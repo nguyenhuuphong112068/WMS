@@ -52,6 +52,12 @@ class LoginController extends Controller
 
         AuditTrialController::log('Login', 'NA', 0, 'NA', 'Đăng Nhập Thành Công');
 
+        // Ngoài Admin, menu trái chỉ có mỗi "Xin cấp lại Hồ sơ" nên đưa thẳng vào đó,
+        // không bắt đi vòng qua trang chủ.
+        if (! user_has_any_role($getUser->id, ['Admin'])) {
+            return redirect()->route('pages.documentStorage.reissue.list');
+        }
+
         return redirect()->route('pages.general.home');
     }
 

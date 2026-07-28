@@ -16,6 +16,8 @@ use App\Http\Controllers\Pages\StorageLocation\WarehouseController;
 use App\Http\Controllers\Pages\StorageLocation\ShelfController;
 use App\Http\Controllers\Pages\StorageLocation\LocationController;
 use App\Http\Controllers\Pages\DocumentStorage\DocumentController;
+use App\Http\Controllers\Pages\DocumentStorage\DocumentRoutingController;
+use App\Http\Controllers\Pages\DocumentStorage\DocumentReissueController;
 use App\Http\Controllers\UploadDataController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -104,5 +106,40 @@ Route::prefix('/documentStorage')
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
+        });
+
+        // Theo dõi đường đi của hồ sơ (Luân chuyển)
+        Route::prefix('/routing')->name('routing.')->controller(DocumentRoutingController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::post('store', 'store')->name('store');                   // Bước 1: Văn thư khởi tạo
+            Route::post('forward', 'forward')->name('forward');             // Bước 2: Chuyển tiếp
+            Route::post('confirmReceive', 'confirmReceive')->name('confirmReceive');
+            Route::post('finish', 'finish')->name('finish');                // Bước 3: Kết thúc & lưu trữ
+            Route::post('cancel', 'cancel')->name('cancel');
+        });
+
+        // Sổ xin cấp lại hồ sơ (BMR/BPR)
+        Route::prefix('/reissue')->name('reissue.')->controller(DocumentReissueController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+
+            // Bước 1: Người xin ghi sổ -> Admin, Production_Manager, Người đề nghị
+            Route::post('store', 'store')->name('store')
+                ->middleware('role:Admin,Production_Manager,Người đề nghị');
+            Route::post('update', 'update')->name('update')
+                ->middleware('role:Admin,Production_Manager,Người đề nghị');
+            Route::post('cancel', 'cancel')->name('cancel')
+                ->middleware('role:Admin,Production_Manager,Người đề nghị');
+
+            // Bước 2: QĐ/P.QĐ PXSX ký duyệt -> Admin, Production_Manager
+            Route::post('pmSign', 'pmSign')->name('pmSign')
+                ->middleware('role:Admin,Production_Manager');
+
+            // Bước 3: Ý kiến TP/PP. ĐBCL (cho phép cấp lại hồ sơ) -> Admin, QA_Manager
+            Route::post('qaReview', 'qaReview')->name('qaReview')
+                ->middleware('role:Admin,QA_Manager');
+
+            // Bước 4: Cấp lại hồ sơ & ký tên -> Admin, QA_Manager, Người cho lại hồ sơ
+            Route::post('issue', 'issue')->name('issue')
+                ->middleware('role:Admin,QA_Manager,Người cho lại hồ sơ');
         });
     });

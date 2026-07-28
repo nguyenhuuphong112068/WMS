@@ -86,49 +86,25 @@
               </div>
 
 
-          <div class="row">
-              <div class="col-md-6">
-                <div class="form-group">
+          <div class="form-group">
+              {{-- DEPARTMENT--}}
+              <label for="deparmentcreate">Phòng Ban</label>
+              <select class="form-control" name="deparment" id="deparmentcreate">
+                  <option value="">-- Chọn phòng ban --</option>
 
-                  {{-- GROUP IN DEPARTMENT --}}
-                    <label for="groupNamecreate">Tổ</label>
-                    <select class="form-control" name="groupName" id="groupNamecreate">
-                        <option value="">-- Chọn Tổ --</option>
-                        @foreach ($groups as $group)
-                            <option value="{{ $group->name }}" 
-                                {{ old('groupName') == $group->name ? 'selected' : '' }}>
-                                {{ $group->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('groupName','createErrors')
-                          <div class="alert alert-danger mt-1">{{ $message }}</div>
-                    @enderror
-                </div>               
-              </div>
-              
-              <div class="col-md-6">
-                  {{-- DEPARTMENT--}}
-                  <div class="form-group">
-                      <label for="deparmentcreate">Phòng Ban</label>
-                      <select class="form-control" name="deparment" id="deparmentcreate">
-                          <option value="">-- Chọn phòng ban --</option>
+                  @foreach ($deparments as $department)
+                      <option value="{{ $department->shortName }}"
+                          {{ old('deparment') == $department->shortName ? 'selected' : '' }}>
+                          {{ $department->name }}
+                      </option>
+                  @endforeach
+              </select>
 
-                          @foreach ($deparments as $department)
-                              <option value="{{ $department->shortName }}" 
-                                  {{ old('deparment') == $department->shortName ? 'selected' : '' }}>
-                                  {{ $department->name }}
-                              </option>
-                          @endforeach
-                      </select>
-
-                      @error('deparment','createErrors')
-                          <div class="alert alert-danger mt-1">{{ $message }}</div>
-                      @enderror
-                  </div>
-              </div>
+              @error('deparment','createErrors')
+                  <div class="alert alert-danger mt-1">{{ $message }}</div>
+              @enderror
           </div>
-           
+
             {{-- Mail--}}
             <div class="form-group">
               <label for="mail"> {{'Mail (Nếu Có)'}}</label>

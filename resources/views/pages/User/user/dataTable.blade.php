@@ -24,7 +24,6 @@
                         <th>Nhóm Người Dùng</th>
                         <th>Tên Người Dùng</th>
                         <th>Phòng Ban</th>
-                        <th>Tổ</th>
                         <th>Mail</th>
                         <th>Người Tạo</th>
                         <th>Ngày Tạo</th>
@@ -41,7 +40,6 @@
                             <td>{{ $data->role_names }}</td>
                             <td>{{ $data->fullName }}</td>
                             <td>{{ $data->deparment }}</td>
-                            <td>{{ $data->groupName }}</td>
                             <td>{{ $data->mail }}</td>
                             <td>{{ $data->prepareBy }}</td>
                             <td>{{ \Carbon\Carbon::parse($data->created_at)->format('d/m/Y') }}</td>
@@ -50,7 +48,7 @@
                                 <button type="button" class="btn btn-warning btn-edit" data-id="{{ $data->id }}"
                                     data-username="{{ $data->userName }}" data-usergroup='@json($data->role_ids)'
                                     data-fullname="{{ $data->fullName }}" data-deparment="{{ $data->deparment }}"
-                                    data-groupname="{{ $data->groupName }}" data-mail="{{ $data->mail }}"
+                                    data-mail="{{ $data->mail }}"
                                     data-toggle="modal" data-target="#UpdateModal">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -121,7 +119,6 @@
 
             modal.find('input[name="fullName"]').val(button.data('fullname'));
             modal.find('select[name="deparment"]').val(button.data('deparment'));
-            modal.find('select[name="groupName"]').val(button.data('groupname'));
             modal.find('input[name="mail"]').val(button.data('mail'));
         });
 

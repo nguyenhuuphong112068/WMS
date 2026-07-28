@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="{{ asset('img/iconstella.svg') }}">
-    <title>Đăng nhập | Quản Lý Thư Viện</title>
+    <title>Đăng nhập | Sổ theo dõi cấp lại hồ sơ</title>
 
     <!-- Bootstrap & Fonts -->
     <link href="{{ asset('css/bootstrap.min.css') }}" rel="stylesheet">
@@ -119,8 +119,8 @@
     <div class="login-card shadow-lg text-center">
         <div class="library-branding mb-5">
             <img src="{{ asset('img/iconstella.svg') }}" alt="Logo" style="max-width: 60px;">
-            <h2>Quản Lý Thư Viện</h2>
-            <p class="text-muted small">Hệ thống quản lý tri thức hiện đại</p>
+            <h2>Sổ theo dõi cấp lại hồ sơ</h2>
+            <p class="text-muted small">Quản lý đề nghị cấp lại trang hồ sơ BMR/ BPR</p>
         </div>
 
         @if (session('error'))
