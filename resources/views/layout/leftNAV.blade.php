@@ -179,23 +179,29 @@
                     </li>
 
                     <!-- Luân chuyển Hồ sơ -->
-                    <li class="nav-item">
-                        <a href="{{ route('pages.documentStorage.routing.list') }}"
-                            class="nav-link {{ str_contains(url()->current(), 'documentStorage/routing') ? 'active' : '' }}">
-                            <i class="fas fa-route"></i>
-                            <p>Luân chuyển Hồ sơ</p>
-                        </a>
-                    </li>
+                    {{-- Route::has(): nếu server chưa có route (deploy thiếu file / cache route cũ)
+                         thì chỉ ẩn mục menu, không để route() ném lỗi làm sập MỌI trang. --}}
+                    @if (Route::has('pages.documentStorage.routing.list'))
+                        <li class="nav-item">
+                            <a href="{{ route('pages.documentStorage.routing.list') }}"
+                                class="nav-link {{ str_contains(url()->current(), 'documentStorage/routing') ? 'active' : '' }}">
+                                <i class="fas fa-route"></i>
+                                <p>Luân chuyển Hồ sơ</p>
+                            </a>
+                        </li>
+                    @endif
                 @endif
 
                 <!-- Xin cấp lại Hồ sơ -->
-                <li class="nav-item">
-                    <a href="{{ route('pages.documentStorage.reissue.list') }}"
-                        class="nav-link {{ str_contains(url()->current(), 'documentStorage/reissue') ? 'active' : '' }}">
-                        <i class="fas fa-redo-alt"></i>
-                        <p>Xin cấp lại Hồ sơ</p>
-                    </a>
-                </li>
+                @if (Route::has('pages.documentStorage.reissue.list'))
+                    <li class="nav-item">
+                        <a href="{{ route('pages.documentStorage.reissue.list') }}"
+                            class="nav-link {{ str_contains(url()->current(), 'documentStorage/reissue') ? 'active' : '' }}">
+                            <i class="fas fa-redo-alt"></i>
+                            <p>Xin cấp lại Hồ sơ</p>
+                        </a>
+                    </li>
+                @endif
 
                 <!-- User Policy -->
                 @if (user_has_any_role(session('user')['userId'], ['Admin']))

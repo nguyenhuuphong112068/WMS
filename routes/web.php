@@ -1,13 +1,13 @@
 
 
 <?php
-require_once(__DIR__ . '/generalRoute.php');
-require_once(__DIR__ . '/materDataRoute.php');
-require_once(__DIR__ . '/UserRoute.php');
-require_once(__DIR__ . '/AuditTrialRoute.php');
+require(__DIR__ . '/generalRoute.php');
+require(__DIR__ . '/materDataRoute.php');
+require(__DIR__ . '/UserRoute.php');
+require(__DIR__ . '/AuditTrialRoute.php');
 
-require_once(__DIR__ . '/NotificationRoute.php');
-require_once(__DIR__ . '/ChatRoute.php');
+require(__DIR__ . '/NotificationRoute.php');
+require(__DIR__ . '/ChatRoute.php');
 
 // require_once(__DIR__ . '/categoryRoute.php');
 // require_once(__DIR__ . '/ImportRoute.php');
