@@ -2,12 +2,12 @@
 <div class="modal fade" id="UpdateModal" tabindex="-1" role="dialog" aria-labelledby="ModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl" role="document">
 
-        <form action="{{ route('pages.User.user.update') }}" method="POST">
+        <form action="{{ route('pages.user.user.update') }}" method="POST">
             @csrf
 
             <div class="modal-content">
                 <div class="modal-header">
-                    <a href="{{ route('pages.general.home') }}">
+                    <a href="{{ route('pages.home') }}">
                         <img src="{{ asset('img/iconstella.svg') }}" style="opacity: 0.8 ; max-width:45px;">
                     </a>
 

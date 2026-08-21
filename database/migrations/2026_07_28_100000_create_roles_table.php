@@ -8,19 +8,13 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Vai trò dùng cho phân quyền sổ xin cấp lại hồ sơ (Document Reissue):
-     *  - Admin:                    toàn quyền mọi thao tác.
-     *  - Production_Manager:       ghi sổ đề nghị (Bước 1) và ký duyệt đề nghị (Bước 2 - QĐ/P.QĐ PXSX).
-     *  - QA_Manager:                cho phép cấp lại hồ sơ (Bước 3 - TP/PP. ĐBCL) và cấp lại hồ sơ (Bước 4).
-     *  - Người đề nghị:             chỉ được ghi sổ đề nghị (Bước 1).
-     *  - Người cho lại hồ sơ:       chỉ được cấp lại hồ sơ (Bước 4).
+     * Vai trò nền của hệ thống:
+     *  - Admin: toàn quyền mọi thao tác.
+     *
+     * Các vai trò nghiệp vụ WMS khác được thêm trực tiếp qua trang Nhóm Quyền.
      */
     private const ROLES = [
         'Admin',
-        'Production_Manager',
-        'QA_Manager',
-        'Người đề nghị',
-        'Người cho lại hồ sơ',
     ];
 
     public function up(): void

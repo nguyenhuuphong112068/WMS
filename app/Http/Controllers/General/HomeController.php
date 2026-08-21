@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\General;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
     public function showHomeForm()
     {
         session()->put(['title' => 'TRANG CHỦ']);
-        return view('pages.general.home');
+
+        return view('pages.home');
     }
 }

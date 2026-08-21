@@ -3,7 +3,7 @@
     <div class="card">
 
         <div class="card-header mt-4">
-            <form action="{{ route('pages.AuditTrail.list') }}" method="GET">
+            <form action="{{ route('pages.auditTrail.list') }}" method="GET">
                 <div class="row align-items-end">
                     <div class="col-md-3">
                         <label for="startDate">Từ ngày</label>

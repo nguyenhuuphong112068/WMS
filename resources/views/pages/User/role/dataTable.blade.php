@@ -89,7 +89,7 @@
       let checked = $(this).is(':checked');
       
       $.ajax({
-        url: "{{ route('pages.User.role.store_or_update') }}",
+        url: "{{ route('pages.user.role.store_or_update') }}",
         type: 'POST',
         dataType: 'json', // 👉 ép jQuery hiểu rõ kiểu dữ liệu trả về
         data: {

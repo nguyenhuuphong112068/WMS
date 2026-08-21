@@ -23,9 +23,4 @@ class LocationModel extends Model
     {
         return $this->belongsTo(\App\Models\masterData\Shelf\ShelfModel::class, 'shelf_id');
     }
-
-    public function documents()
-    {
-        return $this->hasMany(\App\Models\masterData\Document\DocumentModel::class, 'location_id');
-    }
 }

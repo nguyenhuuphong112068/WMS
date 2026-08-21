@@ -33,7 +33,7 @@ class UserController extends Controller
                
                 session()->put(['title'=> 'DANH SÁCH NGƯỜI DÙNG']);
            
-                return view('pages.User.user.list',[
+                return view('pages.user.user.list',[
                         'datas' => $datas,
                         'deparments' => $deparments,
                         'roles' => $roles]);

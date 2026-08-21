@@ -21,7 +21,7 @@ class AuditTrialController extends Controller
 
         session()->put(['title' => 'Audit Trial Log']);
 
-        return view('pages.AuditTrail.list', [
+        return view('pages.auditTrail.list', [
             'datas'     => $datas,
             'startDate' => $startDate,
             'endDate'   => $endDate

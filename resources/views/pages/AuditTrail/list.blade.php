@@ -10,7 +10,7 @@
 @endsection
  
 @section('mainContent')
-  @include('pages.AuditTrail.dataTable')
+  @include('pages.auditTrail.dataTable')
 @endsection
 
 

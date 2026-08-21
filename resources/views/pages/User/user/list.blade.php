@@ -9,10 +9,10 @@
 @endsection
 
 @section('mainContent')
-    @include('pages.User.user.dataTable')
+    @include('pages.user.user.dataTable')
 @endsection
 
 @section('model')
-    @include('pages.User.user.create')
-    @include('pages.User.user.update')
+    @include('pages.user.user.create')
+    @include('pages.user.user.update')
 @endsection

@@ -34,14 +34,25 @@
       
       <style>
             :root {
-                  --primary-navy: #003A4F;
-                  --accent-gold: #CDC717;
-                  --bg-neutral: #F8F9FA;
+                  /* ===== Bảng màu chủ đạo: XANH DƯƠNG NHẠT ===== */
+                  --primary: #2E7BC4;
+                  --primary-dark: #1F5E9E;
+                  --primary-light: #5AA0DE;
+                  --primary-lighter: #9CC7EE;
+                  --primary-soft: #EAF3FC;
+                  --primary-rgb: 46, 123, 196;
+                  --accent: #17B8D4;
+
+                  /* Alias tương thích các view cũ */
+                  --primary-navy: var(--primary);
+                  --accent-gold: var(--accent);
+
+                  --bg-neutral: #F5F9FD;
                   --text-main: #2D3748;
                   --border-radius-lg: 12px;
                   --border-radius-md: 8px;
-                  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
-                  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+                  --shadow-sm: 0 2px 4px rgba(var(--primary-rgb), 0.06);
+                  --shadow-md: 0 4px 12px rgba(var(--primary-rgb), 0.12);
                   --transition-fast: 0.2s ease;
                   --transition-normal: 0.3s ease;
             }
@@ -79,18 +90,71 @@
             }
 
             .btn-primary {
-                  background-color: var(--primary-navy);
-                  border-color: var(--primary-navy);
+                  background-color: var(--primary);
+                  border-color: var(--primary);
                   border-radius: var(--border-radius-md);
                   padding: 8px 16px;
                   font-weight: 500;
                   transition: all var(--transition-fast);
             }
 
-            .btn-primary:hover {
-                  background-color: #002D3D;
+            .btn-primary:hover,
+            .btn-primary:focus,
+            .btn-primary:active {
+                  background-color: var(--primary-dark);
+                  border-color: var(--primary-dark);
                   transform: translateY(-1px);
-                  box-shadow: 0 4px 8px rgba(0, 58, 79, 0.2);
+                  box-shadow: 0 4px 8px rgba(var(--primary-rgb), 0.25);
+            }
+
+            .btn-outline-primary {
+                  color: var(--primary);
+                  border-color: var(--primary);
+                  border-radius: var(--border-radius-md);
+            }
+
+            .btn-outline-primary:hover {
+                  background-color: var(--primary);
+                  border-color: var(--primary);
+                  color: #fff;
+            }
+
+            a {
+                  color: var(--primary);
+            }
+
+            a:hover {
+                  color: var(--primary-dark);
+            }
+
+            .form-control:focus,
+            .form-select:focus,
+            .custom-select:focus {
+                  border-color: var(--primary-light);
+                  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15);
+            }
+
+            /* Bảng dữ liệu theo tông xanh dương nhạt */
+            .table thead th {
+                  background-color: var(--primary-soft);
+                  color: var(--primary-dark);
+                  border-bottom: 2px solid var(--primary-lighter) !important;
+                  text-transform: uppercase;
+                  font-size: 0.8rem;
+                  letter-spacing: 0.5px;
+            }
+
+            .table tbody tr:hover {
+                  background-color: rgba(var(--primary-rgb), 0.05);
+            }
+
+            .page-item.active .page-link {
+                  background-color: var(--primary);
+                  border-color: var(--primary);
+            }
+
+            .page-link {
+                  color: var(--primary);
             }
 
             body.modal-open {

@@ -18,14 +18,6 @@ return new class extends Migration
             $table->string('prepareBy', 255)->nullable();
             $table->timestamps();
         });
-
-        Schema::create('document_types', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 255);
-            $table->boolean('active')->default(true);
-            $table->string('prepareBy', 255)->nullable();
-            $table->timestamps();
-        });
     }
 
     /**
@@ -34,6 +26,5 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('statuses');
-        Schema::dropIfExists('document_types');
     }
 };

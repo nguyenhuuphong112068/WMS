@@ -23,6 +23,8 @@ class DatabaseSeeder extends Seeder
         // ProductName::factory(10)->create();
 
         $this->call([
+            // Bộ đơn vị tính chuẩn kèm thông tin quy đổi, chạy lại nhiều lần vẫn an toàn
+            UnitSeeder::class,
             ProductNameSeeder::class,
         ]);
         

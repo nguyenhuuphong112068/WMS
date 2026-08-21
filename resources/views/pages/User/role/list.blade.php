@@ -10,10 +10,10 @@
 @endsection
  
 @section('mainContent')
-  @include('pages.User.role.dataTable')
+  @include('pages.user.role.dataTable')
 @endsection
 
 @section('model')
-  {{-- @include('pages.User.user.create')
-  @include('pages.User.user.update')  --}}
+  {{-- @include('pages.user.user.create')
+  @include('pages.user.user.update')  --}}
 @endsection

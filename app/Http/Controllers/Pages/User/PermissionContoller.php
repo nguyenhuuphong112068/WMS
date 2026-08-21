@@ -11,7 +11,7 @@ class PermissionContoller extends Controller
     public function index(){
                 $datas = DB::table('permissions')->orderBy('permission_group','asc')->get();
                 session()->put(['title'=> 'DANH SÁCH QUYỀN']);
-                return view('pages.User.permission.list',['datas' => $datas]);
+                return view('pages.user.permission.list',['datas' => $datas]);
         }
     
 }

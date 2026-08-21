@@ -58,7 +58,7 @@
                             <td class="text-center align-middle">
 
                                 <form class="form-deActive"
-                                    action="{{ route('pages.User.user.deActive', ['id' => $data->id]) }}"
+                                    action="{{ route('pages.user.user.deActive', ['id' => $data->id]) }}"
                                     method="post">
                                     @csrf
                                     <button type="submit" class="btn btn-danger" data-name="{{ $data->userName }}">

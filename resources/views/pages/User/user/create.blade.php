@@ -3,13 +3,13 @@
   <div class="modal-dialog" role="document">
    
     <form 
-      action="{{route('pages.User.user.store')}}" 
+      action="{{route('pages.user.user.store')}}" 
       method="POST">
       @csrf
 
       <div class="modal-content">
         <div class="modal-header">
-          <a href="{{ route ('pages.general.home') }}">
+          <a href="{{ route ('pages.home') }}">
               <img src="{{ asset('img/iconstella.svg') }}" style="opacity: 0.8 ; max-width:45px;">
           </a>
 

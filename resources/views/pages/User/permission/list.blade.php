@@ -10,6 +10,6 @@
 @endsection
  
 @section('mainContent')
-  @include('pages.User.permission.dataTable')
+  @include('pages.user.permission.dataTable')
 @endsection
 

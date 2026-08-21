@@ -40,7 +40,7 @@ class RoleController extends Controller
 
 
         session()->put(['title'=> 'DANH SÁCH NHÓM QUYỀN']);
-        return view('pages.User.role.list', ['datas' => $datas]);
+        return view('pages.user.role.list', ['datas' => $datas]);
     }
 
     public function store_or_update(Request $request){

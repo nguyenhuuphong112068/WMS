@@ -33,6 +33,6 @@ class SwitchProductionController extends Controller
         if ($request->has('redirect')) {
             return redirect($request->redirect);
         }
-        return view('pages.general.home');
+        return view('pages.home');
     }
 }
