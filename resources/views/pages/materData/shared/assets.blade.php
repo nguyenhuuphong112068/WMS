@@ -12,63 +12,19 @@
 | - Nút sửa                : class="btn-md-edit" kèm data-row='{"id":1,"name":"..."}'
 | - Form cần hỏi xác nhận  : class="form-md-confirm" kèm data-title / data-text / data-danger
 | - Modal                  : id="createModal" và id="updateModal"
+|
+| Trang có nhiều bảng (nhiều tab) thì:
+| - Bảng thêm vào          : id riêng + class="md-table"
+| - Nút thêm mới / sửa     : thêm data-modal="#idModalCủaBảngĐó"
+|
+| File này bọc trong @once nên có @include nhiều lần trên một trang cũng chỉ in ra một bản.
 --}}
+
+@once
 
 <style>
     .md-page {
         padding: 24px 24px 40px;
-    }
-
-    /* ---------- Đầu trang ---------- */
-    .md-hero {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-        border-radius: var(--border-radius-lg);
-        color: #fff;
-        padding: 22px 26px;
-        margin-bottom: 20px;
-        box-shadow: var(--shadow-md);
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 18px;
-    }
-
-    .md-hero h1 {
-        color: #fff;
-        font-size: 1.4rem;
-        margin: 0 0 6px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .md-hero p {
-        margin: 0;
-        font-size: 0.88rem;
-        opacity: 0.9;
-        text-transform: none;
-        letter-spacing: 0;
-    }
-
-    /* Thẻ đếm số lượng theo trạng thái duyệt */
-    .md-stats {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .md-stats .stat {
-        background: rgba(255, 255, 255, 0.18);
-        border: 1px solid rgba(255, 255, 255, 0.35);
-        border-radius: 999px;
-        padding: 6px 14px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        white-space: nowrap;
     }
 
     /* ---------- Thanh công cụ ---------- */
@@ -98,7 +54,8 @@
         padding: 20px;
     }
 
-    #mdTable thead th {
+    #mdTable thead th,
+    .md-table thead th {
         background: var(--primary-soft);
         color: var(--primary-dark);
         border-bottom: 2px solid var(--primary-lighter);
@@ -108,7 +65,8 @@
         white-space: nowrap;
     }
 
-    #mdTable tbody tr:hover {
+    #mdTable tbody tr:hover,
+    .md-table tbody tr:hover {
         background: var(--primary-soft);
     }
 
@@ -283,18 +241,21 @@
 
         /* ---------- Mở modal Thêm mới ---------- */
         $(document).on('click', '.btn-md-create', function() {
-            var $form = $('#createModal').find('form');
+            // Trang có nhiều bảng (nhiều tab) thì nút tự chỉ ra modal của mình qua data-modal
+            var modal = $(this).data('modal') || '#createModal';
+            var $form = $(modal).find('form');
 
             $form[0].reset();
             $form.find('.md-error').remove();
             $form.find('.is-invalid').removeClass('is-invalid');
-            $('#createModal').modal('show');
+            $(modal).modal('show');
         });
 
         /* ---------- Mở modal Cập nhật, đổ dữ liệu theo name của từng ô ---------- */
         $(document).on('click', '.btn-md-edit', function() {
             var row = $(this).data('row') || {};
-            var $form = $('#updateModal').find('form');
+            var modal = $(this).data('modal') || '#updateModal';
+            var $form = $(modal).find('form');
 
             $form.find('.md-error').remove();
             $form.find('.is-invalid').removeClass('is-invalid');
@@ -303,37 +264,43 @@
                 $form.find('[name="' + field + '"]').val(row[field] === null ? '' : row[field]);
             });
 
-            $('#updateModal').modal('show');
+            $(modal).modal('show');
         });
 
         /* ---------- Bảng dữ liệu ---------- */
-        $('#mdTable').DataTable({
-            autoWidth: false,
-            responsive: true,
-            pageLength: 25,
-            order: [
-                [1, 'asc']
-            ],
-            lengthMenu: [
-                [10, 25, 50, 100, -1],
-                [10, 25, 50, 100, 'Tất cả']
-            ],
-            columnDefs: [{
-                orderable: false,
-                targets: -1
-            }],
-            language: {
-                search: 'Tìm kiếm:',
-                lengthMenu: 'Hiển thị _MENU_ dòng',
-                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
-                infoEmpty: 'Không có dữ liệu',
-                zeroRecords: 'Không tìm thấy dòng nào phù hợp',
-                emptyTable: 'Chưa có dữ liệu, hãy bấm "Thêm mới" để khai báo.',
-                paginate: {
-                    previous: 'Trước',
-                    next: 'Sau'
+        // Một trang có thể có nhiều bảng (nhiều tab): #mdTable là bảng mặc định,
+        // bảng thêm vào chỉ cần gắn thêm class md-table là chạy cùng một cấu hình.
+        $('#mdTable, table.md-table').each(function() {
+            if ($.fn.dataTable.isDataTable(this)) return;
+
+            $(this).DataTable({
+                autoWidth: false,
+                responsive: true,
+                pageLength: 25,
+                order: [
+                    [1, 'asc']
+                ],
+                lengthMenu: [
+                    [10, 25, 50, 100, -1],
+                    [10, 25, 50, 100, 'Tất cả']
+                ],
+                columnDefs: [{
+                    orderable: false,
+                    targets: -1
+                }],
+                language: {
+                    search: 'Tìm kiếm:',
+                    lengthMenu: 'Hiển thị _MENU_ dòng',
+                    info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                    infoEmpty: 'Không có dữ liệu',
+                    zeroRecords: 'Không tìm thấy dòng nào phù hợp',
+                    emptyTable: 'Chưa có dữ liệu, hãy bấm "Thêm mới" để khai báo.',
+                    paginate: {
+                        previous: 'Trước',
+                        next: 'Sau'
+                    }
                 }
-            }
+            });
         });
 
         /* ---------- Hỏi xác nhận trước khi Khoá / Duyệt / Từ chối ---------- */
@@ -377,3 +344,5 @@
         }
     });
 </script>
+
+@endonce

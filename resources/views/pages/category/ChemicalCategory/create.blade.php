@@ -1,6 +1,10 @@
 @php
     $bag = $errors->getBag('createErrors');
-    $oldCodes = (array) old('classification', []);
+
+    // Trang có 2 tab nên có tới 4 form dùng chung kho old(): chỉ điền lại giá trị vừa
+    // nhập khi chính form này báo lỗi, không thì để giá trị mặc định.
+    $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
+    $oldCodes = (array) $old('classification', []);
 @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
@@ -30,7 +34,7 @@
                                 <label>Loại</label>
                                 <input type="text" name="type" maxlength="30" list="chemTypeListCreate"
                                     class="form-control {{ $bag->has('type') ? 'is-invalid' : '' }}"
-                                    value="{{ old('type') }}" placeholder="Ví dụ: Dung môi, Phụ gia...">
+                                    value="{{ $old('type') }}" placeholder="Ví dụ: Dung môi, Phụ gia...">
                                 <datalist id="chemTypeListCreate">
                                     @foreach ($types as $type)
                                         <option value="{{ $type }}"></option>
@@ -51,7 +55,7 @@
                             <option value="">-- Chọn tên hoá chất --</option>
                             @foreach ($chemNames as $option)
                                 <option value="{{ $option->id }}"
-                                    {{ old('chem_names_id') == $option->id ? 'selected' : '' }}>
+                                    {{ $old('chem_names_id') == $option->id ? 'selected' : '' }}>
                                     {{ $option->name }}{{ $option->cas_no ? ' (CAS: ' . $option->cas_no . ')' : '' }}
                                 </option>
                             @endforeach
@@ -71,7 +75,7 @@
                                     <option value="">-- Chọn nhà sản xuất --</option>
                                     @foreach ($manufacturers as $option)
                                         <option value="{{ $option->id }}"
-                                            {{ old('manufacturers_id') == $option->id ? 'selected' : '' }}>
+                                            {{ $old('manufacturers_id') == $option->id ? 'selected' : '' }}>
                                             {{ $option->name }}
                                         </option>
                                     @endforeach
@@ -91,7 +95,7 @@
                                     <option value="">-- Chọn đơn vị tính --</option>
                                     @foreach ($units as $option)
                                         <option value="{{ $option->id }}"
-                                            {{ old('unit_id') == $option->id ? 'selected' : '' }}>
+                                            {{ $old('unit_id') == $option->id ? 'selected' : '' }}>
                                             {{ $option->short_name }} - {{ $option->name }}
                                         </option>
                                     @endforeach
@@ -109,7 +113,7 @@
                                 <label>Tỉ Trọng d (g/ml)</label>
                                 <input type="number" name="density" step="0.0001" min="0.0001"
                                     class="form-control {{ $bag->has('density') ? 'is-invalid' : '' }}"
-                                    value="{{ old('density') }}" placeholder="Ví dụ: 1.04">
+                                    value="{{ $old('density') }}" placeholder="Ví dụ: 1.04">
                                 <small class="md-sub">Dùng để quy đổi giữa kg và lít.</small>
                                 @if ($bag->has('density'))
                                     <span class="md-error">{{ $bag->first('density') }}</span>
@@ -122,7 +126,7 @@
                                 <label>Số Tài Liệu</label>
                                 <input type="text" name="doc_no" maxlength="20"
                                     class="form-control {{ $bag->has('doc_no') ? 'is-invalid' : '' }}"
-                                    value="{{ old('doc_no') }}" placeholder="Nhập số tài liệu">
+                                    value="{{ $old('doc_no') }}" placeholder="Nhập số tài liệu">
                                 @if ($bag->has('doc_no'))
                                     <span class="md-error">{{ $bag->first('doc_no') }}</span>
                                 @endif
@@ -137,7 +141,7 @@
                                 <div class="input-group">
                                     <input type="number" name="shelf_life_months" min="1" max="1200"
                                         class="form-control {{ $bag->has('shelf_life_months') ? 'is-invalid' : '' }}"
-                                        value="{{ old('shelf_life_months') }}" placeholder="Ví dụ: 24">
+                                        value="{{ $old('shelf_life_months') }}" placeholder="Ví dụ: 24">
                                     <div class="input-group-append">
                                         <span class="input-group-text">tháng</span>
                                     </div>
@@ -157,7 +161,7 @@
                                     <option value="">-- Chọn điều kiện bảo quản --</option>
                                     @foreach ($storageConditions as $option)
                                         <option value="{{ $option->id }}"
-                                            {{ old('storage_condition_id') == $option->id ? 'selected' : '' }}>
+                                            {{ $old('storage_condition_id') == $option->id ? 'selected' : '' }}>
                                             {{ $option->name }}
                                         </option>
                                     @endforeach

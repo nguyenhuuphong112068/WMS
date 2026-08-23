@@ -942,6 +942,77 @@
         });
     </script>
 
+    {{--
+    |--------------------------------------------------------------------------
+    | Gom các nút phía trên bảng về một hàng - áp dụng cho MỌI màn hình
+    |--------------------------------------------------------------------------
+    | Trước đây phía trên mỗi bảng có nhiều hàng riêng: nút thêm mới, ghi chú,
+    | bộ lọc, rồi hàng "Hiển thị N dòng / Tìm kiếm" do DataTables tự dựng. Dồn
+    | hết về một thanh .md-tablebar đặt ngay trên bảng để lấy lại chiều cao cho
+    | phần dữ liệu.
+    |
+    | Đặt ở layout để màn hình nào có bảng cũng được, không phải sửa từng file:
+    | các màn hình mới (dùng .md-toolbar + .table-responsive) và cả các màn hình
+    | cũ (nút Thêm mới đứng trơ ngay trước bảng) đều gom được.
+    |
+    | Kiểu dáng của .md-tablebar khai trong layout/css.blade.php.
+    --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // Hoãn một nhịp: mỗi màn hình tự khởi tạo bảng của mình trong
+            // DOMContentLoaded của chính nó, phải đợi mọi bảng dựng xong đã.
+            setTimeout(function() {
+                if (!$.fn.dataTable) return;
+
+                $($.fn.dataTable.tables()).each(function() {
+                    var $wrapper = $(this).closest('.dataTables_wrapper');
+
+                    if (!$wrapper.length) return;
+
+                    // Bảng thường nằm trong .table-responsive, các nút là anh em phía trước
+                    var $responsive = $wrapper.closest('.table-responsive');
+                    var $anchor = $responsive.length ? $responsive : $wrapper;
+                    var $bar = $('<div class="md-tablebar"></div>').insertBefore($anchor);
+
+                    var $toolbar = $anchor.prevAll('.md-toolbar').first();
+                    var $cls = $anchor.prevAll('.cls-filter').first();
+
+                    if ($toolbar.length) {
+                        // Màn hình mới: nút nằm trong .md-toolbar
+                        $bar.append($toolbar.children('button, .btn'));
+                    } else {
+                        // Màn hình cũ: nút Thêm mới đứng trơ ngay trước bảng.
+                        // prevAll trả về ngược thứ tự nên phải đảo lại cho đúng.
+                        $bar.append($($anchor.prevAll('button.btn, a.btn').get().reverse()));
+                    }
+
+                    if ($cls.length) $bar.append($cls);
+
+                    if ($toolbar.length) {
+                        // Ghi chú ngắn đi cùng hàng, riêng dải cảnh báo giữ nguyên hàng của nó
+                        $bar.append($toolbar.children('.hint').not('.inv-blocking'));
+
+                        // Thanh cũ không còn gì thì bỏ luôn cho đỡ một hàng trống
+                        if (!$toolbar.children().length) $toolbar.remove();
+                    }
+
+                    var $length = $wrapper.find('.dataTables_length');
+                    var $filter = $wrapper.find('.dataTables_filter');
+                    var $topRow = $length.closest('.row');
+
+                    $bar.append($length).append($filter);
+
+                    // Hàng trên cùng của DataTables giờ rỗng, bỏ đi để không chừa khoảng trắng
+                    if ($topRow.length && !$.trim($topRow.text())) $topRow.remove();
+
+                    // Không gom được gì thì đừng để lại thanh rỗng
+                    if (!$bar.children().length) $bar.remove();
+                });
+            }, 0);
+        });
+    </script>
+
     {{-- Tự động Logout khi không sử dụng sau 1 tiếng --}}
     <script>
         (function() {

@@ -157,6 +157,131 @@
                   color: var(--primary);
             }
 
+
+            /* ----------------------------------------------------------------
+               Thanh công cụ gộp ngay trên bảng
+               ----------------------------------------------------------------
+               Đoạn JS ở cuối layout/master.blade.php dồn nút thêm mới, bộ lọc,
+               ô "Hiển thị N dòng" và ô "Tìm kiếm" của DataTables về CÙNG MỘT
+               HÀNG, thay vì mỗi thứ chiếm một hàng riêng, để bảng dữ liệu có
+               thêm chiều cao. Khai báo ở đây để mọi màn hình đều dùng được.
+               ---------------------------------------------------------------- */
+            .md-tablebar {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 10px 14px;
+                margin-bottom: 14px;
+            }
+
+            /* Bỏ margin rời rạc của các phần tử được kéo vào (mb-2, mb-3...) */
+            .md-tablebar > * {
+                margin-top: 0;
+                margin-bottom: 0;
+            }
+
+            .md-tablebar .hint {
+                margin: 0;
+                color: #94a3b8;
+                font-size: 0.83rem;
+            }
+
+            /* Nhóm bên phải: số dòng hiển thị + ô tìm kiếm */
+            .md-tablebar .dataTables_length,
+            .md-tablebar .dataTables_filter {
+                margin: 0;
+                padding: 0;
+                text-align: left;
+                white-space: nowrap;
+            }
+
+            .md-tablebar .dataTables_length {
+                margin-left: auto;
+            }
+
+            .md-tablebar .dataTables_length label,
+            .md-tablebar .dataTables_filter label {
+                display: flex;
+                align-items: center;
+                gap: 7px;
+                margin: 0;
+                font-size: 0.83rem;
+                font-weight: 500;
+                color: #64748b;
+                white-space: nowrap;
+            }
+
+            .md-tablebar .dataTables_length select {
+                width: auto;
+                min-width: 68px;
+                height: 34px;
+                padding: 3px 8px;
+                border-radius: var(--border-radius-md);
+                border: 1px solid #dbe6f2;
+            }
+
+            .md-tablebar .dataTables_filter input {
+                min-width: 210px;
+                height: 34px;
+                margin: 0;
+                padding: 3px 10px;
+                border-radius: var(--border-radius-md);
+                border: 1px solid #dbe6f2;
+            }
+
+            .md-tablebar .dataTables_length select:focus,
+            .md-tablebar .dataTables_filter input:focus {
+                border-color: var(--primary-light);
+                box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
+                outline: none;
+            }
+
+            .md-tablebar .btn {
+                white-space: nowrap;
+            }
+
+            /* Bộ lọc phân loại khi đã gom vào thanh: bỏ khung riêng cho đỡ chiếm chỗ */
+            .md-tablebar .cls-filter {
+                padding: 0;
+                margin: 0;
+                border: none;
+                background: transparent;
+                box-shadow: none;
+                gap: 8px;
+            }
+
+            .md-tablebar .cls-filter .cls-hint {
+                display: none;
+            }
+
+            .md-tablebar .cls-filter .cls-select {
+                min-width: 210px;
+                flex: 0 1 280px;
+                height: 34px;
+                padding: 3px 10px;
+            }
+
+            /* Đang lọc thì nhấn ngay ở ô chọn vì khung ngoài đã bỏ */
+            .md-tablebar .cls-filter.is-filtering .cls-select {
+                border-color: var(--primary);
+                background: var(--primary-soft);
+                font-weight: 600;
+            }
+
+            /* Màn hình hẹp: cho ô tìm kiếm giãn hết hàng thay vì tràn */
+            @media (max-width: 767.98px) {
+
+                .md-tablebar .dataTables_length {
+                    margin-left: 0;
+                }
+
+                .md-tablebar .cls-filter .cls-select,
+                .md-tablebar .dataTables_filter input {
+                    min-width: 0;
+                    width: 100%;
+                }
+            }
+
             body.modal-open {
                   padding: 0 !important;
                   overflow-y: scroll;

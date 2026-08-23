@@ -3,20 +3,6 @@
 <div class="content-wrapper">
     <div class="md-page">
 
-        <div class="md-hero">
-            <div>
-                <h1><i class="{{ $mdIcon }}"></i> {{ $mdTitle }}</h1>
-                <p>Khai báo danh mục nhà sản xuất dùng chung cho toàn hệ thống. Bản ghi phải được duyệt trước khi sử dụng.</p>
-            </div>
-            <div class="md-stats">
-                <span class="stat"><i class="fas fa-list"></i> Tổng {{ $datas->count() }}</span>
-                <span class="stat"><i class="fas fa-hourglass-half"></i> Chờ duyệt
-                    {{ $datas->where('app_status', 'pending')->count() }}</span>
-                <span class="stat"><i class="fas fa-check-circle"></i> Đã duyệt
-                    {{ $datas->where('app_status', 'approved')->count() }}</span>
-            </div>
-        </div>
-
         <div class="card md-card">
             <div class="card-body">
 

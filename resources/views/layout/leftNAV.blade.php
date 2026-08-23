@@ -332,10 +332,95 @@
                                         class="far fa-circle nav-icon text-primary"></i>
                                     <p>Danh Mục Vật Tư</p>
                                 </a></li>
+                            {{-- Một trang 2 tab: Danh Mục Hoá Chất Công Ty + Hoá Chất Của Phòng --}}
                             <li class="nav-item"><a href="{{ route('pages.category.chemicalCategory.list') }}"
                                     class="nav-link {{ request()->is('category/chemicalCategory') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-success"></i>
                                     <p>Danh Mục Hoá Chất</p>
+                                </a></li>
+                        </ul>
+                    </li>
+
+
+                    <!-- Droplist Menu Nhập  -->
+                    <li
+                        class="nav-item has-treeview {{ request()->is('import/*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->is('import/*') ? 'active' : '' }}">
+                            <i class="fas fa-dolly"></i>
+                            <p>
+                                Nhập
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a href="{{ route('pages.import.chemicalImport.list') }}"
+                                    class="nav-link {{ request()->is('import/chemicalImport') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-success"></i>
+                                    <p>Nhập Hoá Chất</p>
+                                </a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Droplist Menu Sử Dụng  -->
+                    <li
+                        class="nav-item has-treeview {{ request()->is('export/*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->is('export/*') ? 'active' : '' }}">
+                            <i class="fas fa-hand-holding-water"></i>
+                            <p>
+                                Sử Dụng
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a href="{{ route('pages.export.chemicalExport.list') }}"
+                                    class="nav-link {{ request()->is('export/chemicalExport') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-success"></i>
+                                    <p>Sử Dụng Hoá Chất</p>
+                                </a></li>
+                        </ul>
+                    </li>
+
+
+                    <!-- Droplist Menu Tồn  -->
+                    <li
+                        class="nav-item has-treeview {{ request()->is('inventory/*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->is('inventory/*') ? 'active' : '' }}">
+                            <i class="fas fa-boxes"></i>
+                            <p>
+                                Tồn
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a href="{{ route('pages.inventory.chemicalInventory.list') }}"
+                                    class="nav-link {{ request()->is('inventory/chemicalInventory') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-success"></i>
+                                    <p>Tồn Kho Hoá Chất</p>
+                                </a></li>
+                        </ul>
+                    </li>
+
+
+                    <!-- Droplist Menu Dự Trù  -->
+                    <li
+                        class="nav-item has-treeview {{ request()->is('estimate/*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->is('estimate/*') ? 'active' : '' }}">
+                            <i class="fas fa-file-signature"></i>
+                            <p>
+                                Dự Trù
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a href="{{ route('pages.estimate.chemicalEstimate.list') }}"
+                                    class="nav-link {{ request()->is('estimate/chemicalEstimate*') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-success"></i>
+                                    <p>Dự Trù Hoá Chất</p>
+                                </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.estimate.estimateReception.list') }}"
+                                    class="nav-link {{ request()->is('estimate/estimateReception*') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-warning"></i>
+                                    <p>Tiếp Nhận Dự Trù</p>
                                 </a></li>
                         </ul>
                     </li>

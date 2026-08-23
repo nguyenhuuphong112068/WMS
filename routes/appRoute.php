@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LoginController::class, 'showLogin']);
 
+// Cho phép mở trực tiếp /login - cùng trả về form đăng nhập ở '/'
+Route::get('/login', [LoginController::class, 'showLogin'])->name('login.form');
+
 Route::post('/', [LoginController::class, 'login'])->name('login');
 
 Route::post('/changePassword', [LoginController::class, 'changePassword'])->name('changePassword');

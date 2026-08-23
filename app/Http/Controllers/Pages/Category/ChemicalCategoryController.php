@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DepartmentChemical;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,12 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * DANH MỤC - DANH MỤC HOÁ CHẤT
+ * DANH MỤC - HOÁ CHẤT, TAB "DANH MỤC HOÁ CHẤT CÔNG TY"
+ *
+ * Màn hình này có 2 tab nằm chung một trang:
+ * - Tab 1 "Danh Mục Hoá Chất Công Ty": bản chất của chất, dùng chung toàn công ty (chính là controller này).
+ * - Tab 2 "Hoá Chất Của Phòng": cách dùng riêng của từng phòng, do DepartmentChemicalController xử lý.
+ * Controller này dựng cả trang, nên index() lấy dữ liệu cho cả hai tab.
  *
  * Cột classification lưu danh sách mã nhóm phân loại dạng JSON, ví dụ ["PL2","N1"].
  * Danh sách mã đầy đủ khai báo tại config/chemical.php.
@@ -23,7 +29,7 @@ class ChemicalCategoryController extends Controller
 {
     private const TABLE = 'chemical_categories';
     private const HISTORY_TABLE = 'chemical_category_histories';
-    private const LABEL = 'danh mục hoá chất';
+    private const LABEL = 'danh mục hoá chất công ty';
 
     /** Tiền tố mã danh mục sinh tự động: H00001, H00002... */
     private const CODE_PREFIX = 'H';
@@ -62,7 +68,13 @@ class ChemicalCategoryController extends Controller
             ->orderBy(self::TABLE . '.code', 'asc')
             ->get();
 
-        session()->put(['title' => 'DANH MỤC - DANH MỤC HOÁ CHẤT']);
+        session()->put(['title' => 'DANH MỤC - HOÁ CHẤT']);
+
+        $departmentId = (int) (session('user')['selected_department_id'] ?? 0);
+
+        // Tab 2 - Hoá Chất Của Phòng: cùng một trang nhưng thao tác thêm/sửa/khoá vẫn
+        // gửi về DepartmentChemicalController, ở đây chỉ dựng dữ liệu để hiển thị.
+        $dcDatas = DepartmentChemical::rowsOfDepartment($departmentId);
 
         return view('pages.category.ChemicalCategory.list', [
             'datas' => $datas,
@@ -73,6 +85,17 @@ class ChemicalCategoryController extends Controller
             'classifications' => config('chemical.classifications'),
             'types' => config('chemical.types'),
             'nextCode' => $this->previewNextCode(),
+            /*
+            | Danh mục dùng chung toàn công ty, nhưng mỗi phòng ban tự khai chất nào phòng
+            | mình có dùng (bảng department_chemicals). Cột "Phòng Ban Đang Dùng" đọc từ đó.
+            */
+            'departmentsByCategory' => DepartmentChemical::departmentsByCategory(),
+
+            // Dữ liệu của tab Hoá Chất Của Phòng, đặt tiền tố dc để không đụng biến của tab 1
+            'dcDatas' => $dcDatas,
+            'dcCategories' => DepartmentChemical::categoryOptions($dcDatas->pluck('category_id')->all()),
+            'dcLocations' => DepartmentChemical::locationOptions($departmentId),
+            'dcStorageConditions' => DepartmentChemical::storageConditionOptions(),
         ]);
     }
 

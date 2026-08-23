@@ -12,7 +12,12 @@
 | - Ô chọn 1 giá trị       : class="cat-select"
 | - Nhóm tick chọn nhiều   : class="cat-check-group", input class="cat-check-input", name="<tên>[]"
 | - Nút xem lịch sử        : class="btn-cat-history" kèm data-url / data-title
+| - Trang nhiều tab        : nút thêm/sửa kèm data-modal="#idModalCủaTabĐó"
+|
+| Bọc trong @once nên @include nhiều lần trên một trang vẫn chỉ in ra một bản.
 --}}
+
+@once
 
 @include('pages.materData.shared.assets')
 
@@ -140,6 +145,13 @@
         border-color: #FCA5A5;
     }
 
+    /* Phòng ban đang dùng - tách màu khỏi chip phân loại để không đọc nhầm hai cột */
+    .cat-chip.dept {
+        background: #DCFCE7;
+        color: #15803D;
+        border-color: #86EFAC;
+    }
+
     /* ---------- Modal lịch sử ---------- */
     .cat-history-body {
         max-height: 62vh;
@@ -255,7 +267,7 @@
 
         /* ---------- Xoá trắng ô chọn khi mở modal Thêm mới ---------- */
         $(document).on('click', '.btn-md-create', function() {
-            var $form = $('#createModal').find('form');
+            var $form = $($(this).data('modal') || '#createModal').find('form');
 
             $form.find('.cat-select').val('').trigger('change');
             $form.find('.cat-check-input').prop('checked', false)
@@ -265,7 +277,7 @@
         /* ---------- Đổ dữ liệu vào ô chọn khi mở modal Cập nhật ---------- */
         $(document).on('click', '.btn-md-edit', function() {
             var row = $(this).data('row') || {};
-            var $form = $('#updateModal').find('form');
+            var $form = $($(this).data('modal') || '#updateModal').find('form');
 
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('.cat-select').each(function() {
@@ -355,3 +367,5 @@
         }
     });
 </script>
+
+@endonce
