@@ -44,7 +44,6 @@
         display: flex;
         flex-direction: column;
         gap: 1px;
-        max-height: 230px;
         overflow-y: auto;
         border: 1px solid #dbe6f2;
         border-radius: var(--border-radius-md);
@@ -150,6 +149,73 @@
         background: #DCFCE7;
         color: #15803D;
         border-color: #86EFAC;
+    }
+
+    /* ---------- Badge số lần thay đổi, gắn ở góc trên bên phải nút Sửa ---------- */
+    .cat-btn-wrap {
+        position: relative;
+        display: inline-block;
+    }
+
+    .cat-count-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 5px;
+        border: 2px solid #fff;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        line-height: 16px;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+        transition: transform var(--transition-fast), background-color var(--transition-fast);
+    }
+
+    .cat-count-badge:hover {
+        background: var(--primary-dark);
+        transform: scale(1.12);
+    }
+
+    .cat-count-badge:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
+    }
+
+    /* ---------- Logo cảnh báo an toàn (kiểu GHS) ---------- */
+    .safety-picto {
+        flex-shrink: 0;
+        display: block;
+    }
+
+    /* Ô tick "Cảnh Báo An Toàn": giống .cat-check-item nhưng có thêm logo trước mã */
+    .cat-check-item.has-picto {
+        align-items: center;
+    }
+
+    .cat-check-item.has-picto .safety-picto {
+        margin-right: 2px;
+    }
+
+    /* Thẻ hiển thị ở bảng danh mục / lịch sử: logo + tên cảnh báo trên một dòng */
+    .safety-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #FEE2E2;
+        color: #B91C1C;
+        border: 1px solid #FCA5A5;
+        border-radius: 999px;
+        padding: 1px 9px 1px 4px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        white-space: nowrap;
+        cursor: help;
     }
 
     /* ---------- Modal lịch sử ---------- */
@@ -262,7 +328,14 @@
 
         /* ---------- Tô nền dòng đang tick trong nhóm Phân Loại ---------- */
         $(document).on('change', '.cat-check-input', function() {
-            $(this).closest('.cat-check-item').toggleClass('is-checked', this.checked);
+            if (this.type === 'radio') {
+                $(this).closest('.cat-check-group').find('.cat-check-item').removeClass('is-checked');
+                if (this.checked) {
+                    $(this).closest('.cat-check-item').addClass('is-checked');
+                }
+            } else {
+                $(this).closest('.cat-check-item').toggleClass('is-checked', this.checked);
+            }
         });
 
         /* ---------- Xoá trắng ô chọn khi mở modal Thêm mới ---------- */

@@ -8,34 +8,40 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('user_management', function (Blueprint $table) {
-            $table->id();
-            $table->string('userName')->unique();
-            $table->string('passWord');
-            $table->string('fullName')->nullable();
-            $table->string('userGroup')->nullable();
-            $table->string('deparment')->nullable();
-            $table->string('groupName')->nullable();
-            $table->string('mail')->nullable();
-            $table->timestamp('changePWdate')->nullable();
-            $table->string('prepareBy')->nullable();
-            $table->boolean('isActive')->default(true);
-            $table->integer('last_activity')->nullable();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('user_management')) {
+            Schema::create('user_management', function (Blueprint $table) {
+                $table->id();
+                $table->string('userName')->unique();
+                $table->string('passWord');
+                $table->string('fullName')->nullable();
+                $table->string('userGroup')->nullable();
+                $table->string('deparment')->nullable();
+                $table->string('groupName')->nullable();
+                $table->string('mail')->nullable();
+                $table->timestamp('changePWdate')->nullable();
+                $table->string('prepareBy')->nullable();
+                $table->boolean('isActive')->default(true);
+                $table->integer('last_activity')->nullable();
+                $table->timestamps();
+            });
+        }
         
-        Schema::create('roles', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('roles')) {
+            Schema::create('roles', function (Blueprint $table) {
+                $table->id();
+                $table->string('name')->unique();
+                $table->timestamps();
+            });
+        }
         
-        Schema::create('user_role', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('role_id');
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('user_role')) {
+            Schema::create('user_role', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('user_id');
+                $table->unsignedBigInteger('role_id');
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void

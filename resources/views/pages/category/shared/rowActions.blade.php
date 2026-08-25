@@ -1,24 +1,30 @@
 {{--
 | Cụm nút thao tác của nhóm Danh Mục: Sửa - Lịch sử - Duyệt - Từ chối - Khoá/Mở khoá.
-| Giống nhóm Dữ Liệu Gốc nhưng có thêm nút xem lịch sử thay đổi.
+| Giống nhóm Dữ Liệu Gốc nhưng có thêm badge xem lịch sử thay đổi.
 |
 | Biến vào:
-| - $prefix   : tiền tố tên route, ví dụ 'pages.category.materialCategory.'
-| - $row      : bản ghi đang hiển thị
-| - $label    : tên chức năng viết thường, ví dụ 'danh mục vật tư'
-| - $title    : nội dung nhận diện dòng khi hỏi xác nhận
-| - $editData : mảng dữ liệu đổ vào modal cập nhật (khớp theo name của từng ô nhập)
+| - $prefix       : tiền tố tên route, ví dụ 'pages.category.materialCategory.'
+| - $row          : bản ghi đang hiển thị
+| - $label        : tên chức năng viết thường, ví dụ 'danh mục vật tư'
+| - $title        : nội dung nhận diện dòng khi hỏi xác nhận
+| - $editData     : mảng dữ liệu đổ vào modal cập nhật (khớp theo name của từng ô nhập)
+| - $historyCount : (tuỳ chọn) số lần đã thay đổi, mặc định 0 nếu không truyền
 --}}
 <div class="md-actions">
-    <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
-        data-row="{{ json_encode($editData) }}">
-        <i class="fas fa-edit"></i>
-    </button>
+    <span class="cat-btn-wrap">
+        <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
+            data-row="{{ json_encode($editData) }}">
+            <i class="fas fa-edit"></i>
+        </button>
 
-    <button type="button" class="btn btn-sm btn-info btn-cat-history" title="Lịch sử thay đổi"
-        data-url="{{ route($prefix . 'history', ['id' => $row->id]) }}" data-title="{{ $title }}">
-        <i class="fas fa-history"></i>
-    </button>
+        {{-- Badge số lần thay đổi, nằm ở góc trên bên phải nút Sửa - chỉ hiện khi đã từng đổi --}}
+        @if (($historyCount ?? 0) > 0)
+            <button type="button" class="cat-count-badge btn-cat-history"
+                title="Xem {{ $historyCount }} lần thay đổi của {{ $label }} này"
+                data-url="{{ route($prefix . 'history', ['id' => $row->id]) }}"
+                data-title="{{ $title }}">{{ $historyCount }}</button>
+        @endif
+    </span>
 
     {{-- Chỉ màn hoá chất truyền $showConvert, vì quy đổi cần tỉ trọng --}}
     @isset($showConvert)

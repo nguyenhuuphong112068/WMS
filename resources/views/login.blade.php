@@ -423,7 +423,7 @@
             <div class="brand-features">
                 <div class="feature-item">
                     <i class="bi bi-geo-alt"></i>
-                    <span>Quản lý kho – phòng – kệ – vị trí lưu trữ</span>
+                    <span>Quản lý kho – phòng – kệ/tủ – vị trí lưu trữ</span>
                 </div>
                 <div class="feature-item">
                     <i class="bi bi-boxes"></i>

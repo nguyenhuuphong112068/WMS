@@ -97,7 +97,7 @@
                             @if ($bag->has('location_id'))
                                 <span class="md-error">{{ $bag->first('location_id') }}</span>
                             @endif
-                            <small class="md-sub">Dạng Kho / Phòng / Kệ / Vị trí. Để trống thì mã này hiện
+                            <small class="md-sub">Dạng Kho / Phòng / Kệ/Tủ / Vị trí. Để trống thì mã này hiện
                                 "Chưa xếp vị trí" ở màn hình Tồn Kho.</small>
                         </div>
                     </div>

@@ -46,6 +46,7 @@ class ChemicalCategoryController extends Controller
         'storage_condition_id' => 'Điều kiện bảo quản',
         'doc_no' => 'Số tài liệu',
         'classification' => 'Phân loại',
+        'safety_warning' => 'Cảnh báo an toàn',
     ];
 
     public function index()
@@ -84,7 +85,10 @@ class ChemicalCategoryController extends Controller
             'storageConditions' => $this->options('storage_conditions', $datas->pluck('storage_condition_id')->all()),
             'classifications' => config('chemical.classifications'),
             'types' => config('chemical.types'),
+            'safetyWarnings' => config('chemical.safety_warnings'),
             'nextCode' => $this->previewNextCode(),
+            // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa thay vì một nút riêng
+            'historyCounts' => $this->historyCounts(),
             /*
             | Danh mục dùng chung toàn công ty, nhưng mỗi phòng ban tự khai chất nào phòng
             | mình có dùng (bảng department_chemicals). Cột "Phòng Ban Đang Dùng" đọc từ đó.
@@ -206,6 +210,7 @@ class ChemicalCategoryController extends Controller
     public function history(Request $request)
     {
         $classifications = config('chemical.classifications');
+        $safetyWarnings = config('chemical.safety_warnings');
 
         $rows = DB::table(self::HISTORY_TABLE)
             ->leftJoin('chem_names', self::HISTORY_TABLE . '.chem_names_id', '=', 'chem_names.id')
@@ -224,8 +229,9 @@ class ChemicalCategoryController extends Controller
             ->get();
 
         return response()->json([
-            'rows' => $rows->map(function ($row) use ($classifications) {
-                $codes = $this->decodeClassification($row->classification);
+            'rows' => $rows->map(function ($row) use ($classifications, $safetyWarnings) {
+                $codes = $this->decodeCodes($row->classification);
+                $warningCodes = $this->decodeCodes($row->safety_warning);
 
                 return [
                     'action' => $row->action,
@@ -243,6 +249,9 @@ class ChemicalCategoryController extends Controller
                         'Điều kiện bảo quản' => $row->storage_condition_name ?: '—',
                         'Số tài liệu' => $row->doc_no ?: '—',
                         'Phân loại' => $codes ? implode(', ', $codes) : '—',
+                        'Cảnh báo an toàn' => $warningCodes
+                            ? implode(', ', array_map(fn ($code) => $safetyWarnings[$code] ?? $code, $warningCodes))
+                            : '—',
                     ],
                 ];
             })->values(),
@@ -357,6 +366,7 @@ class ChemicalCategoryController extends Controller
             'storage_condition_id' => $row->storage_condition_id,
             'doc_no' => $row->doc_no,
             'classification' => $row->classification,
+            'safety_warning' => $row->safety_warning,
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
             'change_note' => $note,
@@ -389,10 +399,10 @@ class ChemicalCategoryController extends Controller
                 continue;
             }
 
-            if ($field === 'classification') {
+            if (in_array($field, ['classification', 'safety_warning'], true)) {
                 $parts[] = $title . ': '
-                    . (implode(', ', $this->decodeClassification($current->$field)) ?: '—') . ' -> '
-                    . (implode(', ', $this->decodeClassification($payload[$field])) ?: '—');
+                    . (implode(', ', $this->decodeCodes($current->$field)) ?: '—') . ' -> '
+                    . (implode(', ', $this->decodeCodes($payload[$field])) ?: '—');
                 continue;
             }
 
@@ -479,8 +489,24 @@ class ChemicalCategoryController extends Controller
         return str_contains($text, '.') ? rtrim(rtrim($text, '0'), '.') : $text;
     }
 
-    /** Chuỗi JSON trong cột classification -> mảng mã phân loại. */
-    private function decodeClassification($value): array
+    /**
+     * Số lần thay đổi của từng dòng danh mục: [chemical_category_id => số lần].
+     *
+     * Bỏ dòng "Thêm mới" vì đó là lúc khai báo chứ không phải một lần sửa. Badge trên
+     * nút Sửa chỉ hiện khi dòng danh mục thật sự đã bị đổi ít nhất một lần (sửa, khoá,
+     * mở khoá, duyệt, từ chối...).
+     */
+    private function historyCounts()
+    {
+        return DB::table(self::HISTORY_TABLE)
+            ->select('chemical_category_id', DB::raw('COUNT(*) as times'))
+            ->where('action', '<>', 'Thêm mới')
+            ->groupBy('chemical_category_id')
+            ->pluck('times', 'chemical_category_id');
+    }
+
+    /** Chuỗi JSON mảng mã (classification hoặc safety_warning) -> mảng mã. */
+    private function decodeCodes($value): array
     {
         if (! $value) {
             return [];
@@ -533,6 +559,8 @@ class ChemicalCategoryController extends Controller
             'doc_no' => ['nullable', 'max:20'],
             'classification' => ['nullable', 'array'],
             'classification.*' => [Rule::in(array_keys(config('chemical.classifications')))],
+            'safety_warning' => ['nullable', 'array'],
+            'safety_warning.*' => [Rule::in(array_keys(config('chemical.safety_warnings')))],
         ];
     }
 
@@ -548,6 +576,9 @@ class ChemicalCategoryController extends Controller
         $selected = (array) $request->input('classification', []);
         $codes = array_values(array_intersect(array_keys(config('chemical.classifications')), $selected));
 
+        $selectedWarnings = (array) $request->input('safety_warning', []);
+        $warningCodes = array_values(array_intersect(array_keys(config('chemical.safety_warnings')), $selectedWarnings));
+
         return [
             'type' => $type === '' ? null : $type,
             'chem_names_id' => (int) $request->chem_names_id,
@@ -558,6 +589,7 @@ class ChemicalCategoryController extends Controller
             'storage_condition_id' => $storageConditionId === '' ? null : (int) $storageConditionId,
             'doc_no' => $docNo === '' ? null : $docNo,
             'classification' => $codes ? json_encode($codes, JSON_UNESCAPED_UNICODE) : null,
+            'safety_warning' => $warningCodes ? json_encode($warningCodes, JSON_UNESCAPED_UNICODE) : null,
         ];
     }
 
@@ -579,6 +611,7 @@ class ChemicalCategoryController extends Controller
             'storage_condition_id.exists' => 'Điều kiện bảo quản không hợp lệ.',
             'doc_no.max' => 'Số tài liệu tối đa 20 ký tự.',
             'classification.*.in' => 'Nhóm phân loại không hợp lệ.',
+            'safety_warning.*.in' => 'Cảnh báo an toàn không hợp lệ.',
         ];
     }
 }

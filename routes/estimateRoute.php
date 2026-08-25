@@ -15,6 +15,7 @@
 
 use App\Http\Controllers\Pages\Estimate\ChemicalEstimateController;
 use App\Http\Controllers\Pages\Estimate\EstimateReceptionController;
+use App\Http\Controllers\Pages\Estimate\StandardEstimateController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,30 @@ Route::prefix('/estimate')
             Route::post('deActive', 'deActive')->name('deActive');
 
             // Mặt hàng dự trù + số lượng theo tháng
+            Route::post('storeItem', 'storeItem')->name('storeItem');
+            Route::post('updateItem', 'updateItem')->name('updateItem');
+            Route::post('deleteItem', 'deleteItem')->name('deleteItem');
+
+            // Trình ký 2 bước
+            Route::post('submit', 'submit')->name('submit');
+            Route::post('signManager', 'signManager')->name('signManager');
+            Route::post('signDirector', 'signDirector')->name('signDirector');
+            Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Dự trù chất chuẩn: cùng luồng trình ký 2 bước với dự trù hoá chất,
+        // dữ liệu nằm ở bộ bảng standard_estimates riêng.
+        Route::prefix('/standardEstimate')->name('standardEstimate.')->controller(StandardEstimateController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('detail', 'detail')->name('detail');
+            Route::get('history', 'history')->name('history');
+
+            // Đầu phiếu
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+
+            // Chất chuẩn dự trù + số lượng theo tháng
             Route::post('storeItem', 'storeItem')->name('storeItem');
             Route::post('updateItem', 'updateItem')->name('updateItem');
             Route::post('deleteItem', 'deleteItem')->name('deleteItem');

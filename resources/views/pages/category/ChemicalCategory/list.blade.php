@@ -93,6 +93,8 @@
                         'mdLabel' => $dcLabel,
                         'mdTitle' => $dcTitle,
                         'mdIcon' => $dcIcon,
+                        'classifications' => $classifications,
+                        'mdDangerCodes' => $mdDangerCodes,
                     ])
                 </div>
             </div>

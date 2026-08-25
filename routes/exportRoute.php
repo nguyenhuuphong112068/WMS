@@ -11,6 +11,7 @@
 
 use App\Http\Controllers\Pages\Export\ChemicalDisposalController;
 use App\Http\Controllers\Pages\Export\ChemicalExportController;
+use App\Http\Controllers\Pages\Export\StandardExportController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,8 @@ Route::prefix('/export')
             Route::post('deActive', 'deActive')->name('deActive');
             // Lịch sử điều chỉnh của một phiếu, trả JSON cho modal xem lịch sử
             Route::get('history', 'history')->name('history');
+            // Tra lô theo mã xuất nhập khi quét mã vạch trên nhãn, trả JSON cho form xuất
+            Route::get('lookup', 'lookup')->name('lookup');
             // Đề nghị chuyển hoá chất: nguồn thông tin trước khi lập phiếu chuyển
             Route::post('requestStore', 'requestStore')->name('requestStore');
             Route::post('requestRespond', 'requestRespond')->name('requestRespond');
@@ -47,5 +50,21 @@ Route::prefix('/export')
             Route::post('deActive', 'deActive')->name('deActive');
             // Trang in biểu mẫu QA/F/058-07, mở tab mới rồi Ctrl+P -> Lưu thành PDF
             Route::get('print', 'print')->name('print');
+        });
+
+        Route::prefix('/standardExport')->name('standardExport.')->controller(StandardExportController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            // Lịch sử điều chỉnh của một phiếu, trả JSON cho modal xem lịch sử
+            Route::get('history', 'history')->name('history');
+            // Tra ống theo mã ống chuẩn khi quét mã vạch trên nhãn, trả JSON cho form xuất
+            Route::get('lookup', 'lookup')->name('lookup');
+            // Đề nghị cấp phát chuẩn & Cấp phát chuẩn cho Tổ
+            Route::post('requestStore', 'requestStore')->name('requestStore');
+            Route::post('issueStore', 'issueStore')->name('issueStore');
+            Route::post('requestReject', 'requestReject')->name('requestReject');
+            Route::get('getIssuedStandards', 'getIssuedStandards')->name('getIssuedStandards');
         });
     });

@@ -71,6 +71,75 @@
         color: #B91C1C;
     }
 
+    /* ---------- Ô quét mã vạch trên nhãn lô ---------- */
+    .exp-scan {
+        padding: 12px 14px;
+        margin-bottom: 18px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: var(--border-radius-lg);
+        background: var(--primary-soft);
+    }
+
+    .exp-scan>label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--primary-dark);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .exp-scan-row {
+        display: flex;
+        gap: 8px;
+    }
+
+    .exp-scan-input {
+        flex: 1;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+
+    .exp-scan-row .btn {
+        white-space: nowrap;
+    }
+
+    .exp-scan-result {
+        display: none;
+        margin-top: 10px;
+        padding: 9px 12px;
+        border-radius: var(--border-radius-md);
+        font-size: 0.84rem;
+        line-height: 1.5;
+    }
+
+    .exp-scan-result.is-shown {
+        display: block;
+    }
+
+    .exp-scan-result.ok {
+        background: #DCFCE7;
+        border: 1px solid #86EFAC;
+        color: #15803D;
+    }
+
+    .exp-scan-result.fail {
+        background: #FEE2E2;
+        border: 1px solid #FCA5A5;
+        color: #B91C1C;
+    }
+
+    .exp-scan-result.busy {
+        background: #fff;
+        border: 1px solid var(--primary-lighter);
+        color: var(--primary-dark);
+    }
+
+    .exp-scan-result b {
+        font-weight: 700;
+    }
+
     /* ---------- Ô chọn loại phiếu ---------- */
     .exp-types {
         display: flex;
@@ -762,9 +831,101 @@
             syncImport($(this));
         });
 
+        /* ==========================================================
+        | QUÉT MÃ VẠCH TRÊN NHÃN LÔ ĐỂ CHỌN PHIẾU NHẬP
+        |
+        | Máy quét cầm tay gõ mã vào ô rồi tự bấm Enter như bàn phím, nên chỉ cần bắt
+        | phím Enter là dùng được cả quét lẫn gõ tay. Kết quả tra do Controller trả về,
+        | dùng chung điều kiện xuất với ô chọn phiếu nhập nên không lệch nhau.
+        ========================================================== */
+
+        function scanShow($box, kind, build) {
+            $box.removeClass('ok fail busy').addClass('is-shown ' + kind).empty();
+            build($box);
+        }
+
+        function scanLookup($input) {
+            var code = ($input.val() || '').trim();
+            var $form = $input.closest('form');
+            var $box = $form.find('.exp-scan-result');
+
+            if (!code) return;
+
+            scanShow($box, 'busy', function($target) {
+                $target.append($('<i>').addClass('fas fa-spinner fa-spin mr-1'))
+                    .append(document.createTextNode('Đang tra mã ' + code + '...'));
+            });
+
+            fetch($input.data('url') + '?code=' + encodeURIComponent(code), {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(response) {
+                    if (!response.ok) throw new Error('http');
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (!data.ok) {
+                        scanShow($box, 'fail', function($target) {
+                            $target.append($('<i>').addClass('fas fa-exclamation-circle mr-1'))
+                                .append(document.createTextNode(data.reason ||
+                                    'Không tra được mã này.'));
+                        });
+
+                        $input.select();
+                        return;
+                    }
+
+                    // Chọn đúng phiếu nhập trong ô chọn, syncImport lo phần mã và tồn còn lại
+                    $form.find('[name="import_id"]').val(data.id).trigger('change');
+
+                    // Dựng bằng thao tác DOM để nội dung dữ liệu luôn được escape
+                    scanShow($box, 'ok', function($target) {
+                        $target.append($('<i>').addClass('fas fa-check-circle mr-1'))
+                            .append($('<b>').text(data.code))
+                            .append(document.createTextNode(' · ' + data.chem_name +
+                                ' (' + data.category_code + ')'))
+                            .append($('<br>'))
+                            .append(document.createTextNode(
+                                'Số lô: ' + data.batch_no +
+                                ' · Tồn còn lại: ' + data.remaining +
+                                ' · HSD: ' + data.expired_date));
+                    });
+
+                    $input.val('');
+                    $form.find('[name="amount"]').trigger('focus');
+                })
+                .catch(function() {
+                    scanShow($box, 'fail', function($target) {
+                        $target.text('Không tra được mã, vui lòng thử lại.');
+                    });
+                });
+        }
+
+        // Máy quét kết thúc bằng Enter - chặn để Enter không lỡ tay gửi luôn cả form
+        $(document).on('keydown', '.exp-scan-input', function(e) {
+            if (e.key !== 'Enter') return;
+
+            e.preventDefault();
+            scanLookup($(this));
+        });
+
+        $(document).on('click', '.btn-exp-scan', function() {
+            scanLookup($(this).closest('.exp-scan').find('.exp-scan-input'));
+        });
+
+        // Mở modal xong là con trỏ nằm sẵn ở ô quét, quét phát ăn ngay
+        $('#createModal').on('shown.bs.modal', function() {
+            $(this).find('.exp-scan-input').trigger('focus');
+        });
+
         /* ---------- Xoá trắng ô chọn khi mở modal Thêm mới ---------- */
         $(document).on('click', '.btn-md-create', function() {
             var $form = $('#createModal').find('form');
+
+            $form.find('.exp-scan-input').val('');
+            $form.find('.exp-scan-result').removeClass('is-shown ok fail busy').empty();
 
             $form.find('.exp-select').val('').trigger('change');
 
@@ -794,8 +955,11 @@
             toggleTransfer($form);
             toggleCancel($form);
 
-            // Căn cứ loại bỏ nằm ngoài nhóm .exp-select nên phải đổ tay
+            // Căn cứ loại bỏ & các trường bổ sung
             $form.find('[name="test_report_no"]').val(row.test_report_no || '');
+            $form.find('[name="group_id"]').val(row.group_id || '');
+            $form.find('[name="product_name"]').val(row.product_name || '');
+            $form.find('[name="analyst_id"]').val(row.analyst_id || '');
 
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('.exp-select').each(function() {

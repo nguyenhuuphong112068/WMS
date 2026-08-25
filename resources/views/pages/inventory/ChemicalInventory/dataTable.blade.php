@@ -64,6 +64,26 @@
                         @endforeach
                     </div>
 
+                    @include('pages.shared.barcodeSearch', [
+                        'scanTitle' => 'Quét mã vạch',
+                        'scanTables' => [
+                            ['id' => 'mdTable', 'column' => 1, 'pane' => 'invPaneCode', 'label' => 'Theo mã xuất nhập'],
+                            ['id' => 'invZoneTable', 'column' => 2, 'pane' => 'invPaneZone', 'label' => 'Theo định khu'],
+                            [
+                                'id' => 'invExpiringTable',
+                                'column' => 1,
+                                'pane' => 'invPaneExpiring',
+                                'label' => 'Hạn dùng dưới ' . $expiringSoonMonths . ' tháng',
+                            ],
+                            [
+                                'id' => 'invInternalTable',
+                                'column' => 1,
+                                'pane' => 'invPaneInternal',
+                                'label' => 'Chưa có hạn nội bộ',
+                            ],
+                        ],
+                    ])
+
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'mdTable'])
 
                     <div class="table-responsive">
@@ -74,7 +94,7 @@
                                     <th style="width: 135px">Mã Xuất Nhập</th>
                                     <th>Hoá Chất</th>
                                     <th style="width: 175px"
-                                        title="Vị trí lưu trữ thực tế của lô hàng này (Kho / Phòng / Kệ / Vị trí)">
+                                        title="Vị trí lưu trữ thực tế của lô hàng này (Kho / Phòng / Kệ/Tủ / Vị trí)">
                                         Vị Trí Lưu Trữ</th>
                                     <th class="text-right" style="width: 105px">Nhập</th>
                                     <th class="text-right" style="width: 100px">Cân Đối</th>
@@ -364,7 +384,7 @@
                     <div class="md-toolbar">
                         <p class="hint">
                             <i class="fas fa-info-circle mr-1"></i>
-                            Chọn dần <b>Kho → Phòng → Kệ → Vị trí</b> để xem hoá chất đang chứa ở đó. Chọn tới cấp nào
+                            Chọn dần <b>Kho → Phòng → Kệ/Tủ → Vị trí</b> để xem hoá chất đang chứa ở đó. Chọn tới cấp nào
                             thì lọc tới cấp đó - chỉ chọn Kho là thấy toàn bộ hàng trong kho. Vị trí lấy theo
                             <b>chỗ để thực tế</b> của từng mã xuất nhập, không phải vị trí quy hoạch.
                         </p>
@@ -385,9 +405,9 @@
                             </select>
                         </div>
                         <div class="inv-zone-field">
-                            <label><i class="fas fa-layer-group"></i> Kệ</label>
+                            <label><i class="fas fa-layer-group"></i> Kệ/Tủ</label>
                             <select class="form-control inv-zone-select" data-level="shelf">
-                                <option value="">Tất cả kệ</option>
+                                <option value="">Tất cả kệ/tủ</option>
                             </select>
                         </div>
                         <div class="inv-zone-field">

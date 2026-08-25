@@ -28,7 +28,7 @@ class ZoneController extends Controller
             'parents' => [],
             'children' => [
                 ['rooms', 'warehouse_id', 'phòng'],
-                ['shelves', 'warehouse_id', 'kệ'],
+                ['shelves', 'warehouse_id', 'kệ/tủ'],
                 ['locations', 'warehouse_id', 'vị trí'],
             ],
         ],
@@ -37,13 +37,13 @@ class ZoneController extends Controller
             'label' => 'phòng',
             'parents' => ['warehouse_id' => 'warehouses'],
             'children' => [
-                ['shelves', 'room_id', 'kệ'],
+                ['shelves', 'room_id', 'kệ/tủ'],
                 ['locations', 'room_id', 'vị trí'],
             ],
         ],
         'shelf' => [
             'table' => 'shelves',
-            'label' => 'kệ',
+            'label' => 'kệ/tủ',
             'parents' => ['warehouse_id' => 'warehouses', 'room_id' => 'rooms'],
             'children' => [
                 ['locations', 'shelf_id', 'vị trí'],
@@ -289,8 +289,8 @@ class ZoneController extends Controller
             'warehouse_id.exists' => 'Kho được chọn không hợp lệ.',
             'room_id.required' => 'Vui lòng chọn phòng.',
             'room_id.exists' => 'Phòng được chọn không hợp lệ.',
-            'shelf_id.required' => 'Vui lòng chọn kệ.',
-            'shelf_id.exists' => 'Kệ được chọn không hợp lệ.',
+            'shelf_id.required' => 'Vui lòng chọn kệ/tủ.',
+            'shelf_id.exists' => 'Kệ/Tủ được chọn không hợp lệ.',
         ];
     }
 

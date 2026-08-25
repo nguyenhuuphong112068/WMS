@@ -266,6 +266,26 @@
                                         class="far fa-circle nav-icon text-info"></i>
                                     <p>Phòng Ban</p>
                                 </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.materData.group.list') }}"
+                                    class="nav-link {{ request()->is('materData/group') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-success"></i>
+                                    <p>Tổ</p>
+                                </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.materData.productName.list') }}"
+                                    class="nav-link {{ request()->is('materData/productName') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-danger"></i>
+                                    <p>Tên Sản Phẩm</p>
+                                </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.materData.analyst.list') }}"
+                                    class="nav-link {{ request()->is('materData/analyst') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-primary"></i>
+                                    <p>Kiểm Nghiệm Viên</p>
+                                </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.materData.purpose.list') }}"
+                                    class="nav-link {{ request()->is('materData/purpose') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-info"></i>
+                                    <p>Mục Đích Sử Dụng</p>
+                                </a></li>
                             <li class="nav-item"><a href="{{ route('pages.materData.status.list') }}"
                                     class="nav-link {{ request()->is('materData/status') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-warning"></i>
@@ -280,6 +300,11 @@
                                     class="nav-link {{ request()->is('materData/chemName') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-success"></i>
                                     <p>Tên Hoá Chất</p>
+                                </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.materData.standardName.list') }}"
+                                    class="nav-link {{ request()->is('materData/standardName') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-warning"></i>
+                                    <p>Tên Chuẩn</p>
                                 </a></li>
                             <li class="nav-item"><a href="{{ route('pages.materData.materialName.list') }}"
                                     class="nav-link {{ request()->is('materData/materialName') ? 'active' : '' }}"><i
@@ -338,6 +363,12 @@
                                         class="far fa-circle nav-icon text-success"></i>
                                     <p>Danh Mục Hoá Chất</p>
                                 </a></li>
+                            {{-- Một trang 2 tab: Danh Mục Chất Chuẩn Công Ty + Chất Chuẩn Của Phòng --}}
+                            <li class="nav-item"><a href="{{ route('pages.category.standardCategory.list') }}"
+                                    class="nav-link {{ request()->is('category/standardCategory') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-warning"></i>
+                                    <p>Danh Mục Chất Chuẩn</p>
+                                </a></li>
                         </ul>
                     </li>
 
@@ -358,6 +389,11 @@
                                         class="far fa-circle nav-icon text-success"></i>
                                     <p>Nhập Hoá Chất</p>
                                 </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.import.standardImport.list') }}"
+                                    class="nav-link {{ request()->is('import/standardImport') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-warning"></i>
+                                    <p>Nhập Chất Chuẩn</p>
+                                </a></li>
                         </ul>
                     </li>
 
@@ -376,6 +412,11 @@
                                     class="nav-link {{ request()->is('export/chemicalExport') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-success"></i>
                                     <p>Sử Dụng Hoá Chất</p>
+                                </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.export.standardExport.list') }}"
+                                    class="nav-link {{ request()->is('export/standardExport') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-warning"></i>
+                                    <p>Sử Dụng Chất Chuẩn</p>
                                 </a></li>
                         </ul>
                     </li>
@@ -397,6 +438,11 @@
                                         class="far fa-circle nav-icon text-success"></i>
                                     <p>Tồn Kho Hoá Chất</p>
                                 </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.inventory.standardInventory.list') }}"
+                                    class="nav-link {{ request()->is('inventory/standardInventory') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-warning"></i>
+                                    <p>Tồn Kho Chất Chuẩn</p>
+                                </a></li>
                         </ul>
                     </li>
 
@@ -416,6 +462,11 @@
                                     class="nav-link {{ request()->is('estimate/chemicalEstimate*') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-success"></i>
                                     <p>Dự Trù Hoá Chất</p>
+                                </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.estimate.standardEstimate.list') }}"
+                                    class="nav-link {{ request()->is('estimate/standardEstimate*') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-warning"></i>
+                                    <p>Dự Trù Chất Chuẩn</p>
                                 </a></li>
                             <li class="nav-item"><a href="{{ route('pages.estimate.estimateReception.list') }}"
                                     class="nav-link {{ request()->is('estimate/estimateReception*') ? 'active' : '' }}"><i

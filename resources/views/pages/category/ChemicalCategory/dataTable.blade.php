@@ -26,10 +26,11 @@
                         <th>Nhà Sản Xuất</th>
                         <th class="text-center" style="width: 95px">Đơn Vị Tính</th>
                         <th class="text-center" style="width: 105px">Tỉ Trọng d<br><small>(g/ml)</small></th>
-                        <th class="text-center" style="width: 95px">Hạn Dùng<br><small>(tháng)</small></th>
                         <th style="width: 180px">Điều Kiện Bảo Quản</th>
-                        <th style="width: 110px">Số Tài Liệu</th>
+                        <th style="width: 110px">Số Hồ Sơ</th>
                         <th style="width: 170px">Phân Loại</th>
+                        <th style="width: 150px" title="Dòng cảnh báo in ở dải giữa nhãn dán lô hàng">
+                            Cảnh Báo An Toàn</th>
                         <th style="width: 170px"
                             title="Các phòng ban đã khai dùng hoá chất này (bảng department_chemicals)">
                             Phòng Ban Đang Dùng</th>
@@ -44,6 +45,9 @@
                         @php
                             $codes = json_decode($row->classification ?? '', true);
                             $codes = is_array($codes) ? $codes : [];
+
+                            $warningCodes = json_decode($row->safety_warning ?? '', true);
+                            $warningCodes = is_array($warningCodes) ? $warningCodes : [];
                         @endphp
                         {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
                         <tr data-classification="{{ implode(',', $codes) }}">
@@ -85,9 +89,6 @@
                                     <span class="md-empty">—</span>
                                 @endif
                             </td>
-                            <td class="text-center md-sub">
-                                {{ $row->shelf_life_months ?: '—' }}
-                            </td>
                             <td class="md-sub">
                                 @if ($row->storage_condition_name)
                                     <span class="md-note"
@@ -104,6 +105,21 @@
                                             <span
                                                 class="cat-chip {{ in_array($code, $mdDangerCodes) ? 'danger' : '' }}"
                                                 title="{{ $classifications[$code] ?? $code }}">{{ $code }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="md-empty">—</span>
+                                @endif
+                            </td>
+                            <td class="md-sub">
+                                @if ($warningCodes)
+                                    <div class="cat-chips">
+                                        @foreach ($warningCodes as $code)
+                                            <span class="safety-chip"
+                                                title="{{ $safetyWarnings[$code] ?? $code }}">
+                                                @include('pages.shared.safetyPictogram', ['code' => $code, 'size' => 16])
+                                                {{ $safetyWarnings[$code] ?? $code }}
+                                            </span>
                                         @endforeach
                                     </div>
                                 @else
@@ -151,6 +167,7 @@
                                     'label' => $mdLabel,
                                     'title' => $row->code,
                                     'showConvert' => true,
+                                    'historyCount' => (int) ($historyCounts[$row->id] ?? 0),
                                     'editData' => [
                                         'id' => $row->id,
                                         'code' => $row->code,
@@ -159,10 +176,10 @@
                                         'manufacturers_id' => $row->manufacturers_id,
                                         'unit_id' => $row->unit_id,
                                         'density' => $row->density !== null ? rtrim(rtrim($row->density, '0'), '.') : null,
-                                        'shelf_life_months' => $row->shelf_life_months,
                                         'storage_condition_id' => $row->storage_condition_id,
                                         'doc_no' => $row->doc_no,
                                         'classification' => $codes,
+                                        'safety_warning' => $warningCodes,
                                     ],
                                 ])
                             </td>

@@ -41,6 +41,19 @@
                     </p>
                 </div>
 
+                @include('pages.shared.barcodeSearch', [
+                    'scanTitle' => 'Quét mã vạch',
+                    'scanTables' => [
+                        ['id' => 'mdTable', 'column' => 1, 'pane' => 'impPaneBook', 'label' => 'Sổ nhập hoá chất'],
+                        [
+                            'id' => 'impTransferTable',
+                            'column' => 1,
+                            'pane' => 'impPaneTransfer',
+                            'label' => 'Hàng chờ nhận',
+                        ],
+                    ],
+                ])
+
                 @include('pages.shared.classificationFilter', ['clsTarget' => 'mdTable'])
 
                 <div class="table-responsive">
@@ -53,15 +66,14 @@
                                 <th class="text-right" style="width: 110px">Số Lượng</th>
                                 <th style="width: 110px">Số Lô</th>
                                 <th style="width: 180px"
-                                    title="Vị trí lưu trữ thực tế của lô hàng này (Kho / Phòng / Kệ / Vị trí)">
+                                    title="Vị trí lưu trữ thực tế của lô hàng này (Kho / Phòng / Kệ/Tủ / Vị trí)">
                                     Vị Trí Lưu Trữ</th>
                                 <th class="text-center" style="width: 100px">Ngày Nhập</th>
                                 <th class="text-center" style="width: 100px">Hạn Dùng</th>
                                 <th style="width: 150px">Nhà Cung Cấp</th>
                                 <th style="width: 140px">Hoá Đơn</th>
                                 <th style="width: 130px">Người Nhập</th>
-                                <th class="text-center" style="width: 105px">Sử Dụng</th>
-                                <th class="text-center" style="width: 110px">Thao Tác</th>
+                                <th class="text-center" style="width: 150px">Thao Tác</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -136,40 +148,43 @@
                                         @endif
                                     </td>
                                     <td class="md-sub">{{ $row->imported_by ?: '—' }}</td>
-                                    <td class="text-center">
-                                        @if ($row->status_id == 1)
-                                            <span class="badge badge-success">Hiệu lực</span>
-                                        @else
-                                            <span class="badge badge-danger">Đã khoá</span>
-                                        @endif
-                                    </td>
                                     <td>
                                         <div class="md-actions">
-                                            <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                title="Điều chỉnh thông tin nhập"
-                                                data-row="{{ json_encode([
-                                                    'id' => $row->id,
-                                                    'category_id' => $row->category_id,
-                                                    'amount' => $row->amount,
-                                                    'imported_date' => $row->imported_date,
-                                                    'imported_by' => $row->imported_by,
-                                                    'invoice_number' => $row->invoice_number,
-                                                    'invoice_date' => $row->invoice_date,
-                                                    'expired_date' => $row->expired_date,
-                                                    'is_microbiological_chemicals' => $row->is_microbiological_chemicals,
-                                                    'batch_no' => $row->batch_no,
-                                                    'supplier_id' => $row->supplier_id,
-                                                    'note' => $row->note,
-                                                ]) }}">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
+                                            @php $impAdjust = (int) ($historyCounts[$row->id] ?? 0); @endphp
+                                            {{-- Badge số lần điều chỉnh nằm ở góc trên bên phải nút Sửa --}}
+                                            <span class="imp-btn-wrap">
+                                                <button type="button" class="btn btn-sm btn-warning btn-md-edit"
+                                                    title="Điều chỉnh thông tin nhập"
+                                                    data-row="{{ json_encode([
+                                                        'id' => $row->id,
+                                                        'category_id' => $row->category_id,
+                                                        'amount' => $row->amount,
+                                                        'imported_date' => $row->imported_date,
+                                                        'imported_by' => $row->imported_by,
+                                                        'invoice_number' => $row->invoice_number,
+                                                        'invoice_date' => $row->invoice_date,
+                                                        'expired_date' => $row->expired_date,
+                                                        'is_microbiological_chemicals' => $row->is_microbiological_chemicals,
+                                                        'batch_no' => $row->batch_no,
+                                                        'supplier_id' => $row->supplier_id,
+                                                        'note' => $row->note,
+                                                    ]) }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
 
-                                            <button type="button" class="btn btn-sm btn-outline-primary btn-imp-history"
-                                                title="Xem lịch sử điều chỉnh của phiếu này"
-                                                data-url="{{ route($impRoute . 'history', ['id' => $row->id]) }}"
-                                                data-title="{{ $row->code }} - {{ $row->chem_name }}">
-                                                <i class="fas fa-clock-rotate-left"></i>
-                                            </button>
+                                                @if ($impAdjust > 0)
+                                                    <button type="button" class="imp-count-badge btn-imp-history"
+                                                        title="Xem {{ $impAdjust }} lần điều chỉnh của phiếu này"
+                                                        data-url="{{ route($impRoute . 'history', ['id' => $row->id]) }}"
+                                                        data-title="{{ $row->code }} - {{ $row->chem_name }}">{{ $impAdjust }}</button>
+                                                @endif
+                                            </span>
+
+                                            <a class="btn btn-sm btn-outline-secondary" target="_blank"
+                                                title="In nhãn dán lô hàng (mã vạch Code 128)"
+                                                href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
+                                                <i class="fas fa-tag"></i>
+                                            </a>
 
                                             <form class="form-md-confirm d-inline" action="{{ route($impRoute . 'deActive') }}"
                                                 method="POST"

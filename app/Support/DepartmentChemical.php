@@ -124,6 +124,7 @@ class DepartmentChemical
         return DB::table(self::TABLE)
             ->leftJoin('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('manufacturers', 'chemical_categories.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
             ->leftJoin('storage_conditions', self::TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
             ->leftJoin('storage_conditions as category_storage', 'chemical_categories.storage_condition_id', '=', 'category_storage.id')
@@ -134,9 +135,15 @@ class DepartmentChemical
             ->select(
                 self::TABLE.'.*',
                 'chemical_categories.code as category_code',
+                'chemical_categories.type as category_type',
                 'chemical_categories.classification',
+                'chemical_categories.density as category_density',
+                'chemical_categories.doc_no as category_doc_no',
                 'chemical_categories.shelf_life_months as category_shelf_life_months',
                 'chem_names.name as chem_name',
+                'chem_names.cas_no as cas_no',
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'storage_conditions.name as storage_condition_name',

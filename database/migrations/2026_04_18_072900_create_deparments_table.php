@@ -8,13 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('deparments', function (Blueprint $table) {
-            $table->id();
-            $table->string('shortName')->unique();
-            $table->string('name')->unique();
-            $table->boolean('active')->default(true);
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('deparments')) {
+            Schema::create('deparments', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->string('shortName');
+                $table->string('prepareBy');
+                $table->boolean('isActive')->default(true);
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void

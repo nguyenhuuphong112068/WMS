@@ -11,7 +11,9 @@
 
 use App\Http\Controllers\Pages\Category\ChemicalCategoryController;
 use App\Http\Controllers\Pages\Category\DepartmentChemicalController;
+use App\Http\Controllers\Pages\Category\DepartmentStandardController;
 use App\Http\Controllers\Pages\Category\MaterialCategoryController;
+use App\Http\Controllers\Pages\Category\StandardCategoryController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +50,27 @@ Route::prefix('/category')
         // Không có route hiển thị: nội dung nằm ở tab "Hoá Chất Của Phòng" của trang
         // /category/chemicalCategory, các thao tác bên dưới gọi từ chính tab đó.
         Route::prefix('/departmentChemical')->name('departmentChemical.')->controller(DepartmentChemicalController::class)->group(function () {
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+        });
+
+        // Trang 2 tab: "Danh Mục Chất Chuẩn Công Ty" + "Chất Chuẩn Của Phòng"
+        Route::prefix('/standardCategory')->name('standardCategory.')->controller(StandardCategoryController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::post('approve', 'approve')->name('approve');
+            Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Cấu hình riêng của từng phòng ban cho chất chuẩn dùng chung - không có bước duyệt.
+        //
+        // Không có route hiển thị: nội dung nằm ở tab "Chất Chuẩn Của Phòng" của trang
+        // /category/standardCategory, các thao tác bên dưới gọi từ chính tab đó.
+        Route::prefix('/departmentStandard')->name('departmentStandard.')->controller(DepartmentStandardController::class)->group(function () {
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');

@@ -147,6 +147,63 @@ class ChemicalExportController extends Controller
         ]);
     }
 
+    /**
+     * TRA LÔ THEO MÃ XUẤT NHẬP - quét mã vạch trên nhãn hoặc gõ tay mã.
+     *
+     * Trả về đúng lô của phòng ban đang đứng kèm cờ có xuất được hay không. Điều kiện
+     * xuất được lấy nguyên từ importOptions() - cùng một nguồn với ô chọn phiếu nhập
+     * trên form, để quét mã và chọn tay không bao giờ cho hai kết quả khác nhau.
+     */
+    public function lookup(Request $request)
+    {
+        $code = trim((string) $request->code);
+
+        if ($code === '') {
+            return response()->json(['ok' => false, 'reason' => 'Vui lòng quét mã vạch trên nhãn hoặc nhập mã xuất nhập.']);
+        }
+
+        $import = $this->importOptions($this->departmentId())->firstWhere('code', $code);
+
+        if (! $import) {
+            return response()->json([
+                'ok' => false,
+                'reason' => 'Không tìm thấy mã xuất nhập "'.$code.'" trong kho của phòng ban này, '
+                    .'hoặc phiếu nhập đã bị khoá.',
+            ]);
+        }
+
+        return response()->json([
+            'ok' => (bool) $import->selectable,
+            'id' => $import->id,
+            'code' => $import->code,
+            'chem_name' => $import->chem_name ?: '—',
+            'category_code' => $import->category_code ?: '—',
+            'batch_no' => $import->batch_no ?: '—',
+            'remaining' => $this->number($import->remaining).' '.($import->unit_short_name ?: ''),
+            'expired_date' => $import->expired_date
+                ? \Carbon\Carbon::parse($import->expired_date)->format('d/m/Y')
+                : '—',
+            'reason' => $import->selectable ? null : $this->notSelectableReason($import),
+        ]);
+    }
+
+    /** Vì sao một lô không xuất được, viết đúng cách xử lý tiếp theo cho người dùng. */
+    private function notSelectableReason($import): string
+    {
+        if ($import->expired) {
+            return 'Lô '.$import->code.' đã hết hạn sử dụng ngày '
+                .\Carbon\Carbon::parse($import->expired_date)->format('d/m/Y')
+                .' nên không xuất ra sử dụng được.';
+        }
+
+        if ($import->waiting_internal) {
+            return 'Lô '.$import->code.' chưa xác định hạn dùng nội bộ. Vào màn hình Tồn Kho Hoá Chất, '
+                .'tab "Chưa Xác Định Hạn Nội Bộ" để xác định trước.';
+        }
+
+        return 'Lô '.$import->code.' đã hết tồn, vui lòng quét lô khác.';
+    }
+
     public function store(Request $request)
     {
         $departmentId = $this->departmentId();

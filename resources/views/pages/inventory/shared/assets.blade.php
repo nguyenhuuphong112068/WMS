@@ -773,24 +773,7 @@
             applyZone();
         }
 
-        /* ---------- Ô "Hiển thị" và ô "Tìm kiếm" về cùng một hàng ----------
-        | Bản dựng DataTables Bootstrap 4 đặt hai ô này vào hai cột của một hàng
-        | riêng nên chúng nằm cách nhau theo chiều dọc. Gom cả hai vào một thanh
-        | flex rồi bỏ hàng cũ đi, làm sau khi bảng đã khởi tạo xong.
-        */
-        $('.inv-pane .dataTables_wrapper').each(function() {
-            var $wrapper = $(this);
-            var $length = $wrapper.find('.dataTables_length');
-            var $filter = $wrapper.find('.dataTables_filter');
 
-            if (!$length.length && !$filter.length) return;
-
-            // Lấy hàng cũ trước khi di chuyển, sau đó mới xoá để không mất tham chiếu
-            var $oldRows = $length.closest('.row').add($filter.closest('.row'));
-
-            $wrapper.prepend($('<div class="inv-dt-bar"></div>').append($length).append($filter));
-            $oldRows.remove();
-        });
 
         /* ---------- Modal Cân Đối ---------- */
         var $balancing = $('#balancingModal');

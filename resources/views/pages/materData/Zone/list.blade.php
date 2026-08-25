@@ -37,14 +37,14 @@
             'blockMsg' => 'Chưa có kho nào đang hoạt động. Vui lòng tạo kho trước khi thêm phòng.',
         ],
         'shelf' => [
-            'label' => 'Kệ',
-            'lower' => 'kệ',
+            'label' => 'Kệ/Tủ',
+            'lower' => 'kệ/tủ',
             'icon' => 'fas fa-layer-group',
             'rows' => $shelves,
             'parents' => ['warehouse', 'room'],
             'cols' => ['warehouse_name' => 'Kho', 'room_name' => 'Phòng'],
             'canCreate' => $activeRooms->isNotEmpty(),
-            'blockMsg' => 'Chưa có phòng nào đang hoạt động. Vui lòng tạo phòng trước khi thêm kệ.',
+            'blockMsg' => 'Chưa có phòng nào đang hoạt động. Vui lòng tạo phòng trước khi thêm kệ/tủ.',
         ],
         'location' => [
             'label' => 'Vị Trí',
@@ -52,9 +52,9 @@
             'icon' => 'fas fa-map-pin',
             'rows' => $locations,
             'parents' => ['warehouse', 'room', 'shelf'],
-            'cols' => ['warehouse_name' => 'Kho', 'room_name' => 'Phòng', 'shelf_name' => 'Kệ'],
+            'cols' => ['warehouse_name' => 'Kho', 'room_name' => 'Phòng', 'shelf_name' => 'Kệ/Tủ'],
             'canCreate' => $activeShelves->isNotEmpty(),
-            'blockMsg' => 'Chưa có kệ nào đang hoạt động. Vui lòng tạo kệ trước khi thêm vị trí.',
+            'blockMsg' => 'Chưa có kệ/tủ nào đang hoạt động. Vui lòng tạo kệ/tủ trước khi thêm vị trí.',
         ],
     ];
 
@@ -62,7 +62,7 @@
     $zoneParents = [
         'warehouse' => ['field' => 'warehouse_id', 'label' => 'Kho', 'class' => 'sel-warehouse', 'placeholder' => '-- Chọn kho --'],
         'room' => ['field' => 'room_id', 'label' => 'Phòng', 'class' => 'sel-room', 'placeholder' => '-- Chọn phòng --'],
-        'shelf' => ['field' => 'shelf_id', 'label' => 'Kệ', 'class' => 'sel-shelf', 'placeholder' => '-- Chọn kệ --'],
+        'shelf' => ['field' => 'shelf_id', 'label' => 'Kệ/Tủ', 'class' => 'sel-shelf', 'placeholder' => '-- Chọn kệ/tủ --'],
     ];
 
     // Dữ liệu 3 cấp cha đẩy xuống JS để đổ ô chọn dây chuyền Kho -> Phòng -> Kệ.

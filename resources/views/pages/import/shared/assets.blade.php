@@ -430,6 +430,42 @@
         font-weight: 700;
         white-space: nowrap;
     }
+
+    /* ---------- Badge số lần điều chỉnh, gắn ở góc trên bên phải nút Sửa ---------- */
+    .imp-btn-wrap {
+        position: relative;
+        display: inline-block;
+    }
+
+    .imp-count-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 5px;
+        border: 2px solid #fff;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        line-height: 16px;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+        transition: transform var(--transition-fast), background-color var(--transition-fast);
+    }
+
+    .imp-count-badge:hover {
+        background: var(--primary-dark);
+        transform: scale(1.12);
+    }
+
+    .imp-count-badge:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
+    }
 </style>
 
 <script>

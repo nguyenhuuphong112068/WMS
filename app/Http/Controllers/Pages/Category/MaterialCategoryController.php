@@ -56,6 +56,8 @@ class MaterialCategoryController extends Controller
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
             'suppliers' => $this->options('suppliers', $datas->pluck('suppliers_id')->all()),
             'units' => $this->options('units', $datas->pluck('unit_id')->all()),
+            // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa thay vì một nút riêng
+            'historyCounts' => $this->historyCounts(),
         ]);
     }
 
@@ -191,6 +193,21 @@ class MaterialCategoryController extends Controller
                 ];
             })->values(),
         ]);
+    }
+
+    /**
+     * Số lần thay đổi của từng dòng danh mục: [material_category_id => số lần].
+     *
+     * Bỏ dòng "Thêm mới" vì đó là lúc khai báo chứ không phải một lần sửa. Badge trên
+     * nút Sửa chỉ hiện khi dòng danh mục thật sự đã bị đổi ít nhất một lần.
+     */
+    private function historyCounts()
+    {
+        return DB::table(self::HISTORY_TABLE)
+            ->select('material_category_id', DB::raw('COUNT(*) as times'))
+            ->where('action', '<>', 'Thêm mới')
+            ->groupBy('material_category_id')
+            ->pluck('times', 'material_category_id');
     }
 
     /** Ghi nhận kết quả duyệt: ai duyệt, duyệt lúc nào. */

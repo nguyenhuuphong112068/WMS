@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Import;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\Barcode128;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -447,10 +448,53 @@ class ChemicalImportController extends Controller
             'reportTo' => $to,
             // Hàng phòng ban khác chuyển sang, đang chờ phòng mình nhận
             'pendingTransfers' => $this->pendingTransfers($departmentId),
+            // Số lần điều chỉnh của từng phiếu, hiện thành badge ở góc nút Sửa thay vì một nút riêng
+            'historyCounts' => $this->historyCounts($departmentId),
             // Lọc xong thì trang tải lại, quay về đúng tab báo cáo thay vì tab sổ
             'activeTab' => in_array($request->input('tab'), ['report', 'transfer'], true)
                 ? $request->input('tab')
                 : 'book',
+        ]);
+    }
+
+    /**
+     * IN NHÃN DÁN LÔ HOÁ CHẤT.
+     *
+     * Trang in độc lập đúng khổ nhãn khai ở config/chemical.php (mặc định 60x40mm), mở
+     * tab mới rồi bấm In - chọn máy in nhãn Zebra là ra nhãn dán thẳng lên chai/thùng.
+     *
+     * Mã vạch là Code 128 sinh thẳng thành SVG (App\Support\Barcode128), nội dung đúng
+     * bằng MÃ XUẤT NHẬP của lô, để màn hình Sử Dụng quét lại là ra đúng lô này.
+     */
+    public function label(Request $request)
+    {
+        $row = DB::table(self::TABLE)
+            ->leftJoin('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
+            ->select(
+                self::TABLE.'.*',
+                'chemical_categories.code as category_code',
+                'chemical_categories.safety_warning',
+                'chem_names.name as chem_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                'locations.code as location_code'
+            )
+            ->where(self::TABLE.'.id', $request->id)
+            // Chỉ in được nhãn lô của phòng ban đang chọn
+            ->where(self::TABLE.'.department_id', $this->departmentId())
+            ->first();
+
+        if (! $row) {
+            abort(404, 'Không tìm thấy phiếu nhập cần in nhãn.');
+        }
+
+        return view('pages.import.ChemicalImport.label', [
+            'import' => $row,
+            'label' => config('chemical.label'),
+            'barcode' => Barcode128::svg($row->code),
         ]);
     }
 
@@ -921,6 +965,26 @@ class ChemicalImportController extends Controller
         }
 
         return $previews;
+    }
+
+    /**
+     * Số lần ĐIỀU CHỈNH của từng phiếu nhập: [import_id => số lần].
+     *
+     * Bỏ dòng "Thêm mới" vì đó là lúc lập phiếu chứ không phải một lần chỉnh sửa.
+     * Badge trên nút Sửa chỉ hiện khi phiếu thật sự đã bị đổi ít nhất một lần.
+     */
+    private function historyCounts(int $departmentId)
+    {
+        return DB::table(self::HISTORY_TABLE)
+            ->select('import_id', DB::raw('COUNT(*) as times'))
+            ->whereIn('import_id', function ($query) use ($departmentId) {
+                $query->select('id')
+                    ->from(self::TABLE)
+                    ->where('department_id', $departmentId);
+            })
+            ->where('action', '<>', 'Thêm mới')
+            ->groupBy('import_id')
+            ->pluck('times', 'import_id');
     }
 
     /** Danh mục hoá chất đã duyệt và đang hoạt động mới được chọn để nhập. */

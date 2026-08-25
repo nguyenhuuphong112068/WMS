@@ -960,56 +960,77 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
 
-            // Hoãn một nhịp: mỗi màn hình tự khởi tạo bảng của mình trong
-            // DOMContentLoaded của chính nó, phải đợi mọi bảng dựng xong đã.
+            // Hoãn một nhịp để đợi mọi bảng DataTables dựng xong
             setTimeout(function() {
                 if (!$.fn.dataTable) return;
 
                 $($.fn.dataTable.tables()).each(function() {
-                    var $wrapper = $(this).closest('.dataTables_wrapper');
+                    var $table = $(this);
+                    var $wrapper = $table.closest('.dataTables_wrapper');
 
                     if (!$wrapper.length) return;
 
-                    // Bảng thường nằm trong .table-responsive, các nút là anh em phía trước
                     var $responsive = $wrapper.closest('.table-responsive');
                     var $anchor = $responsive.length ? $responsive : $wrapper;
-                    var $bar = $('<div class="md-tablebar"></div>').insertBefore($anchor);
+                    var $container = $anchor.parent();
 
-                    var $toolbar = $anchor.prevAll('.md-toolbar').first();
-                    var $cls = $anchor.prevAll('.cls-filter').first();
-
-                    if ($toolbar.length) {
-                        // Màn hình mới: nút nằm trong .md-toolbar
-                        $bar.append($toolbar.children('button, .btn'));
-                    } else {
-                        // Màn hình cũ: nút Thêm mới đứng trơ ngay trước bảng.
-                        // prevAll trả về ngược thứ tự nên phải đảo lại cho đúng.
-                        $bar.append($($anchor.prevAll('button.btn, a.btn').get().reverse()));
+                    var $bar = $anchor.prev('.md-tablebar');
+                    if (!$bar.length) {
+                        $bar = $('<div class="md-tablebar"></div>').insertBefore($anchor);
                     }
 
-                    if ($cls.length) $bar.append($cls);
+                    // 1. Quét mã vạch
+                    var $bcs = $anchor.prevAll('.bcs-box').first();
+                    if (!$bcs.length) $bcs = $container.find('.bcs-box').not($bar.find('.bcs-box')).first();
+                    if ($bcs.length && !$bcs.closest('.md-tablebar').length) {
+                        $bar.append($bcs);
+                    }
+
+                    // 2. Nút thao tác trong .md-toolbar
+                    var $toolbar = $anchor.prevAll('.md-toolbar').first();
+                    if ($toolbar.length) {
+                        $bar.append($toolbar.children('button, .btn'));
+                    } else {
+                        var $oldBtns = $($anchor.prevAll('button.btn, a.btn').not('.bcs-box *').get().reverse());
+                        if ($oldBtns.length) $bar.append($oldBtns);
+                    }
+
+                    // 3. Bộ lọc phân loại / phân nhóm
+                    var $cls = $anchor.prevAll('.cls-filter').first();
+                    if (!$cls.length) $cls = $container.find('.cls-filter').not($bar.find('.cls-filter')).first();
+                    if ($cls.length && !$cls.closest('.md-tablebar').length) {
+                        $bar.append($cls);
+                    }
+
+                    var $sgr = $anchor.prevAll('.sgr-filter').first();
+                    if (!$sgr.length) $sgr = $container.find('.sgr-filter').not($bar.find('.sgr-filter')).first();
+                    if ($sgr.length && !$sgr.closest('.md-tablebar').length) {
+                        $bar.append($sgr);
+                    }
 
                     if ($toolbar.length) {
-                        // Ghi chú ngắn đi cùng hàng, riêng dải cảnh báo giữ nguyên hàng của nó
                         $bar.append($toolbar.children('.hint').not('.inv-blocking'));
-
-                        // Thanh cũ không còn gì thì bỏ luôn cho đỡ một hàng trống
                         if (!$toolbar.children().length) $toolbar.remove();
                     }
 
+                    // 4. Hiển thị & Tìm kiếm của DataTables
                     var $length = $wrapper.find('.dataTables_length');
                     var $filter = $wrapper.find('.dataTables_filter');
-                    var $topRow = $length.closest('.row');
+                    var $topRow = $length.closest('.row').add($filter.closest('.row'));
 
-                    $bar.append($length).append($filter);
+                    if ($length.length) $bar.append($length);
+                    if ($filter.length) $bar.append($filter);
 
-                    // Hàng trên cùng của DataTables giờ rỗng, bỏ đi để không chừa khoảng trắng
-                    if ($topRow.length && !$.trim($topRow.text())) $topRow.remove();
+                    if ($topRow.length) $topRow.remove();
 
-                    // Không gom được gì thì đừng để lại thanh rỗng
+                    // Dọn dẹp các hàng row rỗng trước bảng
+                    $anchor.prevAll('.row').each(function() {
+                        if (!$.trim($(this).text())) $(this).remove();
+                    });
+
                     if (!$bar.children().length) $bar.remove();
                 });
-            }, 0);
+            }, 50);
         });
     </script>
 

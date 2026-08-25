@@ -170,11 +170,15 @@
                 display: flex;
                 flex-wrap: wrap;
                 align-items: center;
-                gap: 10px 14px;
-                margin-bottom: 14px;
+                gap: 8px 12px;
+                margin-bottom: 10px;
+                padding: 6px 10px;
+                background: #f8fafc;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
             }
 
-            /* Bỏ margin rời rạc của các phần tử được kéo vào (mb-2, mb-3...) */
+            /* Bỏ margin rời rạc của các phần tử được kéo vào */
             .md-tablebar > * {
                 margin-top: 0;
                 margin-bottom: 0;
@@ -183,7 +187,101 @@
             .md-tablebar .hint {
                 margin: 0;
                 color: #94a3b8;
+                font-size: 0.82rem;
+            }
+
+            /* Quét mã vạch bên trong tablebar */
+            .md-tablebar .bcs-box {
+                padding: 0;
+                margin: 0;
+                border: none;
+                background: transparent;
+                box-shadow: none;
+            }
+
+            .md-tablebar .bcs-box .bcs-row {
+                display: flex;
+                align-items: center;
+                flex-wrap: nowrap;
+                gap: 6px;
+            }
+
+            .md-tablebar .bcs-box .bcs-label-inline {
+                font-size: 0.82rem;
+                font-weight: 700;
+                color: #1e293b;
+                white-space: nowrap;
+            }
+
+            .md-tablebar .bcs-box .bcs-input-wrap {
+                flex: 0 0 135px;
+                width: 135px;
+            }
+
+            .md-tablebar .bcs-box .bcs-input-wrap .bcs-input {
+                height: 30px;
+                padding: 2px 8px;
                 font-size: 0.83rem;
+                border-radius: 4px;
+                border: 1px solid #cbd5e1;
+                background: #fff;
+            }
+
+            .md-tablebar .bcs-box .btn {
+                height: 30px;
+                padding: 2px 8px;
+                font-size: 0.82rem;
+                display: inline-flex;
+                align-items: center;
+                border-radius: 4px;
+            }
+
+            /* Bộ lọc phân loại / phân nhóm chuẩn */
+            .md-tablebar .cls-filter,
+            .md-tablebar .sgr-filter {
+                padding: 0;
+                margin: 0;
+                border: none;
+                background: transparent;
+                box-shadow: none;
+                gap: 6px;
+                display: flex;
+                align-items: center;
+                white-space: nowrap;
+            }
+
+            .md-tablebar .cls-filter .cls-hint,
+            .md-tablebar .sgr-filter .sgr-hint {
+                display: none;
+            }
+
+            .md-tablebar .cls-filter label,
+            .md-tablebar .sgr-filter label {
+                margin: 0;
+                font-size: 0.82rem;
+                font-weight: 700;
+                color: #1e293b;
+                white-space: nowrap;
+            }
+
+            .md-tablebar .cls-filter .cls-select,
+            .md-tablebar .sgr-filter .sgr-select {
+                min-width: 140px;
+                max-width: 200px;
+                flex: 0 1 180px;
+                height: 30px;
+                padding: 2px 8px;
+                font-size: 0.83rem;
+                border-radius: 4px;
+                border: 1px solid #cbd5e1;
+                background: #fff;
+            }
+
+            .md-tablebar .cls-filter.is-filtering .cls-select,
+            .md-tablebar .sgr-filter.is-filtering .sgr-select {
+                border-color: var(--primary);
+                background: var(--primary-soft);
+                font-weight: 600;
             }
 
             /* Nhóm bên phải: số dòng hiển thị + ô tìm kiếm */
@@ -203,76 +301,47 @@
             .md-tablebar .dataTables_filter label {
                 display: flex;
                 align-items: center;
-                gap: 7px;
+                gap: 6px;
                 margin: 0;
-                font-size: 0.83rem;
-                font-weight: 500;
-                color: #64748b;
+                font-size: 0.82rem;
+                font-weight: 600;
+                color: #475569;
                 white-space: nowrap;
             }
 
             .md-tablebar .dataTables_length select {
                 width: auto;
-                min-width: 68px;
-                height: 34px;
-                padding: 3px 8px;
-                border-radius: var(--border-radius-md);
-                border: 1px solid #dbe6f2;
+                min-width: 60px;
+                height: 30px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                border: 1px solid #cbd5e1;
+                font-size: 0.83rem;
+                background: #fff;
             }
 
             .md-tablebar .dataTables_filter input {
-                min-width: 210px;
-                height: 34px;
+                min-width: 130px;
+                max-width: 160px;
+                height: 30px;
                 margin: 0;
-                padding: 3px 10px;
-                border-radius: var(--border-radius-md);
-                border: 1px solid #dbe6f2;
+                padding: 2px 8px;
+                border-radius: 4px;
+                border: 1px solid #cbd5e1;
+                font-size: 0.83rem;
+                background: #fff;
             }
 
             .md-tablebar .dataTables_length select:focus,
             .md-tablebar .dataTables_filter input:focus {
                 border-color: var(--primary-light);
-                box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
+                box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.12);
                 outline: none;
             }
 
             .md-tablebar .btn {
                 white-space: nowrap;
             }
-
-            /* Bộ lọc phân loại khi đã gom vào thanh: bỏ khung riêng cho đỡ chiếm chỗ */
-            .md-tablebar .cls-filter {
-                padding: 0;
-                margin: 0;
-                border: none;
-                background: transparent;
-                box-shadow: none;
-                gap: 8px;
-            }
-
-            .md-tablebar .cls-filter .cls-hint {
-                display: none;
-            }
-
-            .md-tablebar .cls-filter .cls-select {
-                min-width: 210px;
-                flex: 0 1 280px;
-                height: 34px;
-                padding: 3px 10px;
-            }
-
-            /* Đang lọc thì nhấn ngay ở ô chọn vì khung ngoài đã bỏ */
-            .md-tablebar .cls-filter.is-filtering .cls-select {
-                border-color: var(--primary);
-                background: var(--primary-soft);
-                font-weight: 600;
-            }
-
-            /* Màn hình hẹp: cho ô tìm kiếm giãn hết hàng thay vì tràn */
-            @media (max-width: 767.98px) {
-
-                .md-tablebar .dataTables_length {
-                    margin-left: 0;
                 }
 
                 .md-tablebar .cls-filter .cls-select,

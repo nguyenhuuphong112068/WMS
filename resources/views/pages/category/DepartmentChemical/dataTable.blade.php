@@ -59,6 +59,10 @@
                         <th class="text-center" style="width: 55px">STT</th>
                         <th style="width: 120px">Mã Danh Mục</th>
                         <th>Tên Hoá Chất</th>
+                        <th>Nhà Sản Xuất</th>
+                        <th class="text-center" style="width: 105px">Tỉ Trọng d<br><small>(g/ml)</small></th>
+                        <th style="width: 110px">Số Tài Liệu</th>
+                        <th style="width: 170px">Phân Loại</th>
                         <th class="text-center" style="width: 135px">Hạn Dùng Nội Bộ<br><small>(tháng)</small>
                         </th>
                         <th class="text-right" style="width: 130px">Ngưỡng Tồn Tối Thiểu</th>
@@ -79,10 +83,49 @@
                         @endphp
                         <tr data-classification="{{ implode(',', $codes) }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
-                            <td><span class="md-tag">{{ $row->category_code ?: '—' }}</span></td>
+                            <td>
+                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                @if ($row->category_type)
+                                    <br><span class="md-tag">{{ $row->category_type }}</span>
+                                @endif
+                            </td>
                             <td>
                                 <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
+                                @if ($row->cas_no)
+                                    <small class="md-sub">CAS: {{ $row->cas_no }}</small><br>
+                                @endif
                                 <div class="md-sub">Đơn vị {{ $row->unit_short_name ?: $row->unit_name }}</div>
+                            </td>
+                            <td class="md-sub">
+                                @if ($row->manufacturer_name)
+                                    {{ $row->manufacturer_name }}
+                                    @if ($row->manufacturer_short_name)
+                                        <br><span class="md-tag">{{ $row->manufacturer_short_name }}</span>
+                                    @endif
+                                @else
+                                    <span class="md-empty">—</span>
+                                @endif
+                            </td>
+                            <td class="text-center md-sub">
+                                @if ($row->category_density !== null)
+                                    {{ rtrim(rtrim($row->category_density, '0'), '.') }}
+                                @else
+                                    <span class="md-empty">—</span>
+                                @endif
+                            </td>
+                            <td class="md-sub">{{ $row->category_doc_no ?: '—' }}</td>
+                            <td>
+                                @if ($codes)
+                                    <div class="cat-chips">
+                                        @foreach ($codes as $code)
+                                            <span
+                                                class="cat-chip {{ in_array($code, $mdDangerCodes ?? []) ? 'danger' : '' }}"
+                                                title="{{ $classifications[$code] ?? $code }}">{{ $code }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="md-empty">—</span>
+                                @endif
                             </td>
                             <td class="text-center" data-order="{{ $shelfLife ?? 0 }}">
                                 <span class="dc-value {{ $shelfLife ? '' : 'is-none' }}">

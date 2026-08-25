@@ -12,6 +12,25 @@
                 @csrf
                 <div class="modal-body">
 
+                    {{-- Quét mã vạch trên nhãn lô (máy đọc mã rời, camera, hoặc gõ tay mã) để chọn nhanh phiếu nhập --}}
+                    <div class="exp-scan scan-box">
+                        <label><i class="fas fa-barcode mr-1"></i> Quét Mã Xuất Nhập</label>
+                        <div class="exp-scan-row">
+                            <input type="text" class="form-control exp-scan-input" autocomplete="off"
+                                data-url="{{ route($expRoute . 'lookup') }}"
+                                placeholder="Đưa máy quét vào mã vạch trên nhãn, hoặc gõ mã rồi nhấn Enter">
+                            {{-- Cách 2: quét bằng camera máy tính / tablet, thay cho máy đọc mã rời --}}
+                            <button type="button" class="btn btn-outline-primary btn-camera-scan"
+                                title="Quét bằng camera">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                            <button type="button" class="btn btn-primary btn-exp-scan">
+                                <i class="fas fa-search mr-1"></i> Tra mã
+                            </button>
+                        </div>
+                        <div class="exp-scan-result"></div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group col-md-8">
                             <label>Phiếu Nhập <span class="text-danger">*</span></label>
@@ -185,6 +204,9 @@
         </div>
     </div>
 </div>
+
+{{-- Modal quét camera dùng chung - đặt ngoài #createModal để không lồng modal trong modal --}}
+@include('pages.shared.cameraScan')
 
 @if ($bag->any())
     <script>

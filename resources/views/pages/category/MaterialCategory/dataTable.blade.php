@@ -76,6 +76,7 @@
                                             'row' => $row,
                                             'label' => $mdLabel,
                                             'title' => $row->material_name,
+                                            'historyCount' => (int) ($historyCounts[$row->id] ?? 0),
                                             'editData' => [
                                                 'id' => $row->id,
                                                 'material_names_id' => $row->material_names_id,
