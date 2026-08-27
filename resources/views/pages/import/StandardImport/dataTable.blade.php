@@ -39,10 +39,6 @@
                         data-pane="impPaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ nhập chất chuẩn
                     </button>
-                    <button type="button" class="imp-tab {{ $activeTab === 'report' ? 'is-active' : '' }}"
-                        data-pane="impPaneReport">
-                        <i class="fas fa-chart-column mr-1"></i> Báo cáo nhập chất chuẩn
-                    </button>
                 </div>
 
                 {{-- ============ SỔ NHẬP CHẤT CHUẨN ============ --}}
@@ -180,14 +176,19 @@
                                         </td>
                                         <td class="text-center md-sub {{ $impExpiredClass }}"
                                             data-order="{{ $row->expired_date ?: '9999-12-31' }}">
-                                            @if ($row->expiry_type === 'undetermined')
+                                            @if ($row->expiry_type === 'check online' || $row->expiry_type === 'undetermined' || $row->expiry_type === 'unlimited')
                                                 <span class="badge badge-warning" title="Hạn dùng chưa xác định từ NSX. Tra cứu trực tuyến khi sử dụng.">
                                                     <i class="fas fa-globe"></i> Check online
                                                 </span>
                                             @elseif ($row->expiry_type === 'retest')
                                                 <div class="font-weight-bold">{{ $impDate($row->expired_date) }}</div>
-                                                <span class="badge badge-info" title="Chu kỳ retest: {{ $row->retest_interval_months }} tháng">
-                                                    Retest {{ $row->retest_interval_months ? $row->retest_interval_months . 'T' : '' }}
+                                                <span class="badge badge-info" title="Hạn retest do NSX công bố">
+                                                    Retest
+                                                </span>
+                                            @elseif ($row->expiry_type === 'Requires_re-evaluation')
+                                                <div class="font-weight-bold">{{ $impDate($row->expired_date) }}</div>
+                                                <span class="badge badge-secondary" title="Cần xác định lại hạn dùng nội bộ sau khi mở ống">
+                                                    Hạn nội bộ
                                                 </span>
                                             @else
                                                 {{ $impDate($row->expired_date) }}
@@ -225,7 +226,7 @@
                                                             'group_label' => $impGroupName($row->group_code),
                                                             'amount' => $row->amount,
                                                             'imported_date' => $row->imported_date,
-                                                            'expiry_type' => $row->expiry_type ?: 'defined',
+                                                            'expiry_type' => $row->expiry_type ?: 'Specify',
                                                             'expired_date' => $row->expired_date,
                                                             'retest_interval_months' => $row->retest_interval_months,
                                                             'batch_no' => $row->batch_no,
@@ -279,97 +280,7 @@
                     </div>
                 </div>
 
-                {{-- ============ BÁO CÁO NHẬP CHẤT CHUẨN ============ --}}
-                <div class="imp-pane {{ $activeTab === 'report' ? 'is-active' : '' }}" id="impPaneReport">
 
-                    <form method="GET" action="{{ route($impRoute . 'list') }}" class="imp-range">
-                        <input type="hidden" name="tab" value="report">
-
-                        <div class="form-group">
-                            <label>Từ ngày</label>
-                            <input type="date" name="from" class="form-control" value="{{ $reportFrom }}">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Đến ngày</label>
-                            <input type="date" name="to" class="form-control" value="{{ $reportTo }}">
-                        </div>
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-filter mr-1"></i> Xem báo cáo
-                            </button>
-                        </div>
-
-                        <div class="imp-quick">
-                            <button type="button" data-from="{{ now()->startOfMonth()->format('Y-m-d') }}"
-                                data-to="{{ now()->format('Y-m-d') }}">Tháng này</button>
-                            <button type="button"
-                                data-from="{{ now()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d') }}"
-                                data-to="{{ now()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d') }}">Tháng
-                                trước</button>
-                            <button type="button" data-from="{{ now()->startOfQuarter()->format('Y-m-d') }}"
-                                data-to="{{ now()->format('Y-m-d') }}">Quý này</button>
-                            <button type="button" data-from="{{ now()->startOfYear()->format('Y-m-d') }}"
-                                data-to="{{ now()->format('Y-m-d') }}">Năm nay</button>
-                        </div>
-                    </form>
-
-                    <div class="md-toolbar">
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Cộng dồn các phiếu nhập còn hiệu lực từ <b>{{ $impDate($reportFrom) }}</b> đến
-                            <b>{{ $impDate($reportTo) }}</b>, gom theo mã danh mục chất chuẩn
-                            ({{ $report->count() }} mã, {{ $impNum($impReportTimes) }} ống).
-                        </p>
-                    </div>
-
-                    @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'impReportTable'])
-
-                    <div class="table-responsive">
-                        <table id="impReportTable" class="table table-bordered table-hover w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-center" style="width: 60px">STT</th>
-                                    <th style="width: 110px">Mã Chuẩn</th>
-                                    <th>Chất Chuẩn</th>
-                                    <th class="text-center" style="width: 85px">Version</th>
-                                    <th class="text-center" style="width: 90px">Số Ống</th>
-                                    <th class="text-center" style="width: 150px">Lần Nhập Gần Nhất</th>
-                                    <th class="text-right" style="width: 150px">Tổng Nhập</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($report as $row)
-                                    <tr data-groups="{{ $impGroups($row->groups) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td><span class="imp-code">{{ $row->category_code }}</span></td>
-                                        <td>
-                                            <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
-                                            <div class="md-sub">
-                                                {{ $row->manufacturer_name ?: '—' }} · đơn vị {{ $row->unit }}
-                                            </div>
-                                        </td>
-                                        <td class="text-center" data-order="{{ $row->version }}">
-                                            <span class="sgr-version">v{{ $row->version }}</span>
-                                        </td>
-                                        <td class="text-center md-sub" data-order="{{ $row->times }}">
-                                            {{ $row->times }}
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->last_imported_date ?: '0000-00-00' }}">
-                                            {{ $impDate($row->last_imported_date) }}
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->total }}">
-                                            <span class="imp-amount">{{ $impNum($row->total) }}</span>
-                                            <span class="md-sub">{{ $row->unit }}</span>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
 
             </div>
         </div>

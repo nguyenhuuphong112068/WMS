@@ -1,8 +1,10 @@
-<div class="modal fade md-modal" id="issueModal" tabindex="-1" role="dialog" aria-hidden="true">
+<div class="modal fade md-modal" id="issueModal" tabindex="-1" role="dialog" aria-hidden="true" style="z-index: 1070;">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title"><i class="fas fa-hand-holding-medical text-success mr-1"></i> Cấp Phát Ống Chuẩn Cho Tổ</h5>
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-light py-2">
+                <h5 class="modal-title font-weight-bold text-success" style="font-size: 1.05rem;">
+                    <i class="fas fa-hand-holding-medical mr-2"></i> Cấp Phát Ống Chuẩn Cho Tổ
+                </h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -12,72 +14,102 @@
                 @csrf
                 <input type="hidden" name="item_id" id="issue_item_id" value="">
 
-                <div class="modal-body">
-                    <div class="card mb-3 bg-light border">
+                <div class="modal-body p-3">
+                    {{-- Thông tin tóm tắt mục đề nghị --}}
+                    <div class="card mb-3 border-0" style="background-color: #f1f5f9 !important;">
                         <div class="card-body py-2 px-3" style="font-size: 0.88rem;">
                             <div class="row">
                                 <div class="col-md-6">
                                     <div>Mã đề nghị: <b id="issue_req_code" class="text-primary">—</b></div>
                                     <div>Tổ đề nghị: <b id="issue_group_name">—</b></div>
-                                    <div>Chất chuẩn: <b id="issue_std_name" class="text-dark">—</b></div>
+                                    <div>Chất chuẩn: <b id="issue_std_name" class="text-dark font-weight-bold">—</b></div>
                                     <div>Qui cách: <b id="issue_spec">—</b></div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div>Số lượng đề nghị: <b id="issue_req_amount" class="text-success">—</b></div>
+                                    <div>Số lượng đề nghị: <b id="issue_req_amount" class="text-primary font-weight-bold">—</b></div>
                                     <div>Tên sản phẩm: <b id="issue_product_name">—</b></div>
                                     <div>Chỉ tiêu: <b id="issue_criteria">—</b></div>
                                     <div>Kiểm nghiệm viên: <b id="issue_analyst_name">—</b></div>
                                 </div>
                             </div>
-                            <div id="issue_item_note_wrap" class="mt-1 text-muted font-italic" style="display:none;">
-                                <i class="fas fa-comment mr-1"></i>Ghi chú của tổ: <span id="issue_item_note"></span>
+                            <div id="issue_item_note_wrap" class="mt-2 text-muted font-italic" style="display:none; font-size: 0.84rem;">
+                                <i class="fas fa-comment-dots mr-1 text-secondary"></i><b>Ghi chú của tổ:</b> <span id="issue_item_note"></span>
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="required font-weight-bold">Chọn Ống Chuẩn Trong Kho Để Cấp</label>
-                        <select name="import_id" id="issue_import_id" class="form-control" required>
-                            <option value="">-- Chọn ống chuẩn trong kho --</option>
-                            @foreach ($availableImports as $imp)
-                                <option value="{{ $imp->id }}"
-                                    data-category="{{ $imp->category_id ?? 0 }}"
-                                    data-remaining="{{ $imp->remaining }}"
-                                    data-unit="{{ $imp->unit_short_name ?: '' }}"
-                                    data-location="{{ $imp->location_code ?? ($imp->location_name ?? '') }}">
-                                    {{ $imp->code }} — {{ $imp->standard_name }} (Lô {{ $imp->batch_no ?: '—' }}, HSD {{ $imp->expired_date ? \Carbon\Carbon::parse($imp->expired_date)->format('d/m/Y') : '—' }}, tồn {{ $expNum($imp->remaining) }} {{ $imp->unit_short_name ?: '' }}{{ !empty($imp->location_code) ? ', Định khu: ' . $imp->location_code : '' }})
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('import_id', 'issueErrors')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                    {{-- Form nhập thông tin cấp phát --}}
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label class="required font-weight-bold" style="font-size: 0.9rem;">
+                                <i class="fas fa-clock mr-1 text-info"></i> Thời Gian Cấp Phát <span class="text-danger">*</span>
+                            </label>
+                            <input type="datetime-local" name="issued_at" id="issue_issued_at" class="form-control" style="height: 38px !important;" value="{{ now()->format('Y-m-d\TH:i') }}" required>
+                            @error('issued_at', 'issueErrors')
+                                <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label class="required font-weight-bold" style="font-size: 0.9rem;">
+                                <i class="fas fa-barcode mr-1 text-primary"></i> Chọn Mã Ống Chuẩn Trong Kho <span class="text-danger">*</span>
+                            </label>
+                            <select name="import_id" id="issue_import_id" class="form-control" style="height: 38px !important;" required>
+                                <option value="">-- Chọn mã ống chuẩn trong kho --</option>
+                                @foreach ($availableImports as $imp)
+                                    <option value="{{ $imp->id }}"
+                                        data-category="{{ $imp->category_id ?? 0 }}"
+                                        data-remaining="{{ (float)$imp->remaining }}"
+                                        data-unit="{{ $imp->unit_short_name ?: '' }}"
+                                        data-location="{{ $imp->location_code ?? ($imp->location_name ?? '') }}">
+                                        {{ $imp->code }} — {{ $imp->standard_name }} (Lô {{ $imp->batch_no ?: '—' }}, HSD {{ $imp->expired_date ? \Carbon\Carbon::parse($imp->expired_date)->format('d/m/Y') : '—' }}, tồn {{ $expNum($imp->remaining) }} {{ $imp->unit_short_name ?: '' }}{{ !empty($imp->location_code) ? ', Vị trí: ' . $imp->location_code : '' }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('import_id', 'issueErrors')
+                                <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group col-md-8">
-                            <label class="required font-weight-bold">Số Lượng Thực Cấp</label>
-                            <input type="number" step="0.0001" min="0.0001" name="issued_amount" id="issue_amount" class="form-control" placeholder="0.0000" required>
+                        <div class="form-group col-md-6">
+                            <label class="required font-weight-bold" style="font-size: 0.9rem;">
+                                <i class="fas fa-weight-scale mr-1 text-success"></i> Số Lượng Thực Cấp <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" step="0.0001" min="0.0001" name="issued_amount" id="issue_amount" class="form-control text-right font-weight-bold" style="height: 38px !important;" placeholder="0.0000" required>
                             @error('issued_amount', 'issueErrors')
                                 <small class="text-danger">{{ $message }}</small>
                             @enderror
                         </div>
 
-                        <div class="form-group col-md-4">
-                            <label class="font-weight-bold">Đơn Vị Cấp</label>
-                            <input type="text" name="issued_unit" id="issue_unit_input" class="form-control" placeholder="mg/lọ/gói...">
+                        <div class="form-group col-md-6">
+                            <label class="font-weight-bold" style="font-size: 0.9rem;">
+                                <i class="fas fa-ruler mr-1 text-secondary"></i> Đơn Vị Cấp Phát <span class="text-danger">*</span>
+                            </label>
+                            <select name="issued_unit" id="issue_unit_select" class="form-control" style="height: 38px !important;" required>
+                                <option value="">-- Chọn ĐVT --</option>
+                                @foreach ($units as $u)
+                                    @php $uVal = $u->short_name ?: $u->name; @endphp
+                                    <option value="{{ $uVal }}">{{ $uVal }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Ghi chú cấp phát</label>
-                        <input type="text" name="note" id="issue_note_input" class="form-control" placeholder="Ghi chú khi giao ống chuẩn cho tổ...">
+                    <div class="form-group mb-0">
+                        <label class="font-weight-bold" style="font-size: 0.9rem;">
+                            <i class="fas fa-comment-dots mr-1 text-muted"></i> Ghi chú cấp phát
+                        </label>
+                        <input type="text" name="note" id="issue_note_input" class="form-control" style="height: 38px !important;" placeholder="Ghi chú khi giao ống chuẩn cho tổ...">
                     </div>
                 </div>
 
-                <div class="modal-footer">
+                <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
-                    <button type="submit" class="btn btn-success"><i class="fas fa-check mr-1"></i> Xác nhận cấp phát</button>
+                    <button type="submit" class="btn btn-success font-weight-bold">
+                        <i class="fas fa-check-circle mr-1"></i> Xác nhận cấp phát
+                    </button>
                 </div>
             </form>
         </div>
@@ -107,28 +139,47 @@
                 $('#issue_item_note_wrap').hide();
             }
 
+            // Set current datetime for issue
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = ('0' + (now.getMonth() + 1)).slice(-2);
+            var day = ('0' + now.getDate()).slice(-2);
+            var hours = ('0' + now.getHours()).slice(-2);
+            var minutes = ('0' + now.getMinutes()).slice(-2);
+            $('#issue_issued_at').val(year + '-' + month + '-' + day + 'T' + hours + ':' + minutes);
+
             $('#issue_amount').val(data.requested_amount);
-            $('#issue_unit_input').val(data.requested_unit || '');
+            if (data.requested_unit) {
+                $('#issue_unit_select').val(data.requested_unit);
+            }
             $('#issue_note_input').val(data.note || '');
 
             // Lọc danh sách ống chuẩn trong kho theo chất chuẩn này
+            var hasMatchingOption = false;
             $('#issue_import_id option').each(function() {
                 var catId = $(this).data('category');
                 if (!catId || catId == data.category_id) {
                     $(this).show();
+                    if (catId == data.category_id && !hasMatchingOption) {
+                        $(this).prop('selected', true);
+                        hasMatchingOption = true;
+                    }
                 } else {
                     $(this).hide();
                 }
             });
-            $('#issue_import_id').val('');
+
+            if (!hasMatchingOption) {
+                $('#issue_import_id').val('');
+            }
 
             $('#issueModal').modal('show');
         });
 
-        $('#issue_import_id').change(function() {
+        $('#issue_import_id').on('change', function() {
             var unit = $(this).find('option:selected').data('unit');
-            if (unit && !$('#issue_unit_input').val()) {
-                $('#issue_unit_input').val(unit);
+            if (unit && !$('#issue_unit_select').val()) {
+                $('#issue_unit_select').val(unit);
             }
         });
     });

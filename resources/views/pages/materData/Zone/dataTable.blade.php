@@ -423,6 +423,7 @@
             return (zoneData[level] || []).filter(function(item) {
                 if (item.status_id !== 1) return false;
                 if (level === 'warehouse') return true;
+                if (!parentId) return true;
                 return String(item.parent) === String(parentId);
             });
         }

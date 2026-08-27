@@ -16,12 +16,19 @@ use Illuminate\Support\Facades\DB;
  *
  * Phòng chưa khai riêng thì tự động chạy theo mặc định chung, không có màn hình nào gãy.
  *
+ * Riêng ĐƠN VỊ TÍNH không theo quy tắc trên: nó chỉ nằm ở department_chemicals, danh mục
+ * chung không còn cột unit_id. Mỗi phòng nhập / xuất hoá chất theo đơn vị của phòng mình,
+ * nên mọi màn hình muốn hiện đơn vị đều phải đi qua joinUnit().
+ *
  * Lớp này chỉ gom lại phần join + COALESCE để 3 màn hình Nhập / Sử Dụng / Tồn không mỗi
  * nơi viết một kiểu rồi lệch nhau. Vẫn là Query Builder thuần, không dùng Eloquent.
  */
 class DepartmentChemical
 {
     public const TABLE = 'department_chemicals';
+
+    /** Bí danh của chính bảng này khi chỉ nối vào để lấy đơn vị tính - xem joinUnit(). */
+    public const UNIT_ALIAS = 'dc_unit';
 
     /**
      * Nối bảng cấu hình của ĐÚNG một phòng ban vào câu truy vấn đang có.
@@ -53,6 +60,51 @@ class DepartmentChemical
             'COALESCE('.self::TABLE.'.shelf_life_months, chemical_categories.shelf_life_months)'
             .' as shelf_life_months'
         );
+    }
+
+    /**
+     * Nối ĐƠN VỊ TÍNH của đúng một phòng ban vào câu truy vấn đang có.
+     *
+     * Đơn vị nằm ở department_chemicals nên không lấy thẳng từ chemical_categories được
+     * nữa. Dùng bí danh riêng để câu truy vấn nào đã gọi join() ở trên vẫn dùng được.
+     *
+     * Không lọc status_id: phòng khoá dòng khai rồi thì các phiếu cũ vẫn phải hiện đúng
+     * đơn vị đã dùng. Sau khi gọi, select 'units.short_name as unit_short_name' như cũ.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  string  $categoryColumn  Cột chứa category_id ở bảng đang truy vấn,
+     *                                  ví dụ 'imports.category_id'
+     */
+    public static function joinUnit($query, int $departmentId, string $categoryColumn)
+    {
+        return $query
+            ->leftJoin(self::TABLE.' as '.self::UNIT_ALIAS, function ($join) use ($departmentId, $categoryColumn) {
+                $join->on(self::UNIT_ALIAS.'.category_id', '=', $categoryColumn)
+                    ->where(self::UNIT_ALIAS.'.department_id', '=', $departmentId);
+            })
+            ->leftJoin('units', self::UNIT_ALIAS.'.unit_id', '=', 'units.id');
+    }
+
+    /**
+     * Như joinUnit() nhưng phòng ban lấy theo MỘT CỘT của câu truy vấn, không phải một
+     * số cố định.
+     *
+     * Dùng cho màn hình đọc dữ liệu của nhiều phòng cùng lúc (lô đang chuyển kho, đề
+     * nghị của phòng khác, phiếu dự trù): số lượng đã ghi theo đơn vị của phòng nào thì
+     * phải hiện đúng đơn vị của phòng đó.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  string  $departmentColumn  Cột chứa department_id, ví dụ 'exports.department_id'
+     * @param  string  $categoryColumn  Cột chứa category_id, ví dụ 'source.category_id'
+     */
+    public static function joinUnitOn($query, string $departmentColumn, string $categoryColumn)
+    {
+        return $query
+            ->leftJoin(self::TABLE.' as '.self::UNIT_ALIAS, function ($join) use ($departmentColumn, $categoryColumn) {
+                $join->on(self::UNIT_ALIAS.'.category_id', '=', $categoryColumn)
+                    ->on(self::UNIT_ALIAS.'.department_id', '=', $departmentColumn);
+            })
+            ->leftJoin('units', self::UNIT_ALIAS.'.unit_id', '=', 'units.id');
     }
 
     /** Ngưỡng tồn tối thiểu của phòng (không có mặc định chung nên không cần COALESCE). */
@@ -125,7 +177,7 @@ class DepartmentChemical
             ->leftJoin('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
             ->leftJoin('manufacturers', 'chemical_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
             ->leftJoin('storage_conditions', self::TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
             ->leftJoin('storage_conditions as category_storage', 'chemical_categories.storage_condition_id', '=', 'category_storage.id')
             ->leftJoin('locations', self::TABLE.'.default_location_id', '=', 'locations.id')
@@ -169,13 +221,11 @@ class DepartmentChemical
     {
         $query = DB::table('chemical_categories')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
             ->select(
                 'chemical_categories.id',
                 'chemical_categories.code',
                 'chemical_categories.shelf_life_months',
-                'chem_names.name as chem_name',
-                'units.short_name as unit_short_name'
+                'chem_names.name as chem_name'
             )
             ->where('chemical_categories.status_id', 1)
             ->where('chemical_categories.app_status', 'approved')
@@ -211,6 +261,31 @@ class DepartmentChemical
             ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
             ->orderBy('locations.name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Đơn vị tính cho ô chọn của phòng ban.
+     *
+     * Giữ lại những đơn vị phòng đang dùng dù chúng đã bị khoá / chưa duyệt, nếu không
+     * màn hình cập nhật sẽ làm mất đơn vị cũ của dòng đang sửa.
+     */
+    public static function unitOptions(array $usedIds = [])
+    {
+        $usedIds = array_values(array_filter($usedIds));
+
+        return DB::table('units')
+            ->select('id', 'name', 'short_name')
+            ->where(function ($query) use ($usedIds) {
+                $query->where(function ($sub) {
+                    $sub->where('status_id', 1)->where('app_status', 'approved');
+                });
+
+                if ($usedIds) {
+                    $query->orWhereIn('id', $usedIds);
+                }
+            })
+            ->orderBy('name', 'asc')
             ->get();
     }
 

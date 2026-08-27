@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Export;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DepartmentChemical;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -76,7 +77,8 @@ class ChemicalDisposalController extends Controller
             ->leftJoin('imports', self::EXPORT_TABLE.'.import_id', '=', 'imports.id')
             ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            // Đơn vị tính khai ở danh mục hoá chất CỦA PHÒNG, không còn ở danh mục chung
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'imports.category_id'))
             ->select(
                 self::EXPORT_TABLE.'.id',
                 self::EXPORT_TABLE.'.code',
@@ -150,7 +152,13 @@ class ChemicalDisposalController extends Controller
             ->leftJoin('imports', self::EXPORT_TABLE.'.import_id', '=', 'imports.id')
             ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            // Đợt huỷ có thể gom phiếu do nhiều phòng lập, nên lấy đơn vị theo ĐÚNG phòng
+            // đã ghi số lượng ở từng dòng, không phải một phòng cố định.
+            ->tap(fn ($query) => DepartmentChemical::joinUnitOn(
+                $query,
+                self::EXPORT_TABLE.'.department_id',
+                'imports.category_id'
+            ))
             ->select(
                 self::EXPORT_TABLE.'.id',
                 self::EXPORT_TABLE.'.disposal_id',

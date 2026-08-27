@@ -10,18 +10,18 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * DỮ LIỆU GỐC - MỤC ĐÍCH SỬ DỤNG
+ * DỮ LIỆU GỐC - CHỈ TIÊU KIỂM
  */
 class PurposeController extends Controller
 {
     private const TABLE = 'purposes';
-    private const LABEL = 'mục đích sử dụng';
+    private const LABEL = 'chỉ tiêu kiểm';
 
     public function index()
     {
         $datas = DB::table(self::TABLE)->orderBy('name', 'asc')->get();
 
-        session()->put(['title' => 'DỮ LIỆU GỐC - MỤC ĐÍCH SỬ DỤNG']);
+        session()->put(['title' => 'DỮ LIỆU GỐC - CHỈ TIÊU KIỂM']);
 
         return view('pages.materData.Purpose.list', ['datas' => $datas]);
     }
@@ -122,9 +122,9 @@ class PurposeController extends Controller
     private function messages(): array
     {
         return [
-            'name.required' => 'Vui lòng nhập mục đích sử dụng.',
-            'name.max' => 'Mục đích sử dụng tối đa 255 ký tự.',
-            'name.unique' => 'Mục đích sử dụng này đã tồn tại.',
+            'name.required' => 'Vui lòng nhập chỉ tiêu kiểm.',
+            'name.max' => 'Chỉ tiêu kiểm tối đa 255 ký tự.',
+            'name.unique' => 'Chỉ tiêu kiểm này đã tồn tại.',
         ];
     }
 }

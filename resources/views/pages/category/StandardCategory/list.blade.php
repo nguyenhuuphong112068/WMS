@@ -81,7 +81,7 @@
                 phân nhóm chuẩn) và dùng chung toàn công ty.
                 <b>{{ $dsTitle }}</b> chỉ khai phần riêng của
                 <b>{{ session('user')['selected_department'] ?? 'phòng ban đang chọn' }}</b>:
-                hạn dùng nội bộ sau khi mở ống, ngưỡng tồn, vị trí quy hoạch.
+                đơn vị tính, hạn dùng nội bộ sau khi mở ống, ngưỡng tồn, vị trí quy hoạch.
             </p>
 
             <div class="tab-content">
@@ -221,6 +221,9 @@
         'categories' => $dsCategories,
         'locations' => $dsLocations,
         'storageConditions' => $dsStorageConditions,
+        'units' => $dsUnits,
+        'unitsInUse' => $dsUnitsInUse,
+        'conversions' => $dsConversions,
     ])
     @include('pages.category.DepartmentStandard.update', [
         'mdRoute' => $dsRoute,
@@ -228,5 +231,8 @@
         'mdIcon' => $dsIcon,
         'locations' => $dsLocations,
         'storageConditions' => $dsStorageConditions,
+        'units' => $dsUnits,
+        'unitsInUse' => $dsUnitsInUse,
+        'conversions' => $dsConversions,
     ])
 @endsection

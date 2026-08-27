@@ -7,14 +7,7 @@
 
     // Hạn dùng mặc định của từng hoá chất, JS đổ vào placeholder khi đổi ô chọn
     $dcDefaults = $categories
-        ->mapWithKeys(
-            fn($category) => [
-                $category->id => [
-                    'shelf_life_months' => $category->shelf_life_months,
-                    'unit' => $category->unit_short_name ?: '',
-                ],
-            ],
-        )
+        ->mapWithKeys(fn($category) => [$category->id => ['shelf_life_months' => $category->shelf_life_months]])
         ->toArray();
 @endphp
 
@@ -41,7 +34,6 @@
                                 <option value="{{ $category->id }}"
                                     {{ $old('category_id') == $category->id ? 'selected' : '' }}>
                                     {{ $category->code }} - {{ $category->chem_name }}
-                                    ({{ $category->unit_short_name }})
                                 </option>
                             @endforeach
                         </select>
@@ -51,6 +43,35 @@
                         <small class="md-sub">Chỉ hiện hoá chất đã duyệt trong danh mục chung và
                             <b>phòng chưa khai</b>. Danh sách trống nghĩa là phòng đã khai hết.</small>
                     </div>
+
+                    {{-- Đơn vị tính là của RIÊNG PHÒNG: danh mục chung không còn khai đơn vị --}}
+                    <div class="form-group">
+                        <label>Đơn Vị Tính <span class="text-danger">*</span></label>
+                        <select name="unit_id"
+                            class="form-control cat-select dc-unit {{ $bag->has('unit_id') ? 'is-invalid' : '' }}"
+                            required>
+                            <option value="">-- Chọn đơn vị tính --</option>
+                            @foreach ($units as $unit)
+                                <option value="{{ $unit->id }}" data-short="{{ $unit->short_name }}"
+                                    {{ $old('unit_id') == $unit->id ? 'selected' : '' }}>
+                                    {{ $unit->short_name }} - {{ $unit->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if ($bag->has('unit_id'))
+                            <span class="md-error">{{ $bag->first('unit_id') }}</span>
+                        @endif
+                        <small class="md-sub">Đơn vị phòng dùng để nhập / xuất và ghi tồn cho hoá chất này.
+                            Phòng khác có thể khai đơn vị khác.</small>
+                    </div>
+
+                    @include('pages.category.shared.unitConversion', [
+                        'prefix' => 'dc',
+                        'bag' => $bag,
+                        'unitsInUse' => $unitsInUse,
+                        'conversions' => $conversions,
+                        'label' => 'hoá chất',
+                    ])
 
                     <div class="form-row">
                         <div class="form-group col-md-6">
@@ -73,7 +94,7 @@
                                 <span class="md-error">{{ $bag->first('min_stock') }}</span>
                             @endif
                             <small class="md-sub">Tồn xuống dưới mức này thì màn hình Tồn Kho báo "Sắp hết".
-                                Theo <b class="dc-unit-hint">đơn vị gốc</b> của danh mục.</small>
+                                Theo <b class="dc-unit-hint">đơn vị</b> đã chọn ở trên.</small>
                         </div>
                     </div>
 

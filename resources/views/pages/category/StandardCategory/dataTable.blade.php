@@ -25,7 +25,7 @@
                         <th>Tên Chất Chuẩn</th>
                         <th style="width: 130px">Số CAS</th>
                         <th style="width: 160px">Nguồn Gốc / NSX</th>
-                        <th class="text-center" style="width: 90px">Đơn Vị</th>
+                        <th class="text-center" style="width: 100px">Tỷ Trọng</th>
                         <th style="width: 165px">Điều Kiện Bảo Quản</th>
                         <th class="text-center" style="width: 85px">Version</th>
                         <th style="width: 200px" title="Nhóm chuẩn quyết định mã ống chuẩn khi nhập kho">
@@ -67,9 +67,8 @@
                                 @endif
                             </td>
                             <td class="text-center">
-                                @if ($row->unit_short_name || $row->unit_name)
-                                    <span class="md-tag"
-                                        title="{{ $row->unit_name }}">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                @if ($row->density !== null)
+                                    {{ rtrim(rtrim((string) $row->density, '0'), '.') }}
                                 @else
                                     <span class="md-empty">—</span>
                                 @endif
@@ -140,7 +139,7 @@
                                         'chem_names_id' => $row->chem_names_id,
                                         'cas_no' => $row->cas_no,
                                         'manufacturers_id' => $row->manufacturers_id,
-                                        'unit_id' => $row->unit_id,
+                                        'density' => $row->density !== null ? rtrim(rtrim((string) $row->density, '0'), '.') : null,
                                         'storage_condition_id' => $row->storage_condition_id,
                                         'version' => $row->version,
                                         'groups' => $sdCodes,

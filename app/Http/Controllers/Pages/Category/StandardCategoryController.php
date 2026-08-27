@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\CategoryUnitConversion;
 use App\Support\DepartmentStandard;
 use App\Support\StandardCode;
 use Illuminate\Http\Request;
@@ -23,6 +24,9 @@ use Illuminate\Validation\Rule;
  *
  * Cột groups lưu danh sách mã nhóm chuẩn dạng JSON, ví dụ ["PRS","VKN"].
  * Danh sách mã đầy đủ khai báo tại config/standard.php.
+ *
+ * ĐƠN VỊ TÍNH không khai ở đây: mỗi phòng nhập / xuất theo đơn vị của phòng mình nên
+ * đơn vị nằm ở tab "Chất Chuẩn Của Phòng" (department_standards.unit_id).
  *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về
  * "Chờ duyệt". Mọi thay đổi đều được chụp lại ở bảng standard_category_histories.
@@ -45,7 +49,7 @@ class StandardCategoryController extends Controller
         'chem_names_id' => 'Tên chất chuẩn',
         'cas_no' => 'Số CAS',
         'manufacturers_id' => 'Nguồn gốc / Nhà sản xuất',
-        'unit_id' => 'Đơn vị tính',
+        'density' => 'Tỷ trọng d (g/ml)',
         'storage_condition_id' => 'Điều kiện bảo quản',
         'version' => 'Version',
         'groups' => 'Phân nhóm chuẩn',
@@ -57,18 +61,15 @@ class StandardCategoryController extends Controller
     public function index()
     {
         $datas = DB::table(self::TABLE)
-            ->leftJoin('chem_names', self::TABLE.'.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('standard_names', self::TABLE.'.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', self::TABLE.'.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
             ->leftJoin('storage_conditions', self::TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
             ->select(
                 self::TABLE.'.*',
-                'chem_names.name as standard_name',
-                'chem_names.cas_no as name_cas_no',
+                'standard_names.name as standard_name',
+                'standard_names.cas_no as name_cas_no',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
-                'units.name as unit_name',
-                'units.short_name as unit_short_name',
                 'storage_conditions.name as storage_condition_name'
             )
             ->orderBy(self::TABLE.'.code', 'asc')
@@ -84,9 +85,8 @@ class StandardCategoryController extends Controller
 
         return view('pages.category.StandardCategory.list', [
             'datas' => $datas,
-            'chemNames' => $this->options('chem_names', $datas->pluck('chem_names_id')->all()),
+            'chemNames' => $this->options('standard_names', $datas->pluck('chem_names_id')->all()),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
-            'units' => $this->options('units', $datas->pluck('unit_id')->all()),
             'storageConditions' => $this->options('storage_conditions', $datas->pluck('storage_condition_id')->all()),
             'groups' => config('standard.groups'),
             'nextCode' => $this->nextCode(),
@@ -104,6 +104,17 @@ class StandardCategoryController extends Controller
             'dsCategories' => DepartmentStandard::categoryOptions($dsDatas->pluck('category_id')->all()),
             'dsLocations' => DepartmentStandard::locationOptions($departmentId),
             'dsStorageConditions' => DepartmentStandard::storageConditionOptions(),
+            'dsUnits' => DepartmentStandard::unitOptions($dsDatas->pluck('unit_id')->all()),
+            /*
+            | Đơn vị các phòng KHÁC đang dùng cho từng chất chuẩn. Phòng đang khai chọn
+            | đơn vị lệch với danh sách này thì modal bắt khai thêm hệ số quy đổi, để lúc
+            | chuyển kho hệ thống đổi được số lượng qua lại.
+            */
+            'dsUnitsInUse' => CategoryUnitConversion::unitsInUseByCategory(
+                CategoryUnitConversion::TYPE_STANDARD,
+                $departmentId
+            ),
+            'dsConversions' => CategoryUnitConversion::declaredByCategory(CategoryUnitConversion::TYPE_STANDARD),
         ]);
     }
 
@@ -117,10 +128,13 @@ class StandardCategoryController extends Controller
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
         }
 
-        // Sinh mã và ghi bản ghi trong cùng một transaction để hai người thêm cùng lúc không trùng mã
+        // Sinh mã và ghi bản ghi trong cùng một transaction
         $id = DB::transaction(function () use ($request) {
+            $version = $this->nextVersion((int) $request->chem_names_id, (int) $request->manufacturers_id);
+
             return DB::table(self::TABLE)->insertGetId($this->payload($request) + [
                 'code' => $this->nextCode(),
+                'version' => $version,
                 'app_status' => 'pending',
                 'status_id' => 1,
                 'created_by' => $this->actor(),
@@ -219,13 +233,13 @@ class StandardCategoryController extends Controller
     public function history(Request $request)
     {
         $rows = DB::table(self::HISTORY_TABLE)
-            ->leftJoin('chem_names', self::HISTORY_TABLE.'.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('standard_names', self::HISTORY_TABLE.'.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', self::HISTORY_TABLE.'.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', self::HISTORY_TABLE.'.unit_id', '=', 'units.id')
             ->leftJoin('storage_conditions', self::HISTORY_TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
             ->select(
                 self::HISTORY_TABLE.'.*',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'manufacturers.name as manufacturer_name',
                 'units.name as unit_name',
                 'storage_conditions.name as storage_condition_name'
@@ -238,26 +252,34 @@ class StandardCategoryController extends Controller
             'rows' => $rows->map(function ($row) {
                 $groups = StandardCode::decodeGroups($row->groups);
 
+                $snapshot = [
+                    'Mã chất chuẩn' => $row->code ?: '—',
+                    'Tên chất chuẩn' => $row->standard_name ?: '—',
+                    'Số CAS' => $row->cas_no ?: '—',
+                    'Nguồn gốc / NSX' => $row->manufacturer_name ?: '—',
+                    'Tỷ trọng d (g/ml)' => $this->formatDensity($row->density),
+                    'Điều kiện bảo quản' => $row->storage_condition_name ?: '—',
+                    'Version' => $row->version !== null ? (string) $row->version : '—',
+                    'Phân nhóm chuẩn' => $groups
+                        ? implode(', ', array_map(fn ($key) => StandardCode::groupLabel($key), $groups))
+                        : '—',
+                    'Hạn dùng (tháng)' => $row->shelf_life_months ?: '—',
+                    'Số tài liệu' => $row->doc_no ?: '—',
+                    'Ghi chú' => $row->note ?: '—',
+                ];
+
+                // Đơn vị tính đã chuyển sang danh mục của phòng nên bản ghi mới không còn
+                // ghi cột này. Ảnh chụp cũ vẫn hiện lại để không mất vết đã thay đổi.
+                if ($row->unit_name) {
+                    $snapshot['Đơn vị tính (trước khi chuyển về phòng)'] = $row->unit_name;
+                }
+
                 return [
                     'action' => $row->action,
                     'change_note' => $row->change_note,
                     'created_by' => $row->created_by ?: 'NA',
                     'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
-                    'snapshot' => [
-                        'Mã chất chuẩn' => $row->code ?: '—',
-                        'Tên chất chuẩn' => $row->standard_name ?: '—',
-                        'Số CAS' => $row->cas_no ?: '—',
-                        'Nguồn gốc / NSX' => $row->manufacturer_name ?: '—',
-                        'Đơn vị tính' => $row->unit_name ?: '—',
-                        'Điều kiện bảo quản' => $row->storage_condition_name ?: '—',
-                        'Version' => $row->version !== null ? (string) $row->version : '—',
-                        'Phân nhóm chuẩn' => $groups
-                            ? implode(', ', array_map(fn ($key) => StandardCode::groupLabel($key), $groups))
-                            : '—',
-                        'Hạn dùng (tháng)' => $row->shelf_life_months ?: '—',
-                        'Số tài liệu' => $row->doc_no ?: '—',
-                        'Ghi chú' => $row->note ?: '—',
-                    ],
+                    'snapshot' => $snapshot,
                 ];
             })->values(),
         ]);
@@ -308,7 +330,7 @@ class StandardCategoryController extends Controller
             'chem_names_id' => $row->chem_names_id,
             'cas_no' => $row->cas_no,
             'manufacturers_id' => $row->manufacturers_id,
-            'unit_id' => $row->unit_id,
+            'density' => $row->density,
             'storage_condition_id' => $row->storage_condition_id,
             'version' => $row->version,
             'groups' => $row->groups,
@@ -337,6 +359,12 @@ class StandardCategoryController extends Controller
                 continue;
             }
 
+            if ($field === 'density') {
+                $parts[] = $title.': '.$this->formatDensity($current->$field).' -> '.$this->formatDensity($payload[$field]);
+
+                continue;
+            }
+
             if ($field === 'groups') {
                 $parts[] = $title.': '
                     .($this->groupNames($current->$field) ?: '—').' -> '
@@ -359,6 +387,15 @@ class StandardCategoryController extends Controller
         return implode(' | ', $parts);
     }
 
+    private function formatDensity($value): string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+
+        return rtrim(rtrim((string) $value, '0'), '.').' g/ml';
+    }
+
     /** Chuỗi JSON mã nhóm -> "Chuẩn Chính (PRS), Chuẩn Viện (VKN)". */
     private function groupNames($value): string
     {
@@ -372,9 +409,8 @@ class StandardCategoryController extends Controller
     private function labelMaps(): array
     {
         return [
-            'chem_names_id' => DB::table('chem_names')->pluck('name', 'id')->all(),
+            'chem_names_id' => DB::table('standard_names')->pluck('name', 'id')->all(),
             'manufacturers_id' => DB::table('manufacturers')->pluck('name', 'id')->all(),
-            'unit_id' => DB::table('units')->pluck('name', 'id')->all(),
             'storage_condition_id' => DB::table('storage_conditions')->pluck('name', 'id')->all(),
         ];
     }
@@ -396,6 +432,17 @@ class StandardCategoryController extends Controller
         return self::CODE_PREFIX.str_pad((string) $next, self::CODE_LENGTH, '0', STR_PAD_LEFT);
     }
 
+    /** Version tự động tăng theo từng tổ hợp Tên + NSX, bắt đầu từ 0. */
+    private function nextVersion(int $chemNamesId, int $manufacturersId): int
+    {
+        $max = DB::table(self::TABLE)
+            ->where('chem_names_id', $chemNamesId)
+            ->where('manufacturers_id', $manufacturersId)
+            ->max('version');
+
+        return $max === null ? 0 : $max + 1;
+    }
+
     /**
      * Không cho khai báo trùng cùng một tổ hợp Tên + Nguồn gốc + Version.
      *
@@ -405,18 +452,22 @@ class StandardCategoryController extends Controller
     private function checkDuplicate($validator, Request $request, $ignoreId = null): void
     {
         $validator->after(function ($validator) use ($request, $ignoreId) {
-            $exists = DB::table(self::TABLE)
-                ->where('chem_names_id', $request->chem_names_id)
-                ->where('manufacturers_id', $request->manufacturers_id)
-                ->where('version', (int) $request->version)
-                ->when($ignoreId, fn ($query) => $query->where('id', '<>', $ignoreId))
-                ->exists();
+            if ($ignoreId) {
+                $version = DB::table(self::TABLE)->where('id', $ignoreId)->value('version');
+                
+                $exists = DB::table(self::TABLE)
+                    ->where('chem_names_id', $request->chem_names_id)
+                    ->where('manufacturers_id', $request->manufacturers_id)
+                    ->where('version', $version)
+                    ->where('id', '<>', $ignoreId)
+                    ->exists();
 
-            if ($exists) {
-                $validator->errors()->add(
-                    'chem_names_id',
-                    'Tổ hợp Tên chất chuẩn - Nguồn gốc/NSX - Version này đã có trong danh mục.'
-                );
+                if ($exists) {
+                    $validator->errors()->add(
+                        'chem_names_id',
+                        'Tổ hợp Tên chất chuẩn - Nguồn gốc/NSX đã có trong danh mục mang cùng Version.'
+                    );
+                }
             }
         });
     }
@@ -467,12 +518,11 @@ class StandardCategoryController extends Controller
     private function rules(): array
     {
         return [
-            'chem_names_id' => ['required', 'integer', 'exists:chem_names,id'],
+            'chem_names_id' => ['required', 'integer', 'exists:standard_names,id'],
             'cas_no' => ['nullable', 'max:50'],
             'manufacturers_id' => ['required', 'integer', 'exists:manufacturers,id'],
-            'unit_id' => ['required', 'integer', 'exists:units,id'],
+            'density' => ['nullable', 'numeric', 'gt:0', 'max:999999'],
             'storage_condition_id' => ['nullable', 'integer', 'exists:storage_conditions,id'],
-            'version' => ['required', 'integer', 'min:0', 'max:999'],
             // Phải chọn ít nhất một nhóm: nhóm chuẩn quyết định mã ống chuẩn lúc nhập,
             // chất chuẩn không có nhóm thì không nhập kho được.
             'groups' => ['required', 'array', 'min:1'],
@@ -488,14 +538,14 @@ class StandardCategoryController extends Controller
         // Giữ đúng thứ tự khai báo trong config để chuỗi JSON luôn ổn định
         $selected = (array) $request->input('groups', []);
         $groups = array_values(array_intersect(array_keys(config('standard.groups')), $selected));
+        $density = trim((string) $request->density);
 
         return [
             'chem_names_id' => (int) $request->chem_names_id,
             'cas_no' => $this->nullIfBlank($request->cas_no),
             'manufacturers_id' => (int) $request->manufacturers_id,
-            'unit_id' => (int) $request->unit_id,
+            'density' => $density === '' ? null : $density,
             'storage_condition_id' => $request->storage_condition_id ? (int) $request->storage_condition_id : null,
-            'version' => (int) $request->version,
             'groups' => $groups ? json_encode($groups, JSON_UNESCAPED_UNICODE) : null,
             'shelf_life_months' => $this->nullIfBlank($request->shelf_life_months) === null
                 ? null
@@ -520,13 +570,9 @@ class StandardCategoryController extends Controller
             'cas_no.max' => 'Số CAS tối đa 50 ký tự.',
             'manufacturers_id.required' => 'Vui lòng chọn nguồn gốc / nhà sản xuất.',
             'manufacturers_id.exists' => 'Nguồn gốc / nhà sản xuất không hợp lệ.',
-            'unit_id.required' => 'Vui lòng chọn đơn vị tính.',
-            'unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'density.numeric' => 'Tỷ trọng phải là số.',
+            'density.gt' => 'Tỷ trọng phải lớn hơn 0.',
             'storage_condition_id.exists' => 'Điều kiện bảo quản không hợp lệ.',
-            'version.required' => 'Vui lòng nhập version.',
-            'version.integer' => 'Version phải là số nguyên.',
-            'version.min' => 'Version nhỏ nhất là 0.',
-            'version.max' => 'Version tối đa là 999.',
             'groups.required' => 'Vui lòng chọn ít nhất một phân nhóm chuẩn.',
             'groups.min' => 'Vui lòng chọn ít nhất một phân nhóm chuẩn.',
             'groups.*.in' => 'Phân nhóm chuẩn không hợp lệ.',

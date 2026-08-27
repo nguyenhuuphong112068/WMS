@@ -660,6 +660,10 @@
         invTable('#invExpiringTable', [7, 'asc'],
             'Không có mã xuất nhập nào còn tồn mà sắp hết hạn.');
 
+        // Kiểm soát khối lượng
+        invTable('#invWeightTable', [6, 'desc'],
+            'Không có đối tượng nào có khai báo kiểm soát khối lượng.');
+
         // Theo định khu: cột 1 = Vị Trí, gom các mã cùng chỗ đứng cạnh nhau
         var zoneTable = invTable('#invZoneTable', [1, 'asc'],
             'Chưa có mã xuất nhập nào ở định khu đang chọn.');

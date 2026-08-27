@@ -48,9 +48,18 @@
     $expShortByCode = collect($standardGroups ?? [])->mapWithKeys(fn($group) => [$group['code'] => $group['short']])->all();
     $expGroupName = fn($code) => $expShortByCode[$code] ?? ($code ?: '—');
 
-    // Số liệu tổng của tab báo cáo
-    $expReportTimes = $report->sum('times');
+    $stdReqStatus = [
+        'draft' => ['label' => 'Lưu tạm', 'class' => 'neutral'],
+        'pending' => ['label' => 'Chờ cấp phát', 'class' => 'pending'],
+        'partial' => ['label' => 'Cấp một phần', 'class' => 'warning'],
+        'completed' => ['label' => 'Đã cấp đủ', 'class' => 'accepted'],
+        'rejected' => ['label' => 'Từ chối', 'class' => 'rejected'],
+        'issued' => ['label' => 'Đã cấp', 'class' => 'accepted'],
+        'canceled' => ['label' => 'Đã huỷ', 'class' => 'rejected'],
+    ];
+    $stdReqBadge = fn($status) => $stdReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
 @endphp
+
 
 @section('mainContent')
     @include('pages.export.StandardExport.dataTable')
@@ -61,5 +70,10 @@
     @include('pages.export.StandardExport.create')
     @include('pages.export.StandardExport.update')
     @include('pages.export.StandardExport.requestModal')
+    @include('pages.export.StandardExport.requestEditModal')
     @include('pages.export.StandardExport.issueModal')
+    @include('pages.export.StandardExport.requestDetailModal')
+    @include('pages.export.StandardExport.inventoryPickerModal')
+@include('pages.export.StandardExport.issuedStandardPickerModal')
+@include('pages.export.StandardExport.inventoryImportPickerModal')
 @endsection

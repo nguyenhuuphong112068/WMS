@@ -29,7 +29,7 @@
     {{-- Chỉ màn hoá chất truyền $showConvert, vì quy đổi cần tỉ trọng --}}
     @isset($showConvert)
         <button type="button" class="btn btn-sm btn-outline-info btn-cat-convert" title="Quy đổi đơn vị"
-            data-id="{{ $row->id }}" data-unit="{{ $row->unit_id }}" data-title="{{ $title }}">
+            data-id="{{ $row->id }}" data-title="{{ $title }}">
             <i class="fas fa-balance-scale"></i>
         </button>
     @endisset

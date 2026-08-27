@@ -284,7 +284,7 @@
                             <li class="nav-item"><a href="{{ route('pages.materData.purpose.list') }}"
                                     class="nav-link {{ request()->is('materData/purpose') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-info"></i>
-                                    <p>Mục Đích Sử Dụng</p>
+                                    <p>Chỉ Tiêu Kiểm</p>
                                 </a></li>
                             <li class="nav-item"><a href="{{ route('pages.materData.status.list') }}"
                                     class="nav-link {{ request()->is('materData/status') ? 'active' : '' }}"><i

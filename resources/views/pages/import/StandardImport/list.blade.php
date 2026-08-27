@@ -41,9 +41,6 @@
 
     /** Mã nhóm trong mã ống chuẩn -> khoá config, để form Cập Nhật gửi lại đúng nhóm. */
     $impGroupKey = fn($code) => $impKeyByCode[$code] ?? '';
-
-    // Số liệu tổng của tab báo cáo
-    $impReportTimes = $report->sum('times');
 @endphp
 
 @section('mainContent')

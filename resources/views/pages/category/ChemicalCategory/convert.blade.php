@@ -104,10 +104,8 @@
             $modal.find('.cat-convert-result').empty();
             $modal.find('.cat-convert-qty').val(1);
 
-            // Mặc định đổi SANG đơn vị gốc của hoá chất, vì tồn kho lưu theo đơn vị đó
-            $modal.find('.cat-convert-to').val($(this).data('unit'));
-            $modal.find('.cat-convert-from').val($(this).data('unit'));
-
+            // Danh mục không còn khai đơn vị gốc (đơn vị nằm ở từng phòng), nên để người
+            // dùng tự chọn cặp đơn vị cần quy đổi.
             $modal.modal('show');
         });
 

@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\DB;
  *
  * Phòng chưa khai riêng thì tự động chạy theo mặc định chung, không có màn hình nào gãy.
  *
+ * Riêng ĐƠN VỊ TÍNH không theo quy tắc trên: nó chỉ nằm ở department_standards, danh mục
+ * chung không còn cột unit_id. Mỗi phòng nhập / xuất chất chuẩn theo đơn vị của phòng
+ * mình, nên mọi màn hình muốn hiện đơn vị đều phải đi qua joinUnit().
+ *
  * Lớp này chỉ gom lại phần join + COALESCE để 3 màn hình Nhập / Sử Dụng / Tồn không mỗi
  * nơi viết một kiểu rồi lệch nhau. Vẫn là Query Builder thuần, không dùng Eloquent.
  * Song song với App\Support\DepartmentChemical bên hoá chất.
@@ -23,6 +27,9 @@ use Illuminate\Support\Facades\DB;
 class DepartmentStandard
 {
     public const TABLE = 'department_standards';
+
+    /** Bí danh của chính bảng này khi chỉ nối vào để lấy đơn vị tính - xem joinUnit(). */
+    public const UNIT_ALIAS = 'ds_unit';
 
     /**
      * Nối bảng cấu hình của ĐÚNG một phòng ban vào câu truy vấn đang có.
@@ -54,6 +61,51 @@ class DepartmentStandard
             'COALESCE('.self::TABLE.'.shelf_life_months, standard_categories.shelf_life_months)'
             .' as shelf_life_months'
         );
+    }
+
+    /**
+     * Nối ĐƠN VỊ TÍNH của đúng một phòng ban vào câu truy vấn đang có.
+     *
+     * Đơn vị nằm ở department_standards nên không lấy thẳng từ standard_categories được
+     * nữa. Dùng bí danh riêng để câu truy vấn nào đã gọi join() ở trên vẫn dùng được.
+     *
+     * Không lọc status_id: phòng khoá dòng khai rồi thì các phiếu cũ vẫn phải hiện đúng
+     * đơn vị đã dùng. Sau khi gọi, select 'units.short_name as unit_short_name' như cũ.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  string  $categoryColumn  Cột chứa category_id ở bảng đang truy vấn,
+     *                                  ví dụ 'standard_imports.category_id'
+     */
+    public static function joinUnit($query, int $departmentId, string $categoryColumn)
+    {
+        return $query
+            ->leftJoin(self::TABLE.' as '.self::UNIT_ALIAS, function ($join) use ($departmentId, $categoryColumn) {
+                $join->on(self::UNIT_ALIAS.'.category_id', '=', $categoryColumn)
+                    ->where(self::UNIT_ALIAS.'.department_id', '=', $departmentId);
+            })
+            ->leftJoin('units', self::UNIT_ALIAS.'.unit_id', '=', 'units.id');
+    }
+
+    /**
+     * Như joinUnit() nhưng phòng ban lấy theo MỘT CỘT của câu truy vấn, không phải một
+     * số cố định.
+     *
+     * Dùng cho màn hình đọc dữ liệu của nhiều phòng cùng lúc (lô đang chuyển kho, đề
+     * nghị của phòng khác, phiếu dự trù): số lượng đã ghi theo đơn vị của phòng nào thì
+     * phải hiện đúng đơn vị của phòng đó.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  string  $departmentColumn  Cột chứa department_id, ví dụ 'exports.department_id'
+     * @param  string  $categoryColumn  Cột chứa category_id, ví dụ 'source.category_id'
+     */
+    public static function joinUnitOn($query, string $departmentColumn, string $categoryColumn)
+    {
+        return $query
+            ->leftJoin(self::TABLE.' as '.self::UNIT_ALIAS, function ($join) use ($departmentColumn, $categoryColumn) {
+                $join->on(self::UNIT_ALIAS.'.category_id', '=', $categoryColumn)
+                    ->on(self::UNIT_ALIAS.'.department_id', '=', $departmentColumn);
+            })
+            ->leftJoin('units', self::UNIT_ALIAS.'.unit_id', '=', 'units.id');
     }
 
     /** Ngưỡng tồn tối thiểu của phòng (không có mặc định chung nên không cần COALESCE). */
@@ -101,9 +153,9 @@ class DepartmentStandard
     {
         return DB::table(self::TABLE)
             ->leftJoin('standard_categories', self::TABLE.'.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
             ->leftJoin('storage_conditions', self::TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
             ->leftJoin('storage_conditions as category_storage', 'standard_categories.storage_condition_id', '=', 'category_storage.id')
             ->leftJoin('locations', self::TABLE.'.default_location_id', '=', 'locations.id')
@@ -118,7 +170,7 @@ class DepartmentStandard
                 'standard_categories.cas_no',
                 'standard_categories.doc_no as category_doc_no',
                 'standard_categories.shelf_life_months as category_shelf_life_months',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
@@ -145,15 +197,13 @@ class DepartmentStandard
     public static function categoryOptions(array $exclude = [])
     {
         $query = DB::table('standard_categories')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->select(
                 'standard_categories.id',
                 'standard_categories.code',
                 'standard_categories.version',
                 'standard_categories.shelf_life_months',
-                'chem_names.name as standard_name',
-                'units.short_name as unit_short_name'
+                'standard_names.name as standard_name'
             )
             ->where('standard_categories.status_id', 1)
             ->where('standard_categories.app_status', 'approved')
@@ -189,6 +239,31 @@ class DepartmentStandard
             ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
             ->orderBy('locations.name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Đơn vị tính cho ô chọn của phòng ban.
+     *
+     * Giữ lại những đơn vị phòng đang dùng dù chúng đã bị khoá / chưa duyệt, nếu không
+     * màn hình cập nhật sẽ làm mất đơn vị cũ của dòng đang sửa.
+     */
+    public static function unitOptions(array $usedIds = [])
+    {
+        $usedIds = array_values(array_filter($usedIds));
+
+        return DB::table('units')
+            ->select('id', 'name', 'short_name')
+            ->where(function ($query) use ($usedIds) {
+                $query->where(function ($sub) {
+                    $sub->where('status_id', 1)->where('app_status', 'approved');
+                });
+
+                if ($usedIds) {
+                    $query->orWhereIn('id', $usedIds);
+                }
+            })
+            ->orderBy('name', 'asc')
             ->get();
     }
 

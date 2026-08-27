@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Validator;
  *   StandardExportController kiểm tra tồn khi ghi phiếu.
  * - Cả 'export' (sử dụng) và 'cancel' (huỷ bỏ) đều trừ tồn, nhưng tách thành hai cột
  *   để thấy phần hao hụt do huỷ.
- * - Số lượng theo đơn vị gốc của danh mục chất chuẩn (standard_categories.unit_id).
+ * - Số lượng theo đơn vị phòng đã khai cho chất chuẩn đó (department_standards.unit_id).
  *
  * Màn hình chỉ đọc phần tồn, hai hành động ghi dữ liệu là:
  * - CÂN ĐỐI: phiếu sử dụng được xuất vượt tồn tối đa 5% nên tồn có thể âm ("Âm kho"),
@@ -311,9 +311,10 @@ class StandardInventoryController extends Controller
 
         $query = DB::table('standard_imports')
             ->leftJoin('standard_categories', 'standard_imports.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            // Đơn vị tính khai ở danh mục chất chuẩn CỦA PHÒNG, không còn ở danh mục chung
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_imports.category_id'))
             ->leftJoin('suppliers', 'standard_imports.supplier_id', '=', 'suppliers.id')
             // Định khu THỰC TẾ của ống: locations giữ sẵn id của cả 3 cấp trên nên
             // chỉ cần standard_imports.location_id là dựng lại đủ Kho -> Phòng -> Kệ -> Vị trí
@@ -332,17 +333,20 @@ class StandardInventoryController extends Controller
                 'standard_imports.amount',
                 'standard_imports.imported_date',
                 'standard_imports.expired_date',
+                'standard_imports.expiry_type',
                 'standard_imports.internal_expired_date',
                 'standard_imports.batch_no',
                 'standard_imports.coa_no',
                 'standard_imports.invoice_number',
+                'standard_imports.weight_controlled',
+                'standard_imports.standard_form',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no',
                 'standard_categories.groups',
                 DepartmentStandard::shelfLifeColumn(),
                 DepartmentStandard::minStockColumn(),
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
@@ -400,6 +404,40 @@ class StandardInventoryController extends Controller
                 // Chỉ chất chuẩn có khai báo hạn dùng mặc định mới xác định được hạn dùng nội bộ
                 $row->shelf_life_months = (int) ($row->shelf_life_months ?? 0);
                 $row->can_internal_expiry = $row->shelf_life_months > 0;
+
+                $row->ghkl = 0;
+                $row->deviation = 0;
+                if ($row->weight_controlled) {
+                    $quicach = $row->imported;
+                    $unit = strtolower(trim($row->unit_short_name ?: $row->unit_name));
+                    if ($unit === 'g' || $unit === 'ml') {
+                        $quicach *= 1000;
+                    }
+
+                    if ($row->standard_form === 'Dạng Bột Rời') {
+                        if ($quicach < 10) $row->ghkl = 50;
+                        elseif ($quicach <= 100) $row->ghkl = 60;
+                        else $row->ghkl = 70;
+                    } elseif ($row->standard_form === 'Dạng Bột Mịn') {
+                        if ($quicach < 10) $row->ghkl = 20;
+                        elseif ($quicach <= 100) $row->ghkl = 30;
+                        else $row->ghkl = 50;
+                    } elseif ($row->standard_form === 'Dạng Sệt') {
+                        if ($quicach < 10) $row->ghkl = 10;
+                        elseif ($quicach <= 100) $row->ghkl = 20;
+                        else $row->ghkl = 50;
+                    }
+
+                    $klThuc = $row->imported;
+                    $soLuongXuat = $row->used;
+                    if ($unit === 'g' || $unit === 'ml') {
+                        $klThuc *= 1000;
+                        $soLuongXuat *= 1000;
+                    }
+                    if ($soLuongXuat != 0) {
+                        $row->deviation = round(abs(($klThuc - $soLuongXuat) / $soLuongXuat) * 100, 1);
+                    }
+                }
 
                 /*
                 | Hạn ÁP DỤNG: hạn nội bộ nếu đã xác định, không thì hạn nhà sản xuất.
@@ -477,10 +515,9 @@ class StandardInventoryController extends Controller
                 DB::raw("SUM(CASE WHEN type = 'export' THEN amount ELSE 0 END) as used"),
                 DB::raw("SUM(CASE WHEN type = 'cancel' THEN amount ELSE 0 END) as cancelled"),
                 DB::raw('COUNT(*) as times'),
-                DB::raw('MAX(exported_date) as last_exported_date')
+                DB::raw('MAX(created_at) as last_exported_date')
             )
             ->where('department_id', $departmentId)
-            ->where('status_id', 1)
             ->groupBy('import_id')
             ->get()
             ->keyBy('import_id');
@@ -534,7 +571,6 @@ class StandardInventoryController extends Controller
     {
         $out = (float) DB::table('standard_exports')
             ->where('import_id', $import->id)
-            ->where('status_id', 1)
             ->sum('amount');
 
         return (float) $import->amount + $this->balancedOf($import) - $out;

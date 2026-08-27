@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Validator;
  *   ChemicalExportController kiểm tra tồn khi ghi phiếu.
  * - Cả 'export' (sử dụng) và 'cancel' (huỷ bỏ) đều trừ tồn, nhưng tách thành hai
  *   cột để thấy phần hao hụt do huỷ.
- * - Số lượng theo đơn vị gốc của danh mục hoá chất (chemical_categories.unit_id).
+ * - Số lượng theo đơn vị phòng đã khai cho hoá chất đó (department_chemicals.unit_id).
  *
  * Màn hình chỉ đọc phần tồn, riêng CÂN ĐỐI là hành động ghi dữ liệu: phiếu sử dụng
  * được xuất vượt tồn tối đa 5% nên tồn có thể âm ("Âm kho"), nút Cân Đối ghi thêm
@@ -323,7 +323,6 @@ class ChemicalInventoryController extends Controller
         $query = DB::table('imports')
             ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
             ->leftJoin('suppliers', 'imports.supplier_id', '=', 'suppliers.id')
             // Định khu THỰC TẾ của lô: locations giữ sẵn id của cả 3 cấp trên nên
             // chỉ cần imports.location_id là dựng lại đủ Kho -> Phòng -> Kệ -> Vị trí
@@ -332,8 +331,10 @@ class ChemicalInventoryController extends Controller
             ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id');
 
-        // Hạn dùng nội bộ và ngưỡng tồn tối thiểu lấy theo cấu hình riêng của phòng ban
+        // Hạn dùng nội bộ, ngưỡng tồn tối thiểu và đơn vị tính lấy theo cấu hình riêng
+        // của phòng ban
         return DepartmentChemical::join($query, $departmentId, 'imports.category_id')
+            ->leftJoin('units', DepartmentChemical::TABLE.'.unit_id', '=', 'units.id')
             ->select(
                 'imports.id',
                 'imports.code',

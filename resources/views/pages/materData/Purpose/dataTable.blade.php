@@ -7,11 +7,11 @@
 
                 <div class="md-toolbar">
                     <button type="button" class="btn btn-primary btn-md-create">
-                        <i class="fas fa-plus mr-1"></i> Thêm mục đích sử dụng
+                        <i class="fas fa-plus mr-1"></i> Thêm chỉ tiêu kiểm
                     </button>
                     <p class="hint">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} mục đích sử dụng.
+                        Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} chỉ tiêu kiểm.
                     </p>
                 </div>
 
@@ -20,7 +20,7 @@
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 60px">STT</th>
-                                <th>Tên Mục Đích Sử Dụng</th>
+                                <th>Tên Chỉ Tiêu Kiểm</th>
                                 <th style="width: 140px">Người Tạo</th>
                                 <th class="text-center" style="width: 110px">Ngày Tạo</th>
                                 <th class="text-center" style="width: 110px">Trạng Thái</th>
@@ -46,7 +46,7 @@
                                     <td class="text-center">
                                         <div class="md-actions">
                                             <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                title="Sửa mục đích {{ $row->name }}"
+                                                title="Sửa chỉ tiêu {{ $row->name }}"
                                                 data-row="{{ json_encode([
                                                     'id' => $row->id,
                                                     'name' => $row->name,
@@ -56,7 +56,7 @@
 
                                             <form class="form-md-confirm d-inline"
                                                 action="{{ route('pages.materData.purpose.deActive') }}" method="POST"
-                                                data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} mục đích {{ $row->name }}?"
+                                                data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} chỉ tiêu {{ $row->name }}?"
                                                 data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
                                                 @csrf
                                                 <input type="hidden" name="id" value="{{ $row->id }}">

@@ -24,7 +24,6 @@
                         <th style="width: 130px">Mã Danh Mục</th>
                         <th>Tên Hoá Chất</th>
                         <th>Nhà Sản Xuất</th>
-                        <th class="text-center" style="width: 95px">Đơn Vị Tính</th>
                         <th class="text-center" style="width: 105px">Tỉ Trọng d<br><small>(g/ml)</small></th>
                         <th style="width: 180px">Điều Kiện Bảo Quản</th>
                         <th style="width: 110px">Số Hồ Sơ</th>
@@ -70,14 +69,6 @@
                                     @if ($row->manufacturer_short_name)
                                         <br><span class="md-tag">{{ $row->manufacturer_short_name }}</span>
                                     @endif
-                                @else
-                                    <span class="md-empty">—</span>
-                                @endif
-                            </td>
-                            <td class="text-center">
-                                @if ($row->unit_short_name || $row->unit_name)
-                                    <span class="md-tag"
-                                        title="{{ $row->unit_name }}">{{ $row->unit_short_name ?: $row->unit_name }}</span>
                                 @else
                                     <span class="md-empty">—</span>
                                 @endif
@@ -174,7 +165,6 @@
                                         'type' => $row->type,
                                         'chem_names_id' => $row->chem_names_id,
                                         'manufacturers_id' => $row->manufacturers_id,
-                                        'unit_id' => $row->unit_id,
                                         'density' => $row->density !== null ? rtrim(rtrim($row->density, '0'), '.') : null,
                                         'storage_condition_id' => $row->storage_condition_id,
                                         'doc_no' => $row->doc_no,

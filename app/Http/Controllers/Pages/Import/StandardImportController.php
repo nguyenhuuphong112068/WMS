@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pages\Import;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\Barcode128;
+use App\Support\DepartmentStandard;
 use App\Support\StandardCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,7 +59,7 @@ class StandardImportController extends Controller
         'requires_aliquot' => 'Triết ống trước khi dùng',
         'supplier_id' => 'Nhà cung cấp',
         'location_id' => 'Vị trí lưu trữ',
-        'purpose_id' => 'Mục đích sử dụng',
+        'purpose_id' => 'Chỉ tiêu kiểm',
         'note' => 'Ghi chú',
     ];
 
@@ -68,11 +69,11 @@ class StandardImportController extends Controller
 
         $datas = DB::table(self::TABLE)
             ->leftJoin('standard_categories', self::TABLE.'.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            // Đơn vị tính khai ở danh mục chất chuẩn CỦA PHÒNG, không còn ở danh mục chung
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
             ->leftJoin('suppliers', self::TABLE.'.supplier_id', '=', 'suppliers.id')
-            ->leftJoin('purposes', self::TABLE.'.purpose_id', '=', 'purposes.id')
             // Định khu của ống: locations giữ sẵn id 3 cấp trên nên join tiếp là ra đủ đường dẫn
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
@@ -84,14 +85,13 @@ class StandardImportController extends Controller
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no',
                 'standard_categories.groups',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'suppliers.name as supplier_name',
                 'suppliers.address as supplier_address',
-                'purposes.name as purpose_name',
                 'locations.name as location_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
@@ -105,9 +105,9 @@ class StandardImportController extends Controller
 
         session()->put(['title' => 'NHẬP - NHẬP CHẤT CHUẨN']);
 
-        [$from, $to] = $this->reportRange($request);
 
-        $categories = $this->categoryOptions();
+
+        $categories = $this->categoryOptions($departmentId, $datas->pluck('category_id')->all());
 
         $deptStandards = DB::table('department_standards')
             ->where('department_id', $departmentId)
@@ -116,12 +116,24 @@ class StandardImportController extends Controller
 
         $categoryDefaults = $categories->mapWithKeys(function ($category) use ($deptStandards) {
             $ds = $deptStandards->get($category->id);
+            $shelfLife = $ds->shelf_life_months ?? $category->shelf_life_months ?? null;
+            $info = [
+                'Tên: <strong>' . htmlspecialchars($category->standard_name ?: $category->code) . '</strong>',
+                'NSX: <strong>' . htmlspecialchars($category->manufacturer_short_name ?: '—') . '</strong>',
+                'Version: <strong>v' . htmlspecialchars($category->version) . '</strong>',
+                'Đơn vị phòng: <strong>' . htmlspecialchars($category->unit_short_name ?: 'Chưa thiết lập') . '</strong>'
+            ];
+            if ($shelfLife) {
+                $info[] = 'Hạn dùng: <strong>' . htmlspecialchars($shelfLife) . ' tháng</strong>';
+            }
 
             return [$category->id => [
                 'location_id' => $ds->default_location_id ?? null,
-                'shelf_life_months' => $ds->shelf_life_months ?? $category->shelf_life_months ?? null,
+                'shelf_life_months' => $shelfLife,
                 'group_key' => $category->default_group_key,
                 'group_code' => $category->default_group_code,
+                'info_html' => implode(' | ', $info),
+                'unit_short_name' => $category->unit_short_name,
             ]];
         })->toArray();
 
@@ -145,11 +157,8 @@ class StandardImportController extends Controller
             'purposes' => $purposes,
             'groups' => config('standard.groups'),
             'codePreviews' => StandardCode::previews($departmentId, $this->departmentShortName(), now()->format('Y-m-d')),
-            'report' => $this->importReport($departmentId, $from, $to),
-            'reportFrom' => $from,
-            'reportTo' => $to,
             'historyCounts' => $this->historyCounts($departmentId),
-            'activeTab' => $request->input('tab') === 'report' ? 'report' : 'book',
+            'activeTab' => 'book',
         ]);
     }
 
@@ -160,16 +169,16 @@ class StandardImportController extends Controller
     {
         $row = DB::table(self::TABLE)
             ->leftJoin('standard_categories', self::TABLE.'.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), self::TABLE.'.category_id'))
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
             ->select(
                 self::TABLE.'.*',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'manufacturers.name as manufacturer_name',
                 'units.short_name as unit_short_name',
@@ -374,15 +383,15 @@ class StandardImportController extends Controller
 
         $rows = DB::table(self::HISTORY_TABLE)
             ->leftJoin('standard_categories', self::HISTORY_TABLE.'.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), self::HISTORY_TABLE.'.category_id'))
             ->leftJoin('suppliers', self::HISTORY_TABLE.'.supplier_id', '=', 'suppliers.id')
             ->leftJoin('locations', self::HISTORY_TABLE.'.location_id', '=', 'locations.id')
             ->select(
                 self::HISTORY_TABLE.'.*',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'suppliers.name as supplier_name',
@@ -415,10 +424,17 @@ class StandardImportController extends Controller
                     'Kiểm soát khối lượng' => $row->weight_controlled ? 'Có' : 'Không',
                     'Triết ống trước khi dùng' => $row->requires_aliquot ? 'Có' : 'Không',
                     'Ngày nhập' => $date($row->imported_date),
-                    'Loại hạn dùng' => $row->expiry_type === 'undetermined' ? 'Chưa xác định (Check online)' : ($row->expiry_type === 'retest' ? 'Cần retest' : 'Xác định'),
+                    'Loại hạn dùng' => match($row->expiry_type) {
+                        'check online', 'undetermined', 'unlimited' => 'Chưa xác định (Check online)',
+                        'retest' => 'Cần retest định kỳ',
+                        'Specify', 'defined' => 'Hạn dùng xác định',
+                        'Requires_re-evaluation' => 'Cần xác định lại hạn dùng nội bộ',
+                        default => $row->expiry_type ?: '—'
+                    },
                     'Hạn sử dụng' => $date($row->expired_date),
                     'Chu kỳ retest' => $row->retest_interval_months ? $row->retest_interval_months.' tháng' : '—',
                     'Nhà cung cấp' => $row->supplier_name ?: '—',
+                    'Chỉ tiêu kiểm' => $this->purposeNames($row->purpose_id) ?: '—',
                     'Vị trí lưu trữ' => $row->location_name ?: '—',
                     'Hoá đơn' => $row->invoice_number ?: '—',
                     'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
@@ -524,66 +540,7 @@ class StandardImportController extends Controller
         );
     }
 
-    private function reportRange(Request $request): array
-    {
-        $parse = function ($value, $fallback) {
-            try {
-                return $value ? \Carbon\Carbon::parse($value)->format('Y-m-d') : $fallback;
-            } catch (\Exception $e) {
-                return $fallback;
-            }
-        };
 
-        $from = $parse($request->input('from'), now()->startOfMonth()->format('Y-m-d'));
-        $to = $parse($request->input('to'), now()->format('Y-m-d'));
-
-        return $from <= $to ? [$from, $to] : [$to, $from];
-    }
-
-    private function importReport(int $departmentId, string $from, string $to)
-    {
-        return DB::table(self::TABLE)
-            ->join('standard_categories', self::TABLE.'.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
-            ->select(
-                'standard_categories.id as category_id',
-                'standard_categories.code as category_code',
-                'standard_categories.version',
-                'standard_categories.groups',
-                'chem_names.name as standard_name',
-                'manufacturers.name as manufacturer_name',
-                'units.short_name as unit_short_name',
-                'units.name as unit_name',
-                DB::raw('SUM('.self::TABLE.'.amount) as total'),
-                DB::raw('COUNT(*) as times'),
-                DB::raw('COUNT(DISTINCT '.self::TABLE.'.supplier_id) as supplier_count'),
-                DB::raw('MIN('.self::TABLE.'.imported_date) as first_imported_date'),
-                DB::raw('MAX('.self::TABLE.'.imported_date) as last_imported_date')
-            )
-            ->where(self::TABLE.'.department_id', $departmentId)
-            ->where(self::TABLE.'.status_id', 1)
-            ->whereBetween(self::TABLE.'.imported_date', [$from, $to])
-            ->groupBy(
-                'standard_categories.id',
-                'standard_categories.code',
-                'standard_categories.version',
-                'standard_categories.groups',
-                'chem_names.name',
-                'manufacturers.name',
-                'units.short_name',
-                'units.name'
-            )
-            ->orderBy('standard_categories.code', 'asc')
-            ->get()
-            ->map(function ($row) {
-                $row->total = (float) $row->total;
-                $row->unit = $row->unit_short_name ?: $row->unit_name;
-
-                return $row;
-            });
-    }
 
     private function writeHistory(int $id, string $action, ?string $note, ?string $reason = null): void
     {
@@ -616,6 +573,7 @@ class StandardImportController extends Controller
             'standard_form' => $row->standard_form ?? null,
             'requires_aliquot' => $row->requires_aliquot ?? 0,
             'supplier_id' => $row->supplier_id,
+            'purpose_id' => $row->purpose_id ?? null,
             'location_id' => $row->location_id,
             'note' => $row->note,
             'status_id' => $row->status_id,
@@ -654,6 +612,15 @@ class StandardImportController extends Controller
                 continue;
             }
 
+            if ($field === 'purpose_id') {
+                $oldNames = $this->purposeNames($old);
+                $newNames = $this->purposeNames($new);
+                if ($oldNames !== $newNames) {
+                    $parts[] = $title.': '.($oldNames ?: '—').' -> '.($newNames ?: '—');
+                }
+                continue;
+            }
+
             if ((string) $old === (string) $new) {
                 continue;
             }
@@ -677,12 +644,30 @@ class StandardImportController extends Controller
         return implode(' | ', $parts);
     }
 
+    private function purposeNames($value): string
+    {
+        if (! $value) {
+            return '';
+        }
+
+        $ids = is_array($value) ? $value : json_decode((string) $value, true);
+        if (! is_array($ids)) {
+            $ids = is_numeric($value) ? [(int) $value] : [];
+        }
+
+        if (empty($ids)) {
+            return '';
+        }
+
+        return DB::table('purposes')->whereIn('id', $ids)->pluck('name')->implode(', ');
+    }
+
     private function labelMaps(): array
     {
         return [
             'category_id' => DB::table('standard_categories')
-                ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-                ->select('standard_categories.id', 'standard_categories.code', 'chem_names.name as standard_name')
+                ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+                ->select('standard_categories.id', 'standard_categories.code', 'standard_names.name as standard_name')
                 ->get()
                 ->mapWithKeys(fn ($row) => [$row->id => trim($row->code.' '.($row->standard_name ?? ''))])
                 ->all(),
@@ -725,24 +710,36 @@ class StandardImportController extends Controller
             ->pluck('times', 'standard_import_id');
     }
 
-    private function categoryOptions()
+    private function categoryOptions(int $departmentId, array $usedIds = [])
     {
+        $usedIds = array_values(array_filter($usedIds));
+
         return DB::table('standard_categories')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('storage_conditions', 'standard_categories.storage_condition_id', '=', 'storage_conditions.id')
+            // Đơn vị hiện trên ô chọn là đơn vị PHÒNG ĐANG CHỌN đã khai cho chất chuẩn đó
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_categories.id'))
             ->select(
                 'standard_categories.id',
                 'standard_categories.code',
                 'standard_categories.version',
                 'standard_categories.groups',
                 'standard_categories.shelf_life_months',
-                'chem_names.name as standard_name',
+                'standard_categories.density',
+                'standard_names.name as standard_name',
+                'standard_names.cas_no as name_cas_no',
+                'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
+                'storage_conditions.name as storage_condition_name',
                 'units.short_name as unit_short_name'
             )
-            ->where('standard_categories.status_id', 1)
-            ->where('standard_categories.app_status', 'approved')
+            ->where(function ($query) use ($usedIds) {
+                $query->where('standard_categories.status_id', 1);
+                if ($usedIds) {
+                    $query->orWhereIn('standard_categories.id', $usedIds);
+                }
+            })
             ->orderBy('standard_categories.code', 'asc')
             ->get()
             ->map(function ($row) {
@@ -843,8 +840,12 @@ class StandardImportController extends Controller
             'amount' => ['required', 'numeric', 'min:0.0001'],
             'imported_date' => ['nullable', 'date'],
             'invoice_number' => ['nullable', 'max:100'],
-            'expiry_type' => ['required', Rule::in(['defined', 'undetermined', 'retest'])],
-            'expired_date' => ['nullable', 'date'],
+            'expiry_type' => ['required', Rule::in(['check online', 'retest', 'Specify', 'Requires_re-evaluation', 'defined', 'undetermined', 'unlimited'])],
+            'expired_date' => [
+                Rule::requiredIf(fn() => !in_array(request('expiry_type'), ['check online', 'undetermined', 'unlimited'])),
+                'nullable',
+                'date',
+            ],
             'retest_interval_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'batch_no' => ['nullable', 'max:100'],
             'coa_no' => ['nullable', 'max:100'],
@@ -854,7 +855,8 @@ class StandardImportController extends Controller
             'weight_controlled' => ['nullable', 'boolean'],
             'requires_aliquot' => ['nullable', 'boolean'],
             'supplier_id' => ['nullable', 'exists:suppliers,id'],
-            'purpose_id' => ['nullable', 'exists:purposes,id'],
+            'purpose_id' => ['nullable'],
+            'purpose_id.*' => ['exists:purposes,id'],
             'location_id' => [
                 'nullable',
                 Rule::exists('locations', 'id')
@@ -878,15 +880,35 @@ class StandardImportController extends Controller
         $groups = $cat ? StandardCode::decodeGroups($cat->groups) : [];
         $groupKey = $request->group_key ?: ($groups[0] ?? null);
 
-        $expiryType = $request->input('expiry_type', 'defined');
+        $expiryType = $request->input('expiry_type', 'Specify');
+        if (in_array($expiryType, ['undetermined', 'unlimited', 'check_online'])) {
+            $expiryType = 'check online';
+        } elseif (in_array($expiryType, ['defined', 'specify'])) {
+            $expiryType = 'Specify';
+        } elseif (in_array($expiryType, ['requires_re-evaluation', 're_evaluation'])) {
+            $expiryType = 'Requires_re-evaluation';
+        }
+
         $expiredDate = null;
         $retestInterval = null;
 
-        if ($expiryType === 'defined') {
-            $expiredDate = $this->nullIfBlank($request->expired_date);
+        if ($expiryType === 'check online') {
+            $expiredDate = null;
         } elseif ($expiryType === 'retest') {
             $expiredDate = $this->nullIfBlank($request->expired_date);
             $retestInterval = $request->retest_interval_months ? (int) $request->retest_interval_months : null;
+        } else {
+            // 'Specify' hoặc 'Requires_re-evaluation'
+            $expiredDate = $this->nullIfBlank($request->expired_date);
+        }
+
+        $purposeInput = $request->input('purpose_id');
+        $purposeJson = null;
+        if (is_array($purposeInput)) {
+            $filtered = array_values(array_filter(array_map('intval', $purposeInput)));
+            $purposeJson = !empty($filtered) ? json_encode($filtered) : null;
+        } elseif (!empty($purposeInput)) {
+            $purposeJson = is_numeric($purposeInput) ? json_encode([(int) $purposeInput]) : $purposeInput;
         }
 
         return [
@@ -906,7 +928,7 @@ class StandardImportController extends Controller
             'standard_form' => ($request->has('weight_controlled') && $request->weight_controlled) ? $this->nullIfBlank($request->standard_form) : null,
             'requires_aliquot' => $request->has('requires_aliquot') && $request->requires_aliquot ? 1 : 0,
             'supplier_id' => $request->supplier_id ? (int) $request->supplier_id : null,
-            'purpose_id' => $request->purpose_id ? (int) $request->purpose_id : null,
+            'purpose_id' => $purposeJson,
             'location_id' => $request->location_id ? (int) $request->location_id : null,
             'note' => $this->nullIfBlank($request->note),
         ];

@@ -10,7 +10,7 @@
 | Dữ liệu do JS đổ vào khi bấm nút Sửa (xem pages/export/shared/assets.blade.php).
 --}}
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 80vw; width: 80%;" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-edit"></i> Cập Nhật Phiếu Sử Dụng Chất Chuẩn</h5>
@@ -70,32 +70,6 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label>Tên Sản Phẩm Kiểm Nghiệm</label>
-                            <input type="text" list="updateProductList" name="product_name"
-                                class="form-control" value="{{ old('product_name') }}"
-                                placeholder="Ví dụ: Paracetamol 500mg...">
-                            <datalist id="updateProductList">
-                                @foreach ($productNames as $pn)
-                                    <option value="{{ $pn->name }}">
-                                @endforeach
-                            </datalist>
-                        </div>
-
-                        <div class="form-group col-md-6">
-                            <label>Kiểm Nghiệm Viên Thực Hiện</label>
-                            <select name="analyst_id" class="form-control">
-                                <option value="">-- Chọn kiểm nghiệm viên --</option>
-                                @foreach ($analysts as $an)
-                                    <option value="{{ $an->id }}" {{ old('analyst_id') == $an->id ? 'selected' : '' }}>
-                                        {{ $an->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group col-md-4">
                             <label>Số Lượng <span class="text-danger">*</span></label>
                             <input type="number" name="amount" step="0.0001" min="0.0001"
                                 class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}"
@@ -106,7 +80,7 @@
                             <span class="exp-remaining"></span>
                         </div>
 
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-6">
                             <label>Loại Phiếu <span class="text-danger">*</span></label>
                             <div class="exp-types">
                                 @foreach ($types as $value => $label)
@@ -121,53 +95,53 @@
                                 <span class="md-error">{{ $bag->first('type') }}</span>
                             @endif
                         </div>
+                    </div>
+
+                    <div class="form-row exp-export-only">
+                        <div class="form-group col-md-4">
+                            <label>Tên Sản Phẩm</label>
+                            <input type="text" list="updateProductList" name="product_name"
+                                class="form-control {{ $bag->has('product_name') ? 'is-invalid' : '' }}" value="{{ old('product_name') }}"
+                                placeholder="Ví dụ: Paracetamol 500mg...">
+                            <datalist id="updateProductList">
+                                @foreach ($productNames as $pn)
+                                    <option value="{{ $pn->name ?? $pn }}">
+                                @endforeach
+                            </datalist>
+                            @if ($bag->has('product_name'))
+                                <span class="md-error">{{ $bag->first('product_name') }}</span>
+                            @endif
+                        </div>
 
                         <div class="form-group col-md-4">
-                            <label>Ngày Sử Dụng <span class="text-danger">*</span></label>
-                            <input type="date" name="exported_date"
-                                class="form-control {{ $bag->has('exported_date') ? 'is-invalid' : '' }}"
-                                value="{{ old('exported_date') }}" required>
-                            @if ($bag->has('exported_date'))
-                                <span class="md-error">{{ $bag->first('exported_date') }}</span>
+                            <label>Số Lô</label>
+                            <input type="text" name="batch_no"
+                                class="form-control {{ $bag->has('batch_no') ? 'is-invalid' : '' }}"
+                                value="{{ old('batch_no') }}" placeholder="Ví dụ: Lô SP 010226...">
+                            @if ($bag->has('batch_no'))
+                                <span class="md-error">{{ $bag->first('batch_no') }}</span>
+                            @endif
+                        </div>
+
+                        <div class="form-group col-md-4">
+                            <label>Chỉ Tiêu</label>
+                            <input type="text" name="testing"
+                                class="form-control {{ $bag->has('testing') ? 'is-invalid' : '' }}"
+                                value="{{ old('testing') }}" placeholder="Ví dụ: Độ hoà tan, Định lượng...">
+                            @if ($bag->has('testing'))
+                                <span class="md-error">{{ $bag->first('testing') }}</span>
                             @endif
                         </div>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label>Người Kiểm Tra</label>
-                            <select name="checked_by"
-                                class="form-control exp-select {{ $bag->has('checked_by') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chọn người kiểm tra --</option>
-                                @foreach ($checkers as $checker)
-                                    <option value="{{ $checker->fullName }}"
-                                        {{ old('checked_by') == $checker->fullName ? 'selected' : '' }}>
-                                        {{ $checker->fullName }} ({{ $checker->userName }})
-                                    </option>
-                                @endforeach
-                            </select>
-                            @if ($bag->has('checked_by'))
-                                <span class="md-error">{{ $bag->first('checked_by') }}</span>
-                            @endif
-                        </div>
-
-                        <div class="form-group col-md-6">
-                            <label>Số PKN, OOS, BCSL...</label>
-                            <input type="text" name="test_report_no" maxlength="100"
-                                class="form-control {{ $bag->has('test_report_no') ? 'is-invalid' : '' }}"
-                                value="{{ old('test_report_no') }}">
-                            @if ($bag->has('test_report_no'))
-                                <span class="md-error">{{ $bag->first('test_report_no') }}</span>
-                            @endif
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Mục Đích Sử Dụng</label>
-                        <textarea name="purpose" rows="2" maxlength="500"
-                            class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}">{{ old('purpose') }}</textarea>
-                        @if ($bag->has('purpose'))
-                            <span class="md-error">{{ $bag->first('purpose') }}</span>
+                    {{-- Lý do loại bỏ (khi Loại = Loại bỏ) --}}
+                    <div class="form-group exp-cancel-only d-none">
+                        <label class="required font-weight-bold text-danger">Lý Do Loại Bỏ</label>
+                        <textarea name="reason" rows="2" maxlength="500"
+                            class="form-control {{ $bag->has('reason') ? 'is-invalid' : '' }}"
+                            placeholder="Ví dụ: Hết hạn sử dụng, hỏng bao bì, tạp chất, do OOS, BCSL...">{{ old('reason') }}</textarea>
+                        @if ($bag->has('reason'))
+                            <span class="md-error">{{ $bag->first('reason') }}</span>
                         @endif
                     </div>
 

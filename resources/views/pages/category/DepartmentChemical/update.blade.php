@@ -27,6 +27,35 @@
                             <b>khoá</b> dòng này rồi khai dòng mới để giữ lại vết.</small>
                     </div>
 
+                    {{-- Đơn vị tính là của RIÊNG PHÒNG: danh mục chung không còn khai đơn vị --}}
+                    <div class="form-group">
+                        <label>Đơn Vị Tính <span class="text-danger">*</span></label>
+                        <select name="unit_id"
+                            class="form-control cat-select dc-unit {{ $bag->has('unit_id') ? 'is-invalid' : '' }}"
+                            required>
+                            <option value="">-- Chọn đơn vị tính --</option>
+                            @foreach ($units as $unit)
+                                <option value="{{ $unit->id }}" data-short="{{ $unit->short_name }}"
+                                    {{ $old('unit_id') == $unit->id ? 'selected' : '' }}>
+                                    {{ $unit->short_name }} - {{ $unit->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if ($bag->has('unit_id'))
+                            <span class="md-error">{{ $bag->first('unit_id') }}</span>
+                        @endif
+                        <small class="md-sub">Đổi đơn vị chỉ đổi cách khai từ nay về sau, số liệu các phiếu đã
+                            lưu giữ nguyên.</small>
+                    </div>
+
+                    @include('pages.category.shared.unitConversion', [
+                        'prefix' => 'dc',
+                        'bag' => $bag,
+                        'unitsInUse' => $unitsInUse,
+                        'conversions' => $conversions,
+                        'label' => 'hoá chất',
+                    ])
+
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label>Hạn Dùng Nội Bộ (tháng)</label>
@@ -47,7 +76,7 @@
                             @if ($bag->has('min_stock'))
                                 <span class="md-error">{{ $bag->first('min_stock') }}</span>
                             @endif
-                            <small class="md-sub">Theo <b class="dc-unit-hint">đơn vị gốc</b> của danh mục.</small>
+                            <small class="md-sub">Theo <b class="dc-unit-hint">đơn vị</b> đã chọn ở trên.</small>
                         </div>
                     </div>
 
@@ -120,14 +149,11 @@
             var $form = $('#dcUpdateModal').find('form');
 
             $form.find('.dc-chem-view').val(
-                (row.category_code || '') + ' - ' + (row.chem_name || '') +
-                (row.unit ? ' (' + row.unit + ')' : ''));
+                (row.category_code || '') + ' - ' + (row.chem_name || ''));
 
             $form.find('.dc-shelf-hint').text(row.category_shelf_life_months ?
                 'Để trống thì lấy mặc định của danh mục: ' + row.category_shelf_life_months + ' tháng.' :
                 'Danh mục cũng chưa khai hạn dùng, để trống thì mã nhập sẽ không xác định được hạn nội bộ.');
-
-            $form.find('.dc-unit-hint').text(row.unit || 'đơn vị gốc');
 
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('.cat-select').each(function() {
@@ -146,8 +172,13 @@
                 picked.shelf_life_months ?
                 'Để trống thì lấy mặc định của danh mục: ' + picked.shelf_life_months + ' tháng.' :
                 'Danh mục cũng chưa khai hạn dùng, để trống thì mã nhập sẽ không xác định được hạn nội bộ.');
+        });
 
-            $form.find('.dc-unit-hint').text(picked && picked.unit ? picked.unit : 'đơn vị gốc');
+        /* ---------- Dòng nhắc "ngưỡng tồn theo đơn vị nào" chạy theo ô Đơn Vị Tính ---------- */
+        $(document).on('change', '.dc-unit', function() {
+            var short = $(this).find('option:selected').data('short');
+
+            $(this).closest('form').find('.dc-unit-hint').text(short || 'đơn vị');
         });
     });
 </script>

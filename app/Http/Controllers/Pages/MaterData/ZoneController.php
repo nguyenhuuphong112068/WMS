@@ -257,7 +257,7 @@ class ZoneController extends Controller
         ];
 
         foreach ($zone['parents'] as $column => $parentTable) {
-            $rules[$column] = ['required', Rule::exists($parentTable, 'id')];
+            $rules[$column] = ['nullable', 'integer', Rule::exists($parentTable, 'id')];
         }
 
         return $rules;
@@ -271,7 +271,7 @@ class ZoneController extends Controller
         ];
 
         foreach (array_keys($zone['parents']) as $column) {
-            $data[$column] = $request->input($column);
+            $data[$column] = $request->input($column) ?: null;
         }
 
         return $data;

@@ -15,6 +15,11 @@
     $invExpiringSoon = $datas->filter(fn($row) => $row->is_expiring_soon)
         ->sortBy('effective_expired_date')
         ->values();
+
+    /*
+    | Kiểm soát khối lượng
+    */
+    $invWeightControlled = $datas->filter(fn($row) => $row->weight_controlled)->values();
 @endphp
 
 <style>
@@ -56,6 +61,10 @@
                         <i class="fas fa-hourglass-half mr-1"></i> Chưa có hạn nội bộ
                         <span class="inv-tab-count">{{ $invWaitingInternal->count() }}</span>
                     </button>
+                    <button type="button" class="inv-tab" data-pane="invPaneWeight">
+                        <i class="fas fa-balance-scale mr-1"></i> Kiểm soát Khối lượng
+                        <span class="inv-tab-count">{{ $invWeightControlled->count() }}</span>
+                    </button>
                 </div>
 
                 {{-- ============ TỒN THEO TỪNG MÃ ỐNG CHUẨN ============ --}}
@@ -93,6 +102,12 @@
                                 'pane' => 'invPaneInternal',
                                 'label' => 'Chưa có hạn nội bộ',
                             ],
+                            [
+                                'id' => 'invWeightTable',
+                                'column' => 1,
+                                'pane' => 'invPaneWeight',
+                                'label' => 'Kiểm soát Khối lượng',
+                            ],
                         ],
                     ])
 
@@ -109,7 +124,6 @@
                                         title="Vị trí lưu trữ thực tế của ống chuẩn này (Kho / Phòng / Kệ/Tủ / Vị trí)">
                                         Vị Trí Lưu Trữ</th>
                                     <th class="text-right" style="width: 105px">Nhập</th>
-                                    <th class="text-right" style="width: 100px">Cân Đối</th>
                                     <th class="text-right" style="width: 105px">Đã Dùng</th>
                                     <th class="text-right" style="width: 100px">Huỷ Bỏ</th>
                                     <th class="text-right" style="width: 150px">Tồn Còn Lại</th>
@@ -165,17 +179,6 @@
                                             <span class="inv-amount">{{ $invNum($row->imported) }}</span>
                                             <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
                                         </td>
-                                        <td class="text-right" data-order="{{ $row->balanced }}">
-                                            @if ($row->balancing_times > 0)
-                                                <span
-                                                    class="inv-balanced {{ $row->balanced >= 0 ? 'is-plus' : 'is-minus' }}">
-                                                    {{ $row->balanced > 0 ? '+' : '' }}{{ $invNum($row->balanced) }}
-                                                </span>
-                                                <div class="md-sub">{{ $row->balancing_times }} lần</div>
-                                            @else
-                                                <span class="inv-amount inv-muted">—</span>
-                                            @endif
-                                        </td>
                                         <td class="text-right" data-order="{{ $row->used }}">
                                             <span class="inv-amount {{ $row->used > 0 ? '' : 'inv-muted' }}">
                                                 {{ $invNum($row->used) }}
@@ -224,16 +227,23 @@
                                         </td>
                                         <td class="text-center md-sub"
                                             data-order="{{ $row->expired_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->expired_date) }}
-                                            @if ($row->days_to_expiry !== null && $row->remaining > 0)
-                                                <div>
-                                                    @if ($row->days_to_expiry < 0)
-                                                        <span class="text-danger font-weight-bold">Quá
-                                                            {{ abs($row->days_to_expiry) }} ngày</span>
-                                                    @else
-                                                        Còn {{ $row->days_to_expiry }} ngày
-                                                    @endif
-                                                </div>
+                                            @if ($invIsCheckOnline($row))
+                                                <span class="badge badge-warning"
+                                                    title="Hạn dùng chưa xác định từ NSX. Tra cứu trực tuyến khi sử dụng.">
+                                                    <i class="fas fa-globe"></i> Check online
+                                                </span>
+                                            @else
+                                                {{ $invDate($row->expired_date) }}
+                                                @if ($row->days_to_expiry !== null && $row->remaining > 0)
+                                                    <div>
+                                                        @if ($row->days_to_expiry < 0)
+                                                            <span class="text-danger font-weight-bold">Quá
+                                                                {{ abs($row->days_to_expiry) }} ngày</span>
+                                                        @else
+                                                            Còn {{ $row->days_to_expiry }} ngày
+                                                        @endif
+                                                    </div>
+                                                @endif
                                             @endif
                                         </td>
                                         <td class="text-center md-sub"
@@ -267,40 +277,6 @@
                                                     <i class="fas fa-hourglass-half mr-1"></i> Hạn nội bộ
                                                 </button>
                                             @endif
-                                            {{-- Badge góc trên bên phải: số lần đã cân đối, bấm vào để xem lịch sử --}}
-                                            <span class="inv-btn-wrap">
-                                                <button type="button"
-                                                    class="btn btn-sm btn-{{ $row->state === 'over' ? 'danger' : 'primary' }} btn-inv-balancing"
-                                                    title="Cân đối số lượng nhập của ống chuẩn này"
-                                                    data-row="{{ json_encode([
-                                                        'import_id' => $row->id,
-                                                        'code' => $row->code,
-                                                        'chem_name' => $row->standard_name,
-                                                        'unit' => $row->unit_short_name ?: $row->unit_name,
-                                                        'imported' => (float) $row->imported,
-                                                        'balanced' => (float) $row->balanced,
-                                                        'gap' => (float) $row->gap,
-                                                        'limit' => (float) $row->balancing_limit,
-                                                        'min_input' => (float) $row->balancing_min_input,
-                                                        'max_input' => (float) $row->balancing_max_input,
-                                                    ]) }}">
-                                                    <i class="fas fa-scale-balanced mr-1"></i> Cân đối
-                                                </button>
-                                                @if ($row->balancing_times > 0)
-                                                    <button type="button" class="inv-count-badge btn-inv-history"
-                                                        title="Xem {{ $row->balancing_times }} lần cân đối của ống chuẩn này"
-                                                        data-row="{{ json_encode([
-                                                            'import_id' => $row->id,
-                                                            'code' => $row->code,
-                                                            'chem_name' => $row->standard_name,
-                                                            'category_code' => $row->category_code,
-                                                            'unit' => $row->unit_short_name ?: $row->unit_name,
-                                                            'imported' => (float) $row->imported,
-                                                            'balanced' => (float) $row->balanced,
-                                                            'gap' => (float) $row->gap,
-                                                        ]) }}">{{ $row->balancing_times }}</button>
-                                                @endif
-                                            </span>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -330,7 +306,6 @@
                                     <th>Chất Chuẩn</th>
                                     <th class="text-center" style="width: 120px">Ống Chuẩn</th>
                                     <th class="text-right" style="width: 110px">Tổng Nhập</th>
-                                    <th class="text-right" style="width: 100px">Cân Đối</th>
                                     <th class="text-right" style="width: 110px">Đã Dùng</th>
                                     <th class="text-right" style="width: 100px">Huỷ Bỏ</th>
                                     <th class="text-right" style="width: 130px">Tồn Còn Lại</th>
@@ -358,14 +333,6 @@
                                         <td class="text-right" data-order="{{ $sum->imported }}">
                                             <span class="inv-amount">{{ $invNum($sum->imported) }}</span>
                                             <div class="md-sub">{{ $sum->unit }}</div>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $sum->balanced }}">
-                                            @if ($sum->balanced != 0)
-                                                <span
-                                                    class="inv-balanced {{ $sum->balanced > 0 ? 'is-plus' : 'is-minus' }}">{{ $sum->balanced > 0 ? '+' : '' }}{{ $invNum($sum->balanced) }}</span>
-                                            @else
-                                                <span class="inv-amount inv-muted">—</span>
-                                            @endif
                                         </td>
                                         <td class="text-right" data-order="{{ $sum->used }}">
                                             <span
@@ -575,7 +542,14 @@
                                         </td>
                                         <td class="text-center md-sub"
                                             data-order="{{ $row->expired_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->expired_date) }}
+                                            @if ($invIsCheckOnline($row))
+                                                <span class="badge badge-warning"
+                                                    title="Hạn dùng chưa xác định từ NSX. Tra cứu trực tuyến khi sử dụng.">
+                                                    <i class="fas fa-globe"></i> Check online
+                                                </span>
+                                            @else
+                                                {{ $invDate($row->expired_date) }}
+                                            @endif
                                         </td>
                                         <td class="text-center md-sub"
                                             data-order="{{ $row->internal_expired_date ?: '9999-12-31' }}">
@@ -665,7 +639,14 @@
                                         </td>
                                         <td class="text-center md-sub"
                                             data-order="{{ $row->expired_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->expired_date) }}
+                                            @if ($invIsCheckOnline($row))
+                                                <span class="badge badge-warning"
+                                                    title="Hạn dùng chưa xác định từ NSX. Tra cứu trực tuyến khi sử dụng.">
+                                                    <i class="fas fa-globe"></i> Check online
+                                                </span>
+                                            @else
+                                                {{ $invDate($row->expired_date) }}
+                                            @endif
                                         </td>
                                         <td class="text-center">
                                             <span class="md-tag">{{ $row->shelf_life_months }} tháng</span>
@@ -683,6 +664,82 @@
                                                 ]) }}">
                                                 <i class="fas fa-hourglass-half mr-1"></i> Xác định
                                             </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- ============ KIỂM SOÁT KHỐI LƯỢNG ============ --}}
+                <div class="inv-pane" id="invPaneWeight">
+                    <div class="md-toolbar">
+                        <p class="hint">
+                            <i class="fas fa-balance-scale mr-1"></i>
+                            Các ống chuẩn có khai báo <b>Kiểm soát khối lượng</b>. Độ lệch = |Khối lượng thực - Tổng lượng xuất| / Tổng lượng xuất * 100%. Nếu đơn vị là ml hoặc g sẽ được quy đổi sang mg.
+                        </p>
+                    </div>
+
+                    @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'invWeightTable'])
+
+                    <div class="table-responsive">
+                        <table id="invWeightTable" class="table table-bordered table-hover w-100">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 50px">STT</th>
+                                    <th style="width: 150px">Mã Ống Chuẩn</th>
+                                    <th>Chất Chuẩn</th>
+                                    <th style="width: 130px">Dạng Chuẩn</th>
+                                    <th class="text-right" style="width: 130px">Qui Cách (Thực)</th>
+                                    <th class="text-right" style="width: 120px">Tổng Xuất</th>
+                                    <th class="text-center" style="width: 110px">Độ Lệch (%)</th>
+                                    <th class="text-center" style="width: 110px">Giới Hạn (%)</th>
+                                    <th class="text-center" style="width: 100px">Kết Quả</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($invWeightControlled as $row)
+                                    <tr data-groups="{{ $invGroups($row->groups) }}">
+                                        <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td>
+                                            <span class="inv-code">{{ $row->code }}</span>
+                                            @if ($row->batch_no)
+                                                <div class="md-sub">Lô {{ $row->batch_no }}</div>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
+                                            <div class="md-sub">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                                <span class="sgr-version ml-1">v{{ $row->category_version }}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {{ $row->standard_form ?: '—' }}
+                                        </td>
+                                        <td class="text-right" data-order="{{ $row->imported }}">
+                                            <span class="inv-amount">{{ $invNum($row->imported) }}</span>
+                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $row->used }}">
+                                            <span class="inv-amount">{{ $invNum($row->used) }}</span>
+                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                        </td>
+                                        <td class="text-center font-weight-bold {{ $row->used > 0 && $row->deviation > $row->ghkl ? 'text-danger' : 'text-success' }}" data-order="{{ $row->deviation }}">
+                                            {{ $row->used > 0 ? $row->deviation . '%' : '—' }}
+                                        </td>
+                                        <td class="text-center" data-order="{{ $row->ghkl }}">
+                                            <span class="md-tag">{{ $row->ghkl }}%</span>
+                                        </td>
+                                        <td class="text-center">
+                                            @if ($row->used == 0)
+                                                <span class="md-empty">Chưa tính</span>
+                                            @elseif ($row->deviation > $row->ghkl)
+                                                <span class="badge badge-danger">Không đạt</span>
+                                            @else
+                                                <span class="badge badge-success">Đạt</span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -712,6 +769,7 @@
             '#invZoneTable': 'Chưa có ống chuẩn nào ở định khu đang chọn.',
             '#invExpiringTable': 'Không có ống chuẩn nào còn tồn mà sắp hết hạn.',
             '#invInternalTable': 'Tất cả chất chuẩn có khai báo hạn dùng mặc định đều đã xác định hạn dùng nội bộ.',
+            '#invWeightTable': 'Không có ống chuẩn nào có khai báo kiểm soát khối lượng.',
         };
 
         Object.keys(sdEmpty).forEach(function(selector) {

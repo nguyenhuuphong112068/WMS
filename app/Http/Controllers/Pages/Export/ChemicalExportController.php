@@ -87,7 +87,8 @@ class ChemicalExportController extends Controller
             ->leftJoin('imports', self::TABLE.'.import_id', '=', 'imports.id')
             ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            // Đơn vị tính khai ở danh mục hoá chất CỦA PHÒNG, không còn ở danh mục chung
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'imports.category_id'))
             // Phòng ban nhận và mã lô đã sinh ra bên đó, chỉ có ở phiếu chuyển kho
             ->leftJoin('deparments', self::TABLE.'.to_department_id', '=', 'deparments.id')
             ->leftJoin('imports as received', self::TABLE.'.received_import_id', '=', 'received.id')
@@ -122,7 +123,7 @@ class ChemicalExportController extends Controller
 
         return view('pages.export.ChemicalExport.list', [
             'datas' => $datas,
-            'categories' => $this->categoryOptions(),
+            'categories' => $this->categoryOptions($departmentId),
             'requestsSent' => $requests['sent'],
             'requestsReceived' => $requests['received'],
             'imports' => $this->importOptions($departmentId),
@@ -405,7 +406,7 @@ class ChemicalExportController extends Controller
             ->leftJoin('imports', self::HISTORY_TABLE.'.import_id', '=', 'imports.id')
             ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $this->departmentId(), 'imports.category_id'))
             ->leftJoin('deparments', self::HISTORY_TABLE.'.to_department_id', '=', 'deparments.id')
             ->select(
                 self::HISTORY_TABLE.'.*',
@@ -569,11 +570,11 @@ class ChemicalExportController extends Controller
 
         $query = DB::table('imports')
             ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
-            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id');
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id');
 
-        // Hạn dùng nội bộ lấy theo cấu hình của phòng ban đang chọn
+        // Hạn dùng nội bộ và đơn vị tính lấy theo cấu hình của phòng ban đang chọn
         return DepartmentChemical::join($query, $departmentId, 'imports.category_id')
+            ->leftJoin('units', DepartmentChemical::TABLE.'.unit_id', '=', 'units.id')
             ->select(
                 'imports.id',
                 'imports.code',
@@ -642,7 +643,7 @@ class ChemicalExportController extends Controller
      *
      * Cộng dồn các phiếu sử dụng còn hiệu lực trong khoảng ngày, gom theo
      * chemical_categories.code (mã danh mục hoá chất). Mỗi dòng có:
-     * - Số lượng theo ĐƠN VỊ GỐC của danh mục (chemical_categories.unit_id)
+     * - Số lượng theo đơn vị phòng đã khai cho hoá chất đó (department_chemicals.unit_id)
      * - Số lượng QUY ĐỔI SANG KG qua App\Support\UnitConverter
      *
      * Đơn vị nhóm đếm (chai, thùng...) không quy đổi tự động được, và đổi thể tích
@@ -658,7 +659,7 @@ class ChemicalExportController extends Controller
             ->join('imports', self::TABLE.'.import_id', '=', 'imports.id')
             ->join('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'imports.category_id'))
             ->select(
                 'chemical_categories.id as category_id',
                 'chemical_categories.code as category_code',
@@ -904,7 +905,13 @@ class ChemicalExportController extends Controller
         $base = fn () => DB::table(self::REQUEST_TABLE)
             ->leftJoin('chemical_categories', self::REQUEST_TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            // Đơn vị theo PHÒNG ĐÃ TẠO đề nghị (chính chủ request), dù đang xem chiều gửi
+            // hay chiều nhận: số lượng ghi trong đề nghị luôn theo đơn vị của phòng đó.
+            ->tap(fn ($query) => DepartmentChemical::joinUnitOn(
+                $query,
+                self::REQUEST_TABLE.'.department_id',
+                self::REQUEST_TABLE.'.category_id'
+            ))
             ->leftJoin('exports', self::REQUEST_TABLE.'.export_id', '=', 'exports.id')
             ->select(
                 self::REQUEST_TABLE.'.*',
@@ -934,11 +941,12 @@ class ChemicalExportController extends Controller
     }
 
     /** Danh mục hoá chất để chọn khi gửi đề nghị. */
-    private function categoryOptions()
+    private function categoryOptions(int $departmentId)
     {
         return DB::table('chemical_categories')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            // Đơn vị hiện trên ô chọn là đơn vị PHÒNG ĐANG CHỌN đã khai cho hoá chất đó
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'chemical_categories.id'))
             ->select(
                 'chemical_categories.id',
                 'chemical_categories.code',

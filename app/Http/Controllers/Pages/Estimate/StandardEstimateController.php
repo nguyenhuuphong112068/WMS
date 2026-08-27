@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Estimate;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DepartmentStandard;
 use App\Support\StandardCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -503,16 +504,19 @@ class StandardEstimateController extends Controller
      */
     public static function itemsOf(int $listId)
     {
+        // Đơn vị tính nằm ở danh mục chất chuẩn CỦA PHÒNG, nên phải biết phiếu này của phòng nào
+        $departmentId = (int) DB::table(self::TABLE)->where('id', $listId)->value('department_id');
+
         $items = DB::table(self::ITEM_TABLE)
             ->leftJoin('standard_categories', self::ITEM_TABLE.'.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, self::ITEM_TABLE.'.category_id'))
             ->select(
                 self::ITEM_TABLE.'.*',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no as category_cas_no',
-                'chem_names.name as category_standard_name',
+                'standard_names.name as category_standard_name',
                 'units.short_name as category_unit_short_name'
             )
             ->where(self::ITEM_TABLE.'.standard_estimate_id', $listId)
@@ -700,15 +704,17 @@ class StandardEstimateController extends Controller
     /** Danh mục chất chuẩn đã duyệt và đang hoạt động mới được chọn để dự trù. */
     private function categoryOptions()
     {
+        $departmentId = $this->departmentId();
+
         return DB::table('standard_categories')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            // Đơn vị hiện trên ô chọn là đơn vị PHÒNG ĐANG CHỌN đã khai cho chất chuẩn đó
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_categories.id'))
             ->select(
                 'standard_categories.id',
                 'standard_categories.code',
                 'standard_categories.version',
-                'standard_categories.unit_id',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'units.short_name as unit_short_name'
             )
             ->where('standard_categories.status_id', 1)

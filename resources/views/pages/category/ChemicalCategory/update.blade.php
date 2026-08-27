@@ -68,46 +68,24 @@
                                 @endif
                             </div>
 
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Nhà Sản Xuất <span class="text-danger">*</span></label>
-                                        <select name="manufacturers_id"
-                                            class="form-control cat-select {{ $bag->has('manufacturers_id') ? 'is-invalid' : '' }}"
-                                            required>
-                                            <option value="">-- Chọn nhà sản xuất --</option>
-                                            @foreach ($manufacturers as $option)
-                                                <option value="{{ $option->id }}"
-                                                    {{ $old('manufacturers_id') == $option->id ? 'selected' : '' }}>
-                                                    {{ $option->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @if ($bag->has('manufacturers_id'))
-                                            <span class="md-error">{{ $bag->first('manufacturers_id') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Đơn Vị Tính <span class="text-danger">*</span></label>
-                                        <select name="unit_id"
-                                            class="form-control cat-select {{ $bag->has('unit_id') ? 'is-invalid' : '' }}"
-                                            required>
-                                            <option value="">-- Chọn đơn vị tính --</option>
-                                            @foreach ($units as $option)
-                                                <option value="{{ $option->id }}"
-                                                    {{ $old('unit_id') == $option->id ? 'selected' : '' }}>
-                                                    {{ $option->short_name }} - {{ $option->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @if ($bag->has('unit_id'))
-                                            <span class="md-error">{{ $bag->first('unit_id') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
+                            {{-- Đơn vị tính đã chuyển sang tab "Hoá Chất Của Phòng": mỗi phòng nhập /
+                                 xuất theo đơn vị của phòng mình. --}}
+                            <div class="form-group">
+                                <label>Nhà Sản Xuất <span class="text-danger">*</span></label>
+                                <select name="manufacturers_id"
+                                    class="form-control cat-select {{ $bag->has('manufacturers_id') ? 'is-invalid' : '' }}"
+                                    required>
+                                    <option value="">-- Chọn nhà sản xuất --</option>
+                                    @foreach ($manufacturers as $option)
+                                        <option value="{{ $option->id }}"
+                                            {{ $old('manufacturers_id') == $option->id ? 'selected' : '' }}>
+                                            {{ $option->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @if ($bag->has('manufacturers_id'))
+                                    <span class="md-error">{{ $bag->first('manufacturers_id') }}</span>
+                                @endif
                             </div>
 
                             <div class="row">

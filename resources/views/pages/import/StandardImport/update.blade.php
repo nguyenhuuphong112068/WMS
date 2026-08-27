@@ -40,6 +40,7 @@
                             <label>Chất Chuẩn <span class="text-danger">*</span></label>
                             <select name="category_id"
                                 class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
+                                data-defaults="{{ json_encode($categoryDefaults) }}"
                                 required>
                                 <option value="">-- Chọn chất chuẩn --</option>
                                 @foreach ($categories as $category)
@@ -130,13 +131,16 @@
                         </div>
 
                         <div class="form-group col-md-4">
-                            <label>Mục Đích Sử Dụng</label>
-                            <select name="purpose_id"
-                                class="form-control imp-select {{ $bag->has('purpose_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chọn mục đích --</option>
+                            <label>Chỉ Tiêu Kiểm</label>
+                            @php
+                                $oldPurposes = (array) old('purpose_id', []);
+                            @endphp
+                            <select name="purpose_id[]"
+                                class="form-control imp-select sd-up-purpose-select {{ $bag->has('purpose_id') ? 'is-invalid' : '' }}"
+                                multiple="multiple" data-placeholder="-- Chọn chỉ tiêu kiểm --">
                                 @foreach ($purposes as $purpose)
                                     <option value="{{ $purpose->id }}"
-                                        {{ old('purpose_id') == $purpose->id ? 'selected' : '' }}>
+                                        {{ in_array($purpose->id, $oldPurposes) ? 'selected' : '' }}>
                                         {{ $purpose->name }}
                                     </option>
                                 @endforeach
@@ -144,6 +148,7 @@
                             @if ($bag->has('purpose_id'))
                                 <span class="md-error">{{ $bag->first('purpose_id') }}</span>
                             @endif
+                            <small class="md-sub">Chỉ tiêu kiểm nghiệm (chọn 1 hoặc nhiều).</small>
                         </div>
                     </div>
 
@@ -154,36 +159,50 @@
                         </label>
 
                         <div class="d-flex flex-wrap align-items-center mb-2" style="gap: 18px;">
+                            {{-- 1. Hạn dùng xác định --}}
                             <div class="custom-control custom-radio">
-                                <input type="radio" id="upExpTypeDefined" name="expiry_type" value="defined"
+                                <input type="radio" id="upExpTypeSpecify" name="expiry_type" value="Specify"
                                     class="custom-control-input sd-up-exp-type">
-                                <label class="custom-control-label" for="upExpTypeDefined">Hạn dùng xác định</label>
+                                <label class="custom-control-label" for="upExpTypeSpecify">Hạn dùng xác định</label>
                             </div>
+
+                            {{-- 2. Check online --}}
                             <div class="custom-control custom-radio">
-                                <input type="radio" id="upExpTypeUndetermined" name="expiry_type" value="undetermined"
+                                <input type="radio" id="upExpTypeCheckOnline" name="expiry_type" value="check online"
                                     class="custom-control-input sd-up-exp-type">
-                                <label class="custom-control-label" for="upExpTypeUndetermined">Chưa xác định (Check online)</label>
+                                <label class="custom-control-label" for="upExpTypeCheckOnline">Chưa xác định (Check online)</label>
                             </div>
+
+                            {{-- 3. Retest --}}
                             <div class="custom-control custom-radio">
                                 <input type="radio" id="upExpTypeRetest" name="expiry_type" value="retest"
                                     class="custom-control-input sd-up-exp-type">
                                 <label class="custom-control-label" for="upExpTypeRetest">Cần Retest định kỳ</label>
                             </div>
+
+                            <div class="custom-control custom-radio" id="upWrapExpTypeReEvaluation">
+                                <input type="radio" id="upExpTypeReEvaluation" name="expiry_type" value="Requires_re-evaluation"
+                                    class="custom-control-input sd-up-exp-type">
+                                <label class="custom-control-label" for="upExpTypeReEvaluation" id="upLabelExpTypeReEvaluation">
+                                    Cần xác định lại hạn dùng nội bộ
+                                </label>
+                            </div>
                         </div>
 
                         <div class="form-row mt-2 sd-up-exp-defined-box">
-                            <div class="form-group col-md-6 mb-0">
-                                <label>Hạn Sử Dụng</label>
-                                <input type="date" name="expired_date"
-                                    class="form-control sd-up-expired-date {{ $bag->has('expired_date') ? 'is-invalid' : '' }}"
-                                    value="{{ old('expired_date') }}">
-                            </div>
-
-                            <div class="form-group col-md-6 mb-0 sd-up-retest-box" style="display:none;">
-                                <label>Chu Kỳ Retest (Tháng)</label>
-                                <input type="number" name="retest_interval_months" min="1" max="1200"
-                                    class="form-control sd-up-retest-months {{ $bag->has('retest_interval_months') ? 'is-invalid' : '' }}"
-                                    value="{{ old('retest_interval_months') }}" placeholder="Ví dụ: 6, 12">
+                            <div class="form-group col-md-12 mb-0">
+                                <label class="sd-up-label-exp-date font-weight-bold">Hạn Sử Dụng (NSX) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="date" name="expired_date"
+                                        class="form-control sd-up-expired-date {{ $bag->has('expired_date') ? 'is-invalid' : '' }}"
+                                        value="{{ old('expired_date') }}">
+                                    <div class="input-group-append sd-up-auto-calc-btn-wrap" style="display: none;">
+                                        <button type="button" class="btn btn-outline-info sd-up-btn-calc-exp" title="Tính hạn dùng theo danh mục phòng">
+                                            <i class="fas fa-magic"></i> Gợi ý
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="md-sub sd-up-exp-hint">Hạn sử dụng ghi trên nhãn NSX.</small>
                             </div>
                         </div>
 
@@ -204,7 +223,6 @@
                                     </label>
                                 </div>
 
-                                {{-- Dạng chuẩn chỉ hiện khi tick chọn kiểm soát khối lượng --}}
                                 <div class="sd-up-standard-form-box mt-2 pt-2 border-top" style="display:none;">
                                     <label class="small font-weight-bold mb-1 text-primary d-block">Dạng Chuẩn <span class="text-danger">*</span></label>
                                     <select name="standard_form" class="form-control sd-up-standard-form-select" style="height: 38px !important; font-size: 0.9rem;">
@@ -247,15 +265,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <label class="required font-weight-bold text-danger">Lý Do Điều Chỉnh</label>
                         <textarea name="reason" rows="2" maxlength="500"
                             class="form-control {{ $bag->has('reason') ? 'is-invalid' : '' }}"
-                            placeholder="Ví dụ: Nhập sai thông tin, điều chỉnh lại cho đúng thực tế"
-                            required>{{ old('reason') }}</textarea>
+                            placeholder="Nhập lý do điều chỉnh thông tin phiếu nhập..." required>{{ old('reason') }}</textarea>
                         @if ($bag->has('reason'))
                             <span class="md-error">{{ $bag->first('reason') }}</span>
                         @endif
-                        <small class="md-sub">Bắt buộc. Lý do được lưu vào lịch sử điều chỉnh của phiếu.</small>
                     </div>
 
                     <div class="md-hint">
@@ -293,18 +309,76 @@
         // Toggle loại hạn dùng trong update
         $(document).on('change', '#updateModal .sd-up-exp-type', function() {
             var val = $(this).val();
-            if (val === 'undetermined') {
+            var $dateInput = $upModal.find('.sd-up-expired-date');
+            var $label = $upModal.find('.sd-up-label-exp-date');
+            var $hint = $upModal.find('.sd-up-exp-hint');
+
+            if (val === 'check online' || val === 'undetermined' || val === 'unlimited') {
                 $upModal.find('.sd-up-exp-defined-box').slideUp(150);
                 $upModal.find('.sd-up-exp-undetermined-msg').slideDown(150);
-                $upModal.find('.sd-up-retest-box').hide();
+                $dateInput.prop('required', false);
             } else if (val === 'retest') {
                 $upModal.find('.sd-up-exp-defined-box').slideDown(150);
                 $upModal.find('.sd-up-exp-undetermined-msg').slideUp(150);
-                $upModal.find('.sd-up-retest-box').slideDown(150);
-            } else {
+                $label.html('Hạn Retest NSX <span class="text-danger">*</span>');
+                $hint.text('Hạn kiểm nghiệm lại (retest) do NSX công bố.');
+                $dateInput.prop('required', true);
+            } else if (val === 'Requires_re-evaluation') {
                 $upModal.find('.sd-up-exp-defined-box').slideDown(150);
                 $upModal.find('.sd-up-exp-undetermined-msg').slideUp(150);
-                $upModal.find('.sd-up-retest-box').slideUp(150);
+                $label.html('Hạn Sử Dụng (NSX) <span class="text-danger">*</span>');
+                $hint.text('Hạn sử dụng NSX (kết hợp tính hạn dùng nội bộ sau khi mở ống).');
+                $dateInput.prop('required', true);
+            } else {
+                // Specify
+                $upModal.find('.sd-up-exp-defined-box').slideDown(150);
+                $upModal.find('.sd-up-exp-undetermined-msg').slideUp(150);
+                $label.html('Hạn Sử Dụng (NSX) <span class="text-danger">*</span>');
+                $hint.text('Hạn sử dụng ghi trên nhãn NSX.');
+                $dateInput.prop('required', true);
+            }
+        });
+
+        // Bấm nút gợi ý hạn dùng trong update (tính từ ngày nhập)
+        $(document).on('click', '#updateModal .sd-up-btn-calc-exp', function() {
+            var months = parseInt($(this).data('months'), 10);
+            var impDateVal = $upModal.find('input[name="imported_date"]').val() || new Date().toISOString().split('T')[0];
+            if (!months || !impDateVal) return;
+
+            var d = new Date(impDateVal);
+            if (isNaN(d.getTime())) return;
+
+            d.setMonth(d.getMonth() + months);
+            var yyyy = d.getFullYear();
+            var mm = String(d.getMonth() + 1).padStart(2, '0');
+            var dd = String(d.getDate()).padStart(2, '0');
+
+            $upModal.find('.sd-up-expired-date').val(yyyy + '-' + mm + '-' + dd);
+        });
+
+        // Cập nhật cấu hình khi chọn lại category trong modal update
+        $(document).on('change', '#updateModal select[name="category_id"]', function() {
+            var catId = $(this).val();
+            var defaultsMap = $(this).data('defaults') || {};
+            var item = defaultsMap[catId] || null;
+            var shelfLife = (item && item.shelf_life_months) ? parseInt(item.shelf_life_months, 10) : 0;
+            var $optReEval = $upModal.find('#upExpTypeReEvaluation');
+            var $lblReEval = $upModal.find('#upLabelExpTypeReEvaluation');
+
+            if (shelfLife > 0) {
+                $upModal.find('.sd-up-exp-type').not($optReEval).prop('disabled', true);
+                $optReEval.prop('disabled', false).prop('checked', true).trigger('change');
+                $lblReEval.removeClass('text-muted').attr('title', 'Chuẩn có hạn dùng nội bộ: ' + shelfLife + ' tháng');
+                $upModal.find('.sd-up-auto-calc-btn-wrap').show();
+                $upModal.find('.sd-up-btn-calc-exp').data('months', shelfLife);
+            } else {
+                $upModal.find('.sd-up-exp-type').not($optReEval).prop('disabled', false);
+                $optReEval.prop('disabled', true);
+                $lblReEval.addClass('text-muted').attr('title', 'Chất chuẩn chưa có thiết lập hạn dùng nội bộ (shelf_life_months > 0)');
+                $upModal.find('.sd-up-auto-calc-btn-wrap').hide();
+                if ($optReEval.is(':checked')) {
+                    $upModal.find('#upExpTypeSpecify').prop('checked', true).trigger('change');
+                }
             }
         });
 
@@ -316,14 +390,25 @@
             $upModal.find('input[name="id"]').val(row.id || '');
             $upModal.find('input[name="code"]').val(row.code || '');
             $upModal.find('input[name="group_key"]').val(row.group_key || '');
-            $upModal.find('select[name="category_id"]').val(row.category_id || '').trigger('change');
             $upModal.find('input[name="amount"]').val(row.amount || '');
             $upModal.find('input[name="batch_no"]').val(row.batch_no || '');
             $upModal.find('input[name="coa_no"]').val(row.coa_no || '');
             $upModal.find('input[name="potency"]').val(row.potency || '');
             $upModal.find('input[name="moisture"]').val(row.moisture || '');
             $upModal.find('select[name="location_id"]').val(row.location_id || '').trigger('change');
-            $upModal.find('select[name="purpose_id"]').val(row.purpose_id || '').trigger('change');
+            
+            // Set multiselect Chỉ tiêu kiểm (purpose_id)
+            var purpVal = row.purpose_id;
+            var purpArr = [];
+            if (Array.isArray(purpVal)) {
+                purpArr = purpVal;
+            } else if (typeof purpVal === 'string' && purpVal.startsWith('[')) {
+                try { purpArr = JSON.parse(purpVal); } catch(e) { purpArr = []; }
+            } else if (purpVal) {
+                purpArr = [String(purpVal)];
+            }
+            $upModal.find('select[name="purpose_id[]"]').val(purpArr.map(String)).trigger('change');
+
             $upModal.find('input[name="imported_date"]').val(row.imported_date || '');
             $upModal.find('input[name="note"]').val(row.note || '');
 
@@ -341,11 +426,26 @@
             // Checkbox triết ống
             $upModal.find('.sd-up-req-aliquot').prop('checked', !!row.requires_aliquot);
 
-            // Expiry type
-            var expType = row.expiry_type || 'defined';
+            // Expiry type: Chuẩn hoá và check đúng radio
+            var rawExpType = row.expiry_type || 'Specify';
+            var expType = 'Specify';
+            if (rawExpType === 'check online' || rawExpType === 'undetermined' || rawExpType === 'unlimited' || rawExpType === 'check_online') {
+                expType = 'check online';
+            } else if (rawExpType === 'retest') {
+                expType = 'retest';
+            } else if (rawExpType === 'Requires_re-evaluation' || rawExpType === 'requires_re-evaluation') {
+                expType = 'Requires_re-evaluation';
+            } else {
+                expType = 'Specify';
+            }
+
+            $upModal.find('.sd-up-exp-type').prop('checked', false);
             $upModal.find('.sd-up-exp-type[value="' + expType + '"]').prop('checked', true).trigger('change');
             $upModal.find('input[name="expired_date"]').val(row.expired_date || '');
-            $upModal.find('input[name="retest_interval_months"]').val(row.retest_interval_months || '');
+
+            // Kích hoạt thay đổi chất chuẩn sau khi đã gán các giá trị
+            // để logic tự động chọn hạn dùng nội bộ (nếu có) ghi đè lên thiết lập cũ.
+            $upModal.find('select[name="category_id"]').val(row.category_id || '').trigger('change');
 
             // Files đính kèm hiện có
             var files = row.attachments || [];

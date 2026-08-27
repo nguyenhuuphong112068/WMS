@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\CategoryUnitConversion;
 use App\Support\DepartmentChemical;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
@@ -21,6 +22,9 @@ use Illuminate\Validation\Rule;
  *
  * Cột classification lưu danh sách mã nhóm phân loại dạng JSON, ví dụ ["PL2","N1"].
  * Danh sách mã đầy đủ khai báo tại config/chemical.php.
+ *
+ * ĐƠN VỊ TÍNH không khai ở đây: mỗi phòng nhập / xuất theo đơn vị của phòng mình nên
+ * đơn vị nằm ở tab "Hoá Chất Của Phòng" (department_chemicals.unit_id).
  *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về "Chờ duyệt".
  * Mọi thay đổi đều được chụp lại ở bảng chemical_category_histories.
@@ -40,7 +44,6 @@ class ChemicalCategoryController extends Controller
         'type' => 'Loại',
         'chem_names_id' => 'Tên hoá chất',
         'manufacturers_id' => 'Nhà sản xuất',
-        'unit_id' => 'Đơn vị tính',
         'density' => 'Tỉ trọng d (g/ml)',
         'shelf_life_months' => 'Hạn dùng mặc định (tháng)',
         'storage_condition_id' => 'Điều kiện bảo quản',
@@ -54,7 +57,6 @@ class ChemicalCategoryController extends Controller
         $datas = DB::table(self::TABLE)
             ->leftJoin('chem_names', self::TABLE . '.chem_names_id', '=', 'chem_names.id')
             ->leftJoin('manufacturers', self::TABLE . '.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('units', self::TABLE . '.unit_id', '=', 'units.id')
             ->leftJoin('storage_conditions', self::TABLE . '.storage_condition_id', '=', 'storage_conditions.id')
             ->select(
                 self::TABLE . '.*',
@@ -62,8 +64,6 @@ class ChemicalCategoryController extends Controller
                 'chem_names.cas_no as cas_no',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
-                'units.name as unit_name',
-                'units.short_name as unit_short_name',
                 'storage_conditions.name as storage_condition_name'
             )
             ->orderBy(self::TABLE . '.code', 'asc')
@@ -81,7 +81,8 @@ class ChemicalCategoryController extends Controller
             'datas' => $datas,
             'chemNames' => $this->options('chem_names', $datas->pluck('chem_names_id')->all()),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
-            'units' => $this->options('units', $datas->pluck('unit_id')->all()),
+            // Danh mục không còn cột đơn vị; danh sách này chỉ để đổ vào modal Quy Đổi Đơn Vị
+            'units' => $this->options('units', []),
             'storageConditions' => $this->options('storage_conditions', $datas->pluck('storage_condition_id')->all()),
             'classifications' => config('chemical.classifications'),
             'types' => config('chemical.types'),
@@ -100,6 +101,17 @@ class ChemicalCategoryController extends Controller
             'dcCategories' => DepartmentChemical::categoryOptions($dcDatas->pluck('category_id')->all()),
             'dcLocations' => DepartmentChemical::locationOptions($departmentId),
             'dcStorageConditions' => DepartmentChemical::storageConditionOptions(),
+            'dcUnits' => DepartmentChemical::unitOptions($dcDatas->pluck('unit_id')->all()),
+            /*
+            | Đơn vị các phòng KHÁC đang dùng cho từng hoá chất. Phòng đang khai chọn đơn
+            | vị lệch với danh sách này thì modal bắt khai thêm hệ số quy đổi, để lúc
+            | chuyển kho hệ thống đổi được số lượng qua lại.
+            */
+            'dcUnitsInUse' => CategoryUnitConversion::unitsInUseByCategory(
+                CategoryUnitConversion::TYPE_CHEMICAL,
+                $departmentId
+            ),
+            'dcConversions' => CategoryUnitConversion::declaredByCategory(CategoryUnitConversion::TYPE_CHEMICAL),
         ]);
     }
 
@@ -233,26 +245,33 @@ class ChemicalCategoryController extends Controller
                 $codes = $this->decodeCodes($row->classification);
                 $warningCodes = $this->decodeCodes($row->safety_warning);
 
+                $snapshot = [
+                    'Mã danh mục' => $row->code ?: '—',
+                    'Loại' => $row->type ?: '—',
+                    'Tên hoá chất' => $row->chem_name ?: '—',
+                    'Nhà sản xuất' => $row->manufacturer_name ?: '—',
+                    'Tỉ trọng d (g/ml)' => $this->formatDensity($row->density),
+                    'Hạn dùng (tháng)' => $row->shelf_life_months ?: '—',
+                    'Điều kiện bảo quản' => $row->storage_condition_name ?: '—',
+                    'Số tài liệu' => $row->doc_no ?: '—',
+                    'Phân loại' => $codes ? implode(', ', $codes) : '—',
+                    'Cảnh báo an toàn' => $warningCodes
+                        ? implode(', ', array_map(fn ($code) => $safetyWarnings[$code] ?? $code, $warningCodes))
+                        : '—',
+                ];
+
+                // Đơn vị tính đã chuyển sang danh mục của phòng nên bản ghi mới không còn
+                // ghi cột này. Ảnh chụp cũ vẫn hiện lại để không mất vết đã thay đổi.
+                if ($row->unit_name) {
+                    $snapshot['Đơn vị tính (trước khi chuyển về phòng)'] = $row->unit_name;
+                }
+
                 return [
                     'action' => $row->action,
                     'change_note' => $row->change_note,
                     'created_by' => $row->created_by ?: 'NA',
                     'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
-                    'snapshot' => [
-                        'Mã danh mục' => $row->code ?: '—',
-                        'Loại' => $row->type ?: '—',
-                        'Tên hoá chất' => $row->chem_name ?: '—',
-                        'Nhà sản xuất' => $row->manufacturer_name ?: '—',
-                        'Đơn vị tính' => $row->unit_name ?: '—',
-                        'Tỉ trọng d (g/ml)' => $this->formatDensity($row->density),
-                        'Hạn dùng (tháng)' => $row->shelf_life_months ?: '—',
-                        'Điều kiện bảo quản' => $row->storage_condition_name ?: '—',
-                        'Số tài liệu' => $row->doc_no ?: '—',
-                        'Phân loại' => $codes ? implode(', ', $codes) : '—',
-                        'Cảnh báo an toàn' => $warningCodes
-                            ? implode(', ', array_map(fn ($code) => $safetyWarnings[$code] ?? $code, $warningCodes))
-                            : '—',
-                    ],
+                    'snapshot' => $snapshot,
                 ];
             })->values(),
         ]);
@@ -360,7 +379,6 @@ class ChemicalCategoryController extends Controller
             'type' => $row->type,
             'chem_names_id' => $row->chem_names_id,
             'manufacturers_id' => $row->manufacturers_id,
-            'unit_id' => $row->unit_id,
             'density' => $row->density,
             'shelf_life_months' => $row->shelf_life_months,
             'storage_condition_id' => $row->storage_condition_id,
@@ -425,7 +443,6 @@ class ChemicalCategoryController extends Controller
         return [
             'chem_names_id' => DB::table('chem_names')->pluck('name', 'id')->all(),
             'manufacturers_id' => DB::table('manufacturers')->pluck('name', 'id')->all(),
-            'unit_id' => DB::table('units')->pluck('name', 'id')->all(),
             'storage_condition_id' => DB::table('storage_conditions')->pluck('name', 'id')->all(),
         ];
     }
@@ -552,7 +569,6 @@ class ChemicalCategoryController extends Controller
             'type' => ['nullable', 'max:30'],
             'chem_names_id' => ['required', 'integer', 'exists:chem_names,id'],
             'manufacturers_id' => ['required', 'integer', 'exists:manufacturers,id'],
-            'unit_id' => ['required', 'integer', 'exists:units,id'],
             'density' => ['nullable', 'numeric', 'gt:0', 'max:999999'],
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'storage_condition_id' => ['nullable', 'integer', 'exists:storage_conditions,id'],
@@ -583,7 +599,6 @@ class ChemicalCategoryController extends Controller
             'type' => $type === '' ? null : $type,
             'chem_names_id' => (int) $request->chem_names_id,
             'manufacturers_id' => (int) $request->manufacturers_id,
-            'unit_id' => (int) $request->unit_id,
             'density' => $density === '' ? null : $density,
             'shelf_life_months' => $shelfLife === '' ? null : (int) $shelfLife,
             'storage_condition_id' => $storageConditionId === '' ? null : (int) $storageConditionId,
@@ -601,8 +616,6 @@ class ChemicalCategoryController extends Controller
             'chem_names_id.exists' => 'Tên hoá chất không hợp lệ.',
             'manufacturers_id.required' => 'Vui lòng chọn nhà sản xuất.',
             'manufacturers_id.exists' => 'Nhà sản xuất không hợp lệ.',
-            'unit_id.required' => 'Vui lòng chọn đơn vị tính.',
-            'unit_id.exists' => 'Đơn vị tính không hợp lệ.',
             'density.numeric' => 'Tỉ trọng phải là số.',
             'density.gt' => 'Tỉ trọng phải lớn hơn 0.',
             'shelf_life_months.integer' => 'Hạn dùng phải là số tháng nguyên.',

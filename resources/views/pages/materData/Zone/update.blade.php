@@ -26,10 +26,10 @@
                         @foreach ($meta['parents'] as $parent)
                             @php $p = $zoneParents[$parent]; @endphp
                             <div class="form-group">
-                                <label>{{ $p['label'] }} <span class="text-danger">*</span></label>
+                                <label>{{ $p['label'] }}</label>
                                 <select name="{{ $p['field'] }}"
                                     class="form-control {{ $p['class'] }} {{ $bag->has($p['field']) ? 'is-invalid' : '' }}"
-                                    data-placeholder="{{ $p['placeholder'] }}" required>
+                                    data-placeholder="{{ $p['placeholder'] }}">
                                     <option value="">{{ $p['placeholder'] }}</option>
                                 </select>
                                 @if ($bag->has($p['field']))

@@ -63,8 +63,13 @@ Route::prefix('/export')
             Route::get('lookup', 'lookup')->name('lookup');
             // Đề nghị cấp phát chuẩn & Cấp phát chuẩn cho Tổ
             Route::post('requestStore', 'requestStore')->name('requestStore');
+            Route::post('requestUpdate', 'requestUpdate')->name('requestUpdate');
+            Route::post('requestSend', 'requestSend')->name('requestSend');
             Route::post('issueStore', 'issueStore')->name('issueStore');
+            Route::post('issueDraftStore', 'issueDraftStore')->name('issueDraftStore');
             Route::post('requestReject', 'requestReject')->name('requestReject');
+            Route::post('requestDestroy', 'requestDestroy')->name('requestDestroy');
             Route::get('getIssuedStandards', 'getIssuedStandards')->name('getIssuedStandards');
+            Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
         });
     });

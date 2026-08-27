@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\CategoryUnitConversion;
 use App\Support\DepartmentChemical;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,10 +18,13 @@ use Illuminate\Validation\Rule;
  * Controller này chỉ nhận các thao tác thêm / sửa / khoá rồi quay lại đúng tab đó.
  *
  * Danh mục hoá chất (chemical_categories) dùng chung toàn công ty vì nó mô tả BẢN CHẤT
- * của chất. Màn hình này khai phần CÁCH DÙNG của riêng phòng ban đang chọn:
+ * của chất. Màn hình này khai phần CÁCH DÙNG của riêng phòng ban đang chọn: đơn vị tính,
  * hạn dùng nội bộ, ngưỡng tồn tối thiểu, vị trí lưu trữ quy hoạch, điều kiện bảo quản.
  *
  * Để trống một ô nghĩa là "theo mặc định của danh mục" - xem App\Support\DepartmentChemical.
+ *
+ * Riêng ĐƠN VỊ TÍNH thì bắt buộc: danh mục chung không còn cột đơn vị, mọi màn hình
+ * Nhập / Xuất / Tồn của phòng đều đọc đơn vị từ dòng khai ở đây.
  *
  * Mỗi dòng ở đây cũng chính là lời khai "phòng tôi có dùng chất này", dùng cho cột
  * "Phòng Ban Đang Dùng" ở tab Danh Mục Hoá Chất Công Ty.
@@ -39,6 +43,8 @@ class DepartmentChemicalController extends Controller
 
         $validator = Validator::make($request->all(), $this->rules($departmentId), $this->messages());
 
+        $this->checkConversions($validator, $request, (int) $request->category_id, $departmentId);
+
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dcCreateErrors')->withInput();
         }
@@ -51,6 +57,8 @@ class DepartmentChemicalController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $this->saveConversions($request, (int) $request->category_id, $departmentId);
 
         AuditTrialController::log(
             'Thêm mới',
@@ -80,6 +88,8 @@ class DepartmentChemicalController extends Controller
         // Khai nhầm thì khoá dòng cũ rồi khai dòng mới, để giữ vết.
         $validator = Validator::make($request->all(), $this->rules($departmentId, true), $this->messages());
 
+        $this->checkConversions($validator, $request, (int) $current->category_id, $departmentId);
+
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dcUpdateErrors')->withInput();
         }
@@ -89,12 +99,20 @@ class DepartmentChemicalController extends Controller
             'updated_at' => now(),
         ]);
 
+        $this->saveConversions($request, (int) $current->category_id, $departmentId);
+
+        $units = DB::table('units')->pluck('name', 'id');
+
         AuditTrialController::log(
             'Cập nhật',
             self::TABLE,
             $current->id,
-            'hạn: '.($current->shelf_life_months ?? 'mặc định').' | ngưỡng: '.($current->min_stock ?? 'mặc định'),
-            'hạn: '.($request->shelf_life_months ?: 'mặc định').' | ngưỡng: '.($request->min_stock ?: 'mặc định')
+            'đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
+                .' | hạn: '.($current->shelf_life_months ?? 'mặc định')
+                .' | ngưỡng: '.($current->min_stock ?? 'mặc định'),
+            'đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
+                .' | hạn: '.($request->shelf_life_months ?: 'mặc định')
+                .' | ngưỡng: '.($request->min_stock ?: 'mặc định')
         );
 
         return $this->backToTab()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
@@ -136,6 +154,7 @@ class DepartmentChemicalController extends Controller
     private function rules(int $departmentId, bool $isUpdate = false): array
     {
         $rules = [
+            'unit_id' => ['required', 'integer', 'exists:units,id'],
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
             'storage_condition_id' => ['nullable', 'exists:storage_conditions,id'],
@@ -165,9 +184,49 @@ class DepartmentChemicalController extends Controller
         return $rules;
     }
 
+    /**
+     * Bắt khai hệ số quy đổi khi phòng chọn đơn vị lệch với đơn vị phòng khác đang dùng.
+     *
+     * Cùng một mã mà mỗi phòng một đơn vị thì lúc chuyển kho hệ thống phải biết đổi qua
+     * lại; thiếu hệ số là số lượng nhận về sẽ sai đơn vị.
+     */
+    private function checkConversions($validator, Request $request, int $categoryId, int $departmentId): void
+    {
+        $validator->after(function ($validator) use ($request, $categoryId, $departmentId) {
+            $missing = CategoryUnitConversion::missingFor(
+                CategoryUnitConversion::TYPE_CHEMICAL,
+                $categoryId,
+                $departmentId,
+                (int) $request->unit_id,
+                (array) $request->input('conversions', [])
+            );
+
+            foreach ($missing as $unit) {
+                $validator->errors()->add(
+                    'conversions.'.$unit->unit_id,
+                    'Vui lòng khai hệ số quy đổi sang '.($unit->unit_short_name ?: $unit->unit_name)
+                    .' - đơn vị phòng '.($unit->department_short ?: $unit->department_name).' đang dùng cho hoá chất này.'
+                );
+            }
+        });
+    }
+
+    private function saveConversions(Request $request, int $categoryId, int $departmentId): void
+    {
+        CategoryUnitConversion::saveDeclarations(
+            CategoryUnitConversion::TYPE_CHEMICAL,
+            $categoryId,
+            $departmentId,
+            (int) $request->unit_id,
+            (array) $request->input('conversions', []),
+            $this->actor()
+        );
+    }
+
     private function payload(Request $request): array
     {
         return [
+            'unit_id' => (int) $request->unit_id,
             'shelf_life_months' => $this->nullIfBlank($request->shelf_life_months),
             'min_stock' => $this->nullIfBlank($request->min_stock),
             'storage_condition_id' => $request->storage_condition_id ? (int) $request->storage_condition_id : null,
@@ -189,6 +248,8 @@ class DepartmentChemicalController extends Controller
             'category_id.required' => 'Vui lòng chọn hoá chất cần khai.',
             'category_id.exists' => 'Hoá chất được chọn không tồn tại.',
             'category_id.unique' => 'Phòng ban đã khai hoá chất này rồi, hãy sửa dòng đang có.',
+            'unit_id.required' => 'Vui lòng chọn đơn vị tính của phòng cho hoá chất này.',
+            'unit_id.exists' => 'Đơn vị tính không hợp lệ.',
             'shelf_life_months.integer' => 'Hạn dùng nội bộ phải là số tháng nguyên.',
             'shelf_life_months.min' => 'Hạn dùng nội bộ tối thiểu 1 tháng.',
             'shelf_life_months.max' => 'Hạn dùng nội bộ tối đa 1200 tháng (100 năm).',

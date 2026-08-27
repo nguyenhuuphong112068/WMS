@@ -277,6 +277,9 @@
                 autoWidth: false,
                 responsive: true,
                 pageLength: 25,
+                search: {
+                    smart: false
+                },
                 order: [
                     [1, 'asc']
                 ],

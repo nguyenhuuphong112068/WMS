@@ -3,7 +3,7 @@
 
     // Trang có 2 tab nên có tới 4 form dùng chung kho old(): chỉ điền lại giá trị vừa
     // nhập khi chính form này báo lỗi, không thì để JS đổ dữ liệu của dòng đang sửa.
-    $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
+    $old = fn($key, $default = null) => $bag->any() ? old($key, $default) : $default;
     $oldGroups = (array) $old('groups', []);
 @endphp
 
@@ -34,15 +34,10 @@
 
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>Version <span class="text-danger">*</span></label>
-                                        <input type="number" name="version" min="0" max="999"
-                                            class="form-control {{ $bag->has('version') ? 'is-invalid' : '' }}"
-                                            value="{{ $old('version') }}" required>
-                                        <small class="md-sub">Đổi version là đổi giá trị công bố, phiếu phải duyệt
-                                            lại.</small>
-                                        @if ($bag->has('version'))
-                                            <span class="md-error">{{ $bag->first('version') }}</span>
-                                        @endif
+                                        <label>Version</label>
+                                        <input type="text" name="version" class="form-control cat-readonly"
+                                            value="{{ $old('version') }}" readonly tabindex="-1">
+                                        <small class="md-sub">Version tự động cấp, không sửa được.</small>
                                     </div>
                                 </div>
                             </div>
@@ -52,7 +47,7 @@
                                 <select name="chem_names_id"
                                     class="form-control cat-select {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
                                     required>
-                                    <option value="">-- Chọn tên chất chuẩn --</option>
+                                    <option value="">-- Chọn tên chuẩn --</option>
                                     @foreach ($chemNames as $option)
                                         <option value="{{ $option->id }}"
                                             {{ $old('chem_names_id') == $option->id ? 'selected' : '' }}>
@@ -99,23 +94,22 @@
                                 </div>
                             </div>
 
+                            {{-- Đơn vị tính đã chuyển sang tab "Chất Chuẩn Của Phòng": mỗi phòng
+                                 nhập / xuất theo đơn vị của phòng mình. --}}
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>Đơn Vị Tính <span class="text-danger">*</span></label>
-                                        <select name="unit_id"
-                                            class="form-control cat-select {{ $bag->has('unit_id') ? 'is-invalid' : '' }}"
-                                            required>
-                                            <option value="">-- Chọn đơn vị tính --</option>
-                                            @foreach ($units as $option)
-                                                <option value="{{ $option->id }}"
-                                                    {{ $old('unit_id') == $option->id ? 'selected' : '' }}>
-                                                    {{ $option->short_name }} - {{ $option->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @if ($bag->has('unit_id'))
-                                            <span class="md-error">{{ $bag->first('unit_id') }}</span>
+                                        <label>Tỷ Trọng (g/ml)</label>
+                                        <div class="input-group">
+                                            <input type="number" name="density" step="0.0001" min="0.0001"
+                                                class="form-control {{ $bag->has('density') ? 'is-invalid' : '' }}"
+                                                value="{{ $old('density') }}" placeholder="Ví dụ: 1.04">
+                                            <div class="input-group-append">
+                                                <span class="input-group-text">g/ml</span>
+                                            </div>
+                                        </div>
+                                        @if ($bag->has('density'))
+                                            <span class="md-error">{{ $bag->first('density') }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -160,7 +154,8 @@
                                         <label
                                             class="cat-check-item {{ in_array($code, $oldGroups) ? 'is-checked' : '' }}">
                                             <input type="radio" class="cat-check-input" name="groups[]"
-                                                value="{{ $code }}" {{ in_array($code, $oldGroups) ? 'checked' : '' }}>
+                                                value="{{ $code }}"
+                                                {{ in_array($code, $oldGroups) ? 'checked' : '' }}>
                                             <span class="cat-check-code">{{ $group['no'] }}</span>
                                             <span class="cat-check-name">
                                                 {{ $group['name'] }} ({{ $group['short'] }})
@@ -180,12 +175,7 @@
                         </div>
                     </div>
 
-                    <div class="md-hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Bỏ tick một nhóm chuẩn chỉ ảnh hưởng tới các lần nhập <b>về sau</b>: mã ống chuẩn đã cấp
-                        vẫn giữ nguyên vì nhãn đã in và dán lên ống. Sửa nội dung sẽ đưa bản ghi về
-                        <b>Chờ duyệt</b>.
-                    </div>
+
                 </div>
 
                 <div class="modal-footer">

@@ -60,6 +60,7 @@
                         <th style="width: 120px">Mã Danh Mục</th>
                         <th>Tên Hoá Chất</th>
                         <th>Nhà Sản Xuất</th>
+                        <th class="text-center" style="width: 90px">Đơn Vị</th>
                         <th class="text-center" style="width: 105px">Tỉ Trọng d<br><small>(g/ml)</small></th>
                         <th style="width: 110px">Số Tài Liệu</th>
                         <th style="width: 170px">Phân Loại</th>
@@ -92,9 +93,8 @@
                             <td>
                                 <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
                                 @if ($row->cas_no)
-                                    <small class="md-sub">CAS: {{ $row->cas_no }}</small><br>
+                                    <small class="md-sub">CAS: {{ $row->cas_no }}</small>
                                 @endif
-                                <div class="md-sub">Đơn vị {{ $row->unit_short_name ?: $row->unit_name }}</div>
                             </td>
                             <td class="md-sub">
                                 @if ($row->manufacturer_name)
@@ -104,6 +104,14 @@
                                     @endif
                                 @else
                                     <span class="md-empty">—</span>
+                                @endif
+                            </td>
+                            <td class="text-center">
+                                @if ($row->unit_short_name || $row->unit_name)
+                                    <span class="md-tag"
+                                        title="{{ $row->unit_name }}">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                @else
+                                    <span class="md-empty" title="Phòng chưa khai đơn vị tính">—</span>
                                 @endif
                             </td>
                             <td class="text-center md-sub">
@@ -192,6 +200,7 @@
                                         data-row="{{ json_encode([
                                             'id' => $row->id,
                                             'category_id' => $row->category_id,
+                                            'unit_id' => $row->unit_id,
                                             'shelf_life_months' => $row->shelf_life_months,
                                             'min_stock' => $row->min_stock,
                                             'storage_condition_id' => $row->storage_condition_id,

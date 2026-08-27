@@ -2,7 +2,7 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-plus"></i> Thêm Mục Đích Sử Dụng Mới</h5>
+                <h5 class="modal-title"><i class="fas fa-plus"></i> Thêm Chỉ Tiêu Kiểm Mới</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -12,9 +12,9 @@
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
-                        <label class="required">Tên Mục Đích Sử Dụng</label>
+                        <label class="required">Tên Chỉ Tiêu Kiểm</label>
                         <input type="text" name="name" class="form-control" value="{{ old('name') }}"
-                            placeholder="Ví dụ: Kiểm nghiệm định kỳ, Thẩm định phương pháp, Nghiên cứu..." required autofocus>
+                            placeholder="Ví dụ: Định tính, Định lượng, Độ tinh khiết, Tạp chất liên quan..." required autofocus>
                         @error('name', 'createErrors')
                             <small class="text-danger">{{ $message }}</small>
                         @enderror

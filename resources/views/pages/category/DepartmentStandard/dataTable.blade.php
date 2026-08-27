@@ -60,6 +60,7 @@
                         <th style="width: 110px">Mã Chuẩn</th>
                         <th>Tên Chất Chuẩn</th>
                         <th style="width: 160px">Nguồn Gốc / NSX</th>
+                        <th class="text-center" style="width: 90px">Đơn Vị</th>
                         <th class="text-center" style="width: 85px">Version</th>
                         <th style="width: 180px">Phân Nhóm Chuẩn</th>
                         <th class="text-center" style="width: 135px">Hạn Dùng Nội Bộ<br><small>(tháng)</small></th>
@@ -85,9 +86,8 @@
                             <td>
                                 <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
                                 @if ($row->cas_no)
-                                    <small class="md-sub">CAS: {{ $row->cas_no }}</small><br>
+                                    <small class="md-sub">CAS: {{ $row->cas_no }}</small>
                                 @endif
-                                <div class="md-sub">Đơn vị {{ $row->unit_short_name ?: $row->unit_name }}</div>
                             </td>
                             <td class="md-sub">
                                 @if ($row->manufacturer_name)
@@ -97,6 +97,14 @@
                                     @endif
                                 @else
                                     <span class="md-empty">—</span>
+                                @endif
+                            </td>
+                            <td class="text-center">
+                                @if ($row->unit_short_name || $row->unit_name)
+                                    <span class="md-tag"
+                                        title="{{ $row->unit_name }}">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                @else
+                                    <span class="md-empty" title="Phòng chưa khai đơn vị tính">—</span>
                                 @endif
                             </td>
                             <td class="text-center" data-order="{{ $row->category_version }}">
@@ -175,6 +183,7 @@
                                         data-row="{{ json_encode([
                                             'id' => $row->id,
                                             'category_id' => $row->category_id,
+                                            'unit_id' => $row->unit_id,
                                             'shelf_life_months' => $row->shelf_life_months,
                                             'min_stock' => $row->min_stock,
                                             'storage_condition_id' => $row->storage_condition_id,

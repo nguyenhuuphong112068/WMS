@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Estimate;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DepartmentChemical;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -102,7 +103,7 @@ class ChemicalEstimateController extends Controller
             'list' => $list,
             'items' => self::itemsOf($list->id),
             'histories' => self::historiesOf($list->id),
-            'categories' => $this->categoryOptions(),
+            'categories' => $this->categoryOptions($list->department_id),
             'units' => $this->unitOptions(),
             'appStatuses' => config('estimate.app_statuses'),
             'signSteps' => config('estimate.sign_steps'),
@@ -502,10 +503,13 @@ class ChemicalEstimateController extends Controller
      */
     public static function itemsOf(int $listId)
     {
+        // Đơn vị tính nằm ở danh mục hoá chất CỦA PHÒNG, nên phải biết phiếu này của phòng nào
+        $departmentId = (int) DB::table(self::TABLE)->where('id', $listId)->value('department_id');
+
         $items = DB::table(self::ITEM_TABLE)
             ->leftJoin('chemical_categories', self::ITEM_TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, self::ITEM_TABLE.'.category_id'))
             ->select(
                 self::ITEM_TABLE.'.*',
                 'chemical_categories.code as category_code',
@@ -696,15 +700,15 @@ class ChemicalEstimateController extends Controller
     }
 
     /** Danh mục hoá chất đã duyệt và đang hoạt động mới được chọn để dự trù. */
-    private function categoryOptions()
+    private function categoryOptions(int $departmentId)
     {
         return DB::table('chemical_categories')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            // Đơn vị hiện trên ô chọn là đơn vị PHÒNG ĐANG CHỌN đã khai cho hoá chất đó
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'chemical_categories.id'))
             ->select(
                 'chemical_categories.id',
                 'chemical_categories.code',
-                'chemical_categories.unit_id',
                 'chem_names.name as chem_name',
                 'units.short_name as unit_short_name'
             )

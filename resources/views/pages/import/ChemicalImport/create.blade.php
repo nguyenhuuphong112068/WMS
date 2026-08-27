@@ -1,7 +1,7 @@
 @php $bag = $errors->getBag('createErrors'); @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="{{ $impIcon }}"></i> Nhập Hoá Chất</h5>
@@ -15,16 +15,23 @@
                     <div class="form-row">
                         <div class="form-group col-md-8">
                             <label>Hoá Chất <span class="text-danger">*</span></label>
-                            <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}" required>
-                                <option value="">-- Chọn hoá chất --</option>
-                                @foreach ($categories as $category)
-                                    <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
-                                        {{ $category->code }} - {{ $category->chem_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <div class="d-flex align-items-center">
+                                <button type="button" class="btn btn-outline-info mr-2" style="flex-shrink: 0;" data-toggle="modal" data-target="#selectChemicalModal" title="Mở danh mục hoá chất để chọn">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                                <div style="flex: 1 1 auto; min-width: 0;">
+                                    <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}" required>
+                                        <option value="">-- Chọn hoá chất --</option>
+                                        @foreach ($categories as $category)
+                                            <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
+                                                {{ $category->code }} - {{ $category->chem_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
                             @if ($bag->has('category_id'))
-                                <span class="md-error">{{ $bag->first('category_id') }}</span>
+                                <span class="md-error d-block mt-1">{{ $bag->first('category_id') }}</span>
                             @endif
                             <small class="md-sub">Chỉ hiện hoá chất trong Danh Mục đã được duyệt và đang hoạt động.</small>
                         </div>
@@ -36,6 +43,10 @@
                                 data-placeholder="Chọn hoá chất"
                                 value="{{ old('category_id') && isset($codePreviews[old('category_id')]) ? $codePreviews[old('category_id')] : 'Chọn hoá chất' }}">
                             <small class="md-sub">Sinh tự động: mã phòng ban + mã hoá chất + số thứ tự.</small>
+                        </div>
+
+                        <div class="col-md-12 mb-3 chem-info-box-wrap" style="display: none;">
+                            <div class="alert alert-info py-2 px-3 mb-0 chem-info-box" style="font-size: 0.95rem; line-height: 1.5;"></div>
                         </div>
                     </div>
 
@@ -197,3 +208,104 @@
         });
     </script>
 @endif
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        $(document).on('change', '#createModal select[name="category_id"]', function() {
+            var catId = $(this).val();
+            var defaultsMap = @json($categoryDefaults ?? []);
+            var item = defaultsMap[catId] || null;
+            var $form = $(this).closest('form');
+            
+            if (item && item.info_html) {
+                $form.find('.chem-info-box').html(item.info_html);
+                $form.find('.chem-info-box-wrap').slideDown('fast');
+            } else {
+                $form.find('.chem-info-box-wrap').hide();
+            }
+        });
+        
+        // Trigger if there's old input
+        if ($('#createModal select[name="category_id"]').val()) {
+            $('#createModal select[name="category_id"]').trigger('change');
+        }
+    });
+</script>
+
+{{-- Modal Chọn Hoá Chất --}}
+<div class="modal fade" id="selectChemicalModal" tabindex="-1" role="dialog" style="z-index: 1060;" data-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document" style="max-width: 60%;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Chọn Hoá Chất</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body p-2">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover w-100" id="tableSelectChemical">
+                        <thead class="thead-light">
+                            <tr>
+                                <th style="width: 40px;" class="text-center">STT</th>
+                                <th>MÃ HOÁ CHẤT</th>
+                                <th>TÊN HOÁ CHẤT</th>
+                                <th>SỐ CAS</th>
+                                <th>NHÀ SẢN XUẤT</th>
+                                <th>TỈ TRỌNG</th>
+                                <th>BẢO QUẢN</th>
+                                <th>PHÂN LOẠI</th>
+                                <th>ĐƠN VỊ</th>
+                                <th style="width: 60px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($categories as $category)
+                                <tr>
+                                    <td class="text-center">{{ $loop->iteration }}</td>
+                                    <td><strong>{{ $category->code }}</strong></td>
+                                    <td>{{ $category->chem_name }}</td>
+                                    <td>{{ $category->cas_no ?: '—' }}</td>
+                                    <td>
+                                        <div class="md-sub">{{ $category->manufacturer_name ?: '—' }}</div>
+                                        @if ($category->manufacturer_short_name)
+                                            <span class="badge badge-light border">{{ $category->manufacturer_short_name }}</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ $category->density !== null ? $category->density : '—' }}</td>
+                                    <td>{{ $category->storage_condition_name ?: '—' }}</td>
+                                    <td>
+                                        @if($category->classification)
+                                            @foreach(json_decode($category->classification, true) ?? [] as $c)
+                                                <span class="badge badge-secondary">{{ $c }}</span>
+                                            @endforeach
+                                        @endif
+                                    </td>
+                                    <td>{{ $category->unit_short_name }}</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-primary btn-select-chemical" data-id="{{ $category->id }}">Chọn</button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        $('#tableSelectChemical').DataTable({
+            pageLength: 10,
+            lengthChange: false,
+            language: { search: "Tìm kiếm:" },
+            order: [[0, 'asc']]
+        });
+
+        $(document).on('click', '.btn-select-chemical', function() {
+            var id = $(this).data('id');
+            $('#createModal select[name="category_id"]').val(id).trigger('change');
+            $('#selectChemicalModal').modal('hide');
+        });
+    });
+</script>

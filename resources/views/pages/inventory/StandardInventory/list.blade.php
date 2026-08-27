@@ -15,6 +15,9 @@
     /** Ngày hiển thị d/m/Y, trống thì gạch ngang. */
     $invDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
 
+    /** Hạn dùng nhà sản xuất chưa xác định, tra cứu trực tuyến khi dùng (standard_imports.expiry_type). */
+    $invIsCheckOnline = fn($row) => in_array($row->expiry_type ?? null, ['check online', 'undetermined', 'unlimited']);
+
     /**
      * Mã nhóm chuẩn (cột JSON standard_categories.groups) thành chuỗi "PRS,VKN"
      * để đưa vào data-groups cho bộ lọc Phân nhóm chuẩn.

@@ -9,11 +9,13 @@
 
 @php
     $stdReqStatus = [
+        'draft' => ['label' => 'Lưu tạm', 'class' => 'neutral'],
         'pending' => ['label' => 'Chờ cấp phát', 'class' => 'pending'],
         'partial' => ['label' => 'Cấp một phần', 'class' => 'warning'],
         'completed' => ['label' => 'Đã cấp đủ', 'class' => 'accepted'],
         'rejected' => ['label' => 'Từ chối', 'class' => 'rejected'],
         'issued' => ['label' => 'Đã cấp', 'class' => 'accepted'],
+        'canceled' => ['label' => 'Đã huỷ', 'class' => 'rejected'],
     ];
     $stdReqBadge = fn($status) => $stdReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
 @endphp
@@ -61,16 +63,17 @@
     </div>
 
     <div class="table-responsive">
-        <table id="stdRequestTable" class="table table-bordered table-hover w-100 md-table exp-req-table">
+        <table id="stdRequestTable" class="table table-bordered table-hover w-100 exp-req-table">
             <thead>
-                <tr>
-                    <th class="text-center" style="width: 45px">STT</th>
-                    <th style="width: 140px">Mã Đề Nghị</th>
-                    <th style="width: 130px">Tổ Đề Nghị</th>
-                    <th>Danh Sách Đề Nghị Của Tổ</th>
-                    <th class="text-center" style="width: 115px">Trạng Thái</th>
-                    <th style="width: 130px">Người Lập</th>
-                    <th class="text-center" style="width: 100px">Ngày Lập</th>
+                <tr class="text-center">
+                    <th style="width: 50px">STT</th>
+                    <th style="width: 160px">Mã Đề Nghị</th>
+                    <th style="width: 160px">Tổ Đề Nghị</th>
+                    <th style="width: 130px">Số Lượng Mục</th>
+                    <th style="width: 140px">Trạng Thái</th>
+                    <th style="width: 140px">Người Lập</th>
+                    <th style="width: 120px">Ngày Lập</th>
+                    <th style="width: 110px">Thao Tác</th>
                 </tr>
             </thead>
             <tbody>
@@ -79,135 +82,64 @@
                         $items = $requestItems[$req->id] ?? collect();
                     @endphp
                     <tr>
-                        <td class="text-center align-top">{{ $loop->iteration }}</td>
-                        <td class="align-top">
-                            <span class="exp-code">{{ $req->code }}</span>
+                        <td class="text-center align-middle">{{ $loop->iteration }}</td>
+                        <td class="align-middle">
+                            <span class="exp-code font-weight-bold">{{ $req->code }}</span>
                             @if ($req->note)
-                                <div class="md-sub mt-1" title="{{ $req->note }}">
-                                    <i class="fas fa-comment-dots mr-1"></i>{{ Str::limit($req->note, 30) }}
+                                <div class="md-sub mt-1 text-muted" title="{{ $req->note }}">
+                                    <i class="fas fa-comment-dots mr-1"></i>{{ Str::limit($req->note, 25) }}
                                 </div>
                             @endif
                         </td>
-                        <td class="align-top">
+                        <td class="align-middle">
                             <span class="font-weight-bold text-primary">{{ $req->group_name ?: '—' }}</span>
                         </td>
-                        <td>
-                            <table class="table table-sm table-bordered std-req-item-table mb-0 w-100">
-                                <thead>
-                                    <tr class="text-center">
-                                        <th style="width: 16%">Chất Chuẩn</th>
-                                        <th style="width: 8%">Qui Cách</th>
-                                        <th style="width: 9%" class="text-right">Số Lượng ĐN</th>
-                                        <th style="width: 9%" class="text-right">Số Lượng CP</th>
-                                        <th style="width: 14%">Tên Sản Phẩm</th>
-                                        <th style="width: 10%">Chỉ Tiêu</th>
-                                        <th style="width: 11%">Kiểm Nghiệm Viên</th>
-                                        <th style="width: 8%">Ghi Chú</th>
-                                        <th style="width: 7%">Định Khu</th>
-                                        <th style="width: 8%">Ống Chuẩn</th>
-                                        <th style="width: 10%" class="text-center">Thao Tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($items as $item)
-                                        <tr>
-                                            <td>
-                                                <span class="font-weight-bold">{{ $item->standard_name }}</span>
-                                                <span class="md-tag ml-1">{{ $item->category_code }}</span>
-                                            </td>
-                                            <td class="text-center">
-                                                {{ $item->specification ?: '—' }}
-                                            </td>
-                                            <td class="text-right">
-                                                <span class="exp-amount font-weight-bold">{{ $expNum($item->requested_amount) }}</span>
-                                                <small class="text-muted">{{ $item->requested_unit }}</small>
-                                            </td>
-                                            <td class="text-right">
-                                                @if ($item->issued_amount !== null)
-                                                    <span class="exp-amount text-success font-weight-bold">{{ $expNum($item->issued_amount) }}</span>
-                                                    <small class="text-muted">{{ $item->issued_unit ?: $item->requested_unit }}</small>
-                                                @else
-                                                    <span class="md-empty">—</span>
-                                                @endif
-                                            </td>
-                                            <td class="md-sub font-weight-bold text-dark">{{ $item->product_name ?: '—' }}</td>
-                                            <td class="md-sub">{{ $item->test_criteria ?: '—' }}</td>
-                                            <td class="md-sub">{{ $item->analyst_name ?: '—' }}</td>
-                                            <td class="md-sub" title="{{ $item->note }}">{{ $item->note ?: '—' }}</td>
-                                            <td class="text-center">
-                                                @if ($item->location_code || $item->location_name)
-                                                    <span class="std-location-tag">{{ $item->location_code ?: $item->location_name }}</span>
-                                                @else
-                                                    <span class="md-empty">—</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if ($item->import_code)
-                                                    <span class="exp-code">{{ $item->import_code }}</span>
-                                                    @if ($item->batch_no)
-                                                        <small class="text-muted d-block">Lô {{ $item->batch_no }}</small>
-                                                    @endif
-                                                @else
-                                                    <span class="md-empty">Chưa cấp</span>
-                                                @endif
-                                            </td>
-                                            <td class="text-center">
-                                                @if ($item->status === 'pending')
-                                                    <button type="button" class="btn btn-xs btn-success btn-std-issue"
-                                                        title="Cấp phát chuẩn cho mục này"
-                                                        data-item="{{ json_encode([
-                                                            'id' => $item->id,
-                                                            'request_code' => $req->code,
-                                                            'group_name' => $req->group_name,
-                                                            'category_id' => $item->category_id,
-                                                            'standard_name' => $item->standard_name,
-                                                            'specification' => $item->specification,
-                                                            'requested_amount' => (float) $item->requested_amount,
-                                                            'requested_unit' => $item->requested_unit,
-                                                            'product_name' => $item->product_name,
-                                                            'test_criteria' => $item->test_criteria,
-                                                            'analyst_name' => $item->analyst_name,
-                                                            'note' => $item->note,
-                                                        ]) }}">
-                                                        <i class="fas fa-hand-holding-medical mr-1"></i> Cấp
-                                                    </button>
-
-                                                    <form class="form-md-confirm d-inline"
-                                                        action="{{ route('pages.export.standardExport.requestReject') }}"
-                                                        method="POST"
-                                                        data-title="Từ chối cấp mục này?"
-                                                        data-danger="1">
-                                                        @csrf
-                                                        <input type="hidden" name="item_id" value="{{ $item->id }}">
-                                                        <button type="submit" class="btn btn-xs btn-secondary" title="Từ chối">
-                                                            <i class="fas fa-xmark"></i>
-                                                        </button>
-                                                    </form>
-                                                @else
-                                                    <span class="exp-req-badge {{ $stdReqBadge($item->status)['class'] }}">
-                                                        {{ $stdReqBadge($item->status)['label'] }}
-                                                    </span>
-                                                    @if ($item->issued_by)
-                                                        <small class="d-block text-muted">{{ $item->issued_by }}</small>
-                                                    @endif
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                        <td class="text-center align-middle">
+                            <span class="badge badge-info px-2 py-1" style="font-size: 0.82rem;">
+                                <i class="fas fa-vial mr-1"></i> {{ $items->count() }} chất chuẩn
+                            </span>
                         </td>
-                        <td class="text-center align-top">
+                        <td class="text-center align-middle">
                             <span class="exp-req-badge {{ $stdReqBadge($req->status)['class'] }}">
                                 {{ $stdReqBadge($req->status)['label'] }}
                             </span>
                         </td>
-                        <td class="md-sub align-top">{{ $req->created_by ?: '—' }}</td>
-                        <td class="text-center md-sub align-top">{{ $expDate($req->created_at) }}</td>
+                        <td class="align-middle">{{ $req->created_by ?: '—' }}</td>
+                        <td class="text-center align-middle">{{ $expDate($req->created_at) }}</td>
+                        <td class="text-center align-middle" style="white-space: nowrap;">
+                            @if ($req->status === 'draft')
+                                <button type="button" class="btn btn-sm btn-warning px-2 py-1 shadow-sm mr-1"
+                                    data-toggle="modal"
+                                    data-target="#requestEditModal_{{ $req->id }}"
+                                    title="Chỉnh sửa đề nghị">
+                                    <i class="fas fa-edit mr-1"></i> Sửa
+                                </button>
+                                <form action="{{ route('pages.export.standardExport.requestDestroy') }}" method="POST" class="d-inline-block form-delete-req" onsubmit="return confirm('Bạn có chắc chắn muốn huỷ đề nghị này không? Thao tác này không thể phục hồi.');">
+                                    @csrf
+                                    <input type="hidden" name="request_list_id" value="{{ $req->id }}">
+                                    <button type="submit" class="btn btn-sm btn-danger px-2 py-1 shadow-sm mr-1" title="Huỷ/Xoá đề nghị">
+                                        <i class="fas fa-trash-alt mr-1"></i> Huỷ
+                                    </button>
+                                </form>
+                            @elseif (in_array($req->status, ['pending', 'partial']))
+                                <button type="button" class="btn btn-sm btn-success px-2 py-1 shadow-sm mr-1"
+                                    data-toggle="modal"
+                                    data-target="#requestDetailModal_{{ $req->id }}"
+                                    title="Cấp phát chuẩn cho phiếu này">
+                                    <i class="fas fa-hand-holding-medical mr-1"></i> Cấp phát
+                                </button>
+                            @endif
+                            <button type="button" class="btn btn-sm btn-info px-2 py-1 shadow-sm"
+                                data-toggle="modal"
+                                data-target="#requestDetailModal_{{ $req->id }}"
+                                title="Xem chi tiết phiếu đề nghị">
+                                <i class="fas fa-eye mr-1"></i> Xem
+                            </button>
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center md-sub py-4">Chưa có phiếu đề nghị cấp phát chuẩn nào.</td>
+                        <td colspan="8" class="text-center text-muted py-4">Chưa có phiếu đề nghị cấp phát chuẩn nào.</td>
                     </tr>
                 @endforelse
             </tbody>

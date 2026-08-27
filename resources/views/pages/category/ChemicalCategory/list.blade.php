@@ -76,7 +76,7 @@
                 <b>{{ $mdTitle }}</b> khai bản chất của chất và dùng chung toàn công ty.
                 <b>{{ $dcTitle }}</b> chỉ khai phần riêng của
                 <b>{{ session('user')['selected_department'] ?? 'phòng ban đang chọn' }}</b>:
-                hạn dùng nội bộ, ngưỡng tồn, vị trí quy hoạch.
+                đơn vị tính, hạn dùng nội bộ, ngưỡng tồn, vị trí quy hoạch.
             </p>
 
             <div class="tab-content">
@@ -218,6 +218,9 @@
         'categories' => $dcCategories,
         'locations' => $dcLocations,
         'storageConditions' => $dcStorageConditions,
+        'units' => $dcUnits,
+        'unitsInUse' => $dcUnitsInUse,
+        'conversions' => $dcConversions,
     ])
     @include('pages.category.DepartmentChemical.update', [
         'mdRoute' => $dcRoute,
@@ -225,5 +228,8 @@
         'mdIcon' => $dcIcon,
         'locations' => $dcLocations,
         'storageConditions' => $dcStorageConditions,
+        'units' => $dcUnits,
+        'unitsInUse' => $dcUnitsInUse,
+        'conversions' => $dcConversions,
     ])
 @endsection

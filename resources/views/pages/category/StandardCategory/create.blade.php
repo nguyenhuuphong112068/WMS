@@ -36,14 +36,10 @@
 
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>Version <span class="text-danger">*</span></label>
-                                        <input type="number" name="version" min="0" max="999"
-                                            class="form-control {{ $bag->has('version') ? 'is-invalid' : '' }}"
-                                            value="{{ $old('version', 0) }}" required>
-                                        <small class="md-sub">Phiên bản do nhà sản xuất công bố, bắt đầu từ 0.</small>
-                                        @if ($bag->has('version'))
-                                            <span class="md-error">{{ $bag->first('version') }}</span>
-                                        @endif
+                                        <label>Version</label>
+                                        <input type="text" name="version" class="form-control cat-readonly"
+                                            value="0" readonly tabindex="-1">
+                                        <small class="md-sub">Hệ thống tự động tăng theo Tên và NSX, bắt đầu từ 0.</small>
                                     </div>
                                 </div>
                             </div>
@@ -53,7 +49,7 @@
                                 <select name="chem_names_id"
                                     class="form-control cat-select sd-name-select {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
                                     data-cas="{{ json_encode($casByName) }}" required>
-                                    <option value="">-- Chọn tên chất chuẩn --</option>
+                                    <option value="">-- Chọn tên chuẩn --</option>
                                     @foreach ($chemNames as $option)
                                         <option value="{{ $option->id }}"
                                             {{ $old('chem_names_id') == $option->id ? 'selected' : '' }}>
@@ -101,23 +97,22 @@
                                 </div>
                             </div>
 
+                            {{-- Đơn vị tính đã chuyển sang tab "Chất Chuẩn Của Phòng": mỗi phòng
+                                 nhập / xuất theo đơn vị của phòng mình. --}}
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>Đơn Vị Tính <span class="text-danger">*</span></label>
-                                        <select name="unit_id"
-                                            class="form-control cat-select {{ $bag->has('unit_id') ? 'is-invalid' : '' }}"
-                                            required>
-                                            <option value="">-- Chọn đơn vị tính --</option>
-                                            @foreach ($units as $option)
-                                                <option value="{{ $option->id }}"
-                                                    {{ $old('unit_id') == $option->id ? 'selected' : '' }}>
-                                                    {{ $option->short_name }} - {{ $option->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @if ($bag->has('unit_id'))
-                                            <span class="md-error">{{ $bag->first('unit_id') }}</span>
+                                        <label>Tỷ Trọng (g/ml)</label>
+                                        <div class="input-group">
+                                            <input type="number" name="density" step="0.0001" min="0.0001"
+                                                class="form-control {{ $bag->has('density') ? 'is-invalid' : '' }}"
+                                                value="{{ $old('density') }}" placeholder="Ví dụ: 1.04">
+                                            <div class="input-group-append">
+                                                <span class="input-group-text">g/ml</span>
+                                            </div>
+                                        </div>
+                                        @if ($bag->has('density'))
+                                            <span class="md-error">{{ $bag->first('density') }}</span>
                                         @endif
                                     </div>
                                 </div>

@@ -759,13 +759,15 @@
             }
         }
 
-        /** Ô "Số PKN, OOS, BCSL" chỉ dùng cho loại Huỷ bỏ - đó là căn cứ loại bỏ */
+        /** Căn cứ / Lý do loại bỏ chỉ dùng cho loại Loại bỏ (cancel) */
         function toggleCancel($form) {
             var isCancel = $form.find('.exp-type input:checked').val() === 'cancel';
 
             $form.find('.exp-cancel-only').toggle(isCancel);
+            $form.find('.exp-export-only').toggle(!isCancel);
 
             if (!isCancel) {
+                $form.find('[name="reason"]').val('');
                 $form.find('[name="test_report_no"]').val('');
             }
         }
@@ -957,8 +959,11 @@
 
             // Căn cứ loại bỏ & các trường bổ sung
             $form.find('[name="test_report_no"]').val(row.test_report_no || '');
+            $form.find('[name="reason"]').val(row.reason || '');
             $form.find('[name="group_id"]').val(row.group_id || '');
             $form.find('[name="product_name"]').val(row.product_name || '');
+            $form.find('[name="batch_no"]').val(row.batch_no || '');
+            $form.find('[name="testing"]').val(row.testing || '');
             $form.find('[name="analyst_id"]').val(row.analyst_id || '');
 
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ

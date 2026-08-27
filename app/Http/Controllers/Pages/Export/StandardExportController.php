@@ -39,10 +39,10 @@ class StandardExportController extends Controller
         'code' => 'Mã ống chuẩn',
         'amount' => 'Số lượng',
         'type' => 'Loại phiếu',
-        'exported_date' => 'Ngày sử dụng',
-        'purpose' => 'Mục đích sử dụng',
-        'test_report_no' => 'Số phiếu KN, OOS, BCSL',
-        'checked_by' => 'Người kiểm tra',
+        'product_name' => 'Tên sản phẩm',
+        'batch_no' => 'Số lô',
+        'testing' => 'Chỉ tiêu',
+        'reason' => 'Lý do loại bỏ',
     ];
 
     /** Sai số cho phép khi so số lượng xuất với tồn (cột decimal 15,4). */
@@ -53,7 +53,7 @@ class StandardExportController extends Controller
 
     public const TYPES = [
         'export' => 'Sử dụng',
-        'cancel' => 'Huỷ bỏ',
+        'cancel' => 'Loại bỏ',
     ];
 
     public function index(Request $request)
@@ -63,27 +63,26 @@ class StandardExportController extends Controller
         $datas = DB::table(self::TABLE)
             ->leftJoin('standard_imports', self::TABLE.'.import_id', '=', 'standard_imports.id')
             ->leftJoin('standard_categories', 'standard_imports.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            // Đơn vị tính khai ở danh mục chất chuẩn CỦA PHÒNG, không còn ở danh mục chung
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_imports.category_id'))
             ->leftJoin('groups', self::TABLE.'.group_id', '=', 'groups.id')
-            ->leftJoin('analysts', self::TABLE.'.analyst_id', '=', 'analysts.id')
             ->select(
                 self::TABLE.'.*',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_categories.groups',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'standard_imports.amount as import_amount',
-                'standard_imports.batch_no',
+                'standard_imports.batch_no as standard_batch_no',
                 'standard_imports.expired_date',
                 'standard_imports.group_code',
-                'groups.name as group_name',
-                'analysts.name as analyst_name'
+                'groups.name as group_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
-            ->orderBy(self::TABLE.'.exported_date', 'desc')
+            ->orderBy(self::TABLE.'.created_at', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')
             ->get();
 
@@ -101,20 +100,25 @@ class StandardExportController extends Controller
         $requestItems = DB::table('request_items')
             ->leftJoin('request_lists', 'request_items.request_list_id', '=', 'request_lists.id')
             ->leftJoin('standard_categories', 'request_items.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('standard_imports', 'request_items.import_id', '=', 'standard_imports.id')
             ->leftJoin('locations', 'standard_imports.location_id', '=', 'locations.id')
             ->leftJoin('analysts', 'request_items.analyst_id', '=', 'analysts.id')
+            ->leftJoin('purposes', 'request_items.purpose_id', '=', 'purposes.id')
+            ->leftJoin('suppliers', 'request_items.supplier_id', '=', 'suppliers.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
             ->select(
                 'request_items.*',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_imports.batch_no',
                 'standard_imports.expired_date as import_expired_date',
                 'locations.code as location_code',
                 'locations.name as location_name',
-                'analysts.name as analyst_name'
+                'analysts.name as analyst_name',
+                'purposes.name as purpose_name',
+                DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
             )
             ->where('request_lists.department_id', $departmentId)
             ->get()
@@ -141,29 +145,94 @@ class StandardExportController extends Controller
             ->orderBy('name')
             ->get();
 
+        $purposes = DB::table('purposes')
+            ->where('status_id', 1)
+            ->orderBy('name')
+            ->get();
+
+        $suppliers = DB::table('suppliers')
+            ->where('status_id', 1)
+            ->orderBy('name')
+            ->get();
+
+        $units = DB::table('units')
+            ->where('status_id', 1)
+            ->orderBy('name')
+            ->get();
+
         $standardCategories = DB::table('standard_categories')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_categories.id'))
             ->select(
                 'standard_categories.id',
                 'standard_categories.code',
                 'standard_categories.version',
-                'chem_names.name as standard_name',
+                'standard_categories.manufacturers_id',
+                'standard_names.name as standard_name',
+                'manufacturers.name as manufacturer_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
             ->where('standard_categories.status_id', 1)
-            ->orderBy('chem_names.name')
+            ->orderBy('standard_names.name')
             ->get();
 
         $availableImports = $this->importOptions($departmentId);
 
+        // Tính tồn kho theo từng chất chuẩn từ $availableImports (chuẩn xác 100% như màn hình Tồn kho)
+        $inventoryByCategory = $availableImports->groupBy('category_id')
+            ->map(function ($group) {
+                return [
+                    'total_remaining' => (float) $group->sum('remaining'),
+                    'total_tubes' => (int) $group->where('remaining', '>', 0.00005)->count(),
+                    'latest_import' => $group->first(),
+                ];
+            });
+
+        $departmentStandardInventory = $standardCategories->map(function ($cat) use ($inventoryByCategory) {
+            $inv = $inventoryByCategory[$cat->id] ?? null;
+            $latest = $inv['latest_import'] ?? null;
+            $unitName = $cat->unit_short_name ?: $cat->unit_name;
+
+            $spec = '—';
+            $purId = null;
+            $purName = '—';
+            $criteriaNames = [];
+
+            if ($latest) {
+                if (!empty($latest->amount)) {
+                    $spec = (float) $latest->amount . ' ' . $unitName;
+                }
+                if (!empty($latest->purpose_id)) {
+                    $pVal = $latest->purpose_id;
+                    $ids = is_array($pVal) ? $pVal : json_decode((string) $pVal, true);
+                    if (!is_array($ids)) {
+                        $ids = is_numeric($pVal) ? [(int) $pVal] : [];
+                    }
+                    if (!empty($ids)) {
+                        $purId = (int) $ids[0];
+                        $criteriaNames = DB::table('purposes')->whereIn('id', $ids)->pluck('name')->toArray();
+                        $purName = implode(', ', $criteriaNames);
+                    }
+                }
+            }
+
+            $cat->specification = $spec;
+            $cat->manufacturer_id = $cat->manufacturers_id ?? null;
+            $cat->purpose_id = $purId;
+            $cat->purpose_name = $purName;
+            $cat->criteria_names = $criteriaNames;
+            $cat->total_remaining = $inv['total_remaining'] ?? 0;
+            $cat->total_tubes = $inv['total_tubes'] ?? 0;
+
+            return $cat;
+        });
+
         session()->put(['title' => 'SỬ DỤNG - SỬ DỤNG CHẤT CHUẨN']);
 
-        [$from, $to] = $this->reportRange($request);
-
         $activeTab = $request->input('tab');
-        if (!in_array($activeTab, ['book', 'request', 'report'])) {
+        if (!in_array($activeTab, ['book', 'request'])) {
             $activeTab = 'book';
         }
 
@@ -176,16 +245,17 @@ class StandardExportController extends Controller
             'analysts' => $analysts,
             'packagingSpecs' => $packagingSpecs,
             'standardCategories' => $standardCategories,
+            'departmentStandardInventory' => $departmentStandardInventory,
             'availableImports' => $availableImports,
             'imports' => $availableImports,
+            'purposes' => $purposes,
+            'suppliers' => $suppliers,
+            'units' => $units,
             'checkers' => $this->checkerOptions($departmentId),
             'types' => self::TYPES,
             'standardGroups' => config('standard.groups'),
             'overIssuePercent' => (int) round(self::OVER_ISSUE_RATIO * 100),
             'adjustCounts' => $this->adjustCounts($departmentId),
-            'report' => $this->usageReport($departmentId, $from, $to),
-            'reportFrom' => $from,
-            'reportTo' => $to,
             'activeTab' => $activeTab,
         ]);
     }
@@ -269,30 +339,138 @@ class StandardExportController extends Controller
             ->leftJoin('standard_imports', 'request_items.import_id', '=', 'standard_imports.id')
             ->leftJoin('locations', 'standard_imports.location_id', '=', 'locations.id')
             ->leftJoin('standard_categories', 'request_items.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'request_items.category_id'))
             ->leftJoin('analysts', 'request_items.analyst_id', '=', 'analysts.id')
+            ->leftJoin('purposes', 'request_items.purpose_id', '=', 'purposes.id')
+            ->leftJoin('suppliers', 'request_items.supplier_id', '=', 'suppliers.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
             ->select(
                 'request_items.*',
+                'standard_imports.amount as import_amount',
+                'standard_imports.potency',
+                'standard_imports.moisture',
+                'standard_imports.standard_form',
+                'standard_imports.expiry_type',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'standard_imports.batch_no',
                 'standard_imports.expired_date as import_expired_date',
                 'locations.code as location_code',
                 'locations.name as location_name',
-                'analysts.name as analyst_name'
+                'analysts.name as analyst_name',
+                'purposes.name as purpose_name',
+                DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
             )
             ->where('request_lists.department_id', $departmentId)
             ->where('request_lists.group_id', $groupId)
             ->where('request_items.status', 'issued')
             ->whereNotNull('request_items.import_id')
+            // Ẩn ống chuẩn đã được lập phiếu sử dụng: mỗi ống cấp phát cho tổ chỉ dùng
+            // một lần, tránh người sau chọn lại đúng ống người trước đã xuất.
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from(self::TABLE)
+                    ->whereColumn(self::TABLE.'.request_item_id', 'request_items.id')
+                    ->where(self::TABLE.'.type', 'export');
+            })
             ->orderBy('request_items.issued_at', 'desc')
             ->get();
 
+        $importIds = $issuedItems->pluck('import_id')->filter()->unique();
+        $attachments = DB::table('standard_import_attachments')
+            ->whereIn('standard_import_id', $importIds)
+            ->select('id', 'standard_import_id', 'file_name')
+            ->get()
+            ->groupBy('standard_import_id');
+
+        $used = $this->sumByImport(self::TABLE, 'amount', $departmentId);
+        $balanced = $this->sumByImport('standard_balancings', 'balancing_amount', $departmentId);
+
+        $issuedItems->transform(function ($item) use ($attachments, $used, $balanced) {
+            $item->attachments = $attachments->get($item->import_id, collect())->values();
+            
+            $amount = (float) $item->import_amount;
+            $itemUsed = (float) ($used[$item->import_id] ?? 0);
+            $itemBalanced = (float) ($balanced[$item->import_id] ?? 0);
+            $item->actual_remaining = max($amount + $itemBalanced - $itemUsed, 0);
+
+            return $item;
+        });
+
         return response()->json(['standards' => $issuedItems]);
+    }
+
+    /**
+     * LẤY THÔNG TIN CATEGORY (QUI CÁCH, NSX, MỤC ĐÍCH)
+     */
+    public function getCategoryInfo(Request $request)
+    {
+        $categoryId = (int) $request->category_id;
+        $departmentId = $this->departmentId();
+
+        $category = DB::table('standard_categories')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_categories.id'))
+            ->select(
+                'standard_categories.*',
+                'manufacturers.name as manufacturer_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name'
+            )
+            ->where('standard_categories.id', $categoryId)
+            ->first();
+
+        if (!$category) {
+            return response()->json([]);
+        }
+
+        $latestImport = DB::table('standard_imports')
+            ->leftJoin('suppliers', 'standard_imports.supplier_id', '=', 'suppliers.id')
+            ->select('standard_imports.*', 'suppliers.name as supplier_name')
+            ->where('standard_imports.category_id', $categoryId)
+            ->where('standard_imports.department_id', $departmentId)
+            ->orderBy('standard_imports.id', 'desc')
+            ->first();
+
+        $unitName = $category->unit_short_name ?: $category->unit_name;
+        $specification = '';
+        $purposeId = null;
+        $purposeName = '';
+
+        if ($latestImport) {
+            if ($latestImport->amount) {
+                $specification = (float)$latestImport->amount . ' ' . $unitName;
+            }
+
+            if ($latestImport->purpose_id) {
+                $pVal = $latestImport->purpose_id;
+                $ids = is_array($pVal) ? $pVal : json_decode((string)$pVal, true);
+                if (!is_array($ids)) {
+                    $ids = is_numeric($pVal) ? [(int)$pVal] : [];
+                }
+                if (!empty($ids)) {
+                    $purposeId = (int)$ids[0];
+                    $purposeName = DB::table('purposes')->whereIn('id', $ids)->pluck('name')->implode(', ');
+                }
+            }
+        }
+
+        // NSX/Nguồn gốc: lấy từ nhà sản xuất trong danh mục hoặc nhà cung cấp ở phiếu nhập
+        $supplierName = ($latestImport && $latestImport->supplier_name) ? $latestImport->supplier_name : ($category->manufacturer_name ?: '—');
+        $supplierId = ($latestImport && $latestImport->supplier_id) ? $latestImport->supplier_id : $category->manufacturers_id;
+
+        return response()->json([
+            'supplier_id' => $supplierId,
+            'supplier_name' => $supplierName,
+            'purpose_id' => $purposeId,
+            'purpose_name' => $purposeName ?: '—',
+            'specification' => $specification ?: '—',
+            'unit' => $unitName ?: '—',
+        ]);
     }
 
     /**
@@ -306,12 +484,15 @@ class StandardExportController extends Controller
             'group_id' => ['required', 'exists:groups,id'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:standard_categories,id'],
+            'items.*.import_id' => ['nullable'],
             'items.*.specification' => ['nullable', 'string', 'max:100'],
+            'items.*.supplier_id' => ['nullable'],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
+            'items.*.purpose_id' => ['nullable'],
             'items.*.product_name' => ['nullable', 'string', 'max:255'],
-            'items.*.test_criteria' => ['nullable', 'string', 'max:255'],
-            'items.*.analyst_id' => ['nullable', 'exists:analysts,id'],
+            'items.*.test_criteria' => ['nullable'],
+            'items.*.analyst_id' => ['nullable'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
@@ -327,17 +508,38 @@ class StandardExportController extends Controller
         if ($validator->fails()) {
             return redirect()->back()
                 ->withErrors($validator, 'requestCreateErrors')
+                ->with('error', $validator->errors()->first())
                 ->withInput()
                 ->with('activeTab', 'request');
         }
 
-        $code = 'YC-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -4));
+        $actionType = $request->input('action_type', 'send');
+        $isDraft = $actionType === 'draft';
+        $status = $isDraft ? 'draft' : 'pending';
+
+        $deptStr = str_pad($departmentId, 2, '0', STR_PAD_LEFT);
+        $groupStr = str_pad($request->group_id, 2, '0', STR_PAD_LEFT);
+        $dateStr = date('dmy');
+        $prefix = $deptStr . $groupStr . $dateStr . '_';
+
+        $latestCode = DB::table('request_lists')
+            ->where('code', 'LIKE', $prefix . '%')
+            ->orderBy('id', 'desc')
+            ->value('code');
+
+        $seq = 1;
+        if ($latestCode) {
+            $parts = explode('_', $latestCode);
+            $seq = (int) end($parts) + 1;
+        }
+
+        $code = $prefix . str_pad($seq, 2, '0', STR_PAD_LEFT);
 
         $listId = DB::table('request_lists')->insertGetId([
             'code' => $code,
             'department_id' => $departmentId,
             'group_id' => (int) $request->group_id,
-            'status' => 'pending',
+            'status' => $status,
             'note' => $this->nullIfBlank($request->note),
             'created_by' => $this->actor(),
             'created_at' => now(),
@@ -348,13 +550,17 @@ class StandardExportController extends Controller
             DB::table('request_items')->insert([
                 'request_list_id' => $listId,
                 'category_id' => (int) $item['category_id'],
+                'import_id' => !empty($item['import_id']) ? (int) $item['import_id'] : null,
+                'import_code' => !empty($item['import_id']) ? DB::table('standard_imports')->where('id', $item['import_id'])->value('code') : null,
                 'specification' => $this->nullIfBlank($item['specification'] ?? null),
+                'supplier_id' => !empty($item['supplier_id']) ? (int) $item['supplier_id'] : null,
                 'requested_amount' => (float) $item['requested_amount'],
                 'requested_unit' => $this->nullIfBlank($item['requested_unit'] ?? null),
+                'purpose_id' => !empty($item['purpose_id']) ? (int) $item['purpose_id'] : null,
                 'product_name' => $this->nullIfBlank($item['product_name'] ?? null),
-                'test_criteria' => $this->nullIfBlank($item['test_criteria'] ?? null),
+                'test_criteria' => is_array($item['test_criteria'] ?? null) ? implode(', ', array_filter($item['test_criteria'])) : $this->nullIfBlank($item['test_criteria'] ?? null),
                 'analyst_id' => !empty($item['analyst_id']) ? (int) $item['analyst_id'] : null,
-                'status' => 'pending',
+                'status' => $status,
                 'note' => $this->nullIfBlank($item['note'] ?? null),
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -364,15 +570,160 @@ class StandardExportController extends Controller
         $groupName = DB::table('groups')->where('id', $request->group_id)->value('name') ?: 'Tổ';
 
         AuditTrialController::log(
-            'Tạo đề nghị cấp phát chuẩn',
+            $isDraft ? 'Lưu tạm đề nghị cấp phát chuẩn' : 'Tạo đề nghị cấp phát chuẩn',
             'request_lists',
             $listId,
             'NA',
-            'Phiếu đề nghị ' . $code . ' cho ' . $groupName . ' (' . count($request->items) . ' mục)'
+            ($isDraft ? 'Lưu tạm đề nghị ' : 'Tạo đề nghị cấp phát ') . $code . ' cho ' . $groupName . ' (' . count($request->items) . ' mục)'
+        );
+
+        $msg = $isDraft
+            ? 'Đã lưu tạm đề nghị cấp phát chuẩn ' . $code . '! Bạn có thể gửi đề nghị khi sẵn sàng.'
+            : 'Đã gửi đề nghị cấp phát chuẩn ' . $code . ' thành công!';
+
+        return redirect()->route('pages.export.standardExport.list', ['tab' => 'request'])
+            ->with('success', $msg);
+    }
+
+    /**
+     * CẬP NHẬT / ĐIỀU CHỈNH ĐỀ NGHỊ ĐÃ LƯU TẠM
+     */
+    public function requestUpdate(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $listId = (int) $request->request_list_id;
+
+        $req = DB::table('request_lists')
+            ->where('id', $listId)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (!$req || $req->status !== 'draft') {
+            return redirect()->back()->with('error', 'Chỉ có thể điều chỉnh phiếu đề nghị đang ở trạng thái Lưu tạm!');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'request_list_id' => ['required', 'exists:request_lists,id'],
+            'group_id' => ['required', 'exists:groups,id'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.category_id' => ['required', 'exists:standard_categories,id'],
+            'items.*.import_id' => ['nullable'],
+            'items.*.specification' => ['nullable', 'string', 'max:100'],
+            'items.*.supplier_id' => ['nullable'],
+            'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
+            'items.*.purpose_id' => ['nullable'],
+            'items.*.product_name' => ['nullable', 'string', 'max:255'],
+            'items.*.test_criteria' => ['nullable'],
+            'items.*.analyst_id' => ['nullable'],
+            'items.*.note' => ['nullable', 'string', 'max:500'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ], [
+            'group_id.required' => 'Vui lòng chọn Tổ đề nghị.',
+            'group_id.exists' => 'Tổ được chọn không tồn tại.',
+            'items.required' => 'Vui lòng thêm ít nhất một chất chuẩn đề nghị.',
+            'items.min' => 'Vui lòng thêm ít nhất một chất chuẩn đề nghị.',
+            'items.*.category_id.required' => 'Vui lòng chọn chất chuẩn.',
+            'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',
+            'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'requestCreateErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput()
+                ->with('activeTab', 'request');
+        }
+
+        $actionType = $request->input('action_type', 'draft');
+        $isDraft = $actionType === 'draft';
+        $status = $isDraft ? 'draft' : 'pending';
+
+        DB::table('request_lists')->where('id', $req->id)->update([
+            'group_id' => (int) $request->group_id,
+            'status' => $status,
+            'note' => $this->nullIfBlank($request->note),
+            'updated_at' => now(),
+        ]);
+
+        // Recreate items
+        DB::table('request_items')->where('request_list_id', $req->id)->delete();
+
+        foreach ($request->items as $item) {
+            DB::table('request_items')->insert([
+                'request_list_id' => $req->id,
+                'category_id' => (int) $item['category_id'],
+                'import_id' => !empty($item['import_id']) ? (int) $item['import_id'] : null,
+                'import_code' => !empty($item['import_id']) ? DB::table('standard_imports')->where('id', $item['import_id'])->value('code') : null,
+                'specification' => $this->nullIfBlank($item['specification'] ?? null),
+                'supplier_id' => !empty($item['supplier_id']) ? (int) $item['supplier_id'] : null,
+                'requested_amount' => (float) $item['requested_amount'],
+                'requested_unit' => $this->nullIfBlank($item['requested_unit'] ?? null),
+                'purpose_id' => !empty($item['purpose_id']) ? (int) $item['purpose_id'] : null,
+                'product_name' => $this->nullIfBlank($item['product_name'] ?? null),
+                'test_criteria' => is_array($item['test_criteria'] ?? null) ? implode(', ', array_filter($item['test_criteria'])) : $this->nullIfBlank($item['test_criteria'] ?? null),
+                'analyst_id' => !empty($item['analyst_id']) ? (int) $item['analyst_id'] : null,
+                'status' => $status,
+                'note' => $this->nullIfBlank($item['note'] ?? null),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $groupName = DB::table('groups')->where('id', $request->group_id)->value('name') ?: 'Tổ';
+
+        AuditTrialController::log(
+            $isDraft ? 'Cập nhật đề nghị cấp phát chuẩn' : 'Gửi đề nghị cấp phát chuẩn sau cập nhật',
+            'request_lists',
+            $req->id,
+            'draft',
+            ($isDraft ? 'Cập nhật đề nghị ' : 'Gửi đề nghị ') . $req->code . ' cho ' . $groupName . ' (' . count($request->items) . ' mục)'
+        );
+
+        $msg = $isDraft
+            ? 'Đã cập nhật lưu tạm đề nghị ' . $req->code . ' thành công!'
+            : 'Đã cập nhật và gửi đề nghị ' . $req->code . ' thành công!';
+
+        return redirect()->route('pages.export.standardExport.list', ['tab' => 'request'])
+            ->with('success', $msg);
+    }
+
+    /**
+     * GỬI ĐỀ NGHỊ ĐÃ LƯU TẠM
+     */
+    public function requestSend(Request $request)
+    {
+        $listId = (int) $request->request_list_id;
+        $req = DB::table('request_lists')
+            ->where('id', $listId)
+            ->where('department_id', $this->departmentId())
+            ->first();
+
+        if (!$req || $req->status !== 'draft') {
+            return redirect()->back()->with('error', 'Không tìm thấy phiếu đề nghị lưu tạm cần gửi!');
+        }
+
+        DB::table('request_lists')->where('id', $req->id)->update([
+            'status' => 'pending',
+            'updated_at' => now(),
+        ]);
+
+        DB::table('request_items')->where('request_list_id', $req->id)->where('status', 'draft')->update([
+            'status' => 'pending',
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Gửi đề nghị cấp phát chuẩn',
+            'request_lists',
+            $req->id,
+            'draft',
+            'Gửi đề nghị cấp phát: ' . $req->code
         );
 
         return redirect()->route('pages.export.standardExport.list', ['tab' => 'request'])
-            ->with('success', 'Đã tạo phiếu đề nghị cấp phát chuẩn ' . $code . ' thành công!');
+            ->with('success', 'Đã gửi đề nghị cấp phát mã ' . $req->code . ' thành công!');
     }
 
     /**
@@ -387,6 +738,8 @@ class StandardExportController extends Controller
             'import_id' => ['required', 'exists:standard_imports,id'],
             'issued_amount' => ['required', 'numeric', 'min:0.0001'],
             'issued_unit' => ['nullable', 'string', 'max:50'],
+            'issued_at' => ['nullable', 'date'],
+            'return_standard' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
             'item_id.required' => 'Không tìm thấy mục đề nghị cần cấp phát.',
@@ -396,6 +749,9 @@ class StandardExportController extends Controller
         ]);
 
         if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $validator->errors()->first()]);
+            }
             return redirect()->back()
                 ->withErrors($validator, 'issueErrors')
                 ->withInput()
@@ -404,12 +760,36 @@ class StandardExportController extends Controller
 
         $item = DB::table('request_items')->where('id', $request->item_id)->first();
         if (!$item) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Không tìm thấy mục đề nghị!']);
+            }
             return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!');
         }
 
         $import = DB::table('standard_imports')->where('id', $request->import_id)->where('department_id', $departmentId)->first();
         if (!$import) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Không tìm thấy ống chuẩn trong kho phòng ban này!']);
+            }
             return redirect()->back()->with('error', 'Không tìm thấy ống chuẩn trong kho phòng ban này!');
+        }
+
+        $issuedAt = !empty($request->issued_at) ? \Carbon\Carbon::parse($request->issued_at) : now();
+
+        $waitingInternal = (int) ($import->shelf_life_months ?? 0) > 0 && ! $import->internal_expired_date;
+        if ($waitingInternal) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Ống chuẩn chưa xác định hạn dùng nội bộ, không được cấp phát!']);
+            }
+            return redirect()->back()->with('error', 'Ống chuẩn chưa xác định hạn dùng nội bộ, không được cấp phát!');
+        }
+
+        $isExpired = $import->expired_date && now()->startOfDay()->gt(\Carbon\Carbon::parse($import->expired_date));
+        if ($isExpired) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Ống chuẩn đã hết hạn sử dụng, không được cấp phát!']);
+            }
+            return redirect()->back()->with('error', 'Ống chuẩn đã hết hạn sử dụng, không được cấp phát!');
         }
 
         DB::table('request_items')->where('id', $item->id)->update([
@@ -418,7 +798,8 @@ class StandardExportController extends Controller
             'issued_amount' => (float) $request->issued_amount,
             'issued_unit' => $this->nullIfBlank($request->issued_unit ?? $item->requested_unit),
             'issued_by' => $this->actor(),
-            'issued_at' => now(),
+            'issued_at' => $issuedAt,
+            'return_standard' => $request->boolean('return_standard', false),
             'status' => 'issued',
             'note' => $this->nullIfBlank($request->note ?? $item->note),
             'updated_at' => now(),
@@ -444,8 +825,80 @@ class StandardExportController extends Controller
             'Cấp ống ' . $import->code . ' số lượng ' . $request->issued_amount
         );
 
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã cấp phát ống chuẩn ' . $import->code . ' thành công!',
+                'data' => [
+                    'issued_amount' => (float) $request->issued_amount,
+                    'issued_unit' => $this->nullIfBlank($request->issued_unit ?? $item->requested_unit),
+                    'return_standard' => $request->boolean('return_standard', false),
+                    'issued_by' => $this->actor(),
+                    'issued_at' => $issuedAt->format('d/m/Y H:i'),
+                    'import_code' => $import->code,
+                    'batch_no' => $import->batch_no,
+                    'location' => DB::table('locations')->where('id', $import->location_id)->value('code'),
+                ]
+            ]);
+        }
+
         return redirect()->route('pages.export.standardExport.list', ['tab' => 'request'])
             ->with('success', 'Đã cấp phát ống chuẩn ' . $import->code . ' thành công!');
+    }
+
+    /**
+     * LƯU NHÁP THÔNG TIN CẤP PHÁT CHO TẤT CẢ CÁC MỤC TRONG PHIẾU
+     */
+    public function issueDraftStore(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), [
+            'request_list_id' => ['required', 'exists:request_lists,id'],
+            'items' => ['required', 'array'],
+            'items.*.id' => ['required', 'exists:request_items,id'],
+            'items.*.import_id' => ['nullable'],
+            'items.*.issued_amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.issued_unit' => ['nullable', 'string', 'max:50'],
+            'items.*.return_standard' => ['nullable', 'boolean'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ]);
+        }
+
+        $listId = $request->request_list_id;
+        $req = DB::table('request_lists')->where('id', $listId)->where('department_id', $departmentId)->first();
+        if (!$req) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy phiếu đề nghị.']);
+        }
+
+        foreach ($request->items as $itemData) {
+            $itemId = (int)$itemData['id'];
+            $importId = !empty($itemData['import_id']) ? (int)$itemData['import_id'] : null;
+            
+            $importCode = null;
+            if ($importId) {
+                $importCode = DB::table('standard_imports')->where('id', $importId)->value('code');
+            }
+
+            DB::table('request_items')->where('id', $itemId)->where('request_list_id', $listId)->update([
+                'import_id' => $importId,
+                'import_code' => $importCode,
+                'issued_amount' => !empty($itemData['issued_amount']) ? (float)$itemData['issued_amount'] : null,
+                'issued_unit' => $this->nullIfBlank($itemData['issued_unit'] ?? null),
+                'return_standard' => !empty($itemData['return_standard']) ? 1 : 0,
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã lưu nháp thông tin cấp phát thành công!'
+        ]);
     }
 
     /**
@@ -502,9 +955,6 @@ class StandardExportController extends Controller
 
         $id = DB::table(self::TABLE)->insertGetId($this->payload($request, $import) + [
             'department_id' => $departmentId,
-            // Người sử dụng luôn là người đang đăng nhập, không nhận giá trị từ form
-            'exported_by' => $this->actor(),
-            'status_id' => 1,
             'created_by' => $this->actor(),
             'created_at' => now(),
             'updated_at' => now(),
@@ -569,61 +1019,6 @@ class StandardExportController extends Controller
         return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
     }
 
-    public function deActive(Request $request)
-    {
-        $current = DB::table(self::TABLE)
-            ->where('id', $request->id)
-            ->where('department_id', $this->departmentId())
-            ->first();
-
-        if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
-        }
-
-        $newStatus = $current->status_id == 1 ? 0 : 1;
-
-        // Mở khoá lại thì số lượng cũ phải còn nằm trong hạn mức xuất của ống chuẩn
-        if ($newStatus == 1) {
-            $import = DB::table('standard_imports')->where('id', $current->import_id)->first();
-            $remaining = $import ? $this->remaining($import, (int) $current->id) : 0;
-
-            if (! $import || (float) $current->amount > $this->maxIssuable($remaining) + self::EPSILON) {
-                return redirect()->back()->with(
-                    'error',
-                    'Không mở khoá được: ống chuẩn chỉ còn '.$this->number($remaining)
-                    .' trong khi phiếu này cần '.$this->number((float) $current->amount).'.'
-                );
-            }
-        }
-
-        DB::table(self::TABLE)->where('id', $current->id)->update([
-            'status_id' => $newStatus,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
-
-        $action = $newStatus == 1 ? 'Mở khoá' : 'Khoá';
-
-        $this->logHistory(
-            $current->id,
-            $action,
-            $action.' phiếu'.($request->filled('adjust_reason') ? '. Lý do: '.trim($request->adjust_reason) : '')
-        );
-
-        AuditTrialController::log(
-            $action,
-            self::TABLE,
-            $current->id,
-            'status_id: '.$current->status_id,
-            'status_id: '.$newStatus
-        );
-
-        return redirect()->back()->with(
-            'success',
-            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ').self::LABEL.' của ống chuẩn '.$current->code.'!'
-        );
-    }
-
     /**
      * Số lần ĐIỀU CHỈNH của từng phiếu: [standard_export_id => số lần].
      *
@@ -649,11 +1044,11 @@ class StandardExportController extends Controller
         $rows = DB::table(self::HISTORY_TABLE)
             ->leftJoin('standard_imports', self::HISTORY_TABLE.'.import_id', '=', 'standard_imports.id')
             ->leftJoin('standard_categories', 'standard_imports.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), 'standard_imports.category_id'))
             ->select(
                 self::HISTORY_TABLE.'.*',
-                'chem_names.name as standard_name',
+                'standard_names.name as standard_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
@@ -681,12 +1076,10 @@ class StandardExportController extends Controller
                         'Chất chuẩn' => $row->standard_name ?: '—',
                         'Số lượng' => $row->amount !== null ? $this->number((float) $row->amount).' '.$unit : '—',
                         'Loại phiếu' => self::TYPES[$row->type] ?? ($row->type ?: '—'),
-                        'Ngày sử dụng' => $row->exported_date ? \Carbon\Carbon::parse($row->exported_date)->format('d/m/Y') : '—',
-                        'Người sử dụng' => $row->exported_by ?: '—',
-                        'Người kiểm tra' => $row->checked_by ?: '—',
-                        'Mục đích sử dụng' => $row->purpose ?: '—',
-                        'Số phiếu KN, OOS, BCSL' => $row->test_report_no ?: '—',
-                        'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
+                        'Tên sản phẩm' => $row->product_name ?: '—',
+                        'Số lô SP' => $row->batch_no ?: '—',
+                        'Chỉ tiêu' => $row->testing ?: '—',
+                        'Lý do loại bỏ' => $row->reason ?: '—',
                     ],
                 ];
             })->values(),
@@ -713,12 +1106,10 @@ class StandardExportController extends Controller
             'import_id' => $row->import_id,
             'amount' => $row->amount,
             'type' => $row->type,
-            'exported_date' => $row->exported_date,
-            'exported_by' => $row->exported_by,
-            'purpose' => $row->purpose,
-            'test_report_no' => $row->test_report_no,
-            'checked_by' => $row->checked_by,
-            'status_id' => $row->status_id,
+            'product_name' => $row->product_name ?? null,
+            'batch_no' => $row->batch_no ?? null,
+            'testing' => $row->testing ?? null,
+            'reason' => $row->reason ?? null,
             'change_note' => $note,
             'created_by' => $this->actor(),
             'created_at' => now(),
@@ -760,12 +1151,6 @@ class StandardExportController extends Controller
                 continue;
             }
 
-            if ($field === 'exported_date') {
-                $parts[] = $title.': '.$this->historyDate($old).' -> '.$this->historyDate($new);
-
-                continue;
-            }
-
             $parts[] = $title.': '.($old === null || $old === '' ? '—' : $old).' -> '.($new === null || $new === '' ? '—' : $new);
         }
 
@@ -799,128 +1184,71 @@ class StandardExportController extends Controller
 
         $query = DB::table('standard_imports')
             ->leftJoin('standard_categories', 'standard_imports.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id');
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('locations', 'standard_imports.location_id', '=', 'locations.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_imports.category_id'));
 
         // Hạn dùng nội bộ lấy theo cấu hình của phòng ban đang chọn
-        return DepartmentStandard::join($query, $departmentId, 'standard_imports.category_id')
+        $imports = DepartmentStandard::join($query, $departmentId, 'standard_imports.category_id')
             ->select(
                 'standard_imports.id',
                 'standard_imports.code',
+                'standard_imports.category_id',
+                'standard_imports.purpose_id',
+                'standard_imports.supplier_id',
                 'standard_imports.amount',
                 'standard_imports.batch_no',
                 'standard_imports.expired_date',
+                'standard_imports.expiry_type',
                 'standard_imports.internal_expired_date',
                 'standard_imports.group_code',
+                'standard_imports.potency',
+                'standard_imports.moisture',
+                'standard_imports.standard_form',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 DepartmentStandard::shelfLifeColumn(),
-                'chem_names.name as standard_name',
-                'units.short_name as unit_short_name'
+                'standard_names.name as standard_name',
+                'units.short_name as unit_short_name',
+                'locations.code as location_code',
+                'locations.name as location_name'
             )
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
             ->orderBy('standard_imports.imported_date', 'desc')
             ->orderBy('standard_imports.id', 'desc')
+            ->get();
+
+        $importIds = $imports->pluck('id')->filter()->unique();
+        $attachments = DB::table('standard_import_attachments')
+            ->whereIn('standard_import_id', $importIds)
+            ->select('id', 'standard_import_id', 'file_name')
             ->get()
-            ->map(function ($import) use ($used, $balanced, $today) {
-                $import->used = (float) ($used[$import->id] ?? 0);
-                $import->balanced = (float) ($balanced[$import->id] ?? 0);
-                $import->remaining = max((float) $import->amount + $import->balanced - $import->used, 0);
-                $import->max_amount = $this->maxIssuable($import->remaining);
+            ->groupBy('standard_import_id');
 
-                $import->expired = $import->expired_date
-                    && \Carbon\Carbon::parse($import->expired_date)->startOfDay()->lt($today);
+        return $imports->map(function ($import) use ($used, $balanced, $today, $attachments) {
+            $import->attachments = $attachments->get($import->id, collect())->values();
+            $import->used = (float) ($used[$import->id] ?? 0);
+            $import->balanced = (float) ($balanced[$import->id] ?? 0);
+            $import->remaining = max((float) $import->amount + $import->balanced - $import->used, 0);
+            $import->max_amount = $this->maxIssuable($import->remaining);
 
-                // Chất chuẩn có hạn dùng mặc định mà chưa xác định hạn nội bộ thì chưa được dùng
-                $import->waiting_internal = (int) ($import->shelf_life_months ?? 0) > 0
-                    && ! $import->internal_expired_date;
+            $import->expired = $import->expired_date
+                && \Carbon\Carbon::parse($import->expired_date)->startOfDay()->lt($today);
 
-                $import->selectable = ! $import->expired
-                    && ! $import->waiting_internal
-                    && $import->remaining > self::EPSILON;
+            // Chất chuẩn có hạn dùng mặc định mà chưa xác định hạn nội bộ thì chưa được dùng
+            $import->waiting_internal = (int) ($import->shelf_life_months ?? 0) > 0
+                && ! $import->internal_expired_date;
 
-                return $import;
-            });
+            $import->selectable = ! $import->expired
+                && ! $import->waiting_internal
+                && $import->remaining > self::EPSILON;
+
+            return $import;
+        });
     }
 
-    /**
-     * Khoảng thời gian của báo cáo sử dụng.
-     *
-     * Mặc định từ đầu tháng hiện tại đến hôm nay. Người dùng nhập ngược ngày thì
-     * đảo lại cho đúng thay vì trả về báo cáo rỗng.
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function reportRange(Request $request): array
-    {
-        $parse = function ($value, $fallback) {
-            try {
-                return $value ? \Carbon\Carbon::parse($value)->format('Y-m-d') : $fallback;
-            } catch (\Exception $e) {
-                return $fallback;
-            }
-        };
 
-        $from = $parse($request->input('from'), now()->startOfMonth()->format('Y-m-d'));
-        $to = $parse($request->input('to'), now()->format('Y-m-d'));
-
-        return $from <= $to ? [$from, $to] : [$to, $from];
-    }
-
-    /**
-     * BÁO CÁO SỬ DỤNG CHẤT CHUẨN THEO KHOẢNG THỜI GIAN.
-     *
-     * Cộng dồn các phiếu sử dụng còn hiệu lực trong khoảng ngày, gom theo mã danh mục
-     * chất chuẩn, tách riêng phần đã dùng và phần đã huỷ.
-     */
-    private function usageReport(int $departmentId, string $from, string $to)
-    {
-        // Chuỗi trong DB::raw là hằng, không ghép từ dữ liệu người dùng
-        return DB::table(self::TABLE)
-            ->join('standard_imports', self::TABLE.'.import_id', '=', 'standard_imports.id')
-            ->join('standard_categories', 'standard_imports.category_id', '=', 'standard_categories.id')
-            ->leftJoin('chem_names', 'standard_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'standard_categories.unit_id', '=', 'units.id')
-            ->select(
-                'standard_categories.id as category_id',
-                'standard_categories.code as category_code',
-                'standard_categories.version',
-                'standard_categories.groups',
-                'chem_names.name as standard_name',
-                'units.short_name as unit_short_name',
-                'units.name as unit_name',
-                DB::raw('SUM(CASE WHEN '.self::TABLE.".type = 'export' THEN ".self::TABLE.'.amount ELSE 0 END) as used'),
-                DB::raw('SUM(CASE WHEN '.self::TABLE.".type = 'cancel' THEN ".self::TABLE.'.amount ELSE 0 END) as cancelled'),
-                DB::raw('SUM('.self::TABLE.'.amount) as total'),
-                DB::raw('COUNT(*) as times'),
-                DB::raw('COUNT(DISTINCT '.self::TABLE.'.import_id) as code_count'),
-                DB::raw('MAX('.self::TABLE.'.exported_date) as last_exported_date')
-            )
-            ->where(self::TABLE.'.department_id', $departmentId)
-            ->where(self::TABLE.'.status_id', 1)
-            ->whereBetween(self::TABLE.'.exported_date', [$from, $to])
-            // Gom đủ mọi cột không phải hàm tổng, tránh lỗi ONLY_FULL_GROUP_BY của MySQL
-            ->groupBy(
-                'standard_categories.id',
-                'standard_categories.code',
-                'standard_categories.version',
-                'standard_categories.groups',
-                'chem_names.name',
-                'units.short_name',
-                'units.name'
-            )
-            ->orderBy('standard_categories.code', 'asc')
-            ->get()
-            ->map(function ($row) {
-                $row->used = (float) $row->used;
-                $row->cancelled = (float) $row->cancelled;
-                $row->total = (float) $row->total;
-                $row->unit = $row->unit_short_name ?: $row->unit_name;
-
-                return $row;
-            });
-    }
 
     /** Người kiểm tra: user đang hoạt động của phòng ban đang chọn. */
     private function checkerOptions(int $departmentId)
@@ -939,11 +1267,15 @@ class StandardExportController extends Controller
     /** Tổng một cột số theo từng ống chuẩn trong phòng ban: [import_id => tổng]. */
     private function sumByImport(string $table, string $column, int $departmentId)
     {
-        return DB::table($table)
+        $query = DB::table($table)
             ->select('import_id', DB::raw('SUM(`'.$column.'`) as total'))
-            ->where('department_id', $departmentId)
-            ->where('status_id', 1)
-            ->groupBy('import_id')
+            ->where('department_id', $departmentId);
+
+        if ($table !== self::TABLE) {
+            $query->where('status_id', 1);
+        }
+
+        return $query->groupBy('import_id')
             ->pluck('total', 'import_id');
     }
 
@@ -955,8 +1287,7 @@ class StandardExportController extends Controller
     private function remaining($import, ?int $ignoreExportId = null): float
     {
         $query = DB::table(self::TABLE)
-            ->where('import_id', $import->id)
-            ->where('status_id', 1);
+            ->where('import_id', $import->id);
 
         if ($ignoreExportId) {
             $query->where('id', '<>', $ignoreExportId);
@@ -1043,14 +1374,16 @@ class StandardExportController extends Controller
                 return;
             }
 
-            $limit = $this->maxIssuable($remaining);
+            if ($request->type !== 'export') {
+                $limit = $this->maxIssuable($remaining);
 
-            if ((float) $request->amount > $limit + self::EPSILON) {
-                $validator->errors()->add(
-                    'amount',
-                    'Ống chuẩn '.$import->code.' còn '.$this->number($remaining).'. Được xuất vượt tối đa '
-                    .(int) round(self::OVER_ISSUE_RATIO * 100).'%, tức không quá '.$this->number($limit).'.'
-                );
+                if ((float) $request->amount > $limit + self::EPSILON) {
+                    $validator->errors()->add(
+                        'amount',
+                        'Ống chuẩn '.$import->code.' còn '.$this->number($remaining).'. Được xuất vượt tối đa '
+                        .(int) round(self::OVER_ISSUE_RATIO * 100).'%, tức không quá '.$this->number($limit).'.'
+                    );
+                }
             }
         });
     }
@@ -1077,17 +1410,13 @@ class StandardExportController extends Controller
             'import_id' => ['required', 'exists:standard_imports,id'],
             'amount' => ['required', 'numeric', 'min:0.0001'],
             'type' => ['required', 'in:'.implode(',', array_keys(self::TYPES))],
-            'exported_date' => ['required', 'date'],
             'product_name' => ['nullable', 'max:255'],
-            'analyst_id' => ['nullable', 'exists:analysts,id'],
+            'batch_no' => ['nullable', 'max:100'],
+            'testing' => ['nullable', 'max:255'],
+            'reason' => ['nullable', 'max:500'],
             'request_item_id' => ['nullable', 'exists:request_items,id'],
-            'purpose' => ['nullable', 'max:500'],
-            // Số phiếu kiểm nghiệm đã dùng chất chuẩn này, hoặc căn cứ loại bỏ (OOS, BCSL)
-            'test_report_no' => ['nullable', 'max:100'],
             // Chỉ ghi vào lịch sử điều chỉnh, không lưu thành cột của standard_exports
             'adjust_reason' => ['nullable', 'max:500'],
-            // Người kiểm tra phải là user đang hoạt động của chính phòng ban này
-            'checked_by' => ['nullable', Rule::in($this->checkerOptions($departmentId)->pluck('fullName'))],
         ];
     }
 
@@ -1099,13 +1428,11 @@ class StandardExportController extends Controller
             'group_id' => (int) $request->group_id,
             'amount' => (float) $request->amount,
             'type' => $request->type,
-            'exported_date' => $request->exported_date,
             'product_name' => $this->nullIfBlank($request->product_name),
-            'analyst_id' => $request->filled('analyst_id') ? (int) $request->analyst_id : null,
+            'batch_no' => $this->nullIfBlank($request->batch_no),
+            'testing' => $this->nullIfBlank($request->testing),
+            'reason' => $this->nullIfBlank($request->reason),
             'request_item_id' => $request->filled('request_item_id') ? (int) $request->request_item_id : null,
-            'purpose' => $this->nullIfBlank($request->purpose),
-            'test_report_no' => $this->nullIfBlank($request->test_report_no),
-            'checked_by' => $this->nullIfBlank($request->checked_by),
         ];
     }
 
@@ -1114,6 +1441,39 @@ class StandardExportController extends Controller
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    public function requestDestroy(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $req = DB::table('request_lists')
+            ->where('id', $request->request_list_id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $req) {
+            return redirect()->back()->with('error', 'Không tìm thấy phiếu đề nghị này.')->with('activeTab', 'request');
+        }
+
+        if ($req->status !== 'draft') {
+            return redirect()->back()->with('error', 'Chỉ có thể huỷ phiếu đang ở trạng thái Lưu tạm.')->with('activeTab', 'request');
+        }
+
+        DB::table('request_lists')->where('id', $req->id)->update([
+            'status' => 'canceled',
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Huỷ đề nghị',
+            'request_lists',
+            $req->id,
+            $req->code,
+            'Đã huỷ đề nghị cấp phát chuẩn đang lưu tạm'
+        );
+
+        return redirect()->back()->with('success', 'Đã huỷ phiếu đề nghị ' . $req->code . ' thành công!')->with('activeTab', 'request');
     }
 
     private function messages(): array
@@ -1128,12 +1488,7 @@ class StandardExportController extends Controller
             'amount.min' => 'Số lượng phải lớn hơn 0.',
             'type.required' => 'Vui lòng chọn loại phiếu.',
             'type.in' => 'Loại phiếu không hợp lệ.',
-            'exported_date.required' => 'Vui lòng chọn ngày sử dụng.',
-            'exported_date.date' => 'Ngày sử dụng không hợp lệ.',
-            'purpose.max' => 'Mục đích sử dụng tối đa 500 ký tự.',
-            'test_report_no.max' => 'Số phiếu KN, OOS, BCSL tối đa 100 ký tự.',
             'adjust_reason.max' => 'Lý do điều chỉnh tối đa 500 ký tự.',
-            'checked_by.in' => 'Người kiểm tra phải là nhân viên đang hoạt động của phòng ban này.',
         ];
     }
 }

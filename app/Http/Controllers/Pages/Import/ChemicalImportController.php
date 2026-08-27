@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Pages\Import;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\Barcode128;
+use App\Support\CategoryUnitConversion;
+use App\Support\DepartmentChemical;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -115,9 +117,44 @@ class ChemicalImportController extends Controller
             return redirect()->back()->withErrors($validator, 'receiveErrors')->withInput();
         }
 
+        /*
+        | Đơn vị tính là của riêng từng phòng, nên số lượng trên phiếu chuyển đang tính
+        | theo đơn vị PHÒNG GỬI. Ghi thẳng vào kho phòng mình là sai đơn vị, phải quy đổi
+        | theo hệ số đã khai ở tab "Hoá Chất Của Phòng".
+        */
+        $receiveUnitId = (int) DB::table(DepartmentChemical::TABLE)
+            ->where('department_id', $departmentId)
+            ->where('category_id', $transfer->category_id)
+            ->value('unit_id');
+
+        if (! $receiveUnitId) {
+            return redirect()->back()->with(
+                'error',
+                'Phòng mình chưa khai hoá chất '.$transfer->category_code.' ở tab "Hoá Chất Của Phòng" nên chưa có '
+                .'đơn vị tính để nhận hàng. Vui lòng khai hoá chất này cho phòng trước khi nhận.'
+            );
+        }
+
+        $amount = CategoryUnitConversion::convert(
+            CategoryUnitConversion::TYPE_CHEMICAL,
+            (int) $transfer->category_id,
+            (float) $transfer->amount,
+            (int) $transfer->source_unit_id,
+            $receiveUnitId
+        );
+
+        if ($amount === null) {
+            return redirect()->back()->with(
+                'error',
+                'Phòng gửi tính theo đơn vị "'.($transfer->unit_short_name ?: $transfer->unit_name).'" còn phòng mình '
+                .'khai đơn vị khác cho hoá chất '.$transfer->category_code.', nhưng chưa có hệ số quy đổi giữa hai đơn '
+                .'vị này. Vui lòng vào tab "Hoá Chất Của Phòng", sửa dòng hoá chất này và khai mục Quy Đổi Đơn Vị.'
+            );
+        }
+
         // Sinh mã và ghi cả hai bảng trong một transaction: nhận hai lần cùng lúc
         // thì không được ra hai mã, cũng không được có lô mà phiếu chuyển vẫn "chờ nhận"
-        $result = DB::transaction(function () use ($request, $transfer, $departmentId) {
+        $result = DB::transaction(function () use ($request, $transfer, $departmentId, $amount, $receiveUnitId) {
             $code = $this->nextTransferCode($transfer->source_code);
 
             $id = DB::table(self::TABLE)->insertGetId([
@@ -128,7 +165,8 @@ class ChemicalImportController extends Controller
                 'is_partial_lot' => $transfer->is_partial,
                 // Chép nguyên bản chất của lô từ phòng gửi
                 'category_id' => $transfer->category_id,
-                'amount' => $transfer->amount,
+                // Đã quy đổi sang đơn vị của phòng nhận
+                'amount' => $amount,
                 'batch_no' => $transfer->batch_no,
                 'expired_date' => $transfer->expired_date,
                 // Nhận lẻ thì lô nguồn đã mở nên đã có hạn dùng nội bộ -> kế thừa, khỏi xác định lại.
@@ -155,11 +193,17 @@ class ChemicalImportController extends Controller
                 'updated_at' => now(),
             ]);
 
-            $this->writeHistory(
-                $id,
-                'Nhận chuyển kho',
-                'Nhận từ phòng ban '.$transfer->from_department_name.', mã gốc '.$transfer->source_code.' -> mã mới '.$code.'.'
-            );
+            // Ghi chú chuyển kho kèm truy vết quy đổi đơn vị (GMP traceability)
+            $historyNote = 'Nhận từ phòng ban '.$transfer->from_department_name.', mã gốc '.$transfer->source_code.' -> mã mới '.$code.'.';
+
+            if ((int) $transfer->source_unit_id !== $receiveUnitId) {
+                $receiveUnit = DB::table('units')->where('id', $receiveUnitId)->first();
+                $historyNote .= ' | Quy đổi ĐV: '
+                    .$transfer->amount.' '.($transfer->unit_short_name ?: $transfer->unit_name)
+                    .' -> '.$amount.' '.($receiveUnit->short_name ?? $receiveUnit->name ?? 'ĐV#'.$receiveUnitId);
+            }
+
+            $this->writeHistory($id, 'Nhận chuyển kho', $historyNote);
 
             return ['id' => $id, 'code' => $code];
         });
@@ -294,7 +338,9 @@ class ChemicalImportController extends Controller
             ->join('imports as source', 'exports.import_id', '=', 'source.id')
             ->leftJoin('chemical_categories', 'source.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            // Lô đang chờ nhận vẫn tính theo đơn vị của PHÒNG ĐÃ GỬI, vì đó là đơn vị đã
+            // ghi trong imports.amount / exports.amount của lô này.
+            ->tap(fn ($query) => DepartmentChemical::joinUnitOn($query, 'exports.department_id', 'source.category_id'))
             ->leftJoin('deparments', 'exports.department_id', '=', 'deparments.id')
             ->select(
                 'exports.id',
@@ -313,6 +359,7 @@ class ChemicalImportController extends Controller
                 'source.supplier_id',
                 'chemical_categories.code as category_code',
                 'chem_names.name as chem_name',
+                DepartmentChemical::UNIT_ALIAS.'.unit_id as source_unit_id',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'deparments.name as from_department_name',
@@ -397,7 +444,8 @@ class ChemicalImportController extends Controller
         $datas = DB::table(self::TABLE)
             ->leftJoin('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            // Đơn vị tính khai ở danh mục hoá chất CỦA PHÒNG, không còn ở danh mục chung
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
             ->leftJoin('suppliers', self::TABLE.'.supplier_id', '=', 'suppliers.id')
             // Định khu của lô: locations giữ sẵn id 3 cấp trên nên join tiếp là ra đủ đường dẫn
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
@@ -433,13 +481,32 @@ class ChemicalImportController extends Controller
 
         session()->put(['title' => 'NHẬP - NHẬP HOÁ CHẤT']);
 
-        $categories = $this->categoryOptions();
+        $categories = $this->categoryOptions($departmentId);
+
+        $deptChemicals = DB::table('department_chemicals')
+            ->where('department_id', $departmentId)
+            ->get()
+            ->keyBy('category_id');
+
+        $categoryDefaults = $categories->mapWithKeys(function ($category) use ($deptChemicals) {
+            $dc = $deptChemicals->get($category->id);
+            $info = [
+                'Tên: <strong>' . htmlspecialchars($category->chem_name ?: $category->code) . '</strong>',
+                'Đơn vị phòng: <strong>' . htmlspecialchars($category->unit_short_name ?: 'Chưa thiết lập') . '</strong>'
+            ];
+            
+            return [$category->id => [
+                'location_id' => $dc->default_location_id ?? null,
+                'info_html' => implode(' | ', $info),
+            ]];
+        })->toArray();
 
         [$from, $to] = $this->reportRange($request);
 
         return view('pages.import.ChemicalImport.list', [
             'datas' => $datas,
             'categories' => $categories,
+            'categoryDefaults' => $categoryDefaults,
             'suppliers' => $this->supplierOptions(),
             'locations' => $this->locationOptions($departmentId),
             'codePreviews' => $this->codePreviews($departmentId, $categories),
@@ -471,7 +538,7 @@ class ChemicalImportController extends Controller
         $row = DB::table(self::TABLE)
             ->leftJoin('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $this->departmentId(), self::TABLE.'.category_id'))
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
             ->select(
                 self::TABLE.'.*',
@@ -523,7 +590,7 @@ class ChemicalImportController extends Controller
      *
      * Cộng dồn các phiếu nhập còn hiệu lực trong khoảng ngày, gom theo
      * chemical_categories.code (mã danh mục hoá chất). Mỗi dòng có:
-     * - Số lượng theo ĐƠN VỊ GỐC của danh mục (chemical_categories.unit_id)
+     * - Số lượng theo đơn vị PHÒNG đã khai cho hoá chất đó (department_chemicals.unit_id)
      * - Số lượng QUY ĐỔI SANG KG qua App\Support\UnitConverter
      *
      * Đơn vị nhóm đếm (chai, thùng...) không quy đổi tự động được, và đổi thể tích
@@ -538,7 +605,7 @@ class ChemicalImportController extends Controller
         $rows = DB::table(self::TABLE)
             ->join('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
             ->select(
                 'chemical_categories.id as category_id',
                 'chemical_categories.code as category_code',
@@ -722,7 +789,7 @@ class ChemicalImportController extends Controller
         $rows = DB::table(self::HISTORY_TABLE)
             ->leftJoin('chemical_categories', self::HISTORY_TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $this->departmentId(), self::HISTORY_TABLE.'.category_id'))
             ->leftJoin('suppliers', self::HISTORY_TABLE.'.supplier_id', '=', 'suppliers.id')
             ->leftJoin('locations', self::HISTORY_TABLE.'.location_id', '=', 'locations.id')
             ->select(
@@ -988,15 +1055,24 @@ class ChemicalImportController extends Controller
     }
 
     /** Danh mục hoá chất đã duyệt và đang hoạt động mới được chọn để nhập. */
-    private function categoryOptions()
+    private function categoryOptions(int $departmentId)
     {
         return DB::table('chemical_categories')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('units', 'chemical_categories.unit_id', '=', 'units.id')
+            ->leftJoin('manufacturers', 'chemical_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->leftJoin('storage_conditions', 'chemical_categories.storage_condition_id', '=', 'storage_conditions.id')
+            // Đơn vị hiện trên ô chọn là đơn vị PHÒNG ĐANG CHỌN đã khai cho hoá chất đó
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'chemical_categories.id'))
             ->select(
                 'chemical_categories.id',
                 'chemical_categories.code',
+                'chemical_categories.classification',
+                'chemical_categories.density',
                 'chem_names.name as chem_name',
+                'chem_names.cas_no as cas_no',
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                'storage_conditions.name as storage_condition_name',
                 'units.short_name as unit_short_name'
             )
             ->where('chemical_categories.status_id', 1)
