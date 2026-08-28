@@ -23,15 +23,6 @@
                         @endif
                     </div>
 
-                    <div class="form-group">
-                        <label>Thông Tin Kỹ Thuật</label>
-                        <textarea name="technical_information" rows="4" maxlength="2000"
-                            class="form-control {{ $bag->has('technical_information') ? 'is-invalid' : '' }}">{{ old('technical_information') }}</textarea>
-                        @if ($bag->has('technical_information'))
-                            <span class="md-error">{{ $bag->first('technical_information') }}</span>
-                        @endif
-                    </div>
-
                     <div class="md-hint">
                         <i class="fas fa-exclamation-circle mr-1"></i>
                         Sau khi sửa, bản ghi quay về trạng thái <b>Chờ duyệt</b> và cần được duyệt lại.

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\Barcode128;
 use App\Support\CategoryUnitConversion;
+use App\Support\ChemicalCode;
 use App\Support\DepartmentChemical;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
@@ -17,18 +18,19 @@ use Illuminate\Validation\Rule;
  * NHẬP - NHẬP HOÁ CHẤT
  *
  * Ghi nhận từng lần nhập hoá chất vào kho của phòng ban đang chọn.
- * Phiếu nhập chỉ khoá (deActive) chứ không xoá cứng, để mã xuất nhập không bị cấp lại.
+ *
+ * MÃ XUẤT NHẬP (cột code) sinh tự động: "HC" + shortName phòng ban + đuôi ngẫu nhiên,
+ * ví dụ HC-QC1-7KPMR9J4WD. Mã KHÔNG chứa số thứ tự và không gắn với danh mục hoá chất
+ * nên khoá / xoá một phiếu nhập không để lại khoảng trống nhìn thấy được qua giao diện.
+ * Công thức nằm ở App\Support\ChemicalCode.
  */
 class ChemicalImportController extends Controller
 {
-    private const TABLE = 'imports';
+    private const TABLE = 'chemical_imports';
 
-    private const HISTORY_TABLE = 'import_histories';
+    private const HISTORY_TABLE = 'chemical_import_histories';
 
     private const LABEL = 'phiếu nhập hoá chất';
-
-    /** Số thứ tự trong mã xuất nhập: 8 chữ số, bắt đầu từ 00000001. */
-    private const SEQ_LENGTH = 8;
 
     /**
      * Hậu tố cho lô NHẬN TỪ PHÒNG BAN KHÁC.
@@ -36,12 +38,13 @@ class ChemicalImportController extends Controller
      * Hàng chuyển kho không nhập từ ngoài vào nên mã phải phân biệt được với mã nhập
      * thường, đồng thời giữ nguyên mã của phòng nhập ĐẦU TIÊN để truy ngược nguồn gốc:
      *
-     *      61600000001            <- phòng nhập đầu (mua ngoài)
-     *      61600000001-CK01       <- chuyển lần 1
-     *      61600000001-CK02       <- chuyển lần 2 (kể cả chuyển tiếp từ 61600000001-CK01)
+     *      HC-QC1-7KPMR9J4WD            <- phòng nhập đầu (mua ngoài)
+     *      HC-QC1-7KPMR9J4WD-CK01       <- chuyển lần 1
+     *      HC-QC1-7KPMR9J4WD-CK02       <- chuyển lần 2 (kể cả chuyển tiếp từ ...-CK01)
      *
-     * Số thứ tự đếm theo MÃ GỐC trên toàn hệ thống, không đếm theo phòng, vì
-     * imports.code là duy nhất.
+     * Số thứ tự -CK đếm theo MÃ GỐC trên toàn hệ thống, không đếm theo phòng, vì
+     * chemical_imports.code là duy nhất. -CK chỉ đếm số lần một lô được chuyển đi,
+     * không tiết lộ thứ tự nhập của các lô khác nhau.
      */
     private const TRANSFER_MARK = '-CK';
 
@@ -185,7 +188,7 @@ class ChemicalImportController extends Controller
                 'updated_at' => now(),
             ]);
 
-            DB::table('exports')->where('id', $transfer->id)->update([
+            DB::table('chemical_exports')->where('id', $transfer->id)->update([
                 'received_import_id' => $id,
                 'received_at' => now(),
                 'received_by' => $this->actor(),
@@ -260,7 +263,7 @@ class ChemicalImportController extends Controller
         $reason = trim($request->reject_reason);
 
         DB::transaction(function () use ($transfer, $reason) {
-            DB::table('exports')->where('id', $transfer->id)->update([
+            DB::table('chemical_exports')->where('id', $transfer->id)->update([
                 // Khoá phiếu chuyển -> số lượng quay lại tồn của phòng gửi
                 'status_id' => 0,
                 'rejected_at' => now(),
@@ -272,9 +275,9 @@ class ChemicalImportController extends Controller
 
             // Ghi thẳng vào lịch sử của phiếu chuyển bên màn hình Sử Dụng, để phòng gửi
             // mở badge lịch sử là thấy ngay vì sao hàng bị trả về
-            $export = DB::table('exports')->where('id', $transfer->id)->first();
+            $export = DB::table('chemical_exports')->where('id', $transfer->id)->first();
 
-            DB::table('export_histories')->insert([
+            DB::table('chemical_export_histories')->insert([
                 'export_id' => $export->id,
                 'action' => 'Từ chối nhận',
                 'code' => $export->code,
@@ -296,7 +299,7 @@ class ChemicalImportController extends Controller
 
         AuditTrialController::log(
             'Từ chối nhận',
-            'exports',
+            'chemical_exports',
             $transfer->id,
             'Chờ nhận từ '.$transfer->from_department_name,
             'Từ chối. Lý do: '.$reason
@@ -318,7 +321,7 @@ class ChemicalImportController extends Controller
     private function pendingTransfer($exportId, int $departmentId)
     {
         return $this->markTransferKind(
-            $this->pendingTransferQuery($departmentId)->where('exports.id', $exportId)->first()
+            $this->pendingTransferQuery($departmentId)->where('chemical_exports.id', $exportId)->first()
         );
     }
 
@@ -326,29 +329,29 @@ class ChemicalImportController extends Controller
     private function pendingTransfers(int $departmentId)
     {
         return $this->pendingTransferQuery($departmentId)
-            ->orderBy('exports.exported_date', 'desc')
-            ->orderBy('exports.id', 'desc')
+            ->orderBy('chemical_exports.exported_date', 'desc')
+            ->orderBy('chemical_exports.id', 'desc')
             ->get()
             ->map(fn ($row) => $this->markTransferKind($row));
     }
 
     private function pendingTransferQuery(int $departmentId)
     {
-        return DB::table('exports')
-            ->join('imports as source', 'exports.import_id', '=', 'source.id')
+        return DB::table('chemical_exports')
+            ->join('chemical_imports as source', 'chemical_exports.import_id', '=', 'source.id')
             ->leftJoin('chemical_categories', 'source.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
             // Lô đang chờ nhận vẫn tính theo đơn vị của PHÒNG ĐÃ GỬI, vì đó là đơn vị đã
             // ghi trong imports.amount / exports.amount của lô này.
-            ->tap(fn ($query) => DepartmentChemical::joinUnitOn($query, 'exports.department_id', 'source.category_id'))
-            ->leftJoin('deparments', 'exports.department_id', '=', 'deparments.id')
+            ->tap(fn ($query) => DepartmentChemical::joinUnitOn($query, 'chemical_exports.department_id', 'source.category_id'))
+            ->leftJoin('deparments', 'chemical_exports.department_id', '=', 'deparments.id')
             ->select(
-                'exports.id',
-                'exports.amount',
-                'exports.exported_date',
-                'exports.exported_by',
-                'exports.purpose',
-                'exports.checked_by',
+                'chemical_exports.id',
+                'chemical_exports.amount',
+                'chemical_exports.exported_date',
+                'chemical_exports.exported_by',
+                'chemical_exports.purpose',
+                'chemical_exports.checked_by',
                 'source.code as source_code',
                 'source.category_id',
                 'source.amount as source_amount',
@@ -367,26 +370,26 @@ class ChemicalImportController extends Controller
             )
             // Lô nguồn đã cân đối lần nào chưa - đã cân đối thì không còn "nguyên"
             ->selectSub(
-                DB::table('inventory_balancings')
+                DB::table('chemical_balancings')
                     ->selectRaw('COUNT(*)')
-                    ->whereColumn('inventory_balancings.import_id', 'source.id')
-                    ->where('inventory_balancings.status_id', 1),
+                    ->whereColumn('chemical_balancings.import_id', 'source.id')
+                    ->where('chemical_balancings.status_id', 1),
                 'source_balancing_times'
             )
             // Lô nguồn đã xuất ra lần nào khác chưa (không tính chính phiếu chuyển này)
             ->selectSub(
-                DB::table('exports as other')
+                DB::table('chemical_exports as other')
                     ->selectRaw('COUNT(*)')
                     ->whereColumn('other.import_id', 'source.id')
-                    ->whereColumn('other.id', '<>', 'exports.id')
+                    ->whereColumn('other.id', '<>', 'chemical_exports.id')
                     ->where('other.status_id', 1),
                 'source_other_exports'
             )
-            ->where('exports.type', 'transfer')
-            ->where('exports.status_id', 1)
-            ->where('exports.to_department_id', $departmentId)
-            ->whereNull('exports.received_import_id')
-            ->whereNull('exports.rejected_at');
+            ->where('chemical_exports.type', 'transfer')
+            ->where('chemical_exports.status_id', 1)
+            ->where('chemical_exports.to_department_id', $departmentId)
+            ->whereNull('chemical_exports.received_import_id')
+            ->whereNull('chemical_exports.rejected_at');
     }
 
     /**
@@ -453,7 +456,7 @@ class ChemicalImportController extends Controller
             ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
             // Lô nhận từ phòng ban khác: truy ngược phiếu chuyển để biết nhận của phòng nào
-            ->leftJoin('exports as source_export', self::TABLE.'.source_export_id', '=', 'source_export.id')
+            ->leftJoin('chemical_exports as source_export', self::TABLE.'.source_export_id', '=', 'source_export.id')
             ->leftJoin('deparments as from_dept', 'source_export.department_id', '=', 'from_dept.id')
             ->select(
                 self::TABLE.'.*',
@@ -509,7 +512,7 @@ class ChemicalImportController extends Controller
             'categoryDefaults' => $categoryDefaults,
             'suppliers' => $this->supplierOptions(),
             'locations' => $this->locationOptions($departmentId),
-            'codePreviews' => $this->codePreviews($departmentId, $categories),
+            'codePreviews' => [],
             'report' => $this->importReport($departmentId, $from, $to),
             'reportFrom' => $from,
             'reportTo' => $to,
@@ -677,7 +680,7 @@ class ChemicalImportController extends Controller
 
         // Sinh mã và ghi bản ghi trong cùng một transaction để hai người nhập cùng lúc không trùng mã
         $result = DB::transaction(function () use ($request, $departmentId) {
-            $code = $this->nextCode($departmentId, (int) $request->category_id);
+            $code = $this->nextCode($departmentId);
 
             $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
                 'code' => $code,
@@ -745,11 +748,7 @@ class ChemicalImportController extends Controller
             return redirect()->back()->with('error', 'Không có thông tin nào thay đổi nên chưa ghi nhận điều chỉnh.');
         }
 
-        // Đổi hoá chất thì mã xuất nhập phải sinh lại vì mã gắn với danh mục hoá chất
-        if ((int) $payload['category_id'] !== (int) $current->category_id) {
-            $payload['code'] = $this->nextCode((int) $current->department_id, (int) $payload['category_id']);
-            $note .= ' | Mã xuất nhập: '.$current->code.' -> '.$payload['code'];
-        }
+        // Mã xuất nhập là mã lô cố định của phiếu, không đổi kể cả khi đổi hoá chất.
 
         $reason = trim((string) $request->reason);
 
@@ -767,10 +766,10 @@ class ChemicalImportController extends Controller
             self::TABLE,
             $current->id,
             $current->code,
-            ($payload['code'] ?? $current->code).' | '.$note.' | Lý do: '.$reason
+            $current->code.' | '.$note.' | Lý do: '.$reason
         );
 
-        return redirect()->back()->with('success', 'Đã ghi nhận điều chỉnh '.self::LABEL.' '.($payload['code'] ?? $current->code).'!');
+        return redirect()->back()->with('success', 'Đã ghi nhận điều chỉnh '.self::LABEL.' '.$current->code.'!');
     }
 
     /** Lịch sử điều chỉnh của một phiếu nhập, trả JSON cho modal trên bảng. */
@@ -985,53 +984,28 @@ class ChemicalImportController extends Controller
     }
 
     /**
-     * Mã xuất nhập kế tiếp: department_id + category_id + số thứ tự 8 chữ số.
+     * Mã xuất nhập kế tiếp: "HC" + shortName phòng ban + đuôi ngẫu nhiên.
      *
-     * Số thứ tự đếm riêng cho từng cặp (phòng ban, danh mục hoá chất), bắt đầu từ 00000001.
-     * Lấy số lớn nhất đang có của cặp đó rồi cộng 1 - phiếu chỉ khoá chứ không xoá nên mã
-     * không bị dùng lại.
+     * Không còn số thứ tự, không còn phụ thuộc danh mục hoá chất - xem
+     * App\Support\ChemicalCode. Gọi trong transaction của lúc lưu.
      */
-    private function nextCode(int $departmentId, int $categoryId): string
+    private function nextCode(int $departmentId): string
     {
-        $prefix = $departmentId.$categoryId;
-
-        $next = DB::table(self::TABLE)
-            ->where('department_id', $departmentId)
-            ->where('category_id', $categoryId)
-            ->pluck('code')
-            ->map(fn ($code) => (int) substr((string) $code, strlen($prefix)))
-            ->max();
-
-        return $prefix.str_pad((string) (($next ?? 0) + 1), self::SEQ_LENGTH, '0', STR_PAD_LEFT);
+        return ChemicalCode::next($this->departmentShortName($departmentId));
     }
 
-    /**
-     * Mã dự kiến của từng hoá chất để hiện trước trên form thêm mới: [category_id => mã].
-     *
-     * Chỉ để xem, mã thật vẫn sinh lúc lưu trong transaction. Gom một truy vấn cho cả
-     * phòng ban rồi tính trong PHP để không phải hỏi DB theo từng hoá chất.
-     */
-    private function codePreviews(int $departmentId, $categories): array
+    /** shortName của phòng ban để ghép vào mã xuất nhập. */
+    private function departmentShortName(int $departmentId): string
     {
-        $used = DB::table(self::TABLE)
-            ->select('category_id', 'code')
-            ->where('department_id', $departmentId)
-            ->get()
-            ->groupBy('category_id');
+        if ($departmentId === $this->departmentId()) {
+            $short = session('user')['selected_department'] ?? null;
 
-        $previews = [];
-
-        foreach ($categories as $category) {
-            $prefix = $departmentId.$category->id;
-
-            $next = ($used[$category->id] ?? collect())
-                ->map(fn ($row) => (int) substr((string) $row->code, strlen($prefix)))
-                ->max();
-
-            $previews[$category->id] = $prefix.str_pad((string) (($next ?? 0) + 1), self::SEQ_LENGTH, '0', STR_PAD_LEFT);
+            if ($short) {
+                return $short;
+            }
         }
 
-        return $previews;
+        return (string) (DB::table('deparments')->where('id', $departmentId)->value('shortName') ?: $departmentId);
     }
 
     /**

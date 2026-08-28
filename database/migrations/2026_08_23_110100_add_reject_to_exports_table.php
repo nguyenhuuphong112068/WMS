@@ -21,7 +21,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('exports', function (Blueprint $table) {
+        Schema::table('chemical_exports', function (Blueprint $table) {
             $table->dateTime('rejected_at')->nullable()->after('received_by');
             $table->string('rejected_by', 255)->nullable()->after('rejected_at');
             $table->string('reject_reason', 500)->nullable()->after('rejected_by');
@@ -30,7 +30,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('exports', function (Blueprint $table) {
+        Schema::table('chemical_exports', function (Blueprint $table) {
             $table->dropColumn(['rejected_at', 'rejected_by', 'reject_reason']);
         });
     }

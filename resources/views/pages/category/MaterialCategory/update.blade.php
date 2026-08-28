@@ -54,39 +54,15 @@
 
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>Nhà Cung Cấp <span class="text-danger">*</span></label>
-                                <select name="suppliers_id"
-                                    class="form-control cat-select {{ $bag->has('suppliers_id') ? 'is-invalid' : '' }}"
-                                    required>
-                                    <option value="">-- Chọn nhà cung cấp --</option>
-                                    @foreach ($suppliers as $option)
-                                        <option value="{{ $option->id }}"
-                                            {{ old('suppliers_id') == $option->id ? 'selected' : '' }}>
-                                            {{ $option->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                @if ($bag->has('suppliers_id'))
-                                    <span class="md-error">{{ $bag->first('suppliers_id') }}</span>
+                                <label>Thông Tin Kỹ Thuật</label>
+                                <input type="text" name="technical_specification" maxlength="100"
+                                    class="form-control {{ $bag->has('technical_specification') ? 'is-invalid' : '' }}"
+                                    value="{{ old('technical_specification') }}" placeholder="Nhập thông tin kỹ thuật">
+                                @if ($bag->has('technical_specification'))
+                                    <span class="md-error">{{ $bag->first('technical_specification') }}</span>
                                 @endif
                             </div>
                         </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Đơn Vị Tính <span class="text-danger">*</span></label>
-                        <select name="unit_id"
-                            class="form-control cat-select {{ $bag->has('unit_id') ? 'is-invalid' : '' }}" required>
-                            <option value="">-- Chọn đơn vị tính --</option>
-                            @foreach ($units as $option)
-                                <option value="{{ $option->id }}" {{ old('unit_id') == $option->id ? 'selected' : '' }}>
-                                    {{ $option->short_name }} - {{ $option->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @if ($bag->has('unit_id'))
-                            <span class="md-error">{{ $bag->first('unit_id') }}</span>
-                        @endif
                     </div>
 
                     <div class="md-hint">

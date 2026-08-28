@@ -11,6 +11,7 @@
 
 use App\Http\Controllers\Pages\Category\ChemicalCategoryController;
 use App\Http\Controllers\Pages\Category\DepartmentChemicalController;
+use App\Http\Controllers\Pages\Category\DepartmentMaterialController;
 use App\Http\Controllers\Pages\Category\DepartmentStandardController;
 use App\Http\Controllers\Pages\Category\MaterialCategoryController;
 use App\Http\Controllers\Pages\Category\StandardCategoryController;
@@ -22,6 +23,7 @@ Route::prefix('/category')
     ->middleware(CheckLogin::class)
     ->group(function () {
 
+        // Trang 2 tab: "Danh Mục Vật Tư Công Ty" + "Vật Tư Của Phòng"
         Route::prefix('/materialCategory')->name('materialCategory.')->controller(MaterialCategoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
@@ -30,6 +32,17 @@ Route::prefix('/category')
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
             Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Cấu hình riêng của từng phòng ban cho vật tư dùng chung - không có bước duyệt,
+        // phòng nào tự khai của phòng đó.
+        //
+        // Không có route hiển thị: nội dung nằm ở tab "Vật Tư Của Phòng" của trang
+        // /category/materialCategory, các thao tác bên dưới gọi từ chính tab đó.
+        Route::prefix('/departmentMaterial')->name('departmentMaterial.')->controller(DepartmentMaterialController::class)->group(function () {
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
         });
 
         // Trang 2 tab: "Danh Mục Hoá Chất Công Ty" + "Hoá Chất Của Phòng"

@@ -15,6 +15,7 @@ use App\Http\Controllers\Pages\MaterData\ChemNameController;
 use App\Http\Controllers\Pages\MaterData\ChemSupplierController;
 use App\Http\Controllers\Pages\MaterData\DepartmentController;
 use App\Http\Controllers\Pages\MaterData\GroupController;
+use App\Http\Controllers\Pages\MaterData\MaterialClassificationController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
 use App\Http\Controllers\Pages\MaterData\PackagingSpecificationController;
 use App\Http\Controllers\Pages\MaterData\ProductNameController;
@@ -110,6 +111,15 @@ Route::prefix('/materData')
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
             Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Phân loại vật tư: mỗi phòng ban tự khai bộ nhóm của phòng mình, không dùng
+        // chung nhóm A / B / C cứng nữa. Màn hình làm việc trên phòng ban đang chọn.
+        Route::prefix('/materialClassification')->name('materialClassification.')->controller(MaterialClassificationController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
         });
 
         Route::prefix('/chemManufacturer')->name('chemManufacturer.')->controller(ChemManufacturerController::class)->group(function () {

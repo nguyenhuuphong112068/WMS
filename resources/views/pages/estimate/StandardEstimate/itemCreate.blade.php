@@ -106,11 +106,21 @@
                             <label>Mục Đích Sử Dụng</label>
                             <textarea name="purpose" rows="3" maxlength="1000"
                                 class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}"
-                                placeholder="Ví dụ: Dựng đường chuẩn định lượng bằng HPLC">{{ old('purpose') }}</textarea>
+                                placeholder="Ví dụ: Pha chuẩn đánh giá phương pháp HPLC">{{ old('purpose') }}</textarea>
                             @if ($bag->has('purpose'))
                                 <span class="md-error">{{ $bag->first('purpose') }}</span>
                             @endif
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ngày Mong Muốn Giao</label>
+                        <input type="date" name="expected_delivery_date"
+                            class="form-control w-25 {{ $bag->has('expected_delivery_date') ? 'is-invalid' : '' }}"
+                            value="{{ old('expected_delivery_date') }}">
+                        @if ($bag->has('expected_delivery_date'))
+                            <span class="md-error">{{ $bag->first('expected_delivery_date') }}</span>
+                        @endif
                     </div>
 
                     <div class="form-group">

@@ -12,8 +12,9 @@ class UserController extends Controller
 {
          public function index(){
 
-                $deparments = DB::table('deparments')->where('active', true)->get();
+                $deparments = DB::table('deparments')->where('isActive', true)->get();
                 $roles = DB::table('roles')->get();
+                $groups = DB::table('groups')->where('status_id', 1)->get();
                
                 $datas = DB::table('user_management')
                     ->where ('isActive',1)
@@ -36,7 +37,8 @@ class UserController extends Controller
                 return view('pages.user.user.list',[
                         'datas' => $datas,
                         'deparments' => $deparments,
-                        'roles' => $roles]);
+                        'roles' => $roles,
+                        'groups' => $groups]);
         }
     
 
@@ -49,6 +51,7 @@ class UserController extends Controller
                 'fullName' => 'required|string|max:255|min:5',
                 'userGroup' => 'required|array', // Chấp nhận mảng
                 'deparment' => 'required',
+                'group_id' => 'nullable|integer',
                 'mail' => 'required',
 
                 ], [
@@ -87,6 +90,7 @@ class UserController extends Controller
                         'fullName' => $request->fullName,
                         'userGroup' => $primaryRoleName, // Lưu role đầu tiên làm primary
                         'deparment' => $request->deparment,
+                        'group_id' => $request->group_id,
                         'mail' => $request->mail,
                         'changePWdate' => today()->addDays(90),
                         'prepareBy' => session('user')['fullName'] ?? 'Admin',
@@ -111,6 +115,7 @@ class UserController extends Controller
                     'fullName' => 'required|string|max:255|min:5',
                     'userGroup' => 'required|array',
                     'deparment' => 'required',
+                    'group_id' => 'nullable|integer',
                     'mail' => 'required',
                 ];
 
@@ -142,6 +147,7 @@ class UserController extends Controller
                     'fullName' => $request->fullName,
                     'userGroup' => $primaryRoleName,
                     'deparment' => $request->deparment,
+                    'group_id' => $request->group_id,
                     'mail' => $request->mail,
                     'prepareBy' => session('user')['fullName'] ?? 'Admin',
                     'updated_at' => now(),

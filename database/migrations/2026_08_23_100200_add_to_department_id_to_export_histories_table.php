@@ -15,14 +15,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('export_histories', function (Blueprint $table) {
+        Schema::table('chemical_export_histories', function (Blueprint $table) {
             $table->unsignedBigInteger('to_department_id')->nullable()->after('type');
         });
     }
 
     public function down(): void
     {
-        Schema::table('export_histories', function (Blueprint $table) {
+        Schema::table('chemical_export_histories', function (Blueprint $table) {
             $table->dropColumn('to_department_id');
         });
     }

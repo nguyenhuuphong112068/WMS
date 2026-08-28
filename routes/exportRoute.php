@@ -11,6 +11,7 @@
 
 use App\Http\Controllers\Pages\Export\ChemicalDisposalController;
 use App\Http\Controllers\Pages\Export\ChemicalExportController;
+use App\Http\Controllers\Pages\Export\MaterialExportController;
 use App\Http\Controllers\Pages\Export\StandardExportController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -71,5 +72,34 @@ Route::prefix('/export')
             Route::post('requestDestroy', 'requestDestroy')->name('requestDestroy');
             Route::get('getIssuedStandards', 'getIssuedStandards')->name('getIssuedStandards');
             Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
+        });
+
+        /*
+        | SỬ DỤNG VẬT TƯ - bắt buộc qua đề nghị được phê duyệt (Trưởng/Phó Phòng bắt
+        | buộc, Ban Giám Đốc tuỳ chọn) rồi kho cấp phát, Tổ mới lập phiếu sử dụng.
+        | Loại bỏ (type = cancel) hàng hỏng thì lập thẳng, không cần đề nghị.
+        */
+        Route::prefix('/materialExport')->name('materialExport.')->controller(MaterialExportController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::get('history', 'history')->name('history');
+            Route::get('lookup', 'lookup')->name('lookup');
+            Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
+            Route::get('getIssuedItems', 'getIssuedItems')->name('getIssuedItems');
+
+            // Đề nghị cấp phát + trình ký
+            Route::post('requestStore', 'requestStore')->name('requestStore');
+            Route::post('requestUpdate', 'requestUpdate')->name('requestUpdate');
+            Route::post('requestSubmit', 'requestSubmit')->name('requestSubmit');
+            Route::post('requestSignManager', 'requestSignManager')->name('requestSignManager');
+            Route::post('requestSignDirector', 'requestSignDirector')->name('requestSignDirector');
+            Route::post('requestReject', 'requestReject')->name('requestReject');
+            Route::post('requestDestroy', 'requestDestroy')->name('requestDestroy');
+
+            // Cấp phát của kho
+            Route::post('issueStore', 'issueStore')->name('issueStore');
+            Route::post('issueReject', 'issueReject')->name('issueReject');
         });
     });

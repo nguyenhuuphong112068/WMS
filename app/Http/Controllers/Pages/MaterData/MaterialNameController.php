@@ -158,17 +158,13 @@ class MaterialNameController extends Controller
     {
         return [
             'name' => ['required', 'max:255', Rule::unique(self::TABLE, 'name')->ignore($ignoreId)],
-            'technical_information' => ['nullable', 'max:2000'],
         ];
     }
 
     private function payload(Request $request): array
     {
-        $technical = trim((string) $request->technical_information);
-
         return [
             'name' => trim((string) $request->name),
-            'technical_information' => $technical === '' ? null : $technical,
         ];
     }
 

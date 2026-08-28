@@ -21,17 +21,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
+        Schema::table('chemical_imports', function (Blueprint $table) {
             $table->unsignedBigInteger('location_id')->nullable()->after('supplier_id');
 
-            $table->index('location_id', 'imports_location_id_index');
+            $table->index('location_id', 'chemical_imports_location_id_index');
         });
     }
 
     public function down(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
-            $table->dropIndex('imports_location_id_index');
+        Schema::table('chemical_imports', function (Blueprint $table) {
+            $table->dropIndex('chemical_imports_location_id_index');
             $table->dropColumn('location_id');
         });
     }

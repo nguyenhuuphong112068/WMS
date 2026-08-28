@@ -19,17 +19,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
+        Schema::table('chemical_imports', function (Blueprint $table) {
             $table->unsignedBigInteger('source_export_id')->nullable()->after('supplier_id');
 
-            $table->index('source_export_id', 'imports_source_export_id_index');
+            $table->index('source_export_id', 'chemical_imports_source_export_id_index');
         });
     }
 
     public function down(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
-            $table->dropIndex('imports_source_export_id_index');
+        Schema::table('chemical_imports', function (Blueprint $table) {
+            $table->dropIndex('chemical_imports_source_export_id_index');
             $table->dropColumn('source_export_id');
         });
     }

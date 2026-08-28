@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('request_items', function (Blueprint $table) {
+        Schema::table('standard_request_items', function (Blueprint $table) {
             $table->boolean('return_standard')->default(false)->after('note');
         });
     }
@@ -21,7 +21,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('request_items', function (Blueprint $table) {
+        Schema::table('standard_request_items', function (Blueprint $table) {
             $table->dropColumn('return_standard');
         });
     }

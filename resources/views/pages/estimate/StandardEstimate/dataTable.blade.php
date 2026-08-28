@@ -16,19 +16,29 @@
                     </p>
                 </div>
 
-                <div class="table-responsive">
-                    <table id="mdTable" class="table table-bordered table-hover w-100">
+                <ul class="nav nav-tabs mb-3" id="estimateTabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="list-tab" data-toggle="tab" href="#list" role="tab">Danh sách phiếu</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="estimateTabsContent">
+                    <div class="tab-pane fade show active" id="list" role="tabpanel">
+                        <div class="table-responsive">
+                            <table id="mdTable" class="table table-bordered table-hover w-100">
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 55px">STT</th>
+                                <th style="width: 150px">Bộ Phận</th>
                                 <th style="width: 140px">Mã Phiếu</th>
                                 <th class="text-center" style="width: 100px">Kỳ Dự Trù</th>
                                 <th class="text-center" style="width: 95px">Chất Chuẩn</th>
                                 <th style="width: 130px">Trạng Thái</th>
                                 <th style="width: 330px">Theo Dõi Trình Ký</th>
-                                <th class="text-center" style="width: 120px">Tiếp Nhận</th>
                                 <th style="width: 130px">Người Lập</th>
-                                <th class="text-center" style="width: 95px">Sử Dụng</th>
                                 <th class="text-center" style="width: 190px">Thao Tác</th>
                             </tr>
                         </thead>
@@ -40,6 +50,9 @@
                                 @endphp
                                 <tr>
                                     <td class="text-center">{{ $loop->iteration }}</td>
+                                    <td>
+                                        <span class="est-code">{{ $row->department_short_name }}</span>
+                                    </td>
                                     <td>
                                         <span class="est-code">{{ $row->code }}</span>
                                         @if ($row->note)
@@ -56,14 +69,32 @@
                                     </td>
                                     <td>
                                         @php
+                                            $displayStatus = $appStatuses[$row->app_status] ?? $row->app_status;
                                             $estStatusClass = match ($row->app_status) {
                                                 'approved' => 'approved',
                                                 'rejected' => 'rejected',
+                                                'cancelled' => 'rejected',
                                                 default => 'pending',
                                             };
+
+                                            if ($row->app_status === 'approved') {
+                                                if ($row->reception_status === 'completed') {
+                                                    $displayStatus = 'Hoàn tất';
+                                                    $estStatusClass = 'approved bg-success text-white border-success';
+                                                } else {
+                                                    $hasPromisedDate = \Illuminate\Support\Facades\DB::table('standard_estimate_items')
+                                                                         ->where('standard_estimate_id', $row->id)
+                                                                         ->whereNotNull('promised_date')
+                                                                         ->exists();
+                                                    if ($hasPromisedDate) {
+                                                        $displayStatus = 'Cung ứng tiếp nhận và xử lý';
+                                                        $estStatusClass = 'approved bg-info text-white border-info';
+                                                    }
+                                                }
+                                            }
                                         @endphp
                                         <span class="md-badge {{ $estStatusClass }}">
-                                            {{ $appStatuses[$row->app_status] ?? $row->app_status }}
+                                            {{ $displayStatus }}
                                         </span>
                                         @if ($row->app_status === 'rejected' && $row->reject_reason)
                                             <div class="md-sub">
@@ -72,32 +103,21 @@
                                                 </span>
                                             </div>
                                         @endif
+                                        @if ($row->app_status === 'cancelled' && $row->cancel_reason)
+                                            <div class="md-sub text-danger mt-1">
+                                                <i class="fas fa-times-circle mr-1"></i>
+                                                <span class="md-note" title="{{ $row->cancel_reason }}">
+                                                    {{ $row->cancel_reason }}
+                                                </span>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td>
                                         @include('pages.estimate.shared.signFlow', ['row' => $row, 'signSteps' => $signSteps])
                                     </td>
-                                    <td class="text-center">
-                                        @if ($estReception)
-                                            <span class="est-badge {{ $estReception }}">
-                                                {{ $receptionStatuses[$estReception] ?? $estReception }}
-                                            </span>
-                                            @if ($row->received_by)
-                                                <div class="md-sub">{{ $row->received_by }}</div>
-                                            @endif
-                                        @else
-                                            <span class="est-badge none">Chưa duyệt xong</span>
-                                        @endif
-                                    </td>
                                     <td class="md-sub">
                                         {{ $row->created_by ?: '—' }}
                                         <br><small>{{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '' }}</small>
-                                    </td>
-                                    <td class="text-center">
-                                        @if ($row->status_id == 1)
-                                            <span class="badge badge-success">Hiệu lực</span>
-                                        @else
-                                            <span class="badge badge-danger">Đã khoá</span>
-                                        @endif
                                     </td>
                                     <td>
                                         <div class="md-actions">
@@ -168,25 +188,30 @@
                                                 </button>
                                             @endif
 
-                                            <form class="form-md-confirm d-inline" action="{{ route($estRoute . 'deActive') }}"
-                                                method="POST"
-                                                data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $estLabel }}?"
-                                                data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, phiếu &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không trình ký được nữa.' : 'sẽ dùng lại bình thường.' }}"
-                                                data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $row->id }}">
-                                                <button type="submit"
-                                                    class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                    title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                    <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                </button>
-                                            </form>
+                                            @if ($estEditable)
+                                                <form class="form-md-confirm-cancel d-inline" action="{{ route($estRoute . 'destroy') }}"
+                                                    method="POST"
+                                                    data-title="Huỷ phiếu dự trù {{ $row->code }}?"
+                                                    data-text="Hành động này sẽ huỷ phiếu. Bạn cần nhập lý do huỷ."
+                                                    data-danger="1">
+                                                    @csrf
+                                                    <input type="hidden" name="id" value="{{ $row->id }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Huỷ phiếu">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="tracking" role="tabpanel">
+                        @include('pages.estimate.shared.trackingTable', ['items' => $trackedItems])
+                    </div>
                 </div>
             </div>
         </div>

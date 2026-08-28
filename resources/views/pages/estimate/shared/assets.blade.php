@@ -658,5 +658,140 @@
                 $body.html('<div class="is-empty">Không tải được nhật ký trình ký.</div>');
             });
         });
+
+        /* ---------- Xử lý trao đổi thông tin (Chat) ---------- */
+        $('.chat-input-field').on('keypress', function(e) {
+            if (e.which === 13) {
+                e.preventDefault();
+                sendChat($(this));
+            }
+        });
+
+        function sendChat($input) {
+            var content = $input.val().trim();
+            var itemId = $input.data('item-id');
+            var route = $input.data('route');
+
+            if (!content) return;
+
+            $input.prop('disabled', true);
+
+            $.post(route, {
+                _token: $('input[name="_token"]').first().val(),
+                item_id: itemId,
+                content: content
+            }).done(function(res) {
+                if (res.success && res.chat) {
+                    var $container = $('#chat-messages-' + itemId);
+                    var html = '<div class="chat-message mb-2">' +
+                        '<div class="d-flex justify-content-between align-items-center">' +
+                        '<strong class="text-primary">' + res.chat.user_name + '</strong>' +
+                        '<small style="font-size: 0.7rem;">' + res.chat.created_at_formatted + '</small>' +
+                        '</div>' +
+                        '<div>' + res.chat.content + '</div>' +
+                        '</div>';
+                    $container.prepend(html);
+                    $container.scrollTop(0);
+                    $input.val('');
+                }
+            }).fail(function() {
+                alert('Có lỗi xảy ra khi gửi tin nhắn!');
+            }).always(function() {
+                $input.prop('disabled', false).focus();
+            });
+        }
+
+        /* ---------- Xử lý Ngày Hẹn Đáp Ứng ---------- */
+        $('.input-promised-date').on('change', function() {
+            var $input = $(this);
+            var dateVal = $input.val();
+            var route = $input.data('route');
+            var itemId = $input.closest('form').find('[name="id"]').val();
+
+            $.post(route, {
+                _token: $('input[name="_token"]').first().val(),
+                id: itemId,
+                promised_date: dateVal
+            }).done(function(res) {
+                if (res.success) {
+                    var $daysLeft = $input.closest('form').find('.promised-date-days-left');
+                    if (dateVal) {
+                        var promised = new Date(dateVal);
+                        promised.setHours(0,0,0,0);
+                        var today = new Date();
+                        today.setHours(0,0,0,0);
+                        var diffTime = promised - today;
+                        var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                        if (diffDays > 0) {
+                            $daysLeft.html("<span class='text-success small'>Còn " + diffDays + " ngày</span>");
+                        } else if (diffDays === 0) {
+                            $daysLeft.html("<span class='text-warning small'>Hôm nay</span>");
+                        } else {
+                            $daysLeft.html("<span class='text-danger small'>Quá hạn " + Math.abs(diffDays) + " ngày</span>");
+                        }
+                    } else {
+                        $daysLeft.html('');
+                    }
+
+                    if (res.historyAdded) {
+                        var $btn = $input.closest('form').find('.btn-promised-date-history');
+                        var $badge = $btn.find('.promised-date-history-badge');
+                        if ($badge.length) {
+                            $badge.text(parseInt($badge.text()) + 1);
+                        } else {
+                            $btn.append('<span class="badge badge-danger badge-pill position-absolute promised-date-history-badge" style="top: -5px; right: -5px; font-size: 0.6rem; padding: 2px 4px;">1</span>');
+                        }
+                    }
+                } else {
+                    alert(res.message || 'Lỗi');
+                }
+            }).fail(function() {
+                alert('Có lỗi xảy ra!');
+            });
+        });
+
+        // History modal
+        if ($('#promisedDateHistoryModal').length === 0) {
+            $('body').append(
+                '<div class="modal fade" id="promisedDateHistoryModal" tabindex="-1">' +
+                '<div class="modal-dialog modal-dialog-centered">' +
+                '<div class="modal-content">' +
+                '<div class="modal-header">' +
+                '<h5 class="modal-title">Lịch sử thay đổi ngày hẹn đáp ứng</h5>' +
+                '<button type="button" class="close" data-dismiss="modal">&times;</button>' +
+                '</div>' +
+                '<div class="modal-body" id="promisedDateHistoryContent">' +
+                '</div>' +
+                '</div></div></div>'
+            );
+        }
+
+        $(document).on('click', '.btn-promised-date-history', function() {
+            var route = $(this).data('route');
+            var $content = $('#promisedDateHistoryContent');
+            $content.html('<div class="text-center my-3"><i class="fas fa-spinner fa-spin"></i> Đang tải...</div>');
+            $('#promisedDateHistoryModal').modal('show');
+
+            $.get(route, function(res) {
+                if (res.success && res.histories) {
+                    if (res.histories.length === 0) {
+                        $content.html('<div class="text-center text-muted my-3">Chưa có lịch sử thay đổi.</div>');
+                        return;
+                    }
+                    var html = '<ul class="list-group list-group-flush">';
+                    res.histories.forEach(function(h) {
+                        html += '<li class="list-group-item px-0">' +
+                                '<div class="d-flex justify-content-between">' +
+                                '<strong class="text-primary">' + h.user_name + '</strong>' +
+                                '<small class="text-muted">' + h.created_at_formatted + '</small>' +
+                                '</div>' +
+                                '<div class="mt-1">' + h.content + '</div>' +
+                                '</li>';
+                    });
+                    html += '</ul>';
+                    $content.html(html);
+                }
+            });
+        });
     });
 </script>

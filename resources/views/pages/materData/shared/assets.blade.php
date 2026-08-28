@@ -325,6 +325,40 @@
             });
         });
 
+        /* ---------- Hỏi xác nhận có nhập lý do huỷ ---------- */
+        $(document).on('submit', '.form-md-confirm-cancel', function(e) {
+            e.preventDefault();
+            var form = this;
+
+            Swal.fire({
+                title: $(form).data('title'),
+                text: $(form).data('text'),
+                icon: 'warning',
+                input: 'textarea',
+                inputPlaceholder: 'Nhập lý do huỷ...',
+                showCancelButton: true,
+                confirmButtonColor: '#DC2626',
+                cancelButtonColor: '#94A3B8',
+                confirmButtonText: 'Xác nhận',
+                cancelButtonText: 'Đóng',
+                preConfirm: (reason) => {
+                    if (!reason) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do huỷ');
+                    }
+                    return reason;
+                }
+            }).then(function(result) {
+                if (result.isConfirmed) {
+                    var input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'cancel_reason';
+                    input.value = result.value;
+                    form.appendChild(input);
+                    form.submit();
+                }
+            });
+        });
+
         /* ---------- Thông báo kết quả ---------- */
         if (mdFlash.success) {
             Swal.fire({

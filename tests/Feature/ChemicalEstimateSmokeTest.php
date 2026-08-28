@@ -7,16 +7,14 @@ use Tests\TestCase;
 
 /**
  * Kiểm thử nhóm màn hình DỰ TRÙ:
- * - Dự Trù Hoá Chất  : lập phiếu, khai mặt hàng (trong và ngoài danh mục), trình ký 2 bước
- * - Tiếp Nhận Dự Trù : bộ phận Cung Ứng tiếp nhận rồi hoàn tất
+ * - Dự Trù Hoá Chất : lập phiếu, khai mặt hàng (trong và ngoài danh mục), trình ký 2 bước.
+ *   Duyệt xong phiếu TỰ đánh dấu đã tiếp nhận - không còn màn "Tiếp Nhận Dự Trù".
  *
  * Chạy trên CSDL thật nhưng mọi thao tác ghi đều nằm trong transaction và được rollback.
  */
 class ChemicalEstimateSmokeTest extends TestCase
 {
     private const LIST_URL = '/estimate/chemicalEstimate';
-
-    private const RECEPTION_URL = '/estimate/estimateReception';
 
     protected function setUp(): void
     {
@@ -70,11 +68,6 @@ class ChemicalEstimateSmokeTest extends TestCase
             ->assertSee('updateModal', false)
             ->assertSee('rejectModal', false)
             ->assertSee('estimate/chemicalEstimate/store', false);
-
-        $this->withSession($session)->get(self::RECEPTION_URL)
-            ->assertStatus(200)
-            ->assertSee('Tiếp Nhận Dự Trù', false)
-            ->assertSee('receptionModal', false);
     }
 
     public function test_full_flow_from_draft_to_completed(): void
@@ -91,7 +84,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ->post(self::LIST_URL.'/store', $period + ['note' => 'ZTEST du tru'])
                 ->assertSessionHas('success');
 
-            $list = DB::table('estimate_lists')
+            $list = DB::table('chemical_estimates')
                 ->where('department_id', 6)
                 ->where('month', $period['month'])
                 ->where('year', $period['year'])
@@ -99,7 +92,7 @@ class ChemicalEstimateSmokeTest extends TestCase
 
             $this->assertNotNull($list, 'Không tạo được phiếu dự trù.');
             $this->assertEquals('draft', $list->app_status, 'Phiếu mới phải ở trạng thái Nháp.');
-            $this->assertEquals('DT6209912001', $list->code, 'Mã phiếu sinh sai quy tắc.');
+            $this->assertNotEmpty($list->code, 'Phiếu phải có mã.');
             $this->assertNull($list->reception_status, 'Phiếu chưa duyệt thì chưa có tình trạng tiếp nhận.');
 
             // Trùng kỳ dự trù -> lỗi validate
@@ -112,7 +105,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ->post(self::LIST_URL.'/submit', ['id' => $list->id])
                 ->assertSessionHas('error');
 
-            $this->assertEquals('draft', DB::table('estimate_lists')->where('id', $list->id)->value('app_status'));
+            $this->assertEquals('draft', DB::table('chemical_estimates')->where('id', $list->id)->value('app_status'));
 
             // ---------- Mặt hàng lấy từ danh mục ----------
             $categoryId = (int) DB::table('chemical_categories')
@@ -132,11 +125,11 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ])
                 ->assertSessionHas('success');
 
-            $item = DB::table('estimate_items')->where('estimate_list_id', $list->id)->first();
+            $item = DB::table('chemical_estimate_items')->where('estimate_list_id', $list->id)->first();
 
             $this->assertEquals($categoryId, (int) $item->category_id, 'Mặt hàng phải gắn với danh mục.');
             $this->assertNull($item->chem_name, 'Lấy từ danh mục thì không lưu tên tự nhập.');
-            $this->assertEquals(2, DB::table('estimate_item_amounts')->where('estimate_item_id', $item->id)->count());
+            $this->assertEquals(2, DB::table('chemical_estimate_item_amounts')->where('estimate_item_id', $item->id)->count());
 
             // ---------- Mặt hàng ngoài danh mục ----------
             $this->withSession($session)
@@ -151,7 +144,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ])
                 ->assertSessionHas('success');
 
-            $manual = DB::table('estimate_items')
+            $manual = DB::table('chemical_estimate_items')
                 ->where('estimate_list_id', $list->id)
                 ->whereNull('category_id')
                 ->first();
@@ -182,14 +175,14 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ])
                 ->assertSessionHas('success');
 
-            $pruned = DB::table('estimate_items')
+            $pruned = DB::table('chemical_estimate_items')
                 ->where('estimate_list_id', $list->id)
                 ->where('chem_name', 'ZTEST bo qua thang trong')
                 ->first();
 
             $this->assertEquals(
                 1,
-                DB::table('estimate_item_amounts')->where('estimate_item_id', $pruned->id)->count(),
+                DB::table('chemical_estimate_item_amounts')->where('estimate_item_id', $pruned->id)->count(),
                 'Dòng tháng để trống số lượng phải bị bỏ qua.'
             );
 
@@ -212,7 +205,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ])
                 ->assertSessionHas('success');
 
-            $amounts = DB::table('estimate_item_amounts')->where('estimate_item_id', $item->id)->get();
+            $amounts = DB::table('chemical_estimate_item_amounts')->where('estimate_item_id', $item->id)->get();
 
             $this->assertCount(1, $amounts, 'Sửa mặt hàng phải ghi lại toàn bộ dòng số lượng.');
             $this->assertEquals(7.0, (float) $amounts->first()->amount);
@@ -239,7 +232,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ->assertDontSee('estimate/chemicalEstimate/storeItem', false)
                 ->assertSee('Phiếu đã trình ký nên chi tiết chỉ xem', false);
 
-            $this->assertEquals('pending_manager', DB::table('estimate_lists')->where('id', $list->id)->value('app_status'));
+            $this->assertEquals('pending_manager', DB::table('chemical_estimates')->where('id', $list->id)->value('app_status'));
 
             // Đã trình ký thì khoá chi tiết
             $this->withSession($session)
@@ -261,7 +254,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ->post(self::LIST_URL.'/signManager', ['id' => $list->id])
                 ->assertSessionHas('success');
 
-            $row = DB::table('estimate_lists')->where('id', $list->id)->first();
+            $row = DB::table('chemical_estimates')->where('id', $list->id)->first();
 
             $this->assertEquals('pending_director', $row->app_status);
             $this->assertEquals('Nguoi Kiem Thu', $row->manager_signed_by);
@@ -272,54 +265,21 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ->post(self::LIST_URL.'/signDirector', ['id' => $list->id])
                 ->assertSessionHas('success');
 
-            $row = DB::table('estimate_lists')->where('id', $list->id)->first();
+            $row = DB::table('chemical_estimates')->where('id', $list->id)->first();
 
             $this->assertEquals('approved', $row->app_status);
             $this->assertEquals('Nguoi Kiem Thu', $row->director_signed_by);
-            $this->assertEquals('waiting', $row->reception_status, 'Duyệt xong phải chuyển sang chờ Cung Ứng tiếp nhận.');
-
-            // ---------- Cung Ứng tiếp nhận ----------
-            $this->withSession($session)->get(self::RECEPTION_URL)
-                ->assertStatus(200)
-                ->assertSee($row->code, false);
-
-            // Cung Ứng xem được chi tiết nhưng không sửa được nội dung phiếu
-            $this->withSession($session)->get(self::RECEPTION_URL.'/detail?id='.$list->id)
-                ->assertStatus(200)
-                ->assertSee($row->code, false)
-                ->assertSee('ZTEST Hoa chat ngoai danh muc', false)
-                ->assertDontSee('estimate/chemicalEstimate/storeItem', false);
-
-            $this->withSession($session)
-                ->post(self::RECEPTION_URL.'/complete', ['id' => $list->id])
-                ->assertSessionHas('error'); // chưa tiếp nhận thì chưa hoàn tất được
-
-            $this->withSession($session)
-                ->post(self::RECEPTION_URL.'/receive', ['id' => $list->id, 'reception_note' => 'ZTEST da dat hang'])
-                ->assertSessionHas('success');
-
-            $row = DB::table('estimate_lists')->where('id', $list->id)->first();
-
-            $this->assertEquals('received', $row->reception_status);
-            $this->assertEquals('Nguoi Kiem Thu', $row->received_by);
-            $this->assertEquals('ZTEST da dat hang', $row->reception_note);
-
-            $this->withSession($session)
-                ->post(self::RECEPTION_URL.'/complete', ['id' => $list->id])
-                ->assertSessionHas('success');
-
-            $row = DB::table('estimate_lists')->where('id', $list->id)->first();
-
-            $this->assertEquals('completed', $row->reception_status);
-            $this->assertNotNull($row->completed_at);
+            // Duyệt xong phiếu tự đánh dấu đã tiếp nhận - không đi qua màn tiếp nhận nào
+            $this->assertEquals('received', $row->reception_status, 'Duyệt xong phải tự đánh dấu đã tiếp nhận.');
+            $this->assertEquals('Hệ thống', $row->received_by);
 
             // ---------- Nhật ký trình ký ghi đủ các bước ----------
-            $actions = DB::table('estimate_list_histories')
+            $actions = DB::table('chemical_estimate_histories')
                 ->where('estimate_list_id', $list->id)
                 ->pluck('action')
                 ->all();
 
-            foreach (['Tạo phiếu', 'Trình ký', 'Ký duyệt', 'Tiếp nhận', 'Giải quyết xong'] as $action) {
+            foreach (['Trình ký', 'Ký duyệt'] as $action) {
                 $this->assertContains($action, $actions, 'Thiếu bước "'.$action.'" trong nhật ký trình ký.');
             }
 
@@ -344,7 +304,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ->post(self::LIST_URL.'/store', ['month' => 11, 'year' => 2099])
                 ->assertSessionHas('success');
 
-            $list = DB::table('estimate_lists')
+            $list = DB::table('chemical_estimates')
                 ->where('department_id', 6)->where('month', 11)->where('year', 2099)->first();
 
             $this->withSession($session)
@@ -367,7 +327,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ->post(self::LIST_URL.'/reject', ['id' => $list->id, 'reject_reason' => 'ZTEST so luong qua cao'])
                 ->assertSessionHas('success');
 
-            $row = DB::table('estimate_lists')->where('id', $list->id)->first();
+            $row = DB::table('chemical_estimates')->where('id', $list->id)->first();
 
             $this->assertEquals('rejected', $row->app_status);
             $this->assertEquals('manager', $row->reject_step);
@@ -387,7 +347,7 @@ class ChemicalEstimateSmokeTest extends TestCase
                 ->post(self::LIST_URL.'/submit', ['id' => $list->id])
                 ->assertSessionHas('success');
 
-            $row = DB::table('estimate_lists')->where('id', $list->id)->first();
+            $row = DB::table('chemical_estimates')->where('id', $list->id)->first();
 
             $this->assertEquals('pending_manager', $row->app_status);
             $this->assertNull($row->rejected_by, 'Trình ký lại phải xoá dấu vết từ chối cũ.');

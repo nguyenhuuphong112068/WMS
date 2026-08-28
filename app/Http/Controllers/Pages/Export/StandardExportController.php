@@ -87,28 +87,28 @@ class StandardExportController extends Controller
             ->get();
 
         // Danh sách Đề nghị cấp phát chuẩn của các Tổ
-        $requests = DB::table('request_lists')
-            ->leftJoin('groups', 'request_lists.group_id', '=', 'groups.id')
+        $requests = DB::table('standard_request_lists')
+            ->leftJoin('groups', 'standard_request_lists.group_id', '=', 'groups.id')
             ->select(
-                'request_lists.*',
+                'standard_request_lists.*',
                 'groups.name as group_name'
             )
-            ->where('request_lists.department_id', $departmentId)
-            ->orderBy('request_lists.created_at', 'desc')
+            ->where('standard_request_lists.department_id', $departmentId)
+            ->orderBy('standard_request_lists.created_at', 'desc')
             ->get();
 
-        $requestItems = DB::table('request_items')
-            ->leftJoin('request_lists', 'request_items.request_list_id', '=', 'request_lists.id')
-            ->leftJoin('standard_categories', 'request_items.category_id', '=', 'standard_categories.id')
+        $requestItems = DB::table('standard_request_items')
+            ->leftJoin('standard_request_lists', 'standard_request_items.request_list_id', '=', 'standard_request_lists.id')
+            ->leftJoin('standard_categories', 'standard_request_items.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
-            ->leftJoin('standard_imports', 'request_items.import_id', '=', 'standard_imports.id')
+            ->leftJoin('standard_imports', 'standard_request_items.import_id', '=', 'standard_imports.id')
             ->leftJoin('locations', 'standard_imports.location_id', '=', 'locations.id')
-            ->leftJoin('analysts', 'request_items.analyst_id', '=', 'analysts.id')
-            ->leftJoin('purposes', 'request_items.purpose_id', '=', 'purposes.id')
-            ->leftJoin('suppliers', 'request_items.supplier_id', '=', 'suppliers.id')
+            ->leftJoin('analysts', 'standard_request_items.analyst_id', '=', 'analysts.id')
+            ->leftJoin('purposes', 'standard_request_items.purpose_id', '=', 'purposes.id')
+            ->leftJoin('suppliers', 'standard_request_items.supplier_id', '=', 'suppliers.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
             ->select(
-                'request_items.*',
+                'standard_request_items.*',
                 'standard_names.name as standard_name',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
@@ -120,7 +120,7 @@ class StandardExportController extends Controller
                 'purposes.name as purpose_name',
                 DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
             )
-            ->where('request_lists.department_id', $departmentId)
+            ->where('standard_request_lists.department_id', $departmentId)
             ->get()
             ->groupBy('request_list_id');
 
@@ -334,19 +334,19 @@ class StandardExportController extends Controller
         }
 
         // Các request_items đã được cấp phát cho tổ này
-        $issuedItems = DB::table('request_items')
-            ->join('request_lists', 'request_items.request_list_id', '=', 'request_lists.id')
-            ->leftJoin('standard_imports', 'request_items.import_id', '=', 'standard_imports.id')
+        $issuedItems = DB::table('standard_request_items')
+            ->join('standard_request_lists', 'standard_request_items.request_list_id', '=', 'standard_request_lists.id')
+            ->leftJoin('standard_imports', 'standard_request_items.import_id', '=', 'standard_imports.id')
             ->leftJoin('locations', 'standard_imports.location_id', '=', 'locations.id')
-            ->leftJoin('standard_categories', 'request_items.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_categories', 'standard_request_items.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
-            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'request_items.category_id'))
-            ->leftJoin('analysts', 'request_items.analyst_id', '=', 'analysts.id')
-            ->leftJoin('purposes', 'request_items.purpose_id', '=', 'purposes.id')
-            ->leftJoin('suppliers', 'request_items.supplier_id', '=', 'suppliers.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_request_items.category_id'))
+            ->leftJoin('analysts', 'standard_request_items.analyst_id', '=', 'analysts.id')
+            ->leftJoin('purposes', 'standard_request_items.purpose_id', '=', 'purposes.id')
+            ->leftJoin('suppliers', 'standard_request_items.supplier_id', '=', 'suppliers.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
             ->select(
-                'request_items.*',
+                'standard_request_items.*',
                 'standard_imports.amount as import_amount',
                 'standard_imports.potency',
                 'standard_imports.moisture',
@@ -365,19 +365,19 @@ class StandardExportController extends Controller
                 'purposes.name as purpose_name',
                 DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
             )
-            ->where('request_lists.department_id', $departmentId)
-            ->where('request_lists.group_id', $groupId)
-            ->where('request_items.status', 'issued')
-            ->whereNotNull('request_items.import_id')
+            ->where('standard_request_lists.department_id', $departmentId)
+            ->where('standard_request_lists.group_id', $groupId)
+            ->where('standard_request_items.status', 'issued')
+            ->whereNotNull('standard_request_items.import_id')
             // Ẩn ống chuẩn đã được lập phiếu sử dụng: mỗi ống cấp phát cho tổ chỉ dùng
             // một lần, tránh người sau chọn lại đúng ống người trước đã xuất.
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from(self::TABLE)
-                    ->whereColumn(self::TABLE.'.request_item_id', 'request_items.id')
+                    ->whereColumn(self::TABLE.'.request_item_id', 'standard_request_items.id')
                     ->where(self::TABLE.'.type', 'export');
             })
-            ->orderBy('request_items.issued_at', 'desc')
+            ->orderBy('standard_request_items.issued_at', 'desc')
             ->get();
 
         $importIds = $issuedItems->pluck('import_id')->filter()->unique();
@@ -522,7 +522,7 @@ class StandardExportController extends Controller
         $dateStr = date('dmy');
         $prefix = $deptStr . $groupStr . $dateStr . '_';
 
-        $latestCode = DB::table('request_lists')
+        $latestCode = DB::table('standard_request_lists')
             ->where('code', 'LIKE', $prefix . '%')
             ->orderBy('id', 'desc')
             ->value('code');
@@ -535,7 +535,7 @@ class StandardExportController extends Controller
 
         $code = $prefix . str_pad($seq, 2, '0', STR_PAD_LEFT);
 
-        $listId = DB::table('request_lists')->insertGetId([
+        $listId = DB::table('standard_request_lists')->insertGetId([
             'code' => $code,
             'department_id' => $departmentId,
             'group_id' => (int) $request->group_id,
@@ -547,7 +547,7 @@ class StandardExportController extends Controller
         ]);
 
         foreach ($request->items as $item) {
-            DB::table('request_items')->insert([
+            DB::table('standard_request_items')->insert([
                 'request_list_id' => $listId,
                 'category_id' => (int) $item['category_id'],
                 'import_id' => !empty($item['import_id']) ? (int) $item['import_id'] : null,
@@ -571,7 +571,7 @@ class StandardExportController extends Controller
 
         AuditTrialController::log(
             $isDraft ? 'Lưu tạm đề nghị cấp phát chuẩn' : 'Tạo đề nghị cấp phát chuẩn',
-            'request_lists',
+            'standard_request_lists',
             $listId,
             'NA',
             ($isDraft ? 'Lưu tạm đề nghị ' : 'Tạo đề nghị cấp phát ') . $code . ' cho ' . $groupName . ' (' . count($request->items) . ' mục)'
@@ -593,7 +593,7 @@ class StandardExportController extends Controller
         $departmentId = $this->departmentId();
         $listId = (int) $request->request_list_id;
 
-        $req = DB::table('request_lists')
+        $req = DB::table('standard_request_lists')
             ->where('id', $listId)
             ->where('department_id', $departmentId)
             ->first();
@@ -640,7 +640,7 @@ class StandardExportController extends Controller
         $isDraft = $actionType === 'draft';
         $status = $isDraft ? 'draft' : 'pending';
 
-        DB::table('request_lists')->where('id', $req->id)->update([
+        DB::table('standard_request_lists')->where('id', $req->id)->update([
             'group_id' => (int) $request->group_id,
             'status' => $status,
             'note' => $this->nullIfBlank($request->note),
@@ -648,10 +648,10 @@ class StandardExportController extends Controller
         ]);
 
         // Recreate items
-        DB::table('request_items')->where('request_list_id', $req->id)->delete();
+        DB::table('standard_request_items')->where('request_list_id', $req->id)->delete();
 
         foreach ($request->items as $item) {
-            DB::table('request_items')->insert([
+            DB::table('standard_request_items')->insert([
                 'request_list_id' => $req->id,
                 'category_id' => (int) $item['category_id'],
                 'import_id' => !empty($item['import_id']) ? (int) $item['import_id'] : null,
@@ -675,7 +675,7 @@ class StandardExportController extends Controller
 
         AuditTrialController::log(
             $isDraft ? 'Cập nhật đề nghị cấp phát chuẩn' : 'Gửi đề nghị cấp phát chuẩn sau cập nhật',
-            'request_lists',
+            'standard_request_lists',
             $req->id,
             'draft',
             ($isDraft ? 'Cập nhật đề nghị ' : 'Gửi đề nghị ') . $req->code . ' cho ' . $groupName . ' (' . count($request->items) . ' mục)'
@@ -695,7 +695,7 @@ class StandardExportController extends Controller
     public function requestSend(Request $request)
     {
         $listId = (int) $request->request_list_id;
-        $req = DB::table('request_lists')
+        $req = DB::table('standard_request_lists')
             ->where('id', $listId)
             ->where('department_id', $this->departmentId())
             ->first();
@@ -704,19 +704,19 @@ class StandardExportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy phiếu đề nghị lưu tạm cần gửi!');
         }
 
-        DB::table('request_lists')->where('id', $req->id)->update([
+        DB::table('standard_request_lists')->where('id', $req->id)->update([
             'status' => 'pending',
             'updated_at' => now(),
         ]);
 
-        DB::table('request_items')->where('request_list_id', $req->id)->where('status', 'draft')->update([
+        DB::table('standard_request_items')->where('request_list_id', $req->id)->where('status', 'draft')->update([
             'status' => 'pending',
             'updated_at' => now(),
         ]);
 
         AuditTrialController::log(
             'Gửi đề nghị cấp phát chuẩn',
-            'request_lists',
+            'standard_request_lists',
             $req->id,
             'draft',
             'Gửi đề nghị cấp phát: ' . $req->code
@@ -758,7 +758,7 @@ class StandardExportController extends Controller
                 ->with('activeTab', 'request');
         }
 
-        $item = DB::table('request_items')->where('id', $request->item_id)->first();
+        $item = DB::table('standard_request_items')->where('id', $request->item_id)->first();
         if (!$item) {
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => 'Không tìm thấy mục đề nghị!']);
@@ -792,7 +792,7 @@ class StandardExportController extends Controller
             return redirect()->back()->with('error', 'Ống chuẩn đã hết hạn sử dụng, không được cấp phát!');
         }
 
-        DB::table('request_items')->where('id', $item->id)->update([
+        DB::table('standard_request_items')->where('id', $item->id)->update([
             'import_id' => (int) $import->id,
             'import_code' => $import->code,
             'issued_amount' => (float) $request->issued_amount,
@@ -806,20 +806,20 @@ class StandardExportController extends Controller
         ]);
 
         // Cập nhật trạng thái phiếu đề nghị tổng (completed nếu đã cấp hết, partial nếu cấp 1 phần)
-        $allItems = DB::table('request_items')->where('request_list_id', $item->request_list_id)->get();
+        $allItems = DB::table('standard_request_items')->where('request_list_id', $item->request_list_id)->get();
         $pendingCount = $allItems->where('status', 'pending')->count();
         $issuedCount = $allItems->where('status', 'issued')->count();
 
         $newListStatus = $pendingCount === 0 ? 'completed' : ($issuedCount > 0 ? 'partial' : 'pending');
 
-        DB::table('request_lists')->where('id', $item->request_list_id)->update([
+        DB::table('standard_request_lists')->where('id', $item->request_list_id)->update([
             'status' => $newListStatus,
             'updated_at' => now(),
         ]);
 
         AuditTrialController::log(
             'Cấp phát chuẩn',
-            'request_items',
+            'standard_request_items',
             $item->id,
             'pending',
             'Cấp ống ' . $import->code . ' số lượng ' . $request->issued_amount
@@ -871,7 +871,7 @@ class StandardExportController extends Controller
         }
 
         $listId = $request->request_list_id;
-        $req = DB::table('request_lists')->where('id', $listId)->where('department_id', $departmentId)->first();
+        $req = DB::table('standard_request_lists')->where('id', $listId)->where('department_id', $departmentId)->first();
         if (!$req) {
             return response()->json(['success' => false, 'message' => 'Không tìm thấy phiếu đề nghị.']);
         }
@@ -885,7 +885,7 @@ class StandardExportController extends Controller
                 $importCode = DB::table('standard_imports')->where('id', $importId)->value('code');
             }
 
-            DB::table('request_items')->where('id', $itemId)->where('request_list_id', $listId)->update([
+            DB::table('standard_request_items')->where('id', $itemId)->where('request_list_id', $listId)->update([
                 'import_id' => $importId,
                 'import_code' => $importCode,
                 'issued_amount' => !empty($itemData['issued_amount']) ? (float)$itemData['issued_amount'] : null,
@@ -906,31 +906,31 @@ class StandardExportController extends Controller
      */
     public function requestReject(Request $request)
     {
-        $item = DB::table('request_items')->where('id', $request->item_id)->first();
+        $item = DB::table('standard_request_items')->where('id', $request->item_id)->first();
         if (!$item) {
             return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!');
         }
 
-        DB::table('request_items')->where('id', $item->id)->update([
+        DB::table('standard_request_items')->where('id', $item->id)->update([
             'status' => 'rejected',
             'note' => $this->nullIfBlank($request->note),
             'updated_at' => now(),
         ]);
 
-        $allItems = DB::table('request_items')->where('request_list_id', $item->request_list_id)->get();
+        $allItems = DB::table('standard_request_items')->where('request_list_id', $item->request_list_id)->get();
         $pendingCount = $allItems->where('status', 'pending')->count();
         $issuedCount = $allItems->where('status', 'issued')->count();
 
         $newListStatus = $pendingCount === 0 ? ($issuedCount > 0 ? 'completed' : 'rejected') : 'partial';
 
-        DB::table('request_lists')->where('id', $item->request_list_id)->update([
+        DB::table('standard_request_lists')->where('id', $item->request_list_id)->update([
             'status' => $newListStatus,
             'updated_at' => now(),
         ]);
 
         AuditTrialController::log(
             'Từ chối cấp phát',
-            'request_items',
+            'standard_request_items',
             $item->id,
             $item->status,
             'Từ chối cấp phát' . ($request->filled('note') ? ': ' . $request->note : '')
@@ -1447,7 +1447,7 @@ class StandardExportController extends Controller
     {
         $departmentId = $this->departmentId();
 
-        $req = DB::table('request_lists')
+        $req = DB::table('standard_request_lists')
             ->where('id', $request->request_list_id)
             ->where('department_id', $departmentId)
             ->first();
@@ -1460,14 +1460,14 @@ class StandardExportController extends Controller
             return redirect()->back()->with('error', 'Chỉ có thể huỷ phiếu đang ở trạng thái Lưu tạm.')->with('activeTab', 'request');
         }
 
-        DB::table('request_lists')->where('id', $req->id)->update([
+        DB::table('standard_request_lists')->where('id', $req->id)->update([
             'status' => 'canceled',
             'updated_at' => now(),
         ]);
 
         AuditTrialController::log(
             'Huỷ đề nghị',
-            'request_lists',
+            'standard_request_lists',
             $req->id,
             $req->code,
             'Đã huỷ đề nghị cấp phát chuẩn đang lưu tạm'

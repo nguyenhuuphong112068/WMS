@@ -22,7 +22,6 @@
                             <tr>
                                 <th class="text-center" style="width: 60px">STT</th>
                                 <th>Tên Vật Tư</th>
-                                <th>Thông Tin Kỹ Thuật</th>
                                 <th style="width: 140px">Người Tạo</th>
                                 <th class="text-center" style="width: 105px">Ngày Tạo</th>
                                 <th class="text-center" style="width: 130px">Duyệt</th>
@@ -35,14 +34,6 @@
                                 <tr>
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td class="font-weight-bold">{{ $row->name }}</td>
-                                    <td class="md-sub">
-                                        @if ($row->technical_information)
-                                            <span class="md-note"
-                                                title="{{ $row->technical_information }}">{{ $row->technical_information }}</span>
-                                        @else
-                                            <span class="md-empty">—</span>
-                                        @endif
-                                    </td>
                                     <td class="md-sub">{{ $row->created_by ?: '—' }}</td>
                                     <td class="text-center md-sub">
                                         {{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '—' }}
@@ -66,7 +57,6 @@
                                             'editData' => [
                                                 'id' => $row->id,
                                                 'name' => $row->name,
-                                                'technical_information' => $row->technical_information,
                                             ],
                                         ])
                                     </td>

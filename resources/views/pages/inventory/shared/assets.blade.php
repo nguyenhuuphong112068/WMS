@@ -106,8 +106,171 @@
         color: #9D174D;
     }
 
+    /* Số phát sinh trong kỳ: nhập cộng vào xanh lá, sử dụng / huỷ trừ đi đỏ gạch */
+    .inv-amount.is-in {
+        color: #15803D;
+    }
+
+    .inv-amount.is-out {
+        color: #B91C1C;
+    }
+
     .inv-muted {
         color: #94A3B8;
+    }
+
+    /* ---------- Kỳ báo cáo ---------- */
+    .inv-period {
+        display: flex;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: var(--border-radius-md);
+        background: var(--primary-soft);
+    }
+
+    .inv-period-title {
+        align-self: center;
+        font-size: 0.86rem;
+        font-weight: 700;
+        color: var(--primary-dark);
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        white-space: nowrap;
+    }
+
+    .inv-period-title i {
+        margin-right: 5px;
+        color: var(--primary);
+    }
+
+    .inv-period-field {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .inv-period-field label {
+        margin: 0;
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .inv-period-field .form-control {
+        width: 160px;
+        height: 34px;
+        padding: 4px 10px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: var(--border-radius-md);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-main);
+        background: #fff;
+        transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .inv-period-field .form-control:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.14);
+    }
+
+    .inv-period-apply {
+        height: 34px;
+        padding: 0 16px;
+        border-radius: var(--border-radius-md);
+        font-weight: 600;
+        white-space: nowrap;
+        transition: all var(--transition-fast);
+    }
+
+    .inv-period-apply:hover {
+        transform: translateY(-1px);
+    }
+
+    .inv-period-quick {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding-left: 12px;
+        margin-left: 2px;
+        border-left: 1px solid var(--primary-lighter);
+    }
+
+    .inv-period-chip {
+        padding: 5px 12px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--primary-dark);
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all var(--transition-fast);
+    }
+
+    .inv-period-chip:hover {
+        border-color: var(--primary);
+        background: #fff;
+        transform: translateY(-1px);
+    }
+
+    .inv-period-chip.is-active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+        box-shadow: 0 3px 10px rgba(var(--primary-rgb), 0.24);
+    }
+
+    .inv-period-note {
+        flex: 1 1 220px;
+        align-self: center;
+        min-width: 220px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .inv-period-note i {
+        margin-right: 4px;
+        color: var(--primary);
+    }
+
+    .inv-period-days {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 1px 9px;
+        border-radius: 999px;
+        background: #fff;
+        border: 1px solid var(--primary-lighter);
+        color: var(--primary-dark);
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    /* Cột số liệu của kỳ - gạch chân nhẹ để tách khỏi các cột luỹ kế bên cạnh */
+    th.inv-th-period {
+        box-shadow: inset 0 -3px 0 var(--primary-lighter);
+    }
+
+    /* Nhãn "Mới nhập trong kỳ" ở cột Tồn Đầu Kỳ */
+    .inv-period-tag {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: #DCFCE7;
+        border: 1px solid #86EFAC;
+        color: #15803D;
+        font-size: 0.68rem;
+        font-weight: 700;
+        white-space: nowrap;
     }
 
     /* Tồn cộng dồn theo lô / theo hoá chất - nhạt hơn cột Tồn Còn Lại của chính dòng đó */
@@ -604,6 +767,16 @@
         // Bảng dùng chung nhắc bấm "Thêm mới", màn hình tồn không có nút đó
         table.settings()[0].oLanguage.sEmptyTable =
             'Chưa có phiếu nhập nào để tính tồn kho. Hãy tạo phiếu ở màn hình Nhập Hoá Chất.';
+
+        /* ---------- Kỳ báo cáo: mốc chọn nhanh ---------- */
+        // Điền sẵn hai ô ngày rồi gửi form luôn, người dùng không phải chọn tay từng ngày
+        $(document).on('click', '.inv-period-chip', function() {
+            var $form = $(this).closest('form');
+
+            $form.find('[name="from_date"]').val($(this).data('from'));
+            $form.find('[name="to_date"]').val($(this).data('to'));
+            $form.trigger('submit');
+        });
 
         /* ---------- Lọc nhanh theo trạng thái tồn ---------- */
         var invState = 'all';

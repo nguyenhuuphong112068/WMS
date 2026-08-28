@@ -21,14 +21,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
+        Schema::table('chemical_imports', function (Blueprint $table) {
             $table->date('internal_expired_date')->nullable()->after('expired_date');
         });
     }
 
     public function down(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
+        Schema::table('chemical_imports', function (Blueprint $table) {
             $table->dropColumn('internal_expired_date');
         });
     }

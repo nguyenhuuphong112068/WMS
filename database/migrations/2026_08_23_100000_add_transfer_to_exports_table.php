@@ -28,27 +28,27 @@ return new class extends Migration
     public function up(): void
     {
         // Cột enum phải đổi bằng câu lệnh thẳng, Schema builder không sửa được enum
-        DB::statement("ALTER TABLE `exports` MODIFY `type` ENUM('export','cancel','transfer') NOT NULL DEFAULT 'export'");
+        DB::statement("ALTER TABLE `chemical_exports` MODIFY `type` ENUM('export','cancel','transfer') NOT NULL DEFAULT 'export'");
 
-        Schema::table('exports', function (Blueprint $table) {
+        Schema::table('chemical_exports', function (Blueprint $table) {
             $table->unsignedBigInteger('to_department_id')->nullable()->after('type');
             $table->unsignedBigInteger('received_import_id')->nullable()->after('to_department_id');
             $table->dateTime('received_at')->nullable()->after('received_import_id');
             $table->string('received_by', 255)->nullable()->after('received_at');
 
-            $table->index('to_department_id', 'exports_to_department_id_index');
-            $table->index('received_import_id', 'exports_received_import_id_index');
+            $table->index('to_department_id', 'chemical_exports_to_department_id_index');
+            $table->index('received_import_id', 'chemical_exports_received_import_id_index');
         });
     }
 
     public function down(): void
     {
-        Schema::table('exports', function (Blueprint $table) {
-            $table->dropIndex('exports_to_department_id_index');
-            $table->dropIndex('exports_received_import_id_index');
+        Schema::table('chemical_exports', function (Blueprint $table) {
+            $table->dropIndex('chemical_exports_to_department_id_index');
+            $table->dropIndex('chemical_exports_received_import_id_index');
             $table->dropColumn(['to_department_id', 'received_import_id', 'received_at', 'received_by']);
         });
 
-        DB::statement("ALTER TABLE `exports` MODIFY `type` ENUM('export','cancel') NOT NULL DEFAULT 'export'");
+        DB::statement("ALTER TABLE `chemical_exports` MODIFY `type` ENUM('export','cancel') NOT NULL DEFAULT 'export'");
     }
 };

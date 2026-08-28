@@ -21,6 +21,7 @@ return [
         'pending_director' => 'Chờ Ban Giám Đốc ký',
         'approved' => 'Đã phê duyệt',
         'rejected' => 'Bị từ chối',
+        'cancelled' => 'Đã huỷ',
     ],
 
     /*

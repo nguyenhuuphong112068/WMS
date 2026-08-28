@@ -19,6 +19,18 @@ use Illuminate\Support\Facades\Validator;
  *                           + SUM(standard_balancings.balancing_amount)
  *                           - SUM(standard_exports.amount)
  *
+ * KỲ BÁO CÁO: màn hình xét một khoảng "từ ngày - đến ngày" (mặc định là trọn tháng
+ * hiện tại), tách công thức trên thành bốn chỉ số theo mốc thời gian:
+ *
+ *      Tồn đầu kỳ   = phát sinh TRƯỚC ngày bắt đầu kỳ
+ *      Nhập trong kỳ = standard_imports.imported_date trong kỳ (+ cân đối ghi trong kỳ)
+ *      Sử dụng / Huỷ trong kỳ = standard_exports.created_at trong kỳ, tách theo type
+ *      Tồn cuối kỳ  = đầu kỳ + nhập - sử dụng - huỷ
+ *
+ * Ống nhập sau ngày cuối kỳ không hiện trên bảng vì trong kỳ đó chưa tồn tại. Mọi số
+ * luỹ kế khác (trạng thái tồn, hạn dùng, kiểm soát khối lượng) cũng tính đến hết ngày
+ * cuối kỳ để cả màn hình cùng nói về một thời điểm.
+ *
  * Quy ước tính:
  * - Chỉ tính phiếu nhập còn hiệu lực (standard_imports.status_id = 1).
  * - Chỉ trừ phiếu sử dụng còn hiệu lực (standard_exports.status_id = 1), đúng như cách
@@ -64,11 +76,13 @@ class StandardInventoryController extends Controller
         'over' => 'Âm kho',
     ];
 
-    public function index()
+    public function index(Request $request)
     {
         $departmentId = $this->departmentId();
 
-        $datas = $this->stockByCode($departmentId);
+        $period = $this->period($request);
+
+        $datas = $this->stockByCode($departmentId, $period['from'], $period['to']);
 
         session()->put(['title' => 'TỒN - TỒN KHO CHẤT CHUẨN']);
 
@@ -79,11 +93,54 @@ class StandardInventoryController extends Controller
             'zones' => $this->zoneOptions($departmentId),
             'states' => self::STATES,
             'groups' => config('standard.groups'),
+            'period' => $period,
             'nearExpiryDays' => self::NEAR_EXPIRY_DAYS,
             'expiringSoonMonths' => self::EXPIRING_SOON_MONTHS,
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
             'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
         ]);
+    }
+
+    /**
+     * KỲ BÁO CÁO - khoảng "từ ngày - đến ngày" mà cả màn hình tồn đang xét.
+     *
+     * Mặc định là TRỌN THÁNG HIỆN TẠI (ngày 1 đến ngày cuối tháng). Ngày cuối tháng
+     * còn ở tương lai thì cũng chưa có phát sinh nào, nên "Tồn cuối kỳ" vẫn đúng bằng
+     * tồn thực tế đang có trong kho.
+     *
+     * Ngày gửi lên không đọc được thì bỏ qua và lấy mặc định; chọn ngược ngày
+     * (từ > đến) thì đảo lại cho đúng thứ tự thay vì báo lỗi.
+     */
+    private function period(Request $request): array
+    {
+        $parse = function ($value) {
+            if (! is_string($value) || trim($value) === '') {
+                return null;
+            }
+
+            try {
+                return \Carbon\Carbon::parse($value)->startOfDay();
+            } catch (\Throwable $e) {
+                return null;
+            }
+        };
+
+        $today = now()->startOfDay();
+
+        $from = $parse($request->query('from_date')) ?: $today->copy()->startOfMonth();
+        $to = $parse($request->query('to_date')) ?: $today->copy()->endOfMonth();
+
+        if ($from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        return [
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+            'days' => (int) $from->diffInDays($to) + 1,
+            // Kỳ còn bao hôm nay: chưa có phát sinh nào sau đó nên tồn cuối kỳ = tồn hiện tại
+            'is_current' => $to->gte($today),
+        ];
     }
 
     /**
@@ -297,16 +354,62 @@ class StandardInventoryController extends Controller
     }
 
     /**
+     * Ghi nhận xét khi kiểm soát khối lượng ngoài giới hạn
+     */
+    public function weightRemark(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $import = DB::table('standard_imports')
+            ->where('id', $request->import_id)
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->first();
+
+        if (! $import) {
+            return redirect()->back()->with('error', 'Không tìm thấy mã ống chuẩn!');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'import_id' => ['required', 'exists:standard_imports,id'],
+            'weight_deviation_remark' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput()->with('error', 'Lỗi nhập liệu.');
+        }
+
+        DB::table('standard_imports')->where('id', $import->id)->update([
+            'weight_deviation_remark' => $request->weight_deviation_remark,
+            'updated_by' => $this->actor(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Nhận xét khối lượng',
+            'standard_imports',
+            $import->id,
+            $import->weight_deviation_remark ?: 'Trống',
+            $request->weight_deviation_remark ?: 'Trống'
+        );
+
+        return redirect()->back()->with(
+            'success',
+            'Đã lưu nhận xét kiểm soát khối lượng cho mã ống chuẩn '.$import->code
+        );
+    }
+
+    /**
      * Tồn theo từng mã ống chuẩn của phòng ban đang chọn.
      *
      * Lấy phiếu nhập và số lượng đã xuất bằng hai câu truy vấn rồi ghép trong PHP:
      * gọn hơn một câu join có SUM kèm điều kiện, và số liệu khớp đúng cách
      * StandardExportController đang kiểm tra tồn.
      */
-    private function stockByCode(int $departmentId)
+    private function stockByCode(int $departmentId, string $from, string $to)
     {
-        $used = $this->usedByImport($departmentId);
-        $balanced = $this->balancedByImport($departmentId);
+        $used = $this->usedByImport($departmentId, $from, $to);
+        $balanced = $this->balancedByImport($departmentId, $from, $to);
         $today = now()->startOfDay();
 
         $query = DB::table('standard_imports')
@@ -339,6 +442,7 @@ class StandardInventoryController extends Controller
                 'standard_imports.coa_no',
                 'standard_imports.invoice_number',
                 'standard_imports.weight_controlled',
+                'standard_imports.weight_deviation_remark',
                 'standard_imports.standard_form',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
@@ -363,32 +467,77 @@ class StandardInventoryController extends Controller
             )
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
+            // Ống nhập sau ngày cuối kỳ thì trong kỳ này chưa tồn tại -> không đưa vào bảng
+            ->whereDate('standard_imports.imported_date', '<=', $to)
             ->orderBy('standard_imports.code', 'asc')
             ->get()
-            ->map(function ($row) use ($used, $balanced, $today) {
+            ->map(function ($row) use ($used, $balanced, $from, $to, $today) {
                 $out = $used[$row->id] ?? null;
                 $bal = $balanced[$row->id] ?? null;
 
+                // Cột date của MySQL trả về chuỗi 'Y-m-d', so sánh chuỗi là đúng thứ tự ngày
+                $importedDate = substr((string) $row->imported_date, 0, 10);
+
+                /*
+                | SỐ LUỸ KẾ TÍNH ĐẾN HẾT NGÀY CUỐI KỲ.
+                |
+                | Đây là mốc để xét trạng thái tồn, vạch tiến độ đã dùng và các tab phụ,
+                | nhờ vậy khi chọn một kỳ trong quá khứ thì cả màn hình cùng nói về một
+                | thời điểm chứ không lẫn số của hôm nay.
+                */
                 $row->imported = (float) $row->amount;
-                $row->balanced = (float) ($bal->balanced ?? 0);
-                $row->balancing_times = (int) ($bal->times ?? 0);
+                $row->balanced = (float) ($bal->balanced_to ?? 0);
+                $row->used = (float) ($out->used_to ?? 0);
+                $row->cancelled = (float) ($out->cancelled_to ?? 0);
+
                 $row->last_balancing_at = $bal->last_balancing_at ?? null;
-                $row->used = (float) ($out->used ?? 0);
-                $row->cancelled = (float) ($out->cancelled ?? 0);
+                $row->balancing_times = (int) ($bal->times ?? 0);
                 $row->last_exported_date = $out->last_exported_date ?? null;
                 $row->export_times = (int) ($out->times ?? 0);
+                $row->period_export_times = (int) ($out->times_in ?? 0);
 
-                // Lượng nhập thực tế sau khi cân đối
+                /*
+                | BỐN CHỈ SỐ CỦA KỲ
+                |
+                | - Tồn đầu kỳ    : mọi phát sinh TRƯỚC ngày bắt đầu kỳ (nhập + cân đối - xuất).
+                | - Nhập trong kỳ : phiếu nhập có ngày nhập nằm trong kỳ, cộng cả số cân đối
+                |                   ghi trong kỳ vì cân đối là chỉnh lại chính lượng đã nhập.
+                | - Sử dụng / Huỷ : phiếu sử dụng có ngày sử dụng nằm trong kỳ, tách theo type.
+                | - Tồn cuối kỳ   : đầu kỳ + nhập - sử dụng - huỷ.
+                |
+                | Cộng lại đúng bằng phần luỹ kế đến hết kỳ ở trên, nên Tồn Cuối Kỳ luôn
+                | khớp công thức tồn cũ (nhập + cân đối - đã dùng - đã huỷ).
+                */
+                $row->opening = ($importedDate < $from ? $row->imported : 0)
+                    + (float) ($bal->balanced_before ?? 0)
+                    - (float) ($out->used_before ?? 0)
+                    - (float) ($out->cancelled_before ?? 0);
+
+                $row->period_imported = $importedDate >= $from && $importedDate <= $to ? $row->imported : 0;
+                $row->period_balanced = (float) ($bal->balanced_in ?? 0);
+                $row->period_in = $row->period_imported + $row->period_balanced;
+                $row->period_used = (float) ($out->used_in ?? 0);
+                $row->period_cancelled = (float) ($out->cancelled_in ?? 0);
+
+                // Ống mới nhập trong kỳ: đầu kỳ chưa có gì, dùng để ghi chú trên bảng
+                $row->is_new_in_period = $row->period_imported > 0;
+
+                // Lượng nhập thực tế sau khi cân đối, tính đến hết kỳ
                 $row->effective = $row->imported + $row->balanced;
 
-                // Hạn mức cân đối: tổng mọi lần cân đối không quá 5% lượng nhập ban đầu
+                /*
+                | Hạn mức cân đối xét trên TOÀN BỘ lịch sử cân đối, không cắt theo kỳ:
+                | tổng mọi lần cân đối không quá 5% lượng nhập ban đầu.
+                */
+                $row->balanced_all = (float) ($bal->balanced_all ?? 0);
                 $row->balancing_limit = abs($row->imported) * self::BALANCING_MAX_RATIO;
-                $row->balancing_min_input = -$row->balancing_limit - $row->balanced;
-                $row->balancing_max_input = $row->balancing_limit - $row->balanced;
+                $row->balancing_min_input = -$row->balancing_limit - $row->balanced_all;
+                $row->balancing_max_input = $row->balancing_limit - $row->balanced_all;
 
                 // Phiếu sử dụng được xuất vượt tồn tối đa 5% nên chênh lệch có thể âm.
                 // Giữ số âm ở $gap để nhận ra mã cần cân đối, còn $remaining không âm.
-                $row->gap = $row->effective - $row->used - $row->cancelled;
+                $row->closing = $row->opening + $row->period_in - $row->period_used - $row->period_cancelled;
+                $row->gap = $row->closing;
                 $row->remaining = max($row->gap, 0);
                 $row->used_percent = $row->effective > 0
                     ? (int) min(round(($row->used + $row->cancelled) / $row->effective * 100), 100)
@@ -503,36 +652,66 @@ class StandardInventoryController extends Controller
     }
 
     /**
-     * Số lượng đã xuất của từng ống chuẩn: [import_id => {used, cancelled, times, last_exported_date}].
+     * Số lượng đã xuất của từng ống chuẩn, CẮT THEO KỲ:
      *
-     * Chuỗi trong DB::raw là hằng, không ghép từ dữ liệu người dùng.
+     *      [import_id => {used_before, cancelled_before,   -> trước ngày bắt đầu kỳ
+     *                     used_in, cancelled_in, times_in, -> trong kỳ
+     *                     used_to, cancelled_to,           -> luỹ kế đến hết kỳ
+     *                     times, last_exported_date}]
+     *
+     * Gom cả ba mốc trong MỘT câu truy vấn bằng SUM(CASE WHEN ...) để không phải quét
+     * bảng phiếu sử dụng ba lần. Ngày kỳ đưa vào bằng binding, không ghép chuỗi.
+     *
+     * Ngày sử dụng lấy theo standard_exports.created_at - bảng này KHÔNG còn cột
+     * exported_date (đã bỏ ở migration 2026_08_26_143500), màn hình Sử Dụng cũng đang
+     * hiển thị created_at làm ngày xuất. created_at là datetime nên mốc kỳ phải mở
+     * rộng ra cả ngày: 00:00:00 của ngày đầu đến 23:59:59 của ngày cuối.
      */
-    private function usedByImport(int $departmentId)
+    private function usedByImport(int $departmentId, string $from, string $to)
     {
+        $start = $from.' 00:00:00';
+        $end = $to.' 23:59:59';
+
         return DB::table('standard_exports')
-            ->select(
-                'import_id',
-                DB::raw("SUM(CASE WHEN type = 'export' THEN amount ELSE 0 END) as used"),
-                DB::raw("SUM(CASE WHEN type = 'cancel' THEN amount ELSE 0 END) as cancelled"),
-                DB::raw('COUNT(*) as times'),
-                DB::raw('MAX(created_at) as last_exported_date')
-            )
+            ->select('import_id')
+            ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at < ? THEN amount ELSE 0 END) as used_before", [$start])
+            ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at < ? THEN amount ELSE 0 END) as cancelled_before", [$start])
+            ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as used_in", [$start, $end])
+            ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as cancelled_in", [$start, $end])
+            ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at <= ? THEN amount ELSE 0 END) as used_to", [$end])
+            ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at <= ? THEN amount ELSE 0 END) as cancelled_to", [$end])
+            ->selectRaw('SUM(CASE WHEN created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as times_in', [$start, $end])
+            ->selectRaw('SUM(CASE WHEN created_at <= ? THEN 1 ELSE 0 END) as times', [$end])
+            ->selectRaw('MAX(CASE WHEN created_at <= ? THEN created_at END) as last_exported_date', [$end])
             ->where('department_id', $departmentId)
             ->groupBy('import_id')
             ->get()
             ->keyBy('import_id');
     }
 
-    /** Số đã cân đối của từng ống chuẩn: [import_id => {balanced, times, last_balancing_at}]. */
-    private function balancedByImport(int $departmentId)
+    /**
+     * Số đã cân đối của từng ống chuẩn, CẮT THEO KỲ:
+     * [import_id => {balanced_before, balanced_in, balanced_to, balanced_all, times, last_balancing_at}].
+     *
+     * balancing_at là datetime nên mốc kỳ phải mở rộng ra cả ngày: từ 00:00:00 của
+     * ngày bắt đầu đến 23:59:59 của ngày kết thúc.
+     *
+     * balanced_all là tổng KHÔNG cắt theo kỳ - hạn mức cân đối 5% xét trên toàn bộ
+     * lịch sử nên không được để kỳ đang xem làm sai hạn mức đó.
+     */
+    private function balancedByImport(int $departmentId, string $from, string $to)
     {
+        $start = $from.' 00:00:00';
+        $end = $to.' 23:59:59';
+
         return DB::table('standard_balancings')
-            ->select(
-                'import_id',
-                DB::raw('SUM(balancing_amount) as balanced'),
-                DB::raw('COUNT(*) as times'),
-                DB::raw('MAX(balancing_at) as last_balancing_at')
-            )
+            ->select('import_id')
+            ->selectRaw('SUM(CASE WHEN balancing_at < ? THEN balancing_amount ELSE 0 END) as balanced_before', [$start])
+            ->selectRaw('SUM(CASE WHEN balancing_at BETWEEN ? AND ? THEN balancing_amount ELSE 0 END) as balanced_in', [$start, $end])
+            ->selectRaw('SUM(CASE WHEN balancing_at <= ? THEN balancing_amount ELSE 0 END) as balanced_to', [$end])
+            ->selectRaw('SUM(balancing_amount) as balanced_all')
+            ->selectRaw('SUM(CASE WHEN balancing_at <= ? THEN 1 ELSE 0 END) as times', [$end])
+            ->selectRaw('MAX(balancing_at) as last_balancing_at')
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->groupBy('import_id')
@@ -621,6 +800,12 @@ class StandardInventoryController extends Controller
                     'used' => (float) $rows->sum('used'),
                     'cancelled' => (float) $rows->sum('cancelled'),
                     'remaining' => (float) $rows->sum('remaining'),
+                    // Bốn chỉ số của kỳ, cộng thẳng từ các ống nên luôn khớp bảng theo mã ống
+                    'opening' => (float) $rows->sum('opening'),
+                    'period_in' => (float) $rows->sum('period_in'),
+                    'period_used' => (float) $rows->sum('period_used'),
+                    'period_cancelled' => (float) $rows->sum('period_cancelled'),
+                    'closing' => (float) $rows->sum('closing'),
                     'code_count' => $rows->count(),
                     'in_stock_count' => $inStock->count(),
                     // Hạn dùng gần nhất trong các ống còn tồn - phần cần dùng trước

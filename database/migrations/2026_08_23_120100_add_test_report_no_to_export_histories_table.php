@@ -15,14 +15,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('export_histories', function (Blueprint $table) {
+        Schema::table('chemical_export_histories', function (Blueprint $table) {
             $table->string('test_report_no', 100)->nullable()->after('purpose');
         });
     }
 
     public function down(): void
     {
-        Schema::table('export_histories', function (Blueprint $table) {
+        Schema::table('chemical_export_histories', function (Blueprint $table) {
             $table->dropColumn('test_report_no');
         });
     }

@@ -15,6 +15,7 @@
 */
 
 use App\Http\Controllers\Pages\Inventory\ChemicalInventoryController;
+use App\Http\Controllers\Pages\Inventory\MaterialInventoryController;
 use App\Http\Controllers\Pages\Inventory\StandardInventoryController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -34,5 +35,11 @@ Route::prefix('/inventory')
             Route::get('', 'index')->name('list');
             Route::post('balancing', 'balancing')->name('balancing');
             Route::post('internalExpiry', 'internalExpiry')->name('internalExpiry');
+            Route::post('weightRemark', 'weightRemark')->name('weightRemark');
+        });
+
+        Route::prefix('/materialInventory')->name('materialInventory.')->controller(MaterialInventoryController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::post('balancing', 'balancing')->name('balancing');
         });
     });

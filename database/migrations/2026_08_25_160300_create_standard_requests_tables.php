@@ -8,8 +8,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('request_lists')) {
-            Schema::create('request_lists', function (Blueprint $table) {
+        if (!Schema::hasTable('standard_request_lists')) {
+            Schema::create('standard_request_lists', function (Blueprint $table) {
                 $table->id();
                 $table->string('code', 50)->unique();
                 $table->unsignedBigInteger('department_id');
@@ -24,8 +24,8 @@ return new class extends Migration
             });
         }
 
-        if (!Schema::hasTable('request_items')) {
-            Schema::create('request_items', function (Blueprint $table) {
+        if (!Schema::hasTable('standard_request_items')) {
+            Schema::create('standard_request_items', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('request_list_id');
                 $table->unsignedBigInteger('category_id')->nullable();
@@ -51,7 +51,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('request_items');
-        Schema::dropIfExists('request_lists');
+        Schema::dropIfExists('standard_request_items');
+        Schema::dropIfExists('standard_request_lists');
     }
 };

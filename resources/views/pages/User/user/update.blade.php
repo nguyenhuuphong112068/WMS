@@ -104,6 +104,25 @@
                         @enderror
                     </div>
 
+                    <div class="form-group">
+                        {{-- GROUP --}}
+                        <label for="groupUpdate">Tổ</label>
+                        <select class="form-control" name="group_id" id="groupUpdate">
+                            <option value="">-- Chọn Tổ (Không bắt buộc) --</option>
+
+                            @foreach ($groups as $group)
+                                <option value="{{ $group->id }}"
+                                    {{ old('group_id') == $group->id ? 'selected' : '' }}>
+                                    {{ $group->name }}
+                                </option>
+                            @endforeach
+                        </select>
+
+                        @error('group_id', 'updateErrors')
+                            <div class="alert alert-danger mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+
                     {{-- Mail --}}
                     <div class="form-group">
                         <label for="mail"> {{ 'Mail (Nếu Có)' }}</label>

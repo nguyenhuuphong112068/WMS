@@ -10,6 +10,7 @@
 | import       : nhóm menu "Nhập"
 | export       : nhóm menu "Sử Dụng"
 | inventory    : nhóm menu "Tồn"
+| stabilityAssessment : nhóm menu "Đánh Giá Hạn Dùng"
 | estimate     : nhóm menu "Dự Trù"
 | User        : nhóm menu "Phân Quyền"
 | AuditTrial   : nhóm menu "Audit Trail"
@@ -22,6 +23,7 @@ require __DIR__.'/categoryRoute.php';
 require __DIR__.'/importRoute.php';
 require __DIR__.'/exportRoute.php';
 require __DIR__.'/inventoryRoute.php';
+require __DIR__.'/stabilityAssessmentRoute.php';
 require __DIR__.'/estimateRoute.php';
 require __DIR__.'/UserRoute.php';
 require __DIR__.'/AuditTrialRoute.php';

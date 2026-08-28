@@ -71,11 +71,11 @@ return new class extends Migration
      */
     private function seedFromImports(): void
     {
-        $pairs = DB::table('imports')
-            ->join('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
+        $pairs = DB::table('chemical_imports')
+            ->join('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
             ->select(
-                'imports.department_id',
-                'imports.category_id',
+                'chemical_imports.department_id',
+                'chemical_imports.category_id',
                 'chemical_categories.shelf_life_months'
             )
             ->distinct()

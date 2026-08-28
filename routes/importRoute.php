@@ -10,6 +10,7 @@
 */
 
 use App\Http\Controllers\Pages\Import\ChemicalImportController;
+use App\Http\Controllers\Pages\Import\MaterialImportController;
 use App\Http\Controllers\Pages\Import\StandardImportController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,18 @@ Route::prefix('/import')
             Route::get('', 'index')->name('list');
             Route::post('store', 'store')->name('store');
             // Trang in nhãn dán ống chuẩn (mã vạch Code 128), mở tab mới rồi bấm In
+            Route::get('label', 'label')->name('label');
+            Route::get('history', 'history')->name('history');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
+        });
+
+        Route::prefix('/materialImport')->name('materialImport.')->controller(MaterialImportController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::post('store', 'store')->name('store');
+            // Trang in nhãn dán lô vật tư (mã QR), mở tab mới rồi bấm In
             Route::get('label', 'label')->name('label');
             Route::get('history', 'history')->name('history');
             Route::post('update', 'update')->name('update');

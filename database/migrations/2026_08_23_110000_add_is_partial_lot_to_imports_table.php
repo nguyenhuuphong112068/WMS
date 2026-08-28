@@ -25,14 +25,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
+        Schema::table('chemical_imports', function (Blueprint $table) {
             $table->boolean('is_partial_lot')->default(false)->after('source_export_id');
         });
     }
 
     public function down(): void
     {
-        Schema::table('imports', function (Blueprint $table) {
+        Schema::table('chemical_imports', function (Blueprint $table) {
             $table->dropColumn('is_partial_lot');
         });
     }

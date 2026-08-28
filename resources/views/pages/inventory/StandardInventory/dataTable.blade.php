@@ -43,6 +43,51 @@
         <div class="card md-card">
             <div class="card-body">
 
+                {{-- ============ KỲ BÁO CÁO ============ --}}
+                <form method="GET" action="{{ route('pages.inventory.standardInventory.list') }}" class="inv-period"
+                    id="invPeriodForm">
+                    <div class="inv-period-title">
+                        <i class="fas fa-calendar-week"></i> Kỳ báo cáo
+                    </div>
+
+                    <div class="inv-period-field">
+                        <label for="invFromDate">Từ ngày</label>
+                        <input type="date" id="invFromDate" name="from_date" class="form-control"
+                            value="{{ $period['from'] }}">
+                    </div>
+
+                    <div class="inv-period-field">
+                        <label for="invToDate">Đến ngày</label>
+                        <input type="date" id="invToDate" name="to_date" class="form-control"
+                            value="{{ $period['to'] }}">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-sm inv-period-apply">
+                        <i class="fas fa-search mr-1"></i> Xem kỳ
+                    </button>
+
+                    {{-- Bấm mốc nhanh là điền sẵn hai ô ngày rồi gửi luôn, không phải chọn tay --}}
+                    <div class="inv-period-quick">
+                        @foreach ($invPeriodPresets as $preset)
+                            <button type="button" class="inv-period-chip {{ $preset['active'] ? 'is-active' : '' }}"
+                                data-from="{{ $preset['from'] }}" data-to="{{ $preset['to'] }}">
+                                {{ $preset['label'] }}
+                            </button>
+                        @endforeach
+                    </div>
+
+                    <div class="inv-period-note">
+                        @if ($period['is_current'])
+                            <i class="fas fa-circle-check"></i> Kỳ đang chạy - Tồn Cuối Kỳ chính là tồn thực tế
+                            đang có trong kho.
+                        @else
+                            <i class="fas fa-clock-rotate-left"></i> Đang xem lại kỳ đã qua - mọi số liệu tính đến
+                            hết ngày {{ $invDate($period['to']) }}.
+                        @endif
+                        <span class="inv-period-days">{{ $period['days'] }} ngày</span>
+                    </div>
+                </form>
+
                 <div class="inv-tabs">
                     <button type="button" class="inv-tab is-active" data-pane="invPaneCode">
                         <i class="fas fa-barcode mr-1"></i> Theo mã ống chuẩn
@@ -123,10 +168,19 @@
                                     <th style="width: 175px"
                                         title="Vị trí lưu trữ thực tế của ống chuẩn này (Kho / Phòng / Kệ/Tủ / Vị trí)">
                                         Vị Trí Lưu Trữ</th>
-                                    <th class="text-right" style="width: 105px">Nhập</th>
-                                    <th class="text-right" style="width: 105px">Đã Dùng</th>
-                                    <th class="text-right" style="width: 100px">Huỷ Bỏ</th>
-                                    <th class="text-right" style="width: 150px">Tồn Còn Lại</th>
+                                    <th class="text-right inv-th-period" style="width: 110px"
+                                        title="Tồn của ống chuẩn này trước ngày {{ $invDate($period['from']) }}">
+                                        Tồn Đầu Kỳ</th>
+                                    <th class="text-right inv-th-period" style="width: 115px"
+                                        title="Số nhập kho trong kỳ {{ $invPeriodLabel }}, đã gồm cả số cân đối ghi trong kỳ">
+                                        Nhập Trong Kỳ</th>
+                                    <th class="text-right inv-th-period" style="width: 115px"
+                                        title="Số đã sử dụng trong kỳ {{ $invPeriodLabel }}">Sử Dụng Trong Kỳ</th>
+                                    <th class="text-right inv-th-period" style="width: 105px"
+                                        title="Số đã huỷ bỏ trong kỳ {{ $invPeriodLabel }}">Huỷ Trong Kỳ</th>
+                                    <th class="text-right inv-th-period" style="width: 150px"
+                                        title="Tồn đầu kỳ + nhập trong kỳ - sử dụng - huỷ, tính đến hết ngày {{ $invDate($period['to']) }}">
+                                        Tồn Cuối Kỳ</th>
                                     <th class="text-right" style="width: 125px"
                                         title="Tổng tồn của các ống cùng chất chuẩn và cùng số lô">Tổng Tồn Theo Lô</th>
                                     <th class="text-right" style="width: 125px"
@@ -175,21 +229,45 @@
                                                 <span class="inv-zone-none">Chưa xếp vị trí</span>
                                             @endif
                                         </td>
-                                        <td class="text-right" data-order="{{ $row->imported }}">
-                                            <span class="inv-amount">{{ $invNum($row->imported) }}</span>
+                                        {{-- Tồn đầu kỳ: phát sinh trước ngày bắt đầu kỳ --}}
+                                        <td class="text-right" data-order="{{ $row->opening }}">
+                                            <span
+                                                class="inv-amount {{ abs($row->opening) > 0 ? '' : 'inv-muted' }}">{{ $invNum($row->opening) }}</span>
                                             <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->used }}">
-                                            <span class="inv-amount {{ $row->used > 0 ? '' : 'inv-muted' }}">
-                                                {{ $invNum($row->used) }}
-                                            </span>
-                                            @if ($row->export_times > 0)
-                                                <div class="md-sub">{{ $row->export_times }} lần xuất</div>
+                                            @if ($row->is_new_in_period)
+                                                <div class="md-sub"><span class="inv-period-tag">Mới nhập trong
+                                                        kỳ</span></div>
                                             @endif
                                         </td>
-                                        <td class="text-right" data-order="{{ $row->cancelled }}">
+                                        {{-- Nhập trong kỳ: phiếu nhập + số cân đối ghi trong kỳ --}}
+                                        <td class="text-right" data-order="{{ $row->period_in }}">
                                             <span
-                                                class="inv-amount {{ $row->cancelled > 0 ? '' : 'inv-muted' }}">{{ $invNum($row->cancelled) }}</span>
+                                                class="inv-amount {{ $row->period_in != 0 ? 'is-in' : 'inv-muted' }}">{{ $invNum($row->period_in) }}</span>
+                                            <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
+                                            @if ($row->period_imported > 0)
+                                                <div class="md-sub">Nhập {{ $invDate($row->imported_date) }}</div>
+                                            @endif
+                                            @if ($row->period_balanced != 0)
+                                                <div class="md-sub">Cân đối
+                                                    {{ $row->period_balanced > 0 ? '+' : '' }}{{ $invNum($row->period_balanced) }}
+                                                </div>
+                                            @endif
+                                        </td>
+                                        {{-- Sử dụng trong kỳ: standard_exports type = 'export' --}}
+                                        <td class="text-right" data-order="{{ $row->period_used }}">
+                                            <span class="inv-amount {{ $row->period_used > 0 ? 'is-out' : 'inv-muted' }}">
+                                                {{ $invNum($row->period_used) }}
+                                            </span>
+                                            <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
+                                            @if ($row->period_export_times > 0)
+                                                <div class="md-sub">{{ $row->period_export_times }} lần xuất</div>
+                                            @endif
+                                        </td>
+                                        {{-- Huỷ trong kỳ: standard_exports type = 'cancel' --}}
+                                        <td class="text-right" data-order="{{ $row->period_cancelled }}">
+                                            <span
+                                                class="inv-amount {{ $row->period_cancelled > 0 ? 'is-out' : 'inv-muted' }}">{{ $invNum($row->period_cancelled) }}</span>
+                                            <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
                                         </td>
                                         <td class="text-right" data-order="{{ $row->gap }}">
                                             {{-- Tồn âm (đã xuất vượt) hiện đúng số âm để thấy phần phải cân đối --}}
@@ -200,7 +278,9 @@
                                                 class="inv-bar {{ $row->state === 'out' ? 'is-out' : ($row->state === 'low' ? 'is-low' : '') }}">
                                                 <span style="width: {{ $row->used_percent }}%"></span>
                                             </div>
-                                            <div class="md-sub">Đã dùng {{ $row->used_percent }}%</div>
+                                            {{-- Luỹ kế từ lúc nhập đến hết kỳ, không chỉ riêng phần phát sinh trong kỳ --}}
+                                            <div class="md-sub">Đã dùng {{ $row->used_percent }}% (luỹ kế
+                                                {{ $invNum($row->used + $row->cancelled) }})</div>
                                         </td>
                                         {{-- Cùng chất chuẩn + cùng số lô --}}
                                         <td class="text-right" data-order="{{ $row->batch_remaining }}">
@@ -305,10 +385,11 @@
                                     <th class="text-center" style="width: 60px">STT</th>
                                     <th>Chất Chuẩn</th>
                                     <th class="text-center" style="width: 120px">Ống Chuẩn</th>
-                                    <th class="text-right" style="width: 110px">Tổng Nhập</th>
-                                    <th class="text-right" style="width: 110px">Đã Dùng</th>
-                                    <th class="text-right" style="width: 100px">Huỷ Bỏ</th>
-                                    <th class="text-right" style="width: 130px">Tồn Còn Lại</th>
+                                    <th class="text-right inv-th-period" style="width: 110px">Tồn Đầu Kỳ</th>
+                                    <th class="text-right inv-th-period" style="width: 110px">Nhập Trong Kỳ</th>
+                                    <th class="text-right inv-th-period" style="width: 115px">Sử Dụng Trong Kỳ</th>
+                                    <th class="text-right inv-th-period" style="width: 105px">Huỷ Trong Kỳ</th>
+                                    <th class="text-right inv-th-period" style="width: 130px">Tồn Cuối Kỳ</th>
                                     <th class="text-center" style="width: 120px">Hạn Gần Nhất</th>
                                     <th class="text-center" style="width: 110px">Cần Chú Ý</th>
                                 </tr>
@@ -330,21 +411,26 @@
                                         <td class="text-center md-sub" data-order="{{ $sum->code_count }}">
                                             {{ $sum->in_stock_count }}/{{ $sum->code_count }} còn tồn
                                         </td>
-                                        <td class="text-right" data-order="{{ $sum->imported }}">
-                                            <span class="inv-amount">{{ $invNum($sum->imported) }}</span>
+                                        <td class="text-right" data-order="{{ $sum->opening }}">
+                                            <span
+                                                class="inv-amount {{ abs($sum->opening) > 0 ? '' : 'inv-muted' }}">{{ $invNum($sum->opening) }}</span>
                                             <div class="md-sub">{{ $sum->unit }}</div>
                                         </td>
-                                        <td class="text-right" data-order="{{ $sum->used }}">
+                                        <td class="text-right" data-order="{{ $sum->period_in }}">
                                             <span
-                                                class="inv-amount {{ $sum->used > 0 ? '' : 'inv-muted' }}">{{ $invNum($sum->used) }}</span>
+                                                class="inv-amount {{ $sum->period_in != 0 ? 'is-in' : 'inv-muted' }}">{{ $invNum($sum->period_in) }}</span>
                                         </td>
-                                        <td class="text-right" data-order="{{ $sum->cancelled }}">
+                                        <td class="text-right" data-order="{{ $sum->period_used }}">
                                             <span
-                                                class="inv-amount {{ $sum->cancelled > 0 ? '' : 'inv-muted' }}">{{ $invNum($sum->cancelled) }}</span>
+                                                class="inv-amount {{ $sum->period_used > 0 ? 'is-out' : 'inv-muted' }}">{{ $invNum($sum->period_used) }}</span>
                                         </td>
-                                        <td class="text-right" data-order="{{ $sum->remaining }}">
+                                        <td class="text-right" data-order="{{ $sum->period_cancelled }}">
                                             <span
-                                                class="inv-remaining {{ $sum->remaining > 0 ? '' : 'is-zero' }}">{{ $invNum($sum->remaining) }}</span>
+                                                class="inv-amount {{ $sum->period_cancelled > 0 ? 'is-out' : 'inv-muted' }}">{{ $invNum($sum->period_cancelled) }}</span>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $sum->closing }}">
+                                            <span
+                                                class="inv-remaining {{ $sum->closing > 0 ? '' : ($sum->closing < 0 ? 'is-over' : 'is-zero') }}">{{ $invNum($sum->closing) }}</span>
                                             <span class="md-sub">{{ $sum->unit }}</span>
                                         </td>
                                         <td class="text-center md-sub"
@@ -425,7 +511,7 @@
                                     <th style="width: 200px">Vị Trí</th>
                                     <th style="width: 165px">Mã Ống Chuẩn</th>
                                     <th>Chất Chuẩn</th>
-                                    <th class="text-right" style="width: 120px">Tồn Còn Lại</th>
+                                    <th class="text-right" style="width: 120px">Tồn Cuối Kỳ</th>
                                     <th class="text-center" style="width: 115px">Hạn Áp Dụng</th>
                                     <th class="text-center" style="width: 110px">Trạng Thái</th>
                                 </tr>
@@ -503,7 +589,7 @@
                                     <th class="text-center" style="width: 60px">STT</th>
                                     <th style="width: 165px">Mã Ống Chuẩn</th>
                                     <th>Chất Chuẩn</th>
-                                    <th class="text-right" style="width: 125px">Tồn Còn Lại</th>
+                                    <th class="text-right" style="width: 125px">Tồn Cuối Kỳ</th>
                                     <th class="text-right" style="width: 125px">Tổng Tồn Theo Lô</th>
                                     <th class="text-center" style="width: 120px">Hạn Nhà Sản Xuất</th>
                                     <th class="text-center" style="width: 120px">Hạn Nội Bộ</th>
@@ -604,7 +690,7 @@
                                     <th class="text-center" style="width: 60px">STT</th>
                                     <th style="width: 165px">Mã Ống Chuẩn</th>
                                     <th>Chất Chuẩn</th>
-                                    <th class="text-right" style="width: 130px">Tồn Còn Lại</th>
+                                    <th class="text-right" style="width: 130px">Tồn Cuối Kỳ</th>
                                     <th class="text-center" style="width: 110px">Ngày Nhập</th>
                                     <th class="text-center" style="width: 120px">Hạn Nhà Sản Xuất</th>
                                     <th class="text-center" style="width: 130px">Hạn Dùng Mặc Định</th>
@@ -736,9 +822,18 @@
                                             @if ($row->used == 0)
                                                 <span class="md-empty">Chưa tính</span>
                                             @elseif ($row->deviation > $row->ghkl)
-                                                <span class="badge badge-danger">Không đạt</span>
+                                                <span class="badge badge-danger">Ngoài giới hạn</span>
+                                                <button type="button" class="btn btn-sm btn-outline-primary ml-1 btn-weight-remark"
+                                                    data-id="{{ $row->id }}"
+                                                    data-remark="{{ $row->weight_deviation_remark ?? '' }}"
+                                                    title="Nhận xét">
+                                                    <i class="fas fa-comment"></i>
+                                                </button>
+                                                @if($row->weight_deviation_remark)
+                                                    <div class="md-sub mt-1 text-danger text-left font-italic">{{ $row->weight_deviation_remark }}</div>
+                                                @endif
                                             @else
-                                                <span class="badge badge-success">Đạt</span>
+                                                <span class="badge badge-success">Không ngoài giới hạn</span>
                                             @endif
                                         </td>
                                     </tr>

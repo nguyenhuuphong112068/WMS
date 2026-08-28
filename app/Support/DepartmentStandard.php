@@ -95,7 +95,7 @@ class DepartmentStandard
      * phải hiện đúng đơn vị của phòng đó.
      *
      * @param  \Illuminate\Database\Query\Builder  $query
-     * @param  string  $departmentColumn  Cột chứa department_id, ví dụ 'exports.department_id'
+     * @param  string  $departmentColumn  Cột chứa department_id, ví dụ 'standard_exports.department_id'
      * @param  string  $categoryColumn  Cột chứa category_id, ví dụ 'source.category_id'
      */
     public static function joinUnitOn($query, string $departmentColumn, string $categoryColumn)

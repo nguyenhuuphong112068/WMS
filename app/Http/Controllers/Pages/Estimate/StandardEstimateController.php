@@ -68,6 +68,8 @@ class StandardEstimateController extends Controller
             ->orderBy(self::TABLE.'.id', 'desc')
             ->get();
 
+        $trackedItems = self::trackedItems($departmentId);
+
         session()->put(['title' => 'DỰ TRÙ - DỰ TRÙ CHẤT CHUẨN']);
 
         return view('pages.estimate.StandardEstimate.list', [
@@ -76,9 +78,10 @@ class StandardEstimateController extends Controller
             'appStatuses' => config('estimate.app_statuses'),
             'signSteps' => config('estimate.sign_steps'),
             'receptionStatuses' => config('estimate.reception_statuses'),
-            'nextCodes' => $this->codePreviews($departmentId),
             'canSignManager' => $this->canSign('manager'),
             'canSignDirector' => $this->canSign('director'),
+            'nextCode' => $this->nextCode($departmentId),
+            'trackedItems' => $trackedItems,
         ]);
     }
 
@@ -129,8 +132,6 @@ class StandardEstimateController extends Controller
     {
         $validator = Validator::make($request->all(), $this->rules(), $this->messages());
 
-        $this->checkDuplicatePeriod($validator, $request);
-
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
         }
@@ -139,7 +140,7 @@ class StandardEstimateController extends Controller
 
         // Sinh mã và ghi phiếu trong cùng một transaction để hai người lập cùng lúc không trùng mã
         $result = DB::transaction(function () use ($request, $departmentId) {
-            $code = $this->nextCode($departmentId, (int) $request->month, (int) $request->year);
+            $code = $this->nextCode($departmentId);
 
             $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
                 'code' => $code,
@@ -154,9 +155,9 @@ class StandardEstimateController extends Controller
             return ['id' => $id, 'code' => $code];
         });
 
-        self::writeHistory($result['id'], 'Tạo phiếu', null, null, 'draft', 'Lập '.self::LABEL.' mã '.$result['code'].'.');
-
-        AuditTrialController::log('Thêm mới', self::TABLE, $result['id'], 'NA', 'Lập '.self::LABEL.': '.$result['code']);
+        // Không ghi lịch sử "Tạo phiếu" khi đang nháp
+        // self::writeHistory($result['id'], 'Tạo phiếu', null, null, 'draft', 'Lập '.self::LABEL.' mã '.$result['code'].'.');
+        // AuditTrialController::log('Thêm mới', self::TABLE, $result['id'], 'NA', 'Lập '.self::LABEL.': '.$result['code']);
 
         return redirect()->route('pages.estimate.standardEstimate.detail', ['id' => $result['id']])
             ->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'! Hãy khai các chất chuẩn cần dự trù.');
@@ -176,57 +177,50 @@ class StandardEstimateController extends Controller
 
         $validator = Validator::make($request->all(), $this->rules(), $this->messages());
 
-        $this->checkDuplicatePeriod($validator, $request, $current->id);
-
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
         $payload = $this->payload($request);
 
-        // Đổi tháng/năm thì mã phiếu phải sinh lại vì mã gắn với kỳ dự trù
-        if ((int) $payload['month'] !== (int) $current->month || (int) $payload['year'] !== (int) $current->year) {
-            $payload['code'] = $this->nextCode((int) $current->department_id, (int) $payload['month'], (int) $payload['year']);
-        }
+
 
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
 
-        AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->code, $payload['code'] ?? $current->code);
+        if ($current->app_status !== 'draft') {
+            AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->code, $payload['code'] ?? $current->code);
+            self::writeHistory($current->id, 'Sửa phiếu', null, $current->app_status, $current->app_status, 'Cập nhật thông tin phiếu dự trù.');
+        }
 
         return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
     }
 
-    public function deActive(Request $request)
+    public function destroy(Request $request)
     {
         $current = $this->findOwn($request->id);
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
+            return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần huỷ!');
         }
 
-        $newStatus = $current->status_id == 1 ? 0 : 1;
+        if (!in_array($current->app_status, ['draft', 'rejected'])) {
+            return redirect()->back()->with('error', 'Chỉ có thể huỷ phiếu chưa trình ký!');
+        }
+
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
-            'status_id' => $newStatus,
+            'app_status' => 'cancelled',
+            'cancel_reason' => $request->cancel_reason,
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
 
-        AuditTrialController::log(
-            $newStatus == 1 ? 'Mở khoá' : 'Khoá',
-            self::TABLE,
-            $current->id,
-            'status_id: '.$current->status_id,
-            'status_id: '.$newStatus
-        );
+        AuditTrialController::log('Huỷ phiếu', self::TABLE, $current->id, 'Phiếu: ' . $current->code, 'Lý do: ' . $request->cancel_reason);
 
-        return redirect()->back()->with(
-            'success',
-            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ').self::LABEL.' '.$current->code.'!'
-        );
+        return redirect()->back()->with('success', 'Đã huỷ ' . self::LABEL . ' thành công!');
     }
 
     /* ==========================================================
@@ -267,7 +261,10 @@ class StandardEstimateController extends Controller
             return $itemId;
         });
 
-        AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
+        if ($list->app_status !== 'draft') {
+            AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
+            self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm mặt hàng vào phiếu.');
+        }
 
         return redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
     }
@@ -304,7 +301,10 @@ class StandardEstimateController extends Controller
             $this->saveAmounts($item->id, $request);
         });
 
-        AuditTrialController::log('Cập nhật', self::ITEM_TABLE, $item->id, 'Phiếu '.$list->code, 'Sửa '.self::ITEM_LABEL);
+        if ($list->app_status !== 'draft') {
+            AuditTrialController::log('Cập nhật', self::ITEM_TABLE, $item->id, 'Phiếu '.$list->code, 'Sửa '.self::ITEM_LABEL);
+            self::writeHistory($list->id, 'Sửa mặt hàng', null, $list->app_status, $list->app_status, 'Chỉnh sửa mặt hàng trong phiếu.');
+        }
 
         return redirect()->back()->with('success', 'Cập nhật '.self::ITEM_LABEL.' thành công!');
     }
@@ -333,9 +333,178 @@ class StandardEstimateController extends Controller
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->delete();
         });
 
-        AuditTrialController::log('Xoá', self::ITEM_TABLE, $item->id, 'Phiếu '.$list->code, 'Xoá '.self::ITEM_LABEL);
+        if ($list->app_status !== 'draft') {
+            AuditTrialController::log('Xoá', self::ITEM_TABLE, $item->id, 'Phiếu '.$list->code, 'Xoá '.self::ITEM_LABEL);
+            self::writeHistory($list->id, 'Xoá mặt hàng', null, $list->app_status, $list->app_status, 'Xoá mặt hàng khỏi phiếu.');
+        }
 
-        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu '.$list->code.'!');
+        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu dự trù!');
+    }
+
+    public function updateItemStatus(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer',
+            'action' => 'required|in:complete,cancel,undo'
+        ]);
+
+        [$item, $list] = $this->findItem($request->id);
+
+        if (! $item) {
+            return redirect()->back()->with('error', 'Không tìm thấy ' . self::ITEM_LABEL . ' cần cập nhật!');
+        }
+
+        if ($list->app_status !== 'approved') {
+            return redirect()->back()->with('error', 'Phiếu chưa được duyệt nên không thể cập nhật trạng thái mục!');
+        }
+
+        $updateData = [];
+        $logMessage = '';
+        if ($request->action === 'complete') {
+            $updateData = ['fulfilled_date' => now(), 'fulfilled_by' => $this->actor(), 'status_id' => 1];
+            $logMessage = 'Đã xác nhận hoàn thành (giao hàng).';
+        } elseif ($request->action === 'cancel') {
+            $updateData = ['fulfilled_date' => null, 'fulfilled_by' => null, 'status_id' => 0, 'cancel_reason' => $request->cancel_reason];
+            $logMessage = 'Đã huỷ dự trù mặt hàng. Lý do: ' . $request->cancel_reason;
+        } else {
+            $updateData = ['fulfilled_date' => null, 'fulfilled_by' => null, 'status_id' => 1, 'cancel_reason' => null];
+            $logMessage = 'Đã khôi phục lại trạng thái mặt hàng.';
+        }
+
+        DB::transaction(function () use ($item, $list, $updateData, $logMessage) {
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update($updateData);
+            
+            DB::table('estimate_item_chats')->insert([
+                'item_id' => $item->id,
+                'item_type' => 'standard',
+                'user_name' => $this->actor(),
+                'content' => $logMessage,
+                'type' => 'system',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $allItems = DB::table(self::ITEM_TABLE)->where('standard_estimate_id', $list->id)->get();
+            $allCompleted = true;
+            $hasActive = false;
+            foreach ($allItems as $i) {
+                if ($i->status_id != 0) {
+                    $hasActive = true;
+                    if (empty($i->fulfilled_date)) {
+                        $allCompleted = false;
+                        break;
+                    }
+                }
+            }
+
+            if ($allCompleted && $hasActive) {
+                DB::table(self::TABLE)->where('id', $list->id)->update([
+                    'reception_status' => 'completed',
+                    'completed_at' => now(),
+                    'completed_by' => $this->actor()
+                ]);
+            } elseif ($list->reception_status === 'completed') {
+                DB::table(self::TABLE)->where('id', $list->id)->update([
+                    'reception_status' => 'received',
+                    'completed_at' => null,
+                    'completed_by' => null
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Đã cập nhật trạng thái ' . self::ITEM_LABEL . '!');
+    }
+
+    public function updatePromisedDate(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer',
+            'promised_date' => 'nullable|date'
+        ]);
+
+        [$item, $list] = $this->findItem($request->id);
+
+        if (! $item) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy ' . self::ITEM_LABEL . ' cần cập nhật!']);
+        }
+
+        if ($list->app_status !== 'approved') {
+            return response()->json(['success' => false, 'message' => 'Phiếu chưa được duyệt nên không thể hẹn ngày!']);
+        }
+
+        $oldDate = $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('d/m/Y') : 'Chưa có';
+        $newDate = $request->promised_date ? \Carbon\Carbon::parse($request->promised_date)->format('d/m/Y') : 'Chưa có';
+        $actor = $this->actor();
+        $historyAdded = false;
+
+        DB::transaction(function () use ($item, $request, $oldDate, $newDate, $actor, &$historyAdded) {
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'promised_date' => $request->promised_date,
+            ]);
+
+            if ($oldDate !== $newDate) {
+                DB::table('estimate_item_chats')->insert([
+                    'item_id' => $item->id,
+                    'item_type' => 'standard',
+                    'user_name' => $actor,
+                    'content' => "Cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]",
+                    'type' => 'history_promised_date',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $historyAdded = true;
+            }
+        });
+
+        return response()->json(['success' => true, 'message' => 'Đã cập nhật ngày hẹn đáp ứng!', 'historyAdded' => $historyAdded]);
+    }
+
+    public function getPromisedDateHistory($itemId)
+    {
+        $histories = DB::table('estimate_item_chats')
+            ->where('item_id', $itemId)
+            ->where('item_type', 'standard')
+            ->where('type', 'history_promised_date')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($chat) {
+                return [
+                    'content' => $chat->content,
+                    'user_name' => $chat->user_name,
+                    'created_at_formatted' => \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y')
+                ];
+            });
+
+        return response()->json(['success' => true, 'histories' => $histories]);
+    }
+
+    public function storeItemChat(Request $request)
+    {
+        $request->validate([
+            'item_id' => 'required|integer',
+            'content' => 'required|string|max:1000'
+        ]);
+
+        [$item, $list] = $this->findItem($request->item_id);
+
+        if (! $item) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy ' . self::ITEM_LABEL]);
+        }
+
+        $chatId = DB::table('estimate_item_chats')->insertGetId([
+            'item_id' => $item->id,
+            'item_type' => 'standard',
+            'user_name' => $this->actor(),
+            'content' => $request->content,
+            'type' => 'chat',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $chat = DB::table('estimate_item_chats')->where('id', $chatId)->first();
+        $chat->created_at_formatted = \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y');
+
+        return response()->json(['success' => true, 'chat' => $chat]);
     }
 
     /* ==========================================================
@@ -473,9 +642,11 @@ class StandardEstimateController extends Controller
             'updated_at' => now(),
         ];
 
-        // Ký xong bước cuối thì phiếu chuyển sang hàng chờ của bộ phận Cung Ứng
+        // Ký xong bước cuối thì xem như đã tiếp nhận
         if ($config['to'] === 'approved') {
-            $payload['reception_status'] = 'waiting';
+            $payload['reception_status'] = 'received';
+            $payload['received_by'] = 'Hệ thống';
+            $payload['received_at'] = now();
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update($payload);
@@ -502,6 +673,75 @@ class StandardEstimateController extends Controller
      * Gom một truy vấn cho mặt hàng và một truy vấn cho số lượng rồi ghép trong PHP
      * để không phải hỏi DB theo từng dòng.
      */
+    public static function trackedItems(int $departmentId)
+    {
+        $items = DB::table(self::ITEM_TABLE)
+            ->join(self::TABLE, self::ITEM_TABLE.'.standard_estimate_id', '=', self::TABLE.'.id')
+            ->leftJoin('standard_categories', self::ITEM_TABLE.'.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => \App\Support\DepartmentStandard::joinUnit($query, $departmentId, self::ITEM_TABLE.'.category_id'))
+            ->select(
+                self::ITEM_TABLE.'.*',
+                self::TABLE.'.id as list_id',
+                self::TABLE.'.code as list_code',
+                'standard_categories.code as category_code',
+                'standard_categories.version as category_version',
+                'standard_names.name as category_standard_name',
+                'units.short_name as category_unit_short_name',
+                'manufacturers.name as category_manufacturer_name'
+            )
+            ->where(self::TABLE.'.department_id', $departmentId)
+            ->whereNotNull(self::ITEM_TABLE.'.promised_date')
+            ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
+            ->where(self::ITEM_TABLE.'.status_id', 1)
+            ->orderBy(self::ITEM_TABLE.'.promised_date', 'asc')
+            ->get();
+
+        if ($items->isEmpty()) return $items;
+
+        $amounts = DB::table(self::AMOUNT_TABLE)
+            ->leftJoin('units', self::AMOUNT_TABLE.'.unit_id', '=', 'units.id')
+            ->select(
+                self::AMOUNT_TABLE.'.*',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name'
+            )
+            ->whereIn(self::AMOUNT_TABLE.'.standard_estimate_item_id', $items->pluck('id')->all())
+            ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
+            ->get()
+            ->groupBy('standard_estimate_item_id');
+
+        $allChats = DB::table('estimate_item_chats')
+            ->where('item_type', 'standard')
+            ->whereIn('item_id', $items->pluck('id')->all())
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $chats = $allChats->where('type', '!=', 'history_promised_date')
+            ->map(function ($chat) {
+                $chat->created_at_formatted = \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y');
+                return $chat;
+            })
+            ->groupBy('item_id');
+
+        $historyCounts = $allChats->where('type', 'history_promised_date')
+            ->groupBy('item_id')
+            ->map->count();
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts) {
+            $item->amounts = ($amounts[$item->id] ?? collect())->values();
+            $item->chats = ($chats[$item->id] ?? collect())->values();
+            $item->history_count = $historyCounts[$item->id] ?? 0;
+            $item->display_name = $item->category_id ? $item->category_standard_name : $item->standard_name;
+            // Bảng theo dõi dùng chung hiện category_type ngay sau mã danh mục; chất chuẩn
+            // không có "loại" như hoá chất nên mượn ô này cho version danh mục.
+            $item->category_type = $item->category_id ? 'v'.$item->category_version : null;
+
+            return $item;
+        });
+    }
+
     public static function itemsOf(int $listId)
     {
         // Đơn vị tính nằm ở danh mục chất chuẩn CỦA PHÒNG, nên phải biết phiếu này của phòng nào
@@ -510,6 +750,7 @@ class StandardEstimateController extends Controller
         $items = DB::table(self::ITEM_TABLE)
             ->leftJoin('standard_categories', self::ITEM_TABLE.'.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, self::ITEM_TABLE.'.category_id'))
             ->select(
                 self::ITEM_TABLE.'.*',
@@ -517,7 +758,8 @@ class StandardEstimateController extends Controller
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no as category_cas_no',
                 'standard_names.name as category_standard_name',
-                'units.short_name as category_unit_short_name'
+                'units.short_name as category_unit_short_name',
+                'manufacturers.name as category_manufacturer_name'
             )
             ->where(self::ITEM_TABLE.'.standard_estimate_id', $listId)
             ->orderBy(self::ITEM_TABLE.'.id', 'asc')
@@ -535,8 +777,27 @@ class StandardEstimateController extends Controller
             ->get()
             ->groupBy('standard_estimate_item_id');
 
-        return $items->map(function ($item) use ($amounts) {
+        $allChats = DB::table('estimate_item_chats')
+            ->where('item_type', 'standard')
+            ->whereIn('item_id', $items->pluck('id')->all())
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $chats = $allChats->where('type', '!=', 'history_promised_date')
+            ->map(function ($chat) {
+                $chat->created_at_formatted = \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y');
+                return $chat;
+            })
+            ->groupBy('item_id');
+
+        $historyCounts = $allChats->where('type', 'history_promised_date')
+            ->groupBy('item_id')
+            ->map->count();
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts) {
             $item->amounts = ($amounts[$item->id] ?? collect())->values();
+            $item->chats = ($chats[$item->id] ?? collect())->values();
+            $item->history_count = $historyCounts[$item->id] ?? 0;
             // Tên hiển thị: lấy theo danh mục, chất chuẩn ngoài danh mục thì lấy tên tự nhập
             $item->display_name = $item->category_id ? $item->category_standard_name : $item->standard_name;
             $item->group_label = $item->group_key ? StandardCode::groupLabel($item->group_key) : null;
@@ -653,52 +914,24 @@ class StandardEstimateController extends Controller
      * Số thứ tự đếm riêng cho từng bộ (phòng ban, tháng, năm). Phiếu chỉ khoá chứ không
      * xoá nên mã không bị dùng lại.
      */
-    private function nextCode(int $departmentId, int $month, int $year): string
+    private function nextCode(int $departmentId): string
     {
-        $prefix = self::CODE_PREFIX.$departmentId.$year.str_pad((string) $month, 2, '0', STR_PAD_LEFT);
+        $shortName = DB::table('deparments')->where('id', $departmentId)->value('shortName') ?? 'UNK';
+        $datePart = date('ymd'); // yymmdd
+        $prefix = $shortName . $datePart . '.';
 
         $next = DB::table(self::TABLE)
             ->where('department_id', $departmentId)
-            ->where('month', $month)
-            ->where('year', $year)
+            ->whereYear('created_at', date('Y'))
+            ->whereMonth('created_at', date('m'))
             ->pluck('code')
-            ->map(fn ($code) => (int) substr((string) $code, strlen($prefix)))
+            ->map(function ($code) {
+                $parts = explode('.', $code);
+                return isset($parts[1]) ? (int) $parts[1] : 0;
+            })
             ->max();
 
-        return $prefix.str_pad((string) (($next ?? 0) + 1), self::SEQ_LENGTH, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * Mã dự kiến của vài kỳ gần nhất để hiện trước trên form: ["<năm>-<tháng>" => mã].
-     *
-     * Chỉ để xem, mã thật vẫn sinh lúc lưu trong transaction.
-     */
-    private function codePreviews(int $departmentId): array
-    {
-        $used = DB::table(self::TABLE)
-            ->select('month', 'year', 'code')
-            ->where('department_id', $departmentId)
-            ->get()
-            ->groupBy(fn ($row) => $row->year.'-'.(int) $row->month);
-
-        $previews = [];
-        $cursor = now()->startOfMonth()->subMonths(2);
-
-        // Lấy dư vài kỳ quanh hiện tại để ô chọn tháng/năm nào cũng có mã xem trước
-        for ($i = 0; $i < 27; $i++) {
-            $key = $cursor->year.'-'.$cursor->month;
-            $prefix = self::CODE_PREFIX.$departmentId.$cursor->year.$cursor->format('m');
-
-            $next = ($used[$key] ?? collect())
-                ->map(fn ($row) => (int) substr((string) $row->code, strlen($prefix)))
-                ->max();
-
-            $previews[$key] = $prefix.str_pad((string) (($next ?? 0) + 1), self::SEQ_LENGTH, '0', STR_PAD_LEFT);
-
-            $cursor->addMonth();
-        }
-
-        return $previews;
+        return $prefix . str_pad((string) (($next ?? 0) + 1), 2, '0', STR_PAD_LEFT);
     }
 
     /** Danh mục chất chuẩn đã duyệt và đang hoạt động mới được chọn để dự trù. */
@@ -828,22 +1061,7 @@ class StandardEstimateController extends Controller
         ];
     }
 
-    /** Một phòng ban chỉ lập một phiếu dự trù chất chuẩn cho mỗi tháng/năm. */
-    private function checkDuplicatePeriod($validator, Request $request, $ignoreId = null): void
-    {
-        $validator->after(function ($validator) use ($request, $ignoreId) {
-            $exists = DB::table(self::TABLE)
-                ->where('department_id', $this->departmentId())
-                ->where('month', (int) $request->month)
-                ->where('year', (int) $request->year)
-                ->when($ignoreId, fn ($query) => $query->where('id', '<>', $ignoreId))
-                ->exists();
 
-            if ($exists) {
-                $validator->errors()->add('month', 'Phòng ban đã có phiếu dự trù chất chuẩn cho tháng '.$request->month.'/'.$request->year.'.');
-            }
-        });
-    }
 
     private function itemRules(): array
     {
@@ -877,6 +1095,7 @@ class StandardEstimateController extends Controller
             'group_key' => $this->nullIfBlank($request->group_key),
             'technical_information' => $this->nullIfBlank($request->technical_information),
             'purpose' => $this->nullIfBlank($request->purpose),
+            'expected_delivery_date' => $this->nullIfBlank($request->expected_delivery_date),
         ];
     }
 

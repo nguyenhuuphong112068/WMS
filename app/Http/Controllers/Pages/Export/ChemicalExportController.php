@@ -27,11 +27,11 @@ use Illuminate\Validation\Rule;
  */
 class ChemicalExportController extends Controller
 {
-    private const TABLE = 'exports';
+    private const TABLE = 'chemical_exports';
 
-    private const HISTORY_TABLE = 'export_histories';
+    private const HISTORY_TABLE = 'chemical_export_histories';
 
-    private const REQUEST_TABLE = 'transfer_requests';
+    private const REQUEST_TABLE = 'chemical_transfer_requests';
 
     private const LABEL = 'phiếu sử dụng hoá chất';
 
@@ -84,14 +84,14 @@ class ChemicalExportController extends Controller
         $departmentId = $this->departmentId();
 
         $datas = DB::table(self::TABLE)
-            ->leftJoin('imports', self::TABLE.'.import_id', '=', 'imports.id')
-            ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chemical_imports', self::TABLE.'.import_id', '=', 'chemical_imports.id')
+            ->leftJoin('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
             // Đơn vị tính khai ở danh mục hoá chất CỦA PHÒNG, không còn ở danh mục chung
-            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'imports.category_id'))
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'chemical_imports.category_id'))
             // Phòng ban nhận và mã lô đã sinh ra bên đó, chỉ có ở phiếu chuyển kho
             ->leftJoin('deparments', self::TABLE.'.to_department_id', '=', 'deparments.id')
-            ->leftJoin('imports as received', self::TABLE.'.received_import_id', '=', 'received.id')
+            ->leftJoin('chemical_imports as received', self::TABLE.'.received_import_id', '=', 'received.id')
             ->select(
                 self::TABLE.'.*',
                 'chemical_categories.code as category_code',
@@ -99,17 +99,17 @@ class ChemicalExportController extends Controller
                 'chem_names.name as chem_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
-                'imports.amount as import_amount',
-                'imports.batch_no',
-                'imports.expired_date',
+                'chemical_imports.amount as import_amount',
+                'chemical_imports.batch_no',
+                'chemical_imports.expired_date',
                 'deparments.name as to_department_name',
                 'deparments.shortName as to_department_short',
                 'received.code as received_code',
                 // Phiếu loại bỏ đã gom vào đợt huỷ nào, để khoá nút Sửa / Khoá trên bảng
-                'disposals.code as disposal_code',
-                'disposals.app_status as disposal_status'
+                'chemical_disposals.code as disposal_code',
+                'chemical_disposals.app_status as disposal_status'
             )
-            ->leftJoin('disposals', self::TABLE.'.disposal_id', '=', 'disposals.id')
+            ->leftJoin('chemical_disposals', self::TABLE.'.disposal_id', '=', 'chemical_disposals.id')
             ->where(self::TABLE.'.department_id', $departmentId)
             ->orderBy(self::TABLE.'.exported_date', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')
@@ -126,7 +126,7 @@ class ChemicalExportController extends Controller
             'categories' => $this->categoryOptions($departmentId),
             'requestsSent' => $requests['sent'],
             'requestsReceived' => $requests['received'],
-            'imports' => $this->importOptions($departmentId),
+            'chemical_imports' => $this->importOptions($departmentId),
             'checkers' => $this->checkerOptions($departmentId),
             'departments' => $this->departmentOptions($departmentId),
             'types' => self::TYPES,
@@ -137,7 +137,7 @@ class ChemicalExportController extends Controller
             'reportTo' => $to,
             // Bước 2 của nghiệp vụ huỷ: hàng chờ huỷ và các đợt xin quyết định huỷ
             'waitingDisposal' => ChemicalDisposalController::waiting($departmentId),
-            'disposals' => ChemicalDisposalController::batches($departmentId),
+            'chemical_disposals' => ChemicalDisposalController::batches($departmentId),
             'disposalStatuses' => ChemicalDisposalController::STATUSES,
             'disposalMethods' => ChemicalDisposalController::METHODS,
             'disposalExecutors' => ChemicalDisposalController::EXECUTORS,
@@ -340,7 +340,7 @@ class ChemicalExportController extends Controller
 
         // Mở khoá lại thì số lượng cũ phải còn nằm trong hạn mức xuất của phiếu nhập
         if ($newStatus == 1) {
-            $import = DB::table('imports')->where('id', $current->import_id)->first();
+            $import = DB::table('chemical_imports')->where('id', $current->import_id)->first();
             $remaining = $import ? $this->remaining($import, (int) $current->id) : 0;
 
             if (! $import || (float) $current->amount > $this->maxIssuable($remaining, $import) + self::EPSILON) {
@@ -403,10 +403,10 @@ class ChemicalExportController extends Controller
     public function history(Request $request)
     {
         $rows = DB::table(self::HISTORY_TABLE)
-            ->leftJoin('imports', self::HISTORY_TABLE.'.import_id', '=', 'imports.id')
-            ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chemical_imports', self::HISTORY_TABLE.'.import_id', '=', 'chemical_imports.id')
+            ->leftJoin('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $this->departmentId(), 'imports.category_id'))
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $this->departmentId(), 'chemical_imports.category_id'))
             ->leftJoin('deparments', self::HISTORY_TABLE.'.to_department_id', '=', 'deparments.id')
             ->select(
                 self::HISTORY_TABLE.'.*',
@@ -565,33 +565,33 @@ class ChemicalExportController extends Controller
     private function importOptions(int $departmentId)
     {
         $used = $this->sumByImport(self::TABLE, 'amount', $departmentId);
-        $balanced = $this->sumByImport('inventory_balancings', 'balancing_amount', $departmentId);
+        $balanced = $this->sumByImport('chemical_balancings', 'balancing_amount', $departmentId);
         $today = now()->startOfDay();
 
-        $query = DB::table('imports')
-            ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
+        $query = DB::table('chemical_imports')
+            ->leftJoin('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id');
 
         // Hạn dùng nội bộ và đơn vị tính lấy theo cấu hình của phòng ban đang chọn
-        return DepartmentChemical::join($query, $departmentId, 'imports.category_id')
+        return DepartmentChemical::join($query, $departmentId, 'chemical_imports.category_id')
             ->leftJoin('units', DepartmentChemical::TABLE.'.unit_id', '=', 'units.id')
             ->select(
-                'imports.id',
-                'imports.code',
-                'imports.amount',
-                'imports.batch_no',
-                'imports.expired_date',
-                'imports.internal_expired_date',
-                'imports.is_partial_lot',
+                'chemical_imports.id',
+                'chemical_imports.code',
+                'chemical_imports.amount',
+                'chemical_imports.batch_no',
+                'chemical_imports.expired_date',
+                'chemical_imports.internal_expired_date',
+                'chemical_imports.is_partial_lot',
                 'chemical_categories.code as category_code',
                 DepartmentChemical::shelfLifeColumn(),
                 'chem_names.name as chem_name',
                 'units.short_name as unit_short_name'
             )
-            ->where('imports.department_id', $departmentId)
-            ->where('imports.status_id', 1)
-            ->orderBy('imports.imported_date', 'desc')
-            ->orderBy('imports.id', 'desc')
+            ->where('chemical_imports.department_id', $departmentId)
+            ->where('chemical_imports.status_id', 1)
+            ->orderBy('chemical_imports.imported_date', 'desc')
+            ->orderBy('chemical_imports.id', 'desc')
             ->get()
             ->map(function ($import) use ($used, $balanced, $today) {
                 $import->used = (float) ($used[$import->id] ?? 0);
@@ -656,10 +656,10 @@ class ChemicalExportController extends Controller
 
         // Chuỗi trong DB::raw là hằng, không ghép từ dữ liệu người dùng
         $rows = DB::table(self::TABLE)
-            ->join('imports', self::TABLE.'.import_id', '=', 'imports.id')
-            ->join('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
+            ->join('chemical_imports', self::TABLE.'.import_id', '=', 'chemical_imports.id')
+            ->join('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'imports.category_id'))
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'chemical_imports.category_id'))
             ->select(
                 'chemical_categories.id as category_id',
                 'chemical_categories.code as category_code',
@@ -762,7 +762,7 @@ class ChemicalExportController extends Controller
             return null;
         }
 
-        $batch = DB::table('disposals')->where('id', $current->disposal_id)->first();
+        $batch = DB::table('chemical_disposals')->where('id', $current->disposal_id)->first();
 
         return redirect()->back()->with(
             'error',
@@ -912,14 +912,14 @@ class ChemicalExportController extends Controller
                 self::REQUEST_TABLE.'.department_id',
                 self::REQUEST_TABLE.'.category_id'
             ))
-            ->leftJoin('exports', self::REQUEST_TABLE.'.export_id', '=', 'exports.id')
+            ->leftJoin('chemical_exports', self::REQUEST_TABLE.'.export_id', '=', 'chemical_exports.id')
             ->select(
                 self::REQUEST_TABLE.'.*',
                 'chemical_categories.code as category_code',
                 'chem_names.name as chem_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
-                'exports.code as export_code'
+                'chemical_exports.code as export_code'
             )
             ->where(self::REQUEST_TABLE.'.status_id', 1)
             ->orderBy(self::REQUEST_TABLE.'.id', 'desc');
@@ -1010,7 +1010,7 @@ class ChemicalExportController extends Controller
             $query->where('id', '<>', $ignoreExportId);
         }
 
-        $balanced = (float) DB::table('inventory_balancings')
+        $balanced = (float) DB::table('chemical_balancings')
             ->where('import_id', $import->id)
             ->where('status_id', 1)
             ->sum('balancing_amount');
@@ -1051,7 +1051,7 @@ class ChemicalExportController extends Controller
             return false;
         }
 
-        $balanced = DB::table('inventory_balancings')
+        $balanced = DB::table('chemical_balancings')
             ->where('import_id', $import->id)
             ->where('status_id', 1)
             ->exists();
@@ -1074,14 +1074,14 @@ class ChemicalExportController extends Controller
     private function findImport($importId, int $departmentId)
     {
         // Kèm shelf_life_months (theo cấu hình phòng ban) để kiểm tra hạn dùng nội bộ khi xuất
-        $query = DB::table('imports')
-            ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id');
+        $query = DB::table('chemical_imports')
+            ->leftJoin('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id');
 
-        return DepartmentChemical::join($query, $departmentId, 'imports.category_id')
-            ->select('imports.*', DepartmentChemical::shelfLifeColumn())
-            ->where('imports.id', $importId)
-            ->where('imports.department_id', $departmentId)
-            ->where('imports.status_id', 1)
+        return DepartmentChemical::join($query, $departmentId, 'chemical_imports.category_id')
+            ->select('chemical_imports.*', DepartmentChemical::shelfLifeColumn())
+            ->where('chemical_imports.id', $importId)
+            ->where('chemical_imports.department_id', $departmentId)
+            ->where('chemical_imports.status_id', 1)
             ->first();
     }
 

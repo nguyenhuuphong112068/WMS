@@ -28,9 +28,9 @@ use Illuminate\Support\Facades\Validator;
  */
 class ChemicalDisposalController extends Controller
 {
-    private const TABLE = 'disposals';
+    private const TABLE = 'chemical_disposals';
 
-    private const EXPORT_TABLE = 'exports';
+    private const EXPORT_TABLE = 'chemical_exports';
 
     private const LABEL = 'đợt huỷ hoá chất';
 
@@ -74,11 +74,11 @@ class ChemicalDisposalController extends Controller
     public static function waiting(int $departmentId)
     {
         return DB::table(self::EXPORT_TABLE)
-            ->leftJoin('imports', self::EXPORT_TABLE.'.import_id', '=', 'imports.id')
-            ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chemical_imports', self::EXPORT_TABLE.'.import_id', '=', 'chemical_imports.id')
+            ->leftJoin('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
             // Đơn vị tính khai ở danh mục hoá chất CỦA PHÒNG, không còn ở danh mục chung
-            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'imports.category_id'))
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'chemical_imports.category_id'))
             ->select(
                 self::EXPORT_TABLE.'.id',
                 self::EXPORT_TABLE.'.code',
@@ -91,8 +91,8 @@ class ChemicalDisposalController extends Controller
                 'chemical_categories.code as category_code',
                 'chemical_categories.classification',
                 'chem_names.name as chem_name',
-                'imports.batch_no',
-                'imports.expired_date',
+                'chemical_imports.batch_no',
+                'chemical_imports.expired_date',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
@@ -149,15 +149,15 @@ class ChemicalDisposalController extends Controller
         $kgUnit = DB::table('units')->where('short_name', 'kg')->first();
 
         return DB::table(self::EXPORT_TABLE)
-            ->leftJoin('imports', self::EXPORT_TABLE.'.import_id', '=', 'imports.id')
-            ->leftJoin('chemical_categories', 'imports.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chemical_imports', self::EXPORT_TABLE.'.import_id', '=', 'chemical_imports.id')
+            ->leftJoin('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
             // Đợt huỷ có thể gom phiếu do nhiều phòng lập, nên lấy đơn vị theo ĐÚNG phòng
             // đã ghi số lượng ở từng dòng, không phải một phòng cố định.
             ->tap(fn ($query) => DepartmentChemical::joinUnitOn(
                 $query,
                 self::EXPORT_TABLE.'.department_id',
-                'imports.category_id'
+                'chemical_imports.category_id'
             ))
             ->select(
                 self::EXPORT_TABLE.'.id',
@@ -172,7 +172,7 @@ class ChemicalDisposalController extends Controller
                 'chemical_categories.code as category_code',
                 'chemical_categories.density',
                 'chem_names.name as chem_name',
-                'imports.batch_no',
+                'chemical_imports.batch_no',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'units.unit_group',

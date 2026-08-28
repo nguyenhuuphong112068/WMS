@@ -15,6 +15,58 @@
     /** Ngày hiển thị d/m/Y, trống thì gạch ngang. */
     $invDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
 
+    /*
+    |--------------------------------------------------------------------------
+    | KỲ BÁO CÁO
+    |--------------------------------------------------------------------------
+    | $period do controller tính (mặc định từ đầu tháng đến hôm nay). Bảng tồn đọc
+    | bốn chỉ số theo kỳ: Tồn Đầu Kỳ - Nhập Trong Kỳ - Sử Dụng / Huỷ Trong Kỳ -
+    | Tồn Cuối Kỳ.
+    */
+    $invToday = \Carbon\Carbon::today();
+    $invPeriodLabel = $invDate($period['from']) . ' - ' . $invDate($period['to']);
+
+    /*
+    | Mốc chọn nhanh, mỗi mốc là TRỌN kỳ (đến ngày cuối tháng / quý / năm) cho khớp
+    | với kỳ mặc định. Ngày cuối kỳ ở tương lai không làm sai số liệu vì chưa có
+    | phát sinh nào sau hôm nay.
+    |
+    | "Toàn bộ" lấy từ ngày nhập xa nhất đang có nên tồn đầu kỳ bằng 0 và mọi phát
+    | sinh đều nằm trong kỳ - đúng bằng cách xem tồn trước đây.
+    */
+    $invEarliest = $datas->min('imported_date');
+    $invEarliest = $invEarliest ? substr((string) $invEarliest, 0, 10) : $invToday->copy()->startOfYear()->format('Y-m-d');
+
+    $invPeriodPresets = collect([
+        [
+            'label' => 'Tháng này',
+            'from' => $invToday->copy()->startOfMonth()->format('Y-m-d'),
+            'to' => $invToday->copy()->endOfMonth()->format('Y-m-d'),
+        ],
+        [
+            'label' => 'Tháng trước',
+            'from' => $invToday->copy()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d'),
+            'to' => $invToday->copy()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d'),
+        ],
+        [
+            'label' => 'Quý này',
+            'from' => $invToday->copy()->startOfQuarter()->format('Y-m-d'),
+            'to' => $invToday->copy()->endOfQuarter()->format('Y-m-d'),
+        ],
+        [
+            'label' => 'Năm nay',
+            'from' => $invToday->copy()->startOfYear()->format('Y-m-d'),
+            'to' => $invToday->copy()->endOfYear()->format('Y-m-d'),
+        ],
+        [
+            'label' => 'Toàn bộ',
+            'from' => $invEarliest,
+            'to' => $invToday->copy()->endOfMonth()->format('Y-m-d'),
+        ],
+    ])
+        ->map(fn($preset) => $preset + ['active' => $preset['from'] === $period['from'] && $preset['to'] === $period['to']])
+        ->all();
+
     /** Hạn dùng nhà sản xuất chưa xác định, tra cứu trực tuyến khi dùng (standard_imports.expiry_type). */
     $invIsCheckOnline = fn($row) => in_array($row->expiry_type ?? null, ['check online', 'undetermined', 'unlimited']);
 
@@ -74,4 +126,5 @@
     @include('pages.inventory.StandardInventory.balancing')
     @include('pages.inventory.StandardInventory.balancingHistory')
     @include('pages.inventory.StandardInventory.internalExpiry')
+    @include('pages.inventory.StandardInventory.weightRemarkModal')
 @endsection

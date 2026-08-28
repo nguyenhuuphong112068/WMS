@@ -86,6 +86,16 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Ngày Mong Muốn Giao</label>
+                        <input type="date" name="expected_delivery_date"
+                            class="form-control w-25 {{ $bag->has('expected_delivery_date') ? 'is-invalid' : '' }}"
+                            value="{{ old('expected_delivery_date') }}">
+                        @if ($bag->has('expected_delivery_date'))
+                            <span class="md-error">{{ $bag->first('expected_delivery_date') }}</span>
+                        @endif
+                    </div>
+
+                    <div class="form-group">
                         <label>Số Lượng Dự Trù Theo Tháng <span class="text-danger">*</span></label>
                         @include('pages.estimate.shared.amountsBox', [
                             'units' => $units,

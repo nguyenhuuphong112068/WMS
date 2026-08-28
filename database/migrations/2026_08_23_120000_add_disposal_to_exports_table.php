@@ -25,18 +25,18 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('exports', function (Blueprint $table) {
+        Schema::table('chemical_exports', function (Blueprint $table) {
             $table->string('test_report_no', 100)->nullable()->after('purpose');
             $table->unsignedBigInteger('disposal_id')->nullable()->after('test_report_no');
 
-            $table->index('disposal_id', 'exports_disposal_id_index');
+            $table->index('disposal_id', 'chemical_exports_disposal_id_index');
         });
     }
 
     public function down(): void
     {
-        Schema::table('exports', function (Blueprint $table) {
-            $table->dropIndex('exports_disposal_id_index');
+        Schema::table('chemical_exports', function (Blueprint $table) {
+            $table->dropIndex('chemical_exports_disposal_id_index');
             $table->dropColumn(['test_report_no', 'disposal_id']);
         });
     }

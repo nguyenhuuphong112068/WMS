@@ -79,8 +79,8 @@
     /* ---------- Tiêu đề nhóm menu ---------- */
     .nav-sidebar .nav-header {
         padding: 16px 24px 6px !important;
-        color: #94a3b8 !important;
-        font-size: 0.7rem;
+        color: #475569 !important;
+        font-size: 0.72rem;
         text-transform: uppercase;
         letter-spacing: 1px;
         font-weight: 700;
@@ -89,13 +89,13 @@
     /* ---------- Menu cấp 1 ---------- */
     .nav-sidebar > .nav-item > .nav-link {
         position: relative;
-        color: #475569 !important;
+        color: var(--text-main) !important;
         margin: 3px 12px;
         padding: 10px 14px;
         border-radius: var(--border-radius-md);
         display: flex;
         align-items: center;
-        font-weight: 500;
+        font-weight: 600;
         transition: all var(--transition-fast);
     }
 
@@ -108,6 +108,16 @@
         flex-shrink: 0;
     }
 
+    /* icon menu cấp 1 theo màu chủ đạo để dễ phân biệt (không đụng bullet menu con) */
+    .nav-sidebar > .nav-item > .nav-link > i {
+        color: var(--primary);
+    }
+
+    .nav-sidebar > .nav-item.menu-open > .nav-link > i,
+    .nav-sidebar > .nav-item > .nav-link:hover > i {
+        color: var(--primary-dark);
+    }
+
     .nav-sidebar .nav-link > p {
         flex: 1;
         min-width: 0;
@@ -118,7 +128,7 @@
         top: 13px;
         right: 14px;
         font-size: 0.8rem;
-        opacity: 0.6;
+        opacity: 0.85;
     }
 
     .nav-sidebar > .nav-item > .nav-link:hover {
@@ -152,11 +162,12 @@
     }
 
     .nav-sidebar .nav-treeview > .nav-item > .nav-link {
-        color: #64748b !important;
+        color: #334155 !important;
         padding: 7px 12px;
         margin: 2px 0;
         border-radius: var(--border-radius-md);
-        font-size: 0.875rem;
+        font-size: 0.9rem;
+        font-weight: 500;
         display: flex;
         align-items: center;
         transition: all var(--transition-fast);
@@ -311,6 +322,11 @@
                                         class="far fa-circle nav-icon text-primary"></i>
                                     <p>Tên Vật Tư</p>
                                 </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.materData.materialClassification.list') }}"
+                                    class="nav-link {{ request()->is('materData/materialClassification') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-success"></i>
+                                    <p>Phân Loại Vật Tư</p>
+                                </a></li>
                             <li class="nav-item"><a href="{{ route('pages.materData.chemManufacturer.list') }}"
                                     class="nav-link {{ request()->is('materData/chemManufacturer') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-secondary"></i>
@@ -352,6 +368,7 @@
                             </p>
                         </a>
                         <ul class="nav nav-treeview">
+                            {{-- Một trang 2 tab: Danh Mục Vật Tư Công Ty + Vật Tư Của Phòng --}}
                             <li class="nav-item"><a href="{{ route('pages.category.materialCategory.list') }}"
                                     class="nav-link {{ request()->is('category/materialCategory') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-primary"></i>
@@ -394,6 +411,11 @@
                                         class="far fa-circle nav-icon text-warning"></i>
                                     <p>Nhập Chất Chuẩn</p>
                                 </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.import.materialImport.list') }}"
+                                    class="nav-link {{ request()->is('import/materialImport') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-primary"></i>
+                                    <p>Nhập Vật Tư</p>
+                                </a></li>
                         </ul>
                     </li>
 
@@ -417,6 +439,11 @@
                                     class="nav-link {{ request()->is('export/standardExport') ? 'active' : '' }}"><i
                                         class="far fa-circle nav-icon text-warning"></i>
                                     <p>Sử Dụng Chất Chuẩn</p>
+                                </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.export.materialExport.list') }}"
+                                    class="nav-link {{ request()->is('export/materialExport') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-primary"></i>
+                                    <p>Sử Dụng Vật Tư</p>
                                 </a></li>
                         </ul>
                     </li>
@@ -443,6 +470,32 @@
                                         class="far fa-circle nav-icon text-warning"></i>
                                     <p>Tồn Kho Chất Chuẩn</p>
                                 </a></li>
+                            <li class="nav-item"><a href="{{ route('pages.inventory.materialInventory.list') }}"
+                                    class="nav-link {{ request()->is('inventory/materialInventory') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-primary"></i>
+                                    <p>Tồn Kho Vật Tư</p>
+                                </a></li>
+                        </ul>
+                    </li>
+
+
+                    <!-- Droplist Menu Đánh Giá Hạn Dùng  -->
+                    <li
+                        class="nav-item has-treeview {{ request()->is('stabilityAssessment/*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->is('stabilityAssessment/*') ? 'active' : '' }}">
+                            <i class="fas fa-clipboard-list"></i>
+                            <p>
+                                Đánh Giá Hạn Dùng
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a
+                                    href="{{ route('pages.stabilityAssessment.standardStability.list') }}"
+                                    class="nav-link {{ request()->is('stabilityAssessment/standardStability*') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-warning"></i>
+                                    <p>Chất Chuẩn</p>
+                                </a></li>
                         </ul>
                     </li>
 
@@ -468,10 +521,10 @@
                                         class="far fa-circle nav-icon text-warning"></i>
                                     <p>Dự Trù Chất Chuẩn</p>
                                 </a></li>
-                            <li class="nav-item"><a href="{{ route('pages.estimate.estimateReception.list') }}"
-                                    class="nav-link {{ request()->is('estimate/estimateReception*') ? 'active' : '' }}"><i
-                                        class="far fa-circle nav-icon text-warning"></i>
-                                    <p>Tiếp Nhận Dự Trù</p>
+                            <li class="nav-item"><a href="{{ route('pages.estimate.materialEstimate.list') }}"
+                                    class="nav-link {{ request()->is('estimate/materialEstimate*') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon text-primary"></i>
+                                    <p>Dự Trù Vật Tư</p>
                                 </a></li>
                         </ul>
                     </li>

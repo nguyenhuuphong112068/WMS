@@ -8,14 +8,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('request_items', function (Blueprint $table) {
-            if (!Schema::hasColumn('request_items', 'specification')) {
+        Schema::table('standard_request_items', function (Blueprint $table) {
+            if (!Schema::hasColumn('standard_request_items', 'specification')) {
                 $table->string('specification', 100)->nullable()->after('requested_unit');
             }
-            if (!Schema::hasColumn('request_items', 'test_criteria')) {
+            if (!Schema::hasColumn('standard_request_items', 'test_criteria')) {
                 $table->string('test_criteria', 255)->nullable()->after('product_name');
             }
-            if (!Schema::hasColumn('request_items', 'issued_unit')) {
+            if (!Schema::hasColumn('standard_request_items', 'issued_unit')) {
                 $table->string('issued_unit', 50)->nullable()->after('issued_amount');
             }
         });
@@ -32,7 +32,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('request_items', function (Blueprint $table) {
+        Schema::table('standard_request_items', function (Blueprint $table) {
             $table->dropColumn(['specification', 'test_criteria', 'issued_unit']);
         });
 

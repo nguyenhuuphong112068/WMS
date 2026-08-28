@@ -22,16 +22,6 @@
                         @endif
                     </div>
 
-                    <div class="form-group">
-                        <label>Thông Tin Kỹ Thuật</label>
-                        <textarea name="technical_information" rows="4" maxlength="2000"
-                            class="form-control {{ $bag->has('technical_information') ? 'is-invalid' : '' }}"
-                            placeholder="Nhập thông số, quy cách, tiêu chuẩn kỹ thuật...">{{ old('technical_information') }}</textarea>
-                        @if ($bag->has('technical_information'))
-                            <span class="md-error">{{ $bag->first('technical_information') }}</span>
-                        @endif
-                    </div>
-
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Bản ghi mới ở trạng thái <b>Chờ duyệt</b>, cần được duyệt trước khi dùng ở các màn hình nghiệp vụ.

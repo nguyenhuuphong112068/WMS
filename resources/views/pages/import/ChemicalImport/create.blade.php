@@ -40,9 +40,9 @@
                             <label>Mã Xuất Nhập</label>
                             <input type="text" class="form-control imp-readonly imp-code-preview" readonly
                                 data-codes="{{ json_encode($codePreviews) }}"
-                                data-placeholder="Chọn hoá chất"
-                                value="{{ old('category_id') && isset($codePreviews[old('category_id')]) ? $codePreviews[old('category_id')] : 'Chọn hoá chất' }}">
-                            <small class="md-sub">Sinh tự động: mã phòng ban + mã hoá chất + số thứ tự.</small>
+                                data-placeholder="Mã sẽ được cấp tự động khi lưu"
+                                value="Mã sẽ được cấp tự động khi lưu">
+                            <small class="md-sub">Sinh tự động khi lưu: HC + mã phòng ban + chuỗi ngẫu nhiên.</small>
                         </div>
 
                         <div class="col-md-12 mb-3 chem-info-box-wrap" style="display: none;">

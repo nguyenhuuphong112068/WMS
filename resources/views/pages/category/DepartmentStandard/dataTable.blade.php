@@ -126,12 +126,9 @@
                                 <span class="ds-value {{ $dsShelfLife ? '' : 'is-none' }}">
                                     {{ $dsShelfLife ?: 'Không khai' }}
                                 </span>
-                                <br>
                                 @if ($row->shelf_life_months !== null)
+                                    <br>
                                     <span class="ds-source is-own">Riêng phòng</span>
-                                @else
-                                    <span class="ds-source is-default"
-                                        title="Lấy từ standard_categories.shelf_life_months">Theo danh mục</span>
                                 @endif
                             </td>
                             <td class="text-right" data-order="{{ $row->min_stock ?? -1 }}">

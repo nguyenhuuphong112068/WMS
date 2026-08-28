@@ -38,7 +38,7 @@ class DepartmentChemical
      *
      * @param  \Illuminate\Database\Query\Builder  $query
      * @param  string  $categoryColumn  Cột chứa category_id ở bảng đang truy vấn,
-     *                                  ví dụ 'imports.category_id'
+     *                                  ví dụ 'chemical_imports.category_id'
      */
     public static function join($query, int $departmentId, string $categoryColumn)
     {
@@ -73,7 +73,7 @@ class DepartmentChemical
      *
      * @param  \Illuminate\Database\Query\Builder  $query
      * @param  string  $categoryColumn  Cột chứa category_id ở bảng đang truy vấn,
-     *                                  ví dụ 'imports.category_id'
+     *                                  ví dụ 'chemical_imports.category_id'
      */
     public static function joinUnit($query, int $departmentId, string $categoryColumn)
     {
@@ -94,7 +94,7 @@ class DepartmentChemical
      * phải hiện đúng đơn vị của phòng đó.
      *
      * @param  \Illuminate\Database\Query\Builder  $query
-     * @param  string  $departmentColumn  Cột chứa department_id, ví dụ 'exports.department_id'
+     * @param  string  $departmentColumn  Cột chứa department_id, ví dụ 'chemical_exports.department_id'
      * @param  string  $categoryColumn  Cột chứa category_id, ví dụ 'source.category_id'
      */
     public static function joinUnitOn($query, string $departmentColumn, string $categoryColumn)

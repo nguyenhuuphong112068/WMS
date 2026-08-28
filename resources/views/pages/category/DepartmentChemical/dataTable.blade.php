@@ -139,13 +139,9 @@
                                 <span class="dc-value {{ $shelfLife ? '' : 'is-none' }}">
                                     {{ $shelfLife ?: 'Không khai' }}
                                 </span>
-                                <br>
                                 @if ($row->shelf_life_months !== null)
+                                    <br>
                                     <span class="dc-source is-own">Riêng phòng</span>
-                                @else
-                                    <span class="dc-source is-default"
-                                        title="Lấy từ chemical_categories.shelf_life_months">Theo danh
-                                        mục</span>
                                 @endif
                             </td>
                             <td class="text-right" data-order="{{ $row->min_stock ?? -1 }}">

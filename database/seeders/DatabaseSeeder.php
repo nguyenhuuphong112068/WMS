@@ -26,6 +26,9 @@ class DatabaseSeeder extends Seeder
             // Bộ đơn vị tính chuẩn kèm thông tin quy đổi, chạy lại nhiều lần vẫn an toàn
             UnitSeeder::class,
             ProductNameSeeder::class,
+            // Phòng ban + tài khoản Admin + danh mục hoá chất tối thiểu để đăng nhập
+            // và chạy được app / *SmokeTest ngay sau `migrate:fresh --seed`
+            DevSeeder::class,
         ]);
         
     }

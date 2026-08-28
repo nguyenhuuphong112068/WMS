@@ -45,11 +45,9 @@
 
                         <div class="form-group col-md-4">
                             <label>Mã Phiếu</label>
-                            <input type="text" class="form-control est-readonly est-code-preview" readonly
-                                data-codes="{{ json_encode($nextCodes) }}"
-                                data-placeholder="Chọn kỳ dự trù"
-                                value="{{ $nextCodes[$estPreviewKey] ?? 'Chọn kỳ dự trù' }}">
-                            <small class="md-sub">Sinh tự động khi lưu.</small>
+                            <input type="text" class="form-control est-readonly" readonly
+                                value="{{ $nextCode }}">
+                            <small class="md-sub text-primary">Mã sinh tự động theo định dạng [Bộ phận]yymmdd.xx</small>
                         </div>
                     </div>
 
@@ -83,15 +81,6 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        /* Mã phiếu xem trước đổi theo kỳ dự trù đang chọn */
-        $(document).on('change input', '#createModal .est-period-part', function() {
-            var $form = $(this).closest('form');
-            var $preview = $form.find('.est-code-preview');
-            var codes = $preview.data('codes') || {};
-            var key = $form.find('[name="year"]').val() + '-' + parseInt($form.find('[name="month"]').val(), 10);
-
-            $preview.val(codes[key] || $preview.data('placeholder'));
-        });
     });
 </script>
 

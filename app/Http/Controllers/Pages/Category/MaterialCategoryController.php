@@ -4,14 +4,25 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DepartmentMaterial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * DANH MỤC - DANH MỤC VẬT TƯ
+ * DANH MỤC - VẬT TƯ, TAB "DANH MỤC VẬT TƯ CÔNG TY"
  *
- * Một dòng danh mục = một tổ hợp Tên vật tư + Nhà sản xuất + Nhà cung cấp + Đơn vị tính.
+ * Màn hình này có 2 tab nằm chung một trang:
+ * - Tab 1 "Danh Mục Vật Tư Công Ty": bản chất của vật tư, dùng chung toàn công ty (chính
+ *   là controller này). Một dòng = một tổ hợp Tên vật tư + Nhà sản xuất.
+ * - Tab 2 "Vật Tư Của Phòng": cách dùng riêng của từng phòng (phân loại, đơn vị tính,
+ *   ngưỡng tồn), do DepartmentMaterialController xử lý.
+ * Controller này dựng cả trang, nên index() lấy dữ liệu cho cả hai tab.
+ *
+ * PHÂN LOẠI và ĐƠN VỊ TÍNH không khai ở đây: mỗi phòng có bộ nhóm phân loại riêng và
+ * nhập / xuất theo đơn vị của phòng mình, nên hai thứ đó nằm ở tab "Vật Tư Của Phòng"
+ * (department_materials.classification_id / unit_id).
+ *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về "Chờ duyệt".
  * Mọi thay đổi đều được chụp lại ở bảng material_category_histories.
  */
@@ -19,14 +30,13 @@ class MaterialCategoryController extends Controller
 {
     private const TABLE = 'material_categories';
     private const HISTORY_TABLE = 'material_category_histories';
-    private const LABEL = 'danh mục vật tư';
+    private const LABEL = 'danh mục vật tư công ty';
 
     /** Các cột người dùng nhập, dùng chung cho validate - lưu - so sánh lịch sử. */
     private const FIELDS = [
         'material_names_id' => 'Tên vật tư',
         'manufacturers_id' => 'Nhà sản xuất',
-        'suppliers_id' => 'Nhà cung cấp',
-        'unit_id' => 'Đơn vị tính',
+        'technical_specification' => 'Thông tin kỹ thuật',
     ];
 
     public function index()
@@ -34,30 +44,43 @@ class MaterialCategoryController extends Controller
         $datas = DB::table(self::TABLE)
             ->leftJoin('material_names', self::TABLE . '.material_names_id', '=', 'material_names.id')
             ->leftJoin('manufacturers', self::TABLE . '.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('suppliers', self::TABLE . '.suppliers_id', '=', 'suppliers.id')
-            ->leftJoin('units', self::TABLE . '.unit_id', '=', 'units.id')
             ->select(
                 self::TABLE . '.*',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
-                'manufacturers.short_name as manufacturer_short_name',
-                'suppliers.name as supplier_name',
-                'units.name as unit_name',
-                'units.short_name as unit_short_name'
+                'manufacturers.short_name as manufacturer_short_name'
             )
             ->orderBy('material_names.name', 'asc')
             ->get();
 
-        session()->put(['title' => 'DANH MỤC - DANH MỤC VẬT TƯ']);
+        session()->put(['title' => 'DANH MỤC - VẬT TƯ']);
+
+        $departmentId = (int) (session('user')['selected_department_id'] ?? 0);
+
+        // Tab 2 - Vật Tư Của Phòng: cùng một trang nhưng thao tác thêm/sửa/khoá vẫn gửi
+        // về DepartmentMaterialController, ở đây chỉ dựng dữ liệu để hiển thị.
+        $dmDatas = DepartmentMaterial::rowsOfDepartment($departmentId);
 
         return view('pages.category.MaterialCategory.list', [
             'datas' => $datas,
             'materialNames' => $this->options('material_names', $datas->pluck('material_names_id')->all()),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
-            'suppliers' => $this->options('suppliers', $datas->pluck('suppliers_id')->all()),
-            'units' => $this->options('units', $datas->pluck('unit_id')->all()),
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa thay vì một nút riêng
             'historyCounts' => $this->historyCounts(),
+            /*
+            | Danh mục dùng chung toàn công ty, nhưng mỗi phòng ban tự khai vật tư nào phòng
+            | mình có dùng (bảng department_materials). Cột "Phòng Ban Đang Dùng" đọc từ đó.
+            */
+            'departmentsByCategory' => DepartmentMaterial::departmentsByCategory(),
+
+            // Dữ liệu của tab Vật Tư Của Phòng, đặt tiền tố dm để không đụng biến của tab 1
+            'dmDatas' => $dmDatas,
+            'dmCategories' => DepartmentMaterial::categoryOptions($dmDatas->pluck('category_id')->all()),
+            'dmClassifications' => DepartmentMaterial::classificationOptions(
+                $departmentId,
+                $dmDatas->pluck('classification_id')->all()
+            ),
+            'dmUnits' => DepartmentMaterial::unitOptions($dmDatas->pluck('unit_id')->all()),
         ]);
     }
 
@@ -164,13 +187,11 @@ class MaterialCategoryController extends Controller
         $rows = DB::table(self::HISTORY_TABLE)
             ->leftJoin('material_names', self::HISTORY_TABLE . '.material_names_id', '=', 'material_names.id')
             ->leftJoin('manufacturers', self::HISTORY_TABLE . '.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('suppliers', self::HISTORY_TABLE . '.suppliers_id', '=', 'suppliers.id')
             ->leftJoin('units', self::HISTORY_TABLE . '.unit_id', '=', 'units.id')
             ->select(
                 self::HISTORY_TABLE . '.*',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
-                'suppliers.name as supplier_name',
                 'units.name as unit_name'
             )
             ->where(self::HISTORY_TABLE . '.material_category_id', $request->id)
@@ -179,17 +200,24 @@ class MaterialCategoryController extends Controller
 
         return response()->json([
             'rows' => $rows->map(function ($row) {
+                $snapshot = [
+                    'Tên vật tư' => $row->material_name ?: '—',
+                    'Nhà sản xuất' => $row->manufacturer_name ?: '—',
+                    'Thông tin kỹ thuật' => $row->technical_specification ?: '—',
+                ];
+
+                // Đơn vị tính đã chuyển sang danh mục của phòng nên bản ghi mới không còn
+                // ghi cột này. Ảnh chụp cũ vẫn hiện lại để không mất vết đã thay đổi.
+                if ($row->unit_name) {
+                    $snapshot['Đơn vị tính (trước khi chuyển về phòng)'] = $row->unit_name;
+                }
+
                 return [
                     'action' => $row->action,
                     'change_note' => $row->change_note,
                     'created_by' => $row->created_by ?: 'NA',
                     'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
-                    'snapshot' => [
-                        'Tên vật tư' => $row->material_name ?: '—',
-                        'Nhà sản xuất' => $row->manufacturer_name ?: '—',
-                        'Nhà cung cấp' => $row->supplier_name ?: '—',
-                        'Đơn vị tính' => $row->unit_name ?: '—',
-                    ],
+                    'snapshot' => $snapshot,
                 ];
             })->values(),
         ]);
@@ -255,8 +283,7 @@ class MaterialCategoryController extends Controller
             'action' => $action,
             'material_names_id' => $row->material_names_id,
             'manufacturers_id' => $row->manufacturers_id,
-            'suppliers_id' => $row->suppliers_id,
-            'unit_id' => $row->unit_id,
+            'technical_specification' => $row->technical_specification,
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
             'change_note' => $note,
@@ -276,23 +303,27 @@ class MaterialCategoryController extends Controller
                 continue;
             }
 
-            $map = $labels[$field];
-            $parts[] = $title . ': '
-                . ($map[$current->$field] ?? '—') . ' -> '
-                . ($map[$payload[$field]] ?? '—');
+            if ($field === 'technical_specification') {
+                $parts[] = $title . ': '
+                    . ($current->$field ?? '—') . ' -> '
+                    . ($payload[$field] ?? '—');
+            } else {
+                $map = $labels[$field];
+                $parts[] = $title . ': '
+                    . ($map[$current->$field] ?? '—') . ' -> '
+                    . ($map[$payload[$field]] ?? '—');
+            }
         }
 
         return implode(' | ', $parts);
     }
 
-    /** Bảng tra id -> tên của 4 nguồn dữ liệu gốc, dùng để viết mô tả thay đổi. */
+    /** Bảng tra id -> tên của các nguồn dữ liệu gốc, dùng để viết mô tả thay đổi. */
     private function labelMaps(): array
     {
         return [
             'material_names_id' => DB::table('material_names')->pluck('name', 'id')->all(),
             'manufacturers_id' => DB::table('manufacturers')->pluck('name', 'id')->all(),
-            'suppliers_id' => DB::table('suppliers')->pluck('name', 'id')->all(),
-            'unit_id' => DB::table('units')->pluck('name', 'id')->all(),
         ];
     }
 
@@ -302,13 +333,9 @@ class MaterialCategoryController extends Controller
         $row = DB::table(self::TABLE)
             ->leftJoin('material_names', self::TABLE . '.material_names_id', '=', 'material_names.id')
             ->leftJoin('manufacturers', self::TABLE . '.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('suppliers', self::TABLE . '.suppliers_id', '=', 'suppliers.id')
-            ->leftJoin('units', self::TABLE . '.unit_id', '=', 'units.id')
             ->select(
                 'material_names.name as material_name',
-                'manufacturers.name as manufacturer_name',
-                'suppliers.name as supplier_name',
-                'units.name as unit_name'
+                'manufacturers.name as manufacturer_name'
             )
             ->where(self::TABLE . '.id', $id)
             ->first();
@@ -320,13 +347,11 @@ class MaterialCategoryController extends Controller
         return implode(' | ', [
             $row->material_name ?: '—',
             $row->manufacturer_name ?: '—',
-            $row->supplier_name ?: '—',
-            $row->unit_name ?: '—',
         ]);
     }
 
     /**
-     * Không cho khai báo trùng cùng một tổ hợp Vật tư + NSX + NCC + ĐVT.
+     * Không cho khai báo trùng cùng một tổ hợp Vật tư + Nhà sản xuất.
      */
     private function checkDuplicate($validator, Request $request, $ignoreId = null): void
     {
@@ -334,13 +359,11 @@ class MaterialCategoryController extends Controller
             $exists = DB::table(self::TABLE)
                 ->where('material_names_id', $request->material_names_id)
                 ->where('manufacturers_id', $request->manufacturers_id)
-                ->where('suppliers_id', $request->suppliers_id)
-                ->where('unit_id', $request->unit_id)
                 ->when($ignoreId, fn ($query) => $query->where('id', '<>', $ignoreId))
                 ->exists();
 
             if ($exists) {
-                $validator->errors()->add('material_names_id', 'Tổ hợp Vật tư - Nhà sản xuất - Nhà cung cấp - Đơn vị tính này đã có trong danh mục.');
+                $validator->errors()->add('material_names_id', 'Tổ hợp Vật tư - Nhà sản xuất này đã có trong danh mục.');
             }
         });
     }
@@ -378,18 +401,18 @@ class MaterialCategoryController extends Controller
         return [
             'material_names_id' => ['required', 'integer', 'exists:material_names,id'],
             'manufacturers_id' => ['required', 'integer', 'exists:manufacturers,id'],
-            'suppliers_id' => ['required', 'integer', 'exists:suppliers,id'],
-            'unit_id' => ['required', 'integer', 'exists:units,id'],
+            'technical_specification' => ['nullable', 'string', 'max:100'],
         ];
     }
 
     private function payload(Request $request): array
     {
+        $techSpec = trim((string) $request->technical_specification);
+
         return [
             'material_names_id' => (int) $request->material_names_id,
             'manufacturers_id' => (int) $request->manufacturers_id,
-            'suppliers_id' => (int) $request->suppliers_id,
-            'unit_id' => (int) $request->unit_id,
+            'technical_specification' => $techSpec === '' ? null : $techSpec,
         ];
     }
 
@@ -400,10 +423,7 @@ class MaterialCategoryController extends Controller
             'material_names_id.exists' => 'Tên vật tư không hợp lệ.',
             'manufacturers_id.required' => 'Vui lòng chọn nhà sản xuất.',
             'manufacturers_id.exists' => 'Nhà sản xuất không hợp lệ.',
-            'suppliers_id.required' => 'Vui lòng chọn nhà cung cấp.',
-            'suppliers_id.exists' => 'Nhà cung cấp không hợp lệ.',
-            'unit_id.required' => 'Vui lòng chọn đơn vị tính.',
-            'unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'technical_specification.max' => 'Thông tin kỹ thuật tối đa 100 ký tự.',
         ];
     }
 }
