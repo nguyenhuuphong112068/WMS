@@ -62,7 +62,20 @@
         font-size: 0.82rem;
         text-transform: uppercase;
         letter-spacing: 0.4px;
-        white-space: nowrap;
+        /*
+        | Tiêu đề cột ĐƯỢC PHÉP xuống dòng.
+        |
+        | Trước đây để nowrap nên một cột chỉ chứa số 1-2 chữ số vẫn bị kéo rộng
+        | bằng cả dòng chữ tiêu đề ("NHẬP TRONG KỲ", "TỔNG TỒN VẬT TƯ"...) và ăn
+        | hết chỗ của cột tên hàng - tên vật tư phải xuống 5-6 dòng. Cho tiêu đề
+        | xuống dòng thì bề rộng tối thiểu của cột chỉ còn bằng từ dài nhất.
+        |
+        | Phần rộng dư chia cho cột nào là do mdFitColumns ở cuối
+        | layout/master.blade.php quyết định, theo lượng dữ liệu thật của từng cột.
+        */
+        white-space: normal;
+        vertical-align: middle;
+        line-height: 1.25;
     }
 
     #mdTable tbody tr:hover,
@@ -270,41 +283,67 @@
         /* ---------- Bảng dữ liệu ---------- */
         // Một trang có thể có nhiều bảng (nhiều tab): #mdTable là bảng mặc định,
         // bảng thêm vào chỉ cần gắn thêm class md-table là chạy cùng một cấu hình.
-        $('#mdTable, table.md-table').each(function() {
-            if ($.fn.dataTable.isDataTable(this)) return;
+        //
+        // Tách thành hàm dùng chung để màn hình nào nạp lại một vùng bảng bằng AJAX
+        // (ví dụ tab Kiểm Kê Định Kỳ) gọi lại được: mdInitTables(vùng vừa thay).
+        window.mdInitTables = function(root) {
+            $(root ? $(root) : $(document)).find('#mdTable, table.md-table').each(function() {
+                if ($.fn.dataTable.isDataTable(this)) return;
 
-            $(this).DataTable({
-                autoWidth: false,
-                responsive: true,
-                pageLength: 25,
-                search: {
-                    smart: false
-                },
-                order: [
-                    [1, 'asc']
-                ],
-                lengthMenu: [
-                    [10, 25, 50, 100, -1],
-                    [10, 25, 50, 100, 'Tất cả']
-                ],
-                columnDefs: [{
-                    orderable: false,
-                    targets: -1
-                }],
-                language: {
-                    search: 'Tìm kiếm:',
-                    lengthMenu: 'Hiển thị _MENU_ dòng',
-                    info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
-                    infoEmpty: 'Không có dữ liệu',
-                    zeroRecords: 'Không tìm thấy dòng nào phù hợp',
-                    emptyTable: 'Chưa có dữ liệu, hãy bấm "Thêm mới" để khai báo.',
-                    paginate: {
-                        previous: 'Trước',
-                        next: 'Sau'
+                /*
+                | Nhiều màn hình dùng forelse/empty của Blade và chèn sẵn một dòng
+                | <td colspan="N">Chưa có ...</td> khi danh sách rỗng. Dòng đó ít ô hơn
+                | số cột của thead nên DataTables dựng dòng bị lỗi "_DT_CellIndex" và
+                | chết cả trang. Gỡ dòng đó ra, lấy luôn lời nhắn của nó làm emptyTable
+                | để DataTables tự hiển thị.
+                */
+                var emptyText = 'Chưa có dữ liệu, hãy bấm "Thêm mới" để khai báo.';
+
+                $(this).children('tbody').children('tr').each(function() {
+                    var $cells = $(this).children('td, th');
+
+                    if ($cells.length === 1 && parseInt($cells.attr('colspan') || 1, 10) > 1) {
+                        var text = $.trim($cells.text());
+                        if (text) emptyText = text;
+                        $(this).remove();
                     }
-                }
+                });
+
+                $(this).DataTable({
+                    autoWidth: false,
+                    responsive: true,
+                    pageLength: 25,
+                    search: {
+                        smart: false
+                    },
+                    order: [
+                        [1, 'asc']
+                    ],
+                    lengthMenu: [
+                        [10, 25, 50, 100, -1],
+                        [10, 25, 50, 100, 'Tất cả']
+                    ],
+                    columnDefs: [{
+                        orderable: false,
+                        targets: -1
+                    }],
+                    language: {
+                        search: 'Tìm kiếm:',
+                        lengthMenu: 'Hiển thị _MENU_ dòng',
+                        info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                        infoEmpty: 'Không có dữ liệu',
+                        zeroRecords: 'Không tìm thấy dòng nào phù hợp',
+                        emptyTable: emptyText,
+                        paginate: {
+                            previous: 'Trước',
+                            next: 'Sau'
+                        }
+                    }
+                });
             });
-        });
+        };
+
+        window.mdInitTables();
 
         /* ---------- Hỏi xác nhận trước khi Khoá / Duyệt / Từ chối ---------- */
         $(document).on('submit', '.form-md-confirm', function(e) {

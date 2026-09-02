@@ -17,7 +17,7 @@
                         <div class="form-group col-md-8">
                             <label>Hoá Chất <span class="text-danger">*</span></label>
                             <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}" required>
-                                <option value="">-- Chọn hoá chất --</option>
+                                <option value="">-- Chọn hoá chất phòng đang dùng --</option>
                                 @foreach ($categories as $category)
                                     <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
                                         {{ $category->code }} - {{ $category->chem_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}
@@ -27,7 +27,7 @@
                             @if ($bag->has('category_id'))
                                 <span class="md-error">{{ $bag->first('category_id') }}</span>
                             @endif
-                            <small class="md-sub">Đổi sang hoá chất khác thì mã xuất nhập sẽ được cấp lại theo hoá chất mới.</small>
+                            <small class="md-sub">Chỉ đổi được sang hoá chất phòng đã khai ở tab <b>Hoá Chất Của Phòng</b>. Đổi sang hoá chất khác thì mã xuất nhập sẽ được cấp lại theo hoá chất mới.</small>
                         </div>
 
                         <div class="form-group col-md-4">
@@ -86,7 +86,7 @@
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
-                                        {{ $location->name }} ({{ $location->code }})
+                                        {{ $location->code }}
                                     </option>
                                 @endforeach
                             </select>
@@ -100,13 +100,9 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-4">
-                            <label>Ngày Nhập <span class="text-danger">*</span></label>
-                            <input type="date" name="imported_date"
-                                class="form-control {{ $bag->has('imported_date') ? 'is-invalid' : '' }}"
-                                value="{{ old('imported_date') }}" required>
-                            @if ($bag->has('imported_date'))
-                                <span class="md-error">{{ $bag->first('imported_date') }}</span>
-                            @endif
+                            <label>Ngày Nhập</label>
+                            <input type="text" class="form-control imp-readonly imp-up-imported-date" readonly>
+                            <small class="md-sub">Ngày ghi nhận lúc lập phiếu, không sửa được.</small>
                         </div>
 
                         <div class="form-group col-md-4">
@@ -189,6 +185,16 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Ngày nhập chỉ để xem (d/m/Y), không có name nên không gửi lên server
+    $(document).on('click', '.btn-md-edit', function() {
+        var row = $(this).data('row') || {};
+        var parts = String(row.imported_date || '').substring(0, 10).split('-');
+        $('#updateModal .imp-up-imported-date')
+            .val(parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : '—');
+    });
+</script>
 
 @if ($bag->any())
     <script>

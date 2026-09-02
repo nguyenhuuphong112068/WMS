@@ -17,12 +17,7 @@
             </div>
 
             <div class="modal-body">
-                <div class="md-hint mb-3">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Mỗi dòng là một lần thay đổi, hiển thị giá trị của phiếu ngay sau lần thay đổi đó và nội dung đã
-                    đổi theo dạng <b>Trường: cũ → mới</b>. Mới nhất nằm trên cùng. Lịch sử chỉ ghi thêm, không sửa
-                    và không xoá.
-                </div>
+
 
                 <div class="exp-history-body"></div>
             </div>

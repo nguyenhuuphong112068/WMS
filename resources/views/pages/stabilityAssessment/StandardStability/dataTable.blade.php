@@ -7,9 +7,11 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    <button type="button" class="btn btn-primary btn-md-create">
-                        <i class="fas fa-plus mr-1"></i> Lập phiếu đánh giá
-                    </button>
+                    @perm('stability_standard_create')
+                        <button type="button" class="btn btn-primary btn-md-create">
+                            <i class="fas fa-plus mr-1"></i> Lập phiếu đánh giá
+                        </button>
+                    @endperm
                     <p class="hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Chỉ <b>{{ $assessGroupName }} ({{ $assessGroupCode }})</b> mới phải đánh giá hạn dùng, mỗi
@@ -127,6 +129,11 @@
                                     </td>
                                     <td class="text-center">
                                         <span class="ssa-badge {{ $ssaStatusClass($row->status) }}">{{ $row->status }}</span>
+                                        @if ($row->stop_reason)
+                                            <div class="md-sub mt-1">
+                                                <span class="md-note" title="{{ $row->stop_reason }}">{{ $row->stop_reason }}</span>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="md-sub">
                                         {{ $row->created_by ?: '—' }}
@@ -139,7 +146,22 @@
                                                 <i class="fas fa-list-ul"></i>
                                             </a>
 
-                                            @if ($row->status !== 'Huỷ')
+                                            {{-- Phiếu đang ngưng: mở lại ngay từ danh sách, không phải vào chi tiết --}}
+                                            @if ($row->status === 'Dừng Đánh Giá' && user_can('stability_standard_update'))
+                                                <form class="form-md-confirm d-inline"
+                                                    action="{{ route($ssaRoute . 'resume') }}" method="POST"
+                                                    data-title="Đánh giá tiếp phiếu này?"
+                                                    data-text="Phiếu của ống chuẩn {{ $row->import_code }} sẽ chạy lại, các mốc chưa thực hiện quay về theo dõi bình thường.{{ $row->stop_reason ? ' Lý do ngưng cũ: ' . $row->stop_reason : '' }}">
+                                                    @csrf
+                                                    <input type="hidden" name="id" value="{{ $row->id }}">
+                                                    <button type="submit" class="btn btn-sm btn-success"
+                                                        title="Đánh giá tiếp">
+                                                        <i class="fas fa-play"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
+
+                                            @if ($row->status !== 'Huỷ' && user_can('stability_standard_update'))
                                                 <button type="button" class="btn btn-sm btn-warning btn-md-edit"
                                                     title="Sửa đầu phiếu"
                                                     data-row="{{ json_encode([
@@ -152,19 +174,21 @@
                                                 </button>
                                             @endif
 
-                                            <form class="form-md-confirm d-inline" action="{{ route($ssaRoute . 'cancel') }}"
-                                                method="POST"
-                                                data-title="{{ $row->status === 'Huỷ' ? 'Mở lại' : 'Huỷ' }} {{ $ssaLabel }}?"
-                                                data-text="{{ $row->status === 'Huỷ' ? 'Phiếu của ống chuẩn ' . $row->import_code . ' sẽ dùng lại bình thường, trạng thái tính lại theo các mốc đã đánh giá.' : 'Phiếu của ống chuẩn ' . $row->import_code . ' sẽ ngừng theo dõi, không ghi thêm kết quả đánh giá được nữa.' }}"
-                                                data-danger="{{ $row->status === 'Huỷ' ? '' : '1' }}">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $row->id }}">
-                                                <button type="submit"
-                                                    class="btn btn-sm btn-{{ $row->status === 'Huỷ' ? 'primary' : 'secondary' }}"
-                                                    title="{{ $row->status === 'Huỷ' ? 'Mở lại phiếu' : 'Huỷ phiếu' }}">
-                                                    <i class="fas fa-{{ $row->status === 'Huỷ' ? 'rotate-left' : 'ban' }}"></i>
-                                                </button>
-                                            </form>
+                                            @perm('stability_standard_delete')
+                                                <form class="form-md-confirm d-inline" action="{{ route($ssaRoute . 'cancel') }}"
+                                                    method="POST"
+                                                    data-title="{{ $row->status === 'Huỷ' ? 'Mở lại' : 'Huỷ' }} {{ $ssaLabel }}?"
+                                                    data-text="{{ $row->status === 'Huỷ' ? 'Phiếu của ống chuẩn ' . $row->import_code . ' sẽ dùng lại bình thường, trạng thái tính lại theo các mốc đã đánh giá.' : 'Phiếu của ống chuẩn ' . $row->import_code . ' sẽ ngừng theo dõi, không ghi thêm kết quả đánh giá được nữa.' }}"
+                                                    data-danger="{{ $row->status === 'Huỷ' ? '' : '1' }}">
+                                                    @csrf
+                                                    <input type="hidden" name="id" value="{{ $row->id }}">
+                                                    <button type="submit"
+                                                        class="btn btn-sm btn-{{ $row->status === 'Huỷ' ? 'primary' : 'secondary' }}"
+                                                        title="{{ $row->status === 'Huỷ' ? 'Mở lại phiếu' : 'Huỷ phiếu' }}">
+                                                        <i class="fas fa-{{ $row->status === 'Huỷ' ? 'rotate-left' : 'ban' }}"></i>
+                                                    </button>
+                                                </form>
+                                            @endperm
                                         </div>
                                     </td>
                                 </tr>

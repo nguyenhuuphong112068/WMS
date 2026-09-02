@@ -21,6 +21,7 @@
     $ssaStatusClass = fn($status) => match ($status) {
         'Đang Đánh Giá' => 'running',
         'Hoàn Thành' => 'done',
+        'Dừng Đánh Giá' => 'stopped',
         'Huỷ' => 'cancelled',
         default => 'initial',
     };

@@ -4,9 +4,11 @@
     <div class="card-body">
 
         <div class="md-toolbar">
-            <button type="button" class="btn btn-primary btn-md-create">
-                <i class="fas fa-plus mr-1"></i> Thêm mới
-            </button>
+            @perm('category_material_create')
+                <button type="button" class="btn btn-primary btn-md-create">
+                    <i class="fas fa-plus mr-1"></i> Thêm mới
+                </button>
+            @endperm
             <p class="hint">
                 <i class="fas fa-info-circle mr-1"></i>
                 Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} bản ghi.
@@ -19,6 +21,7 @@
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 60px">STT</th>
+                        <th style="width: 110px">Mã Vật Tư</th>
                         <th>Tên Vật Tư</th>
                         <th>Nhà Sản Xuất</th>
                         <th>Thông Tin Kỹ Thuật</th>
@@ -35,6 +38,7 @@
                         @php $usingDepts = $departmentsByCategory[$row->id] ?? collect(); @endphp
                         <tr>
                             <td class="text-center">{{ $loop->iteration }}</td>
+                            <td class="font-weight-bold">{{ $row->code }}</td>
                             <td class="font-weight-bold">{{ $row->material_name ?: '—' }}</td>
                             <td class="md-sub">
                                 @if ($row->manufacturer_name)
@@ -76,12 +80,14 @@
                             <td>
                                 @include('pages.category.shared.rowActions', [
                                     'prefix' => $mdRoute,
+                                    'permPrefix' => 'category_material_',
                                     'row' => $row,
                                     'label' => $mdLabel,
                                     'title' => $row->material_name,
                                     'historyCount' => (int) ($historyCounts[$row->id] ?? 0),
                                     'editData' => [
                                         'id' => $row->id,
+                                        'code' => $row->code,
                                         'material_names_id' => $row->material_names_id,
                                         'manufacturers_id' => $row->manufacturers_id,
                                         'technical_specification' => $row->technical_specification,

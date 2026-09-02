@@ -207,6 +207,15 @@ class UploadDataController extends Controller
                 ],
             ],
 
+            'permission_groups' => [
+                'columns' => [
+                    'id',
+                    'name',
+                    'sort_order',
+                ],
+                'extra' => [],
+            ],
+
             'permissions' => [
                 'columns' => [
                     'id',
@@ -228,6 +237,14 @@ class UploadDataController extends Controller
                 'columns' => [
                     'user_id',
                     'role_id',
+                ],
+                'extra' => [],
+            ],
+            'user_permission' => [
+                'columns' => [
+                    'user_id',
+                    'permission_id',
+                    'is_denied',
                 ],
                 'extra' => [],
             ],

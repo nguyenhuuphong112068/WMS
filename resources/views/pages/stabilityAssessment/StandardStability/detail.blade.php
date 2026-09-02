@@ -7,8 +7,13 @@
 | Đầu trang là thông tin ống chuẩn đang theo dõi, bên dưới là bảng các MỐC ĐÁNH GIÁ
 | của phiếu (T0, T3, T6...) kèm ngày đến hạn, chỉ tiêu kiểm và kết quả.
 |
+| Mỗi chỉ tiêu kiểm của một mốc còn được tick "đã cấp phát chuẩn" kèm ghi chú riêng
+| (modal issue), và phiếu có thể NGƯNG giữa chừng - khi đó mốc còn lại mang tình trạng
+| "Đã ngưng" và mọi thao tác ghi đều khoá cho tới khi bấm "Đánh giá tiếp".
+|
 | Biến vào: $list, $items, $itemStates, $itemResults, $groups, $dueSoonDays,
-|           $maxTestings, $criterias, $histories, $editable
+|           $maxTestings, $testingNoteLength, $criterias, $histories, $editable,
+|           $running, $stopped, $afterContinue, $afterStop, $itemPassed, $itemFailed
 --}}
 
 @php
@@ -23,6 +28,7 @@
     $ssaStatusClass = fn($status) => match ($status) {
         'Đang Đánh Giá' => 'running',
         'Hoàn Thành' => 'done',
+        'Dừng Đánh Giá' => 'stopped',
         'Huỷ' => 'cancelled',
         default => 'initial',
     };
@@ -119,6 +125,27 @@
                 </div>
             @endif
 
+            {{-- Phiếu đã ngưng: nói rõ ngưng vì lý do gì và còn bao nhiêu mốc không thực hiện --}}
+            @if ($stopped)
+                <div class="ssa-stop-banner">
+                    <i class="fas fa-circle-stop"></i>
+                    <div>
+                        <b>Đã ngưng đánh giá.</b>
+                        {{ $list->stop_reason ?: 'Không ghi lý do.' }}
+                        @if ($ssaStateCounts['stopped'] > 0)
+                            <br>{{ $ssaStateCounts['stopped'] }} mốc còn lại sẽ không được thực hiện. Bấm
+                            <b>Đánh giá tiếp</b> nếu muốn chạy lại phiếu.
+                        @endif
+                        <div class="who">
+                            Người ngưng: {{ $list->stopped_by ?: '—' }}
+                            @if ($list->stopped_at)
+                                &middot; {{ \Carbon\Carbon::parse($list->stopped_at)->format('d/m/Y H:i') }}
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="card md-card">
                 <div class="card-body">
 
@@ -128,11 +155,24 @@
                                 <i class="fas fa-arrow-left mr-1"></i> Danh sách phiếu
                             </a>
 
-                            @if ($editable)
+                            @if ($running && user_can('stability_standard_create'))
                                 <button type="button" class="btn btn-primary btn-md-create"
                                     data-modal="#itemCreateModal">
                                     <i class="fas fa-plus mr-1"></i> Thêm mốc đánh giá
                                 </button>
+                            @endif
+
+                            {{-- Mở lại phiếu đã ngưng để chạy tiếp các mốc còn lại --}}
+                            @if ($stopped && user_can('stability_standard_update'))
+                                <form class="form-md-confirm d-inline" action="{{ route($ssaRoute . 'resume') }}"
+                                    method="POST" data-title="Đánh giá tiếp phiếu này?"
+                                    data-text="Phiếu sẽ chạy lại, {{ $ssaStateCounts['stopped'] }} mốc chưa thực hiện quay về theo dõi bình thường. Lý do ngưng cũ vẫn còn trong Lịch sử thay đổi.">
+                                    @csrf
+                                    <input type="hidden" name="id" value="{{ $list->id }}">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-play mr-1"></i> Đánh giá tiếp
+                                    </button>
+                                </form>
                             @endif
 
                             <button type="button" class="btn btn-info" data-toggle="modal"
@@ -144,9 +184,13 @@
 
                         <p class="hint">
                             <i class="fas fa-info-circle mr-1"></i>
-                            @if ($editable)
+                            @if ($running)
                                 Ngày đến hạn = <b>ngày bắt đầu + số tháng của mốc</b>. Mốc đến hạn trong
-                                <b>{{ $dueSoonDays }} ngày</b> được đánh dấu "Sắp đến hạn".
+                                <b>{{ $dueSoonDays }} ngày</b> được đánh dấu "Sắp đến hạn". Mốc kết luận
+                                <b>Không Đạt</b> sẽ dừng phiếu, các mốc sau không thực hiện nữa.
+                            @elseif ($stopped)
+                                Phiếu đã ngưng đánh giá nên chỉ xem lại. Bấm <b>Đánh giá tiếp</b> để chạy lại
+                                các mốc còn dở.
                             @else
                                 Phiếu đã huỷ nên chỉ xem lại, không ghi thêm dữ liệu được.
                             @endif
@@ -160,6 +204,8 @@
                             <span class="count">{{ $items->count() }}</span>
                         </button>
                         @foreach ($itemStates as $key => $label)
+                            {{-- "Đã ngưng" chỉ có nghĩa với phiếu đang ngưng, phiếu khác không hiện chip rỗng --}}
+                            @continue($key === 'stopped' && !$stopped)
                             <button type="button" class="ssa-chip" data-state="{{ $key }}">
                                 <span class="ssa-state ssa-state-{{ $key }}">{{ $label }}</span>
                                 <span class="count">{{ $ssaStateCounts[$key] }}</span>
@@ -213,10 +259,20 @@
                                         </td>
                                         <td>
                                             @forelse ($item->testing_list as $testing)
-                                                <span class="ssa-testing">{{ $testing }}</span>
+                                                {{-- Chỉ tiêu đã cấp phát chuẩn có dấu tick, ghi chú cấp phát nằm ở tooltip --}}
+                                                <span class="ssa-testing {{ $testing['issued'] ? 'is-issued' : '' }}"
+                                                    title="{{ $testing['issued'] ? 'Đã cấp phát chuẩn' : 'Chưa cấp phát chuẩn' }}{{ $testing['note'] ? ' — ' . $testing['note'] : '' }}">
+                                                    {{ $testing['name'] }}
+                                                </span>
                                             @empty
                                                 <span class="md-empty">Chưa chọn chỉ tiêu</span>
                                             @endforelse
+
+                                            @if ($item->testing_list)
+                                                <div class="md-sub mt-1">
+                                                    Đã cấp phát {{ $item->issued_count }}/{{ count($item->testing_list) }}
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="text-center md-sub" data-order="{{ $item->done_at ?: '9999-12-31' }}">
                                             {{ $ssaDate($item->done_at) }}
@@ -240,7 +296,7 @@
                                         </td>
                                         <td>
                                             <div class="md-actions">
-                                                @if ($editable)
+                                                @if ($running && user_can('stability_standard_assess'))
                                                     <button type="button" class="btn btn-sm btn-success btn-ssa-assess"
                                                         title="{{ $item->state === 'done' ? 'Sửa kết quả đánh giá' : 'Ghi kết quả đánh giá' }}"
                                                         data-row="{{ json_encode([
@@ -252,12 +308,29 @@
                                                             'result' => $item->result,
                                                             'status' => $item->status,
                                                             'note' => $item->note,
-                                                            'testings' => implode(', ', $item->testing_list),
+                                                            'testings' => implode(', ', $item->testing_names),
+                                                            // Số mốc chưa làm còn lại, không kể mốc này - modal hỏi tiếp hay ngưng theo số này
+                                                            'remaining' => $items->where('status', 'Ban Đầu')->where('id', '!=', $item->id)->count(),
                                                         ]) }}">
                                                         <i class="fas fa-clipboard-check"></i>
                                                     </button>
 
-                                                    @if ($item->state !== 'done')
+                                                    {{-- Cấp phát chuẩn theo từng chỉ tiêu - chỉ có nghĩa khi mốc đã chọn chỉ tiêu --}}
+                                                    @if ($item->testing_list && user_can('stability_standard_issue'))
+                                                        <button type="button" class="btn btn-sm btn-info btn-ssa-issue"
+                                                            title="Cấp phát chuẩn cho từng chỉ tiêu kiểm ({{ $item->issued_count }}/{{ count($item->testing_list) }} đã cấp)"
+                                                            data-row="{{ json_encode([
+                                                                'id' => $item->id,
+                                                                'name' => $item->name,
+                                                                'timepoint' => $item->timepoint,
+                                                                'due_date' => $ssaDate($item->due_date),
+                                                                'testings' => $item->testing_list,
+                                                            ]) }}">
+                                                            <i class="fas fa-hand-holding-droplet"></i>
+                                                        </button>
+                                                    @endif
+
+                                                    @if ($item->state !== 'done' && user_can('stability_standard_update'))
                                                         <button type="button" class="btn btn-sm btn-warning btn-md-edit"
                                                             title="Sửa mốc đánh giá" data-modal="#itemUpdateModal"
                                                             data-row="{{ json_encode([
@@ -265,14 +338,14 @@
                                                                 'name' => $item->name,
                                                                 'timepoint' => $item->timepoint,
                                                                 'due_date' => $item->due_date ? substr((string) $item->due_date, 0, 10) : '',
-                                                                'testings' => $item->testing_list,
+                                                                'testings' => $item->testing_names,
                                                                 'note' => $item->note,
                                                             ]) }}">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
                                                     @endif
 
-                                                    @if ($item->state !== 'done')
+                                                    @if ($item->state !== 'done' && user_can('stability_standard_delete'))
                                                         <form class="form-md-confirm d-inline"
                                                             action="{{ route($ssaRoute . 'deleteItem') }}" method="POST"
                                                             data-title="Xoá mốc {{ $item->name }}?"
@@ -319,5 +392,6 @@
     @include('pages.stabilityAssessment.StandardStability.itemCreate')
     @include('pages.stabilityAssessment.StandardStability.itemUpdate')
     @include('pages.stabilityAssessment.StandardStability.assess')
+    @include('pages.stabilityAssessment.StandardStability.issue')
     @include('pages.stabilityAssessment.StandardStability.history')
 @endsection

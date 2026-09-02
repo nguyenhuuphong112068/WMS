@@ -18,13 +18,16 @@ use Illuminate\Validation\Rule;
  *
  * Ghi nhận từng lô vật tư nhập vào kho của phòng ban đang chọn.
  *
- * MÃ LÔ VẬT TƯ sinh tự động: "VT" + shortName phòng ban + đuôi ngẫu nhiên, ví dụ
- * VT-QC1-7KPMR9J4WD. Không còn số thứ tự nên xoá phiếu không lộ khoảng trống trên
+ * MÃ LÔ VẬT TƯ sinh tự động: "M" + shortName phòng ban + đuôi ngẫu nhiên, ví dụ
+ * M-QC1-7KPMR9J4WD. Không còn số thứ tự nên xoá phiếu không lộ khoảng trống trên
  * giao diện. Công thức nằm ở App\Support\MaterialCode.
  *
  * Phiếu nhập chỉ khoá (deActive) chứ không xoá cứng, để mã lô không bị cấp lại.
  * Vật tư là hàng tiêu hao nên phiếu nhập gọn: không có nhóm chuẩn, số lô, nhà cung cấp,
  * số hoá đơn, hàm lượng / độ ẩm, hạn dùng nội bộ. Hạn sử dụng có thể để trống.
+ *
+ * NGÀY NHẬP luôn là ngày bấm Lưu (now()), không có ô cho người dùng chọn và cũng không
+ * sửa được khi điều chỉnh phiếu. Chỉ Hạn sử dụng mới do người dùng nhập.
  */
 class MaterialImportController extends Controller
 {
@@ -36,11 +39,13 @@ class MaterialImportController extends Controller
 
     private const LABEL = 'phiếu nhập vật tư';
 
+    /** Số nhãn tối đa cho một lần in, chặn cả ở trang in lẫn ở đây. */
+    private const LABEL_MAX_COPIES = 100;
+
     /** Các trường được theo dõi khi điều chỉnh: cột => tên hiển thị trong lịch sử. */
     private const FIELDS = [
         'category_id' => 'Vật tư',
         'amount' => 'Số lượng',
-        'imported_date' => 'Ngày nhập',
         'expired_date' => 'Hạn sử dụng',
         'location_id' => 'Vị trí lưu trữ',
         'note' => 'Ghi chú',
@@ -71,7 +76,6 @@ class MaterialImportController extends Controller
                 DepartmentMaterial::minStockColumn(),
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
-                'locations.name as location_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
@@ -121,12 +125,16 @@ class MaterialImportController extends Controller
             'categoryDefaults' => $categoryDefaults,
             'attachments' => $attachments,
             'locations' => DepartmentMaterial::locationOptions($departmentId),
-            'codePreview' => 'Mã lô sẽ được cấp tự động khi lưu',
             'historyCounts' => $this->historyCounts($departmentId),
         ]);
     }
 
-    /** Trang in nhãn dán lô vật tư (mã QR). Mở tab mới rồi bấm In. */
+    /**
+     * Trang in nhãn dán lô vật tư (mã QR). Mở tab mới, chọn số lượng nhãn rồi bấm In.
+     *
+     * Số lượng nhãn chọn ngay trên trang in (nhân bản nhãn bằng JS) nên không nạp lại
+     * trang; lúc bấm In, trang gọi labelPrinted() để ghi audit log.
+     */
     public function label(Request $request)
     {
         $departmentId = $this->departmentId();
@@ -155,6 +163,55 @@ class MaterialImportController extends Controller
             'import' => $row,
             'label' => config('material.label'),
             'qr' => QrCode::svg($row->code, 'M', 4),
+            'maxCopies' => self::LABEL_MAX_COPIES,
+        ]);
+    }
+
+    /**
+     * GHI AUDIT LOG MỖI LẦN IN NHÃN VẬT TƯ.
+     *
+     * Trang in gọi vào đây ngay trước khi mở hộp thoại In, kể cả khi người dùng bấm
+     * Ctrl+P thay vì nút In nhãn. Chỉ ghi nhật ký, không đụng vào dữ liệu phiếu nhập.
+     *
+     * Nhật ký lưu: in nhãn của vật tư nào (tên + mã xuất nhập), bao nhiêu nhãn và thời
+     * điểm in - thời điểm chính là audittriallog.created_at, ghi thêm vào phần mô tả
+     * cho dễ đọc trên màn hình Audit Trail.
+     */
+    public function labelPrinted(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $copies = max(1, min(self::LABEL_MAX_COPIES, (int) $request->input('copies', 1)));
+
+        $row = DB::table(self::TABLE)
+            ->leftJoin('material_categories', self::TABLE.'.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->select(self::TABLE.'.id', self::TABLE.'.code', 'material_names.name as material_name')
+            ->where(self::TABLE.'.id', $request->id)
+            // Chỉ ghi nhận in nhãn của lô thuộc phòng ban đang chọn
+            ->where(self::TABLE.'.department_id', $departmentId)
+            ->first();
+
+        if (! $row) {
+            return response()->json(['ok' => false, 'message' => 'Không tìm thấy phiếu nhập vật tư cần in nhãn.'], 404);
+        }
+
+        $printedAt = now();
+
+        AuditTrialController::log(
+            'In nhãn',
+            self::TABLE,
+            $row->id,
+            'NA',
+            'In nhãn vật tư: '.($row->material_name ?: '(chưa có tên)')
+                .' | Mã xuất nhập: '.$row->code
+                .' | Số lượng nhãn: '.$copies
+                .' | Thời điểm in: '.$printedAt->format('d/m/Y H:i:s')
+        );
+
+        return response()->json([
+            'ok' => true,
+            'copies' => $copies,
+            'printedAt' => $printedAt->format('d/m/Y H:i:s'),
         ]);
     }
 
@@ -196,6 +253,8 @@ class MaterialImportController extends Controller
                 $id = DB::table(self::TABLE)->insertGetId($payload + [
                     'code' => $code,
                     'department_id' => $departmentId,
+                    // Ngày nhập luôn là ngày thực hiện thao tác, người dùng không chỉnh được
+                    'imported_date' => now()->format('Y-m-d'),
                     'imported_by' => $this->actor(),
                     'status_id' => 1,
                     'created_by' => $this->actor(),
@@ -212,15 +271,15 @@ class MaterialImportController extends Controller
                     ]);
                 }
 
-                $this->writeHistory($id, 'Thêm mới', 'Tạo mới phiếu nhập, mã lô '.$code.'.');
+                $this->writeHistory($id, 'Thêm mới', 'Tạo mới phiếu nhập, mã xuất nhập '.$code.'.');
                 $createdCodes[] = $code;
 
-                AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Nhập vật tư, mã lô: '.$code);
+                AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Nhập vật tư, mã xuất nhập: '.$code);
             }
         });
 
         $msg = count($createdCodes) === 1
-            ? 'Đã tạo '.self::LABEL.' mã lô '.$createdCodes[0].'!'
+            ? 'Đã tạo '.self::LABEL.' mã xuất nhập '.$createdCodes[0].'!'
             : 'Đã tạo thành công '.count($createdCodes).' lô vật tư: '.implode(', ', $createdCodes).'!';
 
         return redirect()->back()->with('success', $msg);
@@ -322,7 +381,7 @@ class MaterialImportController extends Controller
                 'material_names.name as material_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
-                'locations.name as location_name'
+                'locations.code as location_code'
             )
             ->where(self::HISTORY_TABLE.'.material_import_id', $import->id)
             ->orderBy(self::HISTORY_TABLE.'.id', 'desc')
@@ -338,12 +397,12 @@ class MaterialImportController extends Controller
                 'created_by' => $row->created_by ?: 'NA',
                 'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
                 'snapshot' => [
-                    'Mã lô' => $row->code ?: '—',
+                    'Mã xuất nhập' => $row->code ?: '—',
                     'Vật tư' => $row->material_name ?: '—',
                     'Số lượng' => $this->number((float) $row->amount).' '.($row->unit_short_name ?: $row->unit_name ?: ''),
                     'Ngày nhập' => $date($row->imported_date),
                     'Hạn sử dụng' => $date($row->expired_date),
-                    'Vị trí lưu trữ' => $row->location_name ?: '—',
+                    'Vị trí lưu trữ' => $row->location_code ?: '—',
                     'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
                     'Ghi chú' => $row->note ?: '—',
                 ],
@@ -509,7 +568,7 @@ class MaterialImportController extends Controller
                 ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
                 ->pluck('material_names.name', 'material_categories.id')
                 ->all(),
-            'location_id' => DB::table('locations')->pluck('name', 'id')->all(),
+            'location_id' => DB::table('locations')->pluck('code', 'id')->all(),
         ];
     }
 
@@ -554,12 +613,11 @@ class MaterialImportController extends Controller
         $rules = [
             'category_id' => [
                 'required',
-                Rule::exists('department_materials', 'category_id')
+                Rule::exists('material_department_categories', 'category_id')
                     ->where('department_id', $departmentId)
                     ->where('status_id', 1),
             ],
             'amount' => ['required', 'numeric', 'min:0.0001'],
-            'imported_date' => ['nullable', 'date'],
             'expired_date' => ['nullable', 'date'],
             'location_id' => [
                 'nullable',
@@ -581,7 +639,6 @@ class MaterialImportController extends Controller
         return [
             'category_id' => (int) $request->category_id,
             'amount' => (float) $request->amount,
-            'imported_date' => $request->imported_date ?: now()->format('Y-m-d'),
             'expired_date' => $this->nullIfBlank($request->expired_date),
             'location_id' => $request->location_id ? (int) $request->location_id : null,
             'note' => $this->nullIfBlank($request->note),
@@ -599,14 +656,13 @@ class MaterialImportController extends Controller
     {
         return [
             'category_id.required' => 'Vui lòng chọn vật tư cần nhập.',
-            'category_id.exists' => 'Vật tư được chọn chưa được phòng khai dùng.',
+            'category_id.exists' => 'Vật tư được chọn chưa được phòng khai ở tab "Vật Tư Của Phòng" nên không nhập vào kho được.',
             'amount.required' => 'Vui lòng nhập số lượng.',
             'amount.numeric' => 'Số lượng phải là số.',
             'amount.min' => 'Số lượng phải lớn hơn 0.',
             'quantity.integer' => 'Số lô cần nhập phải là số nguyên.',
             'quantity.min' => 'Số lô cần nhập tối thiểu là 1.',
             'quantity.max' => 'Số lô cần nhập tối đa là 50 trong một lần.',
-            'imported_date.date' => 'Ngày nhập không hợp lệ.',
             'expired_date.date' => 'Hạn sử dụng không hợp lệ.',
             'location_id.exists' => 'Vị trí lưu trữ không thuộc phòng ban đang chọn.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',

@@ -40,7 +40,6 @@ class ChemicalExportController extends Controller
         'code' => 'Mã xuất nhập',
         'amount' => 'Số lượng',
         'type' => 'Loại phiếu',
-        'exported_date' => 'Ngày sử dụng',
         'to_department_id' => 'Phòng ban nhận',
         'purpose' => 'Mục đích sử dụng',
         'test_report_no' => 'Số phiếu KN, OOS, BCSL',
@@ -126,7 +125,7 @@ class ChemicalExportController extends Controller
             'categories' => $this->categoryOptions($departmentId),
             'requestsSent' => $requests['sent'],
             'requestsReceived' => $requests['received'],
-            'chemical_imports' => $this->importOptions($departmentId),
+            'imports' => $this->importOptions($departmentId),
             'checkers' => $this->checkerOptions($departmentId),
             'departments' => $this->departmentOptions($departmentId),
             'types' => self::TYPES,
@@ -137,7 +136,7 @@ class ChemicalExportController extends Controller
             'reportTo' => $to,
             // Bước 2 của nghiệp vụ huỷ: hàng chờ huỷ và các đợt xin quyết định huỷ
             'waitingDisposal' => ChemicalDisposalController::waiting($departmentId),
-            'chemical_disposals' => ChemicalDisposalController::batches($departmentId),
+            'disposals' => ChemicalDisposalController::batches($departmentId),
             'disposalStatuses' => ChemicalDisposalController::STATUSES,
             'disposalMethods' => ChemicalDisposalController::METHODS,
             'disposalExecutors' => ChemicalDisposalController::EXECUTORS,
@@ -220,6 +219,8 @@ class ChemicalExportController extends Controller
 
         $id = DB::table(self::TABLE)->insertGetId($this->payload($request, $import) + [
             'department_id' => $departmentId,
+            // Ngày sử dụng là ngày bấm Lưu, người dùng không chọn được
+            'exported_date' => now()->format('Y-m-d'),
             // Người sử dụng luôn là người đang đăng nhập, không nhận giá trị từ form
             'exported_by' => $this->actor(),
             'status_id' => 1,
@@ -520,12 +521,6 @@ class ChemicalExportController extends Controller
                 continue;
             }
 
-            if ($field === 'exported_date') {
-                $parts[] = $title.': '.$this->historyDate($old).' -> '.$this->historyDate($new);
-
-                continue;
-            }
-
             if ($field === 'to_department_id') {
                 $parts[] = $title.': '.$this->departmentName($old).' -> '.$this->departmentName($new);
 
@@ -542,11 +537,6 @@ class ChemicalExportController extends Controller
         $reason = trim((string) $reason);
 
         return ($reason !== '' ? 'Lý do: '.$reason.' | ' : '').implode(' | ', $parts);
-    }
-
-    private function historyDate($value): string
-    {
-        return $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
     }
 
     private function departmentName($id): string
@@ -643,7 +633,7 @@ class ChemicalExportController extends Controller
      *
      * Cộng dồn các phiếu sử dụng còn hiệu lực trong khoảng ngày, gom theo
      * chemical_categories.code (mã danh mục hoá chất). Mỗi dòng có:
-     * - Số lượng theo đơn vị phòng đã khai cho hoá chất đó (department_chemicals.unit_id)
+     * - Số lượng theo đơn vị phòng đã khai cho hoá chất đó (chemical_department_categories.unit_id)
      * - Số lượng QUY ĐỔI SANG KG qua App\Support\UnitConverter
      *
      * Đơn vị nhóm đếm (chai, thùng...) không quy đổi tự động được, và đổi thể tích
@@ -788,7 +778,7 @@ class ChemicalExportController extends Controller
         $validator = Validator::make($request->all(), [
             'to_department_id' => [
                 'required',
-                Rule::exists('deparments', 'id')->where('active', 1),
+                Rule::exists('deparments', 'id')->where('isActive', 1),
                 Rule::notIn([$departmentId]),
             ],
             'category_id' => ['required', 'exists:chemical_categories,id'],
@@ -964,7 +954,7 @@ class ChemicalExportController extends Controller
     {
         return DB::table('deparments')
             ->select('id', 'name', 'shortName')
-            ->where('active', 1)
+            ->where('isActive', 1)
             ->where('id', '<>', $departmentId)
             ->orderBy('name', 'asc')
             ->get();
@@ -979,7 +969,6 @@ class ChemicalExportController extends Controller
             ->select('user_management.userName', 'user_management.fullName')
             ->where('deparments.id', $departmentId)
             ->where('user_management.isActive', 1)
-            ->where('user_management.isLocked', 0)
             ->orderBy('user_management.fullName', 'asc')
             ->get();
     }
@@ -1193,15 +1182,14 @@ class ChemicalExportController extends Controller
     private function rules(int $departmentId): array
     {
         return [
-            'import_id' => ['required', 'exists:imports,id'],
+            'import_id' => ['required', 'exists:chemical_imports,id'],
             'amount' => ['required', 'numeric', 'min:0.0001'],
             'type' => ['required', 'in:'.implode(',', array_keys(self::TYPES))],
-            'exported_date' => ['required', 'date'],
             // Chỉ phiếu chuyển kho mới cần phòng nhận, và phải khác phòng đang đứng
             'to_department_id' => [
                 'exclude_unless:type,'.self::TYPE_TRANSFER,
                 'required',
-                Rule::exists('deparments', 'id')->where('active', 1),
+                Rule::exists('deparments', 'id')->where('isActive', 1),
                 Rule::notIn([$departmentId]),
             ],
             'purpose' => ['nullable', 'max:500'],
@@ -1221,7 +1209,6 @@ class ChemicalExportController extends Controller
             'import_id' => (int) $import->id,
             'amount' => (float) $request->amount,
             'type' => $request->type,
-            'exported_date' => $request->exported_date,
             // Chỉ phiếu chuyển kho mới giữ phòng nhận, đổi sang loại khác thì xoá đi
             'to_department_id' => $request->type === self::TYPE_TRANSFER && $request->to_department_id
                 ? (int) $request->to_department_id
@@ -1255,8 +1242,6 @@ class ChemicalExportController extends Controller
             'to_department_id.required' => 'Vui lòng chọn phòng ban nhận hoá chất.',
             'to_department_id.exists' => 'Phòng ban nhận không tồn tại hoặc đã ngừng hoạt động.',
             'to_department_id.not_in' => 'Không chuyển hoá chất cho chính phòng ban của mình.',
-            'exported_date.required' => 'Vui lòng chọn ngày sử dụng.',
-            'exported_date.date' => 'Ngày sử dụng không hợp lệ.',
             'purpose.max' => 'Mục đích sử dụng tối đa 500 ký tự.',
             'test_report_no.max' => 'Số phiếu KN, OOS, BCSL tối đa 100 ký tự.',
             'adjust_reason.max' => 'Lý do điều chỉnh tối đa 500 ký tự.',

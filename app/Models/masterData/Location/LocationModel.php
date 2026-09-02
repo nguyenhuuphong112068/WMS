@@ -13,7 +13,6 @@ class LocationModel extends Model
 
     protected $fillable = [
         'code',
-        'name',
         'shelf_id',
         'status_id',
         'created_by',

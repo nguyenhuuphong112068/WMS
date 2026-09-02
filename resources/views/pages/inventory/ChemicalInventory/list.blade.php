@@ -119,4 +119,5 @@
     @include('pages.inventory.ChemicalInventory.balancing')
     @include('pages.inventory.ChemicalInventory.balancingHistory')
     @include('pages.inventory.ChemicalInventory.internalExpiry')
+    @include('pages.inventory.ChemicalInventory.chart')
 @endsection

@@ -5,66 +5,72 @@ namespace App\Http\Controllers\Pages\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class RoleController extends Controller
 {
-    public function index(){
-        $datas = DB::table('roles')
-            ->leftJoin('role_permission', 'roles.id', '=', 'role_permission.role_id')
-            ->leftJoin('permissions', 'role_permission.permission_id', '=', 'permissions.id')
+    public function index()
+    {
+        $roles = DB::table('roles')->orderBy('id', 'asc')->get();
+
+        // Toàn bộ quyền, gom theo nhóm quyền để hiển thị thành từng khối trên bảng
+        $permissions = DB::table('permissions')
+            ->leftJoin('permission_groups', 'permissions.permission_group', '=', 'permission_groups.id')
             ->select(
-                'roles.id as role_id',
-                'roles.name as role_name',
-                'permissions.id as permission_id',
-                'permissions.display_name as permission_name',
-                'permissions.permission_group',
+                'permissions.id',
+                'permissions.name',
+                'permissions.display_name',
+                'permissions.description',
+                'permission_groups.name as group_name',
+                'permission_groups.sort_order',
             )
-            ->orderBy('role_id')
-            ->orderBy('permission_group', 'asc')
+            ->orderBy('permission_groups.sort_order', 'asc')
+            ->orderBy('permissions.id', 'asc')
             ->get()
-            ->groupBy('role_id')
-            ->map(function ($items) {
-                $permissions = $items->pluck('permission_name', 'permission_id')
-                                    ->filter()
-                                    ->toArray();
+            ->groupBy('group_name');
 
-                return [
-                    'id' => $items->first()->role_id,
-                    'name' => $items->first()->role_name,
-                    'permissions' => $permissions
-                   
-                ];
+        // Khoá "roleId-permissionId" để view tra nhanh trạng thái checkbox
+        $assigned = DB::table('role_permission')
+            ->get()
+            ->mapWithKeys(function ($item) {
+                return [$item->role_id . '-' . $item->permission_id => true];
             })
-            ->values();
+            ->toArray();
 
+        session()->put(['title' => 'DANH SÁCH NHÓM QUYỀN']);
 
-        session()->put(['title'=> 'DANH SÁCH NHÓM QUYỀN']);
-        return view('pages.user.role.list', ['datas' => $datas]);
+        return view('pages.user.role.list', [
+            'roles' => $roles,
+            'permissions' => $permissions,
+            'assigned' => $assigned,
+        ]);
     }
 
-    public function store_or_update(Request $request){
+    public function store_or_update(Request $request)
+    {
         try {
             $roleId = $request->input('role_id');
             $permissionId = $request->input('permission_id');
             $checked = filter_var($request->input('checked'), FILTER_VALIDATE_BOOLEAN);
 
             if (!$roleId || !$permissionId) {
-                return response()->json(['error' => 'Thiếu dữ liệu role hoặc permission'], 400);
+                return response()->json(['error' => 'Thiếu dữ liệu nhóm quyền hoặc quyền'], 400);
             }
 
             if ($checked) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $roleId,
                     'permission_id' => $permissionId,
-                ]);
+                ], []);
             } else {
-                if ($roleId != 1) {
-                    DB::table('role_permission')
-                        ->where('role_id', $roleId)
-                        ->where('permission_id', $permissionId)
-                        ->delete();
+                // Nhóm quyền Admin (id = 1) luôn giữ toàn quyền, không cho gỡ
+                if ($roleId == 1) {
+                    return response()->json(['error' => 'Không thể gỡ quyền của nhóm Admin'], 400);
                 }
+
+                DB::table('role_permission')
+                    ->where('role_id', $roleId)
+                    ->where('permission_id', $permissionId)
+                    ->delete();
             }
 
             return response()->json(['success' => true]);

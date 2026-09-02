@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\MaterData;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -17,13 +18,22 @@ class ProductNameController extends Controller
     private const TABLE = 'product_names';
     private const LABEL = 'tên sản phẩm';
 
+    /** Các cột người dùng nhập - dùng chung cho ảnh chụp và mô tả thay đổi của lịch sử. */
+    private const FIELDS = [
+        'name' => 'Tên sản phẩm',
+    ];
+
     public function index()
     {
         $datas = DB::table(self::TABLE)->orderBy('name', 'asc')->get();
 
         session()->put(['title' => 'DỮ LIỆU GỐC - TÊN SẢN PHẨM']);
 
-        return view('pages.materData.ProductName.list', ['datas' => $datas]);
+        return view('pages.materData.ProductName.list', [
+            'datas' => $datas,
+            // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
+            'historyCounts' => DataMasterHistory::counts(self::TABLE),
+        ]);
     }
 
     public function store(Request $request)
@@ -40,6 +50,8 @@ class ProductNameController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . ': ' . $request->name . '.', self::FIELDS);
 
         AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm ' . self::LABEL . ': ' . $request->name);
 
@@ -60,10 +72,15 @@ class ProductNameController extends Controller
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request) + [
+        $payload = $this->payload($request);
+        $note = DataMasterHistory::note(self::FIELDS, $current, $payload);
+
+        DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS);
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->name, $request->name);
 
@@ -86,6 +103,14 @@ class ProductNameController extends Controller
             'updated_at' => now(),
         ]);
 
+        DataMasterHistory::record(
+            self::TABLE,
+            $current->id,
+            $newStatus == 1 ? 'Mở khoá' : 'Khoá',
+            DataMasterHistory::statusNote($current->status_id, $newStatus),
+            self::FIELDS
+        );
+
         AuditTrialController::log(
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             self::TABLE,
@@ -98,6 +123,14 @@ class ProductNameController extends Controller
             'success',
             ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ') . self::LABEL . ' ' . $current->name . '!'
         );
+    }
+
+    /** Trả về lịch sử thay đổi của một dòng cho modal xem lịch sử. */
+    public function history(Request $request)
+    {
+        return response()->json([
+            'rows' => DataMasterHistory::rows(self::TABLE, (int) $request->id),
+        ]);
     }
 
     private function actor(): string

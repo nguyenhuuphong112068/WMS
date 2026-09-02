@@ -134,8 +134,8 @@
                                                 @if ($item->batch_no)
                                                     <small class="text-muted d-block">Lô: {{ $item->batch_no }}</small>
                                                 @endif
-                                                @if ($item->location_code || $item->location_name)
-                                                    <span class="std-location-tag mt-1">{{ $item->location_code ?: $item->location_name }}</span>
+                                                @if ($item->location_code)
+                                                    <span class="std-location-tag mt-1">{{ $item->location_code }}</span>
                                                 @endif
                                             @endif
                                         </td>
@@ -219,7 +219,7 @@
 
                                         {{-- Thao Tác --}}
                                         <td class="align-middle text-center" style="white-space: nowrap;">
-                                            @if ($item->status === 'pending')
+                                            @if ($item->status === 'pending' && user_can('export_standard_issue'))
                                                 <form action="{{ route('pages.export.standardExport.issueStore') }}" method="POST" class="d-inline form-direct-issue">
                                                     @csrf
                                                     <input type="hidden" name="item_id" value="{{ $item->id }}">
@@ -227,7 +227,6 @@
                                                     <input type="hidden" name="issued_amount" class="hidden-issued-amount" value="">
                                                     <input type="hidden" name="issued_unit" class="hidden-issued-unit" value="">
                                                     <input type="hidden" name="return_standard" class="hidden-return-standard" value="0">
-                                                    <input type="hidden" name="issued_at" class="hidden-issued-at" value="">
                                                     <button type="button" class="btn btn-xs btn-success btn-trigger-direct-issue px-2 py-1 shadow-sm" title="Xác nhận cấp phát ngay">
                                                         <i class="fas fa-check-circle mr-1"></i> Cấp phát
                                                     </button>
@@ -269,7 +268,7 @@
 
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
-                    @if ($req->status === 'draft')
+                    @if ($req->status === 'draft' && user_can('export_standard_request'))
                         <button type="button" class="btn btn-warning" data-dismiss="modal" data-toggle="modal" data-target="#requestEditModal_{{ $req->id }}">
                             <i class="fas fa-edit mr-1"></i> Chỉnh sửa
                         </button>
@@ -283,7 +282,7 @@
                                 <i class="fas fa-paper-plane mr-1"></i> Gửi đề nghị này
                             </button>
                         </form>
-                    @elseif (in_array($req->status, ['pending', 'partial']))
+                    @elseif (in_array($req->status, ['pending', 'partial']) && user_can('export_standard_issue'))
                         <button type="button" class="btn btn-primary btn-save-draft-issue" data-list-id="{{ $req->id }}">
                             <i class="fas fa-save mr-1"></i> Lưu
                         </button>
@@ -348,12 +347,8 @@
             $form.find('.hidden-issued-amount').val(issuedAmount);
             $form.find('.hidden-issued-unit').val(issuedUnit);
             $form.find('.hidden-return-standard').val(returnStandard);
-            
-            // Set current time for issued_at
-            let now = new Date();
-            let pad = (n) => (n < 10 ? '0' + n : n);
-            let datetime = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
-            $form.find('.hidden-issued-at').val(datetime);
+
+            // Thời điểm cấp phát do server tự ghi bằng now(), không gửi từ trình duyệt
 
             // Confirm
             Swal.fire({
@@ -493,7 +488,7 @@
             'batch_no' => $imp->batch_no ?: '—',
             'remaining' => (float) $imp->remaining,
             'unit' => $imp->unit_short_name ?: '',
-            'location' => $imp->location_code ?: ($imp->location_name ?: ''),
+            'location' => $imp->location_code ?: '',
             'expired_date' => $imp->expired_date ? \Carbon\Carbon::parse($imp->expired_date)->format('d/m/Y') : '—',
             'expired' => (bool) $imp->expired,
             'selectable' => (bool) $imp->selectable,

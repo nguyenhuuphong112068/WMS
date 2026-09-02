@@ -53,9 +53,11 @@
 <div class="exp-pane {{ $activeTab === 'request' ? 'is-active' : '' }}" id="expPaneRequest">
 
     <div class="md-toolbar">
-        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#requestModal">
-            <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát chuẩn
-        </button>
+        @perm('export_standard_request')
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#requestModal">
+                <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát chuẩn
+            </button>
+        @endperm
         <p class="hint">
             <i class="fas fa-info-circle mr-1"></i>
             Chất chuẩn được quản lý nghiêm ngặt theo <b>Tổ</b>: Tổ lập đề nghị ➔ Quản lý kho cấp phát ➔ Nhân viên tổ chỉ được dùng chuẩn đã cấp.
@@ -107,7 +109,7 @@
                         <td class="align-middle">{{ $req->created_by ?: '—' }}</td>
                         <td class="text-center align-middle">{{ $expDate($req->created_at) }}</td>
                         <td class="text-center align-middle" style="white-space: nowrap;">
-                            @if ($req->status === 'draft')
+                            @if ($req->status === 'draft' && user_can('export_standard_request'))
                                 <button type="button" class="btn btn-sm btn-warning px-2 py-1 shadow-sm mr-1"
                                     data-toggle="modal"
                                     data-target="#requestEditModal_{{ $req->id }}"
@@ -121,7 +123,7 @@
                                         <i class="fas fa-trash-alt mr-1"></i> Huỷ
                                     </button>
                                 </form>
-                            @elseif (in_array($req->status, ['pending', 'partial']))
+                            @elseif (in_array($req->status, ['pending', 'partial']) && user_can('export_standard_issue'))
                                 <button type="button" class="btn btn-sm btn-success px-2 py-1 shadow-sm mr-1"
                                     data-toggle="modal"
                                     data-target="#requestDetailModal_{{ $req->id }}"

@@ -10,13 +10,15 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    <button type="button" class="btn btn-primary btn-md-create">
-                        <i class="fas fa-plus mr-1"></i> Nhập vật tư
-                    </button>
+                    @perm('import_material_create')
+                        <button type="button" class="btn btn-primary btn-md-create">
+                            <i class="fas fa-plus mr-1"></i> Nhập vật tư
+                        </button>
+                    @endperm
                     <p class="hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Đang hiệu lực {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} lô vật tư.
-                        Mã lô = <b>{{ session('user')['selected_department'] }}</b> + VT + năm + tháng + số thứ tự trong năm.
+                        Mã xuất nhập được cấp tự động khi lưu: VT + mã phòng ban + chuỗi ngẫu nhiên.
                     </p>
                 </div>
 
@@ -32,14 +34,15 @@
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 45px">STT</th>
-                                <th style="width: 165px">Mã Lô</th>
+                                <th style="width: 165px">Mã Xuất Nhập</th>
                                 <th>Vật Tư</th>
                                 <th style="width: 150px">Quy Cách / Phân Loại</th>
                                 <th class="text-right" style="width: 110px">Số Lượng</th>
                                 <th style="width: 170px">Vị Trí Lưu Trữ</th>
                                 <th class="text-center" style="width: 95px">Ngày Nhập</th>
                                 <th class="text-center" style="width: 110px">Hạn Dùng</th>
-                                <th class="text-center" style="width: 60px" title="File hồ sơ đính kèm"><i class="fas fa-paperclip"></i></th>
+                                <th class="text-center" style="width: 60px" title="File hồ sơ đính kèm"><i
+                                        class="fas fa-paperclip"></i></th>
                                 <th class="text-center" style="width: 135px">Thao Tác</th>
                             </tr>
                         </thead>
@@ -51,10 +54,13 @@
                                     if ($impExpired) {
                                         $impExpiredClass = $impExpired->lt($impToday)
                                             ? 'imp-expired'
-                                            : ($impExpired->lte($impToday->copy()->addDays(30)) ? 'imp-expiring' : '');
+                                            : ($impExpired->lte($impToday->copy()->addDays(30))
+                                                ? 'imp-expiring'
+                                                : '');
                                     }
                                     $rowAttachments = $attachments->get($row->id) ?? collect();
-                                    $lowStock = $row->min_stock !== null && (float) $row->amount <= (float) $row->min_stock;
+                                    $lowStock =
+                                        $row->min_stock !== null && (float) $row->amount <= (float) $row->min_stock;
                                 @endphp
                                 <tr>
                                     <td class="text-center">{{ $loop->iteration }}</td>
@@ -80,34 +86,40 @@
                                         <span class="imp-amount">{{ $impNum($row->amount) }}</span>
                                         <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
                                         @if ($lowStock)
-                                            <div><span class="badge badge-warning" title="Dưới ngưỡng tồn tối thiểu">Sắp hết</span></div>
+                                            <div><span class="badge badge-warning" title="Dưới ngưỡng tồn tối thiểu">Sắp
+                                                    hết</span></div>
                                         @endif
                                     </td>
                                     <td class="md-sub">
-                                        @if ($row->location_name)
-                                            <div class="font-weight-bold">{{ $row->location_name }}
+                                        @if ($row->location_code)
+                                            <div class="font-weight-bold">
                                                 <span class="md-tag">{{ $row->location_code }}</span>
                                             </div>
-                                            <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} / {{ $row->shelf_name ?: '—' }}</div>
+                                            <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
+                                                {{ $row->shelf_name ?: '—' }}</div>
                                         @else
                                             <span class="imp-no-location">Chưa xếp vị trí</span>
                                         @endif
                                     </td>
-                                    <td class="text-center md-sub" data-order="{{ $row->imported_date }}">{{ $impDate($row->imported_date) }}</td>
-                                    <td class="text-center md-sub {{ $impExpiredClass }}" data-order="{{ $row->expired_date ?: '9999-12-31' }}">
+                                    <td class="text-center md-sub" data-order="{{ $row->imported_date }}">
+                                        {{ $impDate($row->imported_date) }}</td>
+                                    <td class="text-center md-sub {{ $impExpiredClass }}"
+                                        data-order="{{ $row->expired_date ?: '9999-12-31' }}">
                                         {{ $impDate($row->expired_date) }}
                                     </td>
                                     <td class="text-center">
                                         @if ($rowAttachments->isNotEmpty())
                                             <div class="dropdown">
-                                                <button class="btn btn-xs btn-outline-primary dropdown-toggle" type="button" data-toggle="dropdown">
+                                                <button class="btn btn-xs btn-outline-primary dropdown-toggle"
+                                                    type="button" data-toggle="dropdown">
                                                     <i class="fas fa-paperclip"></i> ({{ $rowAttachments->count() }})
                                                 </button>
                                                 <div class="dropdown-menu dropdown-menu-right shadow-sm">
                                                     @foreach ($rowAttachments as $att)
                                                         <a class="dropdown-item small py-2" target="_blank"
                                                             href="{{ route($impRoute . 'downloadAttachment', ['id' => $att->id]) }}">
-                                                            <i class="fas fa-external-link-alt mr-2 text-primary"></i> {{ $att->file_name }}
+                                                            <i class="fas fa-external-link-alt mr-2 text-primary"></i>
+                                                            {{ $att->file_name }}
                                                         </a>
                                                     @endforeach
                                                 </div>
@@ -120,20 +132,23 @@
                                         <div class="md-actions">
                                             @php $impAdjust = (int) ($historyCounts[$row->id] ?? 0); @endphp
                                             <span class="imp-btn-wrap">
-                                                <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Điều chỉnh"
-                                                    data-row="{{ json_encode([
-                                                        'id' => $row->id,
-                                                        'code' => $row->code,
-                                                        'category_id' => $row->category_id,
-                                                        'amount' => $row->amount,
-                                                        'imported_date' => $row->imported_date,
-                                                        'expired_date' => $row->expired_date,
-                                                        'location_id' => $row->location_id,
-                                                        'note' => $row->note,
-                                                        'attachments' => $rowAttachments->map(fn($a) => ['id' => $a->id, 'file_name' => $a->file_name])->toArray(),
-                                                    ]) }}">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
+                                                @perm('import_material_update')
+                                                    <button type="button" class="btn btn-sm btn-warning btn-md-edit"
+                                                        title="Điều chỉnh"
+                                                        data-row="{{ json_encode([
+                                                            'id' => $row->id,
+                                                            'code' => $row->code,
+                                                            'category_id' => $row->category_id,
+                                                            'amount' => $row->amount,
+                                                            'imported_date' => $row->imported_date,
+                                                            'expired_date' => $row->expired_date,
+                                                            'location_id' => $row->location_id,
+                                                            'note' => $row->note,
+                                                            'attachments' => $rowAttachments->map(fn($a) => ['id' => $a->id, 'file_name' => $a->file_name])->toArray(),
+                                                        ]) }}">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                @endperm
                                                 @if ($impAdjust > 0)
                                                     <button type="button" class="imp-count-badge btn-imp-history"
                                                         title="Xem {{ $impAdjust }} lần điều chỉnh"
@@ -143,22 +158,29 @@
                                             </span>
 
                                             <a class="btn btn-sm btn-outline-secondary" target="_blank"
-                                                title="In nhãn dán lô vật tư (mã QR)"
-                                                href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
-                                                <i class="fas fa-qrcode"></i>
-                                            </a>
+                                                title="In nhãn dán lô vật tư (mã QR) - chọn được số lượng nhãn cần in"
+                                                @perm('import_material_label')
+                                                    href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
+                                                    <i class="fas fa-qrcode"></i>
+                                                </a>
+                                                @endperm
 
-                                            <form class="form-md-confirm d-inline" action="{{ route($impRoute . 'deActive') }}" method="POST"
-                                                data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $impLabel }}?"
-                                                data-text="Mã lô &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
-                                                data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $row->id }}">
-                                                <button type="submit" class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                    title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                    <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                </button>
-                                            </form>
+                                            @perm('import_material_delete')
+                                                <form class="form-md-confirm d-inline"
+                                                    action="{{ route($impRoute . 'deActive') }}" method="POST"
+                                                    data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $impLabel }}?"
+                                                    data-text="Mã xuất nhập &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
+                                                    data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
+                                                    @csrf
+                                                    <input type="hidden" name="id" value="{{ $row->id }}">
+                                                    <button type="submit"
+                                                        class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
+                                                        title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
+                                                        <i
+                                                            class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                                    </button>
+                                                </form>
+                                            @endperm
                                         </div>
                                     </td>
                                 </tr>

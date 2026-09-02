@@ -19,6 +19,7 @@
 @endsection
 
 @section('model')
+    @include('pages.materData.shared.history')
     @include('pages.materData.Unit.create')
     @include('pages.materData.Unit.update')
 @endsection

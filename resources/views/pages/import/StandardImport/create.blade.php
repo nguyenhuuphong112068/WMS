@@ -14,9 +14,9 @@
 
             <form action="{{ route($impRoute . 'store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
-                {{-- Ngày nhập mặc định theo ngày hiện hành --}}
-                <input type="hidden" name="imported_date" class="sd-imported-date"
-                    value="{{ old('imported_date', now()->format('Y-m-d')) }}">
+                {{-- Ngày nhập luôn là ngày bấm Lưu, do server tự ghi. Ô ẩn này KHÔNG có name
+                     nên không gửi lên server, chỉ để JS tính gợi ý hạn dùng. --}}
+                <input type="hidden" class="sd-imported-date" value="{{ now()->format('Y-m-d') }}">
 
                 <div class="modal-body">
 
@@ -25,14 +25,14 @@
                         <div class="form-group col-md-8">
                             <label>Chất Chuẩn <span class="text-danger">*</span></label>
                             <div class="d-flex align-items-center">
-                                <button type="button" class="btn btn-outline-info mr-2" style="flex-shrink: 0;" data-toggle="modal" data-target="#selectStandardModal" title="Mở danh mục chất chuẩn để chọn">
+                                <button type="button" class="btn btn-outline-info mr-2" style="flex-shrink: 0;" data-toggle="modal" data-target="#selectStandardModal" title="Mở danh mục chất chuẩn phòng đang dùng để chọn">
                                     <i class="fas fa-list"></i>
                                 </button>
                                 <div style="flex: 1 1 auto; min-width: 0;">
                                     <select name="category_id"
                                         class="form-control imp-select sd-category {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
                                         data-defaults="{{ json_encode($categoryDefaults) }}" required>
-                                        <option value="">-- Chọn chất chuẩn --</option>
+                                        <option value="">-- Chọn chất chuẩn phòng đang dùng --</option>
                                         @foreach ($categories as $category)
                                             <option value="{{ $category->id }}"
                                                 {{ old('category_id') == $category->id ? 'selected' : '' }}>
@@ -46,7 +46,7 @@
                             @if ($bag->has('category_id'))
                                 <span class="md-error d-block mt-1">{{ $bag->first('category_id') }}</span>
                             @endif
-                            <small class="md-sub">Chỉ hiện chất chuẩn trong Danh Mục đã duyệt và hoạt động.</small>
+                            <small class="md-sub">Chỉ hiện chất chuẩn phòng đã khai ở tab <b>Chất Chuẩn Của Phòng</b>. Chất chưa khai thì không nhập vào kho được.</small>
                         </div>
 
                         <div class="form-group col-md-4">
@@ -99,7 +99,7 @@
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
-                                        {{ $location->name }} ({{ $location->code }})
+                                        {{ $location->code }}
                                     </option>
                                 @endforeach
                             </select>
@@ -560,7 +560,12 @@
         var $dt = $('#tableSelectStandard').DataTable({
             pageLength: 10,
             lengthChange: false,
-            language: { search: "Tìm kiếm:" },
+            language: {
+                search: "Tìm kiếm:",
+                // Phòng chưa khai chất chuẩn nào thì nói rõ phải khai ở đâu, đừng để bảng trống trơn
+                emptyTable: 'Phòng chưa khai chất chuẩn nào ở tab "Chất Chuẩn Của Phòng" nên chưa có gì để nhập.',
+                zeroRecords: 'Không tìm thấy chất chuẩn phù hợp trong danh mục của phòng.'
+            },
             order: [[0, 'asc']]
         });
 

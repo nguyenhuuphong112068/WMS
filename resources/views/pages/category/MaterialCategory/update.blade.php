@@ -14,6 +14,13 @@
                 <div class="modal-body">
 
                     <div class="form-group">
+                        <label>Mã Vật Tư</label>
+                        <input type="text" name="code" class="form-control cat-readonly" value="{{ old('code') }}"
+                            readonly tabindex="-1">
+                        <small class="md-sub">Mã đã cấp, không sửa được.</small>
+                    </div>
+
+                    <div class="form-group">
                         <label>Tên Vật Tư <span class="text-danger">*</span></label>
                         <select name="material_names_id"
                             class="form-control cat-select {{ $bag->has('material_names_id') ? 'is-invalid' : '' }}"

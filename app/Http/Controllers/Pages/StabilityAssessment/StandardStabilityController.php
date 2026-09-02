@@ -19,7 +19,9 @@ use Illuminate\Support\Facades\Validator;
  * Mỗi mốc có:
  *      timepoint : số tháng tính từ ngày bắt đầu.
  *      due_date  : ngày đến hạn = start_date + timepoint tháng, tính sẵn khi ghi.
- *      testings  : các chỉ tiêu cần thử nghiệm tại mốc đó (mảng JSON).
+ *      testings  : các chỉ tiêu cần thử nghiệm tại mốc đó (mảng JSON). Mỗi chỉ tiêu còn
+ *                  đánh dấu ĐÃ CẤP PHÁT CHUẨN riêng kèm ghi chú riêng, vì chuẩn thường
+ *                  cấp làm nhiều lần chứ không cấp một thể cho cả mốc.
  *      done_at / result / status : ngày làm, kết quả và kết luận Đạt / Không Đạt.
  *
  * Mọi thay đổi trên phiếu (lập phiếu, sửa đầu phiếu, thêm / sửa / xoá mốc, ghi kết quả,
@@ -30,7 +32,18 @@ use Illuminate\Support\Facades\Validator;
  *      Ban Đầu       : chưa mốc nào có kết quả.
  *      Đang Đánh Giá : đã có kết quả nhưng chưa xong hết các mốc.
  *      Hoàn Thành    : mọi mốc đều đã có kết quả.
- *      Huỷ           : người dùng dừng phiếu. Phiếu KHÔNG xoá cứng, chỉ chuyển "Huỷ".
+ *      Dừng Đánh Giá : ngưng giữa chừng, các mốc còn lại không thực hiện nữa.
+ *      Huỷ           : người dùng bỏ phiếu. Phiếu KHÔNG xoá cứng, chỉ chuyển "Huỷ".
+ *
+ * NGƯNG GIỮA CHỪNG - một phiếu không phải lúc nào cũng chạy hết các mốc:
+ *
+ *      Mốc Không Đạt : chất chuẩn đã hỏng, các mốc sau không còn ý nghĩa nên phiếu dừng
+ *                      ngay tại đó, lý do hệ thống tự ghi.
+ *      Mốc Đạt       : người dùng chọn đánh giá tiếp, hoặc ngưng vì một lý do khác
+ *                      (dùng hết ống, đổi chuẩn...) - chọn ngưng thì phải nhập lý do.
+ *
+ * Ngưng khác Huỷ ở chỗ số liệu các mốc đã làm vẫn còn giá trị. Phiếu đã ngưng khoá mọi
+ * thao tác ghi cho tới khi bấm "Đánh giá tiếp" (resume) để chạy lại.
  *
  * Mỗi ống chuẩn chỉ có một phiếu còn hiệu lực (chưa Huỷ) để số liệu đánh giá không
  * bị tách làm hai nơi; muốn lập lại thì huỷ phiếu cũ trước.
@@ -59,6 +72,15 @@ class StandardStabilityController extends Controller
 
     public const STATUS_CANCELLED = 'Huỷ';
 
+    /**
+     * Ngưng đánh giá giữa chừng - khác hẳn "Huỷ".
+     *
+     * Huỷ là bỏ cả phiếu, coi như chưa từng theo dõi. Dừng là ĐÃ đánh giá được một phần
+     * rồi mới ngưng: hoặc vì một mốc Không Đạt, hoặc vì người dùng chủ động ngưng và
+     * nêu lý do. Số liệu các mốc đã làm vẫn giữ nguyên giá trị.
+     */
+    public const STATUS_STOPPED = 'Dừng Đánh Giá';
+
     /* ---------- Trạng thái một mốc đánh giá ---------- */
     public const ITEM_INITIAL = 'Ban Đầu';
 
@@ -78,21 +100,36 @@ class StandardStabilityController extends Controller
      */
     private const GROUP_KEY = 'CTC';
 
-    /** Còn dưới ngần này ngày là mốc "Sắp đến hạn". */
-    private const DUE_SOON_DAYS = 30;
+    /** Còn dưới ngần này ngày là mốc "Sắp đến hạn". Trang Kế Hoạch Đánh Giá dùng lại hằng này. */
+    public const DUE_SOON_DAYS = 30;
 
-    /** Số chỉ tiêu thử nghiệm tối đa của một mốc, và độ dài cột testings. */
+    /** Số chỉ tiêu thử nghiệm tối đa của một mốc, và độ dài cột testings (kiểu TEXT). */
     private const MAX_TESTINGS = 20;
 
-    private const TESTINGS_LENGTH = 500;
+    private const TESTINGS_LENGTH = 4000;
 
-    /** Tên hiển thị của tình trạng từng mốc, tính ra từ due_date chứ không lưu DB. */
+    /** Ghi chú cấp phát của một chỉ tiêu tối đa ngần này ký tự. */
+    private const TESTING_NOTE_LENGTH = 255;
+
+    /**
+     * Tên hiển thị của tình trạng từng mốc, tính ra từ due_date chứ không lưu DB.
+     *
+     * 'stopped' chỉ xuất hiện khi PHIẾU đã dừng: mốc chưa làm của phiếu dừng không còn
+     * là việc phải làm nữa nên không xét đến hạn. Trang Kế Hoạch Đánh Giá bỏ phiếu dừng
+     * ra ngoài nên ở đó không bao giờ gặp trạng thái này.
+     */
     public const ITEM_STATES = [
         'done' => 'Đã đánh giá',
         'overdue' => 'Quá hạn',
         'due' => 'Sắp đến hạn',
         'waiting' => 'Chưa tới hạn',
+        'stopped' => 'Đã ngưng',
     ];
+
+    /* ---------- Lựa chọn sau khi một mốc kết luận "Đạt" ---------- */
+    public const AFTER_CONTINUE = 'continue';
+
+    public const AFTER_STOP = 'stop';
 
     /* ==========================================================
      |  DANH SÁCH PHIẾU ĐÁNH GIÁ CỦA PHÒNG BAN
@@ -114,9 +151,12 @@ class StandardStabilityController extends Controller
 
             $row->item_total = (int) ($stat['total'] ?? 0);
             $row->item_done = (int) ($stat['done'] ?? 0);
-            $row->item_overdue = (int) ($stat['overdue'] ?? 0);
-            $row->item_due = (int) ($stat['due'] ?? 0);
-            $row->next_due_date = $stat['next_due_date'] ?? null;
+            // Phiếu đã ngưng thì các mốc còn lại không thực hiện nữa, đừng báo đến hạn
+            $waiting = $row->status !== self::STATUS_STOPPED;
+
+            $row->item_overdue = $waiting ? (int) ($stat['overdue'] ?? 0) : 0;
+            $row->item_due = $waiting ? (int) ($stat['due'] ?? 0) : 0;
+            $row->next_due_date = $waiting ? ($stat['next_due_date'] ?? null) : null;
             $row->progress = $row->item_total > 0
                 ? (int) round($row->item_done / $row->item_total * 100)
                 : 0;
@@ -129,7 +169,7 @@ class StandardStabilityController extends Controller
         return view('pages.stabilityAssessment.StandardStability.list', [
             'datas' => $datas,
             'imports' => $this->importOptions($departmentId),
-            'statuses' => [self::STATUS_INITIAL, self::STATUS_RUNNING, self::STATUS_DONE, self::STATUS_CANCELLED],
+            'statuses' => [self::STATUS_INITIAL, self::STATUS_RUNNING, self::STATUS_DONE, self::STATUS_STOPPED, self::STATUS_CANCELLED],
             'itemStates' => self::ITEM_STATES,
             'groups' => config('standard.groups'),
             'dueSoonDays' => self::DUE_SOON_DAYS,
@@ -156,17 +196,27 @@ class StandardStabilityController extends Controller
 
         session()->put(['title' => 'ĐÁNH GIÁ HẠN DÙNG - ỐNG CHUẨN '.$list->import_code]);
 
+        $stopped = $list->status === self::STATUS_STOPPED;
+
         return view('pages.stabilityAssessment.StandardStability.detail', [
             'list' => $list,
-            'items' => $this->itemsOf($list->id),
+            'items' => $this->itemsOf($list->id, $stopped),
             'itemStates' => self::ITEM_STATES,
             'itemResults' => self::ITEM_RESULTS,
             'groups' => config('standard.groups'),
             'dueSoonDays' => self::DUE_SOON_DAYS,
             'maxTestings' => self::MAX_TESTINGS,
+            'testingNoteLength' => self::TESTING_NOTE_LENGTH,
             'criterias' => $this->criteriaOptions(),
             'histories' => $this->historiesOf($list->id),
             'editable' => $this->editable($list),
+            // Phiếu đã ngưng thì chỉ xem: mốc còn lại không thực hiện nữa
+            'running' => $this->running($list),
+            'stopped' => $stopped,
+            'afterContinue' => self::AFTER_CONTINUE,
+            'afterStop' => self::AFTER_STOP,
+            'itemPassed' => self::ITEM_PASSED,
+            'itemFailed' => self::ITEM_FAILED,
         ]);
     }
 
@@ -382,6 +432,10 @@ class StandardStabilityController extends Controller
 
         if ($current->status !== self::STATUS_CANCELLED) {
             $newStatus = self::STATUS_CANCELLED;
+        } elseif ($current->stop_reason) {
+            // Phiếu đang ngưng đánh giá rồi mới bị huỷ: mở lại thì trả về đúng trạng thái ngưng,
+            // muốn chạy tiếp thì bấm "Đánh giá tiếp" - đó là một quyết định riêng
+            $newStatus = self::STATUS_STOPPED;
         } else {
             // Mở lại: phiếu đang ở đâu trong tiến độ thì trả về đúng chỗ đó
             $newStatus = $this->statusFromItems($current->id);
@@ -485,7 +539,7 @@ class StandardStabilityController extends Controller
             return redirect()->back()->withErrors($validator, 'itemUpdateErrors')->withInput();
         }
 
-        $payload = $this->itemPayload($request, $list);
+        $payload = $this->itemPayload($request, $list, $item);
 
         DB::transaction(function () use ($payload, $item, $list) {
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->update($payload + [
@@ -551,10 +605,19 @@ class StandardStabilityController extends Controller
     }
 
     /**
-     * Ghi kết quả đánh giá của một mốc.
+     * Ghi kết quả đánh giá của một mốc, và quyết định phiếu có chạy tiếp hay không.
      *
-     * Ghi xong thì trạng thái phiếu được tính lại: còn mốc chưa làm là "Đang Đánh Giá",
-     * xong hết là "Hoàn Thành".
+     * Bình thường trạng thái phiếu tính theo tiến độ: còn mốc chưa làm là "Đang Đánh
+     * Giá", xong hết là "Hoàn Thành". Nhưng một phiếu không phải lúc nào cũng chạy hết
+     * các mốc:
+     *
+     *      KHÔNG ĐẠT : chất chuẩn đã hỏng, các mốc sau không còn ý nghĩa -> phiếu DỪNG
+     *                  ngay, lý do do hệ thống tự ghi, người dùng không phải chọn gì.
+     *      ĐẠT       : người dùng chọn đánh giá tiếp, hoặc ngưng vì một lý do khác
+     *                  (dùng hết ống, đổi chuẩn...) - chọn ngưng thì BẮT BUỘC nhập lý do.
+     *
+     * Mốc cuối cùng đã Đạt thì phiếu "Hoàn Thành", không hỏi tiếp nữa - không còn mốc
+     * nào ở sau để mà ngưng.
      */
     public function assess(Request $request)
     {
@@ -564,8 +627,10 @@ class StandardStabilityController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần ghi kết quả!');
         }
 
-        if (! $this->editable($list)) {
-            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không ghi kết quả được nữa!');
+        if (! $this->running($list)) {
+            return redirect()->back()->with('error', $list->status === self::STATUS_STOPPED
+                ? 'Phiếu đã ngưng đánh giá, hãy mở lại phiếu trước khi ghi thêm kết quả!'
+                : 'Phiếu đã huỷ nên không ghi kết quả được nữa!');
         }
 
         $validator = Validator::make($request->all(), [
@@ -573,6 +638,8 @@ class StandardStabilityController extends Controller
             'result' => ['required', 'string', 'max:255'],
             'status' => ['required', 'string', 'in:'.implode(',', self::ITEM_RESULTS)],
             'note' => ['nullable', 'string', 'max:255'],
+            'after_pass' => ['nullable', 'string', 'in:'.self::AFTER_CONTINUE.','.self::AFTER_STOP],
+            'stop_reason' => ['nullable', 'string', 'max:255'],
         ], [
             'done_at.required' => 'Chưa chọn ngày thực hiện đánh giá!',
             'done_at.date' => 'Ngày thực hiện đánh giá không hợp lệ!',
@@ -581,13 +648,44 @@ class StandardStabilityController extends Controller
             'status.required' => 'Chưa chọn kết luận Đạt / Không Đạt!',
             'status.in' => 'Kết luận chỉ nhận Đạt hoặc Không Đạt!',
             'note.max' => 'Ghi chú tối đa 255 ký tự!',
+            'after_pass.in' => 'Lựa chọn sau khi đạt không hợp lệ!',
+            'stop_reason.max' => 'Lý do ngưng đánh giá tối đa 255 ký tự!',
         ]);
+
+        // Còn mốc nào chưa làm ở sau thì mới có chuyện chạy tiếp hay ngưng
+        $remaining = DB::table(self::ITEM_TABLE)
+            ->where(self::ITEM_FK, $list->id)
+            ->where('id', '!=', $item->id)
+            ->where('status', self::ITEM_INITIAL)
+            ->count();
+
+        $wantStop = $request->after_pass === self::AFTER_STOP;
+
+        $validator->after(function ($validator) use ($request, $remaining, $wantStop) {
+            if ($request->status === self::ITEM_PASSED && $remaining > 0 && ! $request->after_pass) {
+                $validator->errors()->add('after_pass', 'Chưa chọn đánh giá tiếp hay ngưng đánh giá!');
+            }
+
+            // Ngưng là một quyết định, phải nói rõ vì sao thì lần sau đọc lại mới hiểu
+            if ($wantStop && trim((string) $request->stop_reason) === '') {
+                $validator->errors()->add('stop_reason', 'Chọn ngưng đánh giá thì phải nhập lý do!');
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'assessErrors')->withInput();
         }
 
-        DB::transaction(function () use ($request, $item, $list) {
+        $failed = $request->status === self::ITEM_FAILED;
+
+        // Không Đạt thì dừng dù người dùng có chọn gì; Đạt thì dừng khi người dùng chọn dừng
+        $stop = ($failed || $wantStop) && $remaining > 0;
+
+        $stopReason = $failed
+            ? 'Mốc '.$this->itemTargetOf($item).' kết luận Không Đạt.'
+            : trim((string) $request->stop_reason);
+
+        DB::transaction(function () use ($request, $item, $list, $stop, $stopReason, $remaining) {
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
                 'done_at' => $request->done_at,
                 'result' => $request->result,
@@ -597,9 +695,20 @@ class StandardStabilityController extends Controller
                 'updated_at' => now(),
             ]);
 
-            $newStatus = $this->statusFromItems($list->id);
+            $newStatus = $stop ? self::STATUS_STOPPED : $this->statusFromItems($list->id);
 
-            DB::table(self::TABLE)->where('id', $list->id)->update(['status' => $newStatus]);
+            DB::table(self::TABLE)->where('id', $list->id)->update([
+                'status' => $newStatus,
+                'stop_reason' => $stop ? $this->cut($stopReason, 255) : null,
+                'stopped_at' => $stop ? now() : null,
+                'stopped_by' => $stop ? $this->actor() : null,
+            ]);
+
+            $note = 'Thực hiện '.$this->day($request->done_at);
+
+            if ($list->status !== $newStatus) {
+                $note .= '. Phiếu chuyển sang "'.$newStatus.'"';
+            }
 
             $this->writeHistory(
                 $list->id,
@@ -608,9 +717,21 @@ class StandardStabilityController extends Controller
                 $this->itemTargetOf($item),
                 $item->result ? $item->status.' - '.$item->result : 'Chưa có kết quả',
                 $request->status.' - '.$request->result,
-                'Thực hiện '.$this->day($request->done_at)
-                    .($list->status !== $newStatus ? '. Phiếu chuyển sang "'.$newStatus.'"' : '')
+                $note
             );
+
+            // Ngưng là một quyết định riêng, ghi thành dòng nhật ký riêng để đọc lại rõ
+            if ($stop) {
+                $this->writeHistory(
+                    $list->id,
+                    'Ngưng đánh giá',
+                    $item->id,
+                    $this->itemTargetOf($item),
+                    'Còn '.$remaining.' mốc chưa thực hiện',
+                    'Ngưng tại mốc '.$this->itemTargetOf($item),
+                    $stopReason
+                );
+            }
         });
 
         AuditTrialController::log(
@@ -618,10 +739,151 @@ class StandardStabilityController extends Controller
             self::ITEM_TABLE,
             $item->id,
             'status: '.$item->status,
-            'status: '.$request->status.' - '.$request->result
+            'status: '.$request->status.' - '.$request->result.($stop ? ' (ngưng phiếu)' : '')
         );
 
+        if ($stop) {
+            return redirect()->back()->with('success', $failed
+                ? 'Mốc '.$item->name.' Không Đạt - phiếu đã ngưng đánh giá, '.$remaining.' mốc còn lại sẽ không thực hiện!'
+                : 'Đã ghi kết quả mốc '.$item->name.' và ngưng đánh giá, '.$remaining.' mốc còn lại sẽ không thực hiện!');
+        }
+
         return redirect()->back()->with('success', 'Đã ghi kết quả đánh giá cho mốc '.$item->name.'!');
+    }
+
+    /**
+     * Mở lại phiếu đã NGƯNG để đánh giá tiếp các mốc còn lại.
+     *
+     * Khác với mở lại phiếu Huỷ ở chỗ phần lý do ngưng được xoá trắng; các dòng nhật ký
+     * của lần ngưng trước vẫn còn nguyên nên vẫn truy được là đã từng ngưng vì lý do gì.
+     */
+    public function resume(Request $request)
+    {
+        $current = $this->findOwn($request->id);
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần mở lại!');
+        }
+
+        if ($current->status !== self::STATUS_STOPPED) {
+            return redirect()->back()->with('error', 'Phiếu này không ở trạng thái ngưng đánh giá!');
+        }
+
+        $newStatus = $this->statusFromItems($current->id);
+
+        DB::transaction(function () use ($current, $newStatus) {
+            DB::table(self::TABLE)->where('id', $current->id)->update([
+                'status' => $newStatus,
+                'stop_reason' => null,
+                'stopped_at' => null,
+                'stopped_by' => null,
+            ]);
+
+            $this->writeHistory(
+                $current->id,
+                'Đánh giá tiếp',
+                null,
+                null,
+                'Trạng thái: '.$current->status.($current->stop_reason ? ' - '.$current->stop_reason : ''),
+                'Trạng thái: '.$newStatus
+            );
+        });
+
+        AuditTrialController::log('Mở lại', self::TABLE, $current->id, 'status: '.$current->status, 'status: '.$newStatus);
+
+        return redirect()->back()->with('success', 'Đã mở lại phiếu, trạng thái hiện tại: '.$newStatus.'.');
+    }
+
+    /**
+     * CẤP PHÁT CHUẨN theo từng chỉ tiêu kiểm của một mốc.
+     *
+     * Mỗi chỉ tiêu của mốc được tick "đã cấp phát chuẩn" riêng kèm ghi chú riêng, vì
+     * chuẩn thường cấp làm nhiều lần chứ không cấp một thể cho cả mốc.
+     *
+     * Form gửi lên theo TÊN chỉ tiêu chứ không theo vị trí: danh sách chỉ tiêu của mốc
+     * có thể đã bị sửa ở tab khác trong lúc modal đang mở, ghép theo tên thì tick không
+     * bị lệch sang chỉ tiêu khác. Tên không còn trong mốc thì bỏ qua.
+     */
+    public function issueTestings(Request $request)
+    {
+        [$item, $list] = $this->findItem($request->id);
+
+        if (! $item) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần cấp phát chuẩn!');
+        }
+
+        if (! $this->running($list)) {
+            return redirect()->back()->with('error', $list->status === self::STATUS_STOPPED
+                ? 'Phiếu đã ngưng đánh giá nên không ghi cấp phát chuẩn được nữa!'
+                : 'Phiếu đã huỷ nên không ghi cấp phát chuẩn được nữa!');
+        }
+
+        $current = $this->testingList($item->testings);
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Mốc này chưa chọn chỉ tiêu kiểm nào để cấp phát chuẩn!');
+        }
+
+        $issued = array_map('strval', (array) $request->input('issued', []));
+        $notes = (array) $request->input('notes', []);
+
+        $validator = Validator::make([], []);
+
+        foreach ($notes as $name => $note) {
+            if (mb_strlen(trim((string) $note)) > self::TESTING_NOTE_LENGTH) {
+                $validator->errors()->add('notes.'.$name, 'Ghi chú của chỉ tiêu "'.$name.'" tối đa '.self::TESTING_NOTE_LENGTH.' ký tự!');
+            }
+        }
+
+        if ($validator->errors()->isNotEmpty()) {
+            return redirect()->back()->withErrors($validator, 'issueErrors')->withInput();
+        }
+
+        $updated = [];
+
+        foreach ($current as $testing) {
+            $updated[] = [
+                'name' => $testing['name'],
+                'issued' => in_array($testing['name'], $issued, true),
+                'note' => $this->nullIfBlank($notes[$testing['name']] ?? null),
+            ];
+        }
+
+        $json = json_encode($updated, JSON_UNESCAPED_UNICODE);
+
+        if (strlen($json) > self::TESTINGS_LENGTH) {
+            return redirect()->back()->with('error', 'Ghi chú cấp phát quá dài, hãy viết ngắn lại!');
+        }
+
+        DB::transaction(function () use ($item, $list, $current, $updated, $json) {
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'testings' => $json,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            $this->writeHistory(
+                $list->id,
+                'Cấp phát chuẩn',
+                $item->id,
+                $this->itemTargetOf($item),
+                $this->issueDigest($current),
+                $this->issueDigest($updated)
+            );
+        });
+
+        $count = count(array_filter($updated, fn ($testing) => $testing['issued']));
+
+        AuditTrialController::log(
+            'Cấp phát',
+            self::ITEM_TABLE,
+            $item->id,
+            $this->issueDigest($current),
+            $this->issueDigest($updated)
+        );
+
+        return redirect()->back()->with('success', 'Đã ghi cấp phát chuẩn cho mốc '.$item->name.': '
+            .$count.'/'.count($updated).' chỉ tiêu đã cấp phát.');
     }
 
     /* ==========================================================
@@ -654,8 +916,12 @@ class StandardStabilityController extends Controller
             ->where('standard_imports.department_id', $departmentId);
     }
 
-    /** Các mốc của một phiếu, đã tính sẵn tình trạng để view không phải tính lại. */
-    private function itemsOf(int $listId)
+    /**
+     * Các mốc của một phiếu, đã tính sẵn tình trạng để view không phải tính lại.
+     *
+     * $stopped: phiếu đã ngưng đánh giá thì mốc chưa làm không còn là việc phải làm nữa.
+     */
+    private function itemsOf(int $listId, bool $stopped = false)
     {
         $today = now()->startOfDay();
 
@@ -664,12 +930,14 @@ class StandardStabilityController extends Controller
             ->orderBy('timepoint', 'asc')
             ->orderBy('id', 'asc')
             ->get()
-            ->map(function ($row) use ($today) {
+            ->map(function ($row) use ($today, $stopped) {
                 $row->testing_list = $this->testingList($row->testings);
+                $row->testing_names = array_column($row->testing_list, 'name');
+                $row->issued_count = count(array_filter($row->testing_list, fn ($t) => $t['issued']));
                 $row->days_to_due = $row->due_date
                     ? (int) $today->diffInDays(\Carbon\Carbon::parse($row->due_date)->startOfDay(), false)
                     : null;
-                $row->state = $this->itemState($row);
+                $row->state = $this->itemState($row, $stopped);
                 $row->state_label = self::ITEM_STATES[$row->state];
 
                 return $row;
@@ -679,12 +947,17 @@ class StandardStabilityController extends Controller
     /**
      * Tình trạng của một mốc - tính ra từ due_date, không lưu DB.
      *
-     * Có kết quả rồi thì không còn xét đến hạn nữa, dù ngày đến hạn đã qua.
+     * Có kết quả rồi thì không còn xét đến hạn nữa, dù ngày đến hạn đã qua. Phiếu đã
+     * ngưng thì mốc chưa làm cũng thôi không xét: nó sẽ không được thực hiện nữa.
      */
-    private function itemState($row): string
+    private function itemState($row, bool $stopped = false): string
     {
         if ($row->status !== self::ITEM_INITIAL) {
             return 'done';
+        }
+
+        if ($stopped) {
+            return 'stopped';
         }
 
         if ($row->days_to_due === null) {
@@ -840,6 +1113,17 @@ class StandardStabilityController extends Controller
         return $list && $list->status !== self::STATUS_CANCELLED;
     }
 
+    /**
+     * Phiếu còn ĐANG CHẠY, tức còn ghi kết quả và cấp phát chuẩn được.
+     *
+     * Chặt hơn editable(): phiếu đã ngưng thì các mốc còn lại không thực hiện nữa nên
+     * không ghi thêm gì vào chúng được, muốn làm tiếp phải mở lại phiếu trước.
+     */
+    private function running($list): bool
+    {
+        return $this->editable($list) && $list->status !== self::STATUS_STOPPED;
+    }
+
     /** Trạng thái phiếu suy ra từ tiến độ các mốc. */
     private function statusFromItems(int $listId): string
     {
@@ -873,18 +1157,68 @@ class StandardStabilityController extends Controller
         return $timepoint === 0 ? 'Ban đầu' : $timepoint.' Tháng';
     }
 
-    /** Chuỗi JSON trong cột testings -> mảng chỉ tiêu để hiển thị. */
+    /**
+     * Chuỗi JSON trong cột testings -> mảng chỉ tiêu ĐẦY ĐỦ để hiển thị.
+     *
+     * Mỗi phần tử trả về luôn có đủ ba khoá: name / issued / note, dù trong DB đang lưu
+     * kiểu nào. Cột này từng lưu mảng TÊN trần ["Định tính", ...]; phiếu cũ ghi trước
+     * khi có phần cấp phát chuẩn vẫn nằm nguyên như vậy nên vẫn phải đọc được, và được
+     * hiểu là chỉ tiêu chưa cấp phát, chưa có ghi chú.
+     */
     private function testingList($value): array
     {
         $items = json_decode((string) $value, true);
 
-        return is_array($items) ? array_values(array_filter(array_map('strval', $items), fn ($item) => $item !== '')) : [];
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $list = [];
+
+        foreach ($items as $item) {
+            // Kiểu cũ: phần tử là chính tên chỉ tiêu. Kiểu mới: object có name/issued/note.
+            $name = is_array($item) ? trim((string) ($item['name'] ?? '')) : trim((string) $item);
+
+            if ($name === '') {
+                continue;
+            }
+
+            $list[] = [
+                'name' => $name,
+                'issued' => is_array($item) ? (bool) ($item['issued'] ?? false) : false,
+                'note' => is_array($item) ? $this->nullIfBlank($item['note'] ?? null) : null,
+            ];
+        }
+
+        return $list;
     }
 
-    /** Danh sách chỉ tiêu đã chọn -> mảng JSON để ghi vào cột testings. */
-    private function testingsJson($value): ?string
+    /** Chỉ lấy TÊN các chỉ tiêu - dùng cho ô chọn, nhật ký và phần kiểm tra dữ liệu. */
+    private function testingNames($value): array
     {
-        $items = $this->splitTestings($value);
+        return array_column($this->testingList($value), 'name');
+    }
+
+    /**
+     * Danh sách chỉ tiêu đã chọn -> mảng JSON để ghi vào cột testings.
+     *
+     * $current là nội dung đang lưu của mốc: chỉ tiêu nào vẫn còn được chọn thì GIỮ
+     * NGUYÊN phần đã cấp phát và ghi chú của nó, sửa mốc không được xoá mất dữ liệu
+     * cấp phát đã ghi. Chỉ tiêu bỏ chọn thì mất theo, chỉ tiêu mới bắt đầu từ chưa cấp.
+     */
+    private function testingsJson($value, $current = null): ?string
+    {
+        $keep = [];
+
+        foreach ($this->testingList($current) as $item) {
+            $keep[$item['name']] = $item;
+        }
+
+        $items = [];
+
+        foreach ($this->splitTestings($value) as $name) {
+            $items[] = $keep[$name] ?? ['name' => $name, 'issued' => false, 'note' => null];
+        }
 
         return $items ? json_encode($items, JSON_UNESCAPED_UNICODE) : null;
     }
@@ -992,7 +1326,7 @@ class StandardStabilityController extends Controller
     /** Nội dung một mốc tóm tắt thành một dòng chữ để so sánh trước / sau. */
     private function itemDigest(array $data): string
     {
-        $testings = $this->testingList($data['testings'] ?? null);
+        $testings = $this->testingNames($data['testings'] ?? null);
 
         $parts = [
             'T'.(int) $data['timepoint'],
@@ -1017,6 +1351,28 @@ class StandardStabilityController extends Controller
             'testings' => $row->testings,
             'note' => $row->note,
         ]);
+    }
+
+    /**
+     * Tình hình cấp phát chuẩn của một mốc tóm tắt thành một dòng chữ cho nhật ký.
+     *
+     * Ví dụ: "Định tính [đã cấp: cấp 2 ống] · Định lượng [chưa cấp]".
+     */
+    private function issueDigest(array $testings): string
+    {
+        $parts = [];
+
+        foreach ($testings as $testing) {
+            $state = $testing['issued'] ? 'đã cấp' : 'chưa cấp';
+
+            if ($testing['issued'] && $testing['note']) {
+                $state .= ': '.$testing['note'];
+            }
+
+            $parts[] = $testing['name'].' ['.$state.']';
+        }
+
+        return $parts ? implode(' · ', $parts) : '—';
     }
 
     /** Ngày dạng d/m/Y cho nhật ký, trống thì gạch ngang. */
@@ -1115,7 +1471,7 @@ class StandardStabilityController extends Controller
         });
     }
 
-    /** Số chỉ tiêu và độ dài chuỗi JSON phải nằm gọn trong cột testings varchar(500). */
+    /** Số chỉ tiêu và độ dài chuỗi JSON phải nằm gọn trong cột testings. */
     private function checkTestings($validator, Request $request): void
     {
         $validator->after(function ($validator) use ($request) {
@@ -1151,7 +1507,10 @@ class StandardStabilityController extends Controller
             return 'Chỉ tiêu kiểm không có trong Dữ Liệu Gốc: '.implode(', ', $unknown).'!';
         }
 
-        if (strlen(json_encode($items, JSON_UNESCAPED_UNICODE)) > self::TESTINGS_LENGTH) {
+        // Đo trên đúng format sẽ ghi xuống DB (object có name/issued/note), không đo mảng tên trần
+        $stored = array_map(fn ($name) => ['name' => $name, 'issued' => false, 'note' => null], $items);
+
+        if (strlen(json_encode($stored, JSON_UNESCAPED_UNICODE)) > self::TESTINGS_LENGTH) {
             return 'Danh sách chỉ tiêu kiểm quá dài, hãy chọn bớt lại!';
         }
 
@@ -1220,8 +1579,13 @@ class StandardStabilityController extends Controller
         });
     }
 
-    /** Phần dữ liệu chung của thêm mới / cập nhật một mốc. */
-    private function itemPayload(Request $request, $list): array
+    /**
+     * Phần dữ liệu chung của thêm mới / cập nhật một mốc.
+     *
+     * $current là mốc đang sửa (thêm mới thì null) - truyền xuống để phần đã cấp phát
+     * chuẩn của các chỉ tiêu vẫn còn được chọn không bị xoá mất khi lưu lại.
+     */
+    private function itemPayload(Request $request, $list, $current = null): array
     {
         $timepoint = (int) $request->timepoint;
 
@@ -1231,7 +1595,7 @@ class StandardStabilityController extends Controller
             // Để trống thì tính theo chu kỳ: ngày bắt đầu + số tháng của mốc
             'due_date' => $this->nullIfBlank($request->due_date)
                 ?? $this->dueDate(substr((string) $list->start_date, 0, 10), $timepoint),
-            'testings' => $this->testingsJson($request->testings),
+            'testings' => $this->testingsJson($request->testings, $current->testings ?? null),
             'note' => $this->nullIfBlank($request->note),
         ];
     }

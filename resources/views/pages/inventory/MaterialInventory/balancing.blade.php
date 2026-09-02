@@ -8,7 +8,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-scale-balanced"></i> Cân Đối Số Lượng Nhập</h5>
+                <h5 class="modal-title"><i class="fas fa-balance-scale"></i> Cân Đối Số Lượng Nhập</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -20,7 +20,7 @@
                 <div class="modal-body">
                     <div class="form-row">
                         <div class="form-group col-md-5">
-                            <label>Mã Lô</label>
+                            <label>Mã Xuất Nhập</label>
                             <input type="text" class="form-control inv-readonly mi-code-view" readonly value="{{ $invOldRow->code ?? '' }}">
                         </div>
                         <div class="form-group col-md-7">
@@ -80,7 +80,7 @@
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Nhập <b>số điều chỉnh</b>, không phải số lượng nhập mới: số dương là nhập thiếu, số âm là nhập dư.
-                        <b>Tổng</b> các lần cân đối của một mã lô không vượt <b>±{{ $balancingMaxPercent }}%</b> số lượng nhập.
+                        <b>Tổng</b> các lần cân đối của một mã xuất nhập không vượt <b>±{{ $balancingMaxPercent }}%</b> số lượng nhập.
                         Mọi lần cân đối đều lưu Audit Trail.
                     </div>
                 </div>

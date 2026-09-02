@@ -105,7 +105,7 @@
                                 <i class="fas fa-arrow-left mr-1"></i> Quay lại danh sách
                             </a>
 
-                            @if ($canEditItems)
+                            @if ($canEditItems && user_can('estimate_material_update'))
                                 <button type="button" class="btn btn-primary btn-est-item-create ml-1">
                                     <i class="fas fa-plus mr-1"></i> Thêm vật tư
                                 </button>
@@ -120,7 +120,7 @@
 
                         <p class="hint">
                             <i class="fas fa-info-circle mr-1"></i>
-                            @if ($canEditItems)
+                            @if ($canEditItems && user_can('estimate_material_update'))
                                 Mỗi vật tư khai được nhiều dòng số lượng cho nhiều tháng khác nhau.
                             @else
                                 Phiếu đã trình ký nên chi tiết chỉ xem, không sửa được.
@@ -140,7 +140,7 @@
                                     <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
                                     <th style="width: 280px">Trao Đổi</th>
                                     <th style="width: 110px">Người Tạo</th>
-                                    @if ($canEditItems)
+                                    @if ($canEditItems && user_can('estimate_material_update'))
                                         <th class="text-center" style="width: 90px">Thao Tác</th>
                                     @endif
                                 </tr>
@@ -169,7 +169,7 @@
                                                 <div class="text-primary"><i class="fas fa-calendar-alt mr-1"></i> Mong muốn giao: <b>{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</b></div>
                                             @endif
 
-                                            @if ($list->app_status === 'approved')
+                                            @if ($list->app_status === 'approved' && user_can('estimate_material_tracking'))
                                                 <div class="mt-2 pt-2 border-top">
                                                     @if ($item->status_id == 0)
                                                         <span class="badge badge-danger mb-1">Đã huỷ không dự trù</span>
@@ -242,7 +242,7 @@
                                                     }
                                                 }
                                             @endphp
-                                            @if ($list->app_status === 'approved')
+                                            @if ($list->app_status === 'approved' && user_can('estimate_material_tracking'))
                                                 <form action="{{ route($estRoute . 'updatePromisedDate') }}" method="POST" class="d-flex flex-column promised-date-form">
                                                     @csrf
                                                     <input type="hidden" name="id" value="{{ $item->id }}">
@@ -288,7 +288,7 @@
                                             {{ $item->created_by ?: '—' }}
                                             <br><small>{{ $item->created_at ? \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') : '' }}</small>
                                         </td>
-                                        @if ($canEditItems)
+                                        @if ($canEditItems && user_can('estimate_material_update'))
                                             <td>
                                                 <div class="md-actions">
                                                     <button type="button" class="btn btn-sm btn-warning btn-est-item-edit" title="Sửa"

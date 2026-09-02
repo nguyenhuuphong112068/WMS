@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * MÃ XUẤT NHẬP HOÁ CHẤT - một chỗ duy nhất định nghĩa cách sinh mã.
  *
- *      "HC" + "-" + deparments.shortName + "-" + <đuôi ngẫu nhiên 10 ký tự>
- *      HC-QC1-7KPMR9J4WD
+ *      "C" + "-" + deparments.shortName + "-" + <đuôi ngẫu nhiên 10 ký tự>
+ *      C-QC1-7KPMR9J4WD
  *
  * KHÁC mã cũ (department_id + category_id + số thứ tự 8 chữ số): mã mới KHÔNG chứa
  * số thứ tự và không gắn với danh mục hoá chất. Nhờ vậy khoá / xoá một phiếu nhập
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  * - Mã sinh trong transaction lúc lưu. KHÔNG có bước xem trước trên form vì mã chỉ
  *   tồn tại sau khi đã lưu.
  *
- * Song song với App\Support\MaterialCode (mã vật tư cũng theo cách này, KIND = "VT").
+ * Song song với App\Support\MaterialCode (mã vật tư cũng theo cách này, KIND = "M").
  * Mã ống chuẩn (App\Support\StandardCode) giữ nguyên cách sinh cũ.
  */
 class ChemicalCode
@@ -30,7 +30,7 @@ class ChemicalCode
     public const TABLE = 'chemical_imports';
 
     /** Phần cố định đầu mã, nhìn là biết đây là hoá chất. */
-    public const KIND = 'HC';
+    public const KIND = 'C';
 
     /** Dấu ngăn giữa các phần của mã. */
     public const SEP = '-';

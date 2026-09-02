@@ -45,7 +45,6 @@ class StandardImportController extends Controller
         'category_id' => 'Chất chuẩn',
         'group_code' => 'Nhóm chuẩn',
         'amount' => 'Số lượng',
-        'imported_date' => 'Ngày nhập',
         'invoice_number' => 'Số hoá đơn',
         'expired_date' => 'Hạn sử dụng',
         'expiry_type' => 'Loại hạn dùng',
@@ -92,7 +91,6 @@ class StandardImportController extends Controller
                 'units.name as unit_name',
                 'suppliers.name as supplier_name',
                 'suppliers.address as supplier_address',
-                'locations.name as location_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
@@ -109,7 +107,7 @@ class StandardImportController extends Controller
 
         $categories = $this->categoryOptions($departmentId, $datas->pluck('category_id')->all());
 
-        $deptStandards = DB::table('department_standards')
+        $deptStandards = DB::table('standard_department_categories')
             ->where('department_id', $departmentId)
             ->get()
             ->keyBy('category_id');
@@ -240,12 +238,15 @@ class StandardImportController extends Controller
 
         DB::transaction(function () use ($request, $departmentId, $shortName, $quantity, $uploadedFiles, &$createdCodes) {
             $payload = $this->payload($request);
+            // Ngày nhập là ngày bấm Lưu, người dùng không chọn được
+            $importedDate = now()->format('Y-m-d');
 
             for ($i = 0; $i < $quantity; $i++) {
-                $code = StandardCode::next($departmentId, $shortName, $payload['group_code'], $payload['imported_date']);
+                $code = StandardCode::next($departmentId, $shortName, $payload['group_code'], $importedDate);
 
                 $id = DB::table(self::TABLE)->insertGetId($payload + $code + [
                     'department_id' => $departmentId,
+                    'imported_date' => $importedDate,
                     'imported_by' => $this->actor(),
                     'status_id' => 1,
                     'created_by' => $this->actor(),
@@ -395,7 +396,7 @@ class StandardImportController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'suppliers.name as supplier_name',
-                'locations.name as location_name'
+                'locations.code as location_code'
             )
             ->where(self::HISTORY_TABLE.'.standard_import_id', $import->id)
             ->orderBy(self::HISTORY_TABLE.'.id', 'desc')
@@ -435,7 +436,7 @@ class StandardImportController extends Controller
                     'Chu kỳ retest' => $row->retest_interval_months ? $row->retest_interval_months.' tháng' : '—',
                     'Nhà cung cấp' => $row->supplier_name ?: '—',
                     'Chỉ tiêu kiểm' => $this->purposeNames($row->purpose_id) ?: '—',
-                    'Vị trí lưu trữ' => $row->location_name ?: '—',
+                    'Vị trí lưu trữ' => $row->location_code ?: '—',
                     'Hoá đơn' => $row->invoice_number ?: '—',
                     'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
                     'Ghi chú' => $row->note ?: '—',
@@ -672,7 +673,7 @@ class StandardImportController extends Controller
                 ->mapWithKeys(fn ($row) => [$row->id => trim($row->code.' '.($row->standard_name ?? ''))])
                 ->all(),
             'supplier_id' => DB::table('suppliers')->pluck('name', 'id')->all(),
-            'location_id' => DB::table('locations')->pluck('name', 'id')->all(),
+            'location_id' => DB::table('locations')->pluck('code', 'id')->all(),
         ];
     }
 
@@ -710,38 +711,15 @@ class StandardImportController extends Controller
             ->pluck('times', 'standard_import_id');
     }
 
+    /**
+     * Chất chuẩn được chọn để nhập: CHỈ những chất phòng đã khai ở tab "Chất Chuẩn Của Phòng".
+     *
+     * Chưa khai thì không nhập vào kho được - xem App\Support\DepartmentStandard.
+     * Nhóm chuẩn giải mã ngay ở đây để ô chọn điền sẵn nhóm mặc định của từng chất.
+     */
     private function categoryOptions(int $departmentId, array $usedIds = [])
     {
-        $usedIds = array_values(array_filter($usedIds));
-
-        return DB::table('standard_categories')
-            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
-            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('storage_conditions', 'standard_categories.storage_condition_id', '=', 'storage_conditions.id')
-            // Đơn vị hiện trên ô chọn là đơn vị PHÒNG ĐANG CHỌN đã khai cho chất chuẩn đó
-            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_categories.id'))
-            ->select(
-                'standard_categories.id',
-                'standard_categories.code',
-                'standard_categories.version',
-                'standard_categories.groups',
-                'standard_categories.shelf_life_months',
-                'standard_categories.density',
-                'standard_names.name as standard_name',
-                'standard_names.cas_no as name_cas_no',
-                'manufacturers.name as manufacturer_name',
-                'manufacturers.short_name as manufacturer_short_name',
-                'storage_conditions.name as storage_condition_name',
-                'units.short_name as unit_short_name'
-            )
-            ->where(function ($query) use ($usedIds) {
-                $query->where('standard_categories.status_id', 1);
-                if ($usedIds) {
-                    $query->orWhereIn('standard_categories.id', $usedIds);
-                }
-            })
-            ->orderBy('standard_categories.code', 'asc')
-            ->get()
+        return DepartmentStandard::importCategoryOptions($departmentId, $usedIds)
             ->map(function ($row) {
                 $row->group_keys = StandardCode::decodeGroups($row->groups);
                 $row->default_group_key = $row->group_keys[0] ?? '';
@@ -760,7 +738,6 @@ class StandardImportController extends Controller
             ->select(
                 'locations.id',
                 'locations.code',
-                'locations.name',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
                 'shelves.name as shelf_name'
@@ -770,7 +747,7 @@ class StandardImportController extends Controller
             ->orderBy('warehouses.name', 'asc')
             ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
-            ->orderBy('locations.name', 'asc')
+            ->orderBy('locations.code', 'asc')
             ->get();
     }
 
@@ -836,9 +813,15 @@ class StandardImportController extends Controller
     private function rules(int $departmentId, bool $isCreate = true): array
     {
         $rules = [
-            'category_id' => ['required', 'exists:standard_categories,id'],
+            // Chưa khai chất chuẩn ở tab "Chất Chuẩn Của Phòng" thì không được nhập vào kho:
+            // exists:standard_categories,id không thôi thì sửa request là nhập được chất của phòng khác
+            'category_id' => [
+                'required',
+                Rule::exists('standard_department_categories', 'category_id')
+                    ->where('department_id', $departmentId)
+                    ->where('status_id', 1),
+            ],
             'amount' => ['required', 'numeric', 'min:0.0001'],
-            'imported_date' => ['nullable', 'date'],
             'invoice_number' => ['nullable', 'max:100'],
             'expiry_type' => ['required', Rule::in(['check online', 'retest', 'Specify', 'Requires_re-evaluation', 'defined', 'undetermined', 'unlimited'])],
             'expired_date' => [
@@ -915,7 +898,6 @@ class StandardImportController extends Controller
             'category_id' => (int) $request->category_id,
             'group_code' => StandardCode::groupCode($groupKey),
             'amount' => (float) $request->amount,
-            'imported_date' => $request->imported_date ?: now()->format('Y-m-d'),
             'invoice_number' => $this->nullIfBlank($request->invoice_number),
             'expiry_type' => $expiryType,
             'expired_date' => $expiredDate,
@@ -945,15 +927,13 @@ class StandardImportController extends Controller
     {
         return [
             'category_id.required' => 'Vui lòng chọn chất chuẩn cần nhập.',
-            'category_id.exists' => 'Chất chuẩn được chọn không tồn tại trong danh mục.',
+            'category_id.exists' => 'Chất chuẩn được chọn chưa được phòng khai ở tab "Chất Chuẩn Của Phòng" nên không nhập vào kho được.',
             'amount.required' => 'Vui lòng nhập số lượng.',
             'amount.numeric' => 'Số lượng phải là số.',
             'amount.min' => 'Số lượng phải lớn hơn 0.',
             'quantity.integer' => 'Số ống cần nhập phải là số nguyên.',
             'quantity.min' => 'Số ống cần nhập tối thiểu là 1.',
             'quantity.max' => 'Số ống cần nhập tối đa là 50 ống trong một lần.',
-            'imported_date.required' => 'Vui lòng chọn ngày nhập.',
-            'imported_date.date' => 'Ngày nhập không hợp lệ.',
             'invoice_number.max' => 'Số hoá đơn tối đa 100 ký tự.',
             'expired_date.date' => 'Hạn sử dụng không hợp lệ.',
             'retest_interval_months.integer' => 'Khoảng thời gian retest phải là số nguyên (tháng).',

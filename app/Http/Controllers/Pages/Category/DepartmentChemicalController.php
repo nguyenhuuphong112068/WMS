@@ -33,7 +33,7 @@ use Illuminate\Validation\Rule;
  */
 class DepartmentChemicalController extends Controller
 {
-    private const TABLE = 'department_chemicals';
+    private const TABLE = 'chemical_department_categories';
 
     private const LABEL = 'hoá chất của phòng';
 

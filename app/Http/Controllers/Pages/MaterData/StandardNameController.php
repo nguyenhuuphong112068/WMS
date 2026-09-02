@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\MaterData;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -20,13 +21,24 @@ class StandardNameController extends Controller
     private const TABLE = 'standard_names';
     private const LABEL = 'tên chuẩn';
 
+    /** Các cột người dùng nhập - dùng chung cho ảnh chụp và mô tả thay đổi của lịch sử. */
+    private const FIELDS = [
+        'name' => 'Tên chuẩn',
+        'active_ingredient_name' => 'Tên hoạt chất',
+        'cas_no' => 'Số CAS',
+    ];
+
     public function index()
     {
         $datas = DB::table(self::TABLE)->orderBy('name', 'asc')->get();
 
         session()->put(['title' => 'DỮ LIỆU GỐC - TÊN CHUẨN']);
 
-        return view('pages.materData.StandardName.list', ['datas' => $datas]);
+        return view('pages.materData.StandardName.list', [
+            'datas' => $datas,
+            // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
+            'historyCounts' => DataMasterHistory::counts(self::TABLE),
+        ]);
     }
 
     public function store(Request $request)
@@ -44,6 +56,8 @@ class StandardNameController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . ': ' . $request->name . '.', self::FIELDS);
 
         AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm ' . self::LABEL . ': ' . $request->name);
 
@@ -64,7 +78,10 @@ class StandardNameController extends Controller
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request) + [
+        $payload = $this->payload($request);
+        $note = DataMasterHistory::note(self::FIELDS, $current, $payload);
+
+        DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             // Sửa nội dung thì phải duyệt lại từ đầu
             'app_status' => 'pending',
             'approved_by' => null,
@@ -72,6 +89,8 @@ class StandardNameController extends Controller
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS);
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->name, $request->name);
 
@@ -93,6 +112,14 @@ class StandardNameController extends Controller
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(
+            self::TABLE,
+            $current->id,
+            $newStatus == 1 ? 'Mở khoá' : 'Khoá',
+            DataMasterHistory::statusNote($current->status_id, $newStatus),
+            self::FIELDS
+        );
 
         AuditTrialController::log(
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
@@ -118,6 +145,14 @@ class StandardNameController extends Controller
         return $this->setApproval($request, 'rejected');
     }
 
+    /** Trả về lịch sử thay đổi của một dòng cho modal xem lịch sử. */
+    public function history(Request $request)
+    {
+        return response()->json([
+            'rows' => DataMasterHistory::rows(self::TABLE, (int) $request->id),
+        ]);
+    }
+
     /** Ghi nhận kết quả duyệt: ai duyệt, duyệt lúc nào. */
     private function setApproval(Request $request, string $appStatus)
     {
@@ -134,6 +169,14 @@ class StandardNameController extends Controller
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(
+            self::TABLE,
+            $current->id,
+            $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt',
+            DataMasterHistory::approvalNote($current->app_status, $appStatus),
+            self::FIELDS
+        );
 
         AuditTrialController::log(
             $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt',

@@ -8,15 +8,15 @@ use Illuminate\Support\Facades\DB;
  * CẤU HÌNH CHẤT CHUẨN THEO TỪNG PHÒNG BAN
  *
  * Danh mục chất chuẩn (standard_categories) dùng chung toàn công ty vì nó mô tả bản
- * chất của chất chuẩn. Cách dùng thì riêng từng phòng, nằm ở bảng department_standards.
+ * chất của chất chuẩn. Cách dùng thì riêng từng phòng, nằm ở bảng standard_department_categories.
  *
  * Quy tắc đọc ở mọi nơi trong hệ thống:
  *
- *      giá trị hiệu lực = department_standards.<cột> ?? standard_categories.<cột>
+ *      giá trị hiệu lực = standard_department_categories.<cột> ?? standard_categories.<cột>
  *
  * Phòng chưa khai riêng thì tự động chạy theo mặc định chung, không có màn hình nào gãy.
  *
- * Riêng ĐƠN VỊ TÍNH không theo quy tắc trên: nó chỉ nằm ở department_standards, danh mục
+ * Riêng ĐƠN VỊ TÍNH không theo quy tắc trên: nó chỉ nằm ở standard_department_categories, danh mục
  * chung không còn cột unit_id. Mỗi phòng nhập / xuất chất chuẩn theo đơn vị của phòng
  * mình, nên mọi màn hình muốn hiện đơn vị đều phải đi qua joinUnit().
  *
@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\DB;
  */
 class DepartmentStandard
 {
-    public const TABLE = 'department_standards';
+    public const TABLE = 'standard_department_categories';
 
     /** Bí danh của chính bảng này khi chỉ nối vào để lấy đơn vị tính - xem joinUnit(). */
     public const UNIT_ALIAS = 'ds_unit';
@@ -66,7 +66,7 @@ class DepartmentStandard
     /**
      * Nối ĐƠN VỊ TÍNH của đúng một phòng ban vào câu truy vấn đang có.
      *
-     * Đơn vị nằm ở department_standards nên không lấy thẳng từ standard_categories được
+     * Đơn vị nằm ở standard_department_categories nên không lấy thẳng từ standard_categories được
      * nữa. Dùng bí danh riêng để câu truy vấn nào đã gọi join() ở trên vẫn dùng được.
      *
      * Không lọc status_id: phòng khoá dòng khai rồi thì các phiếu cũ vẫn phải hiện đúng
@@ -177,7 +177,6 @@ class DepartmentStandard
                 'units.name as unit_name',
                 'storage_conditions.name as storage_condition_name',
                 'category_storage.name as category_storage_condition_name',
-                'locations.name as location_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
@@ -218,7 +217,12 @@ class DepartmentStandard
         return $query->get();
     }
 
-    /** Vị trí lưu trữ của đúng phòng ban đang chọn, kèm đường dẫn Kho / Phòng / Kệ. */
+    /**
+     * Vị trí lưu trữ của đúng phòng ban đang chọn, kèm đường dẫn Kho / Phòng / Kệ.
+     *
+     * Lọc theo locations.item_type để không xếp nhầm hàng vào ô của loại khác;
+     * ô chưa khai loại được coi là dùng chung nên vẫn chọn được.
+     */
     public static function locationOptions(int $departmentId)
     {
         return DB::table('locations')
@@ -228,17 +232,19 @@ class DepartmentStandard
             ->select(
                 'locations.id',
                 'locations.code',
-                'locations.name',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
                 'shelves.name as shelf_name'
             )
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
+            // Chỉ những ô khai loại chất chuẩn, cộng thêm ô chưa khai loại (dùng chung)
+            ->where(fn ($query) => $query->whereNull('locations.item_type')
+                ->orWhere('locations.item_type', 'standard'))
             ->orderBy('warehouses.name', 'asc')
             ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
-            ->orderBy('locations.name', 'asc')
+            ->orderBy('locations.code', 'asc')
             ->get();
     }
 
@@ -274,6 +280,63 @@ class DepartmentStandard
             ->select('id', 'name')
             ->where('status_id', 1)
             ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Chất chuẩn được phép NHẬP KHO của đúng một phòng ban.
+     *
+     * Có dòng ở standard_department_categories = phòng đó được dùng chất chuẩn này (đúng cách cột
+     * QC / QC1 / QC2 / AD trên danh mục giấy đang đánh dấu). Phòng chưa khai ở tab "Chất
+     * Chuẩn Của Phòng" thì không nhập vào kho được, nên ô chọn của màn hình Nhập đi thẳng
+     * từ bảng này ra chứ không duyệt cả danh mục chung của công ty.
+     *
+     * Điều kiện bảo quản lấy theo quy tắc chung: của phòng trước, chưa khai thì theo danh mục.
+     * Đơn vị tính chỉ có ở standard_department_categories nên lấy thẳng từ dòng khai của phòng.
+     *
+     * $keepIds là các category_id đang nằm trên phiếu cũ của phòng: giữ lại để modal Điều
+     * chỉnh không mất giá trị đang chọn khi danh mục chung đã bị khoá. Dù thế nào cũng
+     * KHÔNG nới điều kiện "phòng đã khai".
+     */
+    public static function importCategoryOptions(int $departmentId, array $keepIds = [])
+    {
+        $keepIds = array_values(array_filter($keepIds));
+
+        return DB::table(self::TABLE)
+            ->join('standard_categories', self::TABLE.'.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->leftJoin('storage_conditions', self::TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
+            ->leftJoin('storage_conditions as category_storage', 'standard_categories.storage_condition_id', '=', 'category_storage.id')
+            ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
+            ->select(
+                'standard_categories.id',
+                'standard_categories.code',
+                'standard_categories.version',
+                'standard_categories.groups',
+                'standard_categories.density',
+                'standard_names.name as standard_name',
+                'standard_names.cas_no as name_cas_no',
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                // Chuỗi trong DB::raw là hằng, không ghép từ dữ liệu người dùng
+                DB::raw('COALESCE(storage_conditions.name, category_storage.name) as storage_condition_name'),
+                self::shelfLifeColumn(),
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                self::TABLE.'.min_stock',
+                self::TABLE.'.default_location_id'
+            )
+            ->where(self::TABLE.'.department_id', $departmentId)
+            ->where(self::TABLE.'.status_id', 1)
+            ->where(function ($query) use ($keepIds) {
+                $query->where('standard_categories.status_id', 1);
+
+                if ($keepIds) {
+                    $query->orWhereIn('standard_categories.id', $keepIds);
+                }
+            })
+            ->orderBy('standard_categories.code', 'asc')
             ->get();
     }
 }

@@ -537,7 +537,7 @@
                         <td>
                             <div class="exp-code font-weight-bold">${item.import_code}</div>
                             ${item.batch_no ? '<small class="text-muted d-block">Lô: ' + item.batch_no + '</small>' : ''}
-                            ${item.location_name ? '<span class="std-location-tag mt-1">' + item.location_name + '</span>' : ''}
+                            ${item.location_code ? '<span class="std-location-tag mt-1">' + item.location_code + '</span>' : ''}
                         </td>
                         <td><b>${item.standard_name}</b> <span class="badge badge-dark">v${item.category_version}</span></td>
                         <td>${item.specification || '—'}</td>

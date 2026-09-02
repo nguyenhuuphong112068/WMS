@@ -23,6 +23,11 @@
 |                            [data-balancings] '{"<import_id>":[{...}]}'
 | - Nút hạn dùng nội bộ    : class="btn-inv-internal" kèm data-row='{...}'
 | - Modal hạn dùng nội bộ  : id="internalExpiryModal"
+| - Nút xem biểu đồ        : class="btn-inv-chart" kèm data-category="<category_id>"
+|                            và data-chem="<tên hoá chất>", ở cột cuối bảng tồn theo
+|                            hoá chất (chỉ có ở màn hình tồn hoá chất)
+| - Modal biểu đồ          : id="chemChartModal" kèm [data-url] [data-from] [data-to],
+|                            khung vẽ id="chemChartCanvas" - vẽ bằng Chart.js của layout
 --}}
 
 @include('pages.materData.shared.assets')
@@ -243,6 +248,13 @@
         color: var(--primary);
     }
 
+    .inv-period-rule {
+        display: block;
+        margin-top: 4px;
+        font-weight: 600;
+        color: #94a3b8;
+    }
+
     .inv-period-days {
         display: inline-block;
         margin-left: 6px;
@@ -430,6 +442,146 @@
         text-align: center;
         color: #94A3B8;
         font-size: 0.85rem;
+    }
+
+    /* ---------- Modal Biểu Đồ Nhập - Xuất - Tồn ---------- */
+    .inv-chart-stats {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    @media (max-width: 991px) {
+        .inv-chart-stats {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 575px) {
+        .inv-chart-stats {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .inv-chart-stat {
+        padding: 12px 14px;
+        border: 1px solid var(--primary-soft);
+        border-left: 4px solid var(--primary-lighter);
+        border-radius: var(--border-radius-md);
+        background: #fff;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .inv-chart-stat label {
+        display: block;
+        margin: 0 0 4px;
+        color: #64748B;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .inv-chart-stat b {
+        font-size: 1.02rem;
+        font-weight: 700;
+        color: var(--text-main);
+        word-break: break-word;
+    }
+
+    /* Màu viền trái trùng màu của chính đường / cột đó trên biểu đồ */
+    .inv-chart-stat.is-in {
+        border-left-color: var(--primary-light);
+    }
+
+    .inv-chart-stat.is-in b {
+        color: var(--primary-dark);
+    }
+
+    .inv-chart-stat.is-balanced {
+        border-left-color: var(--accent);
+    }
+
+    .inv-chart-stat.is-used {
+        border-left-color: #F59E0B;
+    }
+
+    .inv-chart-stat.is-used b {
+        color: #B45309;
+    }
+
+    .inv-chart-stat.is-cancelled {
+        border-left-color: #DC2626;
+    }
+
+    .inv-chart-stat.is-cancelled b {
+        color: #B91C1C;
+    }
+
+    .inv-chart-stat.is-closing {
+        border-left-color: #16A34A;
+    }
+
+    .inv-chart-stat.is-closing b {
+        color: #15803D;
+    }
+
+    /* Tồn cuối kỳ âm - cùng cách báo với trạng thái "Âm kho" trên bảng */
+    .inv-chart-stat.is-closing.is-over {
+        border-left-color: #DC2626;
+    }
+
+    .inv-chart-stat.is-closing.is-over b {
+        color: #B91C1C;
+    }
+
+    .inv-chart-box {
+        position: relative;
+        height: 56vh;
+        min-height: 320px;
+        padding: 14px 8px 6px;
+        margin-bottom: 16px;
+        border: 1px solid var(--primary-soft);
+        border-radius: var(--border-radius-lg);
+        background: #fff;
+    }
+
+    /* Lớp phủ lúc đang tải / không có phát sinh / gọi hỏng */
+    .inv-chart-state {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 20px;
+        border-radius: var(--border-radius-lg);
+        background: rgba(255, 255, 255, 0.94);
+        color: #64748B;
+        font-size: 0.9rem;
+        text-align: center;
+    }
+
+    .inv-chart-state.is-on {
+        display: flex;
+    }
+
+    .inv-chart-state i {
+        font-size: 1.7rem;
+        color: var(--primary-lighter);
+    }
+
+    .inv-chart-state.is-bad {
+        color: #B91C1C;
+    }
+
+    .inv-chart-state.is-bad i {
+        color: #DC2626;
     }
 
     /* ---------- Ô "Hiển thị" và ô "Tìm kiếm" gom về cùng một hàng ---------- */
@@ -798,12 +950,13 @@
 
         /* ---------- Bảng phụ: tồn theo hoá chất và lịch sử cân đối ---------- */
         // Trả về API của bảng để nơi gọi dùng lại (ví dụ bộ lọc định khu cần draw)
-        function invTable(selector, order, emptyText) {
+        function invTable(selector, order, emptyText, columnDefs) {
             return $(selector).DataTable({
                 autoWidth: false,
                 responsive: true,
                 pageLength: 25,
                 order: [order],
+                columnDefs: columnDefs || [],
                 lengthMenu: [
                     [10, 25, 50, 100, -1],
                     [10, 25, 50, 100, 'Tất cả']
@@ -823,7 +976,13 @@
             });
         }
 
-        invTable('#invSummaryTable', [1, 'asc'], 'Chưa có hoá chất nào trong kho.');
+        // Cột cuối của bảng tồn hoá chất là nút Biểu Đồ - không sắp xếp, không tìm kiếm
+        // được. Màn hình tồn chất chuẩn dùng chung id bảng nhưng không có cột đó, nên nhận
+        // biết bằng chính ô tiêu đề .inv-chart-th thay vì đoán theo màn hình.
+        invTable('#invSummaryTable', [1, 'asc'], 'Chưa có hoá chất nào trong kho.',
+            $('#invSummaryTable thead .inv-chart-th').length
+                ? [{ targets: -1, orderable: false, searchable: false }]
+                : []);
 
         // Chưa có hạn nội bộ: phiếu nhập lâu nhất lên trước vì cần xác định gấp
         invTable('#invInternalTable', [4, 'asc'],
@@ -1157,6 +1316,272 @@
             previewInternal();
             $internal.modal('show');
         });
+
+        /* ---------- Modal Biểu Đồ Nhập - Xuất - Tồn ----------
+        | Dùng chung cho màn hình tồn hoá chất và tồn vật tư: modal nhận diện bằng
+        | class .inv-chart-modal, mỗi màn hình tự khai [data-url] của mình. Màn hình
+        | nào không có modal đó thì bỏ qua toàn bộ khối này.
+        |
+        | Mỗi lần mở là một lần gọi JSON theo category_id của dòng vừa bấm và ĐÚNG kỳ
+        | báo cáo đang xem, nên không phải tải trước số liệu của mọi mã.
+        */
+        var $chart = $('.inv-chart-modal');
+
+        if ($chart.length) {
+            var $chartState = $chart.find('.inv-chart-state');
+            var chartInstance = null;
+
+            // Dữ liệu về trước khi modal mở xong thì chờ: Chart.js đo sai khung vẽ
+            // khi khung còn đang trong hiệu ứng mở của Bootstrap
+            var chartShown = false;
+            var chartPending = null;
+
+            /** Số kèm đơn vị cho hàng chỉ số phía trên biểu đồ */
+            function chartAmount(value, unit, signed) {
+                var number = Number(value) || 0;
+
+                return (signed && number > 0 ? '+' : '') + trimNum(number) + (unit ? ' ' + unit : '');
+            }
+
+            /** Lớp phủ khung vẽ: đang tải / không có phát sinh / gọi hỏng */
+            function chartState(text, isBad, isLoading) {
+                var icon = isLoading ? 'fa-circle-notch fa-spin' : (isBad ? 'fa-exclamation-triangle' : 'fa-chart-bar');
+
+                $chartState
+                    .toggleClass('is-bad', !!isBad)
+                    .addClass('is-on')
+                    .html('<i class="fas ' + icon + '"></i><span>' + esc(text) + '</span>');
+            }
+
+            /** Cột phát sinh trong mốc + đường tồn cuối mốc + đường ngưỡng tồn tối thiểu */
+            function chartDatasets(data) {
+                var bars = [
+                    { key: 'imported', label: 'Nhập', color: '#5AA0DE' },
+                    { key: 'used', label: 'Sử dụng', color: '#F59E0B' },
+                    // Hoá chất gọi là "Huỷ", vật tư gọi là "Loại bỏ" - lấy theo modal
+                    { key: 'cancelled', label: $chart.data('cancel-label') || 'Huỷ', color: '#DC2626' },
+                ];
+
+                // Cân đối rất ít phát sinh, chỉ thêm cột khi kỳ này thực sự có cân đối
+                if (Number(data.totals.balanced) !== 0) {
+                    bars.splice(1, 0, { key: 'balanced', label: 'Cân đối', color: '#17B8D4' });
+                }
+
+                var datasets = bars.map(function(bar) {
+                    return {
+                        label: bar.label,
+                        backgroundColor: bar.color,
+                        borderColor: bar.color,
+                        yAxisID: 'flow',
+                        order: 3,
+                        data: data.points.map(function(point) { return point[bar.key]; })
+                    };
+                });
+
+                datasets.push({
+                    type: 'line',
+                    label: 'Tồn cuối mốc',
+                    borderColor: '#16A34A',
+                    backgroundColor: 'rgba(22, 163, 74, 0.10)',
+                    borderWidth: 3,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#16A34A',
+                    lineTension: 0.25,
+                    fill: true,
+                    yAxisID: 'stock',
+                    order: 1,
+                    data: data.points.map(function(point) { return point.closing; })
+                });
+
+                // Ngưỡng tồn tối thiểu của phòng - đường đứt để thấy lúc nào tồn chạm đáy
+                if (data.min_stock !== null && Number(data.min_stock) > 0) {
+                    datasets.push({
+                        type: 'line',
+                        label: 'Ngưỡng tồn tối thiểu',
+                        borderColor: '#94A3B8',
+                        borderDash: [6, 4],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        yAxisID: 'stock',
+                        order: 2,
+                        data: data.points.map(function() { return Number(data.min_stock); })
+                    });
+                }
+
+                return datasets;
+            }
+
+            /**
+             * Hai trục dọc: bên trái là phát sinh trong mốc (cột), bên phải là tồn cuối
+             * mốc (đường). Tách trục vì tồn thường lớn hơn hẳn phát sinh từng mốc, để
+             * chung một trục thì cột bị dẹp lép không đọc được.
+             */
+            function chartDraw(data) {
+                var unit = data.unit || '';
+
+                // Gỡ lớp phủ "đang tải" ngay lúc vẽ, không gỡ sớm hơn để khỏi loé khung trắng
+                $chartState.removeClass('is-on is-bad');
+
+                if (chartInstance) chartInstance.destroy();
+
+                chartInstance = new Chart($chart.find('.inv-chart-canvas')[0].getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: data.points.map(function(point) { return point.label; }),
+                        datasets: chartDatasets(data)
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        legend: {
+                            position: 'bottom',
+                            labels: { usePointStyle: true, boxWidth: 10, padding: 16 }
+                        },
+                        hover: { mode: 'index', intersect: false },
+                        tooltips: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                // Nhãn trục chỉ ghi gọn "d/m", tooltip mới ghi đủ khoảng ngày của mốc
+                                title: function(items) {
+                                    return data.points[items[0].index].range;
+                                },
+                                label: function(item, content) {
+                                    return content.datasets[item.datasetIndex].label + ': ' +
+                                        trimNum(item.yLabel) + (unit ? ' ' + unit : '');
+                                }
+                            }
+                        },
+                        scales: {
+                            xAxes: [{
+                                gridLines: { display: false },
+                                ticks: { autoSkip: true, maxTicksLimit: 24, maxRotation: 0 }
+                            }],
+                            yAxes: [
+                                {
+                                    id: 'flow',
+                                    position: 'left',
+                                    ticks: { beginAtZero: true },
+                                    gridLines: { color: 'rgba(148, 163, 184, 0.18)' },
+                                    scaleLabel: {
+                                        display: true,
+                                        labelString: 'Phát sinh trong mốc' + (unit ? ' (' + unit + ')' : '')
+                                    }
+                                },
+                                {
+                                    id: 'stock',
+                                    position: 'right',
+                                    ticks: { beginAtZero: true },
+                                    gridLines: { display: false },
+                                    scaleLabel: {
+                                        display: true,
+                                        labelString: 'Tồn cuối mốc' + (unit ? ' (' + unit + ')' : '')
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                });
+            }
+
+            /** Hàng chỉ số phía trên biểu đồ - đúng các cột của bảng cộng dồn để đối chiếu */
+            function chartFill(data) {
+                var unit = data.unit || '';
+
+                // Màn hình hoá chất trả về chem_name, màn hình vật tư trả về material_name
+                $chart.find('.inv-chart-chem').text(data.chem_name || data.material_name || '—');
+                $chart.find('.inv-chart-code').text(data.category_code || '—');
+
+                // Ô quy cách / nhà sản xuất chỉ có ở modal vật tư, modal hoá chất bỏ qua
+                $chart.find('.inv-chart-spec').text(
+                    [data.manufacturer_short_name, data.technical_specification]
+                        .filter(function(part) { return part; }).join(' · ') || '—');
+                $chart.find('.inv-chart-period').text(data.period.label);
+                $chart.find('.inv-chart-bucket').text(data.bucket_label + ' - ' + data.points.length + ' mốc');
+                $chart.find('.inv-chart-unit').text(unit || '—');
+
+                $chart.find('.inv-chart-opening').text(chartAmount(data.opening, unit));
+                $chart.find('.inv-chart-imported').text(chartAmount(data.totals.imported, unit));
+                $chart.find('.inv-chart-balanced').text(chartAmount(data.totals.balanced, unit, true));
+                $chart.find('.inv-chart-used').text(chartAmount(data.totals.used, unit));
+                $chart.find('.inv-chart-cancelled').text(chartAmount(data.totals.cancelled, unit));
+                $chart.find('.inv-chart-closing').text(chartAmount(data.closing, unit));
+
+                // Tồn cuối kỳ âm - báo cùng kiểu với trạng thái "Âm kho" của bảng
+                $chart.find('.inv-chart-stat.is-closing').toggleClass('is-over', Number(data.closing) < 0);
+            }
+
+            $chart.on('shown.bs.modal', function() {
+                chartShown = true;
+
+                if (chartPending) {
+                    var data = chartPending;
+
+                    chartPending = null;
+                    chartDraw(data);
+                }
+            });
+
+            $chart.on('hidden.bs.modal', function() {
+                chartShown = false;
+                chartPending = null;
+
+                if (chartInstance) {
+                    chartInstance.destroy();
+                    chartInstance = null;
+                }
+            });
+
+            $(document).on('click', '.btn-inv-chart', function() {
+                // Tên hoá chất có sẵn trên nút nên hiện ngay, không phải chờ số liệu về
+                $chart.find('.inv-chart-chem').text($(this).data('chem') || '—');
+                $chart.find('.inv-chart-code, .inv-chart-period, .inv-chart-bucket, .inv-chart-unit, .inv-chart-spec')
+                    .text('—');
+                $chart.find('.inv-chart-stats b').text('—');
+                $chart.find('.inv-chart-stat.is-closing').removeClass('is-over');
+
+                if (chartInstance) {
+                    chartInstance.destroy();
+                    chartInstance = null;
+                }
+
+                chartPending = null;
+                chartState('Đang tải số liệu...', false, true);
+                $chart.modal('show');
+
+                $.getJSON($chart.data('url'), {
+                    category_id: $(this).data('category'),
+                    from_date: $chart.data('from'),
+                    to_date: $chart.data('to')
+                }).done(function(data) {
+                    chartFill(data);
+
+                    var moved = Number(data.totals.imported) + Number(data.totals.balanced) +
+                        Number(data.totals.used) + Number(data.totals.cancelled);
+
+                    // Không phát sinh gì mà tồn đầu kỳ cũng bằng 0 thì vẽ ra chỉ là đường thẳng 0
+                    if (!moved && !Number(data.opening)) {
+                        chartState('Hoá chất này không có phát sinh nhập - xuất nào trong kỳ đang xem.', false, false);
+
+                        return;
+                    }
+
+                    if (chartShown) {
+                        chartDraw(data);
+                    } else {
+                        chartPending = data;
+                    }
+                }).fail(function(xhr) {
+                    chartState(
+                        (xhr.responseJSON && xhr.responseJSON.message) ||
+                        'Không tải được số liệu biểu đồ, vui lòng thử lại.',
+                        true,
+                        false
+                    );
+                });
+            });
+        }
 
         /* ---------- Chuyển tab ---------- */
         $(document).on('click', '.inv-tab', function() {

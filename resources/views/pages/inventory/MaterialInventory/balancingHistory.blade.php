@@ -7,7 +7,7 @@
             </div>
             <div class="modal-body">
                 <div class="row mb-3">
-                    <div class="col-md-4"><small class="text-muted">Mã lô</small><div class="font-weight-bold mi-hist-code">—</div></div>
+                    <div class="col-md-4"><small class="text-muted">Mã xuất nhập</small><div class="font-weight-bold mi-hist-code">—</div></div>
                     <div class="col-md-4"><small class="text-muted">Vật tư</small><div class="font-weight-bold mi-hist-name">—</div></div>
                     <div class="col-md-4">
                         <small class="text-muted">Nhập / Đã cân đối / Tồn</small>

@@ -12,7 +12,9 @@
                 @csrf
                 <input type="hidden" name="id" value="{{ old('id') }}">
                 <input type="hidden" name="group_key" value="{{ old('group_key') }}">
-                <input type="hidden" name="imported_date" value="{{ old('imported_date') }}">
+                {{-- Ngày nhập của phiếu, chỉ để JS tính gợi ý hạn dùng. KHÔNG có name nên
+                     không gửi lên server - ngày nhập đã chốt lúc lập phiếu, không sửa được. --}}
+                <input type="hidden" class="sd-up-imported-date" value="">
 
                 <div class="modal-body">
 
@@ -42,7 +44,7 @@
                                 class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
                                 data-defaults="{{ json_encode($categoryDefaults) }}"
                                 required>
-                                <option value="">-- Chọn chất chuẩn --</option>
+                                <option value="">-- Chọn chất chuẩn phòng đang dùng --</option>
                                 @foreach ($categories as $category)
                                     <option value="{{ $category->id }}"
                                         {{ old('category_id') == $category->id ? 'selected' : '' }}>
@@ -121,7 +123,7 @@
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
-                                        {{ $location->name }} ({{ $location->code }})
+                                        {{ $location->code }}
                                     </option>
                                 @endforeach
                             </select>
@@ -342,7 +344,7 @@
         // Bấm nút gợi ý hạn dùng trong update (tính từ ngày nhập)
         $(document).on('click', '#updateModal .sd-up-btn-calc-exp', function() {
             var months = parseInt($(this).data('months'), 10);
-            var impDateVal = $upModal.find('input[name="imported_date"]').val() || new Date().toISOString().split('T')[0];
+            var impDateVal = $upModal.find('.sd-up-imported-date').val() || new Date().toISOString().split('T')[0];
             if (!months || !impDateVal) return;
 
             var d = new Date(impDateVal);
@@ -409,7 +411,7 @@
             }
             $upModal.find('select[name="purpose_id[]"]').val(purpArr.map(String)).trigger('change');
 
-            $upModal.find('input[name="imported_date"]').val(row.imported_date || '');
+            $upModal.find('.sd-up-imported-date').val(String(row.imported_date || '').substring(0, 10));
             $upModal.find('input[name="note"]').val(row.note || '');
 
             // Checkbox kiểm soát khối lượng & Dạng chuẩn

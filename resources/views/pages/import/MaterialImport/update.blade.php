@@ -16,7 +16,7 @@
                         <div class="form-group col-md-8">
                             <label>Vật tư <span class="text-danger">*</span></label>
                             <select name="category_id" class="form-control imp-select mi-up-category {{ $bag->has('category_id') ? 'is-invalid' : '' }}" required>
-                                <option value="">-- Chọn vật tư --</option>
+                                <option value="">-- Chọn vật tư phòng đang dùng --</option>
                                 @foreach ($categories as $c)
                                     <option value="{{ $c->id }}">
                                         {{ $c->material_name }} — {{ $c->manufacturer_short_name ?: $c->manufacturer_name }}
@@ -27,7 +27,7 @@
                             @if ($bag->has('category_id')) <div class="md-error text-danger small">{{ $bag->first('category_id') }}</div> @endif
                         </div>
                         <div class="form-group col-md-4">
-                            <label>Mã lô</label>
+                            <label>Mã xuất nhập</label>
                             <input type="text" name="code" class="form-control imp-readonly" readonly>
                         </div>
                     </div>
@@ -41,7 +41,8 @@
                         </div>
                         <div class="form-group col-md-4">
                             <label>Ngày nhập</label>
-                            <input type="date" name="imported_date" class="form-control">
+                            <input type="text" class="form-control imp-readonly mi-up-imported-date" readonly>
+                            <small class="text-muted">Ngày ghi nhận lúc lập phiếu, không sửa được.</small>
                         </div>
                         <div class="form-group col-md-4">
                             <label>Hạn sử dụng</label>
@@ -55,7 +56,7 @@
                             <option value="">-- Chưa xếp vị trí --</option>
                             @foreach ($locations as $loc)
                                 <option value="{{ $loc->id }}">
-                                    {{ $loc->name }} ({{ $loc->code }}) — {{ $loc->warehouse_name }} / {{ $loc->room_name }} / {{ $loc->shelf_name }}
+                                    {{ $loc->code }} — {{ $loc->warehouse_name }} / {{ $loc->room_name }} / {{ $loc->shelf_name }}
                                 </option>
                             @endforeach
                         </select>
@@ -90,7 +91,7 @@
 </div>
 
 <script>
-    (function () {
+    document.addEventListener('DOMContentLoaded', function () {
         var delUrl = @json(route('pages.import.materialImport.deleteAttachment'));
         var csrf = @json(csrf_token());
 
@@ -112,9 +113,12 @@
         $(document).on('click', '.btn-md-edit', function () {
             var row = $(this).data('row') || {};
             var $form = $('#updateModal form');
-            ['id', 'code', 'amount', 'imported_date', 'expired_date', 'note'].forEach(function (k) {
+            ['id', 'code', 'amount', 'expired_date', 'note'].forEach(function (k) {
                 $form.find('[name="' + k + '"]').val(row[k] == null ? '' : row[k]);
             });
+            // Ngày nhập chỉ để xem: hiển thị d/m/Y, không gửi lên server
+            var imp = (row.imported_date || '').substring(0, 10).split('-');
+            $form.find('.mi-up-imported-date').val(imp.length === 3 ? imp[2] + '/' + imp[1] + '/' + imp[0] : '—');
             $form.find('[name="category_id"]').val(row.category_id || '').trigger('change');
             $form.find('[name="location_id"]').val(row.location_id || '').trigger('change');
             $form.find('[name="reason"]').val('');
@@ -124,5 +128,5 @@
         @if ($bag->any())
             $(function () { $('#updateModal').modal('show'); });
         @endif
-    })();
+    });
 </script>

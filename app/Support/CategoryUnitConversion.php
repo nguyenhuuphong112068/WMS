@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * QUY ĐỔI ĐƠN VỊ GIỮA CÁC PHÒNG BAN CHO CÙNG MỘT MÃ
  *
- * Đơn vị tính là của riêng từng phòng (department_chemicals / department_standards), nên
+ * Đơn vị tính là của riêng từng phòng (chemical_department_categories / standard_department_categories), nên
  * cùng một mã hoá chất hoặc chất chuẩn có thể tồn tại nhiều đơn vị khác nhau trong hệ
  * thống. Lớp này trả lời đúng một câu hỏi: đổi X đơn vị của phòng A thành bao nhiêu đơn
  * vị của phòng B.
@@ -261,7 +261,7 @@ class CategoryUnitConversion
 
     private static function departmentTable(string $type): string
     {
-        return $type === self::TYPE_STANDARD ? 'department_standards' : 'department_chemicals';
+        return $type === self::TYPE_STANDARD ? 'standard_department_categories' : 'chemical_department_categories';
     }
 
     private static function categoryTable(string $type): string

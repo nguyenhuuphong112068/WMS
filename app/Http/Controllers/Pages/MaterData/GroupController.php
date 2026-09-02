@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\MaterData;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -17,6 +18,12 @@ class GroupController extends Controller
     private const TABLE = 'groups';
     private const LABEL = 'tổ';
 
+    /** Các cột người dùng nhập - dùng chung cho ảnh chụp và mô tả thay đổi của lịch sử. */
+    private const FIELDS = [
+        'name' => 'Tên tổ',
+        'department_id' => 'Phòng ban',
+    ];
+
     public function index()
     {
         $datas = DB::table(self::TABLE)
@@ -29,12 +36,14 @@ class GroupController extends Controller
             ->orderBy(self::TABLE . '.name', 'asc')
             ->get();
 
-        $departments = DB::table('deparments')->where('active', 1)->orderBy('name', 'asc')->get();
+        $departments = DB::table('deparments')->where('isActive', 1)->orderBy('name', 'asc')->get();
 
         session()->put(['title' => 'DỮ LIỆU GỐC - TỔ']);
 
         return view('pages.materData.Group.list', [
             'datas' => $datas,
+            // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
+            'historyCounts' => DataMasterHistory::counts(self::TABLE),
             'departments' => $departments,
         ]);
     }
@@ -53,6 +62,8 @@ class GroupController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . ': ' . $request->name . '.', self::FIELDS, $this->maps());
 
         AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm ' . self::LABEL . ': ' . $request->name);
 
@@ -73,10 +84,15 @@ class GroupController extends Controller
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request) + [
+        $payload = $this->payload($request);
+        $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $this->maps());
+
+        DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS, $this->maps());
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->name, $request->name);
 
@@ -99,6 +115,15 @@ class GroupController extends Controller
             'updated_at' => now(),
         ]);
 
+        DataMasterHistory::record(
+            self::TABLE,
+            $current->id,
+            $newStatus == 1 ? 'Mở khoá' : 'Khoá',
+            DataMasterHistory::statusNote($current->status_id, $newStatus),
+            self::FIELDS,
+            $this->maps()
+        );
+
         AuditTrialController::log(
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             self::TABLE,
@@ -113,9 +138,23 @@ class GroupController extends Controller
         );
     }
 
+    /** Trả về lịch sử thay đổi của một dòng cho modal xem lịch sử. */
+    public function history(Request $request)
+    {
+        return response()->json([
+            'rows' => DataMasterHistory::rows(self::TABLE, (int) $request->id),
+        ]);
+    }
+
     private function actor(): string
     {
         return session('user')['fullName'] ?? 'NA';
+    }
+
+    /** Bảng tra nhãn để lịch sử hiện tên phòng ban thay vì department_id. */
+    private function maps(): array
+    {
+        return ['department_id' => DB::table('deparments')->pluck('name', 'id')->all()];
     }
 
     private function rules($ignoreId = null): array

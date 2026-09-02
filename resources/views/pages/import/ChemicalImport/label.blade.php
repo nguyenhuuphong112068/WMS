@@ -7,6 +7,9 @@
 |
 | Mọi kích thước bên trong tính theo mm để in ra đúng bằng nhãn thật, không phụ thuộc
 | độ phân giải màn hình. Mã vạch là SVG co giãn nên in ở 203dpi hay 300dpi đều sắc nét.
+|
+| Số lượng nhãn cần in chọn trên thanh công cụ (pages.import.shared.labelToolbar) và
+| mỗi lần in được ghi vào audit log qua pages.import.chemicalImport.labelPrinted.
 --}}
 
 @php
@@ -44,53 +47,6 @@
             background: #E9EEF3;
             color: #000;
             font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-        }
-
-        /* ---------- Thanh công cụ, chỉ hiện trên màn hình ---------- */
-        .toolbar {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
-            padding: 14px;
-            background: #fff;
-            border-bottom: 1px solid #d7dee6;
-        }
-
-        .toolbar button,
-        .toolbar a {
-            border: 0;
-            border-radius: 8px;
-            padding: 9px 18px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all .2s ease;
-        }
-
-        .toolbar .go {
-            background: #2E7BC4;
-            color: #fff;
-        }
-
-        .toolbar .go:hover {
-            background: #1F5E9E;
-            transform: translateY(-1px);
-        }
-
-        .toolbar .back {
-            background: #EAF3FC;
-            color: #1F5E9E;
-        }
-
-        .toolbar .note {
-            width: 100%;
-            text-align: center;
-            color: #64748B;
-            font-size: 12px;
-            font-weight: 400;
         }
 
         /* ---------- Nhãn ---------- */
@@ -240,10 +196,6 @@
                 background: #fff;
             }
 
-            .toolbar {
-                display: none;
-            }
-
             .label {
                 margin: 0;
                 box-shadow: none;
@@ -254,65 +206,68 @@
 
 <body>
 
-    <div class="toolbar">
-        <button type="button" class="go" onclick="window.print()">In nhãn</button>
-        <a class="back" href="{{ route('pages.import.chemicalImport.list') }}">Quay lại</a>
-        <p class="note">
-            Khổ nhãn {{ $lblWidth }}x{{ $lblHeight }}mm. Trong hộp thoại In, chọn máy in nhãn
-            <b>Zebra ZD421</b>, đặt khổ giấy <b>{{ $lblWidth }} x {{ $lblHeight }} mm</b>, lề <b>None</b>
-            và bỏ tick <b>Headers and footers</b> để nhãn ra đúng như trên màn hình.
-        </p>
-    </div>
+    @include('pages.import.shared.labelToolbar', [
+        'importId' => $import->id,
+        'logUrl' => route('pages.import.chemicalImport.labelPrinted'),
+        'backUrl' => route('pages.import.chemicalImport.list'),
+        'maxCopies' => $maxCopies,
+        'lblWidth' => $lblWidth,
+        'lblHeight' => $lblHeight,
+        'printerNote' => 'Chọn máy in nhãn Zebra ZD421.',
+    ])
 
-    <div class="label">
+    {{-- Bọc để thanh công cụ nhân bản nhãn ra đúng số lượng người dùng chọn --}}
+    <div id="labelStack">
+        <div class="label">
 
-        <div class="row sop">
-            <div class="cell"><span>SOP: {{ $label['sop_no'] }}</span></div>
-            <div class="cell" style="text-align: right">{{ $label['form_no'] }}</div>
-        </div>
+            <div class="row sop">
+                <div class="cell"><span>SOP: {{ $label['sop_no'] }}</span></div>
+                <div class="cell" style="text-align: right">{{ $label['form_no'] }}</div>
+            </div>
 
-        <div class="row" style="height: 8mm">
-            <div class="cell name">{{ $lblName ?: '—' }}</div>
-            <div class="cell code">{{ $import->code }}</div>
-        </div>
+            <div class="row" style="height: 8mm">
+                <div class="cell name">{{ $lblName ?: '—' }}</div>
+                <div class="cell code">{{ $import->code }}</div>
+            </div>
 
-        <div class="row">
-            <div class="cell warning" style="flex: 1">{{ $lblWarningText }}</div>
-        </div>
+            <div class="row">
+                <div class="cell warning" style="flex: 1">{{ $lblWarningText }}</div>
+            </div>
 
-        <div class="row date-row">
-            <div class="cell">
-                <span class="caption">Ngày Nhập/<br>Date of Receipt</span>
+            <div class="row date-row">
+                <div class="cell">
+                    <span class="caption">Ngày Nhập/<br>Date of Receipt</span>
+                </div>
+                <div class="cell">
+                    <span class="value">{{ $lblDate($import->imported_date) }}</span>
+                </div>
+                <div class="cell">
+                    <span class="caption">Hạn Dùng NSX/<br>Mf. Exp. Date</span>
+                </div>
+                <div class="cell">
+                    <span class="value">{{ $lblDate($import->expired_date) }}</span>
+                </div>
             </div>
-            <div class="cell">
-                <span class="value">{{ $lblDate($import->imported_date) }}</span>
-            </div>
-            <div class="cell">
-                <span class="caption">Hạn Dùng NSX/<br>Mf. Exp. Date</span>
-            </div>
-            <div class="cell">
-                <span class="value">{{ $lblDate($import->expired_date) }}</span>
-            </div>
-        </div>
 
-        <div class="row who-row">
-            <div class="cell">
-                <span class="caption">Người nhập/<br>Received By</span>
+            <div class="row who-row">
+                <div class="cell">
+                    <span class="caption">Người nhập/<br>Received By</span>
+                </div>
+                <div class="cell">
+                    <span class="value">{{ $import->imported_by }}</span>
+                </div>
+                <div class="cell">
+                    <span class="value">{{ $import->location_code }}</span>
+                </div>
             </div>
-            <div class="cell">
-                <span class="value">{{ $import->imported_by }}</span>
-            </div>
-            <div class="cell">
-                <span class="value">{{ $import->location_code }}</span>
-            </div>
-        </div>
 
-        <div class="row barcode">
-            @if ($barcode)
-                {!! $barcode !!}
-            @else
-                <span class="barcode-empty">Mã "{{ $import->code }}" không tạo được mã vạch</span>
-            @endif
+            <div class="row barcode">
+                @if ($barcode)
+                    {!! $barcode !!}
+                @else
+                    <span class="barcode-empty">Mã "{{ $import->code }}" không tạo được mã vạch</span>
+                @endif
+            </div>
         </div>
     </div>
 

@@ -74,6 +74,13 @@
             border: 1px solid #FCA5A5;
         }
 
+        /* Ngưng đánh giá - đã làm được một phần rồi mới dừng, không đỏ như Huỷ */
+        .ssa-badge.stopped {
+            background: #FFEDD5;
+            color: #9A3412;
+            border: 1px solid #FDBA74;
+        }
+
         /* ---------- Tình trạng một mốc đánh giá ---------- */
         .ssa-state {
             display: inline-block;
@@ -106,6 +113,13 @@
             background: #F1F5F9;
             color: #475569;
             border: 1px solid #CBD5E1;
+        }
+
+        /* Mốc của phiếu đã ngưng - sẽ không được thực hiện nữa */
+        .ssa-state-stopped {
+            background: #FFEDD5;
+            color: #9A3412;
+            border: 1px solid #FDBA74;
         }
 
         /* Kết luận Đạt / Không Đạt của một mốc */
@@ -145,6 +159,156 @@
             font-size: 0.75rem;
             font-weight: 600;
             white-space: nowrap;
+        }
+
+        /* Chỉ tiêu ĐÃ CẤP PHÁT CHUẨN - dấu tick nằm ngay trong nhãn chỉ tiêu */
+        .ssa-testing.is-issued {
+            background: #DCFCE7;
+            color: #166534;
+            border-color: #86EFAC;
+        }
+
+        .ssa-testing.is-issued::before {
+            content: '\f00c';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            margin-right: 4px;
+            font-size: 0.68rem;
+        }
+
+        /* ---------- Ngưng đánh giá ---------- */
+
+        /* Khối hỏi "làm tiếp hay ngưng" trong modal ghi kết quả */
+        .ssa-after {
+            margin-top: 4px;
+            padding: 12px 14px;
+            border-radius: var(--border-radius-md);
+        }
+
+        .ssa-after-pass {
+            background: var(--primary-soft);
+            border: 1px solid var(--primary-lighter);
+        }
+
+        .ssa-after-fail {
+            display: flex;
+            gap: 10px;
+            background: #FEF2F2;
+            border: 1px solid #FCA5A5;
+            color: #991B1B;
+            font-size: 0.88rem;
+        }
+
+        .ssa-after-fail i {
+            margin-top: 2px;
+            font-size: 1rem;
+        }
+
+        .ssa-after-title {
+            margin-bottom: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        .ssa-after-title i {
+            margin-right: 5px;
+        }
+
+        .ssa-after-choice {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .ssa-radio {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 0;
+            padding: 7px 11px;
+            border: 1px solid transparent;
+            border-radius: var(--border-radius-md);
+            background: #fff;
+            font-size: 0.88rem;
+            font-weight: 500;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .ssa-radio:hover {
+            border-color: var(--primary-light);
+        }
+
+        .ssa-radio input {
+            margin-top: 3px;
+        }
+
+        /* Lý do ngưng đánh giá hiển thị trên đầu trang chi tiết */
+        .ssa-stop-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            border: 1px solid #FDBA74;
+            border-radius: var(--border-radius-md);
+            background: #FFF7ED;
+            color: #9A3412;
+            font-size: 0.88rem;
+        }
+
+        .ssa-stop-banner i {
+            margin-top: 2px;
+            font-size: 1.05rem;
+        }
+
+        .ssa-stop-banner .who {
+            margin-top: 3px;
+            font-size: 0.8rem;
+            color: #B45309;
+        }
+
+        /* ---------- Modal cấp phát chuẩn theo chỉ tiêu ---------- */
+        .ssa-issue-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 4px 0 8px;
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+
+        .ssa-issue-count {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .ssa-issue-table thead th {
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            border-color: var(--primary-lighter);
+            font-size: 0.78rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .ssa-issue-table td {
+            vertical-align: middle;
+        }
+
+        .ssa-issue-name {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .ssa-issue-check {
+            width: 17px;
+            height: 17px;
+            cursor: pointer;
         }
 
         /* ---------- Tiến độ các mốc đã đánh giá ---------- */

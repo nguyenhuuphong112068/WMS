@@ -39,7 +39,26 @@
                             </div>
                         @endforeach
 
-                        <div class="form-group">
+                        @if (!empty($meta['hasType']))
+                            <div class="form-group">
+                                <label>Loại Lưu Trữ</label>
+                                <select name="item_type"
+                                    class="form-control sel-item-type {{ $bag->has('item_type') ? 'is-invalid' : '' }}">
+                                    <option value="">-- Dùng chung cho mọi loại --</option>
+                                    @foreach ($locationTypes as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <small class="form-text text-muted">
+                                    Chọn loại để ô này chỉ hiện ở màn hình Tồn Kho tương ứng. Để trống thì hiện ở cả ba.
+                                </small>
+                                @if ($bag->has('item_type'))
+                                    <span class="zone-error">{{ $bag->first('item_type') }}</span>
+                                @endif
+                            </div>
+                        @endif
+
+                        <div class="form-group {{ ($meta['hasName'] ?? true) ? '' : 'mb-0' }}">
                             <label>Mã {{ $meta['label'] }} <span class="text-danger">*</span></label>
                             <input type="text" name="code" maxlength="50"
                                 class="form-control inp-code {{ $bag->has('code') ? 'is-invalid' : '' }}"
@@ -47,17 +66,24 @@
                             @if ($bag->has('code'))
                                 <span class="zone-error">{{ $bag->first('code') }}</span>
                             @endif
-                        </div>
-
-                        <div class="form-group mb-0">
-                            <label>Tên {{ $meta['label'] }} <span class="text-danger">*</span></label>
-                            <input type="text" name="name" maxlength="255"
-                                class="form-control inp-name {{ $bag->has('name') ? 'is-invalid' : '' }}"
-                                placeholder="Nhập tên {{ $meta['lower'] }}" required>
-                            @if ($bag->has('name'))
-                                <span class="zone-error">{{ $bag->first('name') }}</span>
+                            @if (!($meta['hasName'] ?? true))
+                                <small class="form-text text-muted">
+                                    {{ $meta['label'] }} chỉ dùng mã để nhận biết, không cần khai tên.
+                                </small>
                             @endif
                         </div>
+
+                        @if ($meta['hasName'] ?? true)
+                            <div class="form-group mb-0">
+                                <label>Tên {{ $meta['label'] }} <span class="text-danger">*</span></label>
+                                <input type="text" name="name" maxlength="255"
+                                    class="form-control inp-name {{ $bag->has('name') ? 'is-invalid' : '' }}"
+                                    placeholder="Nhập tên {{ $meta['lower'] }}" required>
+                                @if ($bag->has('name'))
+                                    <span class="zone-error">{{ $bag->first('name') }}</span>
+                                @endif
+                            </div>
+                        @endif
                     </div>
 
                     <div class="modal-footer">

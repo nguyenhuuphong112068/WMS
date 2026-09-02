@@ -9,13 +9,16 @@
 | - $title        : nội dung nhận diện dòng khi hỏi xác nhận
 | - $editData     : mảng dữ liệu đổ vào modal cập nhật (khớp theo name của từng ô nhập)
 | - $historyCount : (tuỳ chọn) số lần đã thay đổi, mặc định 0 nếu không truyền
+| - $permPrefix   : tiền tố tên quyền, ví dụ 'category_material_' -> category_material_update...
 --}}
 <div class="md-actions">
     <span class="cat-btn-wrap">
-        <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
-            data-row="{{ json_encode($editData) }}">
-            <i class="fas fa-edit"></i>
-        </button>
+        @if (user_can($permPrefix . 'update'))
+            <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
+                data-row="{{ json_encode($editData) }}">
+                <i class="fas fa-edit"></i>
+            </button>
+        @endif
 
         {{-- Badge số lần thay đổi, nằm ở góc trên bên phải nút Sửa - chỉ hiện khi đã từng đổi --}}
         @if (($historyCount ?? 0) > 0)
@@ -34,7 +37,7 @@
         </button>
     @endisset
 
-    @if (($row->app_status ?? 'pending') !== 'approved')
+    @if (($row->app_status ?? 'pending') !== 'approved' && user_can($permPrefix . 'approve'))
         <form class="form-md-confirm d-inline" action="{{ route($prefix . 'approve') }}" method="POST"
             data-title="Duyệt {{ $label }}?"
             data-text="Sau khi duyệt, {{ $label }} &quot;{{ $title }}&quot; sẽ được dùng ở các màn hình nghiệp vụ.">
@@ -46,7 +49,7 @@
         </form>
     @endif
 
-    @if (($row->app_status ?? 'pending') !== 'rejected')
+    @if (($row->app_status ?? 'pending') !== 'rejected' && user_can($permPrefix . 'reject'))
         <form class="form-md-confirm d-inline" action="{{ route($prefix . 'reject') }}" method="POST"
             data-title="Từ chối {{ $label }}?"
             data-text="{{ ucfirst($label) }} &quot;{{ $title }}&quot; sẽ bị đánh dấu từ chối và không được dùng."
@@ -59,6 +62,7 @@
         </form>
     @endif
 
+    @if (user_can($permPrefix . 'deActive'))
     <form class="form-md-confirm d-inline" action="{{ route($prefix . 'deActive') }}" method="POST"
         data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $label }}?"
         data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, {{ $label }} &quot;{{ $title }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn xuất hiện khi chọn dữ liệu.' : 'sẽ được dùng lại bình thường.' }}"
@@ -70,4 +74,5 @@
             <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
         </button>
     </form>
+    @endif
 </div>

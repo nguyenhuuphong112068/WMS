@@ -19,6 +19,7 @@
 @endsection
 
 @section('model')
+    @include('pages.materData.shared.history')
     @include('pages.materData.StorageCondition.create')
     @include('pages.materData.StorageCondition.update')
 @endsection

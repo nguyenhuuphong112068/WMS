@@ -14,7 +14,7 @@
 | estimate     : nhóm menu "Dự Trù"
 | User        : nhóm menu "Phân Quyền"
 | AuditTrial   : nhóm menu "Audit Trail"
-| Notification / Chat : tiện ích dùng chung trên topNAV
+| Notification : tiện ích dùng chung trên topNAV
 */
 
 require __DIR__.'/appRoute.php';
@@ -28,4 +28,3 @@ require __DIR__.'/estimateRoute.php';
 require __DIR__.'/UserRoute.php';
 require __DIR__.'/AuditTrialRoute.php';
 require __DIR__.'/NotificationRoute.php';
-require __DIR__.'/ChatRoute.php';

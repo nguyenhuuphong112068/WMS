@@ -280,7 +280,7 @@
                             id="zonePane-{{ $key }}" role="tabpanel">
 
                             <div class="zone-toolbar">
-                                @if ($meta['canCreate'])
+                                @if ($meta['canCreate'] && user_can('materData_create'))
                                     <button type="button" class="btn btn-primary btn-zone-create"
                                         data-type="{{ $key }}">
                                         <i class="fas fa-plus mr-1"></i> Thêm {{ $meta['label'] }}
@@ -346,45 +346,61 @@
                                                 </td>
                                                 <td>
                                                     <div class="zone-actions">
-                                                        <button type="button" class="btn btn-sm btn-warning btn-zone-edit"
-                                                            title="Sửa"
-                                                            data-type="{{ $key }}"
-                                                            data-id="{{ $row->id }}"
-                                                            data-code="{{ $row->code }}"
-                                                            data-name="{{ $row->name }}"
-                                                            data-warehouse="{{ $row->warehouse_id ?? '' }}"
-                                                            data-room="{{ $row->room_id ?? '' }}"
-                                                            data-shelf="{{ $row->shelf_id ?? '' }}">
-                                                            <i class="fas fa-edit"></i>
-                                                        </button>
+                                                        <span class="md-btn-wrap">
+                                                            @perm('materData_update')
+                                                                <button type="button" class="btn btn-sm btn-warning btn-zone-edit"
+                                                                    title="Sửa"
+                                                                    data-type="{{ $key }}"
+                                                                    data-id="{{ $row->id }}"
+                                                                    data-code="{{ $row->code }}"
+                                                                    data-name="{{ ($meta['hasName'] ?? true) ? $row->name : '' }}"
+                                                                    data-warehouse="{{ $row->warehouse_id ?? '' }}"
+                                                                    data-room="{{ $row->room_id ?? '' }}"
+                                                                    data-shelf="{{ $row->shelf_id ?? '' }}"
+                                                                    data-item-type="{{ $row->item_type ?? '' }}">
+                                                                    <i class="fas fa-edit"></i>
+                                                                </button>
+                                                            @endperm
 
-                                                        <form class="form-zone-confirm d-inline"
-                                                            action="{{ route($zoneRoute . 'deActive', $key) }}"
-                                                            method="POST"
-                                                            data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $meta['lower'] }}?"
-                                                            data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, {{ $meta['lower'] }} &quot;{{ $row->name }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được chọn ở các cấp bên dưới.' : 'sẽ được dùng lại bình thường.' }}"
-                                                            data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $row->id }}">
-                                                            <button type="submit"
-                                                                class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'success' }}"
-                                                                title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                                <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                            </button>
-                                                        </form>
+                                                            {{-- Badge số lần thay đổi, bấm vào để xem lịch sử --}}
+                                                            @include('pages.materData.shared.historyBadge', [
+                                                                'count' => $historyCounts[$meta['table'] . '-' . $row->id] ?? 0,
+                                                                'url' => route($zoneRoute . 'history', ['type' => $key, 'id' => $row->id]),
+                                                                'title' => trim($meta['label'] . ' ' . $row->code . (($meta['hasName'] ?? true) ? ' - ' . $row->name : '')),
+                                                            ])
+                                                        </span>
 
-                                                        <form class="form-zone-confirm d-inline"
-                                                            action="{{ route($zoneRoute . 'destroy', $key) }}"
-                                                            method="POST"
-                                                            data-title="Xoá {{ $meta['lower'] }}?"
-                                                            data-text="{{ $meta['label'] }} &quot;{{ $row->name }}&quot; sẽ bị xoá vĩnh viễn khỏi hệ thống."
-                                                            data-danger="1">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $row->id }}">
-                                                            <button type="submit" class="btn btn-sm btn-danger" title="Xoá">
-                                                                <i class="fas fa-trash-alt"></i>
-                                                            </button>
-                                                        </form>
+                                                        @perm('materData_deActive')
+                                                            <form class="form-zone-confirm d-inline"
+                                                                action="{{ route($zoneRoute . 'deActive', $key) }}"
+                                                                method="POST"
+                                                                data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $meta['lower'] }}?"
+                                                                data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, {{ $meta['lower'] }} &quot;{{ $row->name }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được chọn ở các cấp bên dưới.' : 'sẽ được dùng lại bình thường.' }}"
+                                                                data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
+                                                                @csrf
+                                                                <input type="hidden" name="id" value="{{ $row->id }}">
+                                                                <button type="submit"
+                                                                    class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'success' }}"
+                                                                    title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
+                                                                    <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                                                </button>
+                                                            </form>
+                                                        @endperm
+
+                                                        @perm('materData_deActive')
+                                                            <form class="form-zone-confirm d-inline"
+                                                                action="{{ route($zoneRoute . 'destroy', $key) }}"
+                                                                method="POST"
+                                                                data-title="Xoá {{ $meta['lower'] }}?"
+                                                                data-text="{{ $meta['label'] }} &quot;{{ $row->name }}&quot; sẽ bị xoá vĩnh viễn khỏi hệ thống."
+                                                                data-danger="1">
+                                                                @csrf
+                                                                <input type="hidden" name="id" value="{{ $row->id }}">
+                                                                <button type="submit" class="btn btn-sm btn-danger" title="Xoá">
+                                                                    <i class="fas fa-trash-alt"></i>
+                                                                </button>
+                                                            </form>
+                                                        @endperm
                                                     </div>
                                                 </td>
                                             </tr>

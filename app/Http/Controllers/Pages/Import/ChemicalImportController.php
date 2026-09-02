@@ -19,8 +19,8 @@ use Illuminate\Validation\Rule;
  *
  * Ghi nhận từng lần nhập hoá chất vào kho của phòng ban đang chọn.
  *
- * MÃ XUẤT NHẬP (cột code) sinh tự động: "HC" + shortName phòng ban + đuôi ngẫu nhiên,
- * ví dụ HC-QC1-7KPMR9J4WD. Mã KHÔNG chứa số thứ tự và không gắn với danh mục hoá chất
+ * MÃ XUẤT NHẬP (cột code) sinh tự động: "C" + shortName phòng ban + đuôi ngẫu nhiên,
+ * ví dụ C-QC1-7KPMR9J4WD. Mã KHÔNG chứa số thứ tự và không gắn với danh mục hoá chất
  * nên khoá / xoá một phiếu nhập không để lại khoảng trống nhìn thấy được qua giao diện.
  * Công thức nằm ở App\Support\ChemicalCode.
  */
@@ -32,15 +32,18 @@ class ChemicalImportController extends Controller
 
     private const LABEL = 'phiếu nhập hoá chất';
 
+    /** Số nhãn tối đa cho một lần in, chặn cả ở trang in lẫn ở đây. */
+    private const LABEL_MAX_COPIES = 100;
+
     /**
      * Hậu tố cho lô NHẬN TỪ PHÒNG BAN KHÁC.
      *
      * Hàng chuyển kho không nhập từ ngoài vào nên mã phải phân biệt được với mã nhập
      * thường, đồng thời giữ nguyên mã của phòng nhập ĐẦU TIÊN để truy ngược nguồn gốc:
      *
-     *      HC-QC1-7KPMR9J4WD            <- phòng nhập đầu (mua ngoài)
-     *      HC-QC1-7KPMR9J4WD-CK01       <- chuyển lần 1
-     *      HC-QC1-7KPMR9J4WD-CK02       <- chuyển lần 2 (kể cả chuyển tiếp từ ...-CK01)
+     *      C-QC1-7KPMR9J4WD            <- phòng nhập đầu (mua ngoài)
+     *      C-QC1-7KPMR9J4WD-CK01       <- chuyển lần 1
+     *      C-QC1-7KPMR9J4WD-CK02       <- chuyển lần 2 (kể cả chuyển tiếp từ ...-CK01)
      *
      * Số thứ tự -CK đếm theo MÃ GỐC trên toàn hệ thống, không đếm theo phòng, vì
      * chemical_imports.code là duy nhất. -CK chỉ đếm số lần một lô được chuyển đi,
@@ -61,7 +64,6 @@ class ChemicalImportController extends Controller
     private const FIELDS = [
         'category_id' => 'Hoá chất',
         'amount' => 'Số lượng',
-        'imported_date' => 'Ngày nhập',
         'invoice_number' => 'Số hoá đơn',
         'invoice_date' => 'Ngày hoá đơn',
         'expired_date' => 'Hạn sử dụng',
@@ -100,7 +102,6 @@ class ChemicalImportController extends Controller
 
         $validator = Validator::make($request->all(), [
             'export_id' => ['required'],
-            'imported_date' => ['required', 'date'],
             // Định khu để trống được, nhưng đã chọn thì phải là định khu của chính phòng này
             'location_id' => [
                 'nullable',
@@ -110,8 +111,6 @@ class ChemicalImportController extends Controller
             ],
             'note' => ['nullable', 'max:500'],
         ], [
-            'imported_date.required' => 'Vui lòng chọn ngày nhận hàng.',
-            'imported_date.date' => 'Ngày nhận hàng không hợp lệ.',
             'location_id.exists' => 'Định khu được chọn không thuộc phòng ban này hoặc đã ngừng sử dụng.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
         ]);
@@ -177,8 +176,8 @@ class ChemicalImportController extends Controller
                 'internal_expired_date' => $transfer->is_partial ? $transfer->source_internal_expired_date : null,
                 'is_microbiological_chemicals' => $transfer->is_microbiological_chemicals,
                 'supplier_id' => $transfer->supplier_id,
-                // Thông tin riêng của phòng nhận
-                'imported_date' => $request->imported_date,
+                // Thông tin riêng của phòng nhận. Ngày nhận là ngày bấm Nhận hàng, không cho chỉnh
+                'imported_date' => now()->format('Y-m-d'),
                 'imported_by' => $this->actor(),
                 'location_id' => $request->location_id ? (int) $request->location_id : null,
                 'note' => $this->nullIfBlank($request->note),
@@ -471,7 +470,6 @@ class ChemicalImportController extends Controller
                 'units.name as unit_name',
                 'suppliers.name as supplier_name',
                 'suppliers.address as supplier_address',
-                'locations.name as location_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
@@ -484,9 +482,9 @@ class ChemicalImportController extends Controller
 
         session()->put(['title' => 'NHẬP - NHẬP HOÁ CHẤT']);
 
-        $categories = $this->categoryOptions($departmentId);
+        $categories = $this->categoryOptions($departmentId, $datas->pluck('category_id')->all());
 
-        $deptChemicals = DB::table('department_chemicals')
+        $deptChemicals = DB::table('chemical_department_categories')
             ->where('department_id', $departmentId)
             ->get()
             ->keyBy('category_id');
@@ -531,7 +529,9 @@ class ChemicalImportController extends Controller
      * IN NHÃN DÁN LÔ HOÁ CHẤT.
      *
      * Trang in độc lập đúng khổ nhãn khai ở config/chemical.php (mặc định 60x40mm), mở
-     * tab mới rồi bấm In - chọn máy in nhãn Zebra là ra nhãn dán thẳng lên chai/thùng.
+     * tab mới, chọn số lượng nhãn rồi bấm In - chọn máy in nhãn Zebra là ra nhãn dán
+     * thẳng lên chai/thùng. Số lượng nhãn nhân bản bằng JS ngay trên trang, không nạp
+     * lại trang; lúc bấm In, trang gọi labelPrinted() để ghi audit log.
      *
      * Mã vạch là Code 128 sinh thẳng thành SVG (App\Support\Barcode128), nội dung đúng
      * bằng MÃ XUẤT NHẬP của lô, để màn hình Sử Dụng quét lại là ra đúng lô này.
@@ -565,6 +565,55 @@ class ChemicalImportController extends Controller
             'import' => $row,
             'label' => config('chemical.label'),
             'barcode' => Barcode128::svg($row->code),
+            'maxCopies' => self::LABEL_MAX_COPIES,
+        ]);
+    }
+
+    /**
+     * GHI AUDIT LOG MỖI LẦN IN NHÃN HOÁ CHẤT.
+     *
+     * Trang in gọi vào đây ngay trước khi mở hộp thoại In, kể cả khi người dùng bấm
+     * Ctrl+P thay vì nút In nhãn. Chỉ ghi nhật ký, không đụng vào dữ liệu phiếu nhập.
+     *
+     * Nhật ký lưu: in nhãn của hoá chất nào (tên + mã xuất nhập), bao nhiêu nhãn và
+     * thời điểm in - thời điểm chính là audittriallog.created_at, ghi thêm vào phần mô
+     * tả cho dễ đọc trên màn hình Audit Trail.
+     */
+    public function labelPrinted(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $copies = max(1, min(self::LABEL_MAX_COPIES, (int) $request->input('copies', 1)));
+
+        $row = DB::table(self::TABLE)
+            ->leftJoin('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->select(self::TABLE.'.id', self::TABLE.'.code', 'chem_names.name as chem_name')
+            ->where(self::TABLE.'.id', $request->id)
+            // Chỉ ghi nhận in nhãn của lô thuộc phòng ban đang chọn
+            ->where(self::TABLE.'.department_id', $departmentId)
+            ->first();
+
+        if (! $row) {
+            return response()->json(['ok' => false, 'message' => 'Không tìm thấy phiếu nhập cần in nhãn.'], 404);
+        }
+
+        $printedAt = now();
+
+        AuditTrialController::log(
+            'In nhãn',
+            self::TABLE,
+            $row->id,
+            'NA',
+            'In nhãn hoá chất: '.($row->chem_name ?: '(chưa có tên)')
+                .' | Mã xuất nhập: '.$row->code
+                .' | Số lượng nhãn: '.$copies
+                .' | Thời điểm in: '.$printedAt->format('d/m/Y H:i:s')
+        );
+
+        return response()->json([
+            'ok' => true,
+            'copies' => $copies,
+            'printedAt' => $printedAt->format('d/m/Y H:i:s'),
         ]);
     }
 
@@ -593,7 +642,7 @@ class ChemicalImportController extends Controller
      *
      * Cộng dồn các phiếu nhập còn hiệu lực trong khoảng ngày, gom theo
      * chemical_categories.code (mã danh mục hoá chất). Mỗi dòng có:
-     * - Số lượng theo đơn vị PHÒNG đã khai cho hoá chất đó (department_chemicals.unit_id)
+     * - Số lượng theo đơn vị PHÒNG đã khai cho hoá chất đó (chemical_department_categories.unit_id)
      * - Số lượng QUY ĐỔI SANG KG qua App\Support\UnitConverter
      *
      * Đơn vị nhóm đếm (chai, thùng...) không quy đổi tự động được, và đổi thể tích
@@ -685,6 +734,8 @@ class ChemicalImportController extends Controller
             $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
                 'code' => $code,
                 'department_id' => $departmentId,
+                // Ngày nhập là ngày bấm Lưu, người dùng không chọn được
+                'imported_date' => now()->format('Y-m-d'),
                 // Người nhập luôn là người đang đăng nhập, không nhận giá trị từ form
                 'imported_by' => $this->actor(),
                 'status_id' => 1,
@@ -726,7 +777,9 @@ class ChemicalImportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần điều chỉnh!');
         }
 
-        $rules = $this->rules($departmentId) + [
+        $importedDate = $current->imported_date ? \Carbon\Carbon::parse($current->imported_date)->format('Y-m-d') : null;
+
+        $rules = $this->rules($departmentId, $importedDate) + [
             'reason' => ['required', 'max:500'],
         ];
 
@@ -798,7 +851,7 @@ class ChemicalImportController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'suppliers.name as supplier_name',
-                'locations.name as location_name'
+                'locations.code as location_code'
             )
             ->where(self::HISTORY_TABLE.'.import_id', $import->id)
             ->orderBy(self::HISTORY_TABLE.'.id', 'desc')
@@ -822,7 +875,7 @@ class ChemicalImportController extends Controller
                     'Hạn sử dụng' => $date($row->expired_date),
                     'Hạn nội bộ' => $date($row->internal_expired_date),
                     'Nhà cung cấp' => $row->supplier_name ?: '—',
-                    'Vị trí lưu trữ' => $row->location_name ?: '—',
+                    'Vị trí lưu trữ' => $row->location_code ?: '—',
                     'Hoá đơn' => $row->invoice_number ? $row->invoice_number.' ('.$date($row->invoice_date).')' : '—',
                     'Hoá chất vi sinh' => $row->is_microbiological_chemicals ? 'Có' : 'Không',
                     'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
@@ -931,7 +984,7 @@ class ChemicalImportController extends Controller
                 ->mapWithKeys(fn ($row) => [$row->id => trim($row->code.' '.($row->chem_name ?? ''))])
                 ->all(),
             'supplier_id' => DB::table('suppliers')->pluck('name', 'id')->all(),
-            'location_id' => DB::table('locations')->pluck('name', 'id')->all(),
+            'location_id' => DB::table('locations')->pluck('code', 'id')->all(),
         ];
     }
 
@@ -984,7 +1037,7 @@ class ChemicalImportController extends Controller
     }
 
     /**
-     * Mã xuất nhập kế tiếp: "HC" + shortName phòng ban + đuôi ngẫu nhiên.
+     * Mã xuất nhập kế tiếp: "C" + shortName phòng ban + đuôi ngẫu nhiên.
      *
      * Không còn số thứ tự, không còn phụ thuộc danh mục hoá chất - xem
      * App\Support\ChemicalCode. Gọi trong transaction của lúc lưu.
@@ -1028,31 +1081,14 @@ class ChemicalImportController extends Controller
             ->pluck('times', 'import_id');
     }
 
-    /** Danh mục hoá chất đã duyệt và đang hoạt động mới được chọn để nhập. */
-    private function categoryOptions(int $departmentId)
+    /**
+     * Hoá chất được chọn để nhập: CHỈ những chất phòng đã khai ở tab "Hoá Chất Của Phòng".
+     *
+     * Chưa khai thì không nhập vào kho được - xem App\Support\DepartmentChemical.
+     */
+    private function categoryOptions(int $departmentId, array $keepIds = [])
     {
-        return DB::table('chemical_categories')
-            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            ->leftJoin('manufacturers', 'chemical_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('storage_conditions', 'chemical_categories.storage_condition_id', '=', 'storage_conditions.id')
-            // Đơn vị hiện trên ô chọn là đơn vị PHÒNG ĐANG CHỌN đã khai cho hoá chất đó
-            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'chemical_categories.id'))
-            ->select(
-                'chemical_categories.id',
-                'chemical_categories.code',
-                'chemical_categories.classification',
-                'chemical_categories.density',
-                'chem_names.name as chem_name',
-                'chem_names.cas_no as cas_no',
-                'manufacturers.name as manufacturer_name',
-                'manufacturers.short_name as manufacturer_short_name',
-                'storage_conditions.name as storage_condition_name',
-                'units.short_name as unit_short_name'
-            )
-            ->where('chemical_categories.status_id', 1)
-            ->where('chemical_categories.app_status', 'approved')
-            ->orderBy('chemical_categories.code', 'asc')
-            ->get();
+        return DepartmentChemical::importCategoryOptions($departmentId, $keepIds);
     }
 
     /**
@@ -1070,7 +1106,6 @@ class ChemicalImportController extends Controller
             ->select(
                 'locations.id',
                 'locations.code',
-                'locations.name',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
                 'shelves.name as shelf_name'
@@ -1080,7 +1115,7 @@ class ChemicalImportController extends Controller
             ->orderBy('warehouses.name', 'asc')
             ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
-            ->orderBy('locations.name', 'asc')
+            ->orderBy('locations.code', 'asc')
             ->get();
     }
 
@@ -1104,15 +1139,25 @@ class ChemicalImportController extends Controller
         return session('user')['fullName'] ?? 'NA';
     }
 
-    private function rules(int $departmentId): array
+    /**
+     * $importedDate: ngày nhập đã ghi của phiếu (lúc điều chỉnh) hoặc hôm nay (lúc tạo mới),
+     * dùng làm mốc cho Hạn sử dụng vì form không còn ô Ngày nhập.
+     */
+    private function rules(int $departmentId, ?string $importedDate = null): array
     {
         return [
-            'category_id' => ['required', 'exists:chemical_categories,id'],
+            // Chưa khai hoá chất ở tab "Hoá Chất Của Phòng" thì không được nhập vào kho:
+            // exists:chemical_categories,id không thôi thì sửa request là nhập được chất của phòng khác
+            'category_id' => [
+                'required',
+                Rule::exists('chemical_department_categories', 'category_id')
+                    ->where('department_id', $departmentId)
+                    ->where('status_id', 1),
+            ],
             'amount' => ['required', 'numeric', 'min:0.0001'],
-            'imported_date' => ['required', 'date'],
             'invoice_number' => ['nullable', 'max:100'],
             'invoice_date' => ['nullable', 'date'],
-            'expired_date' => ['nullable', 'date', 'after_or_equal:imported_date'],
+            'expired_date' => ['nullable', 'date', 'after_or_equal:'.($importedDate ?: now()->format('Y-m-d'))],
             'batch_no' => ['nullable', 'max:100'],
             'supplier_id' => ['nullable', 'exists:suppliers,id'],
             // Chỉ nhận vị trí thuộc ĐÚNG phòng ban đang chọn và còn hiệu lực:
@@ -1132,7 +1177,6 @@ class ChemicalImportController extends Controller
         return [
             'category_id' => (int) $request->category_id,
             'amount' => (float) $request->amount,
-            'imported_date' => $request->imported_date,
             'invoice_number' => $this->nullIfBlank($request->invoice_number),
             'invoice_date' => $this->nullIfBlank($request->invoice_date),
             'expired_date' => $this->nullIfBlank($request->expired_date),
@@ -1155,12 +1199,10 @@ class ChemicalImportController extends Controller
     {
         return [
             'category_id.required' => 'Vui lòng chọn hoá chất cần nhập.',
-            'category_id.exists' => 'Hoá chất được chọn không tồn tại trong danh mục.',
+            'category_id.exists' => 'Hoá chất được chọn chưa được phòng khai ở tab "Hoá Chất Của Phòng" nên không nhập vào kho được.',
             'amount.required' => 'Vui lòng nhập số lượng.',
             'amount.numeric' => 'Số lượng phải là số.',
             'amount.min' => 'Số lượng phải lớn hơn 0.',
-            'imported_date.required' => 'Vui lòng chọn ngày nhập.',
-            'imported_date.date' => 'Ngày nhập không hợp lệ.',
             'invoice_number.max' => 'Số hoá đơn tối đa 100 ký tự.',
             'invoice_date.date' => 'Ngày hoá đơn không hợp lệ.',
             'expired_date.date' => 'Hạn sử dụng không hợp lệ.',

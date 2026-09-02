@@ -111,18 +111,6 @@ class LoginController extends Controller
             ->where('id', $getUser->id)
             ->update(['passWord' => $newHash]);
 
-        $production = DB::table('production')
-            ->where('code', $getUser->deparment)
-            ->first();
-
-        if ($production) {
-            $production_code = $production->code;
-            $production_name = $production->name;
-        } else {
-            $production_code = 'PXV1';
-            $production_name = 'PX Viên 1';
-        }
-
         $request->session()->put('user', [
             'userId' => $getUser->id,
             'userName' => $getUser->userName,
@@ -130,8 +118,6 @@ class LoginController extends Controller
             'passWord' => $request->newPassword,
             'userGroup' => $getUser->userGroup,
             'department' => $getUser->deparment,
-            'production_code' => $production_code,
-            'production_name' => $production_name,
         ]);
 
         // 5️⃣ Ghi log và thông báo

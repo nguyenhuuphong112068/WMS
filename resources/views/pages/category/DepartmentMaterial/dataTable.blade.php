@@ -4,9 +4,11 @@
     <div class="card-body">
 
         <div class="md-toolbar">
-            <button type="button" class="btn btn-primary btn-md-create" data-modal="#dmCreateModal">
-                <i class="fas fa-plus mr-1"></i> Khai vật tư
-            </button>
+            @perm('category_material_dept_manage')
+                <button type="button" class="btn btn-primary btn-md-create" data-modal="#dmCreateModal">
+                    <i class="fas fa-plus mr-1"></i> Khai vật tư
+                </button>
+            @endperm
             <p class="hint">
                 <i class="fas fa-info-circle mr-1"></i>
                 Mỗi dòng ở đây cũng là lời khai <b>"phòng tôi có dùng vật tư này"</b>, hiện ở cột
@@ -87,34 +89,38 @@
                             </td>
                             <td>
                                 <div class="md-actions">
-                                    <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
-                                        data-modal="#dmUpdateModal"
-                                        data-row="{{ json_encode([
-                                            'id' => $row->id,
-                                            'category_id' => $row->category_id,
-                                            'classification_id' => $row->classification_id,
-                                            'unit_id' => $row->unit_id,
-                                            'min_stock' => $row->min_stock,
-                                            'note' => $row->note,
-                                            'material_name' => $row->material_name,
-                                            'manufacturer_name' => $row->manufacturer_name,
-                                        ]) }}">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-
-                                    <form class="form-md-confirm d-inline"
-                                        action="{{ route($mdRoute . 'deActive') }}" method="POST"
-                                        data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $mdLabel }}?"
-                                        data-text="{{ $row->status_id == 1 ? 'Sau khi khoá, vật tư' : 'Sau khi mở khoá, vật tư' }} &quot;{{ $row->material_name }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn tính là phòng đang dùng.' : 'sẽ dùng lại khai báo riêng của phòng.' }}"
-                                        data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                        @csrf
-                                        <input type="hidden" name="id" value="{{ $row->id }}">
-                                        <button type="submit"
-                                            class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                            title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                            <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                    @perm('category_material_dept_manage')
+                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
+                                            data-modal="#dmUpdateModal"
+                                            data-row="{{ json_encode([
+                                                'id' => $row->id,
+                                                'category_id' => $row->category_id,
+                                                'classification_id' => $row->classification_id,
+                                                'unit_id' => $row->unit_id,
+                                                'min_stock' => $row->min_stock,
+                                                'note' => $row->note,
+                                                'material_name' => $row->material_name,
+                                                'manufacturer_name' => $row->manufacturer_name,
+                                            ]) }}">
+                                            <i class="fas fa-edit"></i>
                                         </button>
-                                    </form>
+                                    @endperm
+
+                                    @perm('category_material_dept_manage')
+                                        <form class="form-md-confirm d-inline"
+                                            action="{{ route($mdRoute . 'deActive') }}" method="POST"
+                                            data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $mdLabel }}?"
+                                            data-text="{{ $row->status_id == 1 ? 'Sau khi khoá, vật tư' : 'Sau khi mở khoá, vật tư' }} &quot;{{ $row->material_name }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn tính là phòng đang dùng.' : 'sẽ dùng lại khai báo riêng của phòng.' }}"
+                                            data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
+                                            @csrf
+                                            <input type="hidden" name="id" value="{{ $row->id }}">
+                                            <button type="submit"
+                                                class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
+                                                title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
+                                                <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                            </button>
+                                        </form>
+                                    @endperm
                                 </div>
                             </td>
                         </tr>

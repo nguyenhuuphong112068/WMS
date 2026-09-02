@@ -36,9 +36,11 @@
                 <div class="exp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="expPaneBook">
 
                     <div class="md-toolbar">
-                        <button type="button" class="btn btn-primary btn-md-create">
-                            <i class="fas fa-plus mr-1"></i> Sử dụng chất chuẩn
-                        </button>
+                        @perm('export_standard_issue')
+                            <button type="button" class="btn btn-primary btn-md-create">
+                                <i class="fas fa-plus mr-1"></i> Sử dụng chất chuẩn
+                            </button>
+                        @endperm
                         <p class="hint">
                             <i class="fas fa-info-circle mr-1"></i>
                             Tổng cộng <b>{{ $datas->count() }}</b> phiếu.
@@ -133,21 +135,23 @@
                                             <div class="md-actions text-center">
                                                 @php $expAdjust = (int) ($adjustCounts[$row->id] ?? 0); @endphp
                                                 <span class="exp-btn-wrap">
-                                                    <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                        title="Cập nhật phiếu"
-                                                        data-row="{{ json_encode([
-                                                             'id' => $row->id,
-                                                             'import_id' => $row->import_id,
-                                                             'group_id' => $row->group_id,
-                                                             'amount' => $row->amount,
-                                                             'type' => $row->type,
-                                                             'product_name' => $row->product_name,
-                                                             'batch_no' => $row->batch_no,
-                                                             'testing' => $row->testing,
-                                                             'reason' => $row->reason,
-                                                         ]) }}">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
+                                                    @perm('export_standard_issue')
+                                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit"
+                                                            title="Cập nhật phiếu"
+                                                            data-row="{{ json_encode([
+                                                                 'id' => $row->id,
+                                                                 'import_id' => $row->import_id,
+                                                                 'group_id' => $row->group_id,
+                                                                 'amount' => $row->amount,
+                                                                 'type' => $row->type,
+                                                                 'product_name' => $row->product_name,
+                                                                 'batch_no' => $row->batch_no,
+                                                                 'testing' => $row->testing,
+                                                                 'reason' => $row->reason,
+                                                             ]) }}">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                    @endperm
 
                                                     @if ($expAdjust > 0)
                                                         <button type="button" class="exp-count-badge btn-exp-history"

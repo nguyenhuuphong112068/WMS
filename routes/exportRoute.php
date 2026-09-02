@@ -76,7 +76,8 @@ Route::prefix('/export')
 
         /*
         | SỬ DỤNG VẬT TƯ - bắt buộc qua đề nghị được phê duyệt (Trưởng/Phó Phòng bắt
-        | buộc, Ban Giám Đốc tuỳ chọn) rồi kho cấp phát, Tổ mới lập phiếu sử dụng.
+        | buộc, Ban Giám Đốc tuỳ chọn) rồi kho cấp phát. Cấp phát trừ tồn ngay; Tổ chỉ
+        | chốt lại đã dùng bao nhiêu hoặc trả về kho (useStore).
         | Loại bỏ (type = cancel) hàng hỏng thì lập thẳng, không cần đề nghị.
         */
         Route::prefix('/materialExport')->name('materialExport.')->controller(MaterialExportController::class)->group(function () {
@@ -87,7 +88,6 @@ Route::prefix('/export')
             Route::get('history', 'history')->name('history');
             Route::get('lookup', 'lookup')->name('lookup');
             Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
-            Route::get('getIssuedItems', 'getIssuedItems')->name('getIssuedItems');
 
             // Đề nghị cấp phát + trình ký
             Route::post('requestStore', 'requestStore')->name('requestStore');
@@ -101,5 +101,8 @@ Route::prefix('/export')
             // Cấp phát của kho
             Route::post('issueStore', 'issueStore')->name('issueStore');
             Route::post('issueReject', 'issueReject')->name('issueReject');
+
+            // Tổ chốt dòng đã cấp phát: ghi nhận sử dụng hoặc trả về kho
+            Route::post('useStore', 'useStore')->name('useStore');
         });
     });

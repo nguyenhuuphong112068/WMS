@@ -10,7 +10,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-scale-balanced"></i> Cân Đối Số Lượng Nhập</h5>
+                <h5 class="modal-title"><i class="fas fa-balance-scale"></i> Cân Đối Số Lượng Nhập</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 

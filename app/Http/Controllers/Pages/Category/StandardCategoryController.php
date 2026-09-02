@@ -26,7 +26,7 @@ use Illuminate\Validation\Rule;
  * Danh sách mã đầy đủ khai báo tại config/standard.php.
  *
  * ĐƠN VỊ TÍNH không khai ở đây: mỗi phòng nhập / xuất theo đơn vị của phòng mình nên
- * đơn vị nằm ở tab "Chất Chuẩn Của Phòng" (department_standards.unit_id).
+ * đơn vị nằm ở tab "Chất Chuẩn Của Phòng" (standard_department_categories.unit_id).
  *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về
  * "Chờ duyệt". Mọi thay đổi đều được chụp lại ở bảng standard_category_histories.
@@ -44,14 +44,17 @@ class StandardCategoryController extends Controller
 
     private const CODE_LENGTH = 5;
 
-    /** Các cột người dùng nhập, dùng chung cho so sánh lịch sử. Mã danh mục không sửa được nên không nằm ở đây. */
+    /**
+     * Các cột người dùng nhập, dùng chung cho so sánh lịch sử.
+     *
+     * Mã danh mục và version sinh tự động, người dùng không sửa được nên không nằm ở đây.
+     */
     private const FIELDS = [
         'chem_names_id' => 'Tên chất chuẩn',
         'cas_no' => 'Số CAS',
         'manufacturers_id' => 'Nguồn gốc / Nhà sản xuất',
         'density' => 'Tỷ trọng d (g/ml)',
         'storage_condition_id' => 'Điều kiện bảo quản',
-        'version' => 'Version',
         'groups' => 'Phân nhóm chuẩn',
         'shelf_life_months' => 'Hạn dùng mặc định (tháng)',
         'doc_no' => 'Số tài liệu',
@@ -94,7 +97,7 @@ class StandardCategoryController extends Controller
             'historyCounts' => $this->historyCounts(),
             /*
             | Danh mục dùng chung toàn công ty, nhưng mỗi phòng ban tự khai chất chuẩn nào
-            | phòng mình có dùng (bảng department_standards). Cột "Phòng Ban Đang Dùng"
+            | phòng mình có dùng (bảng standard_department_categories). Cột "Phòng Ban Đang Dùng"
             | đọc từ đó - chính là cột QC / QC1 / QC2 / AD của danh mục giấy.
             */
             'departmentsByCategory' => DepartmentStandard::departmentsByCategory(),
@@ -453,12 +456,23 @@ class StandardCategoryController extends Controller
     {
         $validator->after(function ($validator) use ($request, $ignoreId) {
             if ($ignoreId) {
-                $version = DB::table(self::TABLE)->where('id', $ignoreId)->value('version');
-                
+                $current = DB::table(self::TABLE)->where('id', $ignoreId)->first();
+
+                if (! $current) {
+                    return;
+                }
+
+                // Dữ liệu cũ có thể đang trùng sẵn từ trước khi có luật này; giữ nguyên tổ hợp
+                // cũ thì cho lưu, chỉ kiểm tra khi người dùng đổi Tên hoặc Nguồn gốc/NSX.
+                if ((int) $current->chem_names_id === (int) $request->chem_names_id
+                    && (int) $current->manufacturers_id === (int) $request->manufacturers_id) {
+                    return;
+                }
+
                 $exists = DB::table(self::TABLE)
                     ->where('chem_names_id', $request->chem_names_id)
                     ->where('manufacturers_id', $request->manufacturers_id)
-                    ->where('version', $version)
+                    ->where('version', $current->version)
                     ->where('id', '<>', $ignoreId)
                     ->exists();
 

@@ -36,7 +36,7 @@
     $dcNum = fn($value) => $value === null ? null : rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
 
     /** Đường dẫn định khu đầy đủ của một dòng, trống thì trả về null */
-    $dcPath = fn($row) => $row->location_name
+    $dcPath = fn($row) => $row->location_code
         ? ($row->warehouse_name ?: '—') . ' / ' . ($row->room_name ?: '—') . ' / ' . ($row->shelf_name ?: '—')
         : null;
 

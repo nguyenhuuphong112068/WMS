@@ -16,9 +16,11 @@
 <div class="exp-pane {{ $activeTab === 'disposal' ? 'is-active' : '' }}" id="expPaneDisposal">
 
     <div class="md-toolbar">
-        <button type="button" class="btn btn-primary" id="btnDspCreate" disabled>
-            <i class="fas fa-file-signature mr-1"></i> Xin quyết định huỷ (<span class="dsp-picked">0</span>)
-        </button>
+        @perm('export_chemical_disposal_manage')
+            <button type="button" class="btn btn-primary" id="btnDspCreate" disabled>
+                <i class="fas fa-file-signature mr-1"></i> Xin quyết định huỷ (<span class="dsp-picked">0</span>)
+            </button>
+        @endperm
         <p class="hint">
             <i class="fas fa-info-circle mr-1"></i>
             Huỷ hoá chất đi <b>hai bước</b>. <b>Bước 1 - Loại bỏ</b>: lập phiếu <b>Huỷ bỏ</b> ở tab Sổ sử dụng, hoá
@@ -138,27 +140,29 @@
                             class="btn btn-sm btn-success" title="In Phiếu Theo Dõi Và Quyết Định Huỷ">
                             <i class="fas fa-print mr-1"></i> In phiếu
                         </a>
-                        <button type="button" class="btn btn-sm btn-primary btn-dsp-complete"
-                            data-batch="{{ json_encode([
-                                'id' => $batch->id,
-                                'code' => $batch->code,
-                                'solid_weight' => $batch->solid_weight,
-                                'liquid_weight' => $batch->liquid_weight,
-                                'handover_date' => $batch->handover_date,
-                                'handover_by' => $batch->handover_by,
-                                'receive_date' => $batch->receive_date,
-                                'receive_by' => $batch->receive_by,
-                                'label_date' => $batch->label_date,
-                                'label_by' => $batch->label_by,
-                                'destroy_date' => $batch->destroy_date,
-                                'destroy_by' => $batch->destroy_by,
-                                'suggest_kg' => round((float) $batch->total_kg, 4),
-                            ]) }}">
-                            <i class="fas fa-truck-ramp-box mr-1"></i> Giao nhận &amp; theo dõi huỷ
-                        </button>
+                        @perm('export_chemical_disposal_decide')
+                            <button type="button" class="btn btn-sm btn-primary btn-dsp-complete"
+                                data-batch="{{ json_encode([
+                                    'id' => $batch->id,
+                                    'code' => $batch->code,
+                                    'solid_weight' => $batch->solid_weight,
+                                    'liquid_weight' => $batch->liquid_weight,
+                                    'handover_date' => $batch->handover_date,
+                                    'handover_by' => $batch->handover_by,
+                                    'receive_date' => $batch->receive_date,
+                                    'receive_by' => $batch->receive_by,
+                                    'label_date' => $batch->label_date,
+                                    'label_by' => $batch->label_by,
+                                    'destroy_date' => $batch->destroy_date,
+                                    'destroy_by' => $batch->destroy_by,
+                                    'suggest_kg' => round((float) $batch->total_kg, 4),
+                                ]) }}">
+                                <i class="fas fa-truck-ramp-box mr-1"></i> Giao nhận &amp; theo dõi huỷ
+                            </button>
+                        @endperm
                     @endif
 
-                    @if ($batch->app_status === 'pending' && $batch->status_id == 1)
+                    @if ($batch->app_status === 'pending' && $batch->status_id == 1 && user_can('export_chemical_disposal_decide'))
                         <button type="button" class="btn btn-sm btn-primary btn-dsp-decide" data-id="{{ $batch->id }}"
                             data-code="{{ $batch->code }}" data-answer="approved">
                             <i class="fas fa-stamp mr-1"></i> Ghi quyết định huỷ
@@ -169,7 +173,7 @@
                         </button>
                     @endif
 
-                    @if ($batch->editable)
+                    @if ($batch->editable && user_can('export_chemical_disposal_manage'))
                         <button type="button" class="btn btn-sm btn-warning btn-dsp-edit"
                             data-batch="{{ json_encode([
                                 'id' => $batch->id,
@@ -203,7 +207,7 @@
                         </form>
                     @endif
 
-                    @if (in_array($batch->app_status, ['draft', 'rejected'], true))
+                    @if (in_array($batch->app_status, ['draft', 'rejected'], true) && user_can('export_chemical_disposal_manage'))
                         <form class="form-md-confirm d-inline" action="{{ route($dspRoute . 'deActive') }}"
                             method="POST"
                             data-title="{{ $batch->status_id == 1 ? 'Khoá' : 'Mở khoá' }} đợt huỷ {{ $batch->code }}?"
@@ -265,7 +269,7 @@
                                         @endif
                                     </td>
                                     <td class="md-sub">{{ $item->purpose ?: '—' }}</td>
-                                    @if ($batch->editable)
+                                    @if ($batch->editable && user_can('export_chemical_disposal_manage'))
                                         <td class="text-center">
                                             <form class="form-md-confirm d-inline"
                                                 action="{{ route($dspRoute . 'removeItem') }}" method="POST"

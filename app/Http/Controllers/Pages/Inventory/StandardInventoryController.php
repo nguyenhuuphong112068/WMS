@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\Validator;
  *                           + SUM(standard_balancings.balancing_amount)
  *                           - SUM(standard_exports.amount)
  *
+ * LỌC THEO KỲ: chỉ hiện mã ống chuẩn CÓ PHÁT SINH hoặc CÒN TỒN trong kỳ - còn tồn cuối
+ * kỳ, hoặc có sử dụng, hoặc có loại bỏ (xem movedInPeriod). Ống đã hết sạch từ kỳ trước,
+ * trong kỳ không động tới thì không hiện.
+ *
  * KỲ BÁO CÁO: màn hình xét một khoảng "từ ngày - đến ngày" (mặc định là trọn tháng
  * hiện tại), tách công thức trên thành bốn chỉ số theo mốc thời gian:
  *
@@ -37,7 +41,7 @@ use Illuminate\Support\Facades\Validator;
  *   StandardExportController kiểm tra tồn khi ghi phiếu.
  * - Cả 'export' (sử dụng) và 'cancel' (huỷ bỏ) đều trừ tồn, nhưng tách thành hai cột
  *   để thấy phần hao hụt do huỷ.
- * - Số lượng theo đơn vị phòng đã khai cho chất chuẩn đó (department_standards.unit_id).
+ * - Số lượng theo đơn vị phòng đã khai cho chất chuẩn đó (standard_department_categories.unit_id).
  *
  * Màn hình chỉ đọc phần tồn, hai hành động ghi dữ liệu là:
  * - CÂN ĐỐI: phiếu sử dụng được xuất vượt tồn tối đa 5% nên tồn có thể âm ("Âm kho"),
@@ -56,6 +60,9 @@ class StandardInventoryController extends Controller
     private const LOW_STOCK_RATIO = 0.2;
 
     /** Sai số cho phép khi so tồn với 0 (cột decimal 15,4). */
+    /** Loại lưu trữ của định khu mà màn hình này quan tâm - xem locations.item_type. */
+    private const LOCATION_TYPE = 'standard';
+
     private const EPSILON = 0.00005;
 
     /**
@@ -457,7 +464,6 @@ class StandardInventoryController extends Controller
                 'suppliers.name as supplier_name',
                 'standard_imports.location_id',
                 'locations.code as location_code',
-                'locations.name as location_name',
                 'locations.warehouse_id',
                 'locations.room_id',
                 'locations.shelf_id',
@@ -609,7 +615,29 @@ class StandardInventoryController extends Controller
 
                 return $row;
             })
+            ->filter(fn ($row) => $this->movedInPeriod($row))
+            ->values()
             ->pipe(fn ($rows) => $this->withGroupTotals($rows));
+    }
+
+    /**
+     * LỌC THEO KỲ - một mã ống chuẩn chỉ hiện trên màn hình tồn khi trong kỳ đang xem
+     * có ít nhất một trong ba dấu hiệu:
+     *
+     *      - còn tồn cuối kỳ  (closing khác 0)
+     *      - có sử dụng       (period_used > 0)
+     *      - có loại bỏ       (period_cancelled > 0)
+     *
+     * Mã đã dùng hết từ những kỳ trước, trong kỳ này không nhập - không xuất - không loại bỏ
+     * (mọi cột đều bằng 0) thì không hiện ra nữa. Mã nhập mới trong kỳ luôn thoả điều kiện
+     * "còn tồn cuối kỳ" hoặc "có sử dụng" nên vẫn hiện bình thường. Riêng mã ÂM KHO
+     * (closing < 0) vẫn giữ lại để sai lệch số liệu không bị giấu đi.
+     */
+    private function movedInPeriod($row): bool
+    {
+        return abs($row->closing) > self::EPSILON
+            || $row->period_used > self::EPSILON
+            || $row->period_cancelled > self::EPSILON;
     }
 
     /**
@@ -774,8 +802,23 @@ class StandardInventoryController extends Controller
             'warehouses' => $of('warehouses', ['id', 'code', 'name']),
             'rooms' => $of('rooms', ['id', 'code', 'name', 'warehouse_id']),
             'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'room_id']),
-            'locations' => $of('locations', ['id', 'code', 'name', 'warehouse_id', 'room_id', 'shelf_id']),
+            'locations' => $this->locationOptions($departmentId),
         ];
+    }
+
+    /**
+     * Chỉ lấy các ô đã khai loại lưu trữ là CHẤT CHUẨN. Ô chưa khai loại là "Dùng chung"
+     * nên vẫn lấy - định khu cũ chưa phân loại không bị biến mất khỏi màn hình này.
+     */
+    private function locationOptions(int $departmentId)
+    {
+        return DB::table('locations')
+            ->select(['id', 'code', 'warehouse_id', 'room_id', 'shelf_id', 'item_type'])
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
+            ->orderBy('code', 'asc')
+            ->get();
     }
 
     /** Cộng dồn tồn của các mã ống chuẩn về từng chất chuẩn trong danh mục. */
@@ -843,7 +886,7 @@ class StandardInventoryController extends Controller
         }
 
         /*
-        | "Sắp hết" ưu tiên ngưỡng tồn tối thiểu do PHÒNG BAN khai trong department_standards.
+        | "Sắp hết" ưu tiên ngưỡng tồn tối thiểu do PHÒNG BAN khai trong standard_department_categories.
         | Phòng chưa khai thì tính theo tỉ lệ so với lượng nhập ban đầu.
         */
         if ($row->min_stock !== null) {

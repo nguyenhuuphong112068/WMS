@@ -7,9 +7,11 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    <button type="button" class="btn btn-primary btn-md-create">
-                        <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
-                    </button>
+                    @perm('estimate_standard_create')
+                        <button type="button" class="btn btn-primary btn-md-create">
+                            <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
+                        </button>
+                    @endperm
                     <p class="hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Phiếu chỉ sửa được khi còn <b>Nháp</b> hoặc <b>Bị từ chối</b>. Trình ký xong là khoá nội dung.
@@ -133,7 +135,7 @@
                                                 <i class="fas fa-route"></i>
                                             </button>
 
-                                            @if ($estEditable)
+                                            @if ($estEditable && user_can('estimate_standard_update'))
                                                 <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
                                                     data-row="{{ json_encode([
                                                         'id' => $row->id,
@@ -155,7 +157,7 @@
                                                 </form>
                                             @endif
 
-                                            @if ($row->app_status === 'pending_manager' && $canSignManager)
+                                            @if ($row->app_status === 'pending_manager' && $canSignManager && user_can('estimate_standard_sign'))
                                                 <form class="form-md-confirm d-inline" action="{{ route($estRoute . 'signManager') }}"
                                                     method="POST" data-title="Ký duyệt bước Phó/Trưởng Phòng?"
                                                     data-text="Phiếu {{ $row->code }} sẽ được chuyển tiếp lên Ban Giám Đốc ký.">
@@ -167,7 +169,7 @@
                                                 </form>
                                             @endif
 
-                                            @if ($row->app_status === 'pending_director' && $canSignDirector)
+                                            @if ($row->app_status === 'pending_director' && $canSignDirector && user_can('estimate_standard_sign'))
                                                 <form class="form-md-confirm d-inline" action="{{ route($estRoute . 'signDirector') }}"
                                                     method="POST" data-title="Ban Giám Đốc phê duyệt phiếu {{ $row->code }}?"
                                                     data-text="Sau khi phê duyệt, phiếu chuyển sang bộ phận Cung Ứng tiếp nhận giải quyết.">
@@ -181,14 +183,14 @@
 
                                             @if (
                                                 ($row->app_status === 'pending_manager' && $canSignManager) ||
-                                                    ($row->app_status === 'pending_director' && $canSignDirector))
+                                                    ($row->app_status === 'pending_director' && $canSignDirector)) && user_can('estimate_standard_sign')
                                                 <button type="button" class="btn btn-sm btn-outline-danger btn-est-reject"
                                                     title="Từ chối" data-id="{{ $row->id }}" data-code="{{ $row->code }}">
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             @endif
 
-                                            @if ($estEditable)
+                                            @if ($estEditable && user_can('estimate_standard_delete'))
                                                 <form class="form-md-confirm-cancel d-inline" action="{{ route($estRoute . 'destroy') }}"
                                                     method="POST"
                                                     data-title="Huỷ phiếu dự trù {{ $row->code }}?"

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pages\Inventory;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentChemical;
+use App\Support\InventoryChart;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -18,6 +19,10 @@ use Illuminate\Support\Facades\Validator;
  *      Tồn của một mã xuất nhập = imports.amount
  *                           + SUM(inventory_balancings.balancing_amount)
  *                           - SUM(exports.amount)
+ *
+ * LỌC THEO KỲ: chỉ hiện mã xuất nhập CÓ PHÁT SINH hoặc CÒN TỒN trong kỳ - còn tồn cuối
+ * kỳ, hoặc có sử dụng, hoặc có loại bỏ (xem movedInPeriod). Mã đã hết sạch từ kỳ trước,
+ * trong kỳ không động tới thì không hiện.
  *
  * KỲ BÁO CÁO: màn hình xét một khoảng "từ ngày - đến ngày" (mặc định là trọn tháng
  * hiện tại), tách công thức trên thành các chỉ số theo mốc thời gian:
@@ -42,7 +47,7 @@ use Illuminate\Support\Facades\Validator;
  *   ChemicalExportController kiểm tra tồn khi ghi phiếu.
  * - Cả 'export' (sử dụng) và 'cancel' (huỷ bỏ) đều trừ tồn, nhưng tách thành hai
  *   cột để thấy phần hao hụt do huỷ.
- * - Số lượng theo đơn vị phòng đã khai cho hoá chất đó (department_chemicals.unit_id).
+ * - Số lượng theo đơn vị phòng đã khai cho hoá chất đó (chemical_department_categories.unit_id).
  *
  * Màn hình chỉ đọc phần tồn, riêng CÂN ĐỐI là hành động ghi dữ liệu: phiếu sử dụng
  * được xuất vượt tồn tối đa 5% nên tồn có thể âm ("Âm kho"), nút Cân Đối ghi thêm
@@ -64,6 +69,9 @@ class ChemicalInventoryController extends Controller
     private const LOW_STOCK_RATIO = 0.2;
 
     /** Sai số cho phép khi so tồn với 0 (cột decimal 15,4). */
+    /** Loại lưu trữ của định khu mà màn hình này quan tâm - xem locations.item_type. */
+    private const LOCATION_TYPE = 'chemical';
+
     private const EPSILON = 0.00005;
 
     /**
@@ -182,7 +190,7 @@ class ChemicalInventoryController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'import_id' => ['required', 'exists:imports,id'],
+            'import_id' => ['required', 'exists:chemical_imports,id'],
             'balancing_amount' => ['required', 'numeric', 'not_in:0'],
             'balancing_at' => ['required', 'date'],
         ], [
@@ -317,7 +325,7 @@ class ChemicalInventoryController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'import_id' => ['required', 'exists:imports,id'],
+            'import_id' => ['required', 'exists:chemical_imports,id'],
             'determined_date' => ['required', 'date'],
         ], [
             'import_id.required' => 'Vui lòng chọn mã xuất nhập cần xác định.',
@@ -369,6 +377,70 @@ class ChemicalInventoryController extends Controller
     }
 
     /**
+     * BIỂU ĐỒ NHẬP - XUẤT - TỒN CỦA MỘT HOÁ CHẤT (trả JSON cho modal).
+     *
+     * Mở bằng nút biểu đồ trên bảng "Tồn Cộng Dồn Theo Hoá Chất". Kỳ báo cáo đọc lại
+     * đúng $period của màn hình (from_date / to_date trên thanh Kỳ Báo Cáo) nên số liệu
+     * trong biểu đồ luôn khớp với con số đang hiện trên bảng.
+     *
+     * Kỳ được chia thành các MỐC theo độ dài để trục ngang luôn đọc được:
+     * <= 31 ngày thì từng ngày, <= 6 tháng thì từng tuần, dài hơn thì từng tháng.
+     *
+     * Mỗi mốc có: nhập, cân đối, sử dụng, huỷ (cột) và TỒN CUỐI MỐC (đường), trong đó
+     * tồn cuối mốc cộng dồn từ tồn đầu kỳ:
+     *
+     *      tồn cuối mốc = tồn cuối mốc trước + nhập + cân đối - sử dụng - huỷ
+     *
+     * Chỉ hỏi DB 3 câu cho toàn kỳ rồi chia mốc trong PHP, không hỏi lại theo từng mốc.
+     */
+    public function chart(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $period = $this->period($request);
+
+        $query = DB::table('chemical_categories')
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id');
+
+        // Đơn vị tính và ngưỡng tồn tối thiểu lấy theo khai báo của phòng ban đang chọn
+        $category = DepartmentChemical::join($query, $departmentId, 'chemical_categories.id')
+            ->leftJoin('units', DepartmentChemical::TABLE.'.unit_id', '=', 'units.id')
+            ->select(
+                'chemical_categories.id',
+                'chemical_categories.code',
+                'chem_names.name as chem_name',
+                DepartmentChemical::minStockColumn(),
+                'units.short_name as unit_short_name',
+                'units.name as unit_name'
+            )
+            ->where('chemical_categories.id', (int) $request->query('category_id'))
+            ->first();
+
+        if (! $category) {
+            return response()->json(['message' => 'Không tìm thấy hoá chất cần xem biểu đồ.'], 404);
+        }
+
+        // Phần chia mốc và cộng dồn tồn dùng chung với màn hình Tồn Kho Vật Tư
+        $series = InventoryChart::series(
+            $period,
+            $this->chartImports($departmentId, $category->id, $period['to']),
+            $this->chartExports($departmentId, $category->id, $period['to']),
+            $this->chartBalancings($departmentId, $category->id, $period['to'])
+        );
+
+        return response()->json($series + [
+            'category_code' => $category->code,
+            'chem_name' => $category->chem_name,
+            'unit' => $category->unit_short_name ?: $category->unit_name,
+            'period' => $period + [
+                'label' => \Carbon\Carbon::parse($period['from'])->format('d/m/Y')
+                    .' - '.\Carbon\Carbon::parse($period['to'])->format('d/m/Y'),
+            ],
+            // Ngưỡng tồn tối thiểu của phòng, vẽ thành đường kẻ đứt để thấy lúc nào chạm đáy
+            'min_stock' => $category->min_stock === null ? null : (float) $category->min_stock,
+        ]);
+    }
+
+    /**
      * Tồn theo từng mã xuất nhập của phòng ban đang chọn.
      *
      * Lấy phiếu nhập và số lượng đã xuất bằng hai câu truy vấn rồi ghép trong PHP:
@@ -417,7 +489,6 @@ class ChemicalInventoryController extends Controller
                 'suppliers.name as supplier_name',
                 'chemical_imports.location_id',
                 'locations.code as location_code',
-                'locations.name as location_name',
                 'locations.warehouse_id',
                 'locations.room_id',
                 'locations.shelf_id',
@@ -542,7 +613,29 @@ class ChemicalInventoryController extends Controller
 
                 return $row;
             })
+            ->filter(fn ($row) => $this->movedInPeriod($row))
+            ->values()
             ->pipe(fn ($rows) => $this->withGroupTotals($rows));
+    }
+
+    /**
+     * LỌC THEO KỲ - một mã xuất nhập chỉ hiện trên màn hình tồn khi trong kỳ đang xem
+     * có ít nhất một trong ba dấu hiệu:
+     *
+     *      - còn tồn cuối kỳ  (closing khác 0)
+     *      - có sử dụng       (period_used > 0)
+     *      - có loại bỏ       (period_cancelled > 0)
+     *
+     * Mã đã dùng hết từ những kỳ trước, trong kỳ này không nhập - không xuất - không loại bỏ
+     * (mọi cột đều bằng 0) thì không hiện ra nữa. Mã nhập mới trong kỳ luôn thoả điều kiện
+     * "còn tồn cuối kỳ" hoặc "có sử dụng" nên vẫn hiện bình thường. Riêng mã ÂM KHO
+     * (closing < 0) vẫn giữ lại để sai lệch số liệu không bị giấu đi.
+     */
+    private function movedInPeriod($row): bool
+    {
+        return abs($row->closing) > self::EPSILON
+            || $row->period_used > self::EPSILON
+            || $row->period_cancelled > self::EPSILON;
     }
 
     /**
@@ -711,8 +804,23 @@ class ChemicalInventoryController extends Controller
             'warehouses' => $of('warehouses', ['id', 'code', 'name']),
             'rooms' => $of('rooms', ['id', 'code', 'name', 'warehouse_id']),
             'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'room_id']),
-            'locations' => $of('locations', ['id', 'code', 'name', 'warehouse_id', 'room_id', 'shelf_id']),
+            'locations' => $this->locationOptions($departmentId),
         ];
+    }
+
+    /**
+     * Chỉ lấy các ô đã khai loại lưu trữ là HOÁ CHẤT. Ô chưa khai loại là "Dùng chung"
+     * nên vẫn lấy - định khu cũ chưa phân loại không bị biến mất khỏi màn hình này.
+     */
+    private function locationOptions(int $departmentId)
+    {
+        return DB::table('locations')
+            ->select(['id', 'code', 'warehouse_id', 'room_id', 'shelf_id', 'item_type'])
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
+            ->orderBy('code', 'asc')
+            ->get();
     }
 
     /** Cộng dồn tồn của các mã xuất nhập về từng hoá chất trong danh mục. */
@@ -725,6 +833,8 @@ class ChemicalInventoryController extends Controller
                 $inStock = $rows->filter(fn ($row) => $row->remaining > self::EPSILON);
 
                 return (object) [
+                    // Khoá của dòng cộng dồn, nút Biểu Đồ gửi lên chart() theo id này
+                    'category_id' => (int) $first->category_id,
                     'category_code' => $first->category_code,
                     // Giữ lại để bộ lọc Phụ lục / Nhóm hoá chất dùng được ở bảng cộng dồn
                     'classification' => $first->classification,
@@ -779,7 +889,7 @@ class ChemicalInventoryController extends Controller
         }
 
         /*
-        | "Sắp hết" ưu tiên ngưỡng tồn tối thiểu do PHÒNG BAN khai trong department_chemicals:
+        | "Sắp hết" ưu tiên ngưỡng tồn tối thiểu do PHÒNG BAN khai trong chemical_department_categories:
         | 20% của 1000 lít khác hẳn 20% của 100 ml. Phòng chưa khai thì giữ nguyên cách cũ
         | là tính theo tỉ lệ, nên hành vi không đổi cho tới khi có người khai ngưỡng.
         */
@@ -792,6 +902,59 @@ class ChemicalInventoryController extends Controller
         }
 
         return 'in';
+    }
+
+    /** Các lần NHẬP của một hoá chất, tính đến hết ngày cuối kỳ (kể cả trước kỳ, để tính tồn đầu kỳ). */
+    private function chartImports(int $departmentId, int $categoryId, string $to)
+    {
+        return DB::table('chemical_imports')
+            ->select('imported_date as at', 'amount')
+            ->where('department_id', $departmentId)
+            ->where('category_id', $categoryId)
+            ->where('status_id', 1)
+            ->whereDate('imported_date', '<=', $to)
+            ->get();
+    }
+
+    /**
+     * Các lần SỬ DỤNG / HUỶ của một hoá chất, tính đến hết ngày cuối kỳ.
+     *
+     * Phiếu sử dụng chỉ trỏ tới mã xuất nhập nên phải join ngược về chemical_imports
+     * mới biết nó thuộc hoá chất nào; phiếu nhập đã khoá thì phần đã xuất của nó cũng
+     * không tính, đúng như cách stockByCode() bỏ qua các phiếu nhập status_id = 0.
+     */
+    private function chartExports(int $departmentId, int $categoryId, string $to)
+    {
+        return DB::table('chemical_exports')
+            ->join('chemical_imports', 'chemical_exports.import_id', '=', 'chemical_imports.id')
+            ->select(
+                'chemical_exports.exported_date as at',
+                'chemical_exports.amount',
+                'chemical_exports.type'
+            )
+            ->where('chemical_exports.department_id', $departmentId)
+            ->where('chemical_exports.status_id', 1)
+            ->where('chemical_imports.category_id', $categoryId)
+            ->where('chemical_imports.status_id', 1)
+            ->whereDate('chemical_exports.exported_date', '<=', $to)
+            ->get();
+    }
+
+    /** Các lần CÂN ĐỐI của một hoá chất, tính đến hết ngày cuối kỳ. */
+    private function chartBalancings(int $departmentId, int $categoryId, string $to)
+    {
+        return DB::table('chemical_balancings')
+            ->join('chemical_imports', 'chemical_balancings.import_id', '=', 'chemical_imports.id')
+            ->select(
+                'chemical_balancings.balancing_at as at',
+                'chemical_balancings.balancing_amount as amount'
+            )
+            ->where('chemical_balancings.department_id', $departmentId)
+            ->where('chemical_balancings.status_id', 1)
+            ->where('chemical_imports.category_id', $categoryId)
+            ->where('chemical_imports.status_id', 1)
+            ->whereDate('chemical_balancings.balancing_at', '<=', $to)
+            ->get();
     }
 
     private function departmentId(): int

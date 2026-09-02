@@ -1,6 +1,6 @@
 ---
 name: wms-rules
-description: Quy tắc bắt buộc khi code dự án WMS (Laravel Blade - Quản Lý Kho). Dùng skill này MỖI KHI tạo/sửa Controller, View Blade, Route, migration, đặt tên bảng CSDL, giao diện, màu sắc, hoặc khi tổ chức thư mục file trong dự án này. Bao gồm - chỉ dùng Query Builder trong Controller, quy tắc đặt tên bảng CSDL, bảng màu xanh dương nhạt, chuẩn giao diện chuyên nghiệp, và cấu trúc thư mục theo nhóm chức năng trên leftNAV.
+description: Quy tắc bắt buộc khi code dự án WMS (Laravel Blade - Quản Lý Kho). Dùng skill này MỖI KHI tạo/sửa Controller, View Blade, Route, migration, đặt tên bảng CSDL, giao diện, màu sắc, khi thêm thư viện JS/CSS/font/icon hoặc plugin frontend, và khi tổ chức thư mục file trong dự án này. Bao gồm - chỉ dùng Query Builder trong Controller, CẤM dùng CDN vì server deploy không có internet (mọi thư viện phải tải về public/ và nạp qua asset()), quy tắc đặt tên bảng CSDL, bảng màu xanh dương nhạt, chuẩn giao diện chuyên nghiệp, và cấu trúc thư mục theo nhóm chức năng trên leftNAV.
 ---
 
 # Quy Tắc Chung Dự Án WMS (Quản Lý Kho)
@@ -77,7 +77,54 @@ Biến CSS được khai báo tập trung tại [resources/views/layout/css.blad
 
 ---
 
-## 4. Cấu trúc thư mục theo nhóm chức năng trên leftNAV
+## 4. Chỉ dùng thư viện offline — CẤM mọi link CDN
+
+**Server triển khai (máy con tại nhà máy) KHÔNG có internet.** Mọi thư viện, font, icon, file ngôn ngữ phải nằm sẵn trong dự án và nạp qua `asset()`.
+
+- ❌ Cấm mọi link ra ngoài: `cdn.datatables.net`, `cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, `unpkg.com`, `code.jquery.com`, `use.fontawesome.com`, `stackpath.bootstrapcdn.com`, `fonts.googleapis.com`...
+- ❌ Cấm cả dạng viết tắt không có scheme: `//cdn.something.net/...`
+- ❌ Cấm `@import url("https://...")` trong file CSS.
+- ❌ Cấm nạp file cấu hình / ngôn ngữ từ mạng — lỗi hay gặp nhất là DataTables:
+  `language: { url: "//cdn.datatables.net/plug-ins/1.10.21/i18n/Vietnamese.json" }`
+- ✅ Tất cả `<script src>` và `<link href>` đều phải là `{{ asset('...') }}` trỏ vào `public/`.
+
+**Chỗ đặt file trong `public/`:**
+
+| Loại tài nguyên | Thư mục |
+|---|---|
+| Plugin AdminLTE / jQuery | `public/dataTable/plugins/<tên-plugin>/` |
+| JS dùng chung | `public/js/` |
+| CSS dùng chung | `public/css/` |
+| Font của icon | `public/css/fonts/`, `public/dataTable/plugins/fontawesome-free/webfonts/` |
+| File ngôn ngữ DataTables | `public/dataTable/plugins/datatables/i18n/vi.json` |
+
+**Khi cần thêm thư viện mới:**
+
+1. Tải file `.min.js` / `.min.css` về đúng thư mục trên — **kèm theo cả font/ảnh mà CSS gọi bằng `url(...)`**, nếu không icon sẽ mất khi chạy offline.
+2. Nạp bằng `asset()` trong blade của màn hình đó; nếu dùng toàn hệ thống thì khai báo ở [resources/views/layout/css.blade.php](resources/views/layout/css.blade.php) / [resources/views/layout/js.blade.php](resources/views/layout/js.blade.php).
+3. Mở trang kiểm tra Network tab — không được có request nào ra ngoài LAN.
+
+**DataTables tiếng Việt — luôn dùng bản local:**
+
+```blade
+$('#myTable').DataTable({
+    language: { url: "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}" }
+});
+```
+
+Hoặc khai báo inline như phần lớn màn hình đang dùng (`search`, `lengthMenu`, `info`, `zeroRecords`, `emptyTable`, `paginate`) — cách này không cần tải file, an toàn nhất.
+
+**Không dùng `@vite` / `npm run build` cho trang nghiệp vụ.** Dự án không build asset khi deploy, server không có `node_modules`. Thư viện frontend lấy trực tiếp từ `public/`.
+
+**Kiểm tra trước khi deploy** — kết quả phải rỗng:
+
+```bash
+grep -rIn "cdn\.\|googleapis\|jsdelivr\|unpkg\|cloudflare\|bootstrapcdn\|use\.fontawesome\|code\.jquery" resources/
+```
+
+---
+
+## 5. Cấu trúc thư mục theo nhóm chức năng trên leftNAV
 
 Hệ thống là **một khối thống nhất**, không chia phân hệ. Không có màn hình chọn phân hệ, không có `session('module')`, không có thư mục `Material/` / `Chemical/` / `General/` trong `Pages/`.
 
@@ -157,7 +204,7 @@ Không đặt file lạc thư mục. Không tạo lại cấu trúc phân hệ (
 
 ---
 
-## 5. Quy tắc đặt tên bảng CSDL
+## 6. Quy tắc đặt tên bảng CSDL
 
 **Không dùng tiền tố.** Tên bảng viết thẳng theo nội dung bảng: `chem_names`, `material_names`, `units`, `packaging_specifications`, `warehouses`, `statuses`... Không thêm `wms_`, `gen_`, `mat_`, `che_` hay bất kỳ tiền tố phân hệ / phân nhóm nào.
 
@@ -196,7 +243,29 @@ $datas = DB::table('materials')
 
 ---
 
-## 6. Quy ước khác đang áp dụng
+## 7. Ngày thao tác do hệ thống ghi, người dùng KHÔNG được chỉnh
+
+**Bắt buộc:** ngày của một thao tác nhập / xuất / cấp phát là **thời điểm thực hiện thao tác**, do server tự lấy bằng `now()`. Tuyệt đối không đưa ô cho người dùng tự chọn.
+
+- ❌ Không có `<input type="date" name="imported_date">`, `exported_date`, `issued_at`... trên form (kể cả `readonly` hay `hidden` gửi giá trị lên).
+- ✅ Controller tự set: `'imported_date' => now()->format('Y-m-d')`, `'exported_date' => now()->format('Y-m-d')`, `'issued_at' => now()`.
+- ✅ Bỏ luôn khỏi `rules()` / `messages()` và không đọc `$request->imported_date` nữa — có gửi lên cũng bỏ qua.
+- ✅ Form điều chỉnh (update) cũng **không** cho sửa ngày thao tác: giữ nguyên giá trị đã ghi lúc tạo phiếu, và bỏ trường đó khỏi danh sách `FIELDS` theo dõi thay đổi.
+- Muốn cho người dùng thấy ngày thì hiển thị dạng chữ (`<div class="val">{{ ... }}</div>`) hoặc để bảng dataTable hiển thị, không dùng input.
+
+**Ngoại lệ — vẫn cho người dùng nhập tay** vì đây là dữ liệu của chứng từ / kế hoạch, không phải thời điểm thao tác:
+
+| Trường | Màn hình |
+|---|---|
+| `expired_date` (Hạn sử dụng) | Nhập vật tư / hoá chất / chất chuẩn |
+| `invoice_date` (Ngày hoá đơn) | Nhập hoá chất |
+| `needed_date` (Ngày cần dùng) | Đề nghị cấp phát |
+| `qa_approved_at`, `director_approved_at`, `handover_date`, `receive_date`, `label_date`, `destroy_date`, `summarized_at`, `checked_at` | Quy trình huỷ / phê duyệt hoá chất |
+| Bộ lọc `from` / `to` trên báo cáo | dataTable |
+
+---
+
+## 8. Quy ước khác đang áp dụng
 
 - Thông tin đăng nhập nằm trong `session('user')`: `userId`, `userName`, `fullName`, `userGroup`, `department`, `selected_department`, `selected_department_id`.
 - Đăng nhập thành công vào thẳng `pages.home`. Không có bước chọn phân hệ, không dùng `session('module')`.

@@ -94,7 +94,7 @@
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
-                                        {{ $location->name }} ({{ $location->code }})
+                                        {{ $location->code }}
                                     </option>
                                 @endforeach
                             </select>

@@ -2,6 +2,11 @@
     // Định dạng số lượng: bỏ số 0 thừa ở phần thập phân (giống shared/detail.blade.php).
     // Bảng này được @include từ dataTable nên phải tự khai, không kế thừa từ trang chi tiết.
     $estNum = fn($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
+
+    // Quyền cập nhật theo dõi giao hàng suy ra từ $estRoute (vật tư / hoá chất / chất chuẩn).
+    $estTrackPerm = str_contains($estRoute, 'materialEstimate')
+        ? 'estimate_material_tracking'
+        : (str_contains($estRoute, 'standardEstimate') ? 'estimate_standard_tracking' : 'estimate_chemical_tracking');
 @endphp
 
 <div class="table-responsive">
@@ -54,6 +59,7 @@
                         @endif
                         
                         <div class="mt-2 pt-2 border-top">
+                            @if (user_can($estTrackPerm))
                             <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline mr-1 form-md-confirm" data-title="Xác nhận hoàn thành?" data-text="Mặt hàng này đã được giao đến khoa/phòng?">
                                 @csrf
                                 <input type="hidden" name="id" value="{{ $item->id }}">
@@ -66,6 +72,7 @@
                                 <input type="hidden" name="action" value="cancel">
                                 <button type="submit" class="btn btn-sm btn-danger" title="Không cần dự trù nữa"><i class="fas fa-times"></i> Huỷ</button>
                             </form>
+                            @endif
                         </div>
                     </td>
                     <td>
@@ -100,7 +107,7 @@
                             @csrf
                             <input type="hidden" name="id" value="{{ $item->id }}">
                             <div class="d-flex align-items-center mb-1">
-                                <input type="date" name="promised_date" class="form-control form-control-sm input-promised-date flex-grow-1" value="{{ $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('Y-m-d') : '' }}" data-route="{{ route($estRoute . 'updatePromisedDate') }}">
+                                <input type="date" name="promised_date" {{ user_can($estTrackPerm, 'disabled') }} class="form-control form-control-sm input-promised-date flex-grow-1" value="{{ $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('Y-m-d') : '' }}" data-route="{{ route($estRoute . 'updatePromisedDate') }}">
                                 <button type="button" class="btn btn-sm btn-link text-info p-1 ml-1 btn-promised-date-history position-relative" data-item-id="{{ $item->id }}" data-route="{{ route($estRoute . 'getPromisedDateHistory', $item->id) }}" title="Lịch sử ngày hẹn">
                                     <i class="fas fa-history"></i>
                                     @if ($item->history_count > 0)
@@ -155,7 +162,7 @@
         $('#mdTrackingTable').DataTable({
             "order": [], // Let the server handle ordering by promised_date asc
             "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.10.21/i18n/Vietnamese.json"
+                "url": "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}"
             }
         });
 

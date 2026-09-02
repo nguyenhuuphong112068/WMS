@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Validator;
  *
  * PHÂN LOẠI và ĐƠN VỊ TÍNH không khai ở đây: mỗi phòng có bộ nhóm phân loại riêng và
  * nhập / xuất theo đơn vị của phòng mình, nên hai thứ đó nằm ở tab "Vật Tư Của Phòng"
- * (department_materials.classification_id / unit_id).
+ * (material_department_categories.classification_id / unit_id).
  *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về "Chờ duyệt".
  * Mọi thay đổi đều được chụp lại ở bảng material_category_histories.
@@ -31,6 +31,10 @@ class MaterialCategoryController extends Controller
     private const TABLE = 'material_categories';
     private const HISTORY_TABLE = 'material_category_histories';
     private const LABEL = 'danh mục vật tư công ty';
+
+    /** Tiền tố mã danh mục sinh tự động: M00001, M00002... */
+    private const CODE_PREFIX = 'M';
+    private const CODE_LENGTH = 5;
 
     /** Các cột người dùng nhập, dùng chung cho validate - lưu - so sánh lịch sử. */
     private const FIELDS = [
@@ -65,11 +69,12 @@ class MaterialCategoryController extends Controller
             'datas' => $datas,
             'materialNames' => $this->options('material_names', $datas->pluck('material_names_id')->all()),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
+            'nextCode' => $this->nextCode(),
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa thay vì một nút riêng
             'historyCounts' => $this->historyCounts(),
             /*
             | Danh mục dùng chung toàn công ty, nhưng mỗi phòng ban tự khai vật tư nào phòng
-            | mình có dùng (bảng department_materials). Cột "Phòng Ban Đang Dùng" đọc từ đó.
+            | mình có dùng (bảng material_department_categories). Cột "Phòng Ban Đang Dùng" đọc từ đó.
             */
             'departmentsByCategory' => DepartmentMaterial::departmentsByCategory(),
 
@@ -94,19 +99,25 @@ class MaterialCategoryController extends Controller
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
         }
 
-        $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
-            'app_status' => 'pending',
-            'status_id' => 1,
-            'created_by' => $this->actor(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // Sinh mã và ghi bản ghi trong cùng một transaction để hai người thêm cùng lúc không trùng mã
+        $id = DB::transaction(function () use ($request) {
+            return DB::table(self::TABLE)->insertGetId($this->payload($request) + [
+                'code' => $this->nextCode(),
+                'app_status' => 'pending',
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
 
-        $this->writeHistory($id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . '.');
+        $code = DB::table(self::TABLE)->where('id', $id)->value('code');
+
+        $this->writeHistory($id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . ', mã ' . $code . '.');
 
         AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', $this->describe($id));
 
-        return redirect()->back()->with('success', 'Đã thêm ' . self::LABEL . ' thành công! Bản ghi đang chờ duyệt.');
+        return redirect()->back()->with('success', 'Đã thêm ' . self::LABEL . ' mã ' . $code . '! Bản ghi đang chờ duyệt.');
     }
 
     public function update(Request $request)
@@ -201,6 +212,7 @@ class MaterialCategoryController extends Controller
         return response()->json([
             'rows' => $rows->map(function ($row) {
                 $snapshot = [
+                    'Mã vật tư' => $row->code ?: '—',
                     'Tên vật tư' => $row->material_name ?: '—',
                     'Nhà sản xuất' => $row->manufacturer_name ?: '—',
                     'Thông tin kỹ thuật' => $row->technical_specification ?: '—',
@@ -281,6 +293,7 @@ class MaterialCategoryController extends Controller
         DB::table(self::HISTORY_TABLE)->insert([
             'material_category_id' => $row->id,
             'action' => $action,
+            'code' => $row->code,
             'material_names_id' => $row->material_names_id,
             'manufacturers_id' => $row->manufacturers_id,
             'technical_specification' => $row->technical_specification,
@@ -334,6 +347,7 @@ class MaterialCategoryController extends Controller
             ->leftJoin('material_names', self::TABLE . '.material_names_id', '=', 'material_names.id')
             ->leftJoin('manufacturers', self::TABLE . '.manufacturers_id', '=', 'manufacturers.id')
             ->select(
+                self::TABLE . '.code',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name'
             )
@@ -345,9 +359,27 @@ class MaterialCategoryController extends Controller
         }
 
         return implode(' | ', [
+            $row->code ?: '—',
             $row->material_name ?: '—',
             $row->manufacturer_name ?: '—',
         ]);
+    }
+
+    /**
+     * Mã danh mục kế tiếp theo dạng M00001: lấy số lớn nhất đang có rồi cộng 1.
+     *
+     * Màn hình này chỉ khoá bản ghi (deActive) chứ không xoá, nên mã không bị dùng lại.
+     */
+    private function nextCode(): string
+    {
+        $numbers = DB::table(self::TABLE)
+            ->where('code', 'like', self::CODE_PREFIX . '%')
+            ->pluck('code')
+            ->map(fn ($code) => (int) substr($code, strlen(self::CODE_PREFIX)));
+
+        $next = ($numbers->max() ?? 0) + 1;
+
+        return self::CODE_PREFIX . str_pad((string) $next, self::CODE_LENGTH, '0', STR_PAD_LEFT);
     }
 
     /**

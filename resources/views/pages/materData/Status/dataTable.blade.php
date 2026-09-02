@@ -5,9 +5,11 @@
             <h3 class="card-title">Danh sách Trạng Thái</h3>
         </div>
         <div class="card-body">
-            <button class="btn btn-success btn-create mb-2" data-toggle="modal" data-target="#createModal" style="width: 155px">
-                <i class="fas fa-plus"></i> Thêm mới
-            </button>
+            @perm('materData_create')
+                <button class="btn btn-success btn-create mb-2" data-toggle="modal" data-target="#createModal" style="width: 155px">
+                    <i class="fas fa-plus"></i> Thêm mới
+                </button>
+            @endperm
 
             <table id="data_table_status" class="table table-bordered table-striped">
                 <thead style="position: sticky; top: 60px; background-color: white; z-index: 1020">
@@ -35,24 +37,37 @@
                             <td>{{ $data->prepareBy ?? '-' }}</td>
                             <td>{{ \Carbon\Carbon::parse($data->created_at)->format('d/m/Y') }}</td>
                             <td class="text-center align-middle">
-                                <button type="button" class="btn btn-warning btn-edit mb-1" 
-                                    data-id="{{ $data->id }}" 
-                                    data-name="{{ $data->name }}"
-                                    data-toggle="modal" 
-                                    data-target="#updateModal">
-                                    <i class="fas fa-edit"></i>
-                                </button>
+                                <span class="md-btn-wrap">
+                                    @perm('materData_update')
+                                        <button type="button" class="btn btn-warning btn-edit mb-1"
+                                            data-id="{{ $data->id }}"
+                                            data-name="{{ $data->name }}"
+                                            data-toggle="modal"
+                                            data-target="#updateModal">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    @endperm
 
-                                <form class="form-deActive d-inline" action="{{ route('pages.materData.status.deActive') }}" method="POST">
-                                    @csrf
-                                    <input type="hidden" name="id" value="{{ $data->id }}">
-                                    <input type="hidden" name="active" value="{{ $data->active }}">
-                                    <button type="submit" class="btn btn-{{ $data->active ? 'danger' : 'success' }} btn-deactive-confirm" 
-                                        data-name="{{ $data->name }}" 
-                                        data-active="{{ $data->active }}">
-                                        <i class="fas fa-{{ $data->active ? 'lock' : 'unlock' }}"></i>
-                                    </button>
-                                </form>
+                                    {{-- Badge số lần thay đổi, bấm vào để xem lịch sử --}}
+                                    @include('pages.materData.shared.historyBadge', [
+                                        'count' => $historyCounts[$data->id] ?? 0,
+                                        'url' => route('pages.materData.status.history', ['id' => $data->id]),
+                                        'title' => $data->name,
+                                    ])
+                                </span>
+
+                                @perm('materData_deActive')
+                                    <form class="form-deActive d-inline" action="{{ route('pages.materData.status.deActive') }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="id" value="{{ $data->id }}">
+                                        <input type="hidden" name="active" value="{{ $data->active }}">
+                                        <button type="submit" class="btn btn-{{ $data->active ? 'danger' : 'success' }} btn-deactive-confirm" 
+                                            data-name="{{ $data->name }}" 
+                                            data-active="{{ $data->active }}">
+                                            <i class="fas fa-{{ $data->active ? 'lock' : 'unlock' }}"></i>
+                                        </button>
+                                    </form>
+                                @endperm
                             </td>
                         </tr>
                     @endforeach

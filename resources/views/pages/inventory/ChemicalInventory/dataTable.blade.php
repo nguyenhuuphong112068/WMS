@@ -68,6 +68,8 @@
                             hết ngày {{ $invDate($period['to']) }}.
                         @endif
                         <span class="inv-period-days">{{ $period['days'] }} ngày</span>
+                        <span class="inv-period-rule"><i class="fas fa-filter"></i>Chỉ hiện mã còn tồn cuối kỳ,
+                            có sử dụng hoặc có loại bỏ trong kỳ.</span>
                     </div>
                 </form>
 
@@ -189,9 +191,9 @@
                                         </td>
                                         {{-- Vị trí THỰC TẾ của lô, sắp xếp theo đường dẫn định khu --}}
                                         <td class="md-sub"
-                                            data-order="{{ $row->location_name ? $row->warehouse_name . '/' . $row->room_name . '/' . $row->shelf_name . '/' . $row->location_name : 'zzz' }}">
-                                            @if ($row->location_name)
-                                                <div class="font-weight-bold">{{ $row->location_name }}
+                                            data-order="{{ $row->location_code ? $row->warehouse_name . '/' . $row->room_name . '/' . $row->shelf_name . '/' . $row->location_code : 'zzz' }}">
+                                            @if ($row->location_code)
+                                                <div class="font-weight-bold">
                                                     <span class="md-tag">{{ $row->location_code }}</span>
                                                 </div>
                                                 <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
@@ -313,39 +315,43 @@
                                         </td>
                                         <td class="text-center">
                                             @if ($row->can_internal_expiry)
-                                                <button type="button" class="btn btn-sm btn-outline-primary btn-inv-internal mb-1"
-                                                    title="Xác định hạn dùng nội bộ cho mã xuất nhập này"
-                                                    data-row="{{ json_encode([
-                                                        'import_id' => $row->id,
-                                                        'code' => $row->code,
-                                                        'chem_name' => $row->chem_name,
-                                                        'shelf_life_months' => $row->shelf_life_months,
-                                                        'expired_date' => $row->expired_date,
-                                                        'internal_expired_date' => $row->internal_expired_date,
-                                                    ]) }}">
-                                                    <i class="fas fa-hourglass-half mr-1"></i> Hạn nội bộ
-                                                </button>
+                                                @perm('inventory_chemical_internalExpiry')
+                                                    <button type="button" class="btn btn-sm btn-outline-primary btn-inv-internal mb-1"
+                                                        title="Xác định hạn dùng nội bộ cho mã xuất nhập này"
+                                                        data-row="{{ json_encode([
+                                                            'import_id' => $row->id,
+                                                            'code' => $row->code,
+                                                            'chem_name' => $row->chem_name,
+                                                            'shelf_life_months' => $row->shelf_life_months,
+                                                            'expired_date' => $row->expired_date,
+                                                            'internal_expired_date' => $row->internal_expired_date,
+                                                        ]) }}">
+                                                        <i class="fas fa-hourglass-half mr-1"></i> Hạn nội bộ
+                                                    </button>
+                                                @endperm
                                             @endif
                                             {{-- Badge góc trên bên phải: số lần đã cân đối, bấm vào để xem lịch sử --}}
                                             <span class="inv-btn-wrap">
-                                                <button type="button"
-                                                    class="btn btn-sm btn-{{ $row->state === 'over' ? 'danger' : 'primary' }} btn-inv-balancing"
-                                                    title="Cân đối số lượng nhập của mã xuất nhập này"
-                                                    data-row="{{ json_encode([
-                                                        'import_id' => $row->id,
-                                                        'code' => $row->code,
-                                                        'chem_name' => $row->chem_name,
-                                                        'unit' => $row->unit_short_name ?: $row->unit_name,
-                                                        'imported' => (float) $row->imported,
-                                                        // Cân đối ghi vào dữ liệu hiện tại nên không cắt theo kỳ
-                                                        'balanced' => (float) $row->balanced_all,
-                                                        'gap' => (float) $row->gap_all,
-                                                        'limit' => (float) $row->balancing_limit,
-                                                        'min_input' => (float) $row->balancing_min_input,
-                                                        'max_input' => (float) $row->balancing_max_input,
-                                                    ]) }}">
-                                                    <i class="fas fa-scale-balanced mr-1"></i> Cân đối
-                                                </button>
+                                                @perm('inventory_chemical_balancing')
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-{{ $row->state === 'over' ? 'danger' : 'primary' }} btn-inv-balancing"
+                                                        title="Cân đối số lượng nhập của mã xuất nhập này"
+                                                        data-row="{{ json_encode([
+                                                            'import_id' => $row->id,
+                                                            'code' => $row->code,
+                                                            'chem_name' => $row->chem_name,
+                                                            'unit' => $row->unit_short_name ?: $row->unit_name,
+                                                            'imported' => (float) $row->imported,
+                                                            // Cân đối ghi vào dữ liệu hiện tại nên không cắt theo kỳ
+                                                            'balanced' => (float) $row->balanced_all,
+                                                            'gap' => (float) $row->gap_all,
+                                                            'limit' => (float) $row->balancing_limit,
+                                                            'min_input' => (float) $row->balancing_min_input,
+                                                            'max_input' => (float) $row->balancing_max_input,
+                                                        ]) }}">
+                                                        <i class="fas fa-balance-scale mr-1"></i> Cân đối
+                                                    </button>
+                                                    @endperm
                                                 @if ($row->balancing_times > 0)
                                                     <button type="button" class="inv-count-badge btn-inv-history"
                                                         title="Xem {{ $row->balancing_times }} lần cân đối của mã xuất nhập này"
@@ -397,6 +403,7 @@
                                     <th class="text-right inv-th-period" style="width: 130px">Tồn Cuối Kỳ</th>
                                     <th class="text-center" style="width: 120px">Hạn Gần Nhất</th>
                                     <th class="text-center" style="width: 110px">Cần Chú Ý</th>
+                                    <th class="text-center inv-chart-th" style="width: 115px">Biểu Đồ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -453,6 +460,15 @@
                                             @else
                                                 <span class="md-empty">—</span>
                                             @endif
+                                        </td>
+                                        {{-- Mở biểu đồ nhập - xuất - tồn của đúng hoá chất này, theo kỳ đang xem --}}
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-outline-primary btn-inv-chart"
+                                                data-category="{{ $sum->category_id }}"
+                                                data-chem="{{ $sum->chem_name }}"
+                                                title="Xem biểu đồ nhập - xuất - tồn của hoá chất này">
+                                                <i class="fas fa-chart-bar mr-1"></i> Biểu đồ
+                                            </button>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -534,8 +550,8 @@
                                         data-category="{{ $row->category_id }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td class="md-sub">
-                                            @if ($row->location_name)
-                                                <div class="font-weight-bold">{{ $row->location_name }}
+                                            @if ($row->location_code)
+                                                <div class="font-weight-bold">
                                                     <span class="md-tag">{{ $row->location_code }}</span>
                                                 </div>
                                                 <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
@@ -581,7 +597,7 @@
 
                     <div class="md-toolbar">
                         <p class="hint">
-                            <i class="fas fa-triangle-exclamation mr-1"></i>
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
                             Các mã xuất nhập <b>còn tồn</b> và hết hạn trong vòng <b>{{ $expiringSoonMonths }}
                                 tháng</b> tới, gần hết hạn nhất xếp trước. Hạn xét ở đây là <b>hạn áp dụng</b>: lấy
                             hạn dùng nội bộ nếu đã xác định, chưa xác định thì lấy hạn nhà sản xuất.
@@ -728,18 +744,20 @@
                                             <span class="md-tag">{{ $row->shelf_life_months }} tháng</span>
                                         </td>
                                         <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-primary btn-inv-internal"
-                                                title="Xác định hạn dùng nội bộ cho mã xuất nhập này"
-                                                data-row="{{ json_encode([
-                                                    'import_id' => $row->id,
-                                                    'code' => $row->code,
-                                                    'chem_name' => $row->chem_name,
-                                                    'shelf_life_months' => $row->shelf_life_months,
-                                                    'expired_date' => $row->expired_date,
-                                                    'internal_expired_date' => $row->internal_expired_date,
-                                                ]) }}">
-                                                <i class="fas fa-hourglass-half mr-1"></i> Xác định
-                                            </button>
+                                            @perm('inventory_chemical_internalExpiry')
+                                                <button type="button" class="btn btn-sm btn-primary btn-inv-internal"
+                                                    title="Xác định hạn dùng nội bộ cho mã xuất nhập này"
+                                                    data-row="{{ json_encode([
+                                                        'import_id' => $row->id,
+                                                        'code' => $row->code,
+                                                        'chem_name' => $row->chem_name,
+                                                        'shelf_life_months' => $row->shelf_life_months,
+                                                        'expired_date' => $row->expired_date,
+                                                        'internal_expired_date' => $row->internal_expired_date,
+                                                    ]) }}">
+                                                    <i class="fas fa-hourglass-half mr-1"></i> Xác định
+                                                </button>
+                                            @endperm
                                         </td>
                                     </tr>
                                 @endforeach

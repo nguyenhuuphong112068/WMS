@@ -22,4 +22,9 @@
 @section('model')
     @include('pages.inventory.MaterialInventory.balancing')
     @include('pages.inventory.MaterialInventory.balancingHistory')
+    @include('pages.inventory.MaterialInventory.zoneDetail')
+    @include('pages.inventory.MaterialInventory.chart')
+    @include('pages.inventory.MaterialInventory.stocktakeDetail')
+    {{-- Modal camera cho ô quét QR của tab Kiểm Kê Định Kỳ --}}
+    @include('pages.shared.cameraScan')
 @endsection

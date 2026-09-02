@@ -15,4 +15,5 @@
 @section('model')
     @include('pages.user.user.create')
     @include('pages.user.user.update')
+    @include('pages.user.user.permission')
 @endsection

@@ -13,6 +13,13 @@
                 <div class="modal-body">
 
                     <div class="form-group">
+                        <label>Mã Vật Tư</label>
+                        <input type="text" class="form-control cat-readonly" value="{{ $nextCode }}" readonly
+                            tabindex="-1">
+                        <small class="md-sub">Sinh tự động khi lưu, dạng M00001.</small>
+                    </div>
+
+                    <div class="form-group">
                         <label>Tên Vật Tư <span class="text-danger">*</span></label>
                         <select name="material_names_id"
                             class="form-control cat-select {{ $bag->has('material_names_id') ? 'is-invalid' : '' }}"

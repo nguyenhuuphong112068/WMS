@@ -9,10 +9,12 @@
         <!-- /.card-Body -->
         <div class="card-body">
 
-            <button class="btn btn-success btn-create mb-2" data-toggle="modal" data-target="#createModal"
-                style="width: 155px">
-                <i class="fas fa-plus"></i> Thêm
-            </button>
+            @perm('user_create')
+                <button class="btn btn-success btn-create mb-2" data-toggle="modal" data-target="#createModal"
+                    style="width: 155px">
+                    <i class="fas fa-plus"></i> Thêm
+                </button>
+            @endperm
 
             <table id="example1" class="table table-bordered table-striped">
 
@@ -27,6 +29,7 @@
                         <th>Mail</th>
                         <th>Người Tạo</th>
                         <th>Ngày Tạo</th>
+                        <th>Quyền Riêng</th>
                         <th>Edit</th>
                         <th>DeActive</th>
                     </tr>
@@ -45,27 +48,42 @@
                             <td>{{ \Carbon\Carbon::parse($data->created_at)->format('d/m/Y') }}</td>
 
                             <td class="text-center align-middle">
-                                <button type="button" class="btn btn-warning btn-edit" data-id="{{ $data->id }}"
-                                    data-username="{{ $data->userName }}" data-usergroup='@json($data->role_ids)'
-                                    data-fullname="{{ $data->fullName }}" data-deparment="{{ $data->deparment }}"
-                                    data-group_id="{{ $data->group_id }}"
-                                    data-mail="{{ $data->mail }}"
-                                    data-toggle="modal" data-target="#UpdateModal">
-                                    <i class="fas fa-edit"></i>
-                                </button>
+                                @perm('userPermission_manage')
+                                    <button type="button" class="btn btn-primary btn-user-permission"
+                                        title="Cấp quyền riêng ngoài nhóm quyền" data-id="{{ $data->id }}"
+                                        data-fullname="{{ $data->fullName }}" data-toggle="modal"
+                                        data-target="#UserPermissionModal">
+                                        <i class="fas fa-user-shield"></i>
+                                    </button>
+                                @endperm
+                            </td>
+
+                            <td class="text-center align-middle">
+                                @perm('user_update')
+                                    <button type="button" class="btn btn-warning btn-edit" data-id="{{ $data->id }}"
+                                        data-username="{{ $data->userName }}" data-usergroup='@json($data->role_ids)'
+                                        data-fullname="{{ $data->fullName }}" data-deparment="{{ $data->deparment }}"
+                                        data-group_id="{{ $data->group_id }}"
+                                        data-mail="{{ $data->mail }}"
+                                        data-toggle="modal" data-target="#UpdateModal">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                @endperm
                             </td>
 
 
                             <td class="text-center align-middle">
 
-                                <form class="form-deActive"
-                                    action="{{ route('pages.user.user.deActive', ['id' => $data->id]) }}"
-                                    method="post">
-                                    @csrf
-                                    <button type="submit" class="btn btn-danger" data-name="{{ $data->userName }}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </form>
+                                @perm('user_deActive')
+                                    <form class="form-deActive"
+                                        action="{{ route('pages.user.user.deActive', ['id' => $data->id]) }}"
+                                        method="post">
+                                        @csrf
+                                        <button type="submit" class="btn btn-danger" data-name="{{ $data->userName }}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                @endperm
 
                             </td>
                         </tr>

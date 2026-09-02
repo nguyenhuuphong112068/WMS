@@ -159,6 +159,80 @@
 
 
             /* ----------------------------------------------------------------
+               Chiều rộng cột bảng dữ liệu - chia theo lượng dữ liệu của từng cột
+               ----------------------------------------------------------------
+               Một bảng luôn có hai loại cột: cột chỉ chứa số / ngày / trạng thái /
+               nút bấm và cột chứa tên hàng dài. Trình duyệt không biết điều đó nên
+               chia gần như đều nhau, kết quả là cột tên hàng bị bóp xuống 5-6 dòng
+               còn cột số thì thừa chỗ.
+
+               Đoạn JS mdFitColumns ở cuối layout/master.blade.php đo độ dài dữ liệu
+               thật của từng cột rồi gắn:
+
+                 .md-col-fit   cột dữ liệu ngắn - co sát đúng nội dung
+                 .md-col-flex  cột chữ dài      - nhận toàn bộ phần rộng còn dư
+
+               Khai ở đây để mọi màn hình có bảng đều dùng được, không phải sửa từng
+               file dataTable.blade.php.
+               ---------------------------------------------------------------- */
+
+            /* Tiêu đề cột được xuống dòng: bề rộng tối thiểu của một cột chỉ còn
+               bằng từ dài nhất của tiêu đề, thay vì cả dòng chữ tiêu đề. */
+            .table thead th,
+            table.dataTable thead th {
+                  white-space: normal;
+                  overflow-wrap: break-word;
+                  vertical-align: middle;
+                  line-height: 1.25;
+            }
+
+            /* Cột dữ liệu ngắn: width 1% để trình duyệt co cột về đúng nội dung.
+               Chỉ ô dữ liệu mới cấm xuống dòng, tiêu đề vẫn được xuống dòng. */
+            .table th.md-col-fit,
+            .table td.md-col-fit,
+            table.dataTable th.md-col-fit,
+            table.dataTable td.md-col-fit {
+                  width: 1%;
+            }
+
+            .table td.md-col-fit,
+            table.dataTable td.md-col-fit {
+                  white-space: nowrap;
+            }
+
+            /* Cột dữ liệu ngắn không cần lề rộng như cột chữ. Bootstrap để 12px mỗi
+               bên, 13 cột là mất gần 300px chỉ cho lề - chỗ đó trả về cho cột tên. */
+            .table th.md-col-fit,
+            .table td.md-col-fit,
+            table.dataTable th.md-col-fit,
+            table.dataTable td.md-col-fit {
+                  padding-left: 8px;
+                  padding-right: 8px;
+            }
+
+            /* Ô tiêu đề sắp xếp được vẫn phải chừa chỗ cho mũi tên của DataTables,
+               nhưng 30px mặc định là quá rộng - mũi tên chỉ nằm cách mép 0.5em - 1em. */
+            table.dataTable thead > tr > th.md-col-fit.sorting,
+            table.dataTable thead > tr > th.md-col-fit.sorting_asc,
+            table.dataTable thead > tr > th.md-col-fit.sorting_desc {
+                  padding-right: 22px;
+            }
+
+            /* Cột chữ dài: hưởng phần rộng dư, nhưng không hẹp quá mức đọc được.
+               Khi màn hình quá nhỏ thì .table-responsive cuộn ngang. */
+            .table th.md-col-flex,
+            table.dataTable th.md-col-flex {
+                  min-width: 120px;
+            }
+
+            .table td.md-col-flex,
+            table.dataTable td.md-col-flex {
+                  overflow-wrap: break-word;
+                  word-break: break-word;
+            }
+
+
+            /* ----------------------------------------------------------------
                Thanh công cụ gộp ngay trên bảng
                ----------------------------------------------------------------
                Đoạn JS ở cuối layout/master.blade.php dồn nút thêm mới, bộ lọc,
@@ -188,6 +262,18 @@
                 margin: 0;
                 color: #94a3b8;
                 font-size: 0.82rem;
+            }
+
+            /*
+               Khối do view tự khai báo bằng class .md-tablebar-item - bỏ nền, viền và
+               khoảng cách riêng của nó để nằm gọn trong thanh chung.
+            */
+            .md-tablebar .md-tablebar-item {
+                margin: 0;
+                padding: 0;
+                border: none;
+                background: transparent;
+                box-shadow: none;
             }
 
             /* Quét mã vạch bên trong tablebar */

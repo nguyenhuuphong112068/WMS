@@ -115,7 +115,6 @@ class StandardExportController extends Controller
                 'standard_imports.batch_no',
                 'standard_imports.expired_date as import_expired_date',
                 'locations.code as location_code',
-                'locations.name as location_name',
                 'analysts.name as analyst_name',
                 'purposes.name as purpose_name',
                 DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
@@ -360,7 +359,6 @@ class StandardExportController extends Controller
                 'standard_imports.batch_no',
                 'standard_imports.expired_date as import_expired_date',
                 'locations.code as location_code',
-                'locations.name as location_name',
                 'analysts.name as analyst_name',
                 'purposes.name as purpose_name',
                 DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
@@ -603,7 +601,7 @@ class StandardExportController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'request_list_id' => ['required', 'exists:request_lists,id'],
+            'request_list_id' => ['required', 'exists:standard_request_lists,id'],
             'group_id' => ['required', 'exists:groups,id'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:standard_categories,id'],
@@ -734,11 +732,10 @@ class StandardExportController extends Controller
         $departmentId = $this->departmentId();
 
         $validator = Validator::make($request->all(), [
-            'item_id' => ['required', 'exists:request_items,id'],
+            'item_id' => ['required', 'exists:standard_request_items,id'],
             'import_id' => ['required', 'exists:standard_imports,id'],
             'issued_amount' => ['required', 'numeric', 'min:0.0001'],
             'issued_unit' => ['nullable', 'string', 'max:50'],
-            'issued_at' => ['nullable', 'date'],
             'return_standard' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
@@ -774,7 +771,8 @@ class StandardExportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ống chuẩn trong kho phòng ban này!');
         }
 
-        $issuedAt = !empty($request->issued_at) ? \Carbon\Carbon::parse($request->issued_at) : now();
+        // Thời điểm cấp phát luôn là lúc bấm Cấp Phát, không nhận giá trị từ form
+        $issuedAt = now();
 
         $waitingInternal = (int) ($import->shelf_life_months ?? 0) > 0 && ! $import->internal_expired_date;
         if ($waitingInternal) {
@@ -854,9 +852,9 @@ class StandardExportController extends Controller
         $departmentId = $this->departmentId();
 
         $validator = Validator::make($request->all(), [
-            'request_list_id' => ['required', 'exists:request_lists,id'],
+            'request_list_id' => ['required', 'exists:standard_request_lists,id'],
             'items' => ['required', 'array'],
-            'items.*.id' => ['required', 'exists:request_items,id'],
+            'items.*.id' => ['required', 'exists:standard_request_items,id'],
             'items.*.import_id' => ['nullable'],
             'items.*.issued_amount' => ['nullable', 'numeric', 'min:0'],
             'items.*.issued_unit' => ['nullable', 'string', 'max:50'],
@@ -1210,8 +1208,7 @@ class StandardExportController extends Controller
                 DepartmentStandard::shelfLifeColumn(),
                 'standard_names.name as standard_name',
                 'units.short_name as unit_short_name',
-                'locations.code as location_code',
-                'locations.name as location_name'
+                'locations.code as location_code'
             )
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
@@ -1259,7 +1256,6 @@ class StandardExportController extends Controller
             ->select('user_management.userName', 'user_management.fullName')
             ->where('deparments.id', $departmentId)
             ->where('user_management.isActive', 1)
-            ->where('user_management.isLocked', 0)
             ->orderBy('user_management.fullName', 'asc')
             ->get();
     }
@@ -1414,7 +1410,7 @@ class StandardExportController extends Controller
             'batch_no' => ['nullable', 'max:100'],
             'testing' => ['nullable', 'max:255'],
             'reason' => ['nullable', 'max:500'],
-            'request_item_id' => ['nullable', 'exists:request_items,id'],
+            'request_item_id' => ['nullable', 'exists:standard_request_items,id'],
             // Chỉ ghi vào lịch sử điều chỉnh, không lưu thành cột của standard_exports
             'adjust_reason' => ['nullable', 'max:500'],
         ];

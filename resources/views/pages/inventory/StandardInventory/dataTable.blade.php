@@ -85,6 +85,8 @@
                             hết ngày {{ $invDate($period['to']) }}.
                         @endif
                         <span class="inv-period-days">{{ $period['days'] }} ngày</span>
+                        <span class="inv-period-rule"><i class="fas fa-filter"></i>Chỉ hiện mã còn tồn cuối kỳ,
+                            có sử dụng hoặc có loại bỏ trong kỳ.</span>
                     </div>
                 </form>
 
@@ -218,9 +220,9 @@
                                         </td>
                                         {{-- Vị trí THỰC TẾ của ống, sắp xếp theo đường dẫn định khu --}}
                                         <td class="md-sub"
-                                            data-order="{{ $row->location_name ? $row->warehouse_name . '/' . $row->room_name . '/' . $row->shelf_name . '/' . $row->location_name : 'zzz' }}">
-                                            @if ($row->location_name)
-                                                <div class="font-weight-bold">{{ $row->location_name }}
+                                            data-order="{{ $row->location_code ? $row->warehouse_name . '/' . $row->room_name . '/' . $row->shelf_name . '/' . $row->location_code : 'zzz' }}">
+                                            @if ($row->location_code)
+                                                <div class="font-weight-bold">
                                                     <span class="md-tag">{{ $row->location_code }}</span>
                                                 </div>
                                                 <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
@@ -343,19 +345,21 @@
                                         </td>
                                         <td class="text-center">
                                             @if ($row->can_internal_expiry)
-                                                <button type="button"
-                                                    class="btn btn-sm btn-outline-primary btn-inv-internal mb-1"
-                                                    title="Xác định hạn dùng nội bộ cho ống chuẩn này"
-                                                    data-row="{{ json_encode([
-                                                        'import_id' => $row->id,
-                                                        'code' => $row->code,
-                                                        'chem_name' => $row->standard_name,
-                                                        'shelf_life_months' => $row->shelf_life_months,
-                                                        'expired_date' => $row->expired_date,
-                                                        'internal_expired_date' => $row->internal_expired_date,
-                                                    ]) }}">
-                                                    <i class="fas fa-hourglass-half mr-1"></i> Hạn nội bộ
-                                                </button>
+                                                @perm('inventory_standard_internalExpiry')
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-outline-primary btn-inv-internal mb-1"
+                                                        title="Xác định hạn dùng nội bộ cho ống chuẩn này"
+                                                        data-row="{{ json_encode([
+                                                            'import_id' => $row->id,
+                                                            'code' => $row->code,
+                                                            'chem_name' => $row->standard_name,
+                                                            'shelf_life_months' => $row->shelf_life_months,
+                                                            'expired_date' => $row->expired_date,
+                                                            'internal_expired_date' => $row->internal_expired_date,
+                                                        ]) }}">
+                                                        <i class="fas fa-hourglass-half mr-1"></i> Hạn nội bộ
+                                                    </button>
+                                                    @endperm
                                             @endif
                                         </td>
                                     </tr>
@@ -525,8 +529,8 @@
                                         data-category="{{ $row->category_id }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td class="md-sub">
-                                            @if ($row->location_name)
-                                                <div class="font-weight-bold">{{ $row->location_name }}
+                                            @if ($row->location_code)
+                                                <div class="font-weight-bold">
                                                     <span class="md-tag">{{ $row->location_code }}</span>
                                                 </div>
                                                 <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
@@ -738,18 +742,20 @@
                                             <span class="md-tag">{{ $row->shelf_life_months }} tháng</span>
                                         </td>
                                         <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-primary btn-inv-internal"
-                                                title="Xác định hạn dùng nội bộ cho ống chuẩn này"
-                                                data-row="{{ json_encode([
-                                                    'import_id' => $row->id,
-                                                    'code' => $row->code,
-                                                    'chem_name' => $row->standard_name,
-                                                    'shelf_life_months' => $row->shelf_life_months,
-                                                    'expired_date' => $row->expired_date,
-                                                    'internal_expired_date' => $row->internal_expired_date,
-                                                ]) }}">
-                                                <i class="fas fa-hourglass-half mr-1"></i> Xác định
-                                            </button>
+                                            @perm('inventory_standard_internalExpiry')
+                                                <button type="button" class="btn btn-sm btn-primary btn-inv-internal"
+                                                    title="Xác định hạn dùng nội bộ cho ống chuẩn này"
+                                                    data-row="{{ json_encode([
+                                                        'import_id' => $row->id,
+                                                        'code' => $row->code,
+                                                        'chem_name' => $row->standard_name,
+                                                        'shelf_life_months' => $row->shelf_life_months,
+                                                        'expired_date' => $row->expired_date,
+                                                        'internal_expired_date' => $row->internal_expired_date,
+                                                    ]) }}">
+                                                    <i class="fas fa-hourglass-half mr-1"></i> Xác định
+                                                </button>
+                                            @endperm
                                         </td>
                                     </tr>
                                 @endforeach
@@ -823,12 +829,14 @@
                                                 <span class="md-empty">Chưa tính</span>
                                             @elseif ($row->deviation > $row->ghkl)
                                                 <span class="badge badge-danger">Ngoài giới hạn</span>
-                                                <button type="button" class="btn btn-sm btn-outline-primary ml-1 btn-weight-remark"
-                                                    data-id="{{ $row->id }}"
-                                                    data-remark="{{ $row->weight_deviation_remark ?? '' }}"
-                                                    title="Nhận xét">
-                                                    <i class="fas fa-comment"></i>
-                                                </button>
+                                                @perm('inventory_standard_weight')
+                                                    <button type="button" class="btn btn-sm btn-outline-primary ml-1 btn-weight-remark"
+                                                        data-id="{{ $row->id }}"
+                                                        data-remark="{{ $row->weight_deviation_remark ?? '' }}"
+                                                        title="Nhận xét">
+                                                        <i class="fas fa-comment"></i>
+                                                    </button>
+                                                @endperm
                                                 @if($row->weight_deviation_remark)
                                                     <div class="md-sub mt-1 text-danger text-left font-italic">{{ $row->weight_deviation_remark }}</div>
                                                 @endif

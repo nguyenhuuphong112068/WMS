@@ -20,9 +20,11 @@
 <div class="exp-pane {{ $activeTab === 'request' ? 'is-active' : '' }}" id="expPaneRequest">
 
     <div class="md-toolbar">
-        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#requestModal">
-            <i class="fas fa-paper-plane mr-1"></i> Đề nghị chuyển hoá chất
-        </button>
+        @perm('export_chemical_request')
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#requestModal">
+                <i class="fas fa-paper-plane mr-1"></i> Đề nghị chuyển hoá chất
+            </button>
+        @endperm
         <p class="hint">
             <i class="fas fa-info-circle mr-1"></i>
             Đề nghị chỉ là <b>nguồn thông tin trước khi chuyển</b>, không trừ cộng tồn kho. Hàng chỉ đi khi phòng
@@ -90,27 +92,33 @@
                         </td>
                         <td class="text-center">
                             @if ($req->app_status === 'pending')
-                                <button type="button" class="btn btn-sm btn-primary btn-exp-respond"
-                                    data-id="{{ $req->id }}" data-answer="accepted"
-                                    data-title="{{ $req->chem_name }} - {{ $expNum($req->amount) }} {{ $expReqUnit }} cho {{ $req->partner_name }}">
-                                    <i class="fas fa-check"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-secondary btn-exp-respond"
-                                    data-id="{{ $req->id }}" data-answer="rejected"
-                                    data-title="{{ $req->chem_name }} - {{ $expNum($req->amount) }} {{ $expReqUnit }} cho {{ $req->partner_name }}">
-                                    <i class="fas fa-xmark"></i>
-                                </button>
+                                @perm('export_chemical_approve')
+                                    <button type="button" class="btn btn-sm btn-primary btn-exp-respond"
+                                        data-id="{{ $req->id }}" data-answer="accepted"
+                                        data-title="{{ $req->chem_name }} - {{ $expNum($req->amount) }} {{ $expReqUnit }} cho {{ $req->partner_name }}">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                @endperm
+                                @perm('export_chemical_approve')
+                                    <button type="button" class="btn btn-sm btn-secondary btn-exp-respond"
+                                        data-id="{{ $req->id }}" data-answer="rejected"
+                                        data-title="{{ $req->chem_name }} - {{ $expNum($req->amount) }} {{ $expReqUnit }} cho {{ $req->partner_name }}">
+                                        <i class="fas fa-xmark"></i>
+                                    </button>
+                                @endperm
                             @elseif ($req->app_status === 'accepted' && ! $req->export_id)
-                                <button type="button" class="btn btn-sm btn-success btn-exp-make-transfer"
-                                    title="Lập phiếu Chuyển kho cho đề nghị này"
-                                    data-request="{{ json_encode([
-                                        'request_id' => $req->id,
-                                        'to_department_id' => $req->department_id,
-                                        'amount' => (float) $req->amount,
-                                        'purpose' => 'Chuyển theo đề nghị của ' . $req->partner_name,
-                                    ]) }}">
-                                    <i class="fas fa-truck-arrow-right mr-1"></i> Lập phiếu
-                                </button>
+                                @perm('export_chemical_transfer')
+                                    <button type="button" class="btn btn-sm btn-success btn-exp-make-transfer"
+                                        title="Lập phiếu Chuyển kho cho đề nghị này"
+                                        data-request="{{ json_encode([
+                                            'request_id' => $req->id,
+                                            'to_department_id' => $req->department_id,
+                                            'amount' => (float) $req->amount,
+                                            'purpose' => 'Chuyển theo đề nghị của ' . $req->partner_name,
+                                        ]) }}">
+                                        <i class="fas fa-truck-arrow-right mr-1"></i> Lập phiếu
+                                    </button>
+                                @endperm
                             @else
                                 <span class="md-empty">—</span>
                             @endif

@@ -29,6 +29,8 @@ Route::prefix('/import')
             Route::post('store', 'store')->name('store');
             // Trang in nhãn dán lô hàng (mã vạch Code 128), mở tab mới rồi bấm In
             Route::get('label', 'label')->name('label');
+            // Trang in nhãn báo về khi bấm In: ghi audit log in nhãn của lô nào, mấy cái, lúc nào
+            Route::post('labelPrinted', 'labelPrinted')->name('labelPrinted');
             Route::get('history', 'history')->name('history');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -51,6 +53,8 @@ Route::prefix('/import')
             Route::post('store', 'store')->name('store');
             // Trang in nhãn dán lô vật tư (mã QR), mở tab mới rồi bấm In
             Route::get('label', 'label')->name('label');
+            // Trang in nhãn báo về khi bấm In: ghi audit log in nhãn của lô nào, mấy cái, lúc nào
+            Route::post('labelPrinted', 'labelPrinted')->name('labelPrinted');
             Route::get('history', 'history')->name('history');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');

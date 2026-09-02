@@ -34,6 +34,7 @@ Route::prefix('/materData')
 
         Route::prefix('/purpose')->name('purpose.')->controller(PurposeController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -41,6 +42,7 @@ Route::prefix('/materData')
 
         Route::prefix('/department')->name('department.')->controller(DepartmentController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -48,6 +50,7 @@ Route::prefix('/materData')
 
         Route::prefix('/group')->name('group.')->controller(GroupController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -55,6 +58,7 @@ Route::prefix('/materData')
 
         Route::prefix('/productName')->name('productName.')->controller(ProductNameController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -62,6 +66,7 @@ Route::prefix('/materData')
 
         Route::prefix('/analyst')->name('analyst.')->controller(AnalystController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -69,6 +74,7 @@ Route::prefix('/materData')
 
         Route::prefix('/status')->name('status.')->controller(StatusController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -80,6 +86,7 @@ Route::prefix('/materData')
             ->where(['type' => 'warehouse|room|shelf|location'])
             ->group(function () {
                 Route::get('', 'index')->name('list');
+                Route::get('{type}/history', 'history')->name('history');
                 Route::post('{type}/store', 'store')->name('store');
                 Route::post('{type}/update', 'update')->name('update');
                 Route::post('{type}/deActive', 'deActive')->name('deActive');
@@ -88,6 +95,7 @@ Route::prefix('/materData')
 
         Route::prefix('/chemName')->name('chemName.')->controller(ChemNameController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -97,6 +105,7 @@ Route::prefix('/materData')
 
         Route::prefix('/standardName')->name('standardName.')->controller(\App\Http\Controllers\Pages\MaterData\StandardNameController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -106,6 +115,7 @@ Route::prefix('/materData')
 
         Route::prefix('/materialName')->name('materialName.')->controller(MaterialNameController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -117,6 +127,7 @@ Route::prefix('/materData')
         // chung nhóm A / B / C cứng nữa. Màn hình làm việc trên phòng ban đang chọn.
         Route::prefix('/materialClassification')->name('materialClassification.')->controller(MaterialClassificationController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -124,6 +135,7 @@ Route::prefix('/materData')
 
         Route::prefix('/chemManufacturer')->name('chemManufacturer.')->controller(ChemManufacturerController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -133,6 +145,7 @@ Route::prefix('/materData')
 
         Route::prefix('/chemSupplier')->name('chemSupplier.')->controller(ChemSupplierController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -142,6 +155,7 @@ Route::prefix('/materData')
 
         Route::prefix('/packagingSpecification')->name('packagingSpecification.')->controller(PackagingSpecificationController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -151,6 +165,7 @@ Route::prefix('/materData')
 
         Route::prefix('/unit')->name('unit.')->controller(UnitController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
@@ -160,6 +175,7 @@ Route::prefix('/materData')
 
         Route::prefix('/storageCondition')->name('storageCondition.')->controller(StorageConditionController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pages\Export;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
+use App\Support\MaterialPicking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -17,13 +18,20 @@ use Illuminate\Support\Facades\Validator;
  *   1. Tổ lập ĐỀ NGHỊ (material_request_lists + items) -> Trình ký.
  *   2. Trưởng/Phó Phòng ký (BẮT BUỘC). Nếu phiếu đánh dấu "cần Ban Giám Đốc" thì ký xong
  *      chuyển tiếp Ban Giám Đốc ký (TUỲ CHỌN). Ký đủ -> approved, issue_status = waiting.
- *   3. Kho CẤP PHÁT từng dòng: chỉ định mã lô, số lượng -> material_request_items.status = issued.
- *   4. Tổ SỬ DỤNG dòng đã cấp phát -> sinh một bản ghi material_exports (trừ tồn).
+ *   3. Kho CẤP PHÁT từng dòng: chỉ định mã xuất nhập, số lượng. Hàng rời kho ngay lúc này
+ *      nên cấp phát TRỪ TỒN TRỰC TIẾP - sinh luôn một bản ghi material_exports (type =
+ *      export) gắn với dòng đề nghị, và material_request_items.status = issued.
+ *   4. Tổ chốt lại dòng đã cấp bằng "SỬ DỤNG VẬT TƯ" (useStore):
+ *        - Ghi nhận sử dụng: sửa phiếu sử dụng về đúng số THỰC DÙNG, phần dư tự về kho
+ *          -> status = used.
+ *        - Trả về kho: trả lại số chưa dùng; trả hết thì huỷ phiếu sử dụng (status_id = 0)
+ *          nên kho hoàn đủ -> status = returned.
  *
  *   LOẠI BỎ (type = cancel) hàng hỏng / hết hạn không phải "sử dụng" nên lập thẳng trên
  *   material_exports, không cần đề nghị; bắt buộc nhập lý do và không được vượt tồn quá 5%.
  *
- * Trạng thái tồn dùng công thức: nhập + cân đối - đã xuất (kể cả loại bỏ).
+ * Trạng thái tồn dùng công thức: nhập + cân đối - đã xuất (kể cả loại bỏ). Vì cấp phát đã
+ * sinh sẵn phiếu sử dụng, không có chỗ nào lập phiếu sử dụng thủ công nữa - tránh trừ hai lần.
  */
 class MaterialExportController extends Controller
 {
@@ -47,7 +55,7 @@ class MaterialExportController extends Controller
     private const FIELDS = [
         'amount' => 'Số lượng',
         'type' => 'Loại phiếu',
-        'product_name' => 'Tên sản phẩm',
+        'product_name' => 'Thiết bị liên quan',
         'test_report_no' => 'Số phiếu kiểm nghiệm',
         'reason' => 'Lý do loại bỏ',
     ];
@@ -65,13 +73,15 @@ class MaterialExportController extends Controller
             ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
             ->leftJoin('groups', self::TABLE.'.group_id', '=', 'groups.id')
+            ->leftJoin(self::REQ_ITEM, self::TABLE.'.request_item_id', '=', self::REQ_ITEM.'.id')
             ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
             ->select(
                 self::TABLE.'.*',
                 'material_names.name as material_name',
                 'material_categories.technical_specification',
                 'groups.name as group_name',
-                'units.short_name as unit_short_name'
+                'units.short_name as unit_short_name',
+                self::REQ_ITEM.'.purpose'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
             ->orderBy(self::TABLE.'.created_at', 'desc')
@@ -110,14 +120,31 @@ class MaterialExportController extends Controller
             })
             ->groupBy('request_list_id');
 
-        // Dòng đề nghị đã được lập phiếu sử dụng (còn hiệu lực) - để ẩn nút "Lập phiếu sử dụng"
-        $usedRequestItemIds = DB::table(self::TABLE)
-            ->where('department_id', $departmentId)
-            ->where('type', 'export')
-            ->where('status_id', 1)
-            ->whereNotNull('request_item_id')
-            ->pluck('request_item_id')
-            ->all();
+        // Danh mục vật tư của phòng kèm tồn kho - đổ vào ô chọn dòng đề nghị và bảng "Danh mục tồn của phòng".
+        $availableImports = $this->importOptions($departmentId);
+        $categories = DepartmentMaterial::importCategoryOptions($departmentId);
+
+        $stockByCategory = $availableImports->groupBy('category_id')->map(fn ($group) => [
+            'total_remaining' => (float) $group->sum('remaining'),
+            'total_lots' => (int) $group->where('remaining', '>', self::EPSILON)->count(),
+        ]);
+
+        $departmentMaterialInventory = $categories->map(function ($cat) use ($stockByCategory) {
+            $cat->total_remaining = $stockByCategory[$cat->id]['total_remaining'] ?? 0.0;
+            $cat->total_lots = $stockByCategory[$cat->id]['total_lots'] ?? 0;
+
+            return $cat;
+        });
+
+        /*
+        | Một dòng đề nghị có thể được cấp từ NHIỀU mã xuất nhập: mỗi lô là một phiếu sử
+        | dụng riêng trong material_exports (cùng request_item_id). Nạp sẵn để phiếu chi
+        | tiết liệt kê đủ các lô đã cấp, và dựng trước kế hoạch chia lô cho dòng còn chờ.
+        */
+        $flatItems = $requestItems->flatten();
+        $issuedLots = $this->issuedLots($flatItems->pluck('id'));
+        $lotsByCategory = $availableImports->groupBy('category_id');
+        $issuePlans = $this->issuePlans($requestLists, $requestItems, $lotsByCategory);
 
         session()->put(['title' => 'SỬ DỤNG - SỬ DỤNG VẬT TƯ']);
 
@@ -126,9 +153,13 @@ class MaterialExportController extends Controller
             'requestLists' => $requestLists,
             'requestItems' => $requestItems,
             'groups' => $this->groupOptions($departmentId),
-            'categories' => DepartmentMaterial::importCategoryOptions($departmentId),
+            'categories' => $categories,
             'units' => $this->unitOptions(),
-            'availableImports' => $this->importOptions($departmentId),
+            'availableImports' => $availableImports,
+            'lotsByCategory' => $lotsByCategory,
+            'issuedLots' => $issuedLots,
+            'issuePlans' => $issuePlans,
+            'departmentMaterialInventory' => $departmentMaterialInventory,
             'adjustCounts' => $this->adjustCounts($departmentId),
             'reqAppStatuses' => config('material.request_app_statuses'),
             'reqSignSteps' => config('material.request_sign_steps'),
@@ -136,7 +167,6 @@ class MaterialExportController extends Controller
             'reqItemStatuses' => config('material.request_item_statuses'),
             'canSignManager' => $this->canSignRequest('manager'),
             'canSignDirector' => $this->canSignRequest('director'),
-            'usedRequestItemIds' => $usedRequestItemIds,
             'overIssuePercent' => (int) round(self::OVER_ISSUE_RATIO * 100),
             'activeTab' => $request->query('tab') === 'request' ? 'request' : 'book',
         ]);
@@ -179,6 +209,7 @@ class MaterialExportController extends Controller
                 'code' => $code,
                 'department_id' => $departmentId,
                 'group_id' => (int) $request->group_id,
+                'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
                 'app_status' => $isDraft ? 'draft' : 'pending_manager',
                 'needs_director' => $request->boolean('needs_director'),
@@ -238,6 +269,7 @@ class MaterialExportController extends Controller
         DB::transaction(function () use ($request, $req, $isDraft) {
             DB::table(self::REQ_LIST)->where('id', $req->id)->update([
                 'group_id' => (int) $request->group_id,
+                'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
                 'needs_director' => $request->boolean('needs_director'),
                 'app_status' => $isDraft ? 'draft' : 'pending_manager',
@@ -414,23 +446,34 @@ class MaterialExportController extends Controller
 
     /* ==========================================================
      |  CẤP PHÁT CỦA KHO
+     |
+     |  Một dòng đề nghị được cấp từ MỘT HOẶC NHIỀU mã xuất nhập: lô hạn gần nhất không
+     |  đủ thì lấy tiếp lô kế tiếp theo đúng thứ tự nên xuất. Mỗi lô sinh một phiếu sử
+     |  dụng riêng (material_exports) để tồn của từng lô trừ đúng phần của nó; dòng đề
+     |  nghị chỉ giữ phần tổng hợp: lô đầu tiên + tổng số lượng đã cấp.
      ========================================================== */
 
     public function issueStore(Request $request)
     {
         $departmentId = $this->departmentId();
 
+        // Dạng cũ (một lô mỗi lần cấp) vẫn nhận được: quy về đúng mảng lots của dạng mới.
+        if (! $request->has('lots') && $request->filled('import_id')) {
+            $request->merge(['lots' => [['import_id' => $request->import_id, 'amount' => $request->issued_amount]]]);
+        }
+
         $validator = Validator::make($request->all(), [
             'item_id' => ['required', 'exists:'.self::REQ_ITEM.',id'],
-            'import_id' => ['required', 'exists:material_imports,id'],
-            'issued_amount' => ['required', 'numeric', 'min:0.0001'],
+            'lots' => ['required', 'array', 'min:1'],
+            'lots.*.import_id' => ['nullable', 'integer'],
+            'lots.*.amount' => ['nullable', 'numeric', 'min:0'],
             'issued_unit' => ['nullable', 'string', 'max:50'],
-            'issued_at' => ['nullable', 'date'],
         ], [
             'item_id.required' => 'Không tìm thấy mục đề nghị cần cấp phát.',
-            'import_id.required' => 'Vui lòng chọn mã lô trong kho để cấp phát.',
-            'issued_amount.required' => 'Vui lòng nhập số lượng cấp phát.',
-            'issued_amount.min' => 'Số lượng cấp phát phải lớn hơn 0.',
+            'lots.required' => 'Vui lòng chọn mã xuất nhập trong kho để cấp phát.',
+            'lots.*.import_id.integer' => 'Mã xuất nhập được chọn không hợp lệ.',
+            'lots.*.amount.numeric' => 'Số lượng cấp phát phải là số.',
+            'lots.*.amount.min' => 'Số lượng cấp phát không được âm.',
         ]);
 
         $fail = function ($message) use ($request) {
@@ -456,53 +499,178 @@ class MaterialExportController extends Controller
             return $fail('Đề nghị '.$req->code.' chưa được phê duyệt nên chưa cấp phát được!');
         }
 
-        if ($item->status === 'issued') {
-            return $fail('Mục này đã được cấp phát rồi!');
+        /*
+        | Cấp thêm được khi dòng CÒN NỢ HÀNG: chưa cấp, mới cấp một phần, hoặc dòng cũ đã
+        | ghi 'issued' nhưng số đã cấp vẫn nhỏ hơn số đề nghị. Dòng đã chốt sử dụng / trả
+        | về kho / bị từ chối thì đã ra khỏi luồng cấp phát.
+        */
+        if (! in_array($item->status, ['pending', 'partial', 'issued'], true)) {
+            return $fail(match ($item->status) {
+                'used' => 'Mục này đã chốt nhật ký sử dụng nên không cấp thêm được!',
+                'returned' => 'Mục này đã trả về kho nên không cấp thêm được!',
+                'rejected' => 'Mục này đã bị từ chối cấp phát!',
+                default => 'Mục này không còn ở trạng thái cấp phát được!',
+            });
         }
 
-        $import = DB::table('material_imports')->where('id', $request->import_id)->where('department_id', $departmentId)->where('status_id', 1)->first();
-
-        if (! $import) {
-            return $fail('Không tìm thấy mã lô trong kho phòng ban này!');
+        if ((float) $item->requested_amount - (float) $item->issued_amount <= self::EPSILON) {
+            return $fail('Mục này đã cấp phát đủ số đề nghị rồi!');
         }
 
-        if ($import->expired_date && now()->startOfDay()->gt(\Carbon\Carbon::parse($import->expired_date))) {
-            return $fail('Mã lô '.$import->code.' đã hết hạn sử dụng, không được cấp phát!');
+        /*
+        | Gom dòng cấp phát: bỏ dòng trống, cộng dồn nếu người dùng chọn trùng một mã xuất
+        | nhập ở hai dòng - có cộng dồn thì mới chặn đúng tồn của lô đó.
+        */
+        $wanted = [];
+
+        foreach ((array) $request->input('lots', []) as $lot) {
+            $importId = (int) ($lot['import_id'] ?? 0);
+            $amount = (float) ($lot['amount'] ?? 0);
+
+            if ($importId <= 0 || $amount <= self::EPSILON) {
+                continue;
+            }
+
+            $wanted[$importId] = ($wanted[$importId] ?? 0) + $amount;
         }
 
-        $issuedAt = $request->filled('issued_at') ? \Carbon\Carbon::parse($request->issued_at) : now();
+        if (! $wanted) {
+            return $fail('Vui lòng chọn mã xuất nhập và nhập số lượng cấp phát lớn hơn 0!');
+        }
 
-        DB::table(self::REQ_ITEM)->where('id', $item->id)->update([
-            'import_id' => (int) $import->id,
-            'import_code' => $import->code,
-            'issued_amount' => (float) $request->issued_amount,
-            'issued_unit' => $this->nullIfBlank($request->issued_unit ?: $item->requested_unit),
-            'issued_by' => $this->actor(),
-            'issued_at' => $issuedAt,
-            'status' => 'issued',
-            'updated_at' => now(),
-        ]);
+        $imports = DB::table('material_imports')
+            ->whereIn('id', array_keys($wanted))
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->get()
+            ->keyBy('id');
+
+        $lines = [];
+
+        foreach ($wanted as $importId => $amount) {
+            $import = $imports->get($importId);
+
+            if (! $import) {
+                return $fail('Không tìm thấy mã xuất nhập trong kho phòng ban này!');
+            }
+
+            if ($import->expired_date && now()->startOfDay()->gt(\Carbon\Carbon::parse($import->expired_date))) {
+                return $fail('Mã xuất nhập '.$import->code.' đã hết hạn sử dụng, không được cấp phát!');
+            }
+
+            /*
+            | Cấp phát trừ tồn ngay nên phải chặn cấp quá số còn lại ngay tại đây. Mốc chặn
+            | là tồn CÒN HỨA ĐƯỢC, không phải tồn sổ sách: phần đã hứa cho một đợt lấy hàng
+            | còn treo vẫn nằm trong kho nhưng không được đem cấp lẻ lần nữa.
+            */
+            $available = $this->available($import);
+            $limit = $available * (1 + self::OVER_ISSUE_RATIO);
+
+            if ($amount > $limit + self::EPSILON) {
+                $held = $this->remaining($import) - $available;
+
+                return $fail(
+                    'Mã xuất nhập '.$import->code.' còn hứa được '.$this->number($available)
+                    .($held > self::EPSILON ? ' (đang giữ '.$this->number($held).' cho đợt lấy hàng)' : '')
+                    .'. Được cấp vượt tối đa '.(int) round(self::OVER_ISSUE_RATIO * 100).'%, tức không quá '.$this->number($limit).'.'
+                );
+            }
+
+            $lines[] = ['import' => $import, 'amount' => round($amount, 4)];
+        }
+
+        // Thời điểm cấp phát luôn là lúc bấm Cấp Phát, không nhận giá trị từ form
+        $issuedAt = now();
+        $issuedUnit = $this->nullIfBlank($request->issued_unit ?: $item->requested_unit);
+        $addedAmount = round(array_sum(array_column($lines, 'amount')), 4);
+        $first = $lines[0]['import'];
+        $codes = implode(', ', array_map(fn ($line) => $line['import']->code, $lines));
+
+        /*
+        | Cấp phát cộng dồn qua nhiều lần: kho thiếu hàng thì cấp trước phần có, dòng đề nghị
+        | nằm ở PARTIAL và vẫn cấp thêm được. Đủ số đề nghị mới chuyển sang ISSUED.
+        */
+        $issuedBefore = (float) $item->issued_amount;
+        $issuedAmount = round($issuedBefore + $addedAmount, 4);
+        $requestedAmount = (float) $item->requested_amount;
+        $shortAfter = round(max($requestedAmount - $issuedAmount, 0), 4);
+        $newStatus = $shortAfter > self::EPSILON ? 'partial' : 'issued';
+
+        DB::transaction(function () use ($item, $req, $lines, $first, $issuedAmount, $issuedUnit, $issuedAt, $departmentId, $newStatus) {
+            DB::table(self::REQ_ITEM)->where('id', $item->id)->update([
+                // Dòng đề nghị chỉ giữ phần tổng hợp; chi tiết từng lô nằm ở material_exports.
+                // Lô đầu tiên giữ nguyên qua các lần cấp thêm để còn tra đúng lần cấp đầu.
+                'import_id' => (int) ($item->import_id ?: $first->id),
+                'import_code' => $item->import_code ?: $first->code,
+                'issued_amount' => $issuedAmount,
+                'issued_unit' => $issuedUnit,
+                'issued_by' => $this->actor(),
+                'issued_at' => $issuedAt,
+                'status' => $newStatus,
+                'updated_at' => now(),
+            ]);
+
+            // Cấp phát là hàng đã rời kho: mỗi lô một phiếu sử dụng để trừ tồn ngay.
+            // Tổ chốt lại sau bằng "Sử Dụng Vật Tư" (ghi số thực dùng) hoặc trả về kho.
+            foreach ($lines as $line) {
+                $exportId = DB::table(self::TABLE)->insertGetId([
+                    'code' => $line['import']->code,
+                    'import_id' => (int) $line['import']->id,
+                    'department_id' => $departmentId,
+                    'group_id' => $req->group_id,
+                    'request_item_id' => $item->id,
+                    'amount' => $line['amount'],
+                    'type' => 'export',
+                    'product_name' => $item->product_name,
+                    'used_by' => $this->actor(),
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => $issuedAt,
+                    'updated_at' => $issuedAt,
+                ]);
+
+                $this->logHistory($exportId, 'Cấp phát', 'Kho cấp phát cho đề nghị '.$req->code.', trừ tồn ngay '.$this->number($line['amount']).' '.($issuedUnit ?: ''));
+            }
+        });
 
         $this->refreshIssueStatus($item->request_list_id);
 
-        AuditTrialController::log('Cấp phát vật tư', self::REQ_ITEM, $item->id, 'pending', 'Cấp lô '.$import->code.' số lượng '.$request->issued_amount);
+        AuditTrialController::log(
+            'Cấp phát vật tư',
+            self::REQ_ITEM,
+            $item->id,
+            $item->status,
+            $newStatus.': cấp thêm '.count($lines).' mã xuất nhập ('.$codes.') '.$this->number($addedAmount)
+                .', luỹ kế '.$this->number($issuedAmount).'/'.$this->number($requestedAmount).' (đã trừ tồn)'
+        );
+
+        $message = count($lines) > 1
+            ? 'Đã cấp phát '.$this->number($addedAmount).' '.($issuedUnit ?: '').' từ '.count($lines).' mã xuất nhập: '.$codes.'!'
+            : 'Đã cấp phát '.$this->number($addedAmount).' '.($issuedUnit ?: '').' từ mã xuất nhập '.$first->code.'!';
+
+        if ($newStatus === 'partial') {
+            $message .= ' Mục này mới cấp '.$this->number($issuedAmount).'/'.$this->number($requestedAmount)
+                .' '.($issuedUnit ?: '').', còn thiếu '.$this->number($shortAfter).' - cấp thêm khi có hàng về.';
+        }
 
         if ($request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Đã cấp phát mã lô '.$import->code.'!',
+                'message' => $message,
                 'data' => [
-                    'issued_amount' => (float) $request->issued_amount,
-                    'issued_unit' => $this->nullIfBlank($request->issued_unit ?: $item->requested_unit),
+                    'status' => $newStatus,
+                    'issued_amount' => $issuedAmount,
+                    'short_amount' => $shortAfter,
+                    'issued_unit' => $issuedUnit,
                     'issued_by' => $this->actor(),
                     'issued_at' => $issuedAt->format('d/m/Y H:i'),
-                    'import_code' => $import->code,
+                    'import_code' => $codes,
                 ],
             ]);
         }
 
         return redirect()->route('pages.export.materialExport.list', ['tab' => 'request'])
-            ->with('success', 'Đã cấp phát mã lô '.$import->code.'!');
+            ->with('success', $message);
     }
 
     public function issueReject(Request $request)
@@ -530,32 +698,170 @@ class MaterialExportController extends Controller
     }
 
     /* ==========================================================
-     |  PHIẾU SỬ DỤNG / LOẠI BỎ (trừ tồn)
+     |  SỬ DỤNG VẬT TƯ ĐÃ CẤP PHÁT
+     |
+     |  Kho cấp phát là đã trừ tồn, nên ở đây Tổ chỉ chốt lại phiếu sử dụng đã có:
+     |    - Ghi nhận sử dụng: nhập số THỰC DÙNG, phần chưa dùng tự cộng lại kho.
+     |    - Trả về kho: nhập số TRẢ LẠI, trả hết thì phiếu sử dụng bị huỷ, kho hoàn đủ.
+     |  Hai việc quy về một phép tính nên dùng chung một action.
+     ========================================================== */
+
+    public function useStore(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), [
+            'item_id' => ['required', 'exists:'.self::REQ_ITEM.',id'],
+            'action' => ['required', 'in:use,return'],
+            'amount' => ['required', 'numeric', 'min:0'],
+            'product_name' => ['nullable', 'string', 'max:255'],
+            'test_report_no' => ['nullable', 'string', 'max:100'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ], [
+            'item_id.required' => 'Không tìm thấy mục đề nghị cần ghi nhận.',
+            'action.required' => 'Vui lòng chọn Sử dụng hoặc Trả về kho.',
+            'amount.required' => 'Vui lòng nhập số lượng.',
+        ]);
+
+        $back = fn (string $key, string $message) => redirect()->back()
+            ->with($key, $message)
+            ->with('activeTab', 'request');
+
+        if ($validator->fails()) {
+            return $back('error', $validator->errors()->first());
+        }
+
+        $item = DB::table(self::REQ_ITEM)->where('id', $request->item_id)->first();
+        $req = $item ? DB::table(self::REQ_LIST)->where('id', $item->request_list_id)->where('department_id', $departmentId)->first() : null;
+
+        if (! $item || ! $req) {
+            return $back('error', 'Không tìm thấy mục đề nghị của phòng ban này!');
+        }
+
+        // Cấp một phần cũng chốt được: Tổ dùng luôn phần đã nhận, không chờ đủ số đề nghị.
+        if (! in_array($item->status, ['issued', 'partial'], true)) {
+            return $back('error', 'Mục này chưa được cấp phát, hoặc đã chốt sử dụng / trả về kho rồi!');
+        }
+
+        /*
+        | Một dòng có thể đã được cấp từ nhiều lô nên có nhiều phiếu sử dụng. Xếp theo thứ
+        | tự đã cấp (cũng là thứ tự nên xuất): phần THỰC DÙNG tính vào các lô đầu, phần trả
+        | lại kho cắt ngược từ lô cuối - lô hạn gần nhất coi như đã dùng trước.
+        */
+        $exports = DB::table(self::TABLE)
+            ->where('request_item_id', $item->id)
+            ->where('type', 'export')
+            ->where('status_id', 1)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        if ($exports->isEmpty()) {
+            return $back('error', 'Không tìm thấy phiếu sử dụng của mục đề nghị này!');
+        }
+
+        $issued = (float) ($item->issued_amount ?: $exports->sum('amount'));
+        $amount = (float) $request->amount;
+        $isReturn = $request->input('action') === 'return';
+
+        if ($amount > $issued + self::EPSILON) {
+            return $back('error', 'Số lượng không được vượt quá số đã cấp phát ('.$this->number($issued).' '.$item->issued_unit.').');
+        }
+
+        // Quy cả hai hành động về "số thực tính là đã dùng"
+        $usedAmount = $isReturn ? $issued - $amount : $amount;
+        $returnedAmount = $issued - $usedAmount;
+        $unit = $item->issued_unit ?: $item->requested_unit;
+
+        if (! $isReturn && $usedAmount <= self::EPSILON) {
+            return $back('error', 'Số lượng sử dụng phải lớn hơn 0. Không dùng gì thì chọn "Trả về kho".');
+        }
+
+        if ($isReturn && $amount <= self::EPSILON) {
+            return $back('error', 'Số lượng trả về kho phải lớn hơn 0.');
+        }
+
+        $fullyReturned = $usedAmount <= self::EPSILON;
+
+        DB::transaction(function () use ($item, $exports, $request, $usedAmount, $unit, $fullyReturned) {
+            $left = $usedAmount;
+
+            foreach ($exports as $export) {
+                $issuedOfLot = (float) $export->amount;
+                $usedOfLot = min($left, $issuedOfLot);
+                $left = max($left - $usedOfLot, 0);
+
+                $returnedOfLot = $issuedOfLot - $usedOfLot;
+                $lotReturned = $usedOfLot <= self::EPSILON;
+
+                $note = $lotReturned
+                    ? 'Trả toàn bộ '.$this->number($issuedOfLot).' '.$unit.' của mã '.$export->code.' về kho'
+                    : 'Ghi nhận sử dụng '.$this->number($usedOfLot).' '.$unit.' của mã '.$export->code
+                        .($returnedOfLot > self::EPSILON ? ', trả lại kho '.$this->number($returnedOfLot).' '.$unit : '');
+
+                DB::table(self::TABLE)->where('id', $export->id)->update([
+                    // Phiếu bị trả hết thì huỷ (status_id = 0) và giữ nguyên số để còn tra cứu
+                    'amount' => $lotReturned ? $issuedOfLot : $usedOfLot,
+                    'product_name' => $this->nullIfBlank($request->product_name ?: $export->product_name),
+                    'test_report_no' => $this->nullIfBlank($request->test_report_no ?: $export->test_report_no),
+                    'reason' => $this->nullIfBlank($request->reason ?: $export->reason),
+                    'status_id' => $lotReturned ? 0 : 1,
+                    'used_by' => $this->actor(),
+                    'updated_by' => $this->actor(),
+                    'updated_at' => now(),
+                ]);
+
+                $this->logHistory($export->id, $lotReturned ? 'Trả về kho' : 'Ghi nhận sử dụng', $note.($request->reason ? ' | Lý do: '.$request->reason : ''));
+            }
+
+            DB::table(self::REQ_ITEM)->where('id', $item->id)->update([
+                'status' => $fullyReturned ? 'returned' : 'used',
+                'product_name' => $this->nullIfBlank($request->product_name ?: $item->product_name),
+                'updated_at' => now(),
+            ]);
+        });
+
+        AuditTrialController::log(
+            $fullyReturned ? 'Trả vật tư về kho' : 'Ghi nhận sử dụng vật tư',
+            self::REQ_ITEM,
+            $item->id,
+            $item->status,
+            ($fullyReturned ? 'returned' : 'used').', dùng '.$this->number($usedAmount).' / cấp '.$this->number($issued)
+        );
+
+        return $back(
+            'success',
+            $fullyReturned
+                ? 'Đã trả '.$this->number($returnedAmount).' '.$unit.' về kho cho đề nghị '.$req->code.'!'
+                : 'Đã ghi nhận sử dụng '.$this->number($usedAmount).' '.$unit
+                    .($returnedAmount > self::EPSILON ? ' (trả lại kho '.$this->number($returnedAmount).' '.$unit.')' : '').'!'
+        );
+    }
+
+    /* ==========================================================
+     |  PHIẾU LOẠI BỎ (trừ tồn) - hàng hỏng / hết hạn, không qua đề nghị
      ========================================================== */
 
     public function store(Request $request)
     {
         $departmentId = $this->departmentId();
 
+        // Chỉ còn loại bỏ hàng hỏng / hết hạn: phiếu sử dụng nay do kho sinh lúc cấp phát.
         $validator = Validator::make($request->all(), [
-            'type' => ['required', 'in:'.implode(',', array_keys(self::TYPES))],
-            'request_item_id' => ['nullable', 'exists:'.self::REQ_ITEM.',id'],
+            'type' => ['required', 'in:cancel'],
             'import_id' => ['nullable', 'exists:material_imports,id'],
             'amount' => ['required', 'numeric', 'min:0.0001'],
-            'product_name' => ['nullable', 'max:255'],
-            'test_report_no' => ['nullable', 'max:100'],
             'reason' => ['nullable', 'max:500'],
             'adjust_reason' => ['nullable', 'max:500'],
         ], $this->messages());
 
-        $type = $request->input('type');
+        $type = 'cancel';
         $import = null;
         $item = null;
         $groupId = null;
 
         // Chạy trong after() để lỗi tự thêm không bị passes() xoá khi gọi fails()
-        $validator->after(function ($v) use ($request, $departmentId, $type, &$import, &$item, &$groupId) {
-            [$import, $item, $groupId] = $this->resolveUseTarget($v, $request, $departmentId, $type);
+        $validator->after(function ($v) use ($request, $departmentId, &$import, &$item, &$groupId) {
+            [$import, $item, $groupId] = $this->resolveUseTarget($v, $request, $departmentId);
         });
 
         if ($validator->fails()) {
@@ -587,10 +893,10 @@ class MaterialExportController extends Controller
             self::TABLE,
             $id,
             'NA',
-            self::TYPES[$type].' vật tư, mã lô: '.$import->code.', số lượng: '.$request->amount
+            self::TYPES[$type].' vật tư, mã xuất nhập: '.$import->code.', số lượng: '.$request->amount
         );
 
-        return redirect()->back()->with('success', 'Đã ghi nhận '.self::LABEL.' cho mã lô '.$import->code.'!');
+        return redirect()->back()->with('success', 'Đã ghi nhận '.self::LABEL.' cho mã xuất nhập '.$import->code.'!');
     }
 
     public function update(Request $request)
@@ -609,7 +915,7 @@ class MaterialExportController extends Controller
         $validator = Validator::make($request->all(), [
             'amount' => ['required', 'numeric', 'min:0.0001'],
             'product_name' => ['nullable', 'max:255'],
-            'test_report_no' => ['nullable', 'max:100'],
+            'purpose' => ['nullable', 'max:500'],
             'reason' => ['nullable', 'max:500'],
             'adjust_reason' => ['nullable', 'max:500'],
         ], $this->messages());
@@ -620,7 +926,7 @@ class MaterialExportController extends Controller
             if ($import && is_numeric($request->amount)) {
                 $limit = $this->remaining($import, (int) $current->id) * (1 + self::OVER_ISSUE_RATIO);
                 if ((float) $request->amount > $limit + self::EPSILON) {
-                    $validator->errors()->add('amount', 'Mã lô '.$import->code.' chỉ còn cho phép xuất tối đa '.$this->number($limit).'.');
+                    $validator->errors()->add('amount', 'Mã xuất nhập '.$import->code.' chỉ còn cho phép xuất tối đa '.$this->number($limit).'.');
                 }
             }
         });
@@ -633,11 +939,27 @@ class MaterialExportController extends Controller
             'amount' => (float) $request->amount,
             'type' => $current->type,
             'product_name' => $this->nullIfBlank($request->product_name),
-            'test_report_no' => $this->nullIfBlank($request->test_report_no),
+            'test_report_no' => $current->test_report_no,
             'reason' => $this->nullIfBlank($request->reason),
         ];
 
-        $note = $this->changeNote($current, $payload, $request->adjust_reason);
+        /*
+        | Mục đích nằm ở DÒNG ĐỀ NGHỊ chứ không ở phiếu sử dụng. Một dòng đề nghị có thể
+        | được cấp từ nhiều mã xuất nhập nên sửa ở đây là sửa chung cho mọi phiếu sinh ra
+        | từ dòng đó. Phiếu loại bỏ không có đề nghị nên không có mục đích để sửa.
+        */
+        $item = $current->request_item_id
+            ? DB::table(self::REQ_ITEM)->where('id', $current->request_item_id)->first()
+            : null;
+
+        $purpose = $this->nullIfBlank($request->purpose);
+        $extra = [];
+
+        if ($item && (string) $item->purpose !== (string) $purpose) {
+            $extra[] = 'Mục đích: '.($item->purpose ?: '—').' -> '.($purpose ?: '—');
+        }
+
+        $note = $this->changeNote($current, $payload, $request->adjust_reason, $extra);
 
         if ($note === '') {
             return redirect()->back()->with('error', 'Không có thông tin nào thay đổi nên chưa cập nhật '.self::LABEL.'.');
@@ -647,6 +969,13 @@ class MaterialExportController extends Controller
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
+
+        if ($item && $extra) {
+            DB::table(self::REQ_ITEM)->where('id', $item->id)->update([
+                'purpose' => $purpose,
+                'updated_at' => now(),
+            ]);
+        }
 
         $this->logHistory($current->id, 'Cập nhật', $note);
 
@@ -712,11 +1041,11 @@ class MaterialExportController extends Controller
                     'created_by' => $row->created_by ?: 'NA',
                     'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
                     'snapshot' => [
-                        'Mã lô' => $row->code ?: '—',
+                        'Mã xuất nhập' => $row->code ?: '—',
                         'Vật tư' => $row->material_name ?: '—',
                         'Số lượng' => $row->amount !== null ? $this->number((float) $row->amount).' '.$unit : '—',
                         'Loại phiếu' => self::TYPES[$row->type] ?? ($row->type ?: '—'),
-                        'Tên sản phẩm' => $row->product_name ?: '—',
+                        'Thiết bị liên quan' => $row->product_name ?: '—',
                         'Số phiếu kiểm nghiệm' => $row->test_report_no ?: '—',
                         'Lý do loại bỏ' => $row->reason ?: '—',
                         'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
@@ -730,14 +1059,14 @@ class MaterialExportController extends Controller
      |  AJAX HỖ TRỢ FORM
      ========================================================== */
 
-    /** Tra mã lô khi quét mã QR trên nhãn, trả JSON cho form. */
+    /** Tra mã xuất nhập khi quét mã QR trên nhãn, trả JSON cho form. */
     public function lookup(Request $request)
     {
         $code = trim((string) $request->query('code'));
         $import = $this->importOptions($this->departmentId())->firstWhere('code', $code);
 
         if (! $import) {
-            return response()->json(['ok' => false, 'message' => 'Không tìm thấy mã lô "'.$code.'" trong kho phòng ban.']);
+            return response()->json(['ok' => false, 'message' => 'Không tìm thấy mã xuất nhập "'.$code.'" trong kho phòng ban.']);
         }
 
         return response()->json([
@@ -748,7 +1077,7 @@ class MaterialExportController extends Controller
             'remaining' => $import->remaining,
             'unit' => $import->unit_short_name,
             'expired_date' => $import->expired_date,
-            'message' => $import->selectable ? '' : ($import->expired ? 'Mã lô đã hết hạn.' : 'Mã lô đã hết tồn.'),
+            'message' => $import->selectable ? '' : ($import->expired ? 'Mã xuất nhập đã hết hạn.' : 'Mã xuất nhập đã hết tồn.'),
         ]);
     }
 
@@ -770,57 +1099,6 @@ class MaterialExportController extends Controller
         ]);
     }
 
-    /** Các dòng đề nghị đã CẤP PHÁT cho một Tổ nhưng CHƯA lập phiếu sử dụng. */
-    public function getIssuedItems(Request $request)
-    {
-        $departmentId = $this->departmentId();
-        $groupId = (int) $request->query('group_id');
-
-        $rows = DB::table(self::REQ_ITEM)
-            ->join(self::REQ_LIST, self::REQ_ITEM.'.request_list_id', '=', self::REQ_LIST.'.id')
-            ->leftJoin('material_categories', self::REQ_ITEM.'.category_id', '=', 'material_categories.id')
-            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
-            ->leftJoin('material_imports', self::REQ_ITEM.'.import_id', '=', 'material_imports.id')
-            ->select(
-                self::REQ_ITEM.'.id',
-                self::REQ_ITEM.'.category_id',
-                self::REQ_ITEM.'.material_name',
-                self::REQ_ITEM.'.import_id',
-                self::REQ_ITEM.'.import_code',
-                self::REQ_ITEM.'.requested_amount',
-                self::REQ_ITEM.'.issued_amount',
-                self::REQ_ITEM.'.issued_unit',
-                self::REQ_ITEM.'.product_name',
-                self::REQ_ITEM.'.purpose',
-                self::REQ_LIST.'.code as request_code',
-                self::REQ_LIST.'.group_id',
-                'material_names.name as category_material_name'
-            )
-            ->where(self::REQ_LIST.'.department_id', $departmentId)
-            ->where(self::REQ_LIST.'.group_id', $groupId)
-            ->where(self::REQ_ITEM.'.status', 'issued')
-            ->whereNotNull(self::REQ_ITEM.'.import_id')
-            ->whereNotExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from(self::TABLE)
-                    ->whereColumn(self::TABLE.'.request_item_id', self::REQ_ITEM.'.id')
-                    ->where(self::TABLE.'.type', 'export')
-                    ->where(self::TABLE.'.status_id', 1);
-            })
-            ->orderBy(self::REQ_ITEM.'.id', 'desc')
-            ->get()
-            ->map(function ($row) {
-                $import = DB::table('material_imports')->where('id', $row->import_id)->first();
-                $balanced = (float) DB::table('material_balancings')->where('import_id', $row->import_id)->where('status_id', 1)->sum('balancing_amount');
-                $used = (float) DB::table(self::TABLE)->where('import_id', $row->import_id)->where('status_id', 1)->sum('amount');
-                $row->display_name = $row->category_id ? $row->category_material_name : $row->material_name;
-                $row->actual_remaining = $import ? max((float) $import->amount + $balanced - $used, 0) : 0;
-
-                return $row;
-            });
-
-        return response()->json(['rows' => $rows]);
-    }
 
     /* ==========================================================
      |  HÀM DÙNG CHUNG
@@ -848,65 +1126,29 @@ class MaterialExportController extends Controller
         }
     }
 
-    /** Xác định mã lô + dòng đề nghị + Tổ cho một phiếu sử dụng / loại bỏ. */
-    private function resolveUseTarget($validator, Request $request, int $departmentId, string $type): array
+    /**
+     * Xác định mã xuất nhập cho một phiếu LOẠI BỎ và chặn xuất vượt tồn.
+     * Phiếu sử dụng không đi qua đây: kho sinh sẵn lúc cấp phát (issueStore), Tổ chỉ chốt
+     * lại bằng useStore().
+     */
+    private function resolveUseTarget($validator, Request $request, int $departmentId): array
     {
-        $import = null;
-        $item = null;
         $groupId = $request->filled('group_id') ? (int) $request->group_id : null;
 
-        if ($type === 'export') {
-            if (! $request->filled('request_item_id')) {
-                $validator->errors()->add('request_item_id', 'Vật tư bắt buộc phải lấy từ một dòng đề nghị đã được cấp phát.');
+        if (! $request->filled('import_id')) {
+            $validator->errors()->add('import_id', 'Vui lòng chọn mã xuất nhập cần loại bỏ.');
 
-                return [null, null, null];
-            }
+            return [null, null, null];
+        }
 
-            $item = DB::table(self::REQ_ITEM)->where('id', $request->request_item_id)->first();
-            $req = $item ? DB::table(self::REQ_LIST)->where('id', $item->request_list_id)->where('department_id', $departmentId)->first() : null;
+        $import = DB::table('material_imports')->where('id', $request->import_id)->where('department_id', $departmentId)->where('status_id', 1)->first();
 
-            if (! $item || ! $req) {
-                $validator->errors()->add('request_item_id', 'Không tìm thấy dòng đề nghị của phòng ban này.');
-
-                return [null, null, null];
-            }
-
-            if ($item->status !== 'issued' || ! $item->import_id) {
-                $validator->errors()->add('request_item_id', 'Dòng đề nghị này chưa được kho cấp phát mã lô.');
-
-                return [null, null, null];
-            }
-
-            $alreadyUsed = DB::table(self::TABLE)
-                ->where('request_item_id', $item->id)
-                ->where('type', 'export')
-                ->where('status_id', 1)
-                ->exists();
-
-            if ($alreadyUsed) {
-                $validator->errors()->add('request_item_id', 'Dòng đề nghị này đã được lập phiếu sử dụng.');
-
-                return [null, null, null];
-            }
-
-            $import = DB::table('material_imports')->where('id', $item->import_id)->where('department_id', $departmentId)->first();
-            $groupId = $req->group_id;
-        } else {
-            if (! $request->filled('import_id')) {
-                $validator->errors()->add('import_id', 'Vui lòng chọn mã lô cần loại bỏ.');
-
-                return [null, null, null];
-            }
-
-            $import = DB::table('material_imports')->where('id', $request->import_id)->where('department_id', $departmentId)->where('status_id', 1)->first();
-
-            if (! trim((string) $request->reason)) {
-                $validator->errors()->add('reason', 'Vui lòng nhập lý do loại bỏ.');
-            }
+        if (! trim((string) $request->reason)) {
+            $validator->errors()->add('reason', 'Vui lòng nhập lý do loại bỏ.');
         }
 
         if (! $import) {
-            $validator->errors()->add('import_id', 'Không tìm thấy mã lô trong kho phòng ban này.');
+            $validator->errors()->add('import_id', 'Không tìm thấy mã xuất nhập trong kho phòng ban này.');
 
             return [null, null, null];
         }
@@ -916,23 +1158,25 @@ class MaterialExportController extends Controller
             if ((float) $request->amount > $limit + self::EPSILON) {
                 $validator->errors()->add(
                     'amount',
-                    'Mã lô '.$import->code.' còn '.$this->number($this->remaining($import)).'. Được xuất vượt tối đa '
+                    'Mã xuất nhập '.$import->code.' còn '.$this->number($this->remaining($import)).'. Được xuất vượt tối đa '
                     .(int) round(self::OVER_ISSUE_RATIO * 100).'%, tức không quá '.$this->number($limit).'.'
                 );
             }
         }
 
-        return [$import, $item, $groupId];
+        return [$import, null, $groupId];
     }
 
     /** Cập nhật issue_status của đề nghị theo trạng thái các dòng. */
     private function refreshIssueStatus(int $listId): void
     {
         $items = DB::table(self::REQ_ITEM)->where('request_list_id', $listId)->get();
-        $pending = $items->where('status', 'pending')->count();
-        $issued = $items->where('status', 'issued')->count();
 
-        $status = $pending === 0 ? 'completed' : ($issued > 0 ? 'partial' : 'waiting');
+        // Dòng mới cấp một phần vẫn còn nợ hàng nên phiếu chưa thể coi là cấp xong.
+        $open = $items->whereIn('status', ['pending', 'partial'])->count();
+        $issued = $items->whereIn('status', ['partial', 'issued', 'used', 'returned'])->count();
+
+        $status = $open === 0 ? 'completed' : ($issued > 0 ? 'partial' : 'waiting');
 
         DB::table(self::REQ_LIST)->where('id', $listId)->update(['issue_status' => $status, 'updated_at' => now()]);
     }
@@ -963,7 +1207,8 @@ class MaterialExportController extends Controller
         ]);
     }
 
-    private function changeNote($current, array $payload, ?string $reason = null): string
+    /** $extra: các thay đổi không nằm trên bảng phiếu sử dụng, ví dụ mục đích của dòng đề nghị. */
+    private function changeNote($current, array $payload, ?string $reason = null, array $extra = []): string
     {
         $parts = [];
 
@@ -993,6 +1238,8 @@ class MaterialExportController extends Controller
             $parts[] = $title.': '.($old === null || $old === '' ? '—' : $old).' -> '.($new === null || $new === '' ? '—' : $new);
         }
 
+        $parts = array_merge($parts, $extra);
+
         if (! $parts) {
             return '';
         }
@@ -1002,55 +1249,110 @@ class MaterialExportController extends Controller
         return ($reason !== '' ? 'Lý do: '.$reason.' | ' : '').implode(' | ', $parts);
     }
 
-    /** Mã lô của phòng ban đang chọn, còn hiệu lực, kèm tồn còn lại. */
-    private function importOptions(int $departmentId)
+    /**
+     * Các lô ĐÃ CẤP của từng dòng đề nghị: request_item_id => danh sách phiếu sử dụng.
+     *
+     * Một dòng cấp từ nhiều mã xuất nhập thì có bấy nhiêu phiếu sử dụng cùng trỏ về nó.
+     * Lấy cả phiếu đã huỷ (status_id = 0) để phiếu chi tiết còn nói được "lô này đã trả
+     * về kho", nhưng KHÔNG lấy phiếu loại bỏ hàng hỏng (type = cancel).
+     */
+    private function issuedLots($itemIds)
     {
-        $used = $this->sumByImport(self::TABLE, 'amount', $departmentId);
-        $balanced = $this->sumByImport('material_balancings', 'balancing_amount', $departmentId);
-        $today = now()->startOfDay();
+        $itemIds = collect($itemIds)->filter()->values();
 
-        return DB::table('material_imports')
-            ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
-            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
-            ->leftJoin('locations', 'material_imports.location_id', '=', 'locations.id')
-            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
+        if ($itemIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table(self::TABLE)
+            ->leftJoin('material_imports', self::TABLE.'.import_id', '=', 'material_imports.id')
             ->select(
-                'material_imports.id',
-                'material_imports.code',
-                'material_imports.category_id',
-                'material_imports.amount',
+                self::TABLE.'.id',
+                self::TABLE.'.request_item_id',
+                self::TABLE.'.import_id',
+                self::TABLE.'.code',
+                self::TABLE.'.amount',
+                self::TABLE.'.status_id',
+                self::TABLE.'.created_at',
                 'material_imports.expired_date',
-                'material_categories.technical_specification',
-                'material_names.name as material_name',
-                'units.short_name as unit_short_name',
-                'locations.code as location_code'
+                'material_imports.imported_date'
             )
-            ->where('material_imports.department_id', $departmentId)
-            ->where('material_imports.status_id', 1)
-            ->orderBy('material_imports.imported_date', 'desc')
-            ->orderBy('material_imports.id', 'desc')
+            ->whereIn(self::TABLE.'.request_item_id', $itemIds)
+            ->where(self::TABLE.'.type', 'export')
+            ->orderBy(self::TABLE.'.id', 'asc')
             ->get()
-            ->map(function ($import) use ($used, $balanced, $today) {
-                $import->used = (float) ($used[$import->id] ?? 0);
-                $import->balanced = (float) ($balanced[$import->id] ?? 0);
-                $import->remaining = max((float) $import->amount + $import->balanced - $import->used, 0);
-                $import->max_amount = $import->remaining * (1 + self::OVER_ISSUE_RATIO);
-                $import->expired = $import->expired_date
-                    && \Carbon\Carbon::parse($import->expired_date)->startOfDay()->lt($today);
-                $import->selectable = ! $import->expired && $import->remaining > self::EPSILON;
-
-                return $import;
-            });
+            ->groupBy('request_item_id');
     }
 
-    private function sumByImport(string $table, string $column, int $departmentId)
+    /**
+     * Kế hoạch chia lô gợi ý cho từng dòng CÒN CHỜ CẤP của các đề nghị đã duyệt.
+     *
+     * Đề nghị 20 cái mà lô hạn gần nhất chỉ còn 12 thì kế hoạch là 12 của lô đó + 8 của
+     * lô kế tiếp, đúng thứ tự nên xuất. Dùng lại bộ lô đã nạp ở index() nên không phát
+     * sinh thêm truy vấn cho mỗi dòng.
+     *
+     * @return \Illuminate\Support\Collection request_item_id => ['lines' => [...], 'shortage' => float]
+     */
+    private function issuePlans($requestLists, $requestItems, $lotsByCategory)
     {
-        return DB::table($table)
-            ->select('import_id', DB::raw('SUM(`'.$column.'`) as total'))
-            ->where('department_id', $departmentId)
-            ->where('status_id', 1)
-            ->groupBy('import_id')
-            ->pluck('total', 'import_id');
+        $plans = collect();
+
+        foreach ($requestLists->where('app_status', 'approved') as $req) {
+            foreach ($requestItems->get($req->id, collect()) as $item) {
+                if (! in_array($item->status, ['pending', 'partial', 'issued'], true) || ! $item->category_id) {
+                    continue;
+                }
+
+                // Dòng đã cấp một phần chỉ cần chia lô cho phần CÒN THIẾU
+                $left = round((float) $item->requested_amount - (float) $item->issued_amount, 4);
+
+                if ($left <= self::EPSILON) {
+                    continue;
+                }
+
+                $plans[$item->id] = MaterialPicking::planFrom(
+                    $lotsByCategory->get($item->category_id, collect()),
+                    $left
+                );
+            }
+        }
+
+        return $plans;
+    }
+
+    /**
+     * Mã xuất nhập của phòng ban đang chọn, còn hiệu lực, kèm tồn còn lại.
+     *
+     * Thứ tự do App\Support\MaterialPicking quyết định: lô NÊN XUẤT TRƯỚC đứng đầu danh
+     * sách (hạn gần nhất trước; vật tư không hạn dùng tự sắp theo ngày nhập). Trước đây
+     * ô chọn sắp theo ngày nhập giảm dần - lô MỚI NHẤT nằm trên cùng, ngược nguyên tắc
+     * xuất kho.
+     *
+     * `remaining` vẫn là tồn sổ sách để hiện cho người dùng; `available` mới là phần còn
+     * hứa được, đã trừ hàng đang giữ cho các đợt lấy hàng còn treo.
+     */
+    private function importOptions(int $departmentId)
+    {
+        return MaterialPicking::lots($departmentId)->map(function ($import) {
+            // Giữ tên cột cũ cho các view đang dùng
+            $import->used = $import->exported;
+            $import->max_amount = $import->available * (1 + self::OVER_ISSUE_RATIO);
+            $import->selectable = $import->suggestable;
+
+            return $import;
+        });
+    }
+
+    /**
+     * Tồn CÒN HỨA ĐƯỢC của một lô = tồn sổ sách - phần đang giữ cho các đợt lấy hàng.
+     *
+     * Dùng khi CẤP PHÁT (hứa hàng cho một Tổ). Việc LOẠI BỎ hàng hỏng vẫn đi theo
+     * remaining() - phát hiện lô hỏng thì phải ghi nhận được ngay, kể cả khi lô đó đã
+     * hứa cho một đợt; bước xuất đợt sẽ kiểm lại tồn trước khi trừ.
+     */
+    private function available($import, ?int $ignoreExportId = null): float
+    {
+        return max($this->remaining($import, $ignoreExportId) - MaterialPicking::heldOf((int) $import->id), 0);
     }
 
     private function remaining($import, ?int $ignoreExportId = null): float
@@ -1151,6 +1453,7 @@ class MaterialExportController extends Controller
     {
         return [
             'group_id' => ['required', 'exists:groups,id'],
+            'name' => ['nullable', 'string', 'max:255'],
             'needs_director' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],

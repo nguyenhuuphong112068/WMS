@@ -34,7 +34,7 @@ use Illuminate\Validation\Rule;
  */
 class DepartmentStandardController extends Controller
 {
-    private const TABLE = 'department_standards';
+    private const TABLE = 'standard_department_categories';
 
     private const LABEL = 'chất chuẩn của phòng';
 

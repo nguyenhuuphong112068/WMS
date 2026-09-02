@@ -25,16 +25,6 @@
         default => ['label' => $reqAppStatuses[$status] ?? $status, 'class' => 'pending'],
     };
 
-    // import_id => {code, remaining, unit} cho JS form
-    $expImportMap = $availableImports->mapWithKeys(fn($i) => [$i->id => [
-        'code' => $i->code,
-        'remaining' => (float) $i->remaining,
-        'max_amount' => (float) $i->max_amount,
-        'unit' => $i->unit_short_name,
-        'material_name' => $i->material_name,
-        'expired' => (bool) $i->expired,
-        'selectable' => (bool) $i->selectable,
-    ]]);
 @endphp
 
 @section('mainContent')
@@ -46,10 +36,14 @@
     @include('pages.export.MaterialExport.create')
     @include('pages.export.MaterialExport.reject')
     @include('pages.export.MaterialExport.requestModal')
+    @include('pages.export.MaterialExport.inventoryPickerModal')
+    @include('pages.export.MaterialExport.useModal')
     @foreach ($requestLists->whereIn('app_status', ['draft', 'rejected']) as $req)
         @include('pages.export.MaterialExport.requestEditModal', ['req' => $req, 'items' => $requestItems->get($req->id, collect())])
     @endforeach
     @foreach ($requestLists as $req)
         @include('pages.export.MaterialExport.requestDetailModal', ['req' => $req, 'items' => $requestItems->get($req->id, collect())])
     @endforeach
+    {{-- Đặt sau các phiếu chi tiết: dựng dòng cấp phát + bảng chọn mã xuất nhập cho mọi mục còn chờ --}}
+    @include('pages.export.MaterialExport.issueLotPickerModal')
 @endsection

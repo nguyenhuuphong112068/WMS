@@ -4,9 +4,11 @@
     <div class="card-body">
 
         <div class="md-toolbar">
-            <button type="button" class="btn btn-primary btn-md-create">
-                <i class="fas fa-plus mr-1"></i> Thêm mới
-            </button>
+            @perm('category_chemical_create')
+                <button type="button" class="btn btn-primary btn-md-create">
+                    <i class="fas fa-plus mr-1"></i> Thêm mới
+                </button>
+            @endperm
             <p class="hint">
                 <i class="fas fa-info-circle mr-1"></i>
                 Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} bản ghi.
@@ -31,7 +33,7 @@
                         <th style="width: 150px" title="Dòng cảnh báo in ở dải giữa nhãn dán lô hàng">
                             Cảnh Báo An Toàn</th>
                         <th style="width: 170px"
-                            title="Các phòng ban đã khai dùng hoá chất này (bảng department_chemicals)">
+                            title="Các phòng ban đã khai dùng hoá chất này (bảng chemical_department_categories)">
                             Phòng Ban Đang Dùng</th>
                         <th style="width: 120px">Người Tạo</th>
                         <th class="text-center" style="width: 125px">Duyệt</th>
@@ -154,6 +156,7 @@
                             <td>
                                 @include('pages.category.shared.rowActions', [
                                     'prefix' => $mdRoute,
+                                    'permPrefix' => 'category_chemical_',
                                     'row' => $row,
                                     'label' => $mdLabel,
                                     'title' => $row->code,

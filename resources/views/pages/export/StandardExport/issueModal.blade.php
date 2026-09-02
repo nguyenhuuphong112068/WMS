@@ -41,13 +41,12 @@
                     {{-- Form nhập thông tin cấp phát --}}
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label class="required font-weight-bold" style="font-size: 0.9rem;">
-                                <i class="fas fa-clock mr-1 text-info"></i> Thời Gian Cấp Phát <span class="text-danger">*</span>
+                            <label class="font-weight-bold" style="font-size: 0.9rem;">
+                                <i class="fas fa-clock mr-1 text-info"></i> Thời Gian Cấp Phát
                             </label>
-                            <input type="datetime-local" name="issued_at" id="issue_issued_at" class="form-control" style="height: 38px !important;" value="{{ now()->format('Y-m-d\TH:i') }}" required>
-                            @error('issued_at', 'issueErrors')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
+                            <input type="text" class="form-control exp-readonly" style="height: 38px !important;"
+                                readonly value="{{ now()->format('d/m/Y H:i') }}">
+                            <small class="text-muted">Luôn là thời điểm bấm Cấp Phát, không sửa được.</small>
                         </div>
 
                         <div class="form-group col-md-6">
@@ -61,7 +60,7 @@
                                         data-category="{{ $imp->category_id ?? 0 }}"
                                         data-remaining="{{ (float)$imp->remaining }}"
                                         data-unit="{{ $imp->unit_short_name ?: '' }}"
-                                        data-location="{{ $imp->location_code ?? ($imp->location_name ?? '') }}">
+                                        data-location="{{ $imp->location_code ?? '' }}">
                                         {{ $imp->code }} — {{ $imp->standard_name }} (Lô {{ $imp->batch_no ?: '—' }}, HSD {{ $imp->expired_date ? \Carbon\Carbon::parse($imp->expired_date)->format('d/m/Y') : '—' }}, tồn {{ $expNum($imp->remaining) }} {{ $imp->unit_short_name ?: '' }}{{ !empty($imp->location_code) ? ', Vị trí: ' . $imp->location_code : '' }})
                                     </option>
                                 @endforeach
@@ -138,15 +137,6 @@
             } else {
                 $('#issue_item_note_wrap').hide();
             }
-
-            // Set current datetime for issue
-            var now = new Date();
-            var year = now.getFullYear();
-            var month = ('0' + (now.getMonth() + 1)).slice(-2);
-            var day = ('0' + now.getDate()).slice(-2);
-            var hours = ('0' + now.getHours()).slice(-2);
-            var minutes = ('0' + now.getMinutes()).slice(-2);
-            $('#issue_issued_at').val(year + '-' + month + '-' + day + 'T' + hours + ':' + minutes);
 
             $('#issue_amount').val(data.requested_amount);
             if (data.requested_unit) {

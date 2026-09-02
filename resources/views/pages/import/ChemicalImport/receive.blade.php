@@ -59,13 +59,10 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-4">
-                            <label>Ngày Nhận <span class="text-danger">*</span></label>
-                            <input type="date" name="imported_date"
-                                class="form-control {{ $bag->has('imported_date') ? 'is-invalid' : '' }}"
-                                value="{{ old('imported_date', now()->format('Y-m-d')) }}" required>
-                            @if ($bag->has('imported_date'))
-                                <span class="md-error">{{ $bag->first('imported_date') }}</span>
-                            @endif
+                            <label>Ngày Nhận</label>
+                            <input type="text" class="form-control imp-readonly" readonly
+                                value="{{ now()->format('d/m/Y') }}">
+                            <small class="md-sub">Luôn là ngày bấm Nhận hàng, không sửa được.</small>
                         </div>
 
                         <div class="form-group col-md-8">
@@ -76,7 +73,7 @@
                                 @foreach ($locations as $location)
                                     <option value="{{ $location->id }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
-                                        {{ $location->code ? $location->code . ' - ' : '' }}{{ $location->name }}{{ $location->warehouse_name ? ' (' . $location->warehouse_name . ($location->room_name ? ' / ' . $location->room_name : '') . ($location->shelf_name ? ' / ' . $location->shelf_name : '') . ')' : '' }}
+                                        {{ $location->code }}{{ $location->warehouse_name ? ' (' . $location->warehouse_name . ($location->room_name ? ' / ' . $location->room_name : '') . ($location->shelf_name ? ' / ' . $location->shelf_name : '') . ')' : '' }}
                                     </option>
                                 @endforeach
                             </select>

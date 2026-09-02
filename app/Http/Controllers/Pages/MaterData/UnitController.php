@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\MaterData;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -20,6 +21,14 @@ class UnitController extends Controller
     private const TABLE = 'units';
     private const LABEL = 'đơn vị tính';
 
+    /** Các cột người dùng nhập - dùng chung cho ảnh chụp và mô tả thay đổi của lịch sử. */
+    private const FIELDS = [
+        'short_name' => 'Ký hiệu',
+        'name' => 'Tên đơn vị tính',
+        'unit_group' => 'Nhóm đơn vị',
+        'factor_to_base' => 'Hệ số quy đổi',
+    ];
+
     public function index()
     {
         $datas = DB::table(self::TABLE)
@@ -31,6 +40,8 @@ class UnitController extends Controller
 
         return view('pages.materData.Unit.list', [
             'datas' => $datas,
+            // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
+            'historyCounts' => DataMasterHistory::counts(self::TABLE),
             'groups' => config('unit.groups'),
             'suggestions' => config('unit.suggestions'),
         ]);
@@ -51,6 +62,8 @@ class UnitController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . ': ' . $request->short_name . ' - ' . $request->name . '.', self::FIELDS, $this->maps());
 
         AuditTrialController::log(
             'Thêm mới',
@@ -77,7 +90,10 @@ class UnitController extends Controller
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request) + [
+        $payload = $this->payload($request);
+        $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $this->maps());
+
+        DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             // Sửa nội dung thì phải duyệt lại từ đầu
             'app_status' => 'pending',
             'approved_by' => null,
@@ -85,6 +101,8 @@ class UnitController extends Controller
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS, $this->maps());
 
         AuditTrialController::log(
             'Cập nhật',
@@ -113,6 +131,15 @@ class UnitController extends Controller
             'updated_at' => now(),
         ]);
 
+        DataMasterHistory::record(
+            self::TABLE,
+            $current->id,
+            $newStatus == 1 ? 'Mở khoá' : 'Khoá',
+            DataMasterHistory::statusNote($current->status_id, $newStatus),
+            self::FIELDS,
+            $this->maps()
+        );
+
         AuditTrialController::log(
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             self::TABLE,
@@ -137,6 +164,14 @@ class UnitController extends Controller
         return $this->setApproval($request, 'rejected');
     }
 
+    /** Trả về lịch sử thay đổi của một dòng cho modal xem lịch sử. */
+    public function history(Request $request)
+    {
+        return response()->json([
+            'rows' => DataMasterHistory::rows(self::TABLE, (int) $request->id),
+        ]);
+    }
+
     /** Ghi nhận kết quả duyệt: ai duyệt, duyệt lúc nào. */
     private function setApproval(Request $request, string $appStatus)
     {
@@ -153,6 +188,15 @@ class UnitController extends Controller
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
+
+        DataMasterHistory::record(
+            self::TABLE,
+            $current->id,
+            $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt',
+            DataMasterHistory::approvalNote($current->app_status, $appStatus),
+            self::FIELDS,
+            $this->maps()
+        );
 
         AuditTrialController::log(
             $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt',
@@ -171,6 +215,12 @@ class UnitController extends Controller
     private function actor(): string
     {
         return session('user')['fullName'] ?? 'NA';
+    }
+
+    /** Bảng tra nhãn để lịch sử hiện tên nhóm đơn vị thay vì mã nhóm. */
+    private function maps(): array
+    {
+        return ['unit_group' => config('unit.groups')];
     }
 
     private function rules($ignoreId = null): array

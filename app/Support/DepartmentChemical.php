@@ -8,15 +8,15 @@ use Illuminate\Support\Facades\DB;
  * CẤU HÌNH HOÁ CHẤT THEO TỪNG PHÒNG BAN
  *
  * Danh mục hoá chất (chemical_categories) dùng chung toàn công ty vì nó mô tả bản chất
- * của chất. Cách dùng chất thì riêng từng phòng, nằm ở bảng department_chemicals.
+ * của chất. Cách dùng chất thì riêng từng phòng, nằm ở bảng chemical_department_categories.
  *
  * Quy tắc đọc ở mọi nơi trong hệ thống:
  *
- *      giá trị hiệu lực = department_chemicals.<cột> ?? chemical_categories.<cột>
+ *      giá trị hiệu lực = chemical_department_categories.<cột> ?? chemical_categories.<cột>
  *
  * Phòng chưa khai riêng thì tự động chạy theo mặc định chung, không có màn hình nào gãy.
  *
- * Riêng ĐƠN VỊ TÍNH không theo quy tắc trên: nó chỉ nằm ở department_chemicals, danh mục
+ * Riêng ĐƠN VỊ TÍNH không theo quy tắc trên: nó chỉ nằm ở chemical_department_categories, danh mục
  * chung không còn cột unit_id. Mỗi phòng nhập / xuất hoá chất theo đơn vị của phòng mình,
  * nên mọi màn hình muốn hiện đơn vị đều phải đi qua joinUnit().
  *
@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\DB;
  */
 class DepartmentChemical
 {
-    public const TABLE = 'department_chemicals';
+    public const TABLE = 'chemical_department_categories';
 
     /** Bí danh của chính bảng này khi chỉ nối vào để lấy đơn vị tính - xem joinUnit(). */
     public const UNIT_ALIAS = 'dc_unit';
@@ -65,7 +65,7 @@ class DepartmentChemical
     /**
      * Nối ĐƠN VỊ TÍNH của đúng một phòng ban vào câu truy vấn đang có.
      *
-     * Đơn vị nằm ở department_chemicals nên không lấy thẳng từ chemical_categories được
+     * Đơn vị nằm ở chemical_department_categories nên không lấy thẳng từ chemical_categories được
      * nữa. Dùng bí danh riêng để câu truy vấn nào đã gọi join() ở trên vẫn dùng được.
      *
      * Không lọc status_id: phòng khoá dòng khai rồi thì các phiếu cũ vẫn phải hiện đúng
@@ -200,7 +200,6 @@ class DepartmentChemical
                 'units.name as unit_name',
                 'storage_conditions.name as storage_condition_name',
                 'category_storage.name as category_storage_condition_name',
-                'locations.name as location_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
@@ -240,7 +239,12 @@ class DepartmentChemical
         return $query->get();
     }
 
-    /** Vị trí lưu trữ của đúng phòng ban đang chọn, kèm đường dẫn Kho / Phòng / Kệ. */
+    /**
+     * Vị trí lưu trữ của đúng phòng ban đang chọn, kèm đường dẫn Kho / Phòng / Kệ.
+     *
+     * Lọc theo locations.item_type để không xếp nhầm hàng vào ô của loại khác;
+     * ô chưa khai loại được coi là dùng chung nên vẫn chọn được.
+     */
     public static function locationOptions(int $departmentId)
     {
         return DB::table('locations')
@@ -250,17 +254,19 @@ class DepartmentChemical
             ->select(
                 'locations.id',
                 'locations.code',
-                'locations.name',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
                 'shelves.name as shelf_name'
             )
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
+            // Chỉ những ô khai loại hoá chất, cộng thêm ô chưa khai loại (dùng chung)
+            ->where(fn ($query) => $query->whereNull('locations.item_type')
+                ->orWhere('locations.item_type', 'chemical'))
             ->orderBy('warehouses.name', 'asc')
             ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
-            ->orderBy('locations.name', 'asc')
+            ->orderBy('locations.code', 'asc')
             ->get();
     }
 
@@ -296,6 +302,63 @@ class DepartmentChemical
             ->select('id', 'name')
             ->where('status_id', 1)
             ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Hoá chất được phép NHẬP KHO của đúng một phòng ban.
+     *
+     * Có dòng ở chemical_department_categories = phòng đó được dùng hoá chất này. Phòng chưa khai ở
+     * tab "Hoá Chất Của Phòng" thì không được nhập vào kho, nên ô chọn của màn hình Nhập
+     * đi thẳng từ bảng này ra chứ không duyệt cả danh mục chung của công ty.
+     *
+     * Điều kiện bảo quản lấy theo quy tắc chung: của phòng trước, chưa khai thì theo danh mục.
+     * Đơn vị tính chỉ có ở chemical_department_categories nên lấy thẳng từ dòng khai của phòng.
+     *
+     * $keepIds là các category_id đang nằm trên phiếu cũ của phòng: giữ lại để modal Điều
+     * chỉnh không mất giá trị đang chọn khi danh mục chung đã bị khoá / thu hồi duyệt.
+     * Dù thế nào cũng KHÔNG nới điều kiện "phòng đã khai".
+     */
+    public static function importCategoryOptions(int $departmentId, array $keepIds = [])
+    {
+        $keepIds = array_values(array_filter($keepIds));
+
+        return DB::table(self::TABLE)
+            ->join('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('manufacturers', 'chemical_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->leftJoin('storage_conditions', self::TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
+            ->leftJoin('storage_conditions as category_storage', 'chemical_categories.storage_condition_id', '=', 'category_storage.id')
+            ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
+            ->select(
+                'chemical_categories.id',
+                'chemical_categories.code',
+                'chemical_categories.classification',
+                'chemical_categories.density',
+                'chem_names.name as chem_name',
+                'chem_names.cas_no as cas_no',
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                // Chuỗi trong DB::raw là hằng, không ghép từ dữ liệu người dùng
+                DB::raw('COALESCE(storage_conditions.name, category_storage.name) as storage_condition_name'),
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                self::TABLE.'.min_stock',
+                self::TABLE.'.default_location_id'
+            )
+            ->where(self::TABLE.'.department_id', $departmentId)
+            ->where(self::TABLE.'.status_id', 1)
+            ->where(function ($query) use ($keepIds) {
+                $query->where(function ($sub) {
+                    $sub->where('chemical_categories.status_id', 1)
+                        ->where('chemical_categories.app_status', 'approved');
+                });
+
+                if ($keepIds) {
+                    $query->orWhereIn('chemical_categories.id', $keepIds);
+                }
+            })
+            ->orderBy('chemical_categories.code', 'asc')
             ->get();
     }
 }

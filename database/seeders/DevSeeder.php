@@ -126,7 +126,7 @@ class DevSeeder extends Seeder
             $categoryId = DB::table('chemical_categories')->where('code', 'H00001')->value('id');
 
             if ($categoryId) {
-                DB::table('department_chemicals')->updateOrInsert(
+                DB::table('chemical_department_categories')->updateOrInsert(
                     ['department_id' => 6, 'category_id' => $categoryId],
                     [
                         'unit_id' => $unitId,

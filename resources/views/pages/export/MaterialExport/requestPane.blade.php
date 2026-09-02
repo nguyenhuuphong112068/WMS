@@ -11,13 +11,16 @@
 </style>
 
 <div class="md-toolbar">
-    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reqCreateModal">
-        <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát vật tư
-    </button>
+    @perm('export_material_request')
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reqCreateModal">
+            <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát vật tư
+        </button>
+    @endperm
     <p class="hint">
         <i class="fas fa-info-circle mr-1"></i>
         Tổ lập đề nghị → <b>Trưởng/Phó Phòng</b> duyệt (bắt buộc) → <b>Ban Giám Đốc</b> duyệt (nếu phiếu đánh dấu cần)
-        → kho <b>cấp phát</b> từng dòng → Tổ lập phiếu sử dụng ở tab "Sổ".
+        → kho <b>cấp phát</b> từng dòng (<b>trừ tồn ngay</b>) → Tổ bấm <b>"Sử Dụng Vật Tư"</b> để ghi nhật ký sử dụng
+        hoặc trả về kho.
     </p>
 </div>
 
@@ -41,11 +44,12 @@
                 @php
                     $b = $expReqBadge($req->app_status);
                     $items = $requestItems->get($req->id, collect());
-                    $editable = in_array($req->app_status, ['draft', 'rejected']);
+                    $editable = in_array($req->app_status, ['draft', 'rejected']) && user_can('export_material_request');
                 @endphp
                 <tr>
                     <td class="text-center">{{ $loop->iteration }}</td>
                     <td><span class="exp-code font-weight-bold">{{ $req->code }}</span>
+                        @if ($req->name) <div class="md-sub small font-weight-bold" style="color: var(--primary-dark);">{{ $req->name }}</div> @endif
                         @if ($req->note) <div class="md-sub small text-muted">{{ $req->note }}</div> @endif
                     </td>
                     <td class="md-sub">{{ $req->group_name ?: '—' }}</td>
@@ -109,21 +113,21 @@
                                 </form>
                             @endif
 
-                            @if ($req->app_status === 'pending_manager' && $canSignManager)
+                            @if ($req->app_status === 'pending_manager' && $canSignManager && user_can('export_material_approve'))
                                 <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSignManager') }}" method="POST"
                                     data-title="Duyệt bước Trưởng/Phó Phòng?" data-text="Đề nghị {{ $req->code }} {{ $req->needs_director ? 'sẽ chuyển lên Ban Giám Đốc.' : 'sẽ được duyệt và kho có thể cấp phát.' }}">
                                     @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
                                     <button type="submit" class="btn btn-sm btn-success" title="Duyệt"><i class="fas fa-signature"></i></button>
                                 </form>
                             @endif
-                            @if ($req->app_status === 'pending_director' && $canSignDirector)
+                            @if ($req->app_status === 'pending_director' && $canSignDirector && user_can('export_material_approve'))
                                 <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSignDirector') }}" method="POST"
                                     data-title="Ban Giám Đốc phê duyệt {{ $req->code }}?" data-text="Duyệt xong kho có thể cấp phát.">
                                     @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
                                     <button type="submit" class="btn btn-sm btn-success" title="Phê duyệt"><i class="fas fa-stamp"></i></button>
                                 </form>
                             @endif
-                            @if (($req->app_status === 'pending_manager' && $canSignManager) || ($req->app_status === 'pending_director' && $canSignDirector))
+                            @if (user_can('export_material_approve') && (($req->app_status === 'pending_manager' && $canSignManager) || ($req->app_status === 'pending_director' && $canSignDirector)))
                                 <button type="button" class="btn btn-sm btn-outline-danger btn-req-reject" data-id="{{ $req->id }}" data-code="{{ $req->code }}" title="Từ chối">
                                     <i class="fas fa-times"></i>
                                 </button>

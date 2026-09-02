@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\Schema;
  *
  * MÃ LÔ VẬT TƯ (cột code) sinh tự động:
  *
- *      "VT" + "-" + deparments.shortName + "-" + đuôi ngẫu nhiên 10 ký tự
- *      VT-QC1-7KPMR9J4WD
+ *      "M" + "-" + deparments.shortName + "-" + đuôi ngẫu nhiên 10 ký tự
+ *      M-QC1-7KPMR9J4WD
  *
  * Mã KHÔNG chứa số thứ tự và không gắn với danh mục: khoá / xoá một phiếu nhập
  * không để lại khoảng trống nhìn thấy được qua giao diện. Xem App\Support\MaterialCode.

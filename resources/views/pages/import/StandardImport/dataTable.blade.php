@@ -45,9 +45,11 @@
                 <div class="imp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="impPaneBook">
 
                     <div class="md-toolbar">
-                        <button type="button" class="btn btn-primary btn-md-create">
-                            <i class="fas fa-plus mr-1"></i> Nhập chất chuẩn
-                        </button>
+                        @perm('import_standard_create')
+                            <button type="button" class="btn btn-primary btn-md-create">
+                                <i class="fas fa-plus mr-1"></i> Nhập chất chuẩn
+                            </button>
+                        @endperm
                         <p class="hint">
                             <i class="fas fa-info-circle mr-1"></i>
                             Đang hiệu lực {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} ống chuẩn.
@@ -161,8 +163,8 @@
                                         <td class="md-sub">{{ $row->batch_no ?: '—' }}</td>
                                         <td class="md-sub">{{ $row->coa_no ?: '—' }}</td>
                                         <td class="md-sub">
-                                            @if ($row->location_name)
-                                                <div class="font-weight-bold">{{ $row->location_name }}
+                                            @if ($row->location_code)
+                                                <div class="font-weight-bold">
                                                     <span class="md-tag">{{ $row->location_code }}</span>
                                                 </div>
                                                 <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
@@ -216,33 +218,35 @@
                                             <div class="md-actions">
                                                 @php $impAdjust = (int) ($historyCounts[$row->id] ?? 0); @endphp
                                                 <span class="imp-btn-wrap">
-                                                    <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                        title="Điều chỉnh thông tin nhập"
-                                                        data-row="{{ json_encode([
-                                                            'id' => $row->id,
-                                                            'code' => $row->code,
-                                                            'category_id' => $row->category_id,
-                                                            'group_key' => $impGroupKey($row->group_code),
-                                                            'group_label' => $impGroupName($row->group_code),
-                                                            'amount' => $row->amount,
-                                                            'imported_date' => $row->imported_date,
-                                                            'expiry_type' => $row->expiry_type ?: 'Specify',
-                                                            'expired_date' => $row->expired_date,
-                                                            'retest_interval_months' => $row->retest_interval_months,
-                                                            'batch_no' => $row->batch_no,
-                                                            'coa_no' => $row->coa_no,
-                                                            'potency' => $row->potency,
-                                                            'moisture' => $row->moisture,
-                                                            'standard_form' => $row->standard_form,
-                                                            'weight_controlled' => $row->weight_controlled,
-                                                            'requires_aliquot' => $row->requires_aliquot,
-                                                            'location_id' => $row->location_id,
-                                                            'purpose_id' => $row->purpose_id,
-                                                            'note' => $row->note,
-                                                            'attachments' => $rowAttachments->map(fn($a) => ['id' => $a->id, 'file_name' => $a->file_name])->toArray(),
-                                                        ]) }}">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
+                                                    @perm('import_standard_update')
+                                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit"
+                                                            title="Điều chỉnh thông tin nhập"
+                                                            data-row="{{ json_encode([
+                                                                'id' => $row->id,
+                                                                'code' => $row->code,
+                                                                'category_id' => $row->category_id,
+                                                                'group_key' => $impGroupKey($row->group_code),
+                                                                'group_label' => $impGroupName($row->group_code),
+                                                                'amount' => $row->amount,
+                                                                'imported_date' => $row->imported_date,
+                                                                'expiry_type' => $row->expiry_type ?: 'Specify',
+                                                                'expired_date' => $row->expired_date,
+                                                                'retest_interval_months' => $row->retest_interval_months,
+                                                                'batch_no' => $row->batch_no,
+                                                                'coa_no' => $row->coa_no,
+                                                                'potency' => $row->potency,
+                                                                'moisture' => $row->moisture,
+                                                                'standard_form' => $row->standard_form,
+                                                                'weight_controlled' => $row->weight_controlled,
+                                                                'requires_aliquot' => $row->requires_aliquot,
+                                                                'location_id' => $row->location_id,
+                                                                'purpose_id' => $row->purpose_id,
+                                                                'note' => $row->note,
+                                                                'attachments' => $rowAttachments->map(fn($a) => ['id' => $a->id, 'file_name' => $a->file_name])->toArray(),
+                                                            ]) }}">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                    @endperm
 
                                                     @if ($impAdjust > 0)
                                                         <button type="button" class="imp-count-badge btn-imp-history"
@@ -254,23 +258,27 @@
 
                                                 <a class="btn btn-sm btn-outline-secondary" target="_blank"
                                                     title="In nhãn dán ống chuẩn (mã vạch Code 128)"
-                                                    href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
-                                                    <i class="fas fa-tag"></i>
-                                                </a>
+                                                    @perm('import_standard_label')
+                                                        href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
+                                                        <i class="fas fa-tag"></i>
+                                                    </a>
+                                                    @endperm
 
-                                                <form class="form-md-confirm d-inline"
-                                                    action="{{ route($impRoute . 'deActive') }}" method="POST"
-                                                    data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $impLabel }}?"
-                                                    data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, ống chuẩn &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
-                                                    data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                    @csrf
-                                                    <input type="hidden" name="id" value="{{ $row->id }}">
-                                                    <button type="submit"
-                                                        class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                        title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                        <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                    </button>
-                                                </form>
+                                                @perm('import_standard_delete')
+                                                    <form class="form-md-confirm d-inline"
+                                                        action="{{ route($impRoute . 'deActive') }}" method="POST"
+                                                        data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $impLabel }}?"
+                                                        data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, ống chuẩn &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
+                                                        data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
+                                                        @csrf
+                                                        <input type="hidden" name="id" value="{{ $row->id }}">
+                                                        <button type="submit"
+                                                            class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
+                                                            title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
+                                                            <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                                        </button>
+                                                    </form>
+                                                @endperm
                                             </div>
                                         </td>
                                     </tr>

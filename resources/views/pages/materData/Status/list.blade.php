@@ -13,6 +13,7 @@
 @endsection
 
 @section('model')
+    @include('pages.materData.shared.history')
     @include('pages.materData.Status.create')
     @include('pages.materData.Status.update')
 @endsection

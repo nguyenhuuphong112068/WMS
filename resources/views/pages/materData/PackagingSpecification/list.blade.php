@@ -19,6 +19,7 @@
 @endsection
 
 @section('model')
+    @include('pages.materData.shared.history')
     @include('pages.materData.PackagingSpecification.create')
     @include('pages.materData.PackagingSpecification.update')
 @endsection

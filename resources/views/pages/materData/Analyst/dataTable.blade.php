@@ -6,9 +6,11 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    <button type="button" class="btn btn-primary btn-md-create">
-                        <i class="fas fa-plus mr-1"></i> Thêm kiểm nghiệm viên
-                    </button>
+                    @perm('materData_create')
+                        <button type="button" class="btn btn-primary btn-md-create">
+                            <i class="fas fa-plus mr-1"></i> Thêm kiểm nghiệm viên
+                        </button>
+                    @endperm
                     <p class="hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} kiểm nghiệm viên.
@@ -45,27 +47,40 @@
                                     </td>
                                     <td class="text-center">
                                         <div class="md-actions">
-                                            <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                title="Sửa kiểm nghiệm viên {{ $row->name }}"
-                                                data-row="{{ json_encode([
-                                                    'id' => $row->id,
-                                                    'name' => $row->name,
-                                                ]) }}">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
+                                            <span class="md-btn-wrap">
+                                                @perm('materData_update')
+                                                    <button type="button" class="btn btn-sm btn-warning btn-md-edit"
+                                                        title="Sửa kiểm nghiệm viên {{ $row->name }}"
+                                                        data-row="{{ json_encode([
+                                                            'id' => $row->id,
+                                                            'name' => $row->name,
+                                                        ]) }}">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                @endperm
 
-                                            <form class="form-md-confirm d-inline"
-                                                action="{{ route('pages.materData.analyst.deActive') }}" method="POST"
-                                                data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} kiểm nghiệm viên {{ $row->name }}?"
-                                                data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $row->id }}">
-                                                <button type="submit"
-                                                    class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                    title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                    <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                </button>
-                                            </form>
+                                                {{-- Badge số lần thay đổi, bấm vào để xem lịch sử --}}
+                                                @include('pages.materData.shared.historyBadge', [
+                                                    'count' => $historyCounts[$row->id] ?? 0,
+                                                    'url' => route('pages.materData.analyst.history', ['id' => $row->id]),
+                                                    'title' => $row->name,
+                                                ])
+                                            </span>
+
+                                            @perm('materData_deActive')
+                                                <form class="form-md-confirm d-inline"
+                                                    action="{{ route('pages.materData.analyst.deActive') }}" method="POST"
+                                                    data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} kiểm nghiệm viên {{ $row->name }}?"
+                                                    data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
+                                                    @csrf
+                                                    <input type="hidden" name="id" value="{{ $row->id }}">
+                                                    <button type="submit"
+                                                        class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
+                                                        title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
+                                                        <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                                    </button>
+                                                </form>
+                                            @endperm
                                         </div>
                                     </td>
                                 </tr>

@@ -58,6 +58,34 @@
         font-size: 0.76rem;
     }
 
+    /* ---------- Khối thông tin chỉ xem trong modal (bám theo cột của bảng) ---------- */
+    .exp-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 28px;
+        padding: 12px 14px;
+        background: var(--primary-soft);
+        border-radius: var(--border-radius-md);
+    }
+
+    .exp-summary .cell small {
+        display: block;
+        color: #6B7280;
+        font-size: 0.75rem;
+    }
+
+    .exp-summary .cell b {
+        display: block;
+        color: var(--text-main);
+        font-size: 0.92rem;
+    }
+
+    .exp-summary .cell .md-sub {
+        display: block;
+        font-size: 0.76rem;
+        color: #6B7280;
+    }
+
     /* ---------- Dòng nhắc tồn còn lại ---------- */
     .exp-remaining {
         display: block;
@@ -251,7 +279,10 @@
         font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 0.4px;
-        white-space: nowrap;
+        /* Cho tiêu đề xuống dòng, cột số không bị kéo rộng theo dòng chữ tiêu đề */
+        white-space: normal;
+        vertical-align: middle;
+        line-height: 1.25;
     }
 
     .exp-req-badge {

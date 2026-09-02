@@ -30,6 +30,7 @@ return [
         'N8'  => 'Hỗn hợp chất cần kiểm soát đặc biệt (Phụ lục III)',
         'N9'  => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng A)',
         'N10' => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng B)',
+        'RND' => 'Ngẫu nhiên',
     ],
 
     /*

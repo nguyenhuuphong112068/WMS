@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Schema;
 /**
  * NHẬP - PHIẾU NHẬP HOÁ CHẤT
  *
- * code : mã xuất nhập, sinh tự động: "HC" + shortName phòng ban + đuôi ngẫu nhiên
- *        10 ký tự, ví dụ HC-QC1-7KPMR9J4WD. KHÔNG chứa số thứ tự, không gắn với
+ * code : mã xuất nhập, sinh tự động: "C" + shortName phòng ban + đuôi ngẫu nhiên
+ *        10 ký tự, ví dụ C-QC1-7KPMR9J4WD. KHÔNG chứa số thứ tự, không gắn với
  *        danh mục hoá chất -> khoá / xoá một phiếu không để lại khoảng trống nhìn
  *        thấy được qua giao diện. Xem App\Support\ChemicalCode.
  *

@@ -27,7 +27,7 @@ use Illuminate\Validation\Rule;
  */
 class DepartmentMaterialController extends Controller
 {
-    private const TABLE = 'department_materials';
+    private const TABLE = 'material_department_categories';
 
     private const LABEL = 'vật tư của phòng';
 

@@ -13,15 +13,15 @@
                 <div class="modal-body">
 
                     <div class="form-row">
-                        <div class="form-group col-md-8">
+                        <div class="form-group col-md-12">
                             <label>Hoá Chất <span class="text-danger">*</span></label>
                             <div class="d-flex align-items-center">
-                                <button type="button" class="btn btn-outline-info mr-2" style="flex-shrink: 0;" data-toggle="modal" data-target="#selectChemicalModal" title="Mở danh mục hoá chất để chọn">
+                                <button type="button" class="btn btn-outline-info mr-2" style="flex-shrink: 0;" data-toggle="modal" data-target="#selectChemicalModal" title="Mở danh mục hoá chất phòng đang dùng để chọn">
                                     <i class="fas fa-list"></i>
                                 </button>
                                 <div style="flex: 1 1 auto; min-width: 0;">
                                     <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}" required>
-                                        <option value="">-- Chọn hoá chất --</option>
+                                        <option value="">-- Chọn hoá chất phòng đang dùng --</option>
                                         @foreach ($categories as $category)
                                             <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
                                                 {{ $category->code }} - {{ $category->chem_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}
@@ -33,16 +33,7 @@
                             @if ($bag->has('category_id'))
                                 <span class="md-error d-block mt-1">{{ $bag->first('category_id') }}</span>
                             @endif
-                            <small class="md-sub">Chỉ hiện hoá chất trong Danh Mục đã được duyệt và đang hoạt động.</small>
-                        </div>
-
-                        <div class="form-group col-md-4">
-                            <label>Mã Xuất Nhập</label>
-                            <input type="text" class="form-control imp-readonly imp-code-preview" readonly
-                                data-codes="{{ json_encode($codePreviews) }}"
-                                data-placeholder="Mã sẽ được cấp tự động khi lưu"
-                                value="Mã sẽ được cấp tự động khi lưu">
-                            <small class="md-sub">Sinh tự động khi lưu: HC + mã phòng ban + chuỗi ngẫu nhiên.</small>
+                            <small class="md-sub">Chỉ hiện hoá chất phòng đã khai ở tab <b>Hoá Chất Của Phòng</b>. Chất chưa khai thì không nhập vào kho được. Mã xuất nhập (HC + mã phòng ban + chuỗi ngẫu nhiên) được cấp tự động khi bấm Lưu.</small>
                         </div>
 
                         <div class="col-md-12 mb-3 chem-info-box-wrap" style="display: none;">
@@ -101,7 +92,7 @@
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
-                                        {{ $location->name }} ({{ $location->code }})
+                                        {{ $location->code }}
                                     </option>
                                 @endforeach
                             </select>
@@ -115,13 +106,10 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-4">
-                            <label>Ngày Nhập <span class="text-danger">*</span></label>
-                            <input type="date" name="imported_date"
-                                class="form-control {{ $bag->has('imported_date') ? 'is-invalid' : '' }}"
-                                value="{{ old('imported_date', now()->format('Y-m-d')) }}" required>
-                            @if ($bag->has('imported_date'))
-                                <span class="md-error">{{ $bag->first('imported_date') }}</span>
-                            @endif
+                            <label>Ngày Nhập</label>
+                            <input type="text" class="form-control imp-readonly" readonly
+                                value="{{ now()->format('d/m/Y') }}">
+                            <small class="md-sub">Luôn là ngày bấm Lưu, không sửa được.</small>
                         </div>
 
                         <div class="form-group col-md-4">
@@ -185,8 +173,8 @@
 
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Phiếu được ghi cho phòng ban <b>{{ session('user')['selected_department'] }}</b>. Mã xuất nhập chính
-                        thức sinh lúc bấm Lưu, có thể khác mã xem trước nếu có người nhập cùng lúc.
+                        Phiếu được ghi cho phòng ban <b>{{ session('user')['selected_department'] }}</b>. Mã xuất nhập được
+                        cấp tự động khi bấm Lưu.
                     </div>
                 </div>
 
@@ -298,7 +286,12 @@
         $('#tableSelectChemical').DataTable({
             pageLength: 10,
             lengthChange: false,
-            language: { search: "Tìm kiếm:" },
+            language: {
+                search: "Tìm kiếm:",
+                // Phòng chưa khai hoá chất nào thì nói rõ phải khai ở đâu, đừng để bảng trống trơn
+                emptyTable: 'Phòng chưa khai hoá chất nào ở tab "Hoá Chất Của Phòng" nên chưa có gì để nhập.',
+                zeroRecords: 'Không tìm thấy hoá chất phù hợp trong danh mục của phòng.'
+            },
             order: [[0, 'asc']]
         });
 

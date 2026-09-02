@@ -32,9 +32,11 @@
                 <div class="imp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="impPaneBook">
 
                 <div class="md-toolbar">
-                    <button type="button" class="btn btn-primary btn-md-create">
-                        <i class="fas fa-plus mr-1"></i> Nhập hoá chất
-                    </button>
+                    @perm('import_chemical_create')
+                        <button type="button" class="btn btn-primary btn-md-create">
+                            <i class="fas fa-plus mr-1"></i> Nhập hoá chất
+                        </button>
+                    @endperm
                     <p class="hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Đang hiệu lực {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} phiếu.
@@ -108,8 +110,8 @@
                                     </td>
                                     <td class="md-sub">{{ $row->batch_no ?: '—' }}</td>
                                     <td class="md-sub">
-                                        @if ($row->location_name)
-                                            <div class="font-weight-bold">{{ $row->location_name }}
+                                        @if ($row->location_code)
+                                            <div class="font-weight-bold">
                                                 <span class="md-tag">{{ $row->location_code }}</span>
                                             </div>
                                             <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
@@ -153,24 +155,26 @@
                                             @php $impAdjust = (int) ($historyCounts[$row->id] ?? 0); @endphp
                                             {{-- Badge số lần điều chỉnh nằm ở góc trên bên phải nút Sửa --}}
                                             <span class="imp-btn-wrap">
-                                                <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                    title="Điều chỉnh thông tin nhập"
-                                                    data-row="{{ json_encode([
-                                                        'id' => $row->id,
-                                                        'category_id' => $row->category_id,
-                                                        'amount' => $row->amount,
-                                                        'imported_date' => $row->imported_date,
-                                                        'imported_by' => $row->imported_by,
-                                                        'invoice_number' => $row->invoice_number,
-                                                        'invoice_date' => $row->invoice_date,
-                                                        'expired_date' => $row->expired_date,
-                                                        'is_microbiological_chemicals' => $row->is_microbiological_chemicals,
-                                                        'batch_no' => $row->batch_no,
-                                                        'supplier_id' => $row->supplier_id,
-                                                        'note' => $row->note,
-                                                    ]) }}">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
+                                                @perm('import_chemical_update')
+                                                    <button type="button" class="btn btn-sm btn-warning btn-md-edit"
+                                                        title="Điều chỉnh thông tin nhập"
+                                                        data-row="{{ json_encode([
+                                                            'id' => $row->id,
+                                                            'category_id' => $row->category_id,
+                                                            'amount' => $row->amount,
+                                                            'imported_date' => $row->imported_date,
+                                                            'imported_by' => $row->imported_by,
+                                                            'invoice_number' => $row->invoice_number,
+                                                            'invoice_date' => $row->invoice_date,
+                                                            'expired_date' => $row->expired_date,
+                                                            'is_microbiological_chemicals' => $row->is_microbiological_chemicals,
+                                                            'batch_no' => $row->batch_no,
+                                                            'supplier_id' => $row->supplier_id,
+                                                            'note' => $row->note,
+                                                        ]) }}">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                @endperm
 
                                                 @if ($impAdjust > 0)
                                                     <button type="button" class="imp-count-badge btn-imp-history"
@@ -181,24 +185,28 @@
                                             </span>
 
                                             <a class="btn btn-sm btn-outline-secondary" target="_blank"
-                                                title="In nhãn dán lô hàng (mã vạch Code 128)"
-                                                href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
-                                                <i class="fas fa-tag"></i>
-                                            </a>
+                                                title="In nhãn dán lô hàng (mã vạch Code 128) - chọn được số lượng nhãn cần in"
+                                                @perm('import_chemical_label')
+                                                    href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
+                                                    <i class="fas fa-tag"></i>
+                                                </a>
+                                                @endperm
 
-                                            <form class="form-md-confirm d-inline" action="{{ route($impRoute . 'deActive') }}"
-                                                method="POST"
-                                                data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $impLabel }}?"
-                                                data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, phiếu &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
-                                                data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $row->id }}">
-                                                <button type="submit"
-                                                    class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                    title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                    <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                </button>
-                                            </form>
+                                            @perm('import_chemical_delete')
+                                                <form class="form-md-confirm d-inline" action="{{ route($impRoute . 'deActive') }}"
+                                                    method="POST"
+                                                    data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $impLabel }}?"
+                                                    data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, phiếu &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
+                                                    data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
+                                                    @csrf
+                                                    <input type="hidden" name="id" value="{{ $row->id }}">
+                                                    <button type="submit"
+                                                        class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
+                                                        title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
+                                                        <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                                    </button>
+                                                </form>
+                                            @endperm
                                         </div>
                                     </td>
                                 </tr>
@@ -277,29 +285,33 @@
                                         </td>
                                         <td class="md-sub">{{ $transfer->exported_by ?: '—' }}</td>
                                         <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-primary btn-imp-receive"
-                                                data-row="{{ json_encode([
-                                                    'export_id' => $transfer->id,
-                                                    'source_code' => $transfer->source_code,
-                                                    'chem_name' => $transfer->chem_name,
-                                                    'category_code' => $transfer->category_code,
-                                                    'amount' => $impNum($transfer->amount) . ' ' . $impTransferUnit,
-                                                    'batch_no' => $transfer->batch_no,
-                                                    'expired_date' => $impDate($transfer->expired_date),
-                                                    'from_department' => $transfer->from_department_name,
-                                                    'exported_date' => $impDate($transfer->exported_date),
-                                                    'exported_by' => $transfer->exported_by,
-                                                    'purpose' => $transfer->purpose,
-                                                ]) }}">
-                                                <i class="fas fa-inbox mr-1"></i> Nhận
-                                            </button>
+                                            @perm('import_chemical_receive')
+                                                <button type="button" class="btn btn-sm btn-primary btn-imp-receive"
+                                                    data-row="{{ json_encode([
+                                                        'export_id' => $transfer->id,
+                                                        'source_code' => $transfer->source_code,
+                                                        'chem_name' => $transfer->chem_name,
+                                                        'category_code' => $transfer->category_code,
+                                                        'amount' => $impNum($transfer->amount) . ' ' . $impTransferUnit,
+                                                        'batch_no' => $transfer->batch_no,
+                                                        'expired_date' => $impDate($transfer->expired_date),
+                                                        'from_department' => $transfer->from_department_name,
+                                                        'exported_date' => $impDate($transfer->exported_date),
+                                                        'exported_by' => $transfer->exported_by,
+                                                        'purpose' => $transfer->purpose,
+                                                    ]) }}">
+                                                    <i class="fas fa-inbox mr-1"></i> Nhận
+                                                </button>
+                                            @endperm
 
-                                            <button type="button" class="btn btn-sm btn-secondary btn-imp-reject"
-                                                title="Từ chối nhận, trả số lượng lại tồn của phòng gửi"
-                                                data-id="{{ $transfer->id }}"
-                                                data-title="{{ $transfer->source_code }} - {{ $transfer->chem_name }} ({{ $impNum($transfer->amount) }} {{ $impTransferUnit }}) từ {{ $transfer->from_department_name }}">
-                                                <i class="fas fa-xmark"></i>
-                                            </button>
+                                            @perm('import_chemical_rejectTransfer')
+                                                <button type="button" class="btn btn-sm btn-secondary btn-imp-reject"
+                                                    title="Từ chối nhận, trả số lượng lại tồn của phòng gửi"
+                                                    data-id="{{ $transfer->id }}"
+                                                    data-title="{{ $transfer->source_code }} - {{ $transfer->chem_name }} ({{ $impNum($transfer->amount) }} {{ $impTransferUnit }}) từ {{ $transfer->from_department_name }}">
+                                                    <i class="fas fa-xmark"></i>
+                                                </button>
+                                            @endperm
                                         </td>
                                     </tr>
                                 @endforeach

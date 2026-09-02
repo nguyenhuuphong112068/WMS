@@ -92,13 +92,9 @@
                         </div>
 
                         <div class="form-group col-md-4">
-                            <label>Ngày Sử Dụng <span class="text-danger">*</span></label>
-                            <input type="date" name="exported_date"
-                                class="form-control {{ $bag->has('exported_date') ? 'is-invalid' : '' }}"
-                                value="{{ old('exported_date') }}" required>
-                            @if ($bag->has('exported_date'))
-                                <span class="md-error">{{ $bag->first('exported_date') }}</span>
-                            @endif
+                            <label>Ngày Sử Dụng</label>
+                            <input type="text" class="form-control exp-readonly exp-up-exported-date" readonly>
+                            <small class="md-sub">Ngày ghi nhận lúc lập phiếu, không sửa được.</small>
                         </div>
                     </div>
 
@@ -179,6 +175,19 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Khối modal được in ra trước thẻ nạp jQuery của layout, phải đợi DOM xong mới có $
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ngày sử dụng chỉ để xem (d/m/Y), không có name nên không gửi lên server
+        $(document).on('click', '.btn-md-edit', function() {
+            var row = $(this).data('row') || {};
+            var parts = String(row.exported_date || '').substring(0, 10).split('-');
+            $('#updateModal .exp-up-exported-date')
+                .val(parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : '—');
+        });
+    });
+</script>
 
 @if ($bag->any())
     <script>

@@ -4,6 +4,9 @@
 | Trang in độc lập, KHÔNG dùng layout.master. Khổ giấy đặt đúng bằng khổ nhãn khai ở
 | config/material.php. Mã vạch dùng mã QR (App\Support\QrCode) - quét nhanh bằng điện
 | thoại, không cần máy quét mã vạch 1 chiều.
+|
+| Số lượng nhãn cần in chọn trên thanh công cụ (pages.import.shared.labelToolbar) và
+| mỗi lần in được ghi vào audit log qua pages.import.materialImport.labelPrinted.
 --}}
 
 @php
@@ -29,41 +32,6 @@
             background: #E9EEF3;
             color: #000;
             font-family: "Segoe UI", Arial, Helvetica, sans-serif;
-        }
-
-        .toolbar {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
-            padding: 14px;
-            background: #fff;
-            border-bottom: 1px solid #d7dee6;
-        }
-
-        .toolbar button,
-        .toolbar a {
-            border: 0;
-            border-radius: 8px;
-            padding: 9px 18px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all .2s ease;
-        }
-
-        .toolbar .go { background: #2E7BC4; color: #fff; }
-        .toolbar .go:hover { background: #1F5E9E; transform: translateY(-1px); }
-        .toolbar .back { background: #EAF3FC; color: #1F5E9E; }
-
-        .toolbar .note {
-            width: 100%;
-            text-align: center;
-            color: #64748B;
-            font-size: 12px;
-            font-weight: 400;
         }
 
         .label {
@@ -150,7 +118,6 @@
             }
 
             body { background: #fff; }
-            .toolbar { display: none; }
             .label { margin: 0; box-shadow: none; }
         }
     </style>
@@ -158,46 +125,48 @@
 
 <body>
 
-    <div class="toolbar">
-        <button type="button" class="go" onclick="window.print()">In nhãn</button>
-        <a class="back" href="{{ route('pages.import.materialImport.list') }}">Quay lại</a>
-        <p class="note">
-            Khổ nhãn {{ $lblWidth }}x{{ $lblHeight }}mm. Trong hộp thoại In, đặt khổ giấy
-            <b>{{ $lblWidth }} x {{ $lblHeight }} mm</b>, lề <b>None</b> và bỏ tick
-            <b>Headers and footers</b> để nhãn ra đúng như trên màn hình.
-        </p>
-    </div>
+    @include('pages.import.shared.labelToolbar', [
+        'importId' => $import->id,
+        'logUrl' => route('pages.import.materialImport.labelPrinted'),
+        'backUrl' => route('pages.import.materialImport.list'),
+        'maxCopies' => $maxCopies,
+        'lblWidth' => $lblWidth,
+        'lblHeight' => $lblHeight,
+    ])
 
-    <div class="label">
-        <div class="body">
-            <div class="row name">{{ $lblName ?: '—' }}</div>
+    {{-- Bọc để thanh công cụ nhân bản nhãn ra đúng số lượng người dùng chọn --}}
+    <div id="labelStack">
+        <div class="label">
+            <div class="body">
+                <div class="row name">{{ $lblName ?: '—' }}</div>
 
-            <div class="row info-row">
-                <div class="line">
-                    <span class="caption">Vị trí</span>
-                    <span class="value">{{ $import->location_code ?: '-' }}</span>
+                <div class="row info-row">
+                    <div class="line">
+                        <span class="caption">Vị trí</span>
+                        <span class="value">{{ $import->location_code ?: '-' }}</span>
+                    </div>
+                </div>
+
+                <div class="row info-row">
+                    <div class="line">
+                        <span class="caption">Ngày nhập</span>
+                        <span class="value">{{ $lblDate($import->imported_date) }}</span>
+                    </div>
+                    <div class="line">
+                        <span class="caption">Hạn dùng</span>
+                        <span class="value">{{ $lblDate($import->expired_date) ?: '—' }}</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="row info-row">
-                <div class="line">
-                    <span class="caption">Ngày nhập</span>
-                    <span class="value">{{ $lblDate($import->imported_date) }}</span>
-                </div>
-                <div class="line">
-                    <span class="caption">Hạn dùng</span>
-                    <span class="value">{{ $lblDate($import->expired_date) ?: '—' }}</span>
-                </div>
+            <div class="qr">
+                @if ($qr)
+                    {!! $qr !!}
+                @else
+                    <span class="qr-empty">Mã "{{ $import->code }}" không tạo được QR</span>
+                @endif
+                <div class="qr-code">{{ $import->code }}</div>
             </div>
-        </div>
-
-        <div class="qr">
-            @if ($qr)
-                {!! $qr !!}
-            @else
-                <span class="qr-empty">Mã "{{ $import->code }}" không tạo được QR</span>
-            @endif
-            <div class="qr-code">{{ $import->code }}</div>
         </div>
     </div>
 

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
  * CẤU HÌNH VẬT TƯ THEO TỪNG PHÒNG BAN
  *
  * Danh mục vật tư (material_categories) dùng chung toàn công ty vì nó mô tả bản chất của
- * vật tư. Cách dùng vật tư thì riêng từng phòng, nằm ở bảng department_materials: phân
+ * vật tư. Cách dùng vật tư thì riêng từng phòng, nằm ở bảng material_department_categories: phân
  * loại theo bộ nhóm của phòng, đơn vị tính, ngưỡng tồn tối thiểu.
  *
  * Lớp này gom lại phần join để tab "Vật Tư Của Phòng" (do MaterialCategoryController dựng)
@@ -18,11 +18,11 @@ use Illuminate\Support\Facades\DB;
  * Song song với App\Support\DepartmentChemical / DepartmentStandard. Từ khi có màn Nhập /
  * Sử Dụng / Tồn / Dự Trù vật tư, lớp này cũng gom phần join đơn vị tính của phòng để mọi
  * màn hình hiện đơn vị đi qua một đường (joinUnit / joinUnitOn) - đơn vị nằm ở
- * department_materials.unit_id, danh mục chung không còn cột đó.
+ * material_department_categories.unit_id, danh mục chung không còn cột đó.
  */
 class DepartmentMaterial
 {
-    public const TABLE = 'department_materials';
+    public const TABLE = 'material_department_categories';
 
     /** Bí danh của chính bảng này khi chỉ nối để lấy đơn vị / ngưỡng tồn - xem joinUnit(). */
     public const UNIT_ALIAS = 'dm_unit';
@@ -88,7 +88,7 @@ class DepartmentMaterial
     }
 
     /**
-     * Vật tư phòng ĐƯỢC PHÉP nhập / dùng: có dòng khai trong department_materials (còn hoạt
+     * Vật tư phòng ĐƯỢC PHÉP nhập / dùng: có dòng khai trong material_department_categories (còn hoạt
      * động) và danh mục chung đã duyệt. Kèm đơn vị của phòng.
      *
      * $exclude là các category_id cần loại khỏi ô chọn (đã nhập rồi trong lần này...).
@@ -126,7 +126,12 @@ class DepartmentMaterial
         return $query->get();
     }
 
-    /** Vị trí lưu trữ của đúng phòng ban đang chọn, kèm đường dẫn Kho / Phòng / Kệ. */
+    /**
+     * Vị trí lưu trữ của đúng phòng ban đang chọn, kèm đường dẫn Kho / Phòng / Kệ.
+     *
+     * Lọc theo locations.item_type để không xếp nhầm hàng vào ô của loại khác;
+     * ô chưa khai loại được coi là dùng chung nên vẫn chọn được.
+     */
     public static function locationOptions(int $departmentId)
     {
         return DB::table('locations')
@@ -136,17 +141,19 @@ class DepartmentMaterial
             ->select(
                 'locations.id',
                 'locations.code',
-                'locations.name',
                 'warehouses.name as warehouse_name',
                 'rooms.name as room_name',
                 'shelves.name as shelf_name'
             )
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
+            // Chỉ những ô khai loại vật tư, cộng thêm ô chưa khai loại (dùng chung)
+            ->where(fn ($query) => $query->whereNull('locations.item_type')
+                ->orWhere('locations.item_type', 'material'))
             ->orderBy('warehouses.name', 'asc')
             ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
-            ->orderBy('locations.name', 'asc')
+            ->orderBy('locations.code', 'asc')
             ->get();
     }
 

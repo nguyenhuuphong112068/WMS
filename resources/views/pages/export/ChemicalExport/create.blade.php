@@ -118,13 +118,10 @@
                         </div>
 
                         <div class="form-group col-md-4">
-                            <label>Ngày Sử Dụng <span class="text-danger">*</span></label>
-                            <input type="date" name="exported_date"
-                                class="form-control {{ $bag->has('exported_date') ? 'is-invalid' : '' }}"
-                                value="{{ old('exported_date', now()->format('Y-m-d')) }}" required>
-                            @if ($bag->has('exported_date'))
-                                <span class="md-error">{{ $bag->first('exported_date') }}</span>
-                            @endif
+                            <label>Ngày Sử Dụng</label>
+                            <input type="text" class="form-control exp-readonly" readonly
+                                value="{{ now()->format('d/m/Y') }}">
+                            <small class="md-sub">Luôn là ngày bấm Lưu, không sửa được.</small>
                         </div>
                     </div>
 

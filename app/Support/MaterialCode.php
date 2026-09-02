@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * MÃ LÔ VẬT TƯ - một chỗ duy nhất định nghĩa cách sinh mã.
  *
- *      "VT" + "-" + deparments.shortName + "-" + <đuôi ngẫu nhiên 10 ký tự>
- *      VT-QC1-7KPMR9J4WD
+ *      "M" + "-" + deparments.shortName + "-" + <đuôi ngẫu nhiên 10 ký tự>
+ *      M-QC1-7KPMR9J4WD
  *
  * KHÁC mã cũ (shortName + "VT" + yy + mm + số thứ tự 4 chữ số): mã mới KHÔNG chứa
  * số thứ tự. Khoá / xoá một phiếu nhập không để lại "khoảng trống" nhìn thấy được
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  *   material_imports.code là UNIQUE.
  * - KHÔNG còn xem trước mã trên form: mã chỉ tồn tại sau khi đã lưu.
  *
- * Song song với App\Support\ChemicalCode (KIND = "HC"). Mã ống chuẩn
+ * Song song với App\Support\ChemicalCode (KIND = "C"). Mã ống chuẩn
  * (App\Support\StandardCode) giữ nguyên cách sinh cũ.
  */
 class MaterialCode
@@ -28,7 +28,7 @@ class MaterialCode
     public const TABLE = 'material_imports';
 
     /** Phần cố định đầu mã, nhìn là biết đây là vật tư. */
-    public const KIND = 'VT';
+    public const KIND = 'M';
 
     /** Dấu ngăn giữa các phần của mã. */
     public const SEP = '-';

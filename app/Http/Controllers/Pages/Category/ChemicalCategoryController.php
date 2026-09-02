@@ -24,7 +24,7 @@ use Illuminate\Validation\Rule;
  * Danh sách mã đầy đủ khai báo tại config/chemical.php.
  *
  * ĐƠN VỊ TÍNH không khai ở đây: mỗi phòng nhập / xuất theo đơn vị của phòng mình nên
- * đơn vị nằm ở tab "Hoá Chất Của Phòng" (department_chemicals.unit_id).
+ * đơn vị nằm ở tab "Hoá Chất Của Phòng" (chemical_department_categories.unit_id).
  *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về "Chờ duyệt".
  * Mọi thay đổi đều được chụp lại ở bảng chemical_category_histories.
@@ -35,8 +35,8 @@ class ChemicalCategoryController extends Controller
     private const HISTORY_TABLE = 'chemical_category_histories';
     private const LABEL = 'danh mục hoá chất công ty';
 
-    /** Tiền tố mã danh mục sinh tự động: H00001, H00002... */
-    private const CODE_PREFIX = 'H';
+    /** Tiền tố mã danh mục sinh tự động: C00001, C00002... */
+    private const CODE_PREFIX = 'C';
     private const CODE_LENGTH = 5;
 
     /** Các cột người dùng nhập, dùng chung cho so sánh lịch sử. Mã danh mục không sửa được nên không nằm ở đây. */
@@ -92,7 +92,7 @@ class ChemicalCategoryController extends Controller
             'historyCounts' => $this->historyCounts(),
             /*
             | Danh mục dùng chung toàn công ty, nhưng mỗi phòng ban tự khai chất nào phòng
-            | mình có dùng (bảng department_chemicals). Cột "Phòng Ban Đang Dùng" đọc từ đó.
+            | mình có dùng (bảng chemical_department_categories). Cột "Phòng Ban Đang Dùng" đọc từ đó.
             */
             'departmentsByCategory' => DepartmentChemical::departmentsByCategory(),
 
@@ -448,7 +448,7 @@ class ChemicalCategoryController extends Controller
     }
 
     /**
-     * Mã danh mục kế tiếp theo dạng H00001: lấy số lớn nhất đang có rồi cộng 1.
+     * Mã danh mục kế tiếp theo dạng C00001: lấy số lớn nhất đang có rồi cộng 1.
      *
      * Lưu ý: màn hình này chỉ khoá bản ghi (deActive) chứ không xoá, nên mã không bị dùng lại.
      * Nếu xoá cứng bản ghi có mã lớn nhất bằng tay dưới DB thì mã đó sẽ được cấp lại.
@@ -474,11 +474,19 @@ class ChemicalCategoryController extends Controller
     /**
      * Không cho khai báo trùng cùng một tổ hợp Tên hoá chất + Loại + Nhà sản xuất.
      * Cột type cho phép rỗng nên phải so sánh riêng trường hợp NULL.
+     *
+     * Lúc sửa: dữ liệu cũ khai trước khi có luật này có thể đang trùng sẵn, chặn luôn thì
+     * không ai sửa được các dòng đó nữa. Vì vậy chỉ kiểm tra khi người dùng thật sự đổi
+     * một trong ba trường của tổ hợp, giữ nguyên tổ hợp cũ thì cho lưu.
      */
     private function checkDuplicate($validator, Request $request, $ignoreId = null): void
     {
         $validator->after(function ($validator) use ($request, $ignoreId) {
             $type = trim((string) $request->type);
+
+            if ($ignoreId && $this->sameIdentity($ignoreId, (int) $request->chem_names_id, (int) $request->manufacturers_id, $type)) {
+                return;
+            }
 
             $exists = DB::table(self::TABLE)
                 ->where('chem_names_id', $request->chem_names_id)
@@ -492,6 +500,20 @@ class ChemicalCategoryController extends Controller
                 $validator->errors()->add('chem_names_id', 'Tổ hợp Tên hoá chất - Loại - Nhà sản xuất này đã có trong danh mục.');
             }
         });
+    }
+
+    /** Dòng đang sửa có giữ nguyên tổ hợp Tên hoá chất + Loại + Nhà sản xuất hay không. */
+    private function sameIdentity($id, int $chemNamesId, int $manufacturersId, string $type): bool
+    {
+        $current = DB::table(self::TABLE)->where('id', $id)->first();
+
+        if (! $current) {
+            return false;
+        }
+
+        return (int) $current->chem_names_id === $chemNamesId
+            && (int) $current->manufacturers_id === $manufacturersId
+            && trim((string) $current->type) === $type;
     }
 
     /** Bỏ số 0 thừa ở cuối: 1.0400 -> 1.04 */

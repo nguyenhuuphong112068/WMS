@@ -18,6 +18,7 @@
     $zoneMeta = [
         'warehouse' => [
             'label' => 'Kho',
+            'table' => 'warehouses',
             'lower' => 'kho',
             'icon' => 'fas fa-warehouse',
             'rows' => $warehouses,
@@ -28,6 +29,7 @@
         ],
         'room' => [
             'label' => 'Phòng',
+            'table' => 'rooms',
             'lower' => 'phòng',
             'icon' => 'fas fa-door-open',
             'rows' => $rooms,
@@ -38,6 +40,7 @@
         ],
         'shelf' => [
             'label' => 'Kệ/Tủ',
+            'table' => 'shelves',
             'lower' => 'kệ/tủ',
             'icon' => 'fas fa-layer-group',
             'rows' => $shelves,
@@ -48,6 +51,7 @@
         ],
         'location' => [
             'label' => 'Vị Trí',
+            'table' => 'locations',
             'lower' => 'vị trí',
             'icon' => 'fas fa-map-pin',
             'rows' => $locations,
@@ -55,8 +59,18 @@
             'cols' => ['warehouse_name' => 'Kho', 'room_name' => 'Phòng', 'shelf_name' => 'Kệ/Tủ'],
             'canCreate' => true,
             'blockMsg' => '',
+            // Chỉ cấp vị trí mới khai loại lưu trữ - đây mới là chỗ thực sự đựng hàng.
+            'hasType' => true,
+            // Vị trí chỉ định danh bằng mã (A01, B02...) nên không có cột tên.
+            'hasName' => false,
         ],
     ];
+
+    // Chuỗi nhận biết một dòng: cấp có tên thì lấy tên, cấp vị trí chỉ có mã.
+    $zoneCaption = fn($meta, $row) => ($meta['hasName'] ?? true) ? $row->name : $row->code;
+
+    // Vị trí không chọn loại nghĩa là dùng chung, hiện ở cả ba màn hình Tồn Kho.
+    $zoneTypeLabel = fn($value) => $locationTypes[$value] ?? 'Dùng chung';
 
     // Mô tả các ô chọn cấp cha dùng trong modal (đổ dữ liệu động bằng JS theo cấp trên).
     $zoneParents = [
@@ -89,6 +103,7 @@
 @endsection
 
 @section('model')
+    @include('pages.materData.shared.history')
     @include('pages.materData.Zone.create')
     @include('pages.materData.Zone.update')
 @endsection

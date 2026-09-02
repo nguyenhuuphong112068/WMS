@@ -20,6 +20,7 @@
 @endsection
 
 @section('model')
+    @include('pages.materData.shared.history')
     @include('pages.materData.MaterialClassification.create')
     @include('pages.materData.MaterialClassification.update')
 @endsection

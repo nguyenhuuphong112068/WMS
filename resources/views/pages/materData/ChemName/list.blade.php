@@ -19,6 +19,7 @@
 @endsection
 
 @section('model')
+    @include('pages.materData.shared.history')
     @include('pages.materData.ChemName.create')
     @include('pages.materData.ChemName.update')
 @endsection
