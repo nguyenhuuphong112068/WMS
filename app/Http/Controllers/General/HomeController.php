@@ -140,7 +140,6 @@ class HomeController extends Controller
             'assessDueDays' => self::ASSESS_DUE_DAYS,
             'notifications' => $this->notifications(),
             'unreadTotal' => $this->unreadTotal(),
-            'activities' => $this->activities(),
             'nearExpiryDays' => self::NEAR_EXPIRY_DAYS,
         ]);
     }

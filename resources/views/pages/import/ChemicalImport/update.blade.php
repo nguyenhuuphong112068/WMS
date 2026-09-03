@@ -188,11 +188,13 @@
 
 <script>
     // Ngày nhập chỉ để xem (d/m/Y), không có name nên không gửi lên server
-    $(document).on('click', '.btn-md-edit', function() {
-        var row = $(this).data('row') || {};
-        var parts = String(row.imported_date || '').substring(0, 10).split('-');
-        $('#updateModal .imp-up-imported-date')
-            .val(parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : '—');
+    document.addEventListener('DOMContentLoaded', function() {
+        $(document).on('click', '.btn-md-edit', function() {
+            var row = $(this).data('row') || {};
+            var parts = String(row.imported_date || '').substring(0, 10).split('-');
+            $('#updateModal .imp-up-imported-date')
+                .val(parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : '—');
+        });
     });
 </script>
 

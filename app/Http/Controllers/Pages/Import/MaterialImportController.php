@@ -162,7 +162,9 @@ class MaterialImportController extends Controller
         return view('pages.import.MaterialImport.label', [
             'import' => $row,
             'label' => config('material.label'),
-            'qr' => QrCode::svg($row->code, 'M', 4),
+            // ECC Q (25%): chịu được logo Stella đè giữa mã. border 1 module: vùng
+            // trắng tối thiểu để QR gọn trong góc 1/4 nhãn.
+            'qr' => QrCode::render($row->code, 'Q', 1),
             'maxCopies' => self::LABEL_MAX_COPIES,
         ]);
     }

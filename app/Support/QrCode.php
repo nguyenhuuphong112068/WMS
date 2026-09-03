@@ -72,6 +72,28 @@ class QrCode
         return $qr->toSvg(max(0, $border));
     }
 
+    /**
+     * Như svg() nhưng trả kèm số module (cạnh mã, CHƯA tính viền) để nơi gọi tự
+     * tính bề rộng in sao cho phần mã đạt đúng số mm mong muốn.
+     *
+     * @param  string  $data    Nội dung mã QR
+     * @param  string  $ecc     Mức sửa lỗi: L | M | Q | H
+     * @param  int     $border  Vùng trắng quanh mã, tính theo module
+     * @return array{svg: string, modules: int, border: int}
+     */
+    public static function render(string $data, string $ecc = 'M', int $border = 4): array
+    {
+        $border = max(0, $border);
+
+        try {
+            $qr = new self($data, $ecc);
+        } catch (\Throwable $e) {
+            return ['svg' => '', 'modules' => 0, 'border' => $border];
+        }
+
+        return ['svg' => $qr->toSvg($border), 'modules' => $qr->size, 'border' => $border];
+    }
+
     private function __construct(string $data, string $ecc)
     {
         $ecc = strtoupper($ecc);

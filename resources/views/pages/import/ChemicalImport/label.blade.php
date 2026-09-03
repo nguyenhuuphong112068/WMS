@@ -192,11 +192,17 @@
                 margin: 0;
             }
 
-            body {
+            html, body {
+                width: {{ $lblWidth }}mm;
+                height: {{ $lblHeight }}mm;
                 background: #fff;
             }
 
+            /* Khung nhãn phủ kín đúng khổ giấy (box-sizing: border-box nên viền nằm
+               gọn trong khổ), không chừa lề để Chrome khỏi tràn sang tờ thứ 2 */
             .label {
+                width: 100%;
+                height: 100%;
                 margin: 0;
                 box-shadow: none;
             }
@@ -213,6 +219,7 @@
         'maxCopies' => $maxCopies,
         'lblWidth' => $lblWidth,
         'lblHeight' => $lblHeight,
+        'dpi' => $label['dpi'] ?? 203,
         'printerNote' => 'Chọn máy in nhãn Zebra ZD421.',
     ])
 

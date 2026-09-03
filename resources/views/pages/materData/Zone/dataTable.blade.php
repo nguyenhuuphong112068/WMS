@@ -308,7 +308,9 @@
                                         <tr>
                                             <th class="text-center" style="width: 60px">STT</th>
                                             <th style="width: 130px">Mã</th>
-                                            <th>Tên {{ $meta['label'] }}</th>
+                                            @if ($meta['hasName'] ?? true)
+                                                <th>Tên {{ $meta['label'] }}</th>
+                                            @endif
                                             @foreach ($meta['cols'] as $title)
                                                 <th>{{ $title }}</th>
                                             @endforeach
@@ -323,7 +325,9 @@
                                             <tr>
                                                 <td class="text-center">{{ $loop->iteration }}</td>
                                                 <td><span class="zone-code">{{ $row->code }}</span></td>
-                                                <td class="font-weight-bold">{{ $row->name }}</td>
+                                                @if ($meta['hasName'] ?? true)
+                                                    <td class="font-weight-bold">{{ $row->name }}</td>
+                                                @endif
                                                 @foreach ($meta['cols'] as $field => $title)
                                                     <td class="zone-parent">
                                                         @if (!empty($row->$field))
@@ -375,7 +379,7 @@
                                                                 action="{{ route($zoneRoute . 'deActive', $key) }}"
                                                                 method="POST"
                                                                 data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $meta['lower'] }}?"
-                                                                data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, {{ $meta['lower'] }} &quot;{{ $row->name }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được chọn ở các cấp bên dưới.' : 'sẽ được dùng lại bình thường.' }}"
+                                                                data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, {{ $meta['lower'] }} &quot;{{ $zoneCaption($meta, $row) }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được chọn ở các cấp bên dưới.' : 'sẽ được dùng lại bình thường.' }}"
                                                                 data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
                                                                 @csrf
                                                                 <input type="hidden" name="id" value="{{ $row->id }}">
@@ -392,7 +396,7 @@
                                                                 action="{{ route($zoneRoute . 'destroy', $key) }}"
                                                                 method="POST"
                                                                 data-title="Xoá {{ $meta['lower'] }}?"
-                                                                data-text="{{ $meta['label'] }} &quot;{{ $row->name }}&quot; sẽ bị xoá vĩnh viễn khỏi hệ thống."
+                                                                data-text="{{ $meta['label'] }} &quot;{{ $zoneCaption($meta, $row) }}&quot; sẽ bị xoá vĩnh viễn khỏi hệ thống."
                                                                 data-danger="1">
                                                                 @csrf
                                                                 <input type="hidden" name="id" value="{{ $row->id }}">

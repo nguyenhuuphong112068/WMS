@@ -111,9 +111,15 @@
             var camDeviceIndex = 0;
             var $camTarget = null; // Ô <input> đang cần điền mã của lần quét hiện tại
 
-            /** Camera chỉ chạy được trên HTTPS hoặc localhost - giới hạn bảo mật của trình duyệt. */
+            /**
+             * Camera chỉ chạy được trong "secure context" - giới hạn bảo mật của trình duyệt.
+             * window.isSecureContext đã đúng cho cả 3 trường hợp: trang HTTPS, mở từ localhost,
+             * và origin HTTP được cấp phép thủ công qua cờ Chrome
+             * "Insecure origins treated as secure" (dùng khi server LAN chưa có HTTPS).
+             */
             function camSecure() {
-                return location.protocol === 'https:' ||
+                return window.isSecureContext === true ||
+                    location.protocol === 'https:' ||
                     ['localhost', '127.0.0.1'].indexOf(location.hostname) !== -1;
             }
 

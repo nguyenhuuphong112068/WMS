@@ -508,9 +508,8 @@
             </div>
 
             <div class="row">
-
                 {{-- ============ NHẮC NHỞ TỒN KHO ============ --}}
-                <div class="col-xl-7 mb-3">
+                <div class="col-12 mb-3">
                     <div class="dash-card" id="stockCard">
                         <div class="dash-card-head">
                             <h2><i class="fas fa-warehouse"></i> Nhắc Nhở Tồn Kho</h2>
@@ -638,7 +637,7 @@
                                     <div class="dash-empty">
                                         <i class="fas fa-check-circle"></i>
                                         <p>Không có mục chuẩn nào phải đánh giá hạn dùng trong
-                                            {{ $assessDueDays }} ngày tới.</p>
+                                             {{ $assessDueDays }} ngày tới.</p>
                                     </div>
                                 @endforelse
                             </div>
@@ -656,46 +655,6 @@
                             <a class="dash-link js-foot-link" data-tab="#tabExpiry,#tabLowStock"
                                 href="{{ route('pages.inventory.chemicalInventory.list') }}">
                                 Mở màn hình Tồn Kho <i class="fas fa-arrow-right ml-1"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- ============ HOẠT ĐỘNG GẦN ĐÂY ============ --}}
-                <div class="col-xl-5 mb-3">
-                    <div class="dash-card">
-                        <div class="dash-card-head">
-                            <h2><i class="fas fa-history"></i> Hoạt Động Gần Đây</h2>
-                        </div>
-
-                        <div class="dash-card-body">
-                            @forelse ($activities as $activity)
-                                <div class="dash-item">
-                                    <div class="item-icon"><i class="fas fa-clock"></i></div>
-                                    <div class="item-body">
-                                        <div class="item-title">{{ $activity->action ?: 'Thao tác' }}</div>
-                                        <div class="item-sub">
-                                            {{ $activity->userName ?: 'NA' }} &middot;
-                                            {{ $activity->table_Audit ?: '' }}
-                                            @if ($activity->record_Id_AuditTrial)
-                                                #{{ $activity->record_Id_AuditTrial }}
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <div class="item-side">{{ $ago($activity->created_at) }}</div>
-                                </div>
-                            @empty
-                                <div class="dash-empty">
-                                    <i class="fas fa-history"></i>
-                                    <p>Chưa có hoạt động nào được ghi nhận.</p>
-                                </div>
-                            @endforelse
-                        </div>
-
-                        <div class="dash-card-foot">
-                            <span>{{ $activities->count() }} thao tác gần nhất</span>
-                            <a class="dash-link" href="{{ route('pages.auditTrail.list') }}">
-                                Mở Audit Trail <i class="fas fa-arrow-right ml-1"></i>
                             </a>
                         </div>
                     </div>

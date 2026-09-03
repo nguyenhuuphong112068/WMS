@@ -9,6 +9,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\General\HomeController;
+use App\Http\Controllers\General\PrintTestController;
 use App\Http\Controllers\General\SwitchProductionController;
 use App\Http\Controllers\UploadDataController;
 use App\Http\Middleware\CheckLogin;
@@ -35,3 +36,6 @@ Route::get('/upload', [UploadDataController::class, 'index'])->name('upload.form
 Route::post('/import', [UploadDataController::class, 'import'])->name('upload.import');
 
 Route::post('/import_permission', [UploadDataController::class, 'import_permission'])->name('upload.import_permission');
+
+// Kiểm tra in nhãn qua Zebra Browser Print (trang chẩn đoán, mở trực tiếp trên máy trạm có máy in)
+Route::get('/print-test', [PrintTestController::class, 'index'])->name('printTest')->middleware(CheckLogin::class);

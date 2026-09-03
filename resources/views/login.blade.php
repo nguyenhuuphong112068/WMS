@@ -157,13 +157,13 @@
             position: relative;
             z-index: 2;
             display: grid;
-            gap: 12px;
+            gap: 18px;
         }
 
         .feature-item {
             display: flex;
-            align-items: center;
-            gap: 12px;
+            align-items: flex-start;
+            gap: 14px;
             font-size: 0.9rem;
         }
 
@@ -177,6 +177,25 @@
             align-items: center;
             justify-content: center;
             font-size: 1rem;
+            margin-top: 2px;
+        }
+
+        .feature-item .feature-text {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .feature-item .feature-text strong {
+            font-weight: 700;
+            font-size: 0.95rem;
+            line-height: 1.3;
+        }
+
+        .feature-item .feature-text span {
+            font-size: 0.82rem;
+            line-height: 1.5;
+            opacity: 0.85;
         }
 
         /* ============ PANEL FORM ============ */
@@ -213,7 +232,7 @@
             position: relative;
         }
 
-        .input-shell > i.field-icon {
+        .input-shell>i.field-icon {
             position: absolute;
             left: 16px;
             top: 50%;
@@ -238,7 +257,7 @@
             box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.12);
         }
 
-        .input-shell:focus-within > i.field-icon {
+        .input-shell:focus-within>i.field-icon {
             color: var(--primary);
         }
 
@@ -326,13 +345,12 @@
                 padding: 32px 28px;
             }
 
-            .warehouse-art,
-            .brand-features {
+            .warehouse-art {
                 display: none;
             }
 
             .brand-headline {
-                margin: 20px 0 0;
+                margin: 20px 0 16px;
             }
 
             .form-panel {
@@ -360,14 +378,13 @@
 
             <div class="brand-headline">
                 <h2>Hệ Thống Quản Lý Kho</h2>
-                <p>Kiểm soát vị trí lưu trữ, tồn kho và luồng xuất nhập vật tư – hoá chất trên một nền tảng duy nhất.</p>
             </div>
 
             <!-- Minh hoạ kệ kho + xe nâng -->
             <svg class="warehouse-art" viewBox="0 0 560 260" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <!-- Nền sàn -->
-                <line x1="10" y1="228" x2="550" y2="228" stroke="rgba(255,255,255,0.45)" stroke-width="3"
-                    stroke-linecap="round" />
+                <line x1="10" y1="228" x2="550" y2="228" stroke="rgba(255,255,255,0.45)"
+                    stroke-width="3" stroke-linecap="round" />
 
                 <!-- Kệ hàng 1 -->
                 <g opacity="0.95">
@@ -398,21 +415,30 @@
                     <rect x="268" y="70" width="151" height="8" rx="4" fill="rgba(255,255,255,0.6)" />
                     <rect x="268" y="146" width="151" height="8" rx="4" fill="rgba(255,255,255,0.6)" />
 
-                    <rect x="286" y="102" width="44" height="44" rx="5" fill="rgba(255,255,255,0.8)" />
+                    <rect x="286" y="102" width="44" height="44" rx="5"
+                        fill="rgba(255,255,255,0.8)" />
                     <rect x="286" y="118" width="44" height="4" fill="rgba(46,123,196,0.3)" />
-                    <rect x="342" y="112" width="38" height="34" rx="5" fill="rgba(255,255,255,0.62)" />
-                    <rect x="290" y="182" width="50" height="42" rx="5" fill="rgba(255,255,255,0.7)" />
+                    <rect x="342" y="112" width="38" height="34" rx="5"
+                        fill="rgba(255,255,255,0.62)" />
+                    <rect x="290" y="182" width="50" height="42" rx="5"
+                        fill="rgba(255,255,255,0.7)" />
                     <rect x="290" y="197" width="50" height="4" fill="rgba(46,123,196,0.3)" />
-                    <rect x="352" y="190" width="40" height="34" rx="5" fill="rgba(255,255,255,0.55)" />
+                    <rect x="352" y="190" width="40" height="34" rx="5"
+                        fill="rgba(255,255,255,0.55)" />
                 </g>
 
                 <!-- Xe nâng -->
                 <g opacity="0.95">
-                    <rect x="470" y="150" width="52" height="52" rx="8" fill="rgba(255,255,255,0.9)" />
-                    <rect x="478" y="128" width="8" height="74" rx="4" fill="rgba(255,255,255,0.75)" />
-                    <rect x="452" y="196" width="30" height="7" rx="3" fill="rgba(255,255,255,0.85)" />
-                    <rect x="444" y="164" width="30" height="32" rx="4" fill="rgba(255,255,255,0.65)" />
-                    <rect x="500" y="132" width="26" height="20" rx="4" fill="rgba(255,255,255,0.6)" />
+                    <rect x="470" y="150" width="52" height="52" rx="8"
+                        fill="rgba(255,255,255,0.9)" />
+                    <rect x="478" y="128" width="8" height="74" rx="4"
+                        fill="rgba(255,255,255,0.75)" />
+                    <rect x="452" y="196" width="30" height="7" rx="3"
+                        fill="rgba(255,255,255,0.85)" />
+                    <rect x="444" y="164" width="30" height="32" rx="4"
+                        fill="rgba(255,255,255,0.65)" />
+                    <rect x="500" y="132" width="26" height="20" rx="4"
+                        fill="rgba(255,255,255,0.6)" />
                     <circle cx="484" cy="212" r="13" fill="rgba(255,255,255,0.9)" />
                     <circle cx="484" cy="212" r="5" fill="rgba(46,123,196,0.45)" />
                     <circle cx="516" cy="212" r="10" fill="rgba(255,255,255,0.9)" />
@@ -420,20 +446,7 @@
                 </g>
             </svg>
 
-            <div class="brand-features">
-                <div class="feature-item">
-                    <i class="bi bi-geo-alt"></i>
-                    <span>Quản lý kho – phòng – kệ/tủ – vị trí lưu trữ</span>
-                </div>
-                <div class="feature-item">
-                    <i class="bi bi-boxes"></i>
-                    <span>Theo dõi tồn kho vật tư và hoá chất</span>
-                </div>
-                <div class="feature-item">
-                    <i class="bi bi-shield-check"></i>
-                    <span>Phân quyền chặt chẽ và truy vết Audit Trail</span>
-                </div>
-            </div>
+
         </div>
 
         <!-- ============ PHẢI: FORM ============ -->
@@ -463,7 +476,7 @@
             <form id="loginForm" action="{{ route('login') }}" method="POST">
                 @csrf
                 <h3>Đăng Nhập</h3>
-                <p class="subtitle">Sử dụng tài khoản nội bộ để truy cập hệ thống.</p>
+                <p class="subtitle">Sử dụng tài khoản để truy cập hệ thống.</p>
 
                 <div class="mb-3">
                     <label for="username" class="form-label">Tên tài khoản</label>
@@ -480,7 +493,8 @@
                         <i class="bi bi-lock field-icon"></i>
                         <input type="password" id="loginPassword" name="passWord" class="form-control"
                             placeholder="••••••••" required>
-                        <i class="bi bi-eye-slash toggle-password" onclick="togglePassword('loginPassword', this)"></i>
+                        <i class="bi bi-eye-slash toggle-password"
+                            onclick="togglePassword('loginPassword', this)"></i>
                     </div>
                 </div>
 
@@ -488,8 +502,7 @@
                     <i class="bi bi-box-arrow-in-right me-1"></i> Đăng nhập hệ thống
                 </button>
 
-                <a href="#" class="toggle-link" onclick="toggleForms(true); return false;">Đổi mật khẩu / Quên mật
-                    khẩu?</a>
+                <a href="#" class="toggle-link" onclick="toggleForms(true); return false;">Đổi mật khẩu</a>
             </form>
 
             <!-- ✅ Form đổi mật khẩu -->
@@ -541,7 +554,8 @@
                     <i class="bi bi-check2-circle me-1"></i> Cập nhật mật khẩu
                 </button>
 
-                <a href="#" class="toggle-link" onclick="toggleForms(false); return false;">Quay lại đăng nhập</a>
+                <a href="#" class="toggle-link" onclick="toggleForms(false); return false;">Quay lại đăng
+                    nhập</a>
             </form>
 
             <div class="form-footer">

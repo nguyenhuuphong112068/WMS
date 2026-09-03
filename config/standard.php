@@ -48,5 +48,7 @@ return [
         'form_no' => 'QC/F/106-03',
         'width_mm' => 50,
         'height_mm' => 30,
+        // Độ phân giải đầu in Zebra (ZD421: bản 203 hoặc 300 dpi - xem tem dưới đáy máy).
+        'dpi' => 300,
     ],
 ];
