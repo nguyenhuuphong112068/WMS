@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Estimate;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentStandard;
 use App\Support\StandardCode;
@@ -31,6 +32,8 @@ use Illuminate\Validation\Rule;
  */
 class StandardEstimateController extends Controller
 {
+    use VerifiesSignature;
+
     private const TABLE = 'standard_estimates';
 
     private const ITEM_TABLE = 'standard_estimate_items';
@@ -296,7 +299,7 @@ class StandardEstimateController extends Controller
             ]);
 
             // Số lượng theo tháng luôn ghi lại toàn bộ: xoá dòng cũ rồi ghi dòng mới
-            DB::table(self::AMOUNT_TABLE)->where('standard_estimate_item_id', $item->id)->delete();
+            DB::table(self::AMOUNT_TABLE)->where('standard_estimate_item_id', $item->id)->update(['active' => 0]);
 
             $this->saveAmounts($item->id, $request);
         });
@@ -329,8 +332,12 @@ class StandardEstimateController extends Controller
         }
 
         DB::transaction(function () use ($item) {
-            DB::table(self::AMOUNT_TABLE)->where('standard_estimate_item_id', $item->id)->delete();
-            DB::table(self::ITEM_TABLE)->where('id', $item->id)->delete();
+            DB::table(self::AMOUNT_TABLE)->where('standard_estimate_item_id', $item->id)->update(['active' => 0]);
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'active' => 0,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
         });
 
         if ($list->app_status !== 'draft') {
@@ -384,7 +391,7 @@ class StandardEstimateController extends Controller
                 'updated_at' => now(),
             ]);
 
-            $allItems = DB::table(self::ITEM_TABLE)->where('standard_estimate_id', $list->id)->get();
+            $allItems = DB::table(self::ITEM_TABLE)->where('standard_estimate_id', $list->id)->where('active', 1)->get();
             $allCompleted = true;
             $hasActive = false;
             foreach ($allItems as $i) {
@@ -528,8 +535,12 @@ class StandardEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$current->code.' đang bị khoá, hãy mở khoá trước khi trình ký!');
         }
 
-        if (! DB::table(self::ITEM_TABLE)->where('standard_estimate_id', $current->id)->exists()) {
+        if (! DB::table(self::ITEM_TABLE)->where('standard_estimate_id', $current->id)->where('active', 1)->exists()) {
             return redirect()->back()->with('error', 'Phiếu '.$current->code.' chưa có chất chuẩn nào, chưa trình ký được!');
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Trình ký')) {
+            return $stop;
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
@@ -598,6 +609,10 @@ class StandardEstimateController extends Controller
             return redirect()->back()->withErrors($validator, 'rejectErrors')->withInput();
         }
 
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Từ chối duyệt')) {
+            return $stop;
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update([
             'app_status' => 'rejected',
             'rejected_by' => $this->actor(),
@@ -632,6 +647,10 @@ class StandardEstimateController extends Controller
 
         if (! $this->canSign($step)) {
             return redirect()->back()->with('error', 'Bạn không có quyền ký duyệt bước "'.$config['label'].'"!');
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Ký duyệt '.$config['label'])) {
+            return $stop;
         }
 
         $payload = [
@@ -695,6 +714,7 @@ class StandardEstimateController extends Controller
             ->whereNotNull(self::ITEM_TABLE.'.promised_date')
             ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
             ->where(self::ITEM_TABLE.'.status_id', 1)
+            ->where(self::ITEM_TABLE.'.active', 1)
             ->orderBy(self::ITEM_TABLE.'.promised_date', 'asc')
             ->get();
 
@@ -707,6 +727,7 @@ class StandardEstimateController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
+            ->where(self::AMOUNT_TABLE.'.active', 1)
             ->whereIn(self::AMOUNT_TABLE.'.standard_estimate_item_id', $items->pluck('id')->all())
             ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
             ->get()
@@ -762,6 +783,7 @@ class StandardEstimateController extends Controller
                 'manufacturers.name as category_manufacturer_name'
             )
             ->where(self::ITEM_TABLE.'.standard_estimate_id', $listId)
+            ->where(self::ITEM_TABLE.'.active', 1)
             ->orderBy(self::ITEM_TABLE.'.id', 'asc')
             ->get();
 
@@ -772,6 +794,7 @@ class StandardEstimateController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
+            ->where(self::AMOUNT_TABLE.'.active', 1)
             ->whereIn(self::AMOUNT_TABLE.'.standard_estimate_item_id', $items->pluck('id')->all())
             ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
             ->get()
@@ -840,7 +863,7 @@ class StandardEstimateController extends Controller
             'from_status' => $from,
             'to_status' => $to,
             'note' => $note,
-            'created_by' => session('user')['fullName'] ?? 'NA',
+            'created_by' => \App\Support\Signer::actor(),
             'created_at' => now(),
         ]);
     }
@@ -855,6 +878,7 @@ class StandardEstimateController extends Controller
         return DB::table(self::ITEM_TABLE)
             ->select('standard_estimate_id', DB::raw('COUNT(*) as total'))
             ->whereIn('standard_estimate_id', $listIds)
+            ->where('active', 1)
             ->groupBy('standard_estimate_id')
             ->pluck('total', 'standard_estimate_id')
             ->all();
@@ -978,7 +1002,7 @@ class StandardEstimateController extends Controller
     /** Một mặt hàng kèm phiếu chứa nó: [item, list]. */
     private function findItem($id): array
     {
-        $item = DB::table(self::ITEM_TABLE)->where('id', $id)->first();
+        $item = DB::table(self::ITEM_TABLE)->where('id', $id)->where('active', 1)->first();
 
         if (! $item) {
             return [null, null];
@@ -1025,7 +1049,7 @@ class StandardEstimateController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     /* ==========================================================

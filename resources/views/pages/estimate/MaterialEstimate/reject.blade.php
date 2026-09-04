@@ -34,6 +34,20 @@
                         @endif
                     </div>
 
+                    <div class="form-group">
+                        <label>Mật Khẩu Xác Nhận <span class="text-danger">*</span></label>
+                        <input type="password" name="sign_password" autocomplete="current-password"
+                            class="form-control {{ $bag->has('sign_password') ? 'is-invalid' : '' }}"
+                            placeholder="Nhập lại mật khẩu đăng nhập của bạn" required>
+                        @if ($bag->has('sign_password'))
+                            <span class="md-error">{{ $bag->first('sign_password') }}</span>
+                        @endif
+                        <span class="md-hint d-block mt-1">
+                            <i class="fas fa-shield-alt mr-1"></i>
+                            Nhập lại mật khẩu để ký xác nhận thao tác từ chối (chữ ký điện tử).
+                        </span>
+                    </div>
+
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Phiếu bị từ chối quay về trạng thái <b>Bị từ chối</b>, phòng ban sửa lại rồi trình ký lại
@@ -52,7 +66,7 @@
     </div>
 </div>
 
-@if ($bag->any())
+@if ($bag->any() || session('signatureError'))
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             $('#rejectModal').modal('show');

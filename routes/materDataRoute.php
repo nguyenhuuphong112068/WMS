@@ -9,14 +9,17 @@
 | Tên route  : pages.materData.<chứcNăng>.<action>
 */
 
+use App\Http\Controllers\Pages\MaterData\ActiveIngredientController;
 use App\Http\Controllers\Pages\MaterData\AnalystController;
 use App\Http\Controllers\Pages\MaterData\ChemManufacturerController;
 use App\Http\Controllers\Pages\MaterData\ChemNameController;
 use App\Http\Controllers\Pages\MaterData\ChemSupplierController;
+use App\Http\Controllers\Pages\MaterData\CompanyController;
 use App\Http\Controllers\Pages\MaterData\DepartmentController;
 use App\Http\Controllers\Pages\MaterData\GroupController;
 use App\Http\Controllers\Pages\MaterData\MaterialClassificationController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
+use App\Http\Controllers\Pages\MaterData\MixtureHazardCategoryController;
 use App\Http\Controllers\Pages\MaterData\PackagingSpecificationController;
 use App\Http\Controllers\Pages\MaterData\ProductNameController;
 use App\Http\Controllers\Pages\MaterData\PurposeController;
@@ -33,6 +36,16 @@ Route::prefix('/materData')
     ->group(function () {
 
         Route::prefix('/purpose')->name('purpose.')->controller(PurposeController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+        });
+
+        // Công Ty: phần mềm chạy cho nhiều công ty, mỗi công ty có bộ phòng ban riêng.
+        // Phạm vi đối chiếu "Ngưỡng Tồn Trữ PL IV" gói trong từng công ty.
+        Route::prefix('/company')->name('company.')->controller(CompanyController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');
@@ -94,6 +107,30 @@ Route::prefix('/materData')
             });
 
         Route::prefix('/chemName')->name('chemName.')->controller(ChemNameController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::post('approve', 'approve')->name('approve');
+            Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Tên Hoạt Chất - danh mục hoạt chất phải xây dựng Kế hoạch phòng ngừa, ứng phó
+        // sự cố hoá chất (Phụ lục IV NĐ 24/2026/NĐ-CP), kèm ngưỡng khối lượng tồn trữ.
+        Route::prefix('/activeIngredient')->name('activeIngredient.')->controller(ActiveIngredientController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::post('approve', 'approve')->name('approve');
+            Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Nhóm Nguy Hại Bảng B - phân loại GHS + ngưỡng tồn trữ cho hỗn hợp
+        // (Phụ lục IV NĐ 24/2026/NĐ-CP - Bảng B).
+        Route::prefix('/mixtureHazardCategory')->name('mixtureHazardCategory.')->controller(MixtureHazardCategoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');

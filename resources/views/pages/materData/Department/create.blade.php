@@ -11,6 +11,20 @@
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
+                        <label for="company_id">Công Ty <span class="text-danger">*</span></label>
+                        <select name="company_id" class="form-control @error('company_id', 'createErrors') is-invalid @enderror" required>
+                            <option value="">-- Chọn công ty --</option>
+                            @foreach ($companies as $company)
+                                <option value="{{ $company->id }}" {{ old('company_id') == $company->id ? 'selected' : '' }}>
+                                    {{ $company->name }} ({{ $company->short_name }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('company_id', 'createErrors')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="form-group">
                         <label for="shortName">Tên Viết Tắt <span class="text-danger">*</span></label>
                         <input type="text" name="shortName" class="form-control @error('shortName', 'createErrors') is-invalid @enderror" value="{{ old('shortName') }}" required>
                         @error('shortName', 'createErrors')

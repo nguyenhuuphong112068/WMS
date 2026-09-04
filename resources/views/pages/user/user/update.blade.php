@@ -92,9 +92,9 @@
                             <option value="">-- Chọn phòng ban --</option>
 
                             @foreach ($deparments as $department)
-                                <option value="{{ $department->shortName }}"
+                                <option value="{{ $department->shortName }}" data-id="{{ $department->id }}"
                                     {{ old('deparment') == $department->shortName ? 'selected' : '' }}>
-                                    {{ $department->name }}
+                                    {{ $department->name }}@if (!empty($department->company_name)) — {{ $department->company_name }}@endif
                                 </option>
                             @endforeach
                         </select>
@@ -106,16 +106,10 @@
 
                     <div class="form-group">
                         {{-- GROUP --}}
-                        <label for="groupUpdate">Tổ</label>
-                        <select class="form-control" name="group_id" id="groupUpdate">
-                            <option value="">-- Chọn Tổ (Không bắt buộc) --</option>
-
-                            @foreach ($groups as $group)
-                                <option value="{{ $group->id }}"
-                                    {{ old('group_id') == $group->id ? 'selected' : '' }}>
-                                    {{ $group->name }}
-                                </option>
-                            @endforeach
+                        <label for="groupUpdate">Tổ (Chọn 1 hoặc nhiều)</label>
+                        <select class="form-control select2-group" name="group_id[]" id="groupUpdate"
+                            multiple="multiple" data-placeholder="-- Chọn phòng ban trước --"
+                            data-preset='@json(old('group_id', []))' disabled>
                         </select>
 
                         @error('group_id', 'updateErrors')

@@ -146,7 +146,7 @@
                                                     <i class="fas fa-edit"></i>
                                                 </button>
 
-                                                <form class="form-md-confirm d-inline" action="{{ route($estRoute . 'submit') }}"
+                                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'submit') }}"
                                                     method="POST" data-title="Trình ký phiếu {{ $row->code }}?"
                                                     data-text="Phiếu sẽ chuyển sang bước chờ Phó/Trưởng Phòng ký và không sửa được nữa cho tới khi bị từ chối.">
                                                     @csrf
@@ -158,7 +158,7 @@
                                             @endif
 
                                             @if ($row->app_status === 'pending_manager' && $canSignManager && user_can('estimate_standard_sign'))
-                                                <form class="form-md-confirm d-inline" action="{{ route($estRoute . 'signManager') }}"
+                                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'signManager') }}"
                                                     method="POST" data-title="Ký duyệt bước Phó/Trưởng Phòng?"
                                                     data-text="Phiếu {{ $row->code }} sẽ được chuyển tiếp lên Ban Giám Đốc ký.">
                                                     @csrf
@@ -170,7 +170,7 @@
                                             @endif
 
                                             @if ($row->app_status === 'pending_director' && $canSignDirector && user_can('estimate_standard_sign'))
-                                                <form class="form-md-confirm d-inline" action="{{ route($estRoute . 'signDirector') }}"
+                                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'signDirector') }}"
                                                     method="POST" data-title="Ban Giám Đốc phê duyệt phiếu {{ $row->code }}?"
                                                     data-text="Sau khi phê duyệt, phiếu chuyển sang bộ phận Cung Ứng tiếp nhận giải quyết.">
                                                     @csrf

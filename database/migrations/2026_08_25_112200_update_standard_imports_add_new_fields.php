@@ -15,7 +15,7 @@ return new class extends Migration
             $table->smallInteger('retest_interval_months')->nullable()->after('expiry_type'); // Khoảng thời gian retest (tháng)
             $table->tinyInteger('weight_controlled')->default(0)->after('retest_interval_months'); // Chuẩn có cần kiểm soát khối lượng (1/0)
             $table->string('standard_form', 50)->nullable()->after('weight_controlled'); // Dạng chuẩn (Bột, Dung dịch, Viên, Khí, Khác)
-            $table->tinyInteger('requires_aliquot')->default(0)->after('standard_form'); // Chuẩn cần triết ống trước khi sử dụng (1/0)
+            $table->tinyInteger('requires_aliquot')->default(0)->after('standard_form'); // Chuẩn cần chiết ống trước khi sử dụng (1/0)
         });
 
         Schema::table('standard_import_histories', function (Blueprint $table) {

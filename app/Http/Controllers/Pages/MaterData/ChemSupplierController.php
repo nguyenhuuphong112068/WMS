@@ -195,7 +195,7 @@ class ChemSupplierController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     private function rules($ignoreId = null): array

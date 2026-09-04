@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
 use Illuminate\Http\Request;
@@ -28,6 +29,8 @@ use Illuminate\Support\Facades\Validator;
  */
 class MaterialCategoryController extends Controller
 {
+    use VerifiesSignature;
+
     private const TABLE = 'material_categories';
     private const HISTORY_TABLE = 'material_category_histories';
     private const LABEL = 'danh mục vật tư công ty';
@@ -259,6 +262,10 @@ class MaterialCategoryController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần duyệt!');
         }
 
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt')) {
+            return $stop;
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update([
             'app_status' => $appStatus,
             'approved_by' => $this->actor(),
@@ -425,7 +432,7 @@ class MaterialCategoryController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     private function rules(): array

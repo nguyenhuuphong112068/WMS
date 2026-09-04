@@ -26,6 +26,9 @@ class GroupController extends Controller
 
     public function index()
     {
+        // Chỉ phòng ban thuộc công ty đang làm việc (suy từ phòng ban đang chọn)
+        $companyId = \App\Support\CompanyContext::currentId();
+
         $datas = DB::table(self::TABLE)
             ->leftJoin('deparments', self::TABLE . '.department_id', '=', 'deparments.id')
             ->select(
@@ -33,10 +36,15 @@ class GroupController extends Controller
                 'deparments.name as department_name',
                 'deparments.shortName as department_short'
             )
+            ->when($companyId, fn ($q) => $q->where('deparments.company_id', $companyId))
             ->orderBy(self::TABLE . '.name', 'asc')
             ->get();
 
-        $departments = DB::table('deparments')->where('isActive', 1)->orderBy('name', 'asc')->get();
+        $departments = DB::table('deparments')
+            ->where('isActive', 1)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->orderBy('name', 'asc')
+            ->get();
 
         session()->put(['title' => 'DỮ LIỆU GỐC - TỔ']);
 
@@ -148,7 +156,7 @@ class GroupController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     /** Bảng tra nhãn để lịch sử hiện tên phòng ban thay vì department_id. */

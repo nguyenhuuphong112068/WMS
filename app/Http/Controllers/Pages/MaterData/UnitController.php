@@ -214,7 +214,7 @@ class UnitController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     /** Bảng tra nhãn để lịch sử hiện tên nhóm đơn vị thay vì mã nhóm. */

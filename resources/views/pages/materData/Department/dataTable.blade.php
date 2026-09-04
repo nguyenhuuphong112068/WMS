@@ -14,6 +14,7 @@
                 <thead style="position: sticky; top: 60px; background-color: white; z-index: 1020">
                     <tr>
                         <th>STT</th>
+                        <th>Công Ty</th>
                         <th>Tên Viết Tắt</th>
                         <th>Tên Phòng Ban</th>
                         <th>Trạng Thái</th>
@@ -26,6 +27,7 @@
                     @foreach ($datas as $data)
                         <tr>
                             <td>{{ $loop->iteration }} </td>
+                            <td>{{ $data->company_name ?? '—' }}</td>
                             <td>{{ $data->shortName }}</td>
                             <td>{{ $data->name }}</td>
                             <td class="text-center">
@@ -42,7 +44,8 @@
                                     @perm('materData_update')
                                         <button type="button" class="btn btn-warning btn-edit mb-1"
                                             data-id="{{ $data->id }}" data-shortname="{{ $data->shortName }}"
-                                            data-name="{{ $data->name }}" data-toggle="modal" data-target="#updateModal">
+                                            data-name="{{ $data->name }}" data-company_id="{{ $data->company_id }}"
+                                            data-toggle="modal" data-target="#updateModal">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                     @endperm
@@ -102,6 +105,7 @@
             const modal = $('#updateModal');
 
             modal.find('#update_id').val(button.data('id'));
+            modal.find('#update_company_id').val(button.data('company_id'));
             modal.find('#update_shortName').val(button.data('shortname'));
             modal.find('#update_name').val(button.data('name'));
         });

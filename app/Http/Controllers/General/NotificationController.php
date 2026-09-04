@@ -40,12 +40,25 @@ class NotificationController extends Controller
         // Nếu có truyền nhóm, lấy tất cả ID của những người thuộc nhóm đó
         if (!empty($targetUserGroups)) {
             $targetUserGroups = is_array($targetUserGroups) ? $targetUserGroups : [$targetUserGroups];
-            $groupIds = DB::table('user_management')
-                ->whereIn('userGroup', $targetUserGroups)
-                ->where('isActive', 1)
-                ->pluck('id')
+
+            // Role chính trên user_management.role_id
+            $byPrimaryRole = DB::table('user_management')
+                ->join('roles', 'roles.id', '=', 'user_management.role_id')
+                ->whereIn('roles.name', $targetUserGroups)
+                ->where('user_management.isActive', 1)
+                ->pluck('user_management.id')
                 ->toArray();
-            $allRecipientIds = array_merge($allRecipientIds, $groupIds);
+
+            // Role gán thêm qua bảng trung gian user_role
+            $byAssignedRole = DB::table('user_management')
+                ->join('user_role', 'user_role.user_id', '=', 'user_management.id')
+                ->join('roles', 'roles.id', '=', 'user_role.role_id')
+                ->whereIn('roles.name', $targetUserGroups)
+                ->where('user_management.isActive', 1)
+                ->pluck('user_management.id')
+                ->toArray();
+
+            $allRecipientIds = array_merge($allRecipientIds, $byPrimaryRole, $byAssignedRole);
         }
 
         // 3. Loại bỏ ID trùng lặp và ID người gửi

@@ -26,6 +26,7 @@
                         <th>Nhóm Người Dùng</th>
                         <th>Tên Người Dùng</th>
                         <th>Phòng Ban</th>
+                        <th>Công Ty</th>
                         <th>Mail</th>
                         <th>Người Tạo</th>
                         <th>Ngày Tạo</th>
@@ -43,6 +44,7 @@
                             <td>{{ $data->role_names }}</td>
                             <td>{{ $data->fullName }}</td>
                             <td>{{ $data->deparment }}</td>
+                            <td>{{ $data->company_short ?? $data->company_name }}</td>
                             <td>{{ $data->mail }}</td>
                             <td>{{ $data->prepareBy }}</td>
                             <td>{{ \Carbon\Carbon::parse($data->created_at)->format('d/m/Y') }}</td>
@@ -63,7 +65,7 @@
                                     <button type="button" class="btn btn-warning btn-edit" data-id="{{ $data->id }}"
                                         data-username="{{ $data->userName }}" data-usergroup='@json($data->role_ids)'
                                         data-fullname="{{ $data->fullName }}" data-deparment="{{ $data->deparment }}"
-                                        data-group_id="{{ $data->group_id }}"
+                                        data-group_ids='@json($data->group_ids)'
                                         data-mail="{{ $data->mail }}"
                                         data-toggle="modal" data-target="#UpdateModal">
                                         <i class="fas fa-edit"></i>
@@ -116,6 +118,44 @@
 @endif
 
 <script>
+    // Danh sách tổ kèm phòng ban - để lọc tổ theo phòng ban đã chọn
+    window.ALL_GROUPS = @json($groups);
+
+    // Dựng lại danh sách tổ theo phòng ban đang chọn trong 1 modal.
+    // Không chọn phòng ban -> khoá ô chọn tổ.
+    function buildGroupOptions(modal, presetIds) {
+        var $dept = modal.find('select[name="deparment"]');
+        var $grp = modal.find('select[name="group_id[]"]');
+        var deptId = $dept.find('option:selected').data('id');
+
+        // Giá trị cần giữ lại: ưu tiên preset truyền vào, sau đó là lựa chọn hiện tại,
+        // cuối cùng là data-preset (dùng khi form bị lỗi validate và mở lại).
+        var keep = presetIds;
+        if (!keep) {
+            keep = $grp.val();
+        }
+        if ((!keep || !keep.length) && $grp.data('preset') && $grp.data('preset').length) {
+            keep = $grp.data('preset');
+            $grp.removeData('preset').removeAttr('data-preset');
+        }
+        keep = (keep || []).map(String);
+
+        $grp.empty();
+
+        if (!deptId) {
+            $grp.prop('disabled', true).trigger('change');
+            return;
+        }
+
+        $grp.prop('disabled', false);
+        (window.ALL_GROUPS || []).forEach(function(g) {
+            if (String(g.department_id) !== String(deptId)) return;
+            var selected = keep.indexOf(String(g.id)) !== -1;
+            $grp.append(new Option(g.name, g.id, selected, selected));
+        });
+        $grp.trigger('change');
+    }
+
     $(document).ready(function() {
         document.body.style.overflowY = "auto";
 
@@ -123,6 +163,21 @@
         $('.select2').select2({
             theme: 'bootstrap4',
             width: '100%'
+        });
+        $('.select2-group').select2({
+            theme: 'bootstrap4',
+            width: '100%'
+        });
+
+        // Lọc lại danh sách tổ mỗi khi đổi phòng ban
+        $(document).on('change', '#createModal select[name="deparment"], #UpdateModal select[name="deparment"]',
+            function() {
+                buildGroupOptions($(this).closest('.modal'));
+            });
+
+        // Mở modal: dựng lại danh sách tổ theo phòng ban (giữ old input khi lỗi validate)
+        $('#createModal, #UpdateModal').on('shown.bs.modal', function() {
+            buildGroupOptions($(this));
         });
 
         $('.btn-edit').click(function() {
@@ -138,8 +193,11 @@
 
             modal.find('input[name="fullName"]').val(button.data('fullname'));
             modal.find('select[name="deparment"]').val(button.data('deparment'));
-            modal.find('select[name="group_id"]').val(button.data('group_id'));
             modal.find('input[name="mail"]').val(button.data('mail'));
+
+            // Tổ: dựng theo phòng ban của user rồi chọn sẵn các tổ hiện có
+            var groupIds = (button.data('group_ids') || []).map(String);
+            buildGroupOptions(modal, groupIds);
         });
 
         $('.form-deActive').on('submit', function(e) {

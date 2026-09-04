@@ -907,7 +907,7 @@ class StandardInventoryController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     private function number(float $value): string

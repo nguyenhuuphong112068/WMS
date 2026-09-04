@@ -273,6 +273,13 @@
                         </a>
                         <ul class="nav nav-treeview">
                             @perm('materData_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.company.list') }}"
+                                        class="nav-link {{ request()->is('materData/company') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-primary"></i>
+                                        <p>Công Ty</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.department.list') }}"
                                         class="nav-link {{ request()->is('materData/department') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-info"></i>
@@ -326,6 +333,20 @@
                                         class="nav-link {{ request()->is('materData/chemName') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-success"></i>
                                         <p>Tên Hoá Chất</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.activeIngredient.list') }}"
+                                        class="nav-link {{ request()->is('materData/activeIngredient') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-danger"></i>
+                                        <p>Tên Hoạt Chất</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.mixtureHazardCategory.list') }}"
+                                        class="nav-link {{ request()->is('materData/mixtureHazardCategory') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-danger"></i>
+                                        <p>Nhóm Nguy Hại Bảng B</p>
                                     </a></li>
                             @endperm
                             @perm('materData_view')
@@ -534,6 +555,13 @@
                                         class="nav-link {{ request()->is('inventory/standardInventory') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-warning"></i>
                                         <p>Chất Chuẩn</p>
+                                    </a></li>
+                            @endperm
+                            @perm('inventory_chemical_view')
+                                <li class="nav-item"><a href="{{ route('pages.inventory.thresholdReconciliation.list') }}"
+                                        class="nav-link {{ request()->is('inventory/thresholdReconciliation') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-danger"></i>
+                                        <p>Ngưỡng Tồn Trữ PL IV</p>
                                     </a></li>
                             @endperm
                         </ul>

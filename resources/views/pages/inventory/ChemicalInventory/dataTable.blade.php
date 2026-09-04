@@ -73,6 +73,139 @@
                     </div>
                 </form>
 
+                {{-- ============ CẢNH BÁO NGƯỠNG TỒN TRỮ PHỤ LỤC IV NĐ 24/2026 ============ --}}
+                @if ($thresholdAlerts->isNotEmpty())
+                    @php
+                        $thrNum = fn($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.');
+                        $hasExceeded = $thresholdAlerts->contains(fn($r) => $r->level === 'exceeded');
+                    @endphp
+                    <div class="alert {{ $hasExceeded ? 'alert-danger' : 'alert-warning' }} inv-threshold-alert">
+                        <div class="inv-threshold-head">
+                            <i class="fas fa-triangle-exclamation mr-1"></i>
+                            <b>{{ $thresholdAlerts->count() }} hoạt chất chạm/vượt ngưỡng tồn trữ lớn nhất tại một thời điểm</b>
+                            (Phụ lục IV Nghị định 24/2026/NĐ-CP). Cơ sở tồn trữ vượt ngưỡng phải xây dựng
+                            Kế hoạch phòng ngừa, ứng phó sự cố hoá chất. Số liệu cộng
+                            <b>toàn bộ phòng ban của công ty @if (!empty($thresholdCompanyName))"{{ $thresholdCompanyName }}"@else đang chọn @endif</b>.
+                        </div>
+                        <div class="table-responsive mt-2">
+                            <table class="table table-sm inv-threshold-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Hoạt chất</th>
+                                        <th>Số CAS</th>
+                                        <th class="text-right">Tồn hiện tại (kg)</th>
+                                        <th class="text-right" title="Mức tồn quy ra kg cao nhất đã từng đạt">Tồn cao nhất (kg)</th>
+                                        <th class="text-right">Ngưỡng (kg)</th>
+                                        <th class="text-right" title="Tồn hiện tại / ngưỡng · Tồn cao nhất / ngưỡng">Tỉ lệ (hiện tại · đỉnh)</th>
+                                        <th>Phòng ban đóng góp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($thresholdAlerts as $alert)
+                                        <tr>
+                                            <td>
+                                                <b>{{ $alert->ai_name }}</b>
+                                                @if ($alert->level === 'exceeded')
+                                                    <span class="badge badge-danger ml-1">Đã vượt ngưỡng</span>
+                                                @else
+                                                    <span class="badge badge-warning ml-1">Đã sắp chạm ngưỡng</span>
+                                                @endif
+                                                @if ($alert->has_unconvertible)
+                                                    <div class="md-sub" title="{{ collect($alert->unconvertible)->map(fn($u) => $u->category_code.': '.$u->reason)->implode('; ') }}">
+                                                        * còn lô chưa quy đổi được ra kg
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td class="md-sub">{{ $alert->cas_no ?: '—' }}</td>
+                                            <td class="text-right">{{ $thrNum($alert->total_kg) }}</td>
+                                            <td class="text-right"><b>{{ $thrNum($alert->peak_kg) }}</b>
+                                                @if ($alert->peak_date)<div class="md-sub">{{ \Carbon\Carbon::parse($alert->peak_date)->format('d/m/Y') }}</div>@endif
+                                            </td>
+                                            <td class="text-right">{{ $thrNum($alert->threshold_kg) }}</td>
+                                            <td class="text-right">{{ (int) round($alert->ratio * 100) }}% · <b>{{ (int) round($alert->peak_ratio * 100) }}%</b></td>
+                                            <td class="md-sub">
+                                                @forelse ($alert->by_department as $dept)
+                                                    <span class="inv-threshold-dept {{ $dept->department_id === $thresholdDepartmentId ? 'is-current' : '' }}">
+                                                        {{ $dept->department_name }}: {{ $thrNum($dept->kg) }} kg
+                                                    </span>
+                                                @empty
+                                                    —
+                                                @endforelse
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
+                @if ($thresholdAlertsB->isNotEmpty())
+                    @php
+                        $thrNumB = fn($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.');
+                        $hasExceededB = $thresholdAlertsB->contains(fn($r) => $r->level === 'exceeded');
+                    @endphp
+                    <div class="alert {{ $hasExceededB ? 'alert-danger' : 'alert-warning' }} inv-threshold-alert">
+                        <div class="inv-threshold-head">
+                            <i class="fas fa-layer-group mr-1"></i>
+                            <b>{{ $thresholdAlertsB->count() }} hỗn hợp chạm/vượt ngưỡng Bảng B</b>
+                            (Phụ lục IV Nghị định 24/2026/NĐ-CP). Đối chiếu <b>tổng tồn thô của công ty
+                            @if (!empty($thresholdCompanyName))"{{ $thresholdCompanyName }}"@else đang chọn @endif</b>
+                            (không nhân % hàm lượng) với ngưỡng thấp nhất trong các nhóm nguy hại đã tick.
+                        </div>
+                        <div class="table-responsive mt-2">
+                            <table class="table table-sm inv-threshold-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Hỗn hợp</th>
+                                        <th>Nhóm đã tick</th>
+                                        <th class="text-right">Tồn thô hiện tại (kg)</th>
+                                        <th class="text-right" title="Mức tồn thô quy ra kg cao nhất đã từng đạt">Tồn thô cao nhất (kg)</th>
+                                        <th class="text-right">Ngưỡng thấp nhất (kg)</th>
+                                        <th class="text-right" title="Tồn hiện tại / ngưỡng · Tồn cao nhất / ngưỡng">Tỉ lệ (hiện tại · đỉnh)</th>
+                                        <th>Phòng ban đóng góp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($thresholdAlertsB as $alert)
+                                        <tr>
+                                            <td>
+                                                <b>{{ $alert->chem_name }}</b>
+                                                @if ($alert->level === 'exceeded')
+                                                    <span class="badge badge-danger ml-1">Đã vượt ngưỡng</span>
+                                                @else
+                                                    <span class="badge badge-warning ml-1">Đã sắp chạm ngưỡng</span>
+                                                @endif
+                                                @if ($alert->has_unconvertible)
+                                                    <div class="md-sub" title="{{ collect($alert->unconvertible)->map(fn($u) => $u->category_code.': '.$u->reason)->implode('; ') }}">
+                                                        * còn lô chưa quy đổi được ra kg
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td class="md-sub">{{ implode(', ', $alert->hazard_labels) }} <span class="md-sub">(chặt nhất {{ $alert->strictest_group }})</span></td>
+                                            <td class="text-right">{{ $thrNumB($alert->total_kg) }}</td>
+                                            <td class="text-right"><b>{{ $thrNumB($alert->peak_kg) }}</b>
+                                                @if ($alert->peak_date)<div class="md-sub">{{ \Carbon\Carbon::parse($alert->peak_date)->format('d/m/Y') }}</div>@endif
+                                            </td>
+                                            <td class="text-right">{{ $thrNumB($alert->min_threshold_kg) }}</td>
+                                            <td class="text-right">{{ (int) round($alert->ratio * 100) }}% · <b>{{ (int) round($alert->peak_ratio * 100) }}%</b></td>
+                                            <td class="md-sub">
+                                                @forelse ($alert->by_department as $dept)
+                                                    <span class="inv-threshold-dept {{ $dept->department_id === $thresholdDepartmentId ? 'is-current' : '' }}">
+                                                        {{ $dept->department_name }}: {{ $thrNumB($dept->kg) }} kg
+                                                    </span>
+                                                @empty
+                                                    —
+                                                @endforelse
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
                 <div class="inv-tabs">
                     <button type="button" class="inv-tab is-active" data-pane="invPaneCode">
                         <i class="fas fa-barcode mr-1"></i> Theo mã xuất nhập
@@ -778,3 +911,47 @@
         $('#mdTable').DataTable().order([11, 'asc']).draw();
     });
 </script>
+
+@once
+    <style>
+        .inv-threshold-alert {
+            border-radius: var(--border-radius-md);
+            margin-bottom: 16px;
+        }
+
+        .inv-threshold-head {
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .inv-threshold-table th {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border-top: none;
+        }
+
+        .inv-threshold-table td {
+            font-size: 0.86rem;
+            vertical-align: middle;
+        }
+
+        .inv-threshold-dept {
+            display: inline-block;
+            background: rgba(var(--primary-rgb), 0.08);
+            border: 1px solid var(--primary-lighter);
+            border-radius: 6px;
+            padding: 1px 7px;
+            margin: 2px 4px 2px 0;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .inv-threshold-dept.is-current {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+            font-weight: 700;
+        }
+    </style>
+@endonce

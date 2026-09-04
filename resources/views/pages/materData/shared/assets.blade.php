@@ -248,6 +248,7 @@
     var mdFlash = {
         success: @json(session('success')),
         error: @json(session('error')),
+        warning: @json(session('warning')),
     };
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -346,21 +347,52 @@
         window.mdInitTables();
 
         /* ---------- Hỏi xác nhận trước khi Khoá / Duyệt / Từ chối ---------- */
+        /*
+         | data-require-password="1": bắt buộc nhập lại mật khẩu đăng nhập ngay trong
+         | hộp xác nhận. Đây là thành phần thứ 2 của chữ ký điện tử (21 CFR Part 11
+         | §11.200) - dùng cho các bước Trình ký / Ký duyệt / Phê duyệt / Từ chối.
+         | Mật khẩu được gắn vào form dưới tên "sign_password" rồi mới submit.
+        */
         $(document).on('submit', '.form-md-confirm', function(e) {
             e.preventDefault();
             var form = this;
+            var needPassword = String($(form).data('require-password') || '') === '1';
 
             Swal.fire({
                 title: $(form).data('title'),
                 text: $(form).data('text'),
                 icon: 'warning',
                 showCancelButton: true,
+                input: needPassword ? 'password' : undefined,
+                inputLabel: needPassword ? 'Nhập lại mật khẩu của bạn để ký xác nhận' : undefined,
+                inputPlaceholder: needPassword ? 'Mật khẩu đăng nhập' : undefined,
+                inputAttributes: needPassword ? {
+                    autocomplete: 'current-password',
+                    autocapitalize: 'off'
+                } : undefined,
                 confirmButtonColor: $(form).data('danger') ? '#DC2626' : '#2E7BC4',
                 cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Đồng ý',
-                cancelButtonText: 'Huỷ'
+                cancelButtonText: 'Huỷ',
+                preConfirm: needPassword ? function(value) {
+                    if (!value) {
+                        Swal.showValidationMessage('Vui lòng nhập mật khẩu để ký xác nhận');
+                    }
+                    return value;
+                } : undefined
             }).then(function(result) {
-                if (result.isConfirmed) form.submit();
+                if (!result.isConfirmed) return;
+
+                if (needPassword) {
+                    $(form).find('input[name="sign_password"]').remove();
+                    var pw = document.createElement('input');
+                    pw.type = 'hidden';
+                    pw.name = 'sign_password';
+                    pw.value = result.value || '';
+                    form.appendChild(pw);
+                }
+
+                form.submit();
             });
         });
 
@@ -399,6 +431,16 @@
         });
 
         /* ---------- Thông báo kết quả ---------- */
+        function mdShowWarning() {
+            Swal.fire({
+                title: 'Lưu ý',
+                text: mdFlash.warning,
+                icon: 'warning',
+                confirmButtonColor: '#F59E0B',
+                confirmButtonText: 'Đã hiểu'
+            });
+        }
+
         if (mdFlash.success) {
             Swal.fire({
                 title: 'Thành công!',
@@ -406,7 +448,12 @@
                 icon: 'success',
                 timer: 1800,
                 showConfirmButton: false
+            }).then(function() {
+                // Cảnh báo (nếu có) hiện sau khi toast thành công tự đóng, cần bấm xác nhận
+                if (mdFlash.warning) mdShowWarning();
             });
+        } else if (mdFlash.warning) {
+            mdShowWarning();
         }
 
         if (mdFlash.error) {

@@ -55,7 +55,7 @@ class StandardImportController extends Controller
         'moisture' => 'Độ ẩm',
         'weight_controlled' => 'Kiểm soát khối lượng',
         'standard_form' => 'Dạng chuẩn',
-        'requires_aliquot' => 'Triết ống trước khi dùng',
+        'requires_aliquot' => 'chiết ống trước khi dùng',
         'supplier_id' => 'Nhà cung cấp',
         'location_id' => 'Vị trí lưu trữ',
         'purpose_id' => 'Chỉ tiêu kiểm',
@@ -67,19 +67,19 @@ class StandardImportController extends Controller
         $departmentId = $this->departmentId();
 
         $datas = DB::table(self::TABLE)
-            ->leftJoin('standard_categories', self::TABLE.'.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_categories', self::TABLE . '.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
             // Đơn vị tính khai ở danh mục chất chuẩn CỦA PHÒNG, không còn ở danh mục chung
-            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
-            ->leftJoin('suppliers', self::TABLE.'.supplier_id', '=', 'suppliers.id')
+            ->tap(fn($query) => DepartmentStandard::joinUnit($query, $departmentId, self::TABLE . '.category_id'))
+            ->leftJoin('suppliers', self::TABLE . '.supplier_id', '=', 'suppliers.id')
             // Định khu của ống: locations giữ sẵn id 3 cấp trên nên join tiếp là ra đủ đường dẫn
-            ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
+            ->leftJoin('locations', self::TABLE . '.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
             ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
             ->select(
-                self::TABLE.'.*',
+                self::TABLE . '.*',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no',
@@ -96,9 +96,9 @@ class StandardImportController extends Controller
                 'rooms.name as room_name',
                 'shelves.name as shelf_name'
             )
-            ->where(self::TABLE.'.department_id', $departmentId)
-            ->orderBy(self::TABLE.'.imported_date', 'desc')
-            ->orderBy(self::TABLE.'.id', 'desc')
+            ->where(self::TABLE . '.department_id', $departmentId)
+            ->orderBy(self::TABLE . '.imported_date', 'desc')
+            ->orderBy(self::TABLE . '.id', 'desc')
             ->get();
 
         session()->put(['title' => 'NHẬP - NHẬP CHẤT CHUẨN']);
@@ -166,13 +166,13 @@ class StandardImportController extends Controller
     public function label(Request $request)
     {
         $row = DB::table(self::TABLE)
-            ->leftJoin('standard_categories', self::TABLE.'.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_categories', self::TABLE . '.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), self::TABLE.'.category_id'))
-            ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
+            ->tap(fn($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), self::TABLE . '.category_id'))
+            ->leftJoin('locations', self::TABLE . '.location_id', '=', 'locations.id')
             ->select(
-                self::TABLE.'.*',
+                self::TABLE . '.*',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no',
@@ -183,8 +183,8 @@ class StandardImportController extends Controller
                 'units.name as unit_name',
                 'locations.code as location_code'
             )
-            ->where(self::TABLE.'.id', $request->id)
-            ->where(self::TABLE.'.department_id', $this->departmentId())
+            ->where(self::TABLE . '.id', $request->id)
+            ->where(self::TABLE . '.department_id', $this->departmentId())
             ->first();
 
         if (! $row) {
@@ -268,17 +268,17 @@ class StandardImportController extends Controller
                     ]);
                 }
 
-                $this->writeHistory($id, 'Thêm mới', 'Tạo mới phiếu nhập, mã ống chuẩn '.$code['code'].'.');
+                $this->writeHistory($id, 'Thêm mới', 'Tạo mới phiếu nhập, mã ống chuẩn ' . $code['code'] . '.');
 
                 $createdCodes[] = $code['code'];
 
-                AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Nhập chất chuẩn, mã ống chuẩn: '.$code['code']);
+                AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Nhập chất chuẩn, mã ống chuẩn: ' . $code['code']);
             }
         });
 
         $msg = count($createdCodes) === 1
-            ? 'Đã tạo '.self::LABEL.' mã ống chuẩn '.$createdCodes[0].'!'
-            : 'Đã tạo thành công '.count($createdCodes).' ống chuẩn: '.implode(', ', $createdCodes).'!';
+            ? 'Đã tạo ' . self::LABEL . ' mã ống chuẩn ' . $createdCodes[0] . '!'
+            : 'Đã tạo thành công ' . count($createdCodes) . ' ống chuẩn: ' . implode(', ', $createdCodes) . '!';
 
         return redirect()->back()->with('success', $msg);
     }
@@ -296,7 +296,7 @@ class StandardImportController extends Controller
             ->first();
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần điều chỉnh!');
+            return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần điều chỉnh!');
         }
 
         $rules = $this->rules($departmentId, false) + [
@@ -364,10 +364,10 @@ class StandardImportController extends Controller
             self::TABLE,
             $current->id,
             $current->code,
-            ($note ?: 'Cập nhật tài liệu đính kèm').' | Lý do: '.$reason
+            ($note ?: 'Cập nhật tài liệu đính kèm') . ' | Lý do: ' . $reason
         );
 
-        return redirect()->back()->with('success', 'Đã ghi nhận điều chỉnh '.self::LABEL.' '.$current->code.'!');
+        return redirect()->back()->with('success', 'Đã ghi nhận điều chỉnh ' . self::LABEL . ' ' . $current->code . '!');
     }
 
     /** Lịch sử điều chỉnh của một phiếu nhập, trả JSON cho modal trên bảng. */
@@ -383,13 +383,13 @@ class StandardImportController extends Controller
         }
 
         $rows = DB::table(self::HISTORY_TABLE)
-            ->leftJoin('standard_categories', self::HISTORY_TABLE.'.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_categories', self::HISTORY_TABLE . '.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
-            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), self::HISTORY_TABLE.'.category_id'))
-            ->leftJoin('suppliers', self::HISTORY_TABLE.'.supplier_id', '=', 'suppliers.id')
-            ->leftJoin('locations', self::HISTORY_TABLE.'.location_id', '=', 'locations.id')
+            ->tap(fn($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), self::HISTORY_TABLE . '.category_id'))
+            ->leftJoin('suppliers', self::HISTORY_TABLE . '.supplier_id', '=', 'suppliers.id')
+            ->leftJoin('locations', self::HISTORY_TABLE . '.location_id', '=', 'locations.id')
             ->select(
-                self::HISTORY_TABLE.'.*',
+                self::HISTORY_TABLE . '.*',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_names.name as standard_name',
@@ -398,14 +398,14 @@ class StandardImportController extends Controller
                 'suppliers.name as supplier_name',
                 'locations.code as location_code'
             )
-            ->where(self::HISTORY_TABLE.'.standard_import_id', $import->id)
-            ->orderBy(self::HISTORY_TABLE.'.id', 'desc')
+            ->where(self::HISTORY_TABLE . '.standard_import_id', $import->id)
+            ->orderBy(self::HISTORY_TABLE . '.id', 'desc')
             ->get();
 
-        $date = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
+        $date = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
 
         return response()->json([
-            'rows' => $rows->map(fn ($row) => [
+            'rows' => $rows->map(fn($row) => [
                 'action' => $row->action,
                 'change_note' => $row->change_note,
                 'reason' => $row->reason,
@@ -413,19 +413,19 @@ class StandardImportController extends Controller
                 'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
                 'snapshot' => [
                     'Mã ống chuẩn' => $row->code ?: '—',
-                    'Chất chuẩn' => trim(($row->category_code ?: '').' '.($row->standard_name ?: '')) ?: '—',
+                    'Chất chuẩn' => trim(($row->category_code ?: '') . ' ' . ($row->standard_name ?: '')) ?: '—',
                     'Version' => $row->category_version !== null ? (string) $row->category_version : '—',
                     'Nhóm chuẩn' => StandardCode::groupLabel($this->groupKeyOf($row->group_code)),
-                    'Số lượng' => $this->number((float) $row->amount).' '.($row->unit_short_name ?: $row->unit_name ?: ''),
+                    'Số lượng' => $this->number((float) $row->amount) . ' ' . ($row->unit_short_name ?: $row->unit_name ?: ''),
                     'Số lô' => $row->batch_no ?: '—',
                     'Số phiếu KN gốc' => $row->coa_no ?: '—',
                     'Hàm lượng' => $row->potency ?: '—',
                     'Độ ẩm' => $row->moisture ?: '—',
                     'Dạng chuẩn' => $row->standard_form ?: '—',
                     'Kiểm soát khối lượng' => $row->weight_controlled ? 'Có' : 'Không',
-                    'Triết ống trước khi dùng' => $row->requires_aliquot ? 'Có' : 'Không',
+                    'Chiết ống trước khi dùng' => $row->requires_aliquot ? 'Có' : 'Không',
                     'Ngày nhập' => $date($row->imported_date),
-                    'Loại hạn dùng' => match($row->expiry_type) {
+                    'Loại hạn dùng' => match ($row->expiry_type) {
                         'check online', 'undetermined', 'unlimited' => 'Chưa xác định (Check online)',
                         'retest' => 'Cần retest định kỳ',
                         'Specify', 'defined' => 'Hạn dùng xác định',
@@ -433,7 +433,7 @@ class StandardImportController extends Controller
                         default => $row->expiry_type ?: '—'
                     },
                     'Hạn sử dụng' => $date($row->expired_date),
-                    'Chu kỳ retest' => $row->retest_interval_months ? $row->retest_interval_months.' tháng' : '—',
+                    'Chu kỳ retest' => $row->retest_interval_months ? $row->retest_interval_months . ' tháng' : '—',
                     'Nhà cung cấp' => $row->supplier_name ?: '—',
                     'Chỉ tiêu kiểm' => $this->purposeNames($row->purpose_id) ?: '—',
                     'Vị trí lưu trữ' => $row->location_code ?: '—',
@@ -450,10 +450,10 @@ class StandardImportController extends Controller
         $departmentId = $this->departmentId();
 
         $attachment = DB::table(self::ATTACHMENT_TABLE)
-            ->join(self::TABLE, self::ATTACHMENT_TABLE.'.standard_import_id', '=', self::TABLE.'.id')
-            ->where(self::ATTACHMENT_TABLE.'.id', $id)
-            ->where(self::TABLE.'.department_id', $departmentId)
-            ->select(self::ATTACHMENT_TABLE.'.*')
+            ->join(self::TABLE, self::ATTACHMENT_TABLE . '.standard_import_id', '=', self::TABLE . '.id')
+            ->where(self::ATTACHMENT_TABLE . '.id', $id)
+            ->where(self::TABLE . '.department_id', $departmentId)
+            ->select(self::ATTACHMENT_TABLE . '.*')
             ->first();
 
         if (! $attachment) {
@@ -474,10 +474,10 @@ class StandardImportController extends Controller
         $departmentId = $this->departmentId();
 
         $attachment = DB::table(self::ATTACHMENT_TABLE)
-            ->join(self::TABLE, self::ATTACHMENT_TABLE.'.standard_import_id', '=', self::TABLE.'.id')
-            ->where(self::ATTACHMENT_TABLE.'.id', $request->id)
-            ->where(self::TABLE.'.department_id', $departmentId)
-            ->select(self::ATTACHMENT_TABLE.'.*', self::TABLE.'.code as import_code')
+            ->join(self::TABLE, self::ATTACHMENT_TABLE . '.standard_import_id', '=', self::TABLE . '.id')
+            ->where(self::ATTACHMENT_TABLE . '.id', $request->id)
+            ->where(self::TABLE . '.department_id', $departmentId)
+            ->select(self::ATTACHMENT_TABLE . '.*', self::TABLE . '.code as import_code')
             ->first();
 
         if (! $attachment) {
@@ -492,7 +492,7 @@ class StandardImportController extends Controller
             self::TABLE,
             $attachment->standard_import_id,
             $attachment->import_code,
-            'Xoá file đính kèm: '.$attachment->file_name
+            'Xoá file đính kèm: ' . $attachment->file_name
         );
 
         return response()->json(['success' => true]);
@@ -506,7 +506,7 @@ class StandardImportController extends Controller
             ->first();
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
+            return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần thay đổi trạng thái!');
         }
 
         $newStatus = $current->status_id == 1 ? 0 : 1;
@@ -522,8 +522,8 @@ class StandardImportController extends Controller
             $this->writeHistory(
                 (int) $current->id,
                 $action,
-                'Trạng thái: '.($current->status_id == 1 ? 'Hiệu lực' : 'Đã khoá')
-                .' -> '.($newStatus == 1 ? 'Hiệu lực' : 'Đã khoá')
+                'Trạng thái: ' . ($current->status_id == 1 ? 'Hiệu lực' : 'Đã khoá')
+                    . ' -> ' . ($newStatus == 1 ? 'Hiệu lực' : 'Đã khoá')
             );
         });
 
@@ -531,13 +531,13 @@ class StandardImportController extends Controller
             $action,
             self::TABLE,
             $current->id,
-            'status_id: '.$current->status_id,
-            'status_id: '.$newStatus
+            'status_id: ' . $current->status_id,
+            'status_id: ' . $newStatus
         );
 
         return redirect()->back()->with(
             'success',
-            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ').self::LABEL.' '.$current->code.'!'
+            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ') . self::LABEL . ' ' . $current->code . '!'
         );
     }
 
@@ -599,7 +599,7 @@ class StandardImportController extends Controller
                     continue;
                 }
 
-                $parts[] = $title.': '.$this->number((float) $old).' -> '.$this->number((float) $new);
+                $parts[] = $title . ': ' . $this->number((float) $old) . ' -> ' . $this->number((float) $new);
 
                 continue;
             }
@@ -608,7 +608,7 @@ class StandardImportController extends Controller
                 $oldBool = (int) $old;
                 $newBool = (int) $new;
                 if ($oldBool !== $newBool) {
-                    $parts[] = $title.': '.($oldBool ? 'Có' : 'Không').' -> '.($newBool ? 'Có' : 'Không');
+                    $parts[] = $title . ': ' . ($oldBool ? 'Có' : 'Không') . ' -> ' . ($newBool ? 'Có' : 'Không');
                 }
                 continue;
             }
@@ -617,7 +617,7 @@ class StandardImportController extends Controller
                 $oldNames = $this->purposeNames($old);
                 $newNames = $this->purposeNames($new);
                 if ($oldNames !== $newNames) {
-                    $parts[] = $title.': '.($oldNames ?: '—').' -> '.($newNames ?: '—');
+                    $parts[] = $title . ': ' . ($oldNames ?: '—') . ' -> ' . ($newNames ?: '—');
                 }
                 continue;
             }
@@ -627,19 +627,19 @@ class StandardImportController extends Controller
             }
 
             if ($field === 'group_code') {
-                $parts[] = $title.': '.StandardCode::groupLabel($this->groupKeyOf($old))
-                    .' -> '.StandardCode::groupLabel($this->groupKeyOf($new));
+                $parts[] = $title . ': ' . StandardCode::groupLabel($this->groupKeyOf($old))
+                    . ' -> ' . StandardCode::groupLabel($this->groupKeyOf($new));
 
                 continue;
             }
 
             if (isset($labels[$field])) {
-                $parts[] = $title.': '.($labels[$field][$old] ?? '—').' -> '.($labels[$field][$new] ?? '—');
+                $parts[] = $title . ': ' . ($labels[$field][$old] ?? '—') . ' -> ' . ($labels[$field][$new] ?? '—');
 
                 continue;
             }
 
-            $parts[] = $title.': '.($old === null || $old === '' ? '—' : $old).' -> '.($new === null || $new === '' ? '—' : $new);
+            $parts[] = $title . ': ' . ($old === null || $old === '' ? '—' : $old) . ' -> ' . ($new === null || $new === '' ? '—' : $new);
         }
 
         return implode(' | ', $parts);
@@ -670,7 +670,7 @@ class StandardImportController extends Controller
                 ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
                 ->select('standard_categories.id', 'standard_categories.code', 'standard_names.name as standard_name')
                 ->get()
-                ->mapWithKeys(fn ($row) => [$row->id => trim($row->code.' '.($row->standard_name ?? ''))])
+                ->mapWithKeys(fn($row) => [$row->id => trim($row->code . ' ' . ($row->standard_name ?? ''))])
                 ->all(),
             'supplier_id' => DB::table('suppliers')->pluck('name', 'id')->all(),
             'location_id' => DB::table('locations')->pluck('code', 'id')->all(),
@@ -807,7 +807,7 @@ class StandardImportController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     private function rules(int $departmentId, bool $isCreate = true): array

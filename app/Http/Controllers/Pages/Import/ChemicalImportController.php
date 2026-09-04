@@ -752,7 +752,70 @@ class ChemicalImportController extends Controller
 
         AuditTrialController::log('Thêm mới', self::TABLE, $result['id'], 'NA', 'Nhập hoá chất, mã xuất nhập: '.$result['code']);
 
-        return redirect()->back()->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'!');
+        $redirect = redirect()->back()->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'!');
+
+        // Cảnh báo (không chặn) khi lô vừa nhập đẩy tồn trữ toàn công ty chạm/vượt ngưỡng
+        // Phụ lục IV NĐ 24/2026/NĐ-CP - cả Bảng A (theo hoạt chất) và Bảng B (theo hỗn hợp).
+        $warnings = array_filter([
+            $this->thresholdWarning((int) $request->category_id),
+            $this->thresholdWarningTableB((int) $request->category_id),
+        ]);
+
+        if ($warnings) {
+            $redirect->with('warning', implode(' — ', $warnings));
+        }
+
+        return $redirect;
+    }
+
+    /**
+     * Sau khi ghi phiếu nhập, đối chiếu tổng tồn trữ của hoạt chất đứng sau mã danh mục này
+     * với ngưỡng Phụ lục IV. Phạm vi cộng tồn gói trong công ty của phòng ban đang chọn.
+     * Trả về câu cảnh báo, hoặc null nếu còn trong ngưỡng.
+     */
+    private function thresholdWarning(int $categoryId): ?string
+    {
+        $eval = \App\Support\ActiveIngredientThreshold::forCategories(\App\Support\CompanyContext::currentId())[$categoryId] ?? null;
+
+        // Cảnh báo lúc nhập bám theo TỒN HIỆN TẠI (sau khi nhập), không theo đỉnh quá khứ.
+        if (! $eval || $eval->current_level === \App\Support\ActiveIngredientThreshold::LEVEL_OK) {
+            return null;
+        }
+
+        $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.');
+
+        return 'Tổng tồn trữ toàn công ty của hoạt chất "'.$eval->ai_name.'" hiện '
+            .$num($eval->total_kg).' kg / ngưỡng '.$num($eval->threshold_kg).' kg ('
+            .(int) round($eval->ratio * 100).'%) theo Phụ lục IV Nghị định 24/2026/NĐ-CP. '
+            .($eval->current_level === \App\Support\ActiveIngredientThreshold::LEVEL_EXCEEDED
+                ? 'Đã VƯỢT ngưỡng.'
+                : 'Sắp chạm ngưỡng.')
+            .' Cơ sở tồn trữ vượt ngưỡng phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất.';
+    }
+
+    /**
+     * Như thresholdWarning() nhưng theo BẢNG B: tổng tồn thô của hỗn hợp trong phạm vi công
+     * ty đang chọn (không nhân % hàm lượng) so với ngưỡng thấp nhất trong các nhóm đã tick.
+     */
+    private function thresholdWarningTableB(int $categoryId): ?string
+    {
+        $eval = \App\Support\MixtureHazardThreshold::forCategories(\App\Support\CompanyContext::currentId())[$categoryId] ?? null;
+
+        // Cảnh báo lúc nhập bám theo TỒN HIỆN TẠI (sau khi nhập), không theo đỉnh quá khứ.
+        if (! $eval || $eval->current_level === \App\Support\MixtureHazardThreshold::LEVEL_OK) {
+            return null;
+        }
+
+        $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.');
+
+        return 'Tổng tồn trữ thô toàn công ty của hỗn hợp "'.$eval->chem_name.'" hiện '
+            .$num($eval->total_kg).' kg / ngưỡng Bảng B '.$num($eval->min_threshold_kg).' kg ('
+            .(int) round($eval->ratio * 100).'%, nhóm chặt nhất '.$eval->strictest_group.') theo Phụ lục IV '
+            .'Nghị định 24/2026/NĐ-CP. '
+            .($eval->current_level === \App\Support\MixtureHazardThreshold::LEVEL_EXCEEDED
+                ? 'Đã VƯỢT ngưỡng.'
+                : 'Sắp chạm ngưỡng.')
+            .' Cơ sở tồn trữ vượt ngưỡng phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất.';
     }
 
     /**
@@ -1136,7 +1199,7 @@ class ChemicalImportController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Estimate;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
 use Illuminate\Http\Request;
@@ -28,6 +29,8 @@ use Illuminate\Support\Facades\Validator;
  */
 class MaterialEstimateController extends Controller
 {
+    use VerifiesSignature;
+
     private const TABLE = 'material_estimates';
 
     private const ITEM_TABLE = 'material_estimate_items';
@@ -275,7 +278,7 @@ class MaterialEstimateController extends Controller
                 'updated_at' => now(),
             ]);
 
-            DB::table(self::AMOUNT_TABLE)->where('material_estimate_item_id', $item->id)->delete();
+            DB::table(self::AMOUNT_TABLE)->where('material_estimate_item_id', $item->id)->update(['active' => 0]);
             $this->saveAmounts($item->id, $request);
         });
 
@@ -300,8 +303,12 @@ class MaterialEstimateController extends Controller
         }
 
         DB::transaction(function () use ($item) {
-            DB::table(self::AMOUNT_TABLE)->where('material_estimate_item_id', $item->id)->delete();
-            DB::table(self::ITEM_TABLE)->where('id', $item->id)->delete();
+            DB::table(self::AMOUNT_TABLE)->where('material_estimate_item_id', $item->id)->update(['active' => 0]);
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'active' => 0,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
         });
 
         if ($list->app_status !== 'draft') {
@@ -467,8 +474,12 @@ class MaterialEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$current->code.' đang bị khoá, hãy mở khoá trước khi trình ký!');
         }
 
-        if (! DB::table(self::ITEM_TABLE)->where('material_estimate_id', $current->id)->exists()) {
+        if (! DB::table(self::ITEM_TABLE)->where('material_estimate_id', $current->id)->where('active', 1)->exists()) {
             return redirect()->back()->with('error', 'Phiếu '.$current->code.' chưa có vật tư nào, chưa trình ký được!');
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Trình ký')) {
+            return $stop;
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
@@ -533,6 +544,10 @@ class MaterialEstimateController extends Controller
             return redirect()->back()->withErrors($validator, 'rejectErrors')->withInput();
         }
 
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Từ chối duyệt')) {
+            return $stop;
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update([
             'app_status' => 'rejected',
             'rejected_by' => $this->actor(),
@@ -566,6 +581,10 @@ class MaterialEstimateController extends Controller
 
         if (! $this->canSign($step)) {
             return redirect()->back()->with('error', 'Bạn không có quyền ký duyệt bước "'.$config['label'].'"!');
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Ký duyệt '.$config['label'])) {
+            return $stop;
         }
 
         $payload = [
@@ -628,6 +647,7 @@ class MaterialEstimateController extends Controller
             ->whereNotNull(self::ITEM_TABLE.'.promised_date')
             ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
             ->where(self::ITEM_TABLE.'.status_id', 1)
+            ->where(self::ITEM_TABLE.'.active', 1)
             ->orderBy(self::ITEM_TABLE.'.promised_date', 'asc')
             ->get();
 
@@ -642,6 +662,7 @@ class MaterialEstimateController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
+            ->where(self::AMOUNT_TABLE.'.active', 1)
             ->whereIn(self::AMOUNT_TABLE.'.material_estimate_item_id', $items->pluck('id')->all())
             ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
             ->get()
@@ -697,6 +718,7 @@ class MaterialEstimateController extends Controller
                 'manufacturers.short_name as category_manufacturer_short_name'
             )
             ->where(self::ITEM_TABLE.'.material_estimate_id', $listId)
+            ->where(self::ITEM_TABLE.'.active', 1)
             ->orderBy(self::ITEM_TABLE.'.id', 'asc')
             ->get();
 
@@ -707,6 +729,7 @@ class MaterialEstimateController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
+            ->where(self::AMOUNT_TABLE.'.active', 1)
             ->whereIn(self::AMOUNT_TABLE.'.material_estimate_item_id', $items->pluck('id')->all())
             ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
             ->get()
@@ -771,7 +794,7 @@ class MaterialEstimateController extends Controller
             'from_status' => $from,
             'to_status' => $to,
             'note' => $note,
-            'created_by' => session('user')['fullName'] ?? 'NA',
+            'created_by' => \App\Support\Signer::actor(),
             'created_at' => now(),
         ]);
     }
@@ -785,6 +808,7 @@ class MaterialEstimateController extends Controller
         return DB::table(self::ITEM_TABLE)
             ->select('material_estimate_id', DB::raw('COUNT(*) as total'))
             ->whereIn('material_estimate_id', $listIds)
+            ->where('active', 1)
             ->groupBy('material_estimate_id')
             ->pluck('total', 'material_estimate_id')
             ->all();
@@ -895,7 +919,7 @@ class MaterialEstimateController extends Controller
 
     private function findItem($id): array
     {
-        $item = DB::table(self::ITEM_TABLE)->where('id', $id)->first();
+        $item = DB::table(self::ITEM_TABLE)->where('id', $id)->where('active', 1)->first();
 
         if (! $item) {
             return [null, null];
@@ -939,7 +963,7 @@ class MaterialEstimateController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     /* ==========================================================

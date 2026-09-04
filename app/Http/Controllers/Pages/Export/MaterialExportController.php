@@ -110,6 +110,7 @@ class MaterialExportController extends Controller
                 'material_names.name as category_material_name',
                 'material_imports.code as issued_import_code'
             )
+            ->where(self::REQ_ITEM.'.active', 1)
             ->whereIn(self::REQ_ITEM.'.request_list_id', $requestLists->pluck('id'))
             ->orderBy(self::REQ_ITEM.'.id', 'asc')
             ->get()
@@ -282,7 +283,12 @@ class MaterialExportController extends Controller
                 'updated_at' => now(),
             ]);
 
-            DB::table(self::REQ_ITEM)->where('request_list_id', $req->id)->delete();
+            // Không xoá cứng: bỏ hiệu lực các mục cũ (active = 0), dữ liệu vẫn lưu lại.
+            DB::table(self::REQ_ITEM)->where('request_list_id', $req->id)->update([
+                'active' => 0,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
             $this->insertRequestItems($req->id, $request);
         });
 
@@ -306,7 +312,7 @@ class MaterialExportController extends Controller
             return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở trạng thái sửa được nên không trình ký lại!')->with('activeTab', 'request');
         }
 
-        if (! DB::table(self::REQ_ITEM)->where('request_list_id', $req->id)->exists()) {
+        if (! DB::table(self::REQ_ITEM)->where('request_list_id', $req->id)->where('active', 1)->exists()) {
             return redirect()->back()->with('error', 'Đề nghị '.$req->code.' chưa có mục nào, chưa trình ký được!')->with('activeTab', 'request');
         }
 
@@ -1170,7 +1176,7 @@ class MaterialExportController extends Controller
     /** Cập nhật issue_status của đề nghị theo trạng thái các dòng. */
     private function refreshIssueStatus(int $listId): void
     {
-        $items = DB::table(self::REQ_ITEM)->where('request_list_id', $listId)->get();
+        $items = DB::table(self::REQ_ITEM)->where('request_list_id', $listId)->where('active', 1)->get();
 
         // Dòng mới cấp một phần vẫn còn nợ hàng nên phiếu chưa thể coi là cấp xong.
         $open = $items->whereIn('status', ['pending', 'partial'])->count();
@@ -1434,7 +1440,7 @@ class MaterialExportController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     private function number(float $value): string

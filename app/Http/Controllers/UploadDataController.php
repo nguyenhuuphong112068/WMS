@@ -33,7 +33,7 @@ class UploadDataController extends Controller
         $tableMappings = [
             'user_management' => [
                 'columns' => [
-                    'id','userName','userGroup','passWord','fullName','deparment','groupName',
+                    'id','userName','role_id','passWord','fullName','deparment_id','group_id',
                     'mail','isLocked','isActive','changePWdate','hisPW_1','hisPW_2','hisPW_3'
                 ],
                 'extra' => [

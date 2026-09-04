@@ -144,12 +144,6 @@
                     </td>
                 </tr>
             @endforeach
-            
-            @if(count($items) == 0)
-            <tr>
-                <td colspan="9" class="text-center text-muted py-4">Không có mặt hàng nào đang được theo dõi</td>
-            </tr>
-            @endif
         </tbody>
     </table>
 </div>
@@ -162,7 +156,8 @@
         $('#mdTrackingTable').DataTable({
             "order": [], // Let the server handle ordering by promised_date asc
             "language": {
-                "url": "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}"
+                "url": "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}",
+                "emptyTable": "Không có mặt hàng nào đang được theo dõi"
             }
         });
 

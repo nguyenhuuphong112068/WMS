@@ -107,6 +107,7 @@ class StandardExportController extends Controller
             ->leftJoin('purposes', 'standard_request_items.purpose_id', '=', 'purposes.id')
             ->leftJoin('suppliers', 'standard_request_items.supplier_id', '=', 'suppliers.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->where('standard_request_items.active', 1)
             ->select(
                 'standard_request_items.*',
                 'standard_names.name as standard_name',
@@ -344,6 +345,7 @@ class StandardExportController extends Controller
             ->leftJoin('purposes', 'standard_request_items.purpose_id', '=', 'purposes.id')
             ->leftJoin('suppliers', 'standard_request_items.supplier_id', '=', 'suppliers.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->where('standard_request_items.active', 1)
             ->select(
                 'standard_request_items.*',
                 'standard_imports.amount as import_amount',
@@ -365,6 +367,7 @@ class StandardExportController extends Controller
             )
             ->where('standard_request_lists.department_id', $departmentId)
             ->where('standard_request_lists.group_id', $groupId)
+            ->where('standard_request_items.active', 1)
             ->where('standard_request_items.status', 'issued')
             ->whereNotNull('standard_request_items.import_id')
             // Ẩn ống chuẩn đã được lập phiếu sử dụng: mỗi ống cấp phát cho tổ chỉ dùng
@@ -646,7 +649,11 @@ class StandardExportController extends Controller
         ]);
 
         // Recreate items
-        DB::table('standard_request_items')->where('request_list_id', $req->id)->delete();
+        // Không xoá cứng: bỏ hiệu lực các mục cũ (active = 0).
+        DB::table('standard_request_items')->where('request_list_id', $req->id)->update([
+            'active' => 0,
+            'updated_at' => now(),
+        ]);
 
         foreach ($request->items as $item) {
             DB::table('standard_request_items')->insert([
@@ -755,7 +762,7 @@ class StandardExportController extends Controller
                 ->with('activeTab', 'request');
         }
 
-        $item = DB::table('standard_request_items')->where('id', $request->item_id)->first();
+        $item = DB::table('standard_request_items')->where('id', $request->item_id)->where('active', 1)->first();
         if (!$item) {
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => 'Không tìm thấy mục đề nghị!']);
@@ -804,7 +811,7 @@ class StandardExportController extends Controller
         ]);
 
         // Cập nhật trạng thái phiếu đề nghị tổng (completed nếu đã cấp hết, partial nếu cấp 1 phần)
-        $allItems = DB::table('standard_request_items')->where('request_list_id', $item->request_list_id)->get();
+        $allItems = DB::table('standard_request_items')->where('request_list_id', $item->request_list_id)->where('active', 1)->get();
         $pendingCount = $allItems->where('status', 'pending')->count();
         $issuedCount = $allItems->where('status', 'issued')->count();
 
@@ -904,7 +911,7 @@ class StandardExportController extends Controller
      */
     public function requestReject(Request $request)
     {
-        $item = DB::table('standard_request_items')->where('id', $request->item_id)->first();
+        $item = DB::table('standard_request_items')->where('id', $request->item_id)->where('active', 1)->first();
         if (!$item) {
             return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!');
         }
@@ -915,7 +922,7 @@ class StandardExportController extends Controller
             'updated_at' => now(),
         ]);
 
-        $allItems = DB::table('standard_request_items')->where('request_list_id', $item->request_list_id)->get();
+        $allItems = DB::table('standard_request_items')->where('request_list_id', $item->request_list_id)->where('active', 1)->get();
         $pendingCount = $allItems->where('status', 'pending')->count();
         $issuedCount = $allItems->where('status', 'issued')->count();
 
@@ -1250,11 +1257,10 @@ class StandardExportController extends Controller
     /** Người kiểm tra: user đang hoạt động của phòng ban đang chọn. */
     private function checkerOptions(int $departmentId)
     {
-        // user_management.deparment lưu theo deparments.shortName chứ không phải id
+        // user_management.deparment_id là FK trỏ thẳng deparments.id
         return DB::table('user_management')
-            ->join('deparments', 'user_management.deparment', '=', 'deparments.shortName')
             ->select('user_management.userName', 'user_management.fullName')
-            ->where('deparments.id', $departmentId)
+            ->where('user_management.deparment_id', $departmentId)
             ->where('user_management.isActive', 1)
             ->orderBy('user_management.fullName', 'asc')
             ->get();
@@ -1391,7 +1397,7 @@ class StandardExportController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     private function number(float $value): string

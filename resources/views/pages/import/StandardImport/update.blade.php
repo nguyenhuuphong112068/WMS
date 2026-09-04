@@ -21,15 +21,15 @@
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label>Mã Ống Chuẩn</label>
-                            <input type="text" name="code" class="form-control imp-readonly" readonly tabindex="-1"
-                                value="{{ old('code') }}">
+                            <input type="text" name="code" class="form-control imp-readonly" readonly
+                                tabindex="-1" value="{{ old('code') }}">
                             <small class="md-sub">Mã đã cấp và đã in ra nhãn, không sinh lại khi điều chỉnh.</small>
                         </div>
 
                         <div class="form-group col-md-6">
                             <label>Nhóm Chuẩn</label>
-                            <input type="text" class="form-control imp-readonly sd-group-view" readonly tabindex="-1"
-                                value="">
+                            <input type="text" class="form-control imp-readonly sd-group-view" readonly
+                                tabindex="-1" value="">
                             <small class="md-sub">Nhóm nằm trong mã ống chuẩn nên không đổi được.</small>
                             @if ($bag->has('group_key'))
                                 <span class="md-error">{{ $bag->first('group_key') }}</span>
@@ -42,8 +42,7 @@
                             <label>Chất Chuẩn <span class="text-danger">*</span></label>
                             <select name="category_id"
                                 class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
-                                data-defaults="{{ json_encode($categoryDefaults) }}"
-                                required>
+                                data-defaults="{{ json_encode($categoryDefaults) }}" required>
                                 <option value="">-- Chọn chất chuẩn phòng đang dùng --</option>
                                 @foreach ($categories as $category)
                                     <option value="{{ $category->id }}"
@@ -155,7 +154,8 @@
                     </div>
 
                     {{-- Cụm Hạn Dùng --}}
-                    <div class="card p-3 mb-3" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <div class="card p-3 mb-3"
+                        style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <label class="font-weight-bold text-primary mb-2">
                             <i class="fas fa-calendar-alt mr-1"></i> Thiết Lập Hạn Dùng & Retest
                         </label>
@@ -170,9 +170,10 @@
 
                             {{-- 2. Check online --}}
                             <div class="custom-control custom-radio">
-                                <input type="radio" id="upExpTypeCheckOnline" name="expiry_type" value="check online"
-                                    class="custom-control-input sd-up-exp-type">
-                                <label class="custom-control-label" for="upExpTypeCheckOnline">Chưa xác định (Check online)</label>
+                                <input type="radio" id="upExpTypeCheckOnline" name="expiry_type"
+                                    value="check online" class="custom-control-input sd-up-exp-type">
+                                <label class="custom-control-label" for="upExpTypeCheckOnline">Chưa xác định (Check
+                                    online)</label>
                             </div>
 
                             {{-- 3. Retest --}}
@@ -183,9 +184,10 @@
                             </div>
 
                             <div class="custom-control custom-radio" id="upWrapExpTypeReEvaluation">
-                                <input type="radio" id="upExpTypeReEvaluation" name="expiry_type" value="Requires_re-evaluation"
-                                    class="custom-control-input sd-up-exp-type">
-                                <label class="custom-control-label" for="upExpTypeReEvaluation" id="upLabelExpTypeReEvaluation">
+                                <input type="radio" id="upExpTypeReEvaluation" name="expiry_type"
+                                    value="Requires_re-evaluation" class="custom-control-input sd-up-exp-type">
+                                <label class="custom-control-label" for="upExpTypeReEvaluation"
+                                    id="upLabelExpTypeReEvaluation">
                                     Cần xác định lại hạn dùng nội bộ
                                 </label>
                             </div>
@@ -193,13 +195,15 @@
 
                         <div class="form-row mt-2 sd-up-exp-defined-box">
                             <div class="form-group col-md-12 mb-0">
-                                <label class="sd-up-label-exp-date font-weight-bold">Hạn Sử Dụng (NSX) <span class="text-danger">*</span></label>
+                                <label class="sd-up-label-exp-date font-weight-bold">Hạn Sử Dụng (NSX) <span
+                                        class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <input type="date" name="expired_date"
                                         class="form-control sd-up-expired-date {{ $bag->has('expired_date') ? 'is-invalid' : '' }}"
                                         value="{{ old('expired_date') }}">
                                     <div class="input-group-append sd-up-auto-calc-btn-wrap" style="display: none;">
-                                        <button type="button" class="btn btn-outline-info sd-up-btn-calc-exp" title="Tính hạn dùng theo danh mục phòng">
+                                        <button type="button" class="btn btn-outline-info sd-up-btn-calc-exp"
+                                            title="Tính hạn dùng theo danh mục phòng">
                                             <i class="fas fa-magic"></i> Gợi ý
                                         </button>
                                     </div>
@@ -219,15 +223,20 @@
                         <div class="col-md-6">
                             <div class="p-3 border rounded bg-light" style="min-height: 80px;">
                                 <div class="custom-control custom-checkbox">
-                                    <input type="checkbox" class="custom-control-input sd-up-weight-ctrl" id="up_weight_controlled" name="weight_controlled" value="1">
-                                    <label class="custom-control-label font-weight-bold text-dark cursor-pointer" for="up_weight_controlled">
-                                        <i class="fas fa-balance-scale mr-1 text-secondary"></i> Chuẩn có cần kiểm soát khối lượng
+                                    <input type="checkbox" class="custom-control-input sd-up-weight-ctrl"
+                                        id="up_weight_controlled" name="weight_controlled" value="1">
+                                    <label class="custom-control-label font-weight-bold text-dark cursor-pointer"
+                                        for="up_weight_controlled">
+                                        <i class="fas fa-balance-scale mr-1 text-secondary"></i> Chuẩn có cần kiểm soát
+                                        khối lượng
                                     </label>
                                 </div>
 
                                 <div class="sd-up-standard-form-box mt-2 pt-2 border-top" style="display:none;">
-                                    <label class="small font-weight-bold mb-1 text-primary d-block">Dạng Chuẩn <span class="text-danger">*</span></label>
-                                    <select name="standard_form" class="form-control sd-up-standard-form-select" style="height: 38px !important; font-size: 0.9rem;">
+                                    <label class="small font-weight-bold mb-1 text-primary d-block">Dạng Chuẩn <span
+                                            class="text-danger">*</span></label>
+                                    <select name="standard_form" class="form-control sd-up-standard-form-select"
+                                        style="height: 38px !important; font-size: 0.9rem;">
                                         <option value="">-- Chọn dạng chuẩn --</option>
                                         <option value="Dạng Bột Rời">Dạng Bột Rời</option>
                                         <option value="Dạng Bột Mịn">Dạng Bột Mịn</option>
@@ -240,9 +249,12 @@
                         <div class="col-md-6">
                             <div class="p-3 border rounded bg-light" style="min-height: 80px;">
                                 <div class="custom-control custom-checkbox">
-                                    <input type="checkbox" class="custom-control-input sd-up-req-aliquot" id="up_requires_aliquot" name="requires_aliquot" value="1">
-                                    <label class="custom-control-label font-weight-bold text-dark cursor-pointer" for="up_requires_aliquot">
-                                        <i class="fas fa-vial mr-1 text-info"></i> Chuẩn cần triết ống trước khi sử dụng
+                                    <input type="checkbox" class="custom-control-input sd-up-req-aliquot"
+                                        id="up_requires_aliquot" name="requires_aliquot" value="1">
+                                    <label class="custom-control-label font-weight-bold text-dark cursor-pointer"
+                                        for="up_requires_aliquot">
+                                        <i class="fas fa-vial mr-1 text-info"></i> Chuẩn cần chiết ống trước khi sử
+                                        dụng
                                     </label>
                                 </div>
                             </div>
@@ -252,7 +264,8 @@
                     {{-- Đính kèm file --}}
                     <div class="form-group">
                         <label>Đính Kèm Thêm File Hồ Sơ</label>
-                        <input type="file" name="attachments[]" multiple class="form-control-file border p-1 rounded">
+                        <input type="file" name="attachments[]" multiple
+                            class="form-control-file border p-1 rounded">
                         <div class="sd-existing-attachments mt-2"></div>
                     </div>
 
@@ -344,7 +357,8 @@
         // Bấm nút gợi ý hạn dùng trong update (tính từ ngày nhập)
         $(document).on('click', '#updateModal .sd-up-btn-calc-exp', function() {
             var months = parseInt($(this).data('months'), 10);
-            var impDateVal = $upModal.find('.sd-up-imported-date').val() || new Date().toISOString().split('T')[0];
+            var impDateVal = $upModal.find('.sd-up-imported-date').val() || new Date().toISOString()
+                .split('T')[0];
             if (!months || !impDateVal) return;
 
             var d = new Date(impDateVal);
@@ -370,13 +384,15 @@
             if (shelfLife > 0) {
                 $upModal.find('.sd-up-exp-type').not($optReEval).prop('disabled', true);
                 $optReEval.prop('disabled', false).prop('checked', true).trigger('change');
-                $lblReEval.removeClass('text-muted').attr('title', 'Chuẩn có hạn dùng nội bộ: ' + shelfLife + ' tháng');
+                $lblReEval.removeClass('text-muted').attr('title', 'Chuẩn có hạn dùng nội bộ: ' +
+                    shelfLife + ' tháng');
                 $upModal.find('.sd-up-auto-calc-btn-wrap').show();
                 $upModal.find('.sd-up-btn-calc-exp').data('months', shelfLife);
             } else {
                 $upModal.find('.sd-up-exp-type').not($optReEval).prop('disabled', false);
                 $optReEval.prop('disabled', true);
-                $lblReEval.addClass('text-muted').attr('title', 'Chất chuẩn chưa có thiết lập hạn dùng nội bộ (shelf_life_months > 0)');
+                $lblReEval.addClass('text-muted').attr('title',
+                    'Chất chuẩn chưa có thiết lập hạn dùng nội bộ (shelf_life_months > 0)');
                 $upModal.find('.sd-up-auto-calc-btn-wrap').hide();
                 if ($optReEval.is(':checked')) {
                     $upModal.find('#upExpTypeSpecify').prop('checked', true).trigger('change');
@@ -398,14 +414,18 @@
             $upModal.find('input[name="potency"]').val(row.potency || '');
             $upModal.find('input[name="moisture"]').val(row.moisture || '');
             $upModal.find('select[name="location_id"]').val(row.location_id || '').trigger('change');
-            
+
             // Set multiselect Chỉ tiêu kiểm (purpose_id)
             var purpVal = row.purpose_id;
             var purpArr = [];
             if (Array.isArray(purpVal)) {
                 purpArr = purpVal;
             } else if (typeof purpVal === 'string' && purpVal.startsWith('[')) {
-                try { purpArr = JSON.parse(purpVal); } catch(e) { purpArr = []; }
+                try {
+                    purpArr = JSON.parse(purpVal);
+                } catch (e) {
+                    purpArr = [];
+                }
             } else if (purpVal) {
                 purpArr = [String(purpVal)];
             }
@@ -425,24 +445,27 @@
                 $upModal.find('.sd-up-standard-form-select').val('');
             }
 
-            // Checkbox triết ống
+            // Checkbox chiết ống
             $upModal.find('.sd-up-req-aliquot').prop('checked', !!row.requires_aliquot);
 
             // Expiry type: Chuẩn hoá và check đúng radio
             var rawExpType = row.expiry_type || 'Specify';
             var expType = 'Specify';
-            if (rawExpType === 'check online' || rawExpType === 'undetermined' || rawExpType === 'unlimited' || rawExpType === 'check_online') {
+            if (rawExpType === 'check online' || rawExpType === 'undetermined' || rawExpType ===
+                'unlimited' || rawExpType === 'check_online') {
                 expType = 'check online';
             } else if (rawExpType === 'retest') {
                 expType = 'retest';
-            } else if (rawExpType === 'Requires_re-evaluation' || rawExpType === 'requires_re-evaluation') {
+            } else if (rawExpType === 'Requires_re-evaluation' || rawExpType ===
+                'requires_re-evaluation') {
                 expType = 'Requires_re-evaluation';
             } else {
                 expType = 'Specify';
             }
 
             $upModal.find('.sd-up-exp-type').prop('checked', false);
-            $upModal.find('.sd-up-exp-type[value="' + expType + '"]').prop('checked', true).trigger('change');
+            $upModal.find('.sd-up-exp-type[value="' + expType + '"]').prop('checked', true).trigger(
+                'change');
             $upModal.find('input[name="expired_date"]').val(row.expired_date || '');
 
             // Kích hoạt thay đổi chất chuẩn sau khi đã gán các giá trị
@@ -453,12 +476,16 @@
             var files = row.attachments || [];
             var $filesContainer = $upModal.find('.sd-existing-attachments').empty();
             if (files.length) {
-                var html = '<div class="small font-weight-bold text-muted mb-1">File đã đính kèm:</div><ul class="list-unstyled mb-0">';
+                var html =
+                    '<div class="small font-weight-bold text-muted mb-1">File đã đính kèm:</div><ul class="list-unstyled mb-0">';
                 files.forEach(function(f) {
-                    html += '<li class="d-flex align-items-center justify-content-between py-1 border-bottom">' +
-                        '<a href="/import/standardImport/download-attachment/' + f.id + '" target="_blank">' +
+                    html +=
+                        '<li class="d-flex align-items-center justify-content-between py-1 border-bottom">' +
+                        '<a href="/import/standardImport/download-attachment/' + f.id +
+                        '" target="_blank">' +
                         '<i class="fas fa-paperclip mr-1"></i> ' + f.file_name + '</a>' +
-                        '<button type="button" class="btn btn-xs btn-outline-danger sd-btn-del-file" data-id="' + f.id + '">' +
+                        '<button type="button" class="btn btn-xs btn-outline-danger sd-btn-del-file" data-id="' +
+                        f.id + '">' +
                         '<i class="fas fa-trash"></i></button>' +
                         '</li>';
                 });
@@ -475,12 +502,14 @@
 
             if (!confirm('Bạn có chắc chắn muốn xoá file này?')) return;
 
-            $.post('{{ route($impRoute . "deleteAttachment") }}', {
+            $.post('{{ route($impRoute . 'deleteAttachment') }}', {
                 _token: '{{ csrf_token() }}',
                 id: fileId
             }, function(res) {
                 if (res.success) {
-                    $li.fadeOut(200, function() { $(this).remove(); });
+                    $li.fadeOut(200, function() {
+                        $(this).remove();
+                    });
                 }
             }).fail(function() {
                 alert('Không thể xoá file lúc này.');

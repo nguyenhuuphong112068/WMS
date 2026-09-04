@@ -128,7 +128,7 @@ class StatusController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'Admin';
+        return \App\Support\Signer::actor();
     }
 
     private function payload(Request $request): array

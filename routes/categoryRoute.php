@@ -49,6 +49,9 @@ Route::prefix('/category')
         Route::prefix('/chemicalCategory')->name('chemicalCategory.')->controller(ChemicalCategoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
+            // JSON cho modal "xem chi tiết" cột Ngưỡng Tồn Trữ PL IV: các dòng dữ liệu
+            // (tồn hiện tại theo mã × phòng, diễn biến chứng từ tạo nên đỉnh)
+            Route::get('thresholdDetail', 'thresholdDetail')->name('thresholdDetail');
             Route::get('convert', 'convert')->name('convert');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');

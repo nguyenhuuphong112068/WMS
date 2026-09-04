@@ -3,9 +3,13 @@
 namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\ActiveIngredientThreshold;
 use App\Support\CategoryUnitConversion;
+use App\Support\CompanyContext;
 use App\Support\DepartmentChemical;
+use App\Support\MixtureHazardThreshold;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +35,8 @@ use Illuminate\Validation\Rule;
  */
 class ChemicalCategoryController extends Controller
 {
+    use VerifiesSignature;
+
     private const TABLE = 'chemical_categories';
     private const HISTORY_TABLE = 'chemical_category_histories';
     private const LABEL = 'danh mục hoá chất công ty';
@@ -45,6 +51,7 @@ class ChemicalCategoryController extends Controller
         'chem_names_id' => 'Tên hoá chất',
         'manufacturers_id' => 'Nhà sản xuất',
         'density' => 'Tỉ trọng d (g/ml)',
+        'ai_content_percent' => 'Hàm lượng hoạt chất (%)',
         'shelf_life_months' => 'Hạn dùng mặc định (tháng)',
         'storage_condition_id' => 'Điều kiện bảo quản',
         'doc_no' => 'Số tài liệu',
@@ -61,11 +68,12 @@ class ChemicalCategoryController extends Controller
             ->select(
                 self::TABLE . '.*',
                 'chem_names.name as chem_name',
-                'chem_names.cas_no as cas_no',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'storage_conditions.name as storage_condition_name'
             )
+            // Số CAS gộp của các hoạt chất trong hỗn hợp (chem_names gắn nhiều hoạt chất qua pivot)
+            ->selectSub(DepartmentChemical::casNoSubquery(self::TABLE . '.chem_names_id'), 'cas_no')
             ->orderBy(self::TABLE . '.code', 'asc')
             ->get();
 
@@ -79,7 +87,7 @@ class ChemicalCategoryController extends Controller
 
         return view('pages.category.ChemicalCategory.list', [
             'datas' => $datas,
-            'chemNames' => $this->options('chem_names', $datas->pluck('chem_names_id')->all()),
+            'chemNames' => $this->chemNameOptions($datas->pluck('chem_names_id')->all()),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
             // Danh mục không còn cột đơn vị; danh sách này chỉ để đổ vào modal Quy Đổi Đơn Vị
             'units' => $this->options('units', []),
@@ -90,6 +98,10 @@ class ChemicalCategoryController extends Controller
             'nextCode' => $this->previewNextCode(),
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa thay vì một nút riêng
             'historyCounts' => $this->historyCounts(),
+            // Đối chiếu tồn trữ với ngưỡng Phụ lục IV NĐ 24/2026, theo mã danh mục. Phạm vi
+            // cộng tồn gói trong công ty của phòng ban đang chọn.
+            'thresholds' => ActiveIngredientThreshold::forCategories(CompanyContext::currentId()),
+            'thresholdsB' => MixtureHazardThreshold::forCategories(CompanyContext::currentId()),
             /*
             | Danh mục dùng chung toàn công ty, nhưng mỗi phòng ban tự khai chất nào phòng
             | mình có dùng (bảng chemical_department_categories). Cột "Phòng Ban Đang Dùng" đọc từ đó.
@@ -251,6 +263,7 @@ class ChemicalCategoryController extends Controller
                     'Tên hoá chất' => $row->chem_name ?: '—',
                     'Nhà sản xuất' => $row->manufacturer_name ?: '—',
                     'Tỉ trọng d (g/ml)' => $this->formatDensity($row->density),
+                    'Hàm lượng hoạt chất (%)' => $this->formatDensity($row->ai_content_percent),
                     'Hạn dùng (tháng)' => $row->shelf_life_months ?: '—',
                     'Điều kiện bảo quản' => $row->storage_condition_name ?: '—',
                     'Số tài liệu' => $row->doc_no ?: '—',
@@ -275,6 +288,125 @@ class ChemicalCategoryController extends Controller
                 ];
             })->values(),
         ]);
+    }
+
+    /**
+     * JSON cho modal "xem chi tiết" của cột Ngưỡng Tồn Trữ PL IV.
+     *
+     * Trả về, cho một mã danh mục hoá chất, toàn bộ dữ liệu đã đóng góp tạo nên hai con số
+     * hiển thị trên bảng:
+     *   - "Tồn thực tế" : bảng tồn hiện tại theo mã × phòng (quy ra kg) + phần chưa quy đổi được.
+     *   - "Tồn cao nhất": diễn biến từng chứng từ nhập / xuất / cân đối theo ngày, luỹ kế kg,
+     *                     đánh dấu đúng dòng làm tồn chạm đỉnh.
+     * Phạm vi cộng tồn gói trong công ty của phòng ban đang chọn.
+     */
+    public function thresholdDetail(Request $request)
+    {
+        $categoryId = (int) $request->id;
+        $companyId = CompanyContext::currentId();
+
+        $category = DB::table(self::TABLE)
+            ->leftJoin('chem_names', self::TABLE . '.chem_names_id', '=', 'chem_names.id')
+            ->where(self::TABLE . '.id', $categoryId)
+            ->select(self::TABLE . '.code', 'chem_names.name as chem_name')
+            ->first();
+
+        if (! $category) {
+            return response()->json(['ok' => false, 'reason' => 'Không tìm thấy mã danh mục hoá chất.']);
+        }
+
+        $tableA = array_map(
+            fn ($row) => $this->thresholdDetailPayload($row, 'A'),
+            ActiveIngredientThreshold::detailForCategory($categoryId, $companyId)
+        );
+
+        $tableBRow = MixtureHazardThreshold::detailForCategory($categoryId, $companyId);
+
+        return response()->json([
+            'ok' => true,
+            'category_code' => $category->code,
+            'chem_name' => $category->chem_name ?: '—',
+            'warn_percent' => (int) round(ActiveIngredientThreshold::warnRatio() * 100),
+            'tableA' => $tableA,
+            'tableB' => $tableBRow ? $this->thresholdDetailPayload($tableBRow, 'B') : null,
+        ]);
+    }
+
+    /** Gom một dòng đánh giá ngưỡng (Bảng A hoặc B) thành mảng đã format sẵn cho modal. */
+    private function thresholdDetailPayload($row, string $table): array
+    {
+        $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.') ?: '0';
+        $signed = fn ($v) => ((float) $v > 0 ? '+' : '') . $num($v);
+        $qty = fn ($v, $u) => (abs((float) $v) < 1e-9 ? '—' : $num($v) . ($u ? ' ' . $u : ''));
+        $typeLabels = ['import' => 'Nhập', 'export' => 'Xuất', 'cancel' => 'Huỷ bỏ', 'balancing' => 'Cân đối'];
+        $levelLabels = ['ok' => 'Trong ngưỡng', 'warn' => 'Đã sắp chạm ngưỡng', 'exceeded' => 'Đã vượt ngưỡng'];
+        $curLevelLabels = ['ok' => 'Trong ngưỡng', 'warn' => 'Sắp chạm ngưỡng', 'exceeded' => 'Vượt ngưỡng'];
+
+        // Số mã xuất nhập gộp lại thành hai con số hiển thị
+        $onhandCount = count($row->onhand_rows);
+        $importRefs = [];
+        foreach ($row->timeline as $t) {
+            if ($t->type === 'import') {
+                $importRefs[$t->ref] = true;
+            }
+        }
+
+        return [
+            'table' => $table,
+            'title' => $table === 'A' ? $row->ai_name : $row->chem_name,
+            'subtitle' => $table === 'A'
+                ? ($row->ai_code ?: '')
+                : ('Nhóm nguy hại: ' . implode(', ', $row->hazard_labels) . ' · ngưỡng thấp nhất nhóm ' . ($row->strictest_group ?? '—')),
+            'threshold_kg' => $num($table === 'A' ? $row->threshold_kg : $row->min_threshold_kg),
+            'total_kg' => $num($row->total_kg),
+            'peak_kg' => $num($row->peak_kg),
+            'peak_date' => $row->peak_date ? \Carbon\Carbon::parse($row->peak_date)->format('d/m/Y') : '—',
+            'ratio_percent' => isset($row->ratio) && $row->ratio !== null ? (int) round($row->ratio * 100) . '%' : '—',
+            'peak_ratio_percent' => isset($row->peak_ratio) && $row->peak_ratio !== null ? (int) round($row->peak_ratio * 100) . '%' : '—',
+            // level = theo ĐỈNH (mức chính); current_level = theo tồn hiện tại
+            'level' => $row->level ?? 'ok',
+            'level_label' => $levelLabels[$row->level ?? 'ok'] ?? ($row->level ?? ''),
+            'current_level' => $row->current_level ?? ($row->level ?? 'ok'),
+            'current_level_label' => $curLevelLabels[$row->current_level ?? 'ok'] ?? ($row->current_level ?? ''),
+            'has_unconvertible' => ! empty($row->unconvertible),
+            // "Tồn thực tế = tổng tồn còn lại của N mã xuất nhập"
+            'onhand_count' => $onhandCount,
+            // "Tồn cao nhất dựng lại từ M chứng từ, trong đó K lần nhập"
+            'timeline_count' => count($row->timeline),
+            'import_count' => count($importRefs),
+            'by_department' => array_map(fn ($d) => [
+                'department_name' => $d->department_name,
+                'kg' => $num($d->kg),
+            ], $row->by_department),
+            'onhand_rows' => array_map(fn ($o) => [
+                'ref' => $o->ref ?? '',
+                'date' => isset($o->date) && $o->date ? \Carbon\Carbon::parse($o->date)->format('d/m/Y') : '—',
+                'category_code' => $o->category_code,
+                'chem_name' => $o->chem_name ?? '',
+                'department_name' => $o->department_name,
+                'imported' => $qty($o->imported ?? 0, $o->unit_short),
+                'balanced' => isset($o->balanced) ? ($signed($o->balanced) === '0' ? '—' : $signed($o->balanced) . ($o->unit_short ? ' ' . $o->unit_short : '')) : '—',
+                'exported' => $qty($o->exported ?? 0, $o->unit_short),
+                'on_hand' => $num($o->on_hand_unit) . ($o->unit_short ? ' ' . $o->unit_short : ''),
+                'on_hand_kg' => $num($o->on_hand_kg),
+            ], $row->onhand_rows),
+            'unconvertible' => array_map(fn ($u) => [
+                'category_code' => $u->category_code,
+                'chem_name' => $u->chem_name ?? '',
+                'reason' => $u->reason,
+            ], $row->unconvertible),
+            'timeline' => array_map(fn ($t) => [
+                'date' => \Carbon\Carbon::parse($t->date)->format('d/m/Y'),
+                'type_label' => $typeLabels[$t->type] ?? $t->type,
+                'ref' => $t->ref,
+                'category_code' => $t->category_code,
+                'department_name' => $t->department_name,
+                'delta' => $signed($t->delta_unit) . ($t->unit_short ? ' ' . $t->unit_short : ''),
+                'delta_kg' => $signed($t->delta_kg),
+                'running_kg' => $num($t->running_kg),
+                'is_peak' => (bool) $t->is_peak,
+            ], $row->timeline),
+        ];
     }
 
     /**
@@ -341,6 +473,10 @@ class ChemicalCategoryController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần duyệt!');
         }
 
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt')) {
+            return $stop;
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update([
             'app_status' => $appStatus,
             'approved_by' => $this->actor(),
@@ -380,6 +516,7 @@ class ChemicalCategoryController extends Controller
             'chem_names_id' => $row->chem_names_id,
             'manufacturers_id' => $row->manufacturers_id,
             'density' => $row->density,
+            'ai_content_percent' => $row->ai_content_percent,
             'shelf_life_months' => $row->shelf_life_months,
             'storage_condition_id' => $row->storage_condition_id,
             'doc_no' => $row->doc_no,
@@ -408,7 +545,7 @@ class ChemicalCategoryController extends Controller
             }
 
             // DB trả về 1.0400 còn form gửi lên 1.04, phải so sánh theo giá trị số
-            if ($field === 'density') {
+            if ($field === 'density' || $field === 'ai_content_percent') {
                 if ((float) $old === (float) $new) {
                     continue;
                 }
@@ -581,7 +718,34 @@ class ChemicalCategoryController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
+    }
+
+    /**
+     * Danh sách hoá chất cho ô chọn "Tên Hoá Chất", kèm số CAS.
+     *
+     * chem_names không còn cột cas_no: mỗi tên hoá chất gắn nhiều hoạt chất qua pivot
+     * chem_name_active_ingredient, số CAS nằm ở active_ingredients. Vì vậy phải gộp CAS
+     * qua subquery giống index(), nếu không view create/update sẽ lỗi Undefined property $cas_no.
+     */
+    private function chemNameOptions(array $usedIds)
+    {
+        $usedIds = array_values(array_filter($usedIds));
+
+        return DB::table('chem_names')
+            ->where(function ($query) use ($usedIds) {
+                $query->where(function ($sub) {
+                    $sub->where('status_id', 1)->where('app_status', 'approved');
+                });
+
+                if ($usedIds) {
+                    $query->orWhereIn('id', $usedIds);
+                }
+            })
+            ->select('chem_names.*')
+            ->selectSub(DepartmentChemical::casNoSubquery('chem_names.id'), 'cas_no')
+            ->orderBy('name', 'asc')
+            ->get();
     }
 
     /** Mã danh mục sinh tự động nên không nằm trong danh sách kiểm tra. */
@@ -592,6 +756,7 @@ class ChemicalCategoryController extends Controller
             'chem_names_id' => ['required', 'integer', 'exists:chem_names,id'],
             'manufacturers_id' => ['required', 'integer', 'exists:manufacturers,id'],
             'density' => ['nullable', 'numeric', 'gt:0', 'max:999999'],
+            'ai_content_percent' => ['nullable', 'numeric', 'gt:0', 'max:100'],
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'storage_condition_id' => ['nullable', 'integer', 'exists:storage_conditions,id'],
             'doc_no' => ['nullable', 'max:20'],
@@ -607,6 +772,7 @@ class ChemicalCategoryController extends Controller
         $type = trim((string) $request->type);
         $docNo = trim((string) $request->doc_no);
         $density = trim((string) $request->density);
+        $aiContentPercent = trim((string) $request->ai_content_percent);
         $shelfLife = trim((string) $request->shelf_life_months);
         $storageConditionId = trim((string) $request->storage_condition_id);
 
@@ -622,6 +788,7 @@ class ChemicalCategoryController extends Controller
             'chem_names_id' => (int) $request->chem_names_id,
             'manufacturers_id' => (int) $request->manufacturers_id,
             'density' => $density === '' ? null : $density,
+            'ai_content_percent' => $aiContentPercent === '' ? null : $aiContentPercent,
             'shelf_life_months' => $shelfLife === '' ? null : (int) $shelfLife,
             'storage_condition_id' => $storageConditionId === '' ? null : (int) $storageConditionId,
             'doc_no' => $docNo === '' ? null : $docNo,
@@ -640,6 +807,9 @@ class ChemicalCategoryController extends Controller
             'manufacturers_id.exists' => 'Nhà sản xuất không hợp lệ.',
             'density.numeric' => 'Tỉ trọng phải là số.',
             'density.gt' => 'Tỉ trọng phải lớn hơn 0.',
+            'ai_content_percent.numeric' => 'Hàm lượng hoạt chất phải là số.',
+            'ai_content_percent.gt' => 'Hàm lượng hoạt chất phải lớn hơn 0.',
+            'ai_content_percent.max' => 'Hàm lượng hoạt chất tối đa 100%.',
             'shelf_life_months.integer' => 'Hạn dùng phải là số tháng nguyên.',
             'shelf_life_months.min' => 'Hạn dùng tối thiểu 1 tháng.',
             'shelf_life_months.max' => 'Hạn dùng tối đa 1200 tháng (100 năm).',

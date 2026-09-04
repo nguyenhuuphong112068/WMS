@@ -30,7 +30,6 @@ return [
         'N8'  => 'Hỗn hợp chất cần kiểm soát đặc biệt (Phụ lục III)',
         'N9'  => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng A)',
         'N10' => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng B)',
-        'RND' => 'Ngẫu nhiên',
     ],
 
     /*
@@ -64,6 +63,29 @@ return [
         'ENV_HAZARD' => 'Nguy hại môi trường/Environmental hazard',
         'COMPRESSED_GAS' => 'Khí nén/Compressed gas',
         'EXPLOSIVE' => 'Nổ/Explosive',
+    ],
+
+    /*
+     | NGƯỠNG TỒN TRỮ - Phụ lục IV Nghị định 24/2026/NĐ-CP.
+     |
+     | Ngưỡng khai ở dữ liệu gốc active_ingredients.threshold_kg. Ở đây chỉ khai mức
+     | tỉ lệ để bắt đầu cảnh báo (so với ngưỡng) và câu trích dẫn dùng chung.
+     |
+     | warn_ratio : tồn / ngưỡng >= mức này thì cảnh báo vàng; >= 1.0 là cảnh báo đỏ.
+     */
+    'threshold_iv' => [
+        'warn_ratio' => 0.8,
+        'legal_ref' => 'Nghị định 24/2026/NĐ-CP - Phụ lục IV',
+
+        /*
+         | Chỉ đối chiếu ngưỡng Phụ lục IV cho mã danh mục hoá chất đã được phân loại
+         | vào một trong các nhóm này (cột chemical_categories.classification):
+         |   N9  - Phụ lục IV Bảng A
+         |   N10 - Phụ lục IV Bảng B
+         |   CAM - Hoá chất cấm
+         | Mã không thuộc các nhóm này thì không hiện Ngưỡng / Tồn thực tế / Tồn cao nhất.
+         */
+        'classification_codes' => ['N9', 'N10', 'CAM'],
     ],
 
     /*

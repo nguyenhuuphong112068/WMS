@@ -193,7 +193,6 @@ class DepartmentChemical
                 'chemical_categories.doc_no as category_doc_no',
                 'chemical_categories.shelf_life_months as category_shelf_life_months',
                 'chem_names.name as chem_name',
-                'chem_names.cas_no as cas_no',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
@@ -205,9 +204,30 @@ class DepartmentChemical
                 'rooms.name as room_name',
                 'shelves.name as shelf_name'
             )
+            // Số CAS gộp của các hoạt chất trong hỗn hợp (chem_names gắn nhiều hoạt chất)
+            ->selectSub(self::casNoSubquery('chemical_categories.chem_names_id'), 'cas_no')
             ->where(self::TABLE.'.department_id', $departmentId)
             ->orderBy('chemical_categories.code', 'asc')
             ->get();
+    }
+
+    /**
+     * Truy vấn con lấy số CAS gộp của một tên hoá chất: "7664-41-7, 7697-37-2".
+     * chem_names gắn nhiều hoạt chất qua bảng pivot chem_name_active_ingredient.
+     *
+     * @param  string  $chemNameColumn  Cột chứa chem_names.id ở câu truy vấn ngoài
+     */
+    public static function casNoSubquery(string $chemNameColumn)
+    {
+        return function ($query) use ($chemNameColumn) {
+            // Chuỗi trong selectRaw là hằng, không ghép từ dữ liệu người dùng
+            $query->from('chem_name_active_ingredient as cnai')
+                ->join('active_ingredients as cnai_ai', 'cnai_ai.id', '=', 'cnai.active_ingredients_id')
+                ->whereColumn('cnai.chem_names_id', $chemNameColumn)
+                ->whereNotNull('cnai_ai.cas_no')
+                ->where('cnai_ai.cas_no', '<>', '')
+                ->selectRaw("GROUP_CONCAT(DISTINCT cnai_ai.cas_no ORDER BY cnai_ai.cas_no SEPARATOR ', ')");
+        };
     }
 
     /**
@@ -336,7 +356,6 @@ class DepartmentChemical
                 'chemical_categories.classification',
                 'chemical_categories.density',
                 'chem_names.name as chem_name',
-                'chem_names.cas_no as cas_no',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 // Chuỗi trong DB::raw là hằng, không ghép từ dữ liệu người dùng
@@ -346,6 +365,7 @@ class DepartmentChemical
                 self::TABLE.'.min_stock',
                 self::TABLE.'.default_location_id'
             )
+            ->selectSub(self::casNoSubquery('chemical_categories.chem_names_id'), 'cas_no')
             ->where(self::TABLE.'.department_id', $departmentId)
             ->where(self::TABLE.'.status_id', 1)
             ->where(function ($query) use ($keepIds) {

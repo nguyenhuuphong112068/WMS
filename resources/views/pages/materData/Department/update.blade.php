@@ -12,6 +12,18 @@
                 <input type="hidden" name="id" id="update_id">
                 <div class="modal-body">
                     <div class="form-group">
+                        <label for="update_company_id">Công Ty <span class="text-danger">*</span></label>
+                        <select name="company_id" id="update_company_id" class="form-control @error('company_id', 'updateErrors') is-invalid @enderror" required>
+                            <option value="">-- Chọn công ty --</option>
+                            @foreach ($companies as $company)
+                                <option value="{{ $company->id }}">{{ $company->name }} ({{ $company->short_name }})</option>
+                            @endforeach
+                        </select>
+                        @error('company_id', 'updateErrors')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="form-group">
                         <label for="update_shortName">Tên Viết Tắt <span class="text-danger">*</span></label>
                         <input type="text" name="shortName" id="update_shortName" class="form-control @error('shortName', 'updateErrors') is-invalid @enderror" required>
                         @error('shortName', 'updateErrors')

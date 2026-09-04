@@ -68,7 +68,7 @@ class DataMasterHistory
             'action' => $action,
             'snapshot' => json_encode($snapshot, JSON_UNESCAPED_UNICODE),
             'change_note' => $note,
-            'created_by' => session('user')['fullName'] ?? 'NA',
+            'created_by' => \App\Support\Signer::actor(),
             'created_at' => now(),
         ]);
     }

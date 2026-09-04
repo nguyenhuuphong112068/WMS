@@ -6,6 +6,13 @@
     $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
     $oldCodes = (array) $old('classification', []);
     $oldWarnings = (array) $old('safety_warning', []);
+
+    // Ô "Phân Loại" tách thành các vùng riêng cho dễ đọc.
+    $classGroups = [
+        'Theo Phụ lục (NĐ 24/2026/NĐ-CP)' => ['PL1', 'PL2', 'PL3', 'PL4'],
+        'Theo Nhóm (Phụ lục II / III / IV)' => ['N1', 'N2', 'N3', 'N4', 'N5', 'N6', 'N7', 'N8', 'N9', 'N10'],
+        'Hoá chất cấm' => ['CAM'],
+    ];
 @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
@@ -103,20 +110,6 @@
 
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>Số Hồ Sơ</label>
-                                        <input type="text" name="doc_no" maxlength="20"
-                                            class="form-control {{ $bag->has('doc_no') ? 'is-invalid' : '' }}"
-                                            value="{{ $old('doc_no') }}" placeholder="Nhập số hồ sơ">
-                                        @if ($bag->has('doc_no'))
-                                            <span class="md-error">{{ $bag->first('doc_no') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-12">
-                                    <div class="form-group">
                                         <label>Điều Kiện Bảo Quản</label>
                                         <select name="storage_condition_id"
                                             class="form-control cat-select {{ $bag->has('storage_condition_id') ? 'is-invalid' : '' }}">
@@ -133,29 +126,6 @@
                                         @endif
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="col-lg-6">
-                            <div class="form-group">
-                                <label>Phân Loại</label>
-                                <div class="cat-check-group {{ $bag->has('classification') ? 'is-invalid' : '' }}">
-                                    @foreach ($classifications as $code => $name)
-                                        <label
-                                            class="cat-check-item {{ in_array($code, $oldCodes) ? 'is-checked' : '' }}">
-                                            <input type="checkbox" class="cat-check-input" name="classification[]"
-                                                value="{{ $code }}" {{ in_array($code, $oldCodes) ? 'checked' : '' }}>
-                                            <span class="cat-check-code">{{ $code }}</span>
-                                            <span class="cat-check-name">{{ $name }}</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                                @if ($bag->has('classification'))
-                                    <span class="md-error">{{ $bag->first('classification') }}</span>
-                                @endif
-                                @if ($bag->has('classification.0'))
-                                    <span class="md-error">{{ $bag->first('classification.0') }}</span>
-                                @endif
                             </div>
 
                             <div class="form-group">
@@ -181,12 +151,42 @@
                                 @endif
                             </div>
                         </div>
+
+                        <div class="col-lg-6">
+                            <div class="form-group">
+                                <label>Phân Loại</label>
+                                @foreach ($classGroups as $groupTitle => $groupCodes)
+                                    <div class="cat-subgroup">
+                                        <span class="cat-subgroup-title">{{ $groupTitle }}</span>
+                                        <div class="cat-check-group {{ $bag->has('classification') ? 'is-invalid' : '' }}">
+                                            @foreach ($groupCodes as $code)
+                                                <label
+                                                    class="cat-check-item {{ in_array($code, $oldCodes) ? 'is-checked' : '' }}">
+                                                    <input type="checkbox" class="cat-check-input" name="classification[]"
+                                                        value="{{ $code }}" {{ in_array($code, $oldCodes) ? 'checked' : '' }}>
+                                                    <span class="cat-check-code">{{ $code }}</span>
+                                                    <span class="cat-check-name">{{ $classifications[$code] }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endforeach
+                                @if ($bag->has('classification'))
+                                    <span class="md-error">{{ $bag->first('classification') }}</span>
+                                @endif
+                                @if ($bag->has('classification.0'))
+                                    <span class="md-error">{{ $bag->first('classification.0') }}</span>
+                                @endif
+                            </div>
+                        </div>
                     </div>
 
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Mã danh mục sinh tự động. Không khai báo trùng tổ hợp
                         <b>Tên hoá chất - Loại - Nhà sản xuất</b>.
+                        Khi đối chiếu ngưỡng tồn trữ PL IV, khối lượng hoạt chất luôn tính bằng
+                        <b>100% khối lượng tồn (kg)</b>.
                         Bản ghi mới ở trạng thái <b>Chờ duyệt</b>, cần được duyệt trước khi dùng.
                     </div>
                 </div>
@@ -202,7 +202,7 @@
     </div>
 </div>
 
-{{-- Chia 2 cột (Phân Loại + Cảnh Báo An Toàn ở cột phải) nên cần khung rộng gấp đôi modal-lg mặc định --}}
+{{-- Chia 2 cột (thông tin + Cảnh Báo An Toàn ở cột trái, Phân Loại ở cột phải) nên cần khung rộng gấp đôi modal-lg mặc định --}}
 <style>
     @media (min-width: 992px) {
         #createModal .modal-dialog {

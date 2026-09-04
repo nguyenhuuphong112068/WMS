@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
 use App\Support\DepartmentStandard;
@@ -33,6 +34,8 @@ use Illuminate\Validation\Rule;
  */
 class StandardCategoryController extends Controller
 {
+    use VerifiesSignature;
+
     private const TABLE = 'standard_categories';
 
     private const HISTORY_TABLE = 'standard_category_histories';
@@ -297,6 +300,10 @@ class StandardCategoryController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần duyệt!');
         }
 
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt')) {
+            return $stop;
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update([
             'app_status' => $appStatus,
             'approved_by' => $this->actor(),
@@ -525,7 +532,7 @@ class StandardCategoryController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     /** Mã chất chuẩn sinh tự động nên không nằm trong danh sách kiểm tra. */

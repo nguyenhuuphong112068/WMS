@@ -17,6 +17,7 @@
         font-weight: 700;
         white-space: nowrap;
     }
+
     .sd-badge-tag {
         display: inline-block;
         border-radius: 4px;
@@ -61,7 +62,12 @@
                     @include('pages.shared.barcodeSearch', [
                         'scanTitle' => 'Quét mã vạch',
                         'scanTables' => [
-                            ['id' => 'mdTable', 'column' => 1, 'pane' => 'impPaneBook', 'label' => 'Sổ nhập chất chuẩn'],
+                            [
+                                'id' => 'mdTable',
+                                'column' => 1,
+                                'pane' => 'impPaneBook',
+                                'label' => 'Sổ nhập chất chuẩn',
+                            ],
                         ],
                     ])
 
@@ -82,14 +88,17 @@
                                         Vị Trí Lưu Trữ</th>
                                     <th class="text-center" style="width: 95px">Ngày Nhập</th>
                                     <th class="text-center" style="width: 120px">Hạn Dùng / Retest</th>
-                                    <th class="text-center" style="width: 65px" title="File hồ sơ đính kèm"><i class="fas fa-paperclip"></i></th>
+                                    <th class="text-center" style="width: 65px" title="File hồ sơ đính kèm"><i
+                                            class="fas fa-paperclip"></i></th>
                                     <th class="text-center" style="width: 135px">Thao Tác</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach ($datas as $row)
                                     @php
-                                        $impExpired = $row->expired_date ? \Carbon\Carbon::parse($row->expired_date) : null;
+                                        $impExpired = $row->expired_date
+                                            ? \Carbon\Carbon::parse($row->expired_date)
+                                            : null;
                                         $impExpiredClass = '';
                                         if ($impExpired) {
                                             $impExpiredClass = $impExpired->lt($impToday)
@@ -100,7 +109,12 @@
                                         }
 
                                         $rowAttachments = $attachments->get($row->id) ?? collect();
-                                        $hasProperties = $row->standard_form || $row->potency || $row->moisture || $row->weight_controlled || $row->requires_aliquot;
+                                        $hasProperties =
+                                            $row->standard_form ||
+                                            $row->potency ||
+                                            $row->moisture ||
+                                            $row->weight_controlled ||
+                                            $row->requires_aliquot;
                                     @endphp
                                     {{-- data-groups để bộ lọc Phân nhóm chuẩn nhận ra dòng này --}}
                                     <tr data-groups="{{ $impGroups($row->groups) }}">
@@ -119,7 +133,8 @@
                                                     {{ $impGroupName($row->group_code) }}
                                                 </span>
                                                 @if ($row->cas_no)
-                                                    <span class="md-sub small text-muted">CAS: {{ $row->cas_no }}</span>
+                                                    <span class="md-sub small text-muted">CAS:
+                                                        {{ $row->cas_no }}</span>
                                                 @endif
                                             </div>
                                         </td>
@@ -127,28 +142,33 @@
                                             @if ($hasProperties)
                                                 @if ($row->standard_form)
                                                     <div class="mb-1">
-                                                        <span class="badge badge-secondary">{{ $row->standard_form }}</span>
+                                                        <span
+                                                            class="badge badge-secondary">{{ $row->standard_form }}</span>
                                                     </div>
                                                 @endif
                                                 <div>
                                                     @if ($row->potency)
-                                                        <span class="sd-badge-tag bg-light text-dark border" title="Hàm lượng">
+                                                        <span class="sd-badge-tag bg-light text-dark border"
+                                                            title="Hàm lượng">
                                                             HL: <b>{{ $row->potency }}</b>
                                                         </span>
                                                     @endif
                                                     @if ($row->moisture)
-                                                        <span class="sd-badge-tag bg-light text-dark border" title="Độ ẩm">
+                                                        <span class="sd-badge-tag bg-light text-dark border"
+                                                            title="Độ ẩm">
                                                             Ẩm: <b>{{ $row->moisture }}</b>
                                                         </span>
                                                     @endif
                                                     @if ($row->weight_controlled)
-                                                        <span class="sd-badge-tag badge-warning text-dark" title="Cần kiểm soát khối lượng">
+                                                        <span class="sd-badge-tag badge-warning text-dark"
+                                                            title="Cần kiểm soát khối lượng">
                                                             <i class="fas fa-balance-scale"></i> Kiểm soát KL
                                                         </span>
                                                     @endif
                                                     @if ($row->requires_aliquot)
-                                                        <span class="sd-badge-tag badge-info" title="Cần triết ống trước khi dùng">
-                                                            <i class="fas fa-vial"></i> Triết ống
+                                                        <span class="sd-badge-tag badge-info"
+                                                            title="Cần chiết ống trước khi dùng">
+                                                            <i class="fas fa-vial"></i> chiết ống
                                                         </span>
                                                     @endif
                                                 </div>
@@ -167,7 +187,8 @@
                                                 <div class="font-weight-bold">
                                                     <span class="md-tag">{{ $row->location_code }}</span>
                                                 </div>
-                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
+                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }}
+                                                    /
                                                     {{ $row->shelf_name ?: '—' }}</div>
                                             @else
                                                 <span class="imp-no-location">Chưa xếp vị trí</span>
@@ -179,7 +200,8 @@
                                         <td class="text-center md-sub {{ $impExpiredClass }}"
                                             data-order="{{ $row->expired_date ?: '9999-12-31' }}">
                                             @if ($row->expiry_type === 'check online' || $row->expiry_type === 'undetermined' || $row->expiry_type === 'unlimited')
-                                                <span class="badge badge-warning" title="Hạn dùng chưa xác định từ NSX. Tra cứu trực tuyến khi sử dụng.">
+                                                <span class="badge badge-warning"
+                                                    title="Hạn dùng chưa xác định từ NSX. Tra cứu trực tuyến khi sử dụng.">
                                                     <i class="fas fa-globe"></i> Check online
                                                 </span>
                                             @elseif ($row->expiry_type === 'retest')
@@ -189,7 +211,8 @@
                                                 </span>
                                             @elseif ($row->expiry_type === 'Requires_re-evaluation')
                                                 <div class="font-weight-bold">{{ $impDate($row->expired_date) }}</div>
-                                                <span class="badge badge-secondary" title="Cần xác định lại hạn dùng nội bộ sau khi mở ống">
+                                                <span class="badge badge-secondary"
+                                                    title="Cần xác định lại hạn dùng nội bộ sau khi mở ống">
                                                     Hạn nội bộ
                                                 </span>
                                             @else
@@ -199,13 +222,20 @@
                                         <td class="text-center">
                                             @if ($rowAttachments->isNotEmpty())
                                                 <div class="dropdown">
-                                                    <button class="btn btn-xs btn-outline-primary dropdown-toggle" type="button" data-toggle="dropdown" title="Xem danh sách file đính kèm">
-                                                        <i class="fas fa-paperclip"></i> ({{ $rowAttachments->count() }})
+                                                    <button class="btn btn-xs btn-outline-primary dropdown-toggle"
+                                                        type="button" data-toggle="dropdown"
+                                                        title="Xem danh sách file đính kèm">
+                                                        <i class="fas fa-paperclip"></i>
+                                                        ({{ $rowAttachments->count() }})
                                                     </button>
                                                     <div class="dropdown-menu dropdown-menu-right shadow-sm">
                                                         @foreach ($rowAttachments as $att)
-                                                            <a class="dropdown-item small py-2" href="{{ route($impRoute . 'downloadAttachment', ['id' => $att->id]) }}" target="_blank" title="Mở xem file trực tiếp">
-                                                                <i class="fas fa-external-link-alt mr-2 text-primary"></i> {{ $att->file_name }}
+                                                            <a class="dropdown-item small py-2"
+                                                                href="{{ route($impRoute . 'downloadAttachment', ['id' => $att->id]) }}"
+                                                                target="_blank" title="Mở xem file trực tiếp">
+                                                                <i
+                                                                    class="fas fa-external-link-alt mr-2 text-primary"></i>
+                                                                {{ $att->file_name }}
                                                             </a>
                                                         @endforeach
                                                     </div>
@@ -262,7 +292,7 @@
                                                         href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
                                                         <i class="fas fa-tag"></i>
                                                     </a>
-                                                    @endperm
+                                                @endperm
 
                                                 @perm('import_standard_delete')
                                                     <form class="form-md-confirm d-inline"
@@ -271,11 +301,13 @@
                                                         data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, ống chuẩn &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
                                                         data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
                                                         @csrf
-                                                        <input type="hidden" name="id" value="{{ $row->id }}">
+                                                        <input type="hidden" name="id"
+                                                            value="{{ $row->id }}">
                                                         <button type="submit"
                                                             class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
                                                             title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                            <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                                            <i
+                                                                class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
                                                         </button>
                                                     </form>
                                                 @endperm

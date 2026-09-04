@@ -963,11 +963,10 @@ class ChemicalExportController extends Controller
     /** Người kiểm tra: user đang hoạt động của phòng ban đang chọn. */
     private function checkerOptions(int $departmentId)
     {
-        // user_management.deparment lưu theo deparments.shortName chứ không phải id
+        // user_management.deparment_id là FK trỏ thẳng deparments.id
         return DB::table('user_management')
-            ->join('deparments', 'user_management.deparment', '=', 'deparments.shortName')
             ->select('user_management.userName', 'user_management.fullName')
-            ->where('deparments.id', $departmentId)
+            ->where('user_management.deparment_id', $departmentId)
             ->where('user_management.isActive', 1)
             ->orderBy('user_management.fullName', 'asc')
             ->get();
@@ -1171,7 +1170,7 @@ class ChemicalExportController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     private function number(float $value): string

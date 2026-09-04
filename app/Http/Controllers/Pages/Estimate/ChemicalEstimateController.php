@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Pages\Estimate;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\ActiveIngredientThreshold;
+use App\Support\CompanyContext;
 use App\Support\DepartmentChemical;
+use App\Support\MixtureHazardThreshold;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -28,6 +32,8 @@ use Illuminate\Support\Facades\Validator;
  */
 class ChemicalEstimateController extends Controller
 {
+    use VerifiesSignature;
+
     private const TABLE = 'chemical_estimates';
 
     private const ITEM_TABLE = 'chemical_estimate_items';
@@ -266,7 +272,13 @@ class ChemicalEstimateController extends Controller
             self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm mặt hàng vào phiếu.');
         }
 
-        return redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
+        $redirect = redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
+
+        if ($warnings = $this->thresholdWarnings($itemId)) {
+            $redirect->with('warning', implode(' — ', $warnings));
+        }
+
+        return $redirect;
     }
 
     public function updateItem(Request $request)
@@ -296,7 +308,7 @@ class ChemicalEstimateController extends Controller
             ]);
 
             // Số lượng theo tháng luôn ghi lại toàn bộ: xoá dòng cũ rồi ghi dòng mới
-            DB::table(self::AMOUNT_TABLE)->where('estimate_item_id', $item->id)->delete();
+            DB::table(self::AMOUNT_TABLE)->where('estimate_item_id', $item->id)->update(['active' => 0]);
 
             $this->saveAmounts($item->id, $request);
         });
@@ -306,7 +318,13 @@ class ChemicalEstimateController extends Controller
             self::writeHistory($list->id, 'Sửa mặt hàng', null, $list->app_status, $list->app_status, 'Chỉnh sửa mặt hàng trong phiếu.');
         }
 
-        return redirect()->back()->with('success', 'Cập nhật '.self::ITEM_LABEL.' thành công!');
+        $redirect = redirect()->back()->with('success', 'Cập nhật '.self::ITEM_LABEL.' thành công!');
+
+        if ($warnings = $this->thresholdWarnings($item->id)) {
+            $redirect->with('warning', implode(' — ', $warnings));
+        }
+
+        return $redirect;
     }
 
     /**
@@ -329,8 +347,12 @@ class ChemicalEstimateController extends Controller
         }
 
         DB::transaction(function () use ($item) {
-            DB::table(self::AMOUNT_TABLE)->where('estimate_item_id', $item->id)->delete();
-            DB::table(self::ITEM_TABLE)->where('id', $item->id)->delete();
+            DB::table(self::AMOUNT_TABLE)->where('estimate_item_id', $item->id)->update(['active' => 0]);
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'active' => 0,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
         });
 
         if ($list->app_status !== 'draft') {
@@ -384,7 +406,7 @@ class ChemicalEstimateController extends Controller
                 'updated_at' => now(),
             ]);
 
-            $allItems = DB::table(self::ITEM_TABLE)->where('estimate_list_id', $list->id)->get();
+            $allItems = DB::table(self::ITEM_TABLE)->where('estimate_list_id', $list->id)->where('active', 1)->get();
             $allCompleted = true;
             $hasActive = false;
             foreach ($allItems as $i) {
@@ -528,8 +550,12 @@ class ChemicalEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$current->code.' đang bị khoá, hãy mở khoá trước khi trình ký!');
         }
 
-        if (! DB::table(self::ITEM_TABLE)->where('estimate_list_id', $current->id)->exists()) {
+        if (! DB::table(self::ITEM_TABLE)->where('estimate_list_id', $current->id)->where('active', 1)->exists()) {
             return redirect()->back()->with('error', 'Phiếu '.$current->code.' chưa có mặt hàng nào, chưa trình ký được!');
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Trình ký')) {
+            return $stop;
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
@@ -598,6 +624,10 @@ class ChemicalEstimateController extends Controller
             return redirect()->back()->withErrors($validator, 'rejectErrors')->withInput();
         }
 
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Từ chối duyệt')) {
+            return $stop;
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update([
             'app_status' => 'rejected',
             'rejected_by' => $this->actor(),
@@ -632,6 +662,10 @@ class ChemicalEstimateController extends Controller
 
         if (! $this->canSign($step)) {
             return redirect()->back()->with('error', 'Bạn không có quyền ký duyệt bước "'.$config['label'].'"!');
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Ký duyệt '.$config['label'])) {
+            return $stop;
         }
 
         $payload = [
@@ -695,6 +729,7 @@ class ChemicalEstimateController extends Controller
             ->whereNotNull(self::ITEM_TABLE.'.promised_date')
             ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
             ->where(self::ITEM_TABLE.'.status_id', 1)
+            ->where(self::ITEM_TABLE.'.active', 1)
             ->orderBy(self::ITEM_TABLE.'.promised_date', 'asc')
             ->get();
 
@@ -707,6 +742,7 @@ class ChemicalEstimateController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
+            ->where(self::AMOUNT_TABLE.'.active', 1)
             ->whereIn(self::AMOUNT_TABLE.'.estimate_item_id', $items->pluck('id')->all())
             ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
             ->get()
@@ -758,6 +794,7 @@ class ChemicalEstimateController extends Controller
                 'manufacturers.name as category_manufacturer_name'
             )
             ->where(self::ITEM_TABLE.'.estimate_list_id', $listId)
+            ->where(self::ITEM_TABLE.'.active', 1)
             ->orderBy(self::ITEM_TABLE.'.id', 'asc')
             ->get();
 
@@ -768,6 +805,7 @@ class ChemicalEstimateController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
+            ->where(self::AMOUNT_TABLE.'.active', 1)
             ->whereIn(self::AMOUNT_TABLE.'.estimate_item_id', $items->pluck('id')->all())
             ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
             ->get()
@@ -835,9 +873,76 @@ class ChemicalEstimateController extends Controller
             'from_status' => $from,
             'to_status' => $to,
             'note' => $note,
-            'created_by' => session('user')['fullName'] ?? 'NA',
+            'created_by' => \App\Support\Signer::actor(),
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * Cảnh báo (không chặn) khi dự trù một mặt hàng là hoá chất thuộc nhóm phải xây dựng
+     * Kế hoạch phòng ngừa (N9 - PL IV Bảng A, N10 - PL IV Bảng B, hoá chất cấm) và lượng
+     * dự trù đủ để đẩy tổng tồn trữ toàn công ty chạm/vượt "Ngưỡng khối lượng tồn trữ lớn
+     * nhất tại một thời điểm" - Phụ lục IV NĐ 24/2026/NĐ-CP.
+     *
+     * Lượng dự trù = tổng số lượng các tháng của mặt hàng, quy ra kg (theo hướng thận trọng).
+     * Chỉ xét mặt hàng chọn từ Danh Mục Hoá Chất (có category_id); hoá chất tự gõ tay bỏ qua.
+     *
+     * @return array<int, string>
+     */
+    private function thresholdWarnings(int $itemId): array
+    {
+        $item = DB::table(self::ITEM_TABLE)->where('id', $itemId)->first();
+
+        if (! $item || ! $item->category_id) {
+            return [];
+        }
+
+        $categoryId = (int) $item->category_id;
+        $companyId = CompanyContext::currentId();
+
+        $amountRows = DB::table(self::AMOUNT_TABLE)
+            ->where('estimate_item_id', $itemId)
+            ->where('active', 1)
+            ->select('amount', 'unit_id')
+            ->get();
+
+        if ($amountRows->isEmpty()) {
+            return [];
+        }
+
+        $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.');
+        $warnings = [];
+
+        // ----- BẢNG A: theo hoạt chất (× % hàm lượng) -----
+        $sumA = ActiveIngredientThreshold::sumEstimateKg($categoryId, $amountRows);
+        $projA = ActiveIngredientThreshold::projectedForCategory($categoryId, $sumA['kg'], $companyId);
+
+        if ($projA && ($projA->add_ratio >= 1.0 || $projA->projected_ratio >= ActiveIngredientThreshold::warnRatio())) {
+            $warnings[] = 'Hoá chất "'.$projA->ai_name.'" phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất '
+                .'(Phụ lục IV NĐ 24/2026/NĐ-CP - Bảng A). Lượng dự trù của mặt hàng ≈ '.$num($projA->add_kg).' kg hoạt chất'
+                .($sumA['unconvertible'] ? ' (chưa gồm dòng dùng đơn vị đếm / thiếu tỉ trọng)' : '')
+                .'; cộng tồn hiện tại toàn công ty '.$num($projA->current_kg).' kg thì tổng ≈ '.$num($projA->projected_kg)
+                .' kg / ngưỡng '.$num($projA->threshold_kg).' kg ('.(int) round($projA->projected_ratio * 100).'%). '
+                .($projA->add_ratio >= 1.0 ? 'Riêng lượng dự trù đã vượt ngưỡng "tồn trữ lớn nhất tại một thời điểm". ' : '')
+                .($projA->level === ActiveIngredientThreshold::LEVEL_EXCEEDED ? 'DỰ KIẾN VƯỢT NGƯỠNG.' : 'Dự kiến chạm ngưỡng cảnh báo.');
+        }
+
+        // ----- BẢNG B: theo hỗn hợp (tồn thô, không × %) -----
+        $sumB = MixtureHazardThreshold::sumEstimateKg($categoryId, $amountRows);
+        $projB = MixtureHazardThreshold::projectedForCategory($categoryId, $sumB['kg'], $companyId);
+
+        if ($projB && ($projB->add_ratio >= 1.0 || $projB->projected_ratio >= MixtureHazardThreshold::warnRatio())) {
+            $warnings[] = 'Hỗn hợp "'.$projB->chem_name.'" thuộc nhóm nguy hại Bảng B (Phụ lục IV NĐ 24/2026/NĐ-CP). '
+                .'Lượng dự trù ≈ '.$num($projB->add_kg).' kg thô'
+                .($sumB['unconvertible'] ? ' (chưa gồm dòng chưa quy đổi được)' : '')
+                .'; cộng tồn hiện tại '.$num($projB->current_kg).' kg thì tổng ≈ '.$num($projB->projected_kg)
+                .' kg / ngưỡng thấp nhất '.$num($projB->threshold_kg).' kg (nhóm '.$projB->strictest_group.', '
+                .(int) round($projB->projected_ratio * 100).'%). '
+                .($projB->add_ratio >= 1.0 ? 'Riêng lượng dự trù đã vượt ngưỡng. ' : '')
+                .($projB->level === MixtureHazardThreshold::LEVEL_EXCEEDED ? 'DỰ KIẾN VƯỢT NGƯỠNG.' : 'Dự kiến chạm ngưỡng cảnh báo.');
+        }
+
+        return $warnings;
     }
 
     /** Số mặt hàng của từng phiếu: [estimate_list_id => số dòng]. */
@@ -850,6 +955,7 @@ class ChemicalEstimateController extends Controller
         return DB::table(self::ITEM_TABLE)
             ->select('estimate_list_id', DB::raw('COUNT(*) as total'))
             ->whereIn('estimate_list_id', $listIds)
+            ->where('active', 1)
             ->groupBy('estimate_list_id')
             ->pluck('total', 'estimate_list_id')
             ->all();
@@ -966,7 +1072,7 @@ class ChemicalEstimateController extends Controller
     /** Một mặt hàng kèm phiếu chứa nó: [item, list]. */
     private function findItem($id): array
     {
-        $item = DB::table(self::ITEM_TABLE)->where('id', $id)->first();
+        $item = DB::table(self::ITEM_TABLE)->where('id', $id)->where('active', 1)->first();
 
         if (! $item) {
             return [null, null];
@@ -1013,7 +1119,7 @@ class ChemicalEstimateController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     /* ==========================================================

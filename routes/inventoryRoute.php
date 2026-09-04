@@ -22,6 +22,7 @@ use App\Http\Controllers\Pages\Inventory\ChemicalInventoryController;
 use App\Http\Controllers\Pages\Inventory\MaterialInventoryController;
 use App\Http\Controllers\Pages\Inventory\MaterialStocktakeController;
 use App\Http\Controllers\Pages\Inventory\StandardInventoryController;
+use App\Http\Controllers\Pages\Inventory\ThresholdReconciliationController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
 
@@ -50,6 +51,14 @@ Route::prefix('/inventory')
             // Dữ liệu JSON cho modal Biểu Đồ Nhập - Xuất - Tồn của một vật tư
             Route::get('chart', 'chart')->name('chart');
             Route::post('balancing', 'balancing')->name('balancing');
+        });
+
+        // Đối chiếu ngưỡng tồn trữ Phụ lục IV NĐ 24/2026/NĐ-CP - màn hình chỉ đọc, số liệu
+        // cộng trong phạm vi các phòng ban thuộc công ty của phòng ban đang chọn.
+        Route::prefix('/thresholdReconciliation')->name('thresholdReconciliation.')->controller(ThresholdReconciliationController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            // Dữ liệu JSON cho modal "Chi tiết đối chiếu Ngưỡng Tồn Trữ PL IV"
+            Route::get('thresholdDetail', 'thresholdDetail')->name('thresholdDetail');
         });
 
         // Tab KIỂM KÊ ĐỊNH KỲ của màn hình Tồn Kho Vật Tư - chu kỳ 1 tháng 1 lần

@@ -5,7 +5,8 @@
 @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg" role="document" style="max-width: 1050px;">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg" role="document"
+        style="max-width: 1050px;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="{{ $impIcon }}"></i> Nhập Chất Chuẩn</h5>
@@ -25,7 +26,9 @@
                         <div class="form-group col-md-8">
                             <label>Chất Chuẩn <span class="text-danger">*</span></label>
                             <div class="d-flex align-items-center">
-                                <button type="button" class="btn btn-outline-info mr-2" style="flex-shrink: 0;" data-toggle="modal" data-target="#selectStandardModal" title="Mở danh mục chất chuẩn phòng đang dùng để chọn">
+                                <button type="button" class="btn btn-outline-info mr-2" style="flex-shrink: 0;"
+                                    data-toggle="modal" data-target="#selectStandardModal"
+                                    title="Mở danh mục chất chuẩn phòng đang dùng để chọn">
                                     <i class="fas fa-list"></i>
                                 </button>
                                 <div style="flex: 1 1 auto; min-width: 0;">
@@ -46,7 +49,8 @@
                             @if ($bag->has('category_id'))
                                 <span class="md-error d-block mt-1">{{ $bag->first('category_id') }}</span>
                             @endif
-                            <small class="md-sub">Chỉ hiện chất chuẩn phòng đã khai ở tab <b>Chất Chuẩn Của Phòng</b>. Chất chưa khai thì không nhập vào kho được.</small>
+                            <small class="md-sub">Chỉ hiện chất chuẩn phòng đã khai ở tab <b>Chất Chuẩn Của Phòng</b>.
+                                Chất chưa khai thì không nhập vào kho được.</small>
                         </div>
 
                         <div class="form-group col-md-4">
@@ -62,14 +66,16 @@
                         </div>
 
                         <div class="col-md-12 mb-3 sd-info-box-wrap" style="display: none;">
-                            <div class="alert alert-info py-2 px-3 mb-0 sd-info-box" style="font-size: 0.95rem; line-height: 1.5;"></div>
+                            <div class="alert alert-info py-2 px-3 mb-0 sd-info-box"
+                                style="font-size: 0.95rem; line-height: 1.5;"></div>
                         </div>
                     </div>
 
                     {{-- Nhóm 2: Số lượng, Số ống nhập, Vị trí lưu trữ, Chỉ tiêu kiểm --}}
                     <div class="form-row">
                         <div class="form-group col-md-3">
-                            <label>Lượng / Ống <span class="text-danger">*</span> <span id="sd-unit-label" class="text-primary font-weight-bold"></span></label>
+                            <label>Lượng / Ống <span class="text-danger">*</span> <span id="sd-unit-label"
+                                    class="text-primary font-weight-bold"></span></label>
                             <input type="number" name="amount" step="0.0001" min="0.0001"
                                 class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}"
                                 value="{{ old('amount') }}" placeholder="Ví dụ: 50" required>
@@ -304,7 +310,7 @@
                                         {{ old('requires_aliquot') ? 'checked' : '' }}>
                                     <label class="custom-control-label font-weight-bold text-dark cursor-pointer"
                                         for="requires_aliquot">
-                                        <i class="fas fa-vial mr-1 text-info"></i> Chuẩn cần triết ống trước khi sử
+                                        <i class="fas fa-vial mr-1 text-info"></i> Chuẩn cần chiết ống trước khi sử
                                         dụng
                                     </label>
                                 </div>
@@ -324,8 +330,7 @@
                         <div class="form-group col-md-6">
                             <label>Ghi Chú</label>
                             <textarea name="note" rows="2" maxlength="500"
-                                class="form-control {{ $bag->has('note') ? 'is-invalid' : '' }}"
-                                placeholder="Ghi chú thêm...">{{ old('note') }}</textarea>
+                                class="form-control {{ $bag->has('note') ? 'is-invalid' : '' }}" placeholder="Ghi chú thêm...">{{ old('note') }}</textarea>
                             @if ($bag->has('note'))
                                 <span class="md-error">{{ $bag->first('note') }}</span>
                             @endif
@@ -495,7 +500,8 @@
 @endif
 
 {{-- Modal Chọn Chất Chuẩn --}}
-<div class="modal fade" id="selectStandardModal" tabindex="-1" role="dialog" style="z-index: 1060;" data-backdrop="static">
+<div class="modal fade" id="selectStandardModal" tabindex="-1" role="dialog" style="z-index: 1060;"
+    data-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document" style="max-width: 60%;">
         <div class="modal-content">
             <div class="modal-header">
@@ -529,21 +535,25 @@
                                     <td>
                                         <div class="md-sub">{{ $category->manufacturer_name ?: '—' }}</div>
                                         @if ($category->manufacturer_short_name)
-                                            <span class="badge badge-light border">{{ $category->manufacturer_short_name }}</span>
+                                            <span
+                                                class="badge badge-light border">{{ $category->manufacturer_short_name }}</span>
                                         @endif
                                     </td>
                                     <td>{{ $category->density !== null ? $category->density : '—' }}</td>
                                     <td>{{ $category->storage_condition_name ?: '—' }}</td>
-                                    <td class="text-center"><span class="badge badge-pill badge-light border">v{{ $category->version }}</span></td>
+                                    <td class="text-center"><span
+                                            class="badge badge-pill badge-light border">v{{ $category->version }}</span>
+                                    </td>
                                     <td>
-                                        @if($category->groups)
-                                            @foreach(json_decode($category->groups) as $g)
+                                        @if ($category->groups)
+                                            @foreach (json_decode($category->groups) as $g)
                                                 <span class="badge badge-primary">{{ $g }}</span>
                                             @endforeach
                                         @endif
                                     </td>
                                     <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-primary btn-select-standard" data-id="{{ $category->id }}">Chọn</button>
+                                        <button type="button" class="btn btn-sm btn-primary btn-select-standard"
+                                            data-id="{{ $category->id }}">Chọn</button>
                                     </td>
                                 </tr>
                             @endforeach
@@ -566,7 +576,9 @@
                 emptyTable: 'Phòng chưa khai chất chuẩn nào ở tab "Chất Chuẩn Của Phòng" nên chưa có gì để nhập.',
                 zeroRecords: 'Không tìm thấy chất chuẩn phù hợp trong danh mục của phòng.'
             },
-            order: [[0, 'asc']]
+            order: [
+                [0, 'asc']
+            ]
         });
 
         $(document).on('click', '.btn-select-standard', function() {

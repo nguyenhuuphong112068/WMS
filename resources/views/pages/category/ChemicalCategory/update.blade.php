@@ -104,6 +104,21 @@
 
                                 <div class="col-md-6">
                                     <div class="form-group">
+                                        <label>Hàm Lượng Hoạt Chất (%)</label>
+                                        <input type="number" name="ai_content_percent" step="0.0001" min="0.0001" max="100"
+                                            class="form-control {{ $bag->has('ai_content_percent') ? 'is-invalid' : '' }}"
+                                            value="{{ $old('ai_content_percent') }}" placeholder="Mặc định 100">
+                                        <small class="md-sub">Dùng khi đối chiếu ngưỡng tồn trữ PL IV: khối lượng hoạt chất = tồn (kg) × %.</small>
+                                        @if ($bag->has('ai_content_percent'))
+                                            <span class="md-error">{{ $bag->first('ai_content_percent') }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
                                         <label>Số Hồ Sơ</label>
                                         <input type="text" name="doc_no" maxlength="20"
                                             class="form-control {{ $bag->has('doc_no') ? 'is-invalid' : '' }}"

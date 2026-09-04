@@ -56,20 +56,21 @@ class DevSeeder extends Seeder
         }
 
         // ---------- Tài khoản quản trị ----------
+        DB::table('roles')->updateOrInsert(['name' => 'Admin'], ['updated_at' => $now, 'created_at' => $now]);
+        $adminRoleId = DB::table('roles')->where('name', 'Admin')->value('id');
+        $qaDeptId = DB::table('deparments')->where('shortName', 'QA')->value('id');
+
         DB::table('user_management')->updateOrInsert(['userName' => self::ADMIN_USERNAME], [
             'passWord' => Hash::make(self::ADMIN_PASSWORD),
             'fullName' => 'Quản trị hệ thống',
-            'userGroup' => 'Admin',
-            'deparment' => 'QA',
+            'role_id' => $adminRoleId,
+            'deparment_id' => $qaDeptId,
             'isActive' => 1,
             'updated_at' => $now,
             'created_at' => $now,
         ]);
 
-        DB::table('roles')->updateOrInsert(['name' => 'Admin'], ['updated_at' => $now, 'created_at' => $now]);
-
         $adminId = DB::table('user_management')->where('userName', self::ADMIN_USERNAME)->value('id');
-        $adminRoleId = DB::table('roles')->where('name', 'Admin')->value('id');
 
         if ($adminId && $adminRoleId) {
             DB::table('user_role')->updateOrInsert(

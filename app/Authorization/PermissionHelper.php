@@ -75,12 +75,15 @@ if (! function_exists('user_has_any_role')) {
     /**
      * Kiểm tra user có thuộc một trong các role được liệt kê không.
      * Role 'Admin' luôn được coi là có toàn quyền (bỏ qua $roleNames).
-     * Gộp cả role chính (user_management.userGroup) lẫn các role gán qua user_role/roles
-     * để tương thích với dữ liệu cũ (chỉ có userGroup, chưa gán user_role).
+     * Gộp cả role chính (user_management.role_id) lẫn các role gán qua user_role/roles
+     * để tương thích với dữ liệu cũ (chỉ có role chính, chưa gán user_role).
      */
     function user_has_any_role($userId, array $roleNames): bool
     {
-        $primaryGroup = DB::table('user_management')->where('id', $userId)->value('userGroup');
+        $primaryGroup = DB::table('user_management')
+            ->leftJoin('roles', 'roles.id', '=', 'user_management.role_id')
+            ->where('user_management.id', $userId)
+            ->value('roles.name');
 
         $assignedRoles = DB::table('user_role')
             ->join('roles', 'roles.id', '=', 'user_role.role_id')

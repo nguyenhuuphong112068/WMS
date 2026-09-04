@@ -1,7 +1,11 @@
-@php $bag = $errors->getBag('createErrors'); @endphp
+@php
+    $bag = $errors->getBag('createErrors');
+    $oldAiIds = array_map('intval', (array) old('active_ingredients_ids', []));
+    $oldHazardIds = array_map('intval', (array) old('hazard_category_ids', []));
+@endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="{{ $mdIcon }}"></i> Thêm {{ $mdTitle }} Mới</h5>
@@ -22,39 +26,14 @@
                         @endif
                     </div>
 
-                    <div class="form-group">
-                        <label>Tên Hoạt Chất</label>
-                        <input type="text" name="active_ingredient_name" maxlength="255"
-                            class="form-control {{ $bag->has('active_ingredient_name') ? 'is-invalid' : '' }}"
-                            value="{{ old('active_ingredient_name') }}" placeholder="Nhập tên hoạt chất">
-                        @if ($bag->has('active_ingredient_name'))
-                            <span class="md-error">{{ $bag->first('active_ingredient_name') }}</span>
-                        @endif
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label>Số CAS</label>
-                            <input type="text" name="cas_no" maxlength="100"
-                                class="form-control {{ $bag->has('cas_no') ? 'is-invalid' : '' }}"
-                                value="{{ old('cas_no') }}" placeholder="Ví dụ: 75-05-8">
-                            @if ($bag->has('cas_no'))
-                                <span class="md-error">{{ $bag->first('cas_no') }}</span>
-                            @endif
-                        </div>
-
-                        <div class="form-group col-md-6">
-                            <label>Số Tài Liệu</label>
-                            <input type="text" name="doc_no" maxlength="100"
-                                class="form-control {{ $bag->has('doc_no') ? 'is-invalid' : '' }}"
-                                value="{{ old('doc_no') }}" placeholder="Nhập số tài liệu">
-                            @if ($bag->has('doc_no'))
-                                <span class="md-error">{{ $bag->first('doc_no') }}</span>
-                            @endif
-                        </div>
-                    </div>
-
-                    @include('pages.materData.shared.formulaInput', ['bag' => $bag])
+                    @include('pages.materData.ChemName.formFields', [
+                        'bag' => $bag,
+                        'activeIngredients' => $activeIngredients,
+                        'hazardCategories' => $hazardCategories,
+                        'hazardGroups' => $hazardGroups,
+                        'oldAiIds' => $oldAiIds,
+                        'oldHazardIds' => $oldHazardIds,
+                    ])
 
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>

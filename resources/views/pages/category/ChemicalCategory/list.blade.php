@@ -179,6 +179,72 @@
                 font-size: 0.78rem;
             }
         }
+
+        /* ==========================================================================
+        |  Yêu cầu hiển thị riêng trang Danh Mục - Hoá Chất:
+        |  1. Toàn bộ chữ trong 2 bảng (#mdTable, #dcTable) hiển thị màu ĐEN.
+        |  2. Cỡ chữ trong bảng = cỡ gốc * 1.5 rồi giảm 20% (tức * 1.2 so với gốc).
+        |  Giữ nguyên màu nền + màu chữ của badge/chip trạng thái (đỏ cảnh báo an
+        |  toàn, xanh "Hoạt động"...) vì đó là mã màu nghiệp vụ, không phải chữ đọc.
+        ========================================================================== */
+        .md-page #mdTable tbody td,
+        .md-page #dcTable tbody td {
+            color: #000;
+            font-size: 1.06rem;   /* ~1.2x cỡ ô bảng gốc (~0.88rem) */
+            line-height: 1.5;
+        }
+
+        .md-page #mdTable thead th,
+        .md-page #dcTable thead th {
+            color: #000;
+            font-size: 0.98rem;   /* 0.82rem * 1.2 */
+        }
+
+        /* Chữ phụ màu xám -> ép về đen */
+        .md-page #mdTable tbody td .md-sub,
+        .md-page #dcTable tbody td .md-sub,
+        .md-page #mdTable tbody td .md-empty,
+        .md-page #dcTable tbody td .md-empty,
+        .md-page #mdTable tbody td .md-note,
+        .md-page #dcTable tbody td .md-note,
+        .md-page #mdTable tbody td .dc-value.is-none,
+        .md-page #dcTable tbody td .dc-value.is-none {
+            color: #000;
+        }
+
+        /* Cỡ chữ nhỏ trong bảng: cỡ gốc * 1.5 rồi giảm 20% */
+        .md-page #mdTable tbody td .md-sub,
+        .md-page #dcTable tbody td .md-sub {
+            font-size: 1.03rem;   /* 0.86rem * 1.2 */
+        }
+
+        .md-page #mdTable tbody td small,
+        .md-page #dcTable tbody td small,
+        .md-page #mdTable tbody td .md-tag,
+        .md-page #dcTable tbody td .md-tag,
+        .md-page #mdTable tbody td .thr-chip,
+        .md-page #dcTable tbody td .thr-chip {
+            font-size: 0.96rem;   /* 0.8rem * 1.2 */
+        }
+
+        .md-page #mdTable tbody td .badge,
+        .md-page #dcTable tbody td .badge,
+        .md-page #mdTable tbody td .md-badge,
+        .md-page #dcTable tbody td .md-badge {
+            font-size: 0.9rem;    /* 0.75rem * 1.2 */
+        }
+
+        .md-page #mdTable tbody td .cat-chip,
+        .md-page #dcTable tbody td .cat-chip,
+        .md-page #mdTable tbody td .safety-chip,
+        .md-page #dcTable tbody td .safety-chip {
+            font-size: 0.89rem;   /* 0.74rem * 1.2 */
+        }
+
+        .md-page #mdTable tbody td .dc-source,
+        .md-page #dcTable tbody td .dc-source {
+            font-size: 0.82rem;   /* 0.68rem * 1.2 */
+        }
     </style>
 
     <script>

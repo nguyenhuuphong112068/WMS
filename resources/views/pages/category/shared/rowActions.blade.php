@@ -38,7 +38,7 @@
     @endisset
 
     @if (($row->app_status ?? 'pending') !== 'approved' && user_can($permPrefix . 'approve'))
-        <form class="form-md-confirm d-inline" action="{{ route($prefix . 'approve') }}" method="POST"
+        <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($prefix . 'approve') }}" method="POST"
             data-title="Duyệt {{ $label }}?"
             data-text="Sau khi duyệt, {{ $label }} &quot;{{ $title }}&quot; sẽ được dùng ở các màn hình nghiệp vụ.">
             @csrf
@@ -50,7 +50,7 @@
     @endif
 
     @if (($row->app_status ?? 'pending') !== 'rejected' && user_can($permPrefix . 'reject'))
-        <form class="form-md-confirm d-inline" action="{{ route($prefix . 'reject') }}" method="POST"
+        <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($prefix . 'reject') }}" method="POST"
             data-title="Từ chối {{ $label }}?"
             data-text="{{ ucfirst($label) }} &quot;{{ $title }}&quot; sẽ bị đánh dấu từ chối và không được dùng."
             data-danger="1">

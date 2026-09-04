@@ -113,6 +113,20 @@ class ChemicalInventoryController extends Controller
             'expiringSoonMonths' => self::EXPIRING_SOON_MONTHS,
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
             'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
+            // Đối chiếu tổng tồn trữ của từng hoạt chất với ngưỡng Phụ lục IV NĐ 24/2026
+            // (chỉ giữ mức cảnh báo vàng / đỏ). Phạm vi cộng tồn gói trong công ty của phòng
+            // ban đang chọn; số của cả công ty hiển thị kể cả trên màn theo phòng, có nhãn rõ.
+            'thresholdAlerts' => collect(\App\Support\ActiveIngredientThreshold::evaluate(null, \App\Support\CompanyContext::currentId()))
+                ->filter(fn ($row) => $row->level !== \App\Support\ActiveIngredientThreshold::LEVEL_OK)
+                ->sortByDesc('peak_ratio')
+                ->values(),
+            // Bảng B: hỗn hợp có hoạt chất Bảng A + đã tick nhóm nguy hại, tồn thô vs ngưỡng thấp nhất
+            'thresholdAlertsB' => collect(\App\Support\MixtureHazardThreshold::evaluate(null, \App\Support\CompanyContext::currentId()))
+                ->filter(fn ($row) => $row->level !== \App\Support\MixtureHazardThreshold::LEVEL_OK)
+                ->sortByDesc('peak_ratio')
+                ->values(),
+            'thresholdDepartmentId' => $departmentId,
+            'thresholdCompanyName' => \App\Support\CompanyContext::currentName(),
         ]);
     }
 
@@ -964,7 +978,7 @@ class ChemicalInventoryController extends Controller
 
     private function actor(): string
     {
-        return session('user')['fullName'] ?? 'NA';
+        return \App\Support\Signer::actor();
     }
 
     private function number(float $value): string

@@ -55,6 +55,21 @@
         border-color: #dc3545;
     }
 
+    /* Tách ô "Phân Loại" thành nhiều vùng riêng, mỗi vùng một tiêu đề nhỏ */
+    .cat-subgroup + .cat-subgroup {
+        margin-top: 12px;
+    }
+
+    .cat-subgroup-title {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        color: var(--primary-dark);
+    }
+
     .cat-check-item {
         display: flex;
         align-items: flex-start;
