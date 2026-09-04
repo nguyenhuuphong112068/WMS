@@ -90,6 +90,20 @@ class LoginController extends Controller
                 ->with('pwExpiredUser', $getUser->userName);
         }
 
+        // §11.300(b) - mật khẩu do quản trị đặt (tài khoản mới / vừa reset):
+        // buộc đổi ngay ở lần đăng nhập đầu tiên trước khi vào hệ thống.
+        if (! empty($getUser->must_change_password)) {
+            AuditTrialController::log(
+                'Yêu cầu đổi mật khẩu', 'user_management', $getUser->id,
+                'must_change_password: 1', 'Lần đăng nhập đầu tiên - buộc đổi mật khẩu', $getUser->userName
+            );
+
+            return redirect()->route('login')
+                ->with('error', 'Đây là lần đăng nhập đầu tiên. Vui lòng đổi mật khẩu mới để tiếp tục.')
+                ->with('activeForm', 'changePass')
+                ->with('pwExpiredUser', $getUser->userName);
+        }
+
         $this->establishSession($request, $getUser);
 
         AuditTrialController::log('Login', 'NA', 0, 'NA', 'Đăng Nhập Thành Công');
@@ -161,6 +175,7 @@ class LoginController extends Controller
                 'changePWdate'          => today()->addDays(self::PASSWORD_VALIDITY_DAYS),
                 'failed_login_attempts' => 0,
                 'locked_until'          => null,
+                'must_change_password'  => false,
             ]);
 
         $this->recordPasswordHistory($getUser->id, $newHash, $getUser->userName);

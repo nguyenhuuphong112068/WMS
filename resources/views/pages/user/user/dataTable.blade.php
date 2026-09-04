@@ -31,6 +31,7 @@
                         <th>Người Tạo</th>
                         <th>Ngày Tạo</th>
                         <th>Quyền Riêng</th>
+                        <th>Reset Pass</th>
                         <th>Edit</th>
                         <th>DeActive</th>
                     </tr>
@@ -56,6 +57,17 @@
                                         data-fullname="{{ $data->fullName }}" data-toggle="modal"
                                         data-target="#UserPermissionModal">
                                         <i class="fas fa-user-shield"></i>
+                                    </button>
+                                @endperm
+                            </td>
+
+                            <td class="text-center align-middle">
+                                @perm('user_resetPassword')
+                                    <button type="button" class="btn btn-secondary btn-reset-pass"
+                                        title="Reset mật khẩu tạm - buộc user đổi ở lần đăng nhập kế tiếp"
+                                        data-id="{{ $data->id }}" data-username="{{ $data->userName }}"
+                                        data-toggle="modal" data-target="#ResetPassModal">
+                                        <i class="fas fa-key"></i>
                                     </button>
                                 @endperm
                             </td>
@@ -198,6 +210,15 @@
             // Tổ: dựng theo phòng ban của user rồi chọn sẵn các tổ hiện có
             var groupIds = (button.data('group_ids') || []).map(String);
             buildGroupOptions(modal, groupIds);
+        });
+
+        // Mở modal reset mật khẩu: nạp id + tên đăng nhập của dòng đang chọn
+        $('.btn-reset-pass').click(function() {
+            const button = $(this);
+            const modal = $('#ResetPassModal');
+            modal.find('input[name="id"]').val(button.data('id'));
+            modal.find('#resetPassUserName').text(button.data('username'));
+            modal.find('#resetNewPassword, #resetConfirmPassword').val('');
         });
 
         $('.form-deActive').on('submit', function(e) {

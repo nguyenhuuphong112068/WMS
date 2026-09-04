@@ -9,6 +9,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\General\HomeController;
+use App\Http\Controllers\General\PublicChemicalLookupController;
 use App\Http\Controllers\General\PrintTestController;
 use App\Http\Controllers\General\SwitchProductionController;
 use App\Http\Controllers\UploadDataController;
@@ -21,6 +22,9 @@ Route::get('/', [LoginController::class, 'showLogin']);
 Route::get('/login', [LoginController::class, 'showLogin'])->name('login.form');
 
 Route::post('/', [LoginController::class, 'login'])->name('login');
+
+// Tra cứu tồn kho + vị trí hoá chất của một phòng ban - CÔNG KHAI, không cần đăng nhập
+Route::get('/tra-cuu-hoa-chat', [PublicChemicalLookupController::class, 'index'])->name('publicChemicalLookup');
 
 Route::post('/changePassword', [LoginController::class, 'changePassword'])->name('changePassword');
 

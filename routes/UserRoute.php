@@ -28,6 +28,7 @@ Route::prefix('/user')
                 Route::get('', 'index')->name('list');
                 Route::post('store', 'store')->name('store');
                 Route::post('update', 'update')->name('update');
+                Route::post('resetPassword', 'resetPassword')->name('resetPassword');
                 Route::post('deActive/{id}', 'deActive')->name('deActive');
             });
 

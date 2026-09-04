@@ -147,6 +147,8 @@ class UserController extends Controller
                         'company_id' => $companyId,
                         'mail' => $request->mail,
                         'changePWdate' => today()->addDays(90),
+                        // §11.300(b) - mật khẩu do quản trị đặt: buộc đổi ở lần đăng nhập đầu tiên
+                        'must_change_password' => true,
                         'prepareBy' => \App\Support\Signer::actor(),
                         'created_at' => now(),
                 ]);
@@ -241,6 +243,8 @@ class UserController extends Controller
                     $updateData['changePWdate'] = today()->addDays(90);
                     $updateData['failed_login_attempts'] = 0;
                     $updateData['locked_until'] = null;
+                    // Mật khẩu do quản trị đặt: buộc user đổi ở lần đăng nhập kế tiếp
+                    $updateData['must_change_password'] = true;
                     $pwChanged = true;
                 }
 
@@ -338,6 +342,96 @@ class UserController extends Controller
                 if ($valid !== $groupIds->unique()->count()) {
                         $validator->errors()->add('group_id', 'Tổ được chọn không thuộc phòng ban đã chọn.');
                 }
+        }
+
+        /**
+         * Reset mật khẩu cho một tài khoản (nút "Reset Mật Khẩu" trên danh sách).
+         * Đặt mật khẩu tạm do quản trị nhập, buộc user đổi ở lần đăng nhập kế tiếp.
+         * §11.300(b): không cho trùng 5 mật khẩu gần nhất, ghi lịch sử + audit trail.
+         */
+        public function resetPassword(Request $request){
+
+                $validator = Validator::make($request->all(), [
+                    'id' => 'required|integer|exists:user_management,id',
+                    'newPassword' => [
+                        'required', 'string', 'min:6', 'max:255',
+                        'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/',
+                    ],
+                    'confirmPassword' => 'required|same:newPassword',
+                ], [
+                    'newPassword.required' => 'Vui lòng nhập mật khẩu tạm.',
+                    'newPassword.min' => 'Mật khẩu phải có ít nhất :min ký tự.',
+                    'newPassword.regex' => 'Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt.',
+                    'confirmPassword.required' => 'Vui lòng xác nhận mật khẩu tạm.',
+                    'confirmPassword.same' => 'Xác nhận mật khẩu không khớp.',
+                ]);
+
+                if ($validator->fails()) {
+                    return redirect()->back()->withErrors($validator, 'resetPasswordErrors')->withInput();
+                }
+
+                $target = DB::table('user_management')->where('id', $request->id)->first();
+
+                if (! $target) {
+                    return redirect()->back()->with('error', 'Không tìm thấy tài khoản.');
+                }
+
+                // §11.300(b) - không cho dùng lại mật khẩu cũ
+                if ($this->passwordRecentlyUsed($target, $request->newPassword)) {
+                    return redirect()->back()
+                        ->withErrors(['newPassword' => 'Mật khẩu tạm trùng với một trong 5 mật khẩu đã dùng gần đây. Vui lòng chọn mật khẩu khác.'], 'resetPasswordErrors')
+                        ->withInput();
+                }
+
+                $pwHash = Hash::make($request->newPassword);
+
+                DB::table('user_management')->where('id', $target->id)->update([
+                    'passWord' => $pwHash,
+                    'changePWdate' => today()->addDays(90),
+                    'must_change_password' => true,
+                    'failed_login_attempts' => 0,
+                    'locked_until' => null,
+                    'prepareBy' => \App\Support\Signer::actor(),
+                    'updated_at' => now(),
+                ]);
+
+                DB::table('password_histories')->insert([
+                    'user_id' => $target->id,
+                    'password_hash' => $pwHash,
+                    'created_by' => Signer::actor(),
+                    'created_at' => now(),
+                ]);
+
+                AuditTrialController::log(
+                    'Reset mật khẩu', 'user_management', $target->id, 'NA',
+                    'Reset mật khẩu tạm cho tài khoản: '.$target->userName.' ('.$target->fullName.') - buộc đổi ở lần đăng nhập kế tiếp'
+                );
+
+                return redirect()->back()->with('success', 'Đã reset mật khẩu. Người dùng phải đổi mật khẩu ở lần đăng nhập kế tiếp.');
+        }
+
+        /**
+         * Mật khẩu mới có trùng hash hiện tại hoặc 5 hash gần nhất trong lịch sử không.
+         */
+        private function passwordRecentlyUsed($target, string $newPassword): bool
+        {
+                if (Hash::check($newPassword, $target->passWord)) {
+                    return true;
+                }
+
+                $recent = DB::table('password_histories')
+                    ->where('user_id', $target->id)
+                    ->orderByDesc('id')
+                    ->limit(5)
+                    ->pluck('password_hash');
+
+                foreach ($recent as $hash) {
+                    if (Hash::check($newPassword, $hash)) {
+                        return true;
+                    }
+                }
+
+                return false;
         }
 
         public function deActive(string|int $id){

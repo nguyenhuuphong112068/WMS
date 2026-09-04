@@ -558,6 +558,10 @@
                     nhập</a>
             </form>
 
+            <a href="{{ route('publicChemicalLookup') }}" class="toggle-link">
+                <i class="bi bi-search me-1"></i> Tra cứu tồn kho hoá chất (không cần đăng nhập)
+            </a>
+
             <div class="form-footer">
                 WMS © {{ date('Y') }} – Hệ thống quản lý kho nội bộ
             </div>
