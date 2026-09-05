@@ -40,7 +40,7 @@
                         </tbody>
                     </table>
 
-                    <h6 class="cg-h">Mười nhóm phân loại ("hình 1")</h6>
+                    <h6 class="cg-h">Mười một nhóm phân loại ("hình 1" + nhóm 11 Luật Đầu tư)</h6>
                     <table class="table table-sm table-bordered cg-table cg-groups mb-2">
                         <thead>
                             <tr>
@@ -62,9 +62,24 @@
 
                     <div class="cg-legend mb-4">
                         <span><span class="badge badge-danger">&nbsp;</span> Nhóm 9, 10 – phải lập Kế hoạch phòng ngừa, ứng phó sự cố (Phụ lục IV)</span>
-                        <span><span class="badge badge-warning text-dark">&nbsp;</span> Nhóm 4, 6 – hoá chất cấm (Phụ lục III bảng B)</span>
+                        <span><span class="badge badge-warning text-dark">&nbsp;</span> Nhóm 4, 6, 11 – hoá chất cấm (Phụ lục III bảng B / Luật Đầu tư 2025)</span>
                         <span><span class="badge badge-primary">&nbsp;</span> Các nhóm còn lại</span>
                     </div>
+
+                    <div class="md-hint mb-4">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <b>Nhóm 11</b> không thuộc Nghị định 24/2026/NĐ-CP - là "Hoá chất cấm" theo
+                        <b>Luật Đầu tư 2025, số 143/2025/QH15</b>, gộp chung vào danh sách phân loại để khai
+                        và cảnh báo cùng một chỗ với các nhóm hoạt chất khác.
+                    </div>
+
+                    <h6 class="cg-h">Cách xác định một hỗn hợp có thuộc nhóm 2 hay không</h6>
+                    <p class="cg-p">
+                        Xét từng thành phần của hỗn hợp, đối chiếu với danh mục Nghị định 24: hỗn hợp có
+                        <b>≥ 2 hoạt chất thành phần</b>, trong đó có <b>≥ 1 thành phần thuộc Phụ lục II nhóm 1</b>
+                        → hỗn hợp thuộc <b>nhóm 2</b>.
+                        <span class="cg-note">(hệ thống tự suy, không cần tick tay).</span>
+                    </p>
 
                     <h6 class="cg-h">Cách xác định một hỗn hợp có thuộc nhóm 8 hay không</h6>
                     <p class="cg-p">Xét từng thành phần của hỗn hợp, đối chiếu với danh mục Nghị định 24:</p>

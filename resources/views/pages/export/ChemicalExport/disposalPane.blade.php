@@ -1,7 +1,7 @@
 {{--
 | SỬ DỤNG - TAB HOÁ CHẤT CHỜ HUỶ (BƯỚC 2 CỦA NGHIỆP VỤ HUỶ BỎ)
 |
-| BƯỚC 1 "Loại bỏ" làm ở tab Sổ sử dụng: lập phiếu loại Huỷ bỏ, hoá chất bị đánh dấu
+| BƯỚC 1 "Loại bỏ" làm ở tab Sổ sử dụng: lập phiếu loại Loại bỏ, hoá chất bị đánh dấu
 |        loại bỏ và trừ tồn ngay, rồi rơi vào bảng "Hoá chất chờ huỷ" bên dưới.
 | BƯỚC 2 "Huỷ hoá chất": chọn các phiếu chờ, gom thành MỘT đợt để xin quyết định huỷ
 |        một lần từ TP. ĐBCL và Ban Giám Đốc. Có quyết định rồi thì in được biểu mẫu
@@ -23,7 +23,7 @@
         @endperm
         <p class="hint">
             <i class="fas fa-info-circle mr-1"></i>
-            Huỷ hoá chất đi <b>hai bước</b>. <b>Bước 1 - Loại bỏ</b>: lập phiếu <b>Huỷ bỏ</b> ở tab Sổ sử dụng, hoá
+            Huỷ hoá chất đi <b>hai bước</b>. <b>Bước 1 - Loại bỏ</b>: lập phiếu <b>Loại bỏ</b> ở tab Sổ sử dụng, hoá
             chất trừ tồn ngay và về đây chờ. <b>Bước 2 - Huỷ</b>: gom nhiều phiếu thành một đợt, trình
             <b>TP. ĐBCL</b> và <b>Ban Giám Đốc</b>; có quyết định rồi thì in được biểu mẫu
             <b>{{ \App\Http\Controllers\Pages\Export\ChemicalDisposalController::FORM['form_no'] }}</b>.
@@ -89,7 +89,7 @@
                 @empty
                     <tr>
                         <td colspan="9" class="text-center md-empty py-4">
-                            Không có hoá chất nào đang chờ huỷ. Lập phiếu loại <b>Huỷ bỏ</b> ở tab
+                            Không có hoá chất nào đang chờ huỷ. Lập phiếu loại <b>Loại bỏ</b> ở tab
                             <b>Sổ sử dụng hoá chất</b> để đánh dấu loại bỏ.
                         </td>
                     </tr>

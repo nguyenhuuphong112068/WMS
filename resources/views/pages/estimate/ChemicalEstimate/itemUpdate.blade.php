@@ -42,7 +42,14 @@
 
                     <div class="form-group est-source-category">
                         <label>Hoá Chất Trong Danh Mục <span class="text-danger">*</span></label>
-                        <select name="category_id" class="form-control est-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}">
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-est-pick-category est-pick-category"
+                                data-target-modal="#itemUpdateModal">
+                                <i class="fas fa-th-list mr-1"></i> Chọn Từ Danh Mục Hoá Chất
+                            </button>
+                        </div>
+                        <select name="category_id" class="form-control est-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
+                            data-threshold-url="{{ route('pages.estimate.chemicalEstimate.checkThreshold') }}">
                             <option value="">-- Chọn hoá chất --</option>
                             @foreach ($categories as $category)
                                 <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
@@ -53,6 +60,7 @@
                         @if ($bag->has('category_id'))
                             <span class="md-error">{{ $bag->first('category_id') }}</span>
                         @endif
+                        <div class="est-threshold-alerts"></div>
                     </div>
 
                     <div class="form-group est-source-manual">

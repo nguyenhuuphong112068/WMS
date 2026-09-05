@@ -1,10 +1,10 @@
 {{--
 | Phần dùng chung cho modal Thêm mới / Cập nhật Tên Hoá Chất:
-|   - chọn NHIỀU hoạt chất + khai % khối lượng từng thành phần (dùng cho quy tắc nhóm 8)
-|   - tick "Hỗn hợp SX-KD có điều kiện (Phụ lục II nhóm 2)"  => nhóm 2
+|   - chọn NHIỀU hoạt chất + khai % khối lượng từng thành phần (dùng cho quy tắc nhóm 2, 8)
 |   - tick nhóm nguy hại Bảng B (chỉ có hiệu lực khi hỗn hợp có thành phần nhóm 9) => nhóm 10
+| Nhóm 2 (hỗn hợp >= 2 hoạt chất, có >= 1 thành phần nhóm 1) tự suy, không tick tay.
 | Biến vào: $bag, $activeIngredients, $hazardCategories, $hazardGroups, $groupLabels,
-|           $oldAiIds, $oldHazardIds, $oldPercents, $oldConditional
+|           $oldAiIds, $oldHazardIds, $oldPercents
 --}}
 <div class="form-group">
     <div class="d-flex align-items-center justify-content-between flex-wrap mb-1" style="gap: 8px">
@@ -27,7 +27,6 @@
             @endphp
             <option value="{{ $ai->id }}" data-name="{{ $ai->name }}"
                 data-g9="{{ in_array(9, $ai->groups ?? [], true) ? 1 : 0 }}"
-                data-g1="{{ in_array(1, $ai->groups ?? [], true) ? 1 : 0 }}"
                 {{ in_array((int) $ai->id, $oldAiIds, true) ? 'selected' : '' }}>{{ $aiLabel }}</option>
         @endforeach
     </select>
@@ -50,21 +49,6 @@
     <small class="text-muted d-block mt-1">
         Dùng để tự xét <b>nhóm 8</b> (Hỗn hợp chất cần kiểm soát đặc biệt): có thành phần nhóm 3/4/6/7
         tỉ lệ &gt; 1%, hoặc thành phần nhóm 5 tỉ lệ &gt; 5%. Bỏ trống = coi như 0% (không tự đánh nhóm 8).
-    </small>
-</div>
-
-<div class="form-group">
-    <div class="custom-control custom-checkbox">
-        <input type="checkbox" class="custom-control-input" id="{{ $chemCondId ?? 'chemConditional' }}"
-            name="is_conditional_mixture" value="1" data-conditional-toggle
-            {{ $oldConditional ? 'checked' : '' }}>
-        <label class="custom-control-label" for="{{ $chemCondId ?? 'chemConditional' }}">
-            <b>Hỗn hợp chất sản xuất, kinh doanh có điều kiện</b> (Phụ lục II nhóm 2) — nhóm 2
-        </label>
-    </div>
-    <small class="text-muted d-block mt-1" data-conditional-hint style="display: none">
-        <i class="fas fa-lightbulb mr-1"></i>
-        Hỗn hợp này có thành phần thuộc nhóm 1 (Phụ lục II) — cân nhắc đánh dấu nhóm 2.
     </small>
 </div>
 

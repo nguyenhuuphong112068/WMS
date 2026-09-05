@@ -165,7 +165,7 @@
                                                         <select name="items[{{ $idx }}][analyst_id]" class="form-control">
                                                             <option value="">-- KNV --</option>
                                                             @foreach ($analysts as $an)
-                                                                <option value="{{ $an->id }}" {{ $item->analyst_id == $an->id ? 'selected' : '' }}>{{ $an->name }}</option>
+                                                                <option value="{{ $an->id }}" {{ $item->analyst_id == $an->id ? 'selected' : '' }}>{{ $an->fullName }} ({{ $an->userName }})</option>
                                                             @endforeach
                                                         </select>
                                                     </td>
@@ -232,7 +232,7 @@
                                                         <select name="items[0][analyst_id]" class="form-control form-control-sm">
                                                             <option value="">-- KNV --</option>
                                                             @foreach ($analysts as $an)
-                                                                <option value="{{ $an->id }}">{{ $an->name }}</option>
+                                                                <option value="{{ $an->id }}">{{ $an->fullName }} ({{ $an->userName }})</option>
                                                             @endforeach
                                                         </select>
                                                     </td>

@@ -1,14 +1,36 @@
 @include('pages.category.shared.assets')
 
+@php
+    // Danh sách nhóm để lọc bảng: chỉ lấy các nhóm THỰC SỰ đang xuất hiện trong bảng này.
+    $dmFilterGroups = $datas
+        ->filter(fn ($row) => $row->classification_id && $row->classification_name)
+        ->unique('classification_id')
+        ->pluck('classification_name', 'classification_id')
+        ->sort();
+@endphp
+
 <div class="card md-card">
     <div class="card-body">
 
         <div class="md-toolbar">
-            @perm('category_material_dept_manage')
-                <button type="button" class="btn btn-primary btn-md-create" data-modal="#dmCreateModal">
-                    <i class="fas fa-plus mr-1"></i> Khai vật tư
-                </button>
-            @endperm
+            <div class="d-flex align-items-center flex-wrap" style="gap: 10px">
+                @perm('category_material_dept_manage')
+                    <button type="button" class="btn btn-primary btn-md-create" data-modal="#dmCreateModal">
+                        <i class="fas fa-plus mr-1"></i> Thêm mới vật tư phòng
+                    </button>
+                @endperm
+
+                <div class="dm-filter">
+                    <label for="dmGroupFilter"><i class="fas fa-filter mr-1"></i> Nhóm</label>
+                    <select id="dmGroupFilter" class="form-control form-control-sm">
+                        <option value="all">Tất cả</option>
+                        <option value="none">Chưa phân loại</option>
+                        @foreach ($dmFilterGroups as $groupId => $groupName)
+                            <option value="{{ $groupId }}">{{ $groupName }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
             <p class="hint">
                 <i class="fas fa-info-circle mr-1"></i>
                 Mỗi dòng ở đây cũng là lời khai <b>"phòng tôi có dùng vật tư này"</b>, hiện ở cột
@@ -20,22 +42,24 @@
             <table id="dmTable" class="table table-bordered table-hover w-100 md-table">
                 <thead>
                     <tr>
-                        <th class="text-center" style="width: 55px">STT</th>
-                        <th>Tên Vật Tư</th>
-                        <th>Nhà Sản Xuất</th>
+                        <th class="text-center" style="width: 46px">STT</th>
+                        <th style="width: 100px">Mã Vật Tư</th>
+                        <th style="width: 170px">Tên Vật Tư</th>
+                        <th style="width: 150px">Nhà Sản Xuất</th>
                         <th>Thông Tin Kỹ Thuật</th>
-                        <th style="width: 150px">Phân Loại</th>
-                        <th class="text-center" style="width: 90px">Đơn Vị</th>
-                        <th class="text-right" style="width: 140px">Ngưỡng Tồn Tối Thiểu</th>
-                        <th style="width: 170px">Ghi Chú</th>
-                        <th class="text-center" style="width: 100px">Sử Dụng</th>
-                        <th class="text-center" style="width: 110px">Thao Tác</th>
+                        <th style="width: 110px">Phân Loại</th>
+                        <th class="text-center" style="width: 65px">Đơn Vị</th>
+                        <th class="text-right" style="width: 120px">Ngưỡng Tồn Tối Thiểu</th>
+                        <th style="width: 130px">Ghi Chú</th>
+                        <th class="text-center" style="width: 90px">Sử Dụng</th>
+                        <th class="text-center" style="width: 85px">Thao Tác</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($datas as $row)
-                        <tr>
+                        <tr data-classification="{{ $row->classification_id }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
+                            <td class="font-weight-bold">{{ $row->category_code ?: '—' }}</td>
                             <td class="font-weight-bold">{{ $row->material_name ?: '—' }}</td>
                             <td class="md-sub">
                                 @if ($row->manufacturer_name)
@@ -130,3 +154,47 @@
         </div>
     </div>
 </div>
+
+@once
+    <style>
+        .dm-filter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dm-filter label {
+            margin: 0;
+            font-size: 0.83rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            white-space: nowrap;
+        }
+
+        .dm-filter .form-control {
+            width: auto;
+            min-width: 170px;
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var dmGroupWant = 'all';
+
+            /* ---------- Lọc bảng Vật Tư Của Phòng theo nhóm phân loại ---------- */
+            $.fn.dataTable.ext.search.push(function(settings, data, index) {
+                if (settings.nTable.id !== 'dmTable') return true;
+                if (dmGroupWant === 'all') return true;
+
+                var classificationId = ($(settings.aoData[index].nTr).attr('data-classification') || '').trim();
+
+                return dmGroupWant === 'none' ? classificationId === '' : classificationId === dmGroupWant;
+            });
+
+            $(document).on('change', '#dmGroupFilter', function() {
+                dmGroupWant = this.value;
+                $('#dmTable').DataTable().draw();
+            });
+        });
+    </script>
+@endonce

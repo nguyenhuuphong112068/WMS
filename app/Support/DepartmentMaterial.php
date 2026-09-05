@@ -170,6 +170,7 @@ class DepartmentMaterial
             ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
             ->select(
                 self::TABLE.'.*',
+                'material_categories.code as category_code',
                 'material_categories.technical_specification as category_technical_specification',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',

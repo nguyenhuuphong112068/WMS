@@ -30,9 +30,21 @@ Route::prefix('/export')
             Route::get('history', 'history')->name('history');
             // Tra lô theo mã xuất nhập khi quét mã vạch trên nhãn, trả JSON cho form xuất
             Route::get('lookup', 'lookup')->name('lookup');
-            // Đề nghị chuyển hoá chất: nguồn thông tin trước khi lập phiếu chuyển
-            Route::post('requestStore', 'requestStore')->name('requestStore');
-            Route::post('requestRespond', 'requestRespond')->name('requestRespond');
+            // Đề nghị chuyển hoá chất LIÊN PHÒNG BAN: A đề nghị -> B cấp phát (trừ tồn B) -> A nhận (tạo tồn A)
+            Route::post('transferRequestStore', 'transferRequestStore')->name('transferRequestStore');
+            Route::post('transferRequestUpdate', 'transferRequestUpdate')->name('transferRequestUpdate');
+            Route::post('transferRequestSend', 'transferRequestSend')->name('transferRequestSend');
+            Route::post('transferRequestDestroy', 'transferRequestDestroy')->name('transferRequestDestroy');
+            Route::post('transferIssueStore', 'transferIssueStore')->name('transferIssueStore');
+            Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
+            Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
+            Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
+            // Picker "Chọn Nhiều Từ Tồn Kho": xuất/lưu tạm nhiều phiếu nhập cùng lúc
+            Route::post('storeBatch', 'storeBatch')->name('storeBatch');
+            // Tab "Phiếu Tạm": dùng ngay hoặc xoá các đợt đã lưu tạm
+            Route::post('draftFinalize', 'draftFinalize')->name('draftFinalize');
+            Route::post('draftDeleteItem', 'draftDeleteItem')->name('draftDeleteItem');
+            Route::post('draftDeleteBatch', 'draftDeleteBatch')->name('draftDeleteBatch');
         });
 
         /*
@@ -62,7 +74,7 @@ Route::prefix('/export')
             Route::get('history', 'history')->name('history');
             // Tra ống theo mã ống chuẩn khi quét mã vạch trên nhãn, trả JSON cho form xuất
             Route::get('lookup', 'lookup')->name('lookup');
-            // Đề nghị cấp phát chuẩn & Cấp phát chuẩn cho Tổ
+            // Đề nghị cấp phát chuẩn nội bộ & Cấp phát chuẩn cho Tổ
             Route::post('requestStore', 'requestStore')->name('requestStore');
             Route::post('requestUpdate', 'requestUpdate')->name('requestUpdate');
             Route::post('requestSend', 'requestSend')->name('requestSend');
@@ -72,6 +84,16 @@ Route::prefix('/export')
             Route::post('requestDestroy', 'requestDestroy')->name('requestDestroy');
             Route::get('getIssuedStandards', 'getIssuedStandards')->name('getIssuedStandards');
             Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
+
+            // Đề nghị cấp phát chuẩn LIÊN PHÒNG BAN: A đề nghị -> B cấp phát (trừ tồn B) -> A nhận (tạo tồn A)
+            Route::post('transferRequestStore', 'transferRequestStore')->name('transferRequestStore');
+            Route::post('transferRequestUpdate', 'transferRequestUpdate')->name('transferRequestUpdate');
+            Route::post('transferRequestSend', 'transferRequestSend')->name('transferRequestSend');
+            Route::post('transferRequestDestroy', 'transferRequestDestroy')->name('transferRequestDestroy');
+            Route::post('transferIssueStore', 'transferIssueStore')->name('transferIssueStore');
+            Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
+            Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
+            Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
         });
 
         /*

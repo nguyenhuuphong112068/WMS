@@ -1,7 +1,7 @@
 @php
     $clsTarget = $clsTarget ?? 'mdTable';
     $clsLabel = $clsLabel ?? 'Phụ lục / Nhóm hoá chất';
-    // 10 nhóm NĐ 24/2026 (mã N1..N10), suy tự động từ dữ liệu gốc.
+    // 11 nhóm (10 nhóm NĐ 24/2026 + nhóm 11 Luật Đầu tư 2025), mã N1..N11, suy tự động từ dữ liệu gốc.
     $clsList = \App\Support\ChemicalClassification::labels();
 @endphp
 

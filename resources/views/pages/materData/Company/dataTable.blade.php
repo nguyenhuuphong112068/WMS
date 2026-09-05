@@ -10,11 +10,7 @@
                 </button>
             @endperm
 
-            <p class="text-muted mb-2" style="font-size: .88rem">
-                <i class="fas fa-info-circle mr-1"></i>
-                Mỗi phòng ban thuộc đúng một công ty. "Ngưỡng Tồn Trữ PL IV" chỉ cộng tồn trong phạm vi
-                các phòng ban của cùng một công ty.
-            </p>
+
 
             <table id="data_table_company" class="table table-bordered table-striped">
                 <thead style="position: sticky; top: 60px; background-color: white; z-index: 1020">
@@ -46,7 +42,8 @@
                                 @endif
                             </td>
                             <td>{{ $data->created_by ?? '-' }}</td>
-                            <td>{{ $data->created_at ? \Carbon\Carbon::parse($data->created_at)->format('d/m/Y') : '-' }}</td>
+                            <td>{{ $data->created_at ? \Carbon\Carbon::parse($data->created_at)->format('d/m/Y') : '-' }}
+                            </td>
                             <td class="text-center align-middle">
                                 <span class="md-btn-wrap">
                                     @perm('materData_update')

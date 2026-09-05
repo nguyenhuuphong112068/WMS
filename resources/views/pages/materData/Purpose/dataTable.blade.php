@@ -34,7 +34,7 @@
                                 <tr>
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td class="font-weight-bold">{{ $row->name }}</td>
-                                    <td class="md-sub">{{ $row->created_by ?: '—' }}</td>
+                                    <td class="md-sub">{{ $row->updated_by ?: $row->created_by ?: '—' }}</td>
                                     <td class="text-center md-sub">
                                         {{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '—' }}
                                     </td>

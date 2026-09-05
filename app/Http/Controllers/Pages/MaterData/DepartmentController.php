@@ -23,6 +23,7 @@ class DepartmentController extends Controller
         'company_id' => 'Công ty',
         'shortName' => 'Tên viết tắt',
         'name' => 'Tên phòng ban',
+        'is_general' => 'Phòng ban chung',
     ];
 
     public function index()
@@ -157,10 +158,13 @@ class DepartmentController extends Controller
         return \App\Support\Signer::actor();
     }
 
-    /** Bảng tra nhãn để lịch sử hiện tên công ty thay vì company_id. */
+    /** Bảng tra nhãn để lịch sử hiện tên công ty và Có/Không thay vì company_id, 0/1. */
     private function maps(): array
     {
-        return ['company_id' => DB::table('companies')->pluck('name', 'id')->all()];
+        return [
+            'company_id' => DB::table('companies')->pluck('name', 'id')->all(),
+            'is_general' => [1 => 'Không', 0 => 'Có'],
+        ];
     }
 
     private function payload(Request $request): array
@@ -169,6 +173,9 @@ class DepartmentController extends Controller
             'company_id' => (int) $request->company_id,
             'shortName' => trim((string) $request->shortName),
             'name' => trim((string) $request->name),
+            // Checkbox trên form là "Phòng ban chung" (is_common) - ngược dấu với cột
+            // is_general: tick vào nghĩa là KHÔNG tham gia nghiệp vụ nên is_general = 0.
+            'is_general' => $request->has('is_common') ? 0 : 1,
         ];
     }
 }

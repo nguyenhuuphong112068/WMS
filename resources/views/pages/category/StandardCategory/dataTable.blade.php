@@ -113,7 +113,7 @@
                                 @endif
                             </td>
                             <td class="md-sub">
-                                {{ $row->created_by ?: '—' }}
+                                {{ $row->updated_by ?: $row->created_by ?: '—' }}
                                 @if ($row->created_at)
                                     <br><small>{{ \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') }}</small>
                                 @endif

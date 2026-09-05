@@ -129,6 +129,13 @@ class DataMasterHistory
     {
         $snapshot = [];
 
+        if (property_exists($row, 'created_by') || property_exists($row, 'created_at')) {
+            $snapshot['Người tạo'] = self::label($row->created_by ?? null);
+            $snapshot['Ngày tạo'] = ($row->created_at ?? null)
+                ? Carbon::parse($row->created_at)->format('d/m/Y H:i')
+                : '—';
+        }
+
         foreach ($fields as $column => $title) {
             $snapshot[$title] = self::label($row->$column ?? null, $maps[$column] ?? null);
         }

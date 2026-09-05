@@ -233,30 +233,46 @@
                 </li> --}}
 
                 <!-- Droplist Menu Chuyển Bộ Phận  -->
+                @php
+                    $currentDept = session('user')['selected_department'] ?? session('user')['department'] ?? null;
+                @endphp
                 @if (user_has_any_role(session('user')['userId'], ['Admin']))
                     <li class="nav-item has-treeview">
                         <a href="#" class="nav-link">
                             <i class="fas fa-building"></i>
                             <p>
-                                {{ session('user')['selected_department'] }}
+                                {{ $currentDept ?? 'Chưa chọn bộ phận' }}
                                 <i class="right fas fa-angle-left"></i>
                             </p>
                         </a>
                         <ul class="nav nav-treeview">
                             @php
-                                $departments = DB::table('deparments')->get();
+                                // Phòng ban chung (is_general = 0, VD: BOD, Cung Ứng) chỉ để tạo user,
+                                // không có kho hàng riêng nên không hiện trong Chuyển Bộ Phận.
+                                $departments = DB::table('deparments')
+                                    ->where('isActive', 1)
+                                    ->where('is_general', 1)
+                                    ->orderBy('shortName', 'asc')
+                                    ->get();
                             @endphp
                             @foreach ($departments as $dept)
                                 <li class="nav-item">
                                     <a href="{{ route('switch', ['selected_department' => $dept->shortName, 'redirect' => url()->current()]) }}"
                                         class="nav-link">
                                         <i
-                                            class="far fa-circle nav-icon {{ session('user')['selected_department'] == $dept->shortName ? 'text-danger' : '' }}"></i>
+                                            class="far fa-circle nav-icon {{ $currentDept == $dept->shortName ? 'text-danger' : '' }}"></i>
                                         <p>{{ $dept->shortName }}</p>
                                     </a>
                                 </li>
                             @endforeach
                         </ul>
+                    </li>
+                @else
+                    <li class="nav-item">
+                        <span class="nav-link" style="color: #c2c7d0; cursor: default;">
+                            <i class="fas fa-building nav-icon"></i>
+                            <p>{{ $currentDept ?? 'Chưa phân bộ phận' }}</p>
+                        </span>
                     </li>
                 @endif
 
@@ -333,13 +349,6 @@
                                         class="nav-link {{ request()->is('materData/productName') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-danger"></i>
                                         <p>Tên Sản Phẩm</p>
-                                    </a></li>
-                            @endperm
-                            @perm('materData_view')
-                                <li class="nav-item"><a href="{{ route('pages.materData.analyst.list') }}"
-                                        class="nav-link {{ request()->is('materData/analyst') ? 'active' : '' }}"><i
-                                            class="far fa-circle nav-icon text-primary"></i>
-                                        <p>Kiểm Nghiệm Viên</p>
                                     </a></li>
                             @endperm
                             @perm('materData_view')

@@ -22,11 +22,9 @@ Route::prefix('/import')
 
         Route::prefix('/chemicalImport')->name('chemicalImport.')->controller(ChemicalImportController::class)->group(function () {
             Route::get('', 'index')->name('list');
-            // Nhận lô hoá chất do phòng ban khác chuyển sang, khai định khu của phòng mình
-            Route::post('receive', 'receive')->name('receive');
-            // Từ chối nhận: khoá phiếu chuyển, trả số lượng lại tồn của phòng gửi
-            Route::post('rejectTransfer', 'rejectTransfer')->name('rejectTransfer');
             Route::post('store', 'store')->name('store');
+            // Cảnh báo ngưỡng PL IV tức thời khi chọn hoá chất / gõ số lượng trong modal Nhập/Điều chỉnh
+            Route::get('checkThreshold', 'checkThreshold')->name('checkThreshold');
             // Trang in nhãn dán lô hàng (mã vạch Code 128), mở tab mới rồi bấm In
             Route::get('label', 'label')->name('label');
             // Trang in nhãn báo về khi bấm In: ghi audit log in nhãn của lô nào, mấy cái, lúc nào
@@ -34,6 +32,8 @@ Route::prefix('/import')
             Route::get('history', 'history')->name('history');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
+            Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
         });
 
         Route::prefix('/standardImport')->name('standardImport.')->controller(StandardImportController::class)->group(function () {

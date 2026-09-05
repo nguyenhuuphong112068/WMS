@@ -372,6 +372,8 @@ class StandardStabilityController extends Controller
                 'start_date' => $startDate,
                 'assessment_period' => (int) $request->assessment_period,
                 'note' => $this->nullIfBlank($request->note),
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
             ]);
 
             $moved = 0;

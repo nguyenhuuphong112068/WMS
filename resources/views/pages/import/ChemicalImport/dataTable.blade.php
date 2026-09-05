@@ -15,13 +15,6 @@
                         data-pane="impPaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ nhập hoá chất
                     </button>
-                    <button type="button" class="imp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}"
-                        data-pane="impPaneTransfer">
-                        <i class="fas fa-truck-arrow-right mr-1"></i> Hàng chờ nhận
-                        @if ($pendingTransfers->count())
-                            <span class="imp-tab-count">{{ $pendingTransfers->count() }}</span>
-                        @endif
-                    </button>
                     <button type="button" class="imp-tab {{ $activeTab === 'report' ? 'is-active' : '' }}"
                         data-pane="impPaneReport">
                         <i class="fas fa-chart-column mr-1"></i> Báo cáo nhập hoá chất
@@ -47,12 +40,6 @@
                     'scanTitle' => 'Quét mã vạch',
                     'scanTables' => [
                         ['id' => 'mdTable', 'column' => 1, 'pane' => 'impPaneBook', 'label' => 'Sổ nhập hoá chất'],
-                        [
-                            'id' => 'impTransferTable',
-                            'column' => 1,
-                            'pane' => 'impPaneTransfer',
-                            'label' => 'Hàng chờ nhận',
-                        ],
                     ],
                 ])
 
@@ -75,6 +62,8 @@
                                 <th style="width: 150px">Nhà Cung Cấp</th>
                                 <th style="width: 140px">Hoá Đơn</th>
                                 <th style="width: 130px">Người Nhập</th>
+                                <th class="text-center" style="width: 60px" title="File hồ sơ đính kèm"><i
+                                        class="fas fa-paperclip"></i></th>
                                 <th class="text-center" style="width: 150px">Thao Tác</th>
                             </tr>
                         </thead>
@@ -90,6 +79,7 @@
                                                 ? 'imp-expiring'
                                                 : '');
                                     }
+                                    $rowAttachments = $attachments->get($row->id) ?? collect();
                                 @endphp
                                 {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
                                 <tr data-classification="{{ $impCls($row->category_id) }}">
@@ -150,6 +140,27 @@
                                         @endif
                                     </td>
                                     <td class="md-sub">{{ $row->imported_by ?: '—' }}</td>
+                                    <td class="text-center">
+                                        @if ($rowAttachments->isNotEmpty())
+                                            <div class="dropdown">
+                                                <button class="btn btn-xs btn-outline-primary dropdown-toggle"
+                                                    type="button" data-toggle="dropdown">
+                                                    <i class="fas fa-paperclip"></i> ({{ $rowAttachments->count() }})
+                                                </button>
+                                                <div class="dropdown-menu dropdown-menu-right shadow-sm">
+                                                    @foreach ($rowAttachments as $att)
+                                                        <a class="dropdown-item small py-2" target="_blank"
+                                                            href="{{ route($impRoute . 'downloadAttachment', ['id' => $att->id]) }}">
+                                                            <i class="fas fa-external-link-alt mr-2 text-primary"></i>
+                                                            {{ $att->file_name }}
+                                                        </a>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
                                     <td>
                                         <div class="md-actions">
                                             @php $impAdjust = (int) ($historyCounts[$row->id] ?? 0); @endphp
@@ -170,7 +181,9 @@
                                                             'is_microbiological_chemicals' => $row->is_microbiological_chemicals,
                                                             'batch_no' => $row->batch_no,
                                                             'supplier_id' => $row->supplier_id,
+                                                            'location_id' => $row->location_id,
                                                             'note' => $row->note,
+                                                            'attachments' => $rowAttachments->map(fn($a) => ['id' => $a->id, 'file_name' => $a->file_name])->toArray(),
                                                         ]) }}">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
@@ -214,110 +227,6 @@
                         </tbody>
                     </table>
                 </div>
-                </div>
-
-                {{-- ============ HÀNG CHỜ NHẬN TỪ PHÒNG BAN KHÁC ============ --}}
-                <div class="imp-pane {{ $activeTab === 'transfer' ? 'is-active' : '' }}" id="impPaneTransfer">
-
-                    <div class="md-toolbar">
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Hoá chất do phòng ban khác chuyển sang, <b>chưa nằm trong tồn kho của phòng mình</b>.
-                            Bấm <b>Nhận</b> để khai định khu và các thông tin riêng của kho phòng mình - lúc đó lô
-                            mới được cấp mã (giữ nguyên mã gốc kèm hậu tố <b>-CK</b>) và cộng vào tồn.
-                        </p>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table id="impTransferTable" class="table table-bordered table-hover w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-center" style="width: 60px">STT</th>
-                                    <th style="width: 150px">Mã Gốc</th>
-                                    <th>Hoá Chất</th>
-                                    <th class="text-right" style="width: 110px">Số Lượng</th>
-                                    <th style="width: 150px">Phòng Ban Gửi</th>
-                                    <th class="text-center" style="width: 105px">Ngày Chuyển</th>
-                                    <th class="text-center" style="width: 105px">Hạn Dùng</th>
-                                    <th style="width: 130px">Người Chuyển</th>
-                                    <th class="text-center" style="width: 110px">Thao Tác</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($pendingTransfers as $transfer)
-                                    @php $impTransferUnit = $transfer->unit_short_name ?: $transfer->unit_name; @endphp
-                                    <tr>
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td><span class="imp-code">{{ $transfer->source_code }}</span></td>
-                                        <td>
-                                            <div class="font-weight-bold">{{ $transfer->chem_name ?: '—' }}</div>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $transfer->category_code ?: '—' }}</span>
-                                                @if ($transfer->batch_no)
-                                                    <span class="ml-1">Lô {{ $transfer->batch_no }}</span>
-                                                @endif
-                                                @if ($transfer->is_microbiological_chemicals)
-                                                    <span class="imp-flag ml-1">Vi sinh</span>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $transfer->amount }}">
-                                            <span class="imp-amount">{{ $impNum($transfer->amount) }}</span>
-                                            <div class="md-sub">{{ $impTransferUnit }}</div>
-                                            @if ($transfer->is_partial)
-                                                <span class="imp-lot-kind partial"
-                                                    title="Nhận lẻ: lô nguồn nhập {{ $impNum($transfer->full_lot_amount) }} {{ $impTransferUnit }} và đã bị đụng vào (cân chia, cân đối hoặc dùng bớt). Số lượng chốt cứng, không xuất vượt và không cân đối được, nhưng kế thừa luôn hạn dùng nội bộ.">Nhận
-                                                    lẻ</span>
-                                            @else
-                                                <span class="imp-lot-kind full"
-                                                    title="Nhận nguyên: lô còn y nguyên như lúc phòng gửi nhập ({{ $impNum($transfer->full_lot_amount) }} {{ $impTransferUnit }}), chưa cân đối, chưa xuất lần nào. Vẫn được xuất vượt 5% và cân đối, nhưng phải tự xác định hạn dùng nội bộ.">Nhận
-                                                    nguyên</span>
-                                            @endif
-                                        </td>
-                                        <td class="md-sub">{{ $transfer->from_department_name ?: '—' }}</td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $transfer->exported_date }}">
-                                            {{ $impDate($transfer->exported_date) }}
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $transfer->expired_date ?: '9999-12-31' }}">
-                                            {{ $impDate($transfer->expired_date) }}
-                                        </td>
-                                        <td class="md-sub">{{ $transfer->exported_by ?: '—' }}</td>
-                                        <td class="text-center">
-                                            @perm('import_chemical_receive')
-                                                <button type="button" class="btn btn-sm btn-primary btn-imp-receive"
-                                                    data-row="{{ json_encode([
-                                                        'export_id' => $transfer->id,
-                                                        'source_code' => $transfer->source_code,
-                                                        'chem_name' => $transfer->chem_name,
-                                                        'category_code' => $transfer->category_code,
-                                                        'amount' => $impNum($transfer->amount) . ' ' . $impTransferUnit,
-                                                        'batch_no' => $transfer->batch_no,
-                                                        'expired_date' => $impDate($transfer->expired_date),
-                                                        'from_department' => $transfer->from_department_name,
-                                                        'exported_date' => $impDate($transfer->exported_date),
-                                                        'exported_by' => $transfer->exported_by,
-                                                        'purpose' => $transfer->purpose,
-                                                    ]) }}">
-                                                    <i class="fas fa-inbox mr-1"></i> Nhận
-                                                </button>
-                                            @endperm
-
-                                            @perm('import_chemical_rejectTransfer')
-                                                <button type="button" class="btn btn-sm btn-secondary btn-imp-reject"
-                                                    title="Từ chối nhận, trả số lượng lại tồn của phòng gửi"
-                                                    data-id="{{ $transfer->id }}"
-                                                    data-title="{{ $transfer->source_code }} - {{ $transfer->chem_name }} ({{ $impNum($transfer->amount) }} {{ $impTransferUnit }}) từ {{ $transfer->from_department_name }}">
-                                                    <i class="fas fa-xmark"></i>
-                                                </button>
-                                            @endperm
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
 
                 {{-- ============ BÁO CÁO NHẬP HOÁ CHẤT ============ --}}

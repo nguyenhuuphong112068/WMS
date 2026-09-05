@@ -15,9 +15,10 @@ use Illuminate\Validation\Rule;
  * DỮ LIỆU GỐC - TÊN HOẠT CHẤT (Nghị định 24/2026/NĐ-CP)
  *
  * Mỗi hoạt chất được phân loại theo quy tắc "hình 1" của NĐ 24/2026. Ở màn này khai được
- * các nhóm ĐƠN CHẤT: 1, 3, 4, 5, 6, 7, 9 (App\Support\ChemicalClassification::
- * SINGLE_SUBSTANCE_GROUPS). Một hoạt chất có thể thuộc NHIỀU nhóm cùng lúc nên phân loại
- * lưu ở bảng con active_ingredient_classifications (mỗi dòng một bộ phụ lục / nhóm / bảng).
+ * các nhóm ĐƠN CHẤT: 1, 3, 4, 5, 6, 7, 9 và nhóm 11 "Hoá chất cấm theo Luật Đầu tư 2025,
+ * số 143/2025/QH15" (App\Support\ChemicalClassification::SINGLE_SUBSTANCE_GROUPS). Một
+ * hoạt chất có thể thuộc NHIỀU nhóm cùng lúc nên phân loại lưu ở bảng con
+ * active_ingredient_classifications (mỗi dòng một bộ phụ lục / nhóm / bảng).
  *
  * Nhóm 9 = "Phụ lục IV Bảng A" - bắt buộc kèm "Ngưỡng khối lượng hoá chất tồn trữ lớn nhất
  * tại một thời điểm (kg)" (cột threshold_kg). Các nhóm hỗn hợp (2, 8, 10) suy ở màn "Tên

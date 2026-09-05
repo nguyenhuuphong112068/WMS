@@ -113,6 +113,7 @@ class ChemicalEstimateController extends Controller
             'items' => self::itemsOf($list->id),
             'histories' => self::historiesOf($list->id),
             'categories' => $this->categoryOptions($list->department_id),
+            'categoryLevels' => $this->categoryThresholdLevels(CompanyContext::resolveForDepartment($list->department_id)),
             'units' => $this->unitOptions(),
             'appStatuses' => config('estimate.app_statuses'),
             'signSteps' => config('estimate.sign_steps'),
@@ -275,7 +276,7 @@ class ChemicalEstimateController extends Controller
         $redirect = redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
 
         if ($warnings = $this->thresholdWarnings($itemId)) {
-            $redirect->with('warning', implode(' — ', $warnings));
+            $redirect->with('warning', implode(' — ', array_column($warnings, 'message')));
         }
 
         return $redirect;
@@ -321,7 +322,7 @@ class ChemicalEstimateController extends Controller
         $redirect = redirect()->back()->with('success', 'Cập nhật '.self::ITEM_LABEL.' thành công!');
 
         if ($warnings = $this->thresholdWarnings($item->id)) {
-            $redirect->with('warning', implode(' — ', $warnings));
+            $redirect->with('warning', implode(' — ', array_column($warnings, 'message')));
         }
 
         return $redirect;
@@ -709,6 +710,8 @@ class ChemicalEstimateController extends Controller
      */
     public static function trackedItems(int $departmentId)
     {
+        $companyId = CompanyContext::resolveForDepartment($departmentId);
+
         $items = DB::table(self::ITEM_TABLE)
             ->join(self::TABLE, self::ITEM_TABLE.'.estimate_list_id', '=', self::TABLE.'.id')
             ->leftJoin('chemical_categories', self::ITEM_TABLE.'.category_id', '=', 'chemical_categories.id')
@@ -765,11 +768,14 @@ class ChemicalEstimateController extends Controller
             ->groupBy('item_id')
             ->map->count();
 
-        return $items->map(function ($item) use ($amounts, $chats, $historyCounts) {
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $companyId) {
             $item->amounts = ($amounts[$item->id] ?? collect())->values();
             $item->chats = ($chats[$item->id] ?? collect())->values();
             $item->history_count = $historyCounts[$item->id] ?? 0;
             $item->display_name = $item->category_id ? $item->category_chem_name : $item->chem_name;
+            $item->threshold_warnings = $item->category_id
+                ? self::computeThresholdWarnings((int) $item->category_id, $item->amounts, $companyId)
+                : [];
 
             return $item;
         });
@@ -779,6 +785,7 @@ class ChemicalEstimateController extends Controller
     {
         // Đơn vị tính nằm ở danh mục hoá chất CỦA PHÒNG, nên phải biết phiếu này của phòng nào
         $departmentId = (int) DB::table(self::TABLE)->where('id', $listId)->value('department_id');
+        $companyId = CompanyContext::resolveForDepartment($departmentId);
 
         $items = DB::table(self::ITEM_TABLE)
             ->leftJoin('chemical_categories', self::ITEM_TABLE.'.category_id', '=', 'chemical_categories.id')
@@ -828,12 +835,16 @@ class ChemicalEstimateController extends Controller
             ->groupBy('item_id')
             ->map->count();
 
-        return $items->map(function ($item) use ($amounts, $chats, $historyCounts) {
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $companyId) {
             $item->amounts = ($amounts[$item->id] ?? collect())->values();
             $item->chats = ($chats[$item->id] ?? collect())->values();
             $item->history_count = $historyCounts[$item->id] ?? 0;
             // Tên hiển thị: lấy theo danh mục, hoá chất ngoài danh mục thì lấy tên tự nhập
             $item->display_name = $item->category_id ? $item->category_chem_name : $item->chem_name;
+            // Cảnh báo ngưỡng PL IV hiển thị thường trực cho người ký duyệt / bộ phận tiếp nhận
+            $item->threshold_warnings = $item->category_id
+                ? self::computeThresholdWarnings((int) $item->category_id, $item->amounts, $companyId)
+                : [];
 
             return $item;
         });
@@ -879,6 +890,32 @@ class ChemicalEstimateController extends Controller
     }
 
     /**
+     * Kiểm tra cảnh báo ngưỡng PL IV theo hoá chất + số lượng đang gõ trong modal Thêm/Sửa
+     * mặt hàng, TRƯỚC KHI lưu - JS gọi mỗi khi đổi hoá chất hoặc đổi số lượng/đơn vị
+     * (xem pages/estimate/shared/assets.blade.php).
+     */
+    public function checkThreshold(Request $request)
+    {
+        $categoryId = (int) $request->category_id;
+
+        if (! $categoryId) {
+            return response()->json(['warnings' => []]);
+        }
+
+        $amountRows = collect((array) $request->input('amounts', []))
+            ->map(fn ($line) => (object) [
+                'amount' => (float) ($line['amount'] ?? 0),
+                'unit_id' => (int) ($line['unit_id'] ?? 0),
+            ])
+            ->filter(fn ($row) => $row->amount > 0 && $row->unit_id > 0)
+            ->values();
+
+        return response()->json([
+            'warnings' => self::computeThresholdWarnings($categoryId, $amountRows, CompanyContext::currentId()),
+        ]);
+    }
+
+    /**
      * Cảnh báo (không chặn) khi dự trù một mặt hàng là hoá chất thuộc nhóm phải xây dựng
      * Kế hoạch phòng ngừa (N9 - PL IV Bảng A, N10 - PL IV Bảng B, hoá chất cấm) và lượng
      * dự trù đủ để đẩy tổng tồn trữ toàn công ty chạm/vượt "Ngưỡng khối lượng tồn trữ lớn
@@ -887,7 +924,7 @@ class ChemicalEstimateController extends Controller
      * Lượng dự trù = tổng số lượng các tháng của mặt hàng, quy ra kg (theo hướng thận trọng).
      * Chỉ xét mặt hàng chọn từ Danh Mục Hoá Chất (có category_id); hoá chất tự gõ tay bỏ qua.
      *
-     * @return array<int, string>
+     * @return array<int, array{level: string, message: string}>
      */
     private function thresholdWarnings(int $itemId): array
     {
@@ -897,14 +934,27 @@ class ChemicalEstimateController extends Controller
             return [];
         }
 
-        $categoryId = (int) $item->category_id;
-        $companyId = CompanyContext::currentId();
-
         $amountRows = DB::table(self::AMOUNT_TABLE)
             ->where('estimate_item_id', $itemId)
             ->where('active', 1)
             ->select('amount', 'unit_id')
             ->get();
+
+        return self::computeThresholdWarnings((int) $item->category_id, $amountRows, CompanyContext::currentId());
+    }
+
+    /**
+     * Lõi tính cảnh báo ngưỡng PL IV dùng chung cho: cảnh báo sau khi lưu mặt hàng
+     * (thresholdWarnings), kiểm tra tức thời trước khi lưu (checkThreshold) và cảnh báo
+     * hiển thị thường trực trên phiếu cho người ký duyệt / bộ phận tiếp nhận xem
+     * (itemsOf, trackedItems).
+     *
+     * @param  iterable  $amountRows  các dòng {amount, unit_id}
+     * @return array<int, array{level: string, message: string}>
+     */
+    private static function computeThresholdWarnings(int $categoryId, $amountRows, ?int $companyId): array
+    {
+        $amountRows = collect($amountRows);
 
         if ($amountRows->isEmpty()) {
             return [];
@@ -918,13 +968,16 @@ class ChemicalEstimateController extends Controller
         $projA = ActiveIngredientThreshold::projectedForCategory($categoryId, $sumA['kg'], $companyId);
 
         if ($projA && ($projA->add_ratio >= 1.0 || $projA->projected_ratio >= ActiveIngredientThreshold::warnRatio())) {
-            $warnings[] = 'Hoá chất "'.$projA->ai_name.'" phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất '
-                .'(Phụ lục IV NĐ 24/2026/NĐ-CP - Bảng A). Lượng dự trù của mặt hàng ≈ '.$num($projA->add_kg).' kg hoạt chất'
-                .($sumA['unconvertible'] ? ' (chưa gồm dòng dùng đơn vị đếm / thiếu tỉ trọng)' : '')
-                .'; cộng tồn hiện tại toàn công ty '.$num($projA->current_kg).' kg thì tổng ≈ '.$num($projA->projected_kg)
-                .' kg / ngưỡng '.$num($projA->threshold_kg).' kg ('.(int) round($projA->projected_ratio * 100).'%). '
-                .($projA->add_ratio >= 1.0 ? 'Riêng lượng dự trù đã vượt ngưỡng "tồn trữ lớn nhất tại một thời điểm". ' : '')
-                .($projA->level === ActiveIngredientThreshold::LEVEL_EXCEEDED ? 'DỰ KIẾN VƯỢT NGƯỠNG.' : 'Dự kiến chạm ngưỡng cảnh báo.');
+            $warnings[] = [
+                'level' => $projA->level,
+                'message' => 'Hoá chất "'.$projA->ai_name.'" phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất '
+                    .'(Phụ lục IV NĐ 24/2026/NĐ-CP - Bảng A). Lượng dự trù của mặt hàng ≈ '.$num($projA->add_kg).' kg hoạt chất'
+                    .($sumA['unconvertible'] ? ' (chưa gồm dòng dùng đơn vị đếm / thiếu tỉ trọng)' : '')
+                    .'; cộng tồn hiện tại toàn công ty '.$num($projA->current_kg).' kg thì tổng ≈ '.$num($projA->projected_kg)
+                    .' kg / ngưỡng '.$num($projA->threshold_kg).' kg ('.(int) round($projA->projected_ratio * 100).'%). '
+                    .($projA->add_ratio >= 1.0 ? 'Riêng lượng dự trù đã vượt ngưỡng "tồn trữ lớn nhất tại một thời điểm". ' : '')
+                    .($projA->level === ActiveIngredientThreshold::LEVEL_EXCEEDED ? 'DỰ KIẾN VƯỢT NGƯỠNG.' : 'Dự kiến chạm ngưỡng cảnh báo.'),
+            ];
         }
 
         // ----- BẢNG B: theo hỗn hợp (tồn thô, không × %) -----
@@ -932,14 +985,17 @@ class ChemicalEstimateController extends Controller
         $projB = MixtureHazardThreshold::projectedForCategory($categoryId, $sumB['kg'], $companyId);
 
         if ($projB && ($projB->add_ratio >= 1.0 || $projB->projected_ratio >= MixtureHazardThreshold::warnRatio())) {
-            $warnings[] = 'Hỗn hợp "'.$projB->chem_name.'" thuộc nhóm nguy hại Bảng B (Phụ lục IV NĐ 24/2026/NĐ-CP). '
-                .'Lượng dự trù ≈ '.$num($projB->add_kg).' kg thô'
-                .($sumB['unconvertible'] ? ' (chưa gồm dòng chưa quy đổi được)' : '')
-                .'; cộng tồn hiện tại '.$num($projB->current_kg).' kg thì tổng ≈ '.$num($projB->projected_kg)
-                .' kg / ngưỡng thấp nhất '.$num($projB->threshold_kg).' kg (nhóm '.$projB->strictest_group.', '
-                .(int) round($projB->projected_ratio * 100).'%). '
-                .($projB->add_ratio >= 1.0 ? 'Riêng lượng dự trù đã vượt ngưỡng. ' : '')
-                .($projB->level === MixtureHazardThreshold::LEVEL_EXCEEDED ? 'DỰ KIẾN VƯỢT NGƯỠNG.' : 'Dự kiến chạm ngưỡng cảnh báo.');
+            $warnings[] = [
+                'level' => $projB->level,
+                'message' => 'Hỗn hợp "'.$projB->chem_name.'" thuộc nhóm nguy hại Bảng B (Phụ lục IV NĐ 24/2026/NĐ-CP). '
+                    .'Lượng dự trù ≈ '.$num($projB->add_kg).' kg thô'
+                    .($sumB['unconvertible'] ? ' (chưa gồm dòng chưa quy đổi được)' : '')
+                    .'; cộng tồn hiện tại '.$num($projB->current_kg).' kg thì tổng ≈ '.$num($projB->projected_kg)
+                    .' kg / ngưỡng thấp nhất '.$num($projB->threshold_kg).' kg (nhóm '.$projB->strictest_group.', '
+                    .(int) round($projB->projected_ratio * 100).'%). '
+                    .($projB->add_ratio >= 1.0 ? 'Riêng lượng dự trù đã vượt ngưỡng. ' : '')
+                    .($projB->level === MixtureHazardThreshold::LEVEL_EXCEEDED ? 'DỰ KIẾN VƯỢT NGƯỠNG.' : 'Dự kiến chạm ngưỡng cảnh báo.'),
+            ];
         }
 
         return $warnings;
@@ -1048,6 +1104,31 @@ class ChemicalEstimateController extends Controller
             ->where('chemical_categories.app_status', 'approved')
             ->orderBy('chemical_categories.code', 'asc')
             ->get();
+    }
+
+    /**
+     * Mức cảnh báo ngưỡng PL IV hiện tại (không tính thêm số lượng dự trù) của từng mã
+     * danh mục, để bảng "Chọn Từ Danh Mục Hoá Chất" tô badge ngay khi duyệt danh sách -
+     * gộp mức nặng nhất giữa Bảng A (theo hoạt chất) và Bảng B (theo hỗn hợp).
+     *
+     * @return array<int, string>  category_id => 'ok' | 'warn' | 'exceeded'
+     */
+    private function categoryThresholdLevels(?int $companyId): array
+    {
+        $rank = ['ok' => 0, 'warn' => 1, 'exceeded' => 2];
+        $levels = [];
+
+        foreach (ActiveIngredientThreshold::forCategories($companyId) as $categoryId => $row) {
+            $levels[$categoryId] = $row->level;
+        }
+
+        foreach (MixtureHazardThreshold::forCategories($companyId) as $categoryId => $row) {
+            if (! isset($levels[$categoryId]) || $rank[$row->level] > $rank[$levels[$categoryId]]) {
+                $levels[$categoryId] = $row->level;
+            }
+        }
+
+        return $levels;
     }
 
     private function unitOptions()

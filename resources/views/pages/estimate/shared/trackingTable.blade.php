@@ -45,6 +45,11 @@
                                 <span class="est-outside">Ngoài danh mục</span>
                             @endif
                         </div>
+                        @foreach ($item->threshold_warnings ?? [] as $warning)
+                            <div class="est-threshold-alert is-compact level-{{ $warning['level'] }}">
+                                <i class="fas fa-triangle-exclamation mr-1"></i>{{ $warning['message'] }}
+                            </div>
+                        @endforeach
                     </td>
                     <td class="md-sub">
                         @if ($item->category_manufacturer_name)
@@ -139,7 +144,7 @@
                         </div>
                     </td>
                     <td class="md-sub">
-                        {{ $item->created_by ?: '-' }}
+                        {{ $item->updated_by ?: $item->created_by ?: '-' }}
                         <br><small>{{ $item->created_at ? \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') : '' }}</small>
                     </td>
                 </tr>

@@ -28,7 +28,22 @@
                     </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'request' ? 'is-active' : '' }}"
                         data-pane="expPaneRequest">
-                        <i class="fas fa-hand-holding-medical mr-1"></i> Đề nghị cấp phát chuẩn
+                        <i class="fas fa-hand-holding-medical mr-1"></i> Đề nghị cấp phát chuẩn nội bộ
+                    </button>
+                    <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}"
+                        data-pane="expPaneTransfer">
+                        <i class="fas fa-people-arrows mr-1"></i> Đề nghị cấp phát chuẩn liên phòng ban
+                        @php
+                            // Cần cấp phát (mình là B) + đã cấp, chờ mình xác nhận Nhận (mình là A)
+                            $stdTransferPending = $transferReceived->whereIn('status', ['pending', 'partial'])->count();
+                            $stdTransferAwaitingReceipt = $transferSent->pluck('id')
+                                ->flatMap(fn ($id) => $transferItems[$id] ?? collect())
+                                ->where('status', 'issued')->count();
+                            $stdTransferBadgeCount = $stdTransferPending + $stdTransferAwaitingReceipt;
+                        @endphp
+                        @if ($stdTransferBadgeCount)
+                            <span class="exp-tab-count">{{ $stdTransferBadgeCount }}</span>
+                        @endif
                     </button>
                 </div>
 
@@ -130,7 +145,7 @@
                                                 @endif
                                             @endif
                                         </td>
-                                        <td class="md-sub">{{ $row->created_by ?: '—' }}</td>
+                                        <td class="md-sub">{{ $row->updated_by ?: $row->created_by ?: '—' }}</td>
                                         <td>
                                             <div class="md-actions text-center">
                                                 @php $expAdjust = (int) ($adjustCounts[$row->id] ?? 0); @endphp
@@ -169,10 +184,11 @@
                     </div>
                 </div>
 
-                {{-- ============ ĐỀ NGHỊ CẤP PHÁT CHUẨN ============ --}}
+                {{-- ============ ĐỀ NGHỊ CẤP PHÁT CHUẨN NỘI BỘ ============ --}}
                 @include('pages.export.StandardExport.requestPane')
 
-
+                {{-- ============ ĐỀ NGHỊ CẤP PHÁT CHUẨN LIÊN PHÒNG BAN ============ --}}
+                @include('pages.export.StandardExport.transferPane')
 
             </div>
         </div>

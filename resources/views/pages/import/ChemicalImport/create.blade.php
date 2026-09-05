@@ -8,7 +8,7 @@
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
-            <form action="{{ route($impRoute . 'store') }}" method="POST">
+            <form action="{{ route($impRoute . 'store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-body">
 
@@ -20,7 +20,8 @@
                                     <i class="fas fa-list"></i>
                                 </button>
                                 <div style="flex: 1 1 auto; min-width: 0;">
-                                    <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}" required>
+                                    <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
+                                        data-threshold-url="{{ route($impRoute . 'checkThreshold') }}" required>
                                         <option value="">-- Chọn hoá chất phòng đang dùng --</option>
                                         @foreach ($categories as $category)
                                             <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
@@ -77,6 +78,8 @@
                                 <span class="md-error">{{ $bag->first('supplier_id') }}</span>
                             @endif
                         </div>
+
+                        <div class="col-md-12 imp-threshold-alerts"></div>
                     </div>
 
                     <div class="form-row">
@@ -159,6 +162,12 @@
                                 <span>Hoá chất vi sinh</span>
                             </label>
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tài Liệu Đính Kèm</label>
+                        <input type="file" name="attachments[]" class="form-control-file" multiple>
+                        <small class="md-sub">Tối đa 10MB / file.</small>
                     </div>
 
                     <div class="form-group">

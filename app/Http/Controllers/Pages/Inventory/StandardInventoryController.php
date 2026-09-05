@@ -495,6 +495,9 @@ class StandardInventoryController extends Controller
                 $row->balanced = (float) ($bal->balanced_to ?? 0);
                 $row->used = (float) ($out->used_to ?? 0);
                 $row->cancelled = (float) ($out->cancelled_to ?? 0);
+                // Chuyển liên phòng ban (standard_exports.type = 'transfer_out') cũng trừ tồn
+                // thật như dùng/huỷ, nhưng tách riêng để không lẫn vào số liệu dùng/huỷ.
+                $row->transferred = (float) ($out->transferred_to ?? 0);
 
                 $row->last_balancing_at = $bal->last_balancing_at ?? null;
                 $row->balancing_times = (int) ($bal->times ?? 0);
@@ -517,13 +520,15 @@ class StandardInventoryController extends Controller
                 $row->opening = ($importedDate < $from ? $row->imported : 0)
                     + (float) ($bal->balanced_before ?? 0)
                     - (float) ($out->used_before ?? 0)
-                    - (float) ($out->cancelled_before ?? 0);
+                    - (float) ($out->cancelled_before ?? 0)
+                    - (float) ($out->transferred_before ?? 0);
 
                 $row->period_imported = $importedDate >= $from && $importedDate <= $to ? $row->imported : 0;
                 $row->period_balanced = (float) ($bal->balanced_in ?? 0);
                 $row->period_in = $row->period_imported + $row->period_balanced;
                 $row->period_used = (float) ($out->used_in ?? 0);
                 $row->period_cancelled = (float) ($out->cancelled_in ?? 0);
+                $row->period_transferred = (float) ($out->transferred_in ?? 0);
 
                 // Ống mới nhập trong kỳ: đầu kỳ chưa có gì, dùng để ghi chú trên bảng
                 $row->is_new_in_period = $row->period_imported > 0;
@@ -542,11 +547,11 @@ class StandardInventoryController extends Controller
 
                 // Phiếu sử dụng được xuất vượt tồn tối đa 5% nên chênh lệch có thể âm.
                 // Giữ số âm ở $gap để nhận ra mã cần cân đối, còn $remaining không âm.
-                $row->closing = $row->opening + $row->period_in - $row->period_used - $row->period_cancelled;
+                $row->closing = $row->opening + $row->period_in - $row->period_used - $row->period_cancelled - $row->period_transferred;
                 $row->gap = $row->closing;
                 $row->remaining = max($row->gap, 0);
                 $row->used_percent = $row->effective > 0
-                    ? (int) min(round(($row->used + $row->cancelled) / $row->effective * 100), 100)
+                    ? (int) min(round(($row->used + $row->cancelled + $row->transferred) / $row->effective * 100), 100)
                     : 0;
 
                 $row->days_to_expiry = $row->expired_date
@@ -704,10 +709,13 @@ class StandardInventoryController extends Controller
             ->select('import_id')
             ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at < ? THEN amount ELSE 0 END) as used_before", [$start])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at < ? THEN amount ELSE 0 END) as cancelled_before", [$start])
+            ->selectRaw("SUM(CASE WHEN type = 'transfer_out' AND created_at < ? THEN amount ELSE 0 END) as transferred_before", [$start])
             ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as used_in", [$start, $end])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as cancelled_in", [$start, $end])
+            ->selectRaw("SUM(CASE WHEN type = 'transfer_out' AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as transferred_in", [$start, $end])
             ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at <= ? THEN amount ELSE 0 END) as used_to", [$end])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at <= ? THEN amount ELSE 0 END) as cancelled_to", [$end])
+            ->selectRaw("SUM(CASE WHEN type = 'transfer_out' AND created_at <= ? THEN amount ELSE 0 END) as transferred_to", [$end])
             ->selectRaw('SUM(CASE WHEN created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as times_in', [$start, $end])
             ->selectRaw('SUM(CASE WHEN created_at <= ? THEN 1 ELSE 0 END) as times', [$end])
             ->selectRaw('MAX(CASE WHEN created_at <= ? THEN created_at END) as last_exported_date', [$end])

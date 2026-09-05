@@ -136,7 +136,7 @@
                                         @endif
                                     </td>
                                     <td class="md-sub">
-                                        {{ $row->created_by ?: '—' }}
+                                        {{ $row->updated_by ?: $row->created_by ?: '—' }}
                                         <br><small>{{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '' }}</small>
                                     </td>
                                     <td>

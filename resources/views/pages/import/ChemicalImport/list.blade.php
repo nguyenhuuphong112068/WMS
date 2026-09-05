@@ -39,7 +39,5 @@
 @section('model')
     @include('pages.import.ChemicalImport.create')
     @include('pages.import.ChemicalImport.update')
-    @include('pages.import.ChemicalImport.receive')
-    @include('pages.import.ChemicalImport.rejectTransfer')
     @include('pages.import.ChemicalImport.historyModal')
 @endsection

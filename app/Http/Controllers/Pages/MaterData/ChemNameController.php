@@ -20,7 +20,7 @@ use Illuminate\Validation\Rule;
  * TÊN HOẠT CHẤT / SỐ CAS / CÔNG THỨC luôn lấy từ dữ liệu gốc "Tên Hoạt Chất".
  *
  * PHÂN LOẠI HỖN HỢP theo Nghị định 24/2026/NĐ-CP (hình 1):
- *   - Nhóm 2  : tick tay ô "Hỗn hợp SX-KD có điều kiện (Phụ lục II nhóm 2)".
+ *   - Nhóm 2  : tự suy - hỗn hợp (>= 2 hoạt chất) có >= 1 thành phần nhóm 1 (PL II bảng A).
  *   - Nhóm 8  : tự suy - có thành phần nhóm 3/4/6/7 tỉ lệ > 1%, hoặc nhóm 5 tỉ lệ > 5%.
  *   - Nhóm 10 : hỗn hợp (>= 2 hoạt chất) có >= 1 thành phần nhóm 9 (PL IV bảng A) VÀ
  *               tick >= 1 nhóm nguy hại Bảng B (chem_name_mixture_hazard_category).
@@ -41,7 +41,6 @@ class ChemNameController extends Controller
     /** Cột người dùng nhập trực tiếp trên bảng chem_names. */
     private const FIELDS = [
         'name' => 'Tên hoá chất',
-        'is_conditional_mixture' => 'Hỗn hợp SX-KD có điều kiện (nhóm 2)',
     ];
 
     public function index()
@@ -68,7 +67,6 @@ class ChemNameController extends Controller
             $row->active_ingredient_ids = $ais->pluck('id')->map(fn ($v) => (int) $v)->values()->all();
             $row->hazard_category_ids = $hazards->pluck('id')->map(fn ($v) => (int) $v)->values()->all();
             $row->content_percents = $ais->mapWithKeys(fn ($ai) => [(int) $ai->id => $ai->content_percent])->all();
-            $row->is_conditional_mixture = (int) $row->is_conditional_mixture;
             // "có thành phần thuộc nhóm 9 (PL IV bảng A)"
             $row->has_table_a = $ais->contains(fn ($ai) => in_array(9, $ai->groups, true));
             // Bảng B chỉ xét cho HỖN HỢP: từ 2 hoạt chất trở lên, trong đó có ít nhất một thành phần nhóm 9
@@ -122,12 +120,10 @@ class ChemNameController extends Controller
         $aiIds = $this->cleanIds($request->input('active_ingredients_ids', []));
         $hazardIds = $this->cleanIds($request->input('hazard_category_ids', []));
         $percents = $this->cleanPercents($request->input('content_percent', []));
-        $isConditional = $request->boolean('is_conditional_mixture') ? 1 : 0;
 
-        $id = DB::transaction(function () use ($request, $aiIds, $hazardIds, $percents, $isConditional) {
+        $id = DB::transaction(function () use ($request, $aiIds, $hazardIds, $percents) {
             $newId = DB::table(self::TABLE)->insertGetId([
                 'name' => trim((string) $request->name),
-                'is_conditional_mixture' => $isConditional,
                 'app_status' => 'pending',
                 'status_id' => 1,
                 'created_by' => $this->actor(),
@@ -147,9 +143,6 @@ class ChemNameController extends Controller
         }
         if ($hazardIds) {
             $note .= ' Phân loại nhóm nguy hại (nhóm 10): ' . $this->hazardLabels($hazardIds) . '.';
-        }
-        if ($isConditional) {
-            $note .= ' Đánh dấu Hỗn hợp SX-KD có điều kiện (nhóm 2).';
         }
 
         DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', $note, self::FIELDS, $this->maps());
@@ -177,7 +170,6 @@ class ChemNameController extends Controller
         $aiIds = $this->cleanIds($request->input('active_ingredients_ids', []));
         $hazardIds = $this->cleanIds($request->input('hazard_category_ids', []));
         $percents = $this->cleanPercents($request->input('content_percent', []));
-        $isConditional = $request->boolean('is_conditional_mixture') ? 1 : 0;
 
         $oldAiIds = $this->pivotIds(self::AI_PIVOT, 'active_ingredients_id', $current->id);
         $oldHazardIds = $this->pivotIds(self::HAZARD_PIVOT, 'mixture_hazard_categories_id', $current->id);
@@ -185,7 +177,6 @@ class ChemNameController extends Controller
 
         $payload = [
             'name' => trim((string) $request->name),
-            'is_conditional_mixture' => $isConditional,
         ];
 
         $noteParts = [];
@@ -332,9 +323,7 @@ class ChemNameController extends Controller
     /** Bảng tra giá trị đọc được cho lịch sử thay đổi. */
     private function maps(): array
     {
-        return [
-            'is_conditional_mixture' => [0 => 'Không', 1 => 'Có'],
-        ];
+        return [];
     }
 
     /* -------------------------------------------------------------------------
@@ -655,7 +644,6 @@ class ChemNameController extends Controller
     {
         return [
             'name' => ['required', 'max:255', Rule::unique(self::TABLE, 'name')->ignore($ignoreId)],
-            'is_conditional_mixture' => ['nullable', 'boolean'],
             'active_ingredients_ids' => ['nullable', 'array'],
             'active_ingredients_ids.*' => ['integer', 'exists:active_ingredients,id'],
             'content_percent' => ['nullable', 'array'],
@@ -671,7 +659,6 @@ class ChemNameController extends Controller
             'name.required' => 'Vui lòng nhập tên hoá chất.',
             'name.max' => 'Tên hoá chất tối đa 255 ký tự.',
             'name.unique' => 'Tên hoá chất này đã tồn tại.',
-            'is_conditional_mixture.boolean' => 'Giá trị "Hỗn hợp SX-KD có điều kiện" không hợp lệ.',
             'active_ingredients_ids.array' => 'Danh sách hoạt chất không hợp lệ.',
             'active_ingredients_ids.*.integer' => 'Hoạt chất không hợp lệ.',
             'active_ingredients_ids.*.exists' => 'Có hoạt chất không hợp lệ hoặc chưa được duyệt.',

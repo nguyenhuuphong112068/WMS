@@ -106,7 +106,7 @@
                                 {{ $stdReqBadge($req->status)['label'] }}
                             </span>
                         </td>
-                        <td class="align-middle">{{ $req->created_by ?: '—' }}</td>
+                        <td class="align-middle">{{ $req->updated_by ?: $req->created_by ?: '—' }}</td>
                         <td class="text-center align-middle">{{ $expDate($req->created_at) }}</td>
                         <td class="text-center align-middle" style="white-space: nowrap;">
                             @if ($req->status === 'draft' && user_can('export_standard_request'))

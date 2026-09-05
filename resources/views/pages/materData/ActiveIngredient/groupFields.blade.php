@@ -1,6 +1,6 @@
 {{--
-| Phân loại hoạt chất theo Nghị định 24/2026/NĐ-CP - các nhóm ĐƠN CHẤT (1, 3, 4, 5, 6, 7, 9).
-| Nhóm 9 (Phụ lục IV Bảng A) bắt buộc kèm ngưỡng tồn trữ.
+| Phân loại hoạt chất - các nhóm ĐƠN CHẤT (1, 3, 4, 5, 6, 7, 9 theo Nghị định 24/2026/NĐ-CP,
+| 11 theo Luật Đầu tư 2025 số 143/2025/QH15). Nhóm 9 (Phụ lục IV Bảng A) bắt buộc kèm ngưỡng tồn trữ.
 | Biến vào: $bag, $groupLabels, $singleSubstanceGroups, $oldGroups
 --}}
 <div class="form-group">

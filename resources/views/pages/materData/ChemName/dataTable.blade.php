@@ -96,12 +96,7 @@
                                 <tr data-apx="{{ $apxList->implode(',') }}" data-grp="{{ $grpList->implode(',') }}"
                                     data-tbl="{{ $tblList->implode(',') }}" data-classification="{{ $clsCodes->implode(',') }}">
                                     <td class="text-center">{{ $loop->iteration }}</td>
-                                    <td class="font-weight-bold">
-                                        {{ $row->name }}
-                                        @if ($row->is_conditional_mixture)
-                                            <span class="badge badge-primary ml-1" title="Hỗn hợp SX-KD có điều kiện (Phụ lục II nhóm 2)">Nhóm 2</span>
-                                        @endif
-                                    </td>
+                                    <td class="font-weight-bold">{{ $row->name }}</td>
                                     <td data-search="{{ $formulaSearch }}">
                                         @forelse ($row->active_ingredients as $ai)
                                             <div class="chem-ai-line">
@@ -182,7 +177,7 @@
                                             <span class="md-empty">Không thuộc</span>
                                         @endforelse
                                     </td>
-                                    <td class="md-sub">{{ $row->created_by ?: '—' }}</td>
+                                    <td class="md-sub">{{ $row->updated_by ?: $row->created_by ?: '—' }}</td>
                                     <td class="text-center md-sub">
                                         {{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '—' }}
                                     </td>
@@ -206,7 +201,6 @@
                                             'editData' => [
                                                 'id' => $row->id,
                                                 'name' => $row->name,
-                                                'is_conditional_mixture' => (int) $row->is_conditional_mixture,
                                                 'active_ingredient_ids' => $row->active_ingredient_ids,
                                                 'hazard_category_ids' => $row->hazard_category_ids,
                                                 'content_percents' => (object) $row->content_percents,
@@ -348,15 +342,6 @@
                 chemHazardCount($modal);
             }
 
-            /* ---------- Gợi ý nhóm 2 khi có thành phần nhóm 1 ---------- */
-            function chemConditionalHint($modal) {
-                var hasGroup1 = false;
-                $modal.find('.chem-ai-select option:selected').each(function() {
-                    if (String($(this).data('g1')) === '1') hasGroup1 = true;
-                });
-                $modal.find('[data-conditional-hint]').toggle(hasGroup1);
-            }
-
             $(document).on('change', '.chem-hazard-input', function() {
                 $(this).closest('.chem-hazard-item').toggleClass('is-checked', this.checked);
                 chemHazardCount($(this).closest('.md-modal'));
@@ -366,7 +351,6 @@
                 var $modal = $(this).closest('.md-modal');
                 chemRebuildPercents($modal);
                 chemHazardLock($modal);
-                chemConditionalHint($modal);
             });
 
             /* ---------- Nút Sửa: điền ô chọn nhiều + % + checkbox (sau handler của shared.assets) ---------- */
@@ -377,7 +361,6 @@
                 var hazIds = (row.hazard_category_ids || []).map(String);
 
                 $modal.find('[data-percent-rows]').attr('data-seed', JSON.stringify(row.content_percents || {}));
-                $modal.find('[data-conditional-toggle]').prop('checked', Number(row.is_conditional_mixture) === 1);
 
                 $modal.find('.chem-ai-select').val(aiIds).trigger('change');
                 $modal.find('.chem-hazard-input').each(function() {
@@ -385,26 +368,22 @@
                     $(this).prop('checked', on).closest('.chem-hazard-item').toggleClass('is-checked', on);
                 });
                 chemHazardLock($modal);
-                chemConditionalHint($modal);
             });
 
             /* ---------- Nút Thêm mới: xoá trắng ---------- */
             $(document).on('click', '.btn-md-create', function() {
                 var $modal = $($(this).data('modal') || '#createModal');
                 $modal.find('[data-percent-rows]').attr('data-seed', '{}');
-                $modal.find('[data-conditional-toggle]').prop('checked', false);
                 $modal.find('.chem-ai-select').val(null).trigger('change');
                 $modal.find('.chem-hazard-input').prop('checked', false)
                     .closest('.chem-hazard-item').removeClass('is-checked');
                 chemHazardLock($modal);
-                chemConditionalHint($modal);
             });
 
             /* ---------- Mở modal xong thì rà lại ---------- */
             $(document).on('shown.bs.modal', '.md-modal', function() {
                 chemRebuildPercents($(this));
                 chemHazardLock($(this));
-                chemConditionalHint($(this));
             });
         });
     </script>

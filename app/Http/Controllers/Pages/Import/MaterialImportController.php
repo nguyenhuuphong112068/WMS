@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Import;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\AttachmentBackup;
 use App\Support\DepartmentMaterial;
 use App\Support\MaterialCode;
 use App\Support\QrCode;
@@ -36,6 +37,9 @@ class MaterialImportController extends Controller
     private const HISTORY_TABLE = 'material_import_histories';
 
     private const ATTACHMENT_TABLE = 'material_import_attachments';
+
+    /** Thư mục lưu file đính kèm, dùng chung cho cả disk private lẫn bản sao lưu public/uploads/. */
+    private const ATTACHMENT_FOLDER = 'material_imports';
 
     private const LABEL = 'phiếu nhập vật tư';
 
@@ -234,9 +238,12 @@ class MaterialImportController extends Controller
         if ($request->hasFile('attachments')) {
             foreach ($request->file('attachments') as $file) {
                 if ($file->isValid()) {
+                    $path = $file->store('public/'.self::ATTACHMENT_FOLDER);
+                    AttachmentBackup::copy($path, self::ATTACHMENT_FOLDER);
+
                     $uploadedFiles[] = [
                         'file_name' => $file->getClientOriginalName(),
-                        'file_path' => $file->store('public/material_imports'),
+                        'file_path' => $path,
                         'file_size' => $file->getSize(),
                         'file_type' => $file->getClientMimeType() ?: $file->getClientOriginalExtension(),
                     ];
@@ -331,10 +338,13 @@ class MaterialImportController extends Controller
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
                     if ($file->isValid()) {
+                        $path = $file->store('public/'.self::ATTACHMENT_FOLDER);
+                        AttachmentBackup::copy($path, self::ATTACHMENT_FOLDER);
+
                         DB::table(self::ATTACHMENT_TABLE)->insert([
                             'material_import_id' => $current->id,
                             'file_name' => $file->getClientOriginalName(),
-                            'file_path' => $file->store('public/material_imports'),
+                            'file_path' => $path,
                             'file_size' => $file->getSize(),
                             'file_type' => $file->getClientMimeType() ?: $file->getClientOriginalExtension(),
                             'created_by' => $this->actor(),
@@ -448,6 +458,7 @@ class MaterialImportController extends Controller
         }
 
         Storage::delete($attachment->file_path);
+        AttachmentBackup::delete($attachment->file_path, self::ATTACHMENT_FOLDER);
         DB::table(self::ATTACHMENT_TABLE)->where('id', $attachment->id)->delete();
 
         AuditTrialController::log(

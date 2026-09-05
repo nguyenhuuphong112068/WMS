@@ -5,7 +5,9 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 
 /**
- * PHÂN LOẠI HOÁ CHẤT THEO NGHỊ ĐỊNH 24/2026/NĐ-CP - 10 nhóm của "hình 1".
+ * PHÂN LOẠI HOÁ CHẤT THEO NGHỊ ĐỊNH 24/2026/NĐ-CP - 10 nhóm của "hình 1", cộng thêm
+ * nhóm 11 "Hoá chất cấm theo Luật Đầu tư 2025, số 143/2025/QH15" (khai đơn chất, không
+ * thuộc phạm vi NĐ 24/2026 nhưng gộp chung danh sách để khai/lọc/cảnh báo cùng một chỗ).
  *
  * Nguồn sự thật DUY NHẤT để suy 10 nhóm. Không còn cột chemical_categories.classification
  * và không còn active_ingredients.is_table_a - mọi phân loại suy tự động từ hai dữ liệu gốc:
@@ -17,10 +19,10 @@ use Illuminate\Support\Facades\DB;
  * QUY TẮC HỖN HỢP (hình 1) - hỗn hợp = từ 2 hoạt chất thành phần trở lên, CHỈ mang nhóm
  * của hỗn hợp (2 / 8 / 10), KHÔNG thừa hưởng nhóm đơn chất (1, 3, 4, 5, 6, 7, 9) của các
  * thành phần (các nhóm đó thuộc về từng hoạt chất, đã hiển thị riêng ở cột thành phần):
+ *   Nhóm 2 : hỗn hợp (>= 2 hoạt chất) có >= 1 thành phần nhóm 1 (PL II bảng A).
  *   Nhóm 8 : có thành phần nhóm 3/4/6/7 tỉ lệ > 1%, HOẶC thành phần nhóm 5 tỉ lệ > 5%.
  *   Nhóm 10: hỗn hợp (>= 2 hoạt chất) có >= 1 thành phần nhóm 9 (PL IV bảng A) VÀ tick
  *            >= 1 nhóm nguy hại mixture_hazard_categories (đã duyệt, đang hoạt động).
- *   Nhóm 2 : chem_names.is_conditional_mixture = 1.
  * Tên hoá chất đơn chất (<= 1 thành phần) thì mang đúng nhóm của thành phần đó.
  *
  * Danh mục hoá chất (chemical_categories) trỏ về đúng một tên hoá chất -> nhóm của mã danh
@@ -42,6 +44,7 @@ class ChemicalClassification
         8 => 'Hỗn hợp chất cần kiểm soát đặc biệt (Phụ lục III)',
         9 => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng A)',
         10 => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng B)',
+        11 => 'Hoá chất cấm theo Luật Đầu tư 2025, số 143/2025/QH15',
     ];
 
     /**
@@ -51,13 +54,13 @@ class ChemicalClassification
      *   - Xanh: các nhóm còn lại.
      */
     public const CRITICAL_GROUPS = [9, 10];
-    public const BANNED_GROUPS = [4, 6];
+    public const BANNED_GROUPS = [4, 6, 11];
 
     /** @deprecated Giữ để tương thích - dùng badgeClass() / BANNED_GROUPS. */
     public const DANGER_GROUPS = [4, 6];
 
     /** Nhóm khai được ở màn "Tên Hoạt Chất" (đơn chất). */
-    public const SINGLE_SUBSTANCE_GROUPS = [1, 3, 4, 5, 6, 7, 9];
+    public const SINGLE_SUBSTANCE_GROUPS = [1, 3, 4, 5, 6, 7, 9, 11];
 
     /** Nhóm chỉ dành cho hỗn hợp, suy ở màn "Tên Hoá Chất". */
     public const MIXTURE_GROUPS = [2, 8, 10];
@@ -78,6 +81,10 @@ class ChemicalClassification
         'III|2|B'  => 6,
         'III|2|C'  => 7,
         'IV||A'    => 9,
+        // Không thuộc Nghị định 24/2026 - "Hoá chất cấm" theo Luật Đầu tư 2025 (số
+        // 143/2025/QH15). Dùng chung bảng active_ingredient_classifications, khoá appendix
+        // riêng 'LDT' để không đụng các phụ lục II/III/IV ở trên.
+        'LDT||'    => 11,
     ];
 
     /** Ngưỡng % để nhóm 8 kích hoạt theo nhóm của thành phần. */
@@ -239,7 +246,7 @@ class ChemicalClassification
      */
     public static function groupsByChemName(?array $chemNameIds = null): array
     {
-        $chemQuery = DB::table('chem_names')->select('id', 'is_conditional_mixture');
+        $chemQuery = DB::table('chem_names')->select('id');
 
         if ($chemNameIds !== null) {
             $chemNameIds = array_values(array_unique(array_filter(array_map('intval', $chemNameIds))));
@@ -292,6 +299,7 @@ class ChemicalClassification
 
             // HỖN HỢP = từ 2 hoạt chất thành phần trở lên.
             $isMixture = $rows->count() >= 2;
+            $hasG1 = false;
             $hasG9 = false;
 
             foreach ($rows as $row) {
@@ -300,6 +308,10 @@ class ChemicalClassification
                 $compGroups = $aiGroups[$aiId] ?? [];
 
                 foreach ($compGroups as $g) {
+                    if ($g === 1) {
+                        $hasG1 = true;
+                    }
+
                     if ($g === 9) {
                         $hasG9 = true;
                     }
@@ -319,12 +331,12 @@ class ChemicalClassification
             }
 
             // Nhóm 10 - điều kiện Bảng B: hỗn hợp >= 2 thành phần, có nhóm 9, có tick nguy hại
-            if ($rows->count() >= 2 && $hasG9 && $withHazard->has($chemId)) {
+            if ($isMixture && $hasG9 && $withHazard->has($chemId)) {
                 $groups[10] = true;
             }
 
-            // Nhóm 2 - tick tay
-            if ((int) $chem->is_conditional_mixture === 1) {
+            // Nhóm 2 - hỗn hợp >= 2 thành phần, có >= 1 thành phần thuộc nhóm 1
+            if ($isMixture && $hasG1) {
                 $groups[2] = true;
             }
 

@@ -377,6 +377,8 @@ class HomeController extends Controller
             $this->materialRequestApprovals($departmentId),
             $this->standardRequestApprovals($departmentId),
             $this->transferRequestApprovals($departmentId),
+            $this->transferReceiptApprovals($departmentId),
+            $this->standardTransferReceiptApprovals($departmentId),
             $this->disposalApprovals($departmentId),
             $this->categoryApprovals()
         );
@@ -514,21 +516,23 @@ class HomeController extends Controller
         return $rows;
     }
 
-    /** Đề nghị chuyển hoá chất mà phòng ban đang chọn là bên GIỮ HÀNG, phải trả lời. */
+    /** Đề nghị chuyển hoá chất liên phòng ban mà phòng ban đang chọn là bên GIỮ HÀNG, phải cấp phát. */
     private function transferRequestApprovals(int $departmentId): array
     {
         if ($departmentId <= 0) {
             return [];
         }
 
-        $records = DB::table('chemical_transfer_requests as t')
+        $records = DB::table('chemical_transfer_items as i')
+            ->join('chemical_transfer_requests as t', 'i.transfer_request_id', '=', 't.id')
             ->leftJoin('deparments as d', 't.department_id', '=', 'd.id')
-            ->leftJoin('chemical_categories as c', 't.category_id', '=', 'c.id')
+            ->leftJoin('chemical_categories as c', 'i.category_id', '=', 'c.id')
             ->leftJoin('chem_names as n', 'c.chem_names_id', '=', 'n.id')
-            ->select('t.id', 't.amount', 't.needed_date', 't.created_at', 'd.name as from_department', 'n.name as chem_name')
+            ->select('i.id', 'i.requested_amount', 't.code', 't.created_at', 'd.name as from_department', 'n.name as chem_name')
             ->where('t.to_department_id', $departmentId)
-            ->where('t.status_id', 1)
-            ->where('t.app_status', 'pending')
+            ->where('i.active', 1)
+            ->where('i.status', 'pending')
+            ->whereIn('t.status', ['pending', 'partial'])
             ->orderBy('t.created_at')
             ->get();
 
@@ -538,13 +542,88 @@ class HomeController extends Controller
             $rows[] = [
                 'group' => 'Chờ xử lý',
                 'icon' => 'fas fa-exchange-alt',
-                'label' => 'Đề nghị chuyển hoá chất',
-                'code' => $record->chem_name ?: 'Hoá chất',
-                'title' => 'Từ '.($record->from_department ?: 'phòng ban khác')
-                    .($record->needed_date ? ' - cần ngày '.\Carbon\Carbon::parse($record->needed_date)->format('d/m/Y') : ''),
-                'status_label' => 'Chờ phòng bạn trả lời',
+                'label' => 'Đề nghị chuyển hoá chất liên phòng ban',
+                'code' => $record->code,
+                'title' => ($record->chem_name ?: 'Hoá chất').' - từ '.($record->from_department ?: 'phòng ban khác'),
+                'status_label' => 'Chờ phòng bạn cấp phát',
                 'since' => $record->created_at,
-                'url' => route('pages.export.chemicalExport.list'),
+                'url' => route('pages.export.chemicalExport.list', ['tab' => 'request']),
+                'waiting_me' => true,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** Hoá chất phòng ban đang chọn là bên ĐỀ NGHỊ (A), đã được cấp phát, đang chờ bấm Nhận. */
+    private function transferReceiptApprovals(int $departmentId): array
+    {
+        if ($departmentId <= 0) {
+            return [];
+        }
+
+        $records = DB::table('chemical_transfer_items as i')
+            ->join('chemical_transfer_requests as t', 'i.transfer_request_id', '=', 't.id')
+            ->leftJoin('deparments as d', 't.to_department_id', '=', 'd.id')
+            ->leftJoin('chemical_categories as c', 'i.category_id', '=', 'c.id')
+            ->leftJoin('chem_names as n', 'c.chem_names_id', '=', 'n.id')
+            ->select('i.id', 'i.issued_amount', 't.code', 'i.issued_at', 'd.name as to_department', 'n.name as chem_name')
+            ->where('t.department_id', $departmentId)
+            ->where('i.active', 1)
+            ->where('i.status', 'issued')
+            ->orderBy('i.issued_at')
+            ->get();
+
+        $rows = [];
+
+        foreach ($records as $record) {
+            $rows[] = [
+                'group' => 'Chờ xử lý',
+                'icon' => 'fas fa-inbox',
+                'label' => 'Hoá chất chuyển liên phòng ban',
+                'code' => $record->code,
+                'title' => ($record->chem_name ?: 'Hoá chất').' - từ '.($record->to_department ?: 'phòng ban khác'),
+                'status_label' => 'Chờ bạn xác nhận Nhận',
+                'since' => $record->issued_at,
+                'url' => route('pages.export.chemicalExport.list', ['tab' => 'request']),
+                'waiting_me' => true,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** Chất chuẩn phòng ban đang chọn là bên ĐỀ NGHỊ (A), đã được cấp phát, đang chờ bấm Nhận. */
+    private function standardTransferReceiptApprovals(int $departmentId): array
+    {
+        if ($departmentId <= 0) {
+            return [];
+        }
+
+        $records = DB::table('standard_transfer_items as i')
+            ->join('standard_transfer_requests as t', 'i.transfer_request_id', '=', 't.id')
+            ->leftJoin('deparments as d', 't.to_department_id', '=', 'd.id')
+            ->leftJoin('standard_categories as c', 'i.category_id', '=', 'c.id')
+            ->leftJoin('standard_names as n', 'c.chem_names_id', '=', 'n.id')
+            ->select('i.id', 'i.issued_amount', 't.code', 'i.issued_at', 'd.name as to_department', 'n.name as standard_name')
+            ->where('t.department_id', $departmentId)
+            ->where('i.active', 1)
+            ->where('i.status', 'issued')
+            ->orderBy('i.issued_at')
+            ->get();
+
+        $rows = [];
+
+        foreach ($records as $record) {
+            $rows[] = [
+                'group' => 'Chờ xử lý',
+                'icon' => 'fas fa-inbox',
+                'label' => 'Chất chuẩn chuyển liên phòng ban',
+                'code' => $record->code,
+                'title' => ($record->standard_name ?: 'Chất chuẩn').' - từ '.($record->to_department ?: 'phòng ban khác'),
+                'status_label' => 'Chờ bạn xác nhận Nhận',
+                'since' => $record->issued_at,
+                'url' => route('pages.export.standardExport.list', ['tab' => 'transfer']),
                 'waiting_me' => true,
             ];
         }

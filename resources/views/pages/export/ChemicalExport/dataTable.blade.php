@@ -1,7 +1,9 @@
 @include('pages.export.shared.assets')
 
 @php
-    $expTypeLabel = fn($type) => $types[$type] ?? $type;
+    // transfer_out không nằm trong $types (không chọn được ở form chung, chỉ tạo qua
+    // tab Đề nghị chuyển hoá chất liên phòng ban) nên gán nhãn hiển thị riêng ở đây.
+    $expTypeLabel = fn($type) => $type === 'transfer_out' ? 'Chuyển liên phòng ban' : ($types[$type] ?? $type);
 @endphp
 
 <div class="content-wrapper">
@@ -17,10 +19,17 @@
                     </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'request' ? 'is-active' : '' }}"
                         data-pane="expPaneRequest">
-                        <i class="fas fa-paper-plane mr-1"></i> Đề nghị chuyển
-                        @php $expReqPending = $requestsReceived->where('app_status', 'pending')->count(); @endphp
-                        @if ($expReqPending)
-                            <span class="exp-tab-count">{{ $expReqPending }}</span>
+                        <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
+                        @php
+                            // Cần cấp phát (mình là B) + đã cấp, chờ mình xác nhận Nhận (mình là A)
+                            $expReqPending = $transferReceived->whereIn('status', ['pending', 'partial'])->count();
+                            $expReqAwaitingReceipt = $transferSent->pluck('id')
+                                ->flatMap(fn ($id) => $transferItems[$id] ?? collect())
+                                ->where('status', 'issued')->count();
+                            $expReqBadgeCount = $expReqPending + $expReqAwaitingReceipt;
+                        @endphp
+                        @if ($expReqBadgeCount)
+                            <span class="exp-tab-count">{{ $expReqBadgeCount }}</span>
                         @endif
                     </button>
                     @perm('export_chemical_disposal_view')
@@ -32,6 +41,13 @@
                             @endif
                         </button>
                         @endperm
+                    <button type="button" class="exp-tab {{ $activeTab === 'draft' ? 'is-active' : '' }}"
+                        data-pane="expPaneDraft">
+                        <i class="fas fa-cart-shopping mr-1"></i> Phiếu Tạm
+                        @if ($drafts->count())
+                            <span class="exp-tab-count">{{ $drafts->count() }}</span>
+                        @endif
+                    </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'report' ? 'is-active' : '' }}"
                         data-pane="expPaneReport">
                         <i class="fas fa-chart-column mr-1"></i> Báo cáo theo khoảng thời gian
@@ -106,25 +122,14 @@
                                             <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="exp-badge exp-badge-{{ $row->type }}">
+                                            <span class="exp-badge exp-badge-{{ $row->type === 'transfer_out' ? 'transfer' : $row->type }}">
                                                 {{ $expTypeLabel($row->type) }}
                                             </span>
-                                            @if ($row->type === 'transfer')
+                                            @if ($row->type === 'transfer_out')
                                                 <div class="md-sub mt-1">
                                                     <i
                                                         class="fas fa-arrow-right-long mr-1"></i>{{ $row->to_department_short ?: $row->to_department_name ?: '—' }}
                                                 </div>
-                                                @if ($row->received_import_id)
-                                                    <span class="exp-received"
-                                                        title="Phòng nhận đã lấy hàng, mã lô bên đó: {{ $row->received_code }}">
-                                                        Đã nhận
-                                                    </span>
-                                                @else
-                                                    <span class="exp-pending"
-                                                        title="Phòng nhận chưa vào màn hình Nhập Hoá Chất để nhận">
-                                                        Chờ nhận
-                                                    </span>
-                                                @endif
                                             @endif
 
                                             {{-- Phiếu loại bỏ: cho biết đang chờ gom hay đã nằm trong đợt xin huỷ nào --}}
@@ -159,55 +164,61 @@
                                         <td class="md-sub">{{ $row->exported_by ?: '—' }}</td>
                                         <td class="md-sub">{{ $row->checked_by ?: '—' }}</td>
                                         <td>
-                                            <div class="md-actions">
-                                                {{-- Badge số lần điều chỉnh nằm ở góc trên bên phải nút Sửa --}}
-                                                <div class="exp-btn-wrap">
-                                                    {{-- Đã gom vào đợt xin huỷ thì khoá: số liệu trên phiếu đã vào hồ sơ --}}
+                                            @if ($row->type === 'transfer_out')
+                                                {{-- Phiếu cấp phát liên phòng ban: chỉ sửa/từ chối qua thao tác
+                                                     Nhận / Từ chối nhận ở tab Đề nghị liên phòng ban. --}}
+                                                <span class="md-empty" title="Xem/nhận/từ chối ở tab Đề nghị chuyển hoá chất liên phòng ban">—</span>
+                                            @else
+                                                <div class="md-actions">
+                                                    {{-- Badge số lần điều chỉnh nằm ở góc trên bên phải nút Sửa --}}
+                                                    <div class="exp-btn-wrap">
+                                                        {{-- Đã gom vào đợt xin huỷ thì khoá: số liệu trên phiếu đã vào hồ sơ --}}
+                                                        @perm('export_chemical_issue')
+                                                            <button type="button" class="btn btn-sm btn-warning btn-md-edit"
+                                                                {{ $row->disposal_id ? 'disabled' : '' }}
+                                                                title="{{ $row->disposal_id ? 'Đã gom vào đợt xin huỷ ' . $row->disposal_code . ', gỡ khỏi đợt ở tab Hoá chất chờ huỷ mới sửa được' : 'Sửa' }}"
+                                                                data-row="{{ json_encode([
+                                                                    'id' => $row->id,
+                                                                    'import_id' => $row->import_id,
+                                                                    'amount' => $row->amount,
+                                                                    'type' => $row->type,
+                                                                    'exported_date' => $row->exported_date,
+                                                                    'exported_by' => $row->exported_by,
+                                                                    'purpose' => $row->purpose,
+                                                                    'test_report_no' => $row->test_report_no,
+                                                                    'checked_by' => $row->checked_by,
+                                                                ]) }}">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                        @endperm
+
+                                                        @if ($expAdjust > 0)
+                                                            <button type="button" class="exp-count-badge btn-exp-history"
+                                                                title="Xem {{ $expAdjust }} lần điều chỉnh của phiếu này"
+                                                                data-url="{{ route($expRoute . 'history', ['id' => $row->id]) }}"
+                                                                data-title="{{ $row->code }} - {{ $row->chem_name }}">{{ $expAdjust }}</button>
+                                                        @endif
+                                                    </div>
+
                                                     @perm('export_chemical_issue')
-                                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                            {{ $row->disposal_id ? 'disabled' : '' }}
-                                                            title="{{ $row->disposal_id ? 'Đã gom vào đợt xin huỷ ' . $row->disposal_code . ', gỡ khỏi đợt ở tab Hoá chất chờ huỷ mới sửa được' : 'Sửa' }}"
-                                                            data-row="{{ json_encode([
-                                                                'id' => $row->id,
-                                                                'import_id' => $row->import_id,
-                                                                'amount' => $row->amount,
-                                                                'type' => $row->type,
-                                                                'exported_date' => $row->exported_date,
-                                                                'exported_by' => $row->exported_by,
-                                                                'purpose' => $row->purpose,
-                                                                'test_report_no' => $row->test_report_no,
-                                                                'checked_by' => $row->checked_by,
-                                                            ]) }}">
-                                                            <i class="fas fa-edit"></i>
-                                                        </button>
+                                                        <form class="form-md-confirm d-inline"
+                                                            action="{{ route($expRoute . 'deActive') }}" method="POST"
+                                                            data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $expLabel }}?"
+                                                            data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, số lượng của phiếu &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ được cộng trả lại tồn kho.' : 'sẽ bị trừ khỏi tồn kho trở lại.' }}"
+                                                            data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
+                                                            @csrf
+                                                            <input type="hidden" name="id" value="{{ $row->id }}">
+                                                            <button type="submit"
+                                                                class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
+                                                                {{ $row->disposal_id ? 'disabled' : '' }}
+                                                                title="{{ $row->disposal_id ? 'Đã gom vào đợt xin huỷ ' . $row->disposal_code . ', gỡ khỏi đợt trước khi khoá' : ($row->status_id == 1 ? 'Khoá' : 'Mở khoá') }}">
+                                                                <i
+                                                                    class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                                            </button>
+                                                        </form>
                                                     @endperm
-
-                                                    @if ($expAdjust > 0)
-                                                        <button type="button" class="exp-count-badge btn-exp-history"
-                                                            title="Xem {{ $expAdjust }} lần điều chỉnh của phiếu này"
-                                                            data-url="{{ route($expRoute . 'history', ['id' => $row->id]) }}"
-                                                            data-title="{{ $row->code }} - {{ $row->chem_name }}">{{ $expAdjust }}</button>
-                                                    @endif
                                                 </div>
-
-                                                @perm('export_chemical_issue')
-                                                    <form class="form-md-confirm d-inline"
-                                                        action="{{ route($expRoute . 'deActive') }}" method="POST"
-                                                        data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $expLabel }}?"
-                                                        data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, số lượng của phiếu &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ được cộng trả lại tồn kho.' : 'sẽ bị trừ khỏi tồn kho trở lại.' }}"
-                                                        data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                        @csrf
-                                                        <input type="hidden" name="id" value="{{ $row->id }}">
-                                                        <button type="submit"
-                                                            class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                            {{ $row->disposal_id ? 'disabled' : '' }}
-                                                            title="{{ $row->disposal_id ? 'Đã gom vào đợt xin huỷ ' . $row->disposal_code . ', gỡ khỏi đợt trước khi khoá' : ($row->status_id == 1 ? 'Khoá' : 'Mở khoá') }}">
-                                                            <i
-                                                                class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                        </button>
-                                                    </form>
-                                                @endperm
-                                            </div>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -216,11 +227,14 @@
                     </div>
                 </div>
 
-                {{-- ============ ĐỀ NGHỊ CHUYỂN HOÁ CHẤT ============ --}}
-                @include('pages.export.ChemicalExport.requestPane')
+                {{-- ============ ĐỀ NGHỊ CHUYỂN HOÁ CHẤT LIÊN PHÒNG BAN ============ --}}
+                @include('pages.export.ChemicalExport.transferPane')
 
                 {{-- ============ HOÁ CHẤT CHỜ HUỶ (BƯỚC 2 CỦA HUỶ BỎ) ============ --}}
                 @include('pages.export.ChemicalExport.disposalPane')
+
+                {{-- ============ PHIẾU TẠM (LƯU TẠM TỪ PICKER CHỌN NHIỀU) ============ --}}
+                @include('pages.export.ChemicalExport.draftPane')
 
                 <div class="exp-pane {{ $activeTab === 'report' ? 'is-active' : '' }}" id="expPaneReport">
 

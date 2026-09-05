@@ -154,7 +154,7 @@
                                         <select name="items[0][analyst_id]" class="form-control">
                                             <option value="">-- KNV --</option>
                                             @foreach ($analysts as $an)
-                                                <option value="{{ $an->id }}">{{ $an->name }}</option>
+                                                <option value="{{ $an->id }}">{{ $an->fullName }} ({{ $an->userName }})</option>
                                             @endforeach
                                         </select>
                                     </td>

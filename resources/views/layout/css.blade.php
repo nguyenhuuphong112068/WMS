@@ -137,15 +137,57 @@
             /* Bảng dữ liệu theo tông xanh dương nhạt */
             .table thead th {
                   background-color: var(--primary-soft);
-                  color: var(--primary-dark);
+                  color: #000;
                   border-bottom: 2px solid var(--primary-lighter) !important;
                   text-transform: uppercase;
-                  font-size: 0.8rem;
+                  font-size: 0.98rem;
                   letter-spacing: 0.5px;
             }
 
             .table tbody tr:hover {
                   background-color: rgba(var(--primary-rgb), 0.05);
+            }
+
+            /* ----------------------------------------------------------------
+               Cỡ chữ + màu chữ dùng chung cho MỌI bảng dữ liệu (DataTables)
+               ----------------------------------------------------------------
+               Áp dụng cho toàn bộ .table / table.dataTable trong dự án: chữ
+               trong bảng màu đen, cỡ chữ = cỡ gốc * 1.2 (tăng 1.5 lần rồi
+               giảm 20% theo yêu cầu). Khai ở đây để mọi màn hình có bảng đều
+               tự nhận, không phải lặp lại ở từng dataTable.blade.php.
+               ---------------------------------------------------------------- */
+            .table tbody td,
+            table.dataTable tbody td {
+                  color: #000;
+                  font-size: 1.06rem;
+                  line-height: 1.5;
+            }
+
+            .table td .md-sub,
+            table.dataTable td .md-sub {
+                  color: #000;
+                  font-size: 1.03rem;
+            }
+
+            .table td small,
+            table.dataTable td small,
+            .table td .md-tag,
+            table.dataTable td .md-tag {
+                  font-size: 0.96rem;
+            }
+
+            .table td .badge,
+            table.dataTable td .badge,
+            .table td .md-badge,
+            table.dataTable td .md-badge {
+                  font-size: 0.9rem;
+            }
+
+            .table td .md-empty,
+            table.dataTable td .md-empty,
+            .table td .md-note,
+            table.dataTable td .md-note {
+                  color: #000;
             }
 
             .page-item.active .page-link {

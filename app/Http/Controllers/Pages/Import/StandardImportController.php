@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Import;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\AttachmentBackup;
 use App\Support\Barcode128;
 use App\Support\DepartmentStandard;
 use App\Support\StandardCode;
@@ -35,6 +36,9 @@ class StandardImportController extends Controller
     private const HISTORY_TABLE = 'standard_import_histories';
 
     private const ATTACHMENT_TABLE = 'standard_import_attachments';
+
+    /** Thư mục lưu file đính kèm, dùng chung cho cả disk private lẫn bản sao lưu public/uploads/. */
+    private const ATTACHMENT_FOLDER = 'standard_imports';
 
     private const LABEL = 'phiếu nhập chất chuẩn';
 
@@ -222,7 +226,8 @@ class StandardImportController extends Controller
                     $originalName = $file->getClientOriginalName();
                     $fileSize = $file->getSize();
                     $fileType = $file->getClientMimeType() ?: $file->getClientOriginalExtension();
-                    $path = $file->store('public/standard_imports');
+                    $path = $file->store('public/'.self::ATTACHMENT_FOLDER);
+                    AttachmentBackup::copy($path, self::ATTACHMENT_FOLDER);
 
                     $uploadedFiles[] = [
                         'file_name' => $originalName,
@@ -340,7 +345,8 @@ class StandardImportController extends Controller
                         $originalName = $file->getClientOriginalName();
                         $fileSize = $file->getSize();
                         $fileType = $file->getClientMimeType() ?: $file->getClientOriginalExtension();
-                        $path = $file->store('public/standard_imports');
+                        $path = $file->store('public/'.self::ATTACHMENT_FOLDER);
+                        AttachmentBackup::copy($path, self::ATTACHMENT_FOLDER);
 
                         DB::table(self::ATTACHMENT_TABLE)->insert([
                             'standard_import_id' => $current->id,
@@ -485,6 +491,7 @@ class StandardImportController extends Controller
         }
 
         Storage::delete($attachment->file_path);
+        AttachmentBackup::delete($attachment->file_path, self::ATTACHMENT_FOLDER);
         DB::table(self::ATTACHMENT_TABLE)->where('id', $attachment->id)->delete();
 
         AuditTrialController::log(

@@ -30,12 +30,14 @@ class UnitSeeder extends Seeder
      */
     private const UNITS = [
         // ---------- Khối lượng (gốc: g) ----------
+        ['µg', 'Vi-crô-gam', 'mass', 0.000001],
         ['mg', 'Mi-li-gam', 'mass', 0.001],
         ['g', 'Gam', 'mass', 1],
         ['kg', 'Ki-lô-gam', 'mass', 1000],
         ['tấn', 'Tấn', 'mass', 1000000],
 
         // ---------- Thể tích (gốc: ml) ----------
+        ['µl', 'Vi-crô-lít', 'volume', 0.001],
         ['ml', 'Mi-li-lít', 'volume', 1],
         ['cc', 'Xăng-ti-mét khối', 'volume', 1],
         ['L', 'Lít', 'volume', 1000],
@@ -43,19 +45,26 @@ class UnitSeeder extends Seeder
 
         // ---------- Đếm / Bao bì (không tự quy đổi sang kg hay lít) ----------
         ['cái', 'Cái', 'count', 1],
+        ['chiếc', 'Chiếc', 'count', 1],
         ['bộ', 'Bộ', 'count', 1],
         ['đôi', 'Đôi', 'count', 1],
+        ['viên', 'Viên', 'count', 1],
         ['chai', 'Chai', 'count', 1],
         ['lọ', 'Lọ', 'count', 1],
         ['ống', 'Ống', 'count', 1],
         ['can', 'Can', 'count', 1],
+        ['phuy', 'Phuy', 'count', 1],
+        ['xô', 'Xô', 'count', 1],
         ['hộp', 'Hộp', 'count', 1],
         ['thùng', 'Thùng', 'count', 1],
         ['bao', 'Bao', 'count', 1],
         ['túi', 'Túi', 'count', 1],
+        ['gói', 'Gói', 'count', 1],
+        ['vỉ', 'Vỉ', 'count', 1],
         ['kiện', 'Kiện', 'count', 1],
         ['cuộn', 'Cuộn', 'count', 1],
         ['tờ', 'Tờ', 'count', 1],
+        ['m', 'Mét', 'count', 1],
     ];
 
     public function run(): void

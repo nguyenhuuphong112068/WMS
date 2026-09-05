@@ -425,6 +425,34 @@
         font-size: 0.87rem;
         margin-bottom: 16px;
     }
+
+    /* ---------- Cảnh báo ngưỡng tồn trữ PL IV (theo hoạt chất / hỗn hợp) ---------- */
+    .est-threshold-alert {
+        border-radius: var(--border-radius-md);
+        border: 1px solid;
+        padding: 8px 12px;
+        margin-top: 8px;
+        font-size: 0.82rem;
+        line-height: 1.45;
+    }
+
+    .est-threshold-alert.level-warn {
+        background: #FFFBEB;
+        border-color: #FCD34D;
+        color: #92400E;
+    }
+
+    .est-threshold-alert.level-exceeded {
+        background: #FEF2F2;
+        border-color: #FCA5A5;
+        color: #B91C1C;
+    }
+
+    .est-threshold-alert.is-compact {
+        padding: 5px 9px;
+        font-size: 0.74rem;
+        margin-top: 6px;
+    }
 </style>
 
 <script>
@@ -542,6 +570,59 @@
             // Chưa có dòng nào (form thêm mới) thì mở sẵn các tháng mặc định
             if (!$(this).find('.est-amount-row').length) fillDefaults($(this));
             reindex($(this));
+        });
+
+        /* ---------- Cảnh báo ngưỡng PL IV khi chọn hoá chất / đổi số lượng ---------- */
+        // Chỉ hoạt động trên modal có ô chọn mang data-threshold-url (hiện chỉ Dự Trù Hoá Chất
+        // có ngưỡng PL IV để đối chiếu); modal Vật Tư / Chất Chuẩn không có thì im lặng bỏ qua.
+        function renderThresholdAlerts($box, warnings) {
+            if (!$box.length) return;
+
+            if (!warnings || !warnings.length) {
+                $box.empty();
+                return;
+            }
+
+            $box.html(warnings.map(function(w) {
+                return '<div class="est-threshold-alert level-' + (w.level || 'warn') + '">' +
+                    '<i class="fas fa-triangle-exclamation mr-1"></i>' + w.message +
+                    '</div>';
+            }).join(''));
+        }
+
+        function checkThreshold($form) {
+            var $select = $form.find('.est-select[data-threshold-url]');
+            var $box = $form.find('.est-threshold-alerts');
+
+            if (!$select.length || !$box.length) return;
+
+            var categoryId = $select.val();
+
+            if (!categoryId) {
+                renderThresholdAlerts($box, []);
+                return;
+            }
+
+            var amounts = [];
+            $form.find('.est-amount-row').each(function() {
+                amounts.push({
+                    amount: $(this).find('[data-field="amount"]').val(),
+                    unit_id: $(this).find('[data-field="unit_id"]').val()
+                });
+            });
+
+            $.get($select.data('threshold-url'), { category_id: categoryId, amounts: amounts })
+                .done(function(res) {
+                    renderThresholdAlerts($box, res && res.warnings);
+                });
+        }
+
+        $(document).on('change', '.est-select[data-threshold-url]', function() {
+            checkThreshold($(this).closest('form'));
+        });
+
+        $(document).on('change', '.est-amounts [data-field="amount"], .est-amounts [data-field="unit_id"]', function() {
+            checkThreshold($(this).closest('form'));
         });
 
         /* ---------- Mở modal sửa mặt hàng dự trù ---------- */

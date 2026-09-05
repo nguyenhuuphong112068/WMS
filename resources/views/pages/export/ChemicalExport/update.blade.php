@@ -73,24 +73,6 @@
                             @endif
                         </div>
 
-                        {{-- Chỉ hiện khi chọn Chuyển kho, JS bật/tắt qua class exp-transfer-only --}}
-                        <div class="form-group col-md-4 exp-transfer-only" style="display: none">
-                            <label>Phòng Ban Nhận <span class="text-danger">*</span></label>
-                            <select name="to_department_id"
-                                class="form-control exp-select {{ $bag->has('to_department_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chọn phòng ban nhận --</option>
-                                @foreach ($departments as $department)
-                                    <option value="{{ $department->id }}"
-                                        {{ old('to_department_id') == $department->id ? 'selected' : '' }}>
-                                        {{ $department->name }} ({{ $department->shortName }})
-                                    </option>
-                                @endforeach
-                            </select>
-                            @if ($bag->has('to_department_id'))
-                                <span class="md-error">{{ $bag->first('to_department_id') }}</span>
-                            @endif
-                        </div>
-
                         <div class="form-group col-md-4">
                             <label>Ngày Sử Dụng</label>
                             <input type="text" class="form-control exp-readonly exp-up-exported-date" readonly>
@@ -123,7 +105,7 @@
                         </div>
                     </div>
 
-                    {{-- Căn cứ loại bỏ, chỉ hỏi khi chọn Huỷ bỏ; JS bật/tắt qua class exp-cancel-only --}}
+                    {{-- Căn cứ loại bỏ, chỉ hỏi khi chọn Loại bỏ; JS bật/tắt qua class exp-cancel-only --}}
                     <div class="form-group exp-cancel-only" style="display: none">
                         <label>Số PKN, OOS, BCSL...</label>
                         <input type="text" name="test_report_no" maxlength="100"

@@ -270,6 +270,9 @@
                                             <span
                                                 class="inv-amount {{ $row->period_cancelled > 0 ? 'is-out' : 'inv-muted' }}">{{ $invNum($row->period_cancelled) }}</span>
                                             <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
+                                            @if ($row->period_transferred > 0)
+                                                <div class="md-sub text-info">Chuyển LPB: {{ $invNum($row->period_transferred) }}</div>
+                                            @endif
                                         </td>
                                         <td class="text-right" data-order="{{ $row->gap }}">
                                             {{-- Tồn âm (đã xuất vượt) hiện đúng số âm để thấy phần phải cân đối --}}

@@ -3,7 +3,7 @@
 
     // Trang có 2 tab nên có tới 4 form dùng chung kho old(): chỉ điền lại giá trị vừa
     // nhập khi chính form này báo lỗi, không thì để giá trị mặc định.
-    $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
+    $old = fn($key, $default = null) => $bag->any() ? old($key, $default) : $default;
     $oldWarnings = (array) $old('safety_warning', []);
 @endphp
 
@@ -24,8 +24,8 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>Mã Danh Mục</label>
-                                        <input type="text" class="form-control cat-readonly" value="{{ $nextCode }}"
-                                            readonly tabindex="-1">
+                                        <input type="text" class="form-control cat-readonly"
+                                            value="{{ $nextCode }}" readonly tabindex="-1">
                                         <small class="md-sub">Sinh tự động khi lưu, không cần nhập.</small>
                                     </div>
                                 </div>
@@ -133,13 +133,7 @@
                         <div class="col-lg-6">
                             <div class="form-group">
                                 <label>Phân Loại Nghị định số 24/2026/NĐ-CP</label>
-                                <div class="md-hint">
-                                    <i class="fas fa-magic mr-1"></i>
-                                    Phân loại 10 nhóm được <b>suy tự động</b> từ dữ liệu gốc
-                                    <b>Tên Hoạt Chất</b> (nhóm 1, 3–7, 9) và <b>Tên Hoá Chất</b>
-                                    (nhóm 2, 8, 10). Không khai tay ở màn này nữa — bảng danh mục
-                                    hiển thị nhóm suy được ở cột <b>Phân Loại NĐ 24/2026</b>.
-                                </div>
+
                                 <div class="cat-cls-preview mt-2" data-cls-preview>
                                     <span class="md-empty">Chọn tên hoá chất để xem nhóm phân loại NĐ 24/2026.</span>
                                 </div>
@@ -152,8 +146,12 @@
                                         <label
                                             class="cat-check-item has-picto {{ in_array($code, $oldWarnings) ? 'is-checked' : '' }}">
                                             <input type="checkbox" class="cat-check-input" name="safety_warning[]"
-                                                value="{{ $code }}" {{ in_array($code, $oldWarnings) ? 'checked' : '' }}>
-                                            @include('pages.shared.safetyPictogram', ['code' => $code, 'size' => 24])
+                                                value="{{ $code }}"
+                                                {{ in_array($code, $oldWarnings) ? 'checked' : '' }}>
+                                            @include('pages.shared.safetyPictogram', [
+                                                'code' => $code,
+                                                'size' => 24,
+                                            ])
                                             <span class="cat-check-name">{{ $name }}</span>
                                         </label>
                                     @endforeach

@@ -17,6 +17,7 @@
                         <th>Công Ty</th>
                         <th>Tên Viết Tắt</th>
                         <th>Tên Phòng Ban</th>
+                        <th>Phân Loại</th>
                         <th>Trạng Thái</th>
                         <th>Người Tạo</th>
                         <th>Ngày Tạo</th>
@@ -30,6 +31,13 @@
                             <td>{{ $data->company_name ?? '—' }}</td>
                             <td>{{ $data->shortName }}</td>
                             <td>{{ $data->name }}</td>
+                            <td class="text-center">
+                                @if ($data->is_general)
+                                    <span class="badge badge-info">Nghiệp vụ</span>
+                                @else
+                                    <span class="badge badge-secondary">Chung</span>
+                                @endif
+                            </td>
                             <td class="text-center">
                                 @if ($data->isActive)
                                     <span class="badge badge-success">Hoạt động</span>
@@ -45,6 +53,7 @@
                                         <button type="button" class="btn btn-warning btn-edit mb-1"
                                             data-id="{{ $data->id }}" data-shortname="{{ $data->shortName }}"
                                             data-name="{{ $data->name }}" data-company_id="{{ $data->company_id }}"
+                                            data-is_general="{{ $data->is_general }}"
                                             data-toggle="modal" data-target="#updateModal">
                                             <i class="fas fa-edit"></i>
                                         </button>
@@ -108,6 +117,7 @@
             modal.find('#update_company_id').val(button.data('company_id'));
             modal.find('#update_shortName').val(button.data('shortname'));
             modal.find('#update_name').val(button.data('name'));
+            modal.find('#update_is_common').prop('checked', !button.data('is_general'));
         });
 
         $('.form-deActive').on('submit', function(e) {

@@ -8,15 +8,20 @@
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
-            <form action="{{ route($impRoute . 'update') }}" method="POST">
+            <form action="{{ route($impRoute . 'update') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="id" value="{{ old('id') }}">
+                {{-- Hoá chất + số lượng ĐANG LƯU của phiếu trước khi sửa - dùng để trừ ra khi
+                     tính tồn dự kiến (checkImpThreshold), tránh cộng trùng số lượng cũ --}}
+                <input type="hidden" name="original_category_id" value="{{ old('original_category_id') }}">
+                <input type="hidden" name="original_amount" value="{{ old('original_amount') }}">
                 <div class="modal-body">
 
                     <div class="form-row">
                         <div class="form-group col-md-8">
                             <label>Hoá Chất <span class="text-danger">*</span></label>
-                            <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}" required>
+                            <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
+                                data-threshold-url="{{ route($impRoute . 'checkThreshold') }}" required>
                                 <option value="">-- Chọn hoá chất phòng đang dùng --</option>
                                 @foreach ($categories as $category)
                                     <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
@@ -39,6 +44,8 @@
                                 <span class="md-error">{{ $bag->first('amount') }}</span>
                             @endif
                         </div>
+
+                        <div class="col-md-12 imp-threshold-alerts"></div>
                     </div>
 
                     <div class="form-row">
@@ -148,6 +155,13 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Tài Liệu Đính Kèm</label>
+                        <div class="ci-existing-files mb-2 small"></div>
+                        <input type="file" name="attachments[]" class="form-control-file" multiple>
+                        <small class="md-sub">Thêm file mới (tối đa 10MB / file).</small>
+                    </div>
+
+                    <div class="form-group">
                         <label>Ghi Chú</label>
                         <textarea name="note" rows="2" maxlength="500"
                             class="form-control {{ $bag->has('note') ? 'is-invalid' : '' }}">{{ old('note') }}</textarea>
@@ -189,11 +203,30 @@
 <script>
     // Ngày nhập chỉ để xem (d/m/Y), không có name nên không gửi lên server
     document.addEventListener('DOMContentLoaded', function() {
+        var delUrl = @json(route($impRoute . 'deleteAttachment'));
+        var csrf = @json(csrf_token());
+
+        function renderFiles(list) {
+            var $box = $('#updateModal .ci-existing-files').empty();
+            (list || []).forEach(function(f) {
+                var $row = $('<div class="d-flex align-items-center mb-1"></div>');
+                $row.append($('<span class="mr-2"><i class="fas fa-paperclip text-primary mr-1"></i></span>').append(document.createTextNode(f.file_name)));
+                var $btn = $('<button type="button" class="btn btn-xs btn-outline-danger">&times;</button>');
+                $btn.on('click', function() {
+                    if (!confirm('Xoá file "' + f.file_name + '"?')) return;
+                    $.post(delUrl, { _token: csrf, id: f.id }).done(function() { $row.remove(); });
+                });
+                $row.append($btn);
+                $box.append($row);
+            });
+        }
+
         $(document).on('click', '.btn-md-edit', function() {
             var row = $(this).data('row') || {};
             var parts = String(row.imported_date || '').substring(0, 10).split('-');
             $('#updateModal .imp-up-imported-date')
                 .val(parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : '—');
+            renderFiles(row.attachments);
         });
     });
 </script>

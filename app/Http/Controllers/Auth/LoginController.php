@@ -104,6 +104,7 @@ class LoginController extends Controller
                 ->with('pwExpiredUser', $getUser->userName);
         }
 
+        $request->session()->regenerate();
         $this->establishSession($request, $getUser);
 
         AuditTrialController::log('Login', 'NA', 0, 'NA', 'Đăng Nhập Thành Công');
@@ -195,9 +196,17 @@ class LoginController extends Controller
     private function establishSession(Request $request, $getUser): void
     {
         $departmentId = $getUser->deparment_id ? (int) $getUser->deparment_id : null;
-        $departmentShort = $departmentId
-            ? DB::table('deparments')->where('id', $departmentId)->value('shortName')
+        $department = $departmentId
+            ? DB::table('deparments')->where('id', $departmentId)->first()
             : null;
+
+        // Nếu user chưa được gán bộ phận hoặc bộ phận không còn tồn tại, fallback về bộ phận đầu tiên đang hoạt động
+        if (! $department) {
+            $department = DB::table('deparments')->where('isActive', 1)->orderBy('id', 'asc')->first();
+            $departmentId = $department->id ?? null;
+        }
+
+        $departmentShort = $department->shortName ?? null;
         $roleName = $getUser->role_id
             ? DB::table('roles')->where('id', $getUser->role_id)->value('name')
             : null;

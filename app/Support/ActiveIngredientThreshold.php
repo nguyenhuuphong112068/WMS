@@ -25,7 +25,14 @@ use Illuminate\Support\Facades\DB;
  *
  * Số lượng lưu theo đơn vị của phòng ban (chemical_department_categories.unit_id). Quy về
  * kg bằng App\Support\UnitConverter với tỉ trọng chemical_categories.density, rồi nhân
- * hàm lượng hoạt chất chemical_categories.ai_content_percent (mặc định 100%).
+ * hàm lượng hoạt chất: ưu tiên chemical_categories.ai_content_percent (khai tay ở mã danh
+ * mục, ví dụ lô có kết quả COA khác nhãn); nếu mã danh mục không khai thì lấy % thành phần
+ * (chem_name_active_ingredient.content_percent, khai trên màn Tên Hoá Chất); không có gì
+ * thì mặc định 100%. CHỈ áp dụng cho hoá chất là hoạt chất ĐƠN (chính nó là hoạt chất Bảng
+ * A, có thể pha loãng) - xem categoryRows(). Hỗn hợp nhiều hoạt chất (ví dụ hỗn hợp chứa
+ * một hoạt chất Bảng A bên trong) KHÔNG cộng vào đây; hỗn hợp đó đứng riêng ở Nhóm 10
+ * (Bảng B, tồn thô - App\Support\MixtureHazardThreshold), nhập kho hỗn hợp không tách %
+ * hoạt chất thành phần để cộng thêm vào ngưỡng Bảng A.
  *
  * Đơn vị đếm (chai/thùng…) hoặc thiếu tỉ trọng => KHÔNG quy đổi được, gom vào phần
  * "cần kiểm tra thủ công" chứ không bỏ qua âm thầm.
@@ -194,9 +201,6 @@ class ActiveIngredientThreshold
                 continue;
             }
 
-            $percent = $catRows->first()->ai_content_percent !== null
-                ? (float) $catRows->first()->ai_content_percent
-                : 100.0;
             $factor = $keyFactor[$key] ?? null;
             $reason = $keyReason[$key] ?? null;
             $deptName = $deptNames[$deptId] ?? ('#' . $deptId);
@@ -213,6 +217,7 @@ class ActiveIngredientThreshold
                     continue;
                 }
 
+                $percent = self::resolvePercent($cat);
                 $kg = (float) $amount * $factor * $percent / 100;
 
                 $target->total_kg += $kg;
@@ -248,13 +253,12 @@ class ActiveIngredientThreshold
                     continue;
                 }
 
-                $percent = $catRows->first()->ai_content_percent !== null
-                    ? (float) $catRows->first()->ai_content_percent
-                    : 100.0;
                 $unitShort = ($deptUnits[$key] ?? null)->short_name ?? '';
                 $deptName = $deptNames[$lot->department_id] ?? ('#' . $lot->department_id);
 
                 foreach ($catRows as $cat) {
+                    $percent = self::resolvePercent($cat);
+
                     $result[$cat->ai_id]->onhand_rows[] = (object) [
                         'ref' => $lot->code,
                         'date' => $lot->imported_date,
@@ -289,14 +293,12 @@ class ActiveIngredientThreshold
                 continue;
             }
 
-            $percent = $catRows->first()->ai_content_percent !== null
-                ? (float) $catRows->first()->ai_content_percent
-                : 100.0;
-            $kgDelta = $event['delta'] * $factor * $percent / 100;
             $unitShort = ($deptUnits[$key] ?? null)->short_name ?? '';
             $deptName = $deptNames[$event['department_id']] ?? ('#' . $event['department_id']);
 
             foreach ($catRows as $cat) {
+                $percent = self::resolvePercent($cat);
+                $kgDelta = $event['delta'] * $factor * $percent / 100;
                 $aiId = $cat->ai_id;
                 $running[$aiId] = ($running[$aiId] ?? 0.0) + $kgDelta;
 
@@ -454,7 +456,7 @@ class ActiveIngredientThreshold
     {
         $cat = DB::table('chemical_categories')
             ->where('id', $categoryId)
-            ->select('density', 'ai_content_percent')
+            ->select('chem_names_id', 'density', 'ai_content_percent')
             ->first();
 
         $rows = collect($amountRows);
@@ -467,7 +469,9 @@ class ActiveIngredientThreshold
         $units = $unitIds ? DB::table('units')->whereIn('id', $unitIds)->get()->keyBy('id') : collect();
 
         $density = $cat->density !== null ? (float) $cat->density : null;
-        $percent = $cat->ai_content_percent !== null ? (float) $cat->ai_content_percent : 100.0;
+        $percent = $cat->ai_content_percent !== null
+            ? (float) $cat->ai_content_percent
+            : self::maxAppendixIvAPercent((int) $cat->chem_names_id);
         $kgUnit = (object) ['unit_group' => 'mass', 'factor_to_base' => 1000.0];
 
         $totalKg = 0.0;
@@ -544,14 +548,16 @@ class ActiveIngredientThreshold
      | ------------------------------------------------------------------------- */
 
     /**
-     * Mã danh mục hoá chất có gắn hoạt chất thuộc NHÓM 9 (Phụ lục IV Bảng A) đã duyệt +
-     * đang hoạt động. Diện đối chiếu ngưỡng PL IV nay SUY tự động từ phân loại của hoạt
-     * chất - không còn điều kiện tick N9/N10/CAM trên mã danh mục.
+     * Mã danh mục hoá chất mà CHÍNH tên hoá chất của nó là hoạt chất đơn (không phải hỗn
+     * hợp) thuộc NHÓM 9 (Phụ lục IV Bảng A), hoạt chất đã duyệt + đang hoạt động.
      *
-     * chem_names gắn NHIỀU hoạt chất (bảng pivot chem_name_active_ingredient) nên một
-     * mã danh mục có thể sinh ra nhiều dòng - mỗi hoạt chất nhóm 9 một dòng. Tồn của
-     * mã đó được quy cho TỪNG hoạt chất nhóm 9 của hỗn hợp (nhân cùng ai_content_percent
-     * của mã danh mục); hỗn hợp có 2+ chất nhóm 9 thì tính theo hướng thận trọng.
+     * Chỉ nhận chem_names có ĐÚNG 1 dòng trong bảng pivot chem_name_active_ingredient (tức
+     * bản thân tên hoá chất CHÍNH LÀ hoạt chất đó, có thể pha loãng - % lấy theo
+     * cnai.content_percent hoặc override cc.ai_content_percent - nhưng không lẫn hoạt chất
+     * nào khác). Hoá chất là HỖN HỢP nhiều hoạt chất khác nhau (như "Hộn chất ABC" gồm
+     * Acetone + Acrolein) bị loại khỏi đây dù có chứa một hoạt chất nhóm 9 bên trong: hỗn
+     * hợp đó đã đứng riêng ở Nhóm 10 (Bảng B, tồn thô - MixtureHazardThreshold), nhập kho
+     * hỗn hợp không tách ra cộng thêm vào tồn hoạt chất nhóm 9 của từng thành phần.
      *
      * @return array<int, object>
      */
@@ -571,11 +577,14 @@ class ActiveIngredientThreshold
             })
             ->where('ai.status_id', 1)
             ->where('ai.app_status', 'approved')
+            // Tên hoá chất phải là hoạt chất đơn - không phải hỗn hợp nhiều thành phần
+            ->whereRaw('(select count(*) from chem_name_active_ingredient as x where x.chem_names_id = cn.id) = 1')
             ->select(
                 'cc.id as category_id',
                 'cc.code as category_code',
                 'cc.density',
                 'cc.ai_content_percent',
+                'cnai.content_percent as cnai_percent',
                 'cn.name as chem_name',
                 'ai.id as ai_id',
                 'ai.code as ai_code',
@@ -586,5 +595,52 @@ class ActiveIngredientThreshold
             )
             ->get()
             ->all();
+    }
+
+    /**
+     * % hàm lượng dùng để quy tồn của một mã danh mục (hoạt chất ĐƠN - xem categoryRows())
+     * ra kg hoạt chất gốc: ưu tiên chemical_categories.ai_content_percent (khai tay ở mã
+     * danh mục - override khi lô có kết quả COA khác nhãn); không khai thì lấy %
+     * chem_name_active_ingredient.content_percent (độ tinh khiết/nồng độ khai trên màn Tên
+     * Hoá Chất); không có gì thì mặc định 100% (coi như hoạt chất nguyên chất).
+     */
+    private static function resolvePercent(object $cat): float
+    {
+        if ($cat->ai_content_percent !== null) {
+            return (float) $cat->ai_content_percent;
+        }
+
+        if ($cat->cnai_percent !== null) {
+            return (float) $cat->cnai_percent;
+        }
+
+        return 100.0;
+    }
+
+    /**
+     * Dùng cho sumEstimateKg(): mã danh mục không khai ai_content_percent tay thì lấy %
+     * nồng độ của CHÍNH hoạt chất đó (chem_name_active_ingredient.content_percent) - chỉ có
+     * ý nghĩa khi tên hoá chất là hoạt chất đơn (đúng 1 dòng pivot, cùng điều kiện với
+     * categoryRows()); hoá chất là hỗn hợp nhiều thành phần thì không thuộc diện Bảng A nên
+     * projectedForCategory() sẽ bỏ qua kg trả về ở đây. Không có hoạt chất nhóm 9 nào -> 100%.
+     */
+    private static function maxAppendixIvAPercent(int $chemNamesId): float
+    {
+        $percent = DB::table('chem_name_active_ingredient as cnai')
+            ->join('active_ingredients as ai', 'cnai.active_ingredients_id', '=', 'ai.id')
+            ->where('cnai.chem_names_id', $chemNamesId)
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('active_ingredient_classifications as aic')
+                    ->whereColumn('aic.active_ingredients_id', 'ai.id')
+                    ->where('aic.appendix', 'IV')
+                    ->where('aic.table_ref', 'A');
+            })
+            ->where('ai.status_id', 1)
+            ->where('ai.app_status', 'approved')
+            ->whereRaw('(select count(*) from chem_name_active_ingredient as x where x.chem_names_id = cnai.chem_names_id) = 1')
+            ->max('cnai.content_percent');
+
+        return $percent !== null ? (float) $percent : 100.0;
     }
 }

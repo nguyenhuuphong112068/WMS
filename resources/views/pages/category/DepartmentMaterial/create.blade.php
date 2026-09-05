@@ -20,9 +20,16 @@
                 <div class="modal-body">
 
                     <div class="form-group">
-                        <label>Vật Tư <span class="text-danger">*</span></label>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap" style="gap: 6px">
+                            <label class="mb-0">Vật Tư <span class="text-danger">*</span></label>
+                            <button type="button" class="btn btn-outline-primary btn-sm dmc-pick-category"
+                                data-target-form="#dmCreateModal">
+                                <i class="fas fa-cubes mr-1"></i> Chọn từ danh mục công ty
+                            </button>
+                        </div>
                         <select name="category_id"
-                            class="form-control cat-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}" required>
+                            class="form-control cat-select mt-1 {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
+                            required>
                             <option value="">-- Chọn vật tư --</option>
                             @foreach ($categories as $category)
                                 <option value="{{ $category->id }}"

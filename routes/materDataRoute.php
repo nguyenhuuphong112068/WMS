@@ -10,7 +10,6 @@
 */
 
 use App\Http\Controllers\Pages\MaterData\ActiveIngredientController;
-use App\Http\Controllers\Pages\MaterData\AnalystController;
 use App\Http\Controllers\Pages\MaterData\ChemManufacturerController;
 use App\Http\Controllers\Pages\MaterData\ChemNameController;
 use App\Http\Controllers\Pages\MaterData\ChemSupplierController;
@@ -70,14 +69,6 @@ Route::prefix('/materData')
         });
 
         Route::prefix('/productName')->name('productName.')->controller(ProductNameController::class)->group(function () {
-            Route::get('', 'index')->name('list');
-            Route::get('history', 'history')->name('history');
-            Route::post('store', 'store')->name('store');
-            Route::post('update', 'update')->name('update');
-            Route::post('deActive', 'deActive')->name('deActive');
-        });
-
-        Route::prefix('/analyst')->name('analyst.')->controller(AnalystController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');

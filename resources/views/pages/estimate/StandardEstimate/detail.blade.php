@@ -68,7 +68,7 @@
 
                 <div class="box">
                     <label>Người Lập Phiếu</label>
-                    <div class="val">{{ $list->created_by ?: '—' }}</div>
+                    <div class="val">{{ $list->updated_by ?: $list->created_by ?: '—' }}</div>
                     <div class="md-sub">
                         {{ $list->created_at ? \Carbon\Carbon::parse($list->created_at)->format('d/m/Y H:i') : '' }}
                     </div>
@@ -324,7 +324,7 @@
                                             </div>
                                         </td>
                                         <td class="md-sub">
-                                            {{ $item->created_by ?: '—' }}
+                                            {{ $item->updated_by ?: $item->created_by ?: '—' }}
                                             <br><small>{{ $item->created_at ? \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') : '' }}</small>
                                         </td>
                                         @if ($canEditItems && user_can('estimate_standard_update'))

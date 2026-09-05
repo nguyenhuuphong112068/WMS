@@ -17,6 +17,9 @@
 | - Nút chọn nhanh khoảng thời gian : trong .imp-quick, kèm data-from / data-to
 | - Nút xem lịch sử điều chỉnh : class="btn-imp-history" kèm data-url / data-title
 | - Modal lịch sử          : id="historyModal"
+| - Cảnh báo ngưỡng PL IV (Bảng A hoạt chất / Bảng B hỗn hợp), gõ tới đâu cảnh báo tới đó:
+|   ô chọn hoá chất kèm data-threshold-url="{{ route(...checkThreshold) }}" + div
+|   class="imp-threshold-alerts" trong cùng form; cần input [name="amount"] để lấy số lượng
 --}}
 
 @include('pages.materData.shared.assets')
@@ -466,6 +469,28 @@
         outline: none;
         box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
     }
+
+    /* ---------- Cảnh báo ngưỡng tồn trữ PL IV (theo hoạt chất / hỗn hợp) ---------- */
+    .imp-threshold-alert {
+        border-radius: var(--border-radius-md);
+        border: 1px solid;
+        padding: 8px 12px;
+        margin-top: 8px;
+        font-size: 0.82rem;
+        line-height: 1.45;
+    }
+
+    .imp-threshold-alert.level-warn {
+        background: #FFFBEB;
+        border-color: #FCD34D;
+        color: #92400E;
+    }
+
+    .imp-threshold-alert.level-exceeded {
+        background: #FEF2F2;
+        border-color: #FCA5A5;
+        color: #B91C1C;
+    }
 </style>
 
 <script>
@@ -599,70 +624,6 @@
             }
         });
 
-        /* ---------- Bảng hàng chờ nhận từ phòng ban khác ---------- */
-        $('#impTransferTable').DataTable({
-            autoWidth: false,
-            responsive: true,
-            pageLength: 25,
-            order: [
-                [5, 'desc']
-            ],
-            lengthMenu: [
-                [10, 25, 50, 100, -1],
-                [10, 25, 50, 100, 'Tất cả']
-            ],
-            language: {
-                search: 'Tìm kiếm:',
-                lengthMenu: 'Hiển thị _MENU_ dòng',
-                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
-                infoEmpty: 'Không có dữ liệu',
-                zeroRecords: 'Không tìm thấy dòng nào phù hợp',
-                emptyTable: 'Không có hoá chất nào đang chờ nhận từ phòng ban khác.',
-                paginate: {
-                    previous: 'Trước',
-                    next: 'Sau'
-                }
-            }
-        });
-
-        /* ---------- Mở modal Nhận hàng chuyển kho ---------- */
-        $(document).on('click', '.btn-imp-receive', function() {
-            var row = $(this).data('row') || {};
-            var $form = $('#receiveModal').find('form');
-
-            $form.find('[name="export_id"]').val(row.export_id);
-            $form.find('.imp-rcv-from').text(row.from_department || '—');
-            $form.find('.imp-rcv-code').text(row.source_code || '—');
-            $form.find('.imp-rcv-chem').text((row.chem_name || '—') +
-                (row.category_code ? ' (' + row.category_code + ')' : ''));
-            $form.find('.imp-rcv-amount').text(row.amount || '—');
-            $form.find('.imp-rcv-batch').text(row.batch_no || '—');
-            $form.find('.imp-rcv-expired').text(row.expired_date || '—');
-            $form.find('.imp-rcv-date').text(row.exported_date || '—');
-            $form.find('.imp-rcv-by').text(row.exported_by || '—');
-
-            // Định khu và ghi chú là của phòng nhận, không lấy theo lô bên phòng gửi
-            $form.find('[name="location_id"]').val('').trigger('change');
-            $form.find('[name="note"]').val('');
-            $form.find('.md-error').remove();
-            $form.find('.is-invalid').removeClass('is-invalid');
-
-            $('#receiveModal').modal('show');
-        });
-
-        /* ---------- Mở modal Từ chối nhận ---------- */
-        $(document).on('click', '.btn-imp-reject', function() {
-            var $form = $('#rejectTransferModal').find('form');
-
-            $form.find('[name="export_id"]').val($(this).data('id'));
-            $form.find('[name="reject_reason"]').val('');
-            $form.find('.md-error').remove();
-            $form.find('.is-invalid').removeClass('is-invalid');
-
-            $('#rejectTransferModal').find('.imp-reject-subtitle').text($(this).data('title') || '');
-            $('#rejectTransferModal').modal('show');
-        });
-
         /* ---------- Chuyển tab ---------- */
         $(document).on('click', '.imp-tab', function() {
             var target = $(this).data('pane');
@@ -714,6 +675,13 @@
             var row = $(this).data('row') || {};
             var $form = $('#updateModal').find('form');
 
+            // Số lượng + hoá chất gốc của phiếu đang sửa, để trừ ra khi tính tồn dự kiến
+            // (xem checkImpThreshold) - tránh cộng trùng số lượng cũ của chính phiếu này.
+            // Đặt TRƯỚC khi trigger 'change' của .imp-select bên dưới để lần kiểm tra ngưỡng
+            // đầu tiên đã có đủ dữ liệu, không phải gọi lại lần hai.
+            $form.find('[name="original_category_id"]').val(row.category_id || '');
+            $form.find('[name="original_amount"]').val(row.amount || '');
+
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('.imp-select').each(function() {
                 var field = $(this).attr('name');
@@ -727,6 +695,77 @@
 
             // Lý do là của riêng từng lần điều chỉnh, không lấy lại của lần trước
             $form.find('[name="reason"]').val('').removeClass('is-invalid');
+        });
+
+        /* ---------- Cảnh báo ngưỡng PL IV khi chọn hoá chất / gõ số lượng ---------- */
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, function(c) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[c];
+            });
+        }
+
+        function renderImpThresholdAlerts($box, warnings) {
+            if (!$box.length) return;
+
+            if (!warnings || !warnings.length) {
+                $box.empty();
+                return;
+            }
+
+            $box.html(warnings.map(function(w) {
+                return '<div class="imp-threshold-alert level-' + (w.level || 'warn') + '">' +
+                    '<i class="fas fa-triangle-exclamation mr-1"></i>' + escapeHtml(w.message) + '</div>';
+            }).join(''));
+        }
+
+        function checkImpThreshold($form) {
+            var $select = $form.find('.imp-select[data-threshold-url]');
+            var $box = $form.find('.imp-threshold-alerts');
+
+            if (!$select.length || !$box.length) return;
+
+            var categoryId = $select.val();
+            var amount = parseFloat($form.find('[name="amount"]').val());
+
+            if (!categoryId || !amount || amount <= 0) {
+                renderImpThresholdAlerts($box, []);
+                return;
+            }
+
+            $.get($select.data('threshold-url'), {
+                category_id: categoryId,
+                amount: amount,
+                original_category_id: $form.find('[name="original_category_id"]').val() || '',
+                original_amount: $form.find('[name="original_amount"]').val() || ''
+            }).done(function(res) {
+                renderImpThresholdAlerts($box, res && res.warnings);
+            });
+        }
+
+        $(document).on('change', '.imp-select[data-threshold-url]', function() {
+            checkImpThreshold($(this).closest('form'));
+        });
+
+        var impThresholdTimer = null;
+
+        $(document).on('input', '.md-modal [name="amount"]', function() {
+            var $form = $(this).closest('form');
+
+            clearTimeout(impThresholdTimer);
+            impThresholdTimer = setTimeout(function() {
+                checkImpThreshold($form);
+            }, 400);
+        });
+
+        // Mở modal Thêm mới thì xoá cảnh báo cũ, không để sót từ lần mở trước
+        $(document).on('click', '.btn-md-create', function() {
+            $('#createModal').find('.imp-threshold-alerts').empty();
         });
     });
 </script>

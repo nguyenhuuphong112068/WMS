@@ -45,7 +45,7 @@
                                 </div>
                                 <div class="col-md-3">
                                     <span class="text-muted">Người lập:</span>
-                                    <b class="ml-1">{{ $req->created_by ?: '—' }}</b>
+                                    <b class="ml-1">{{ $req->updated_by ?: $req->created_by ?: '—' }}</b>
                                 </div>
                                 <div class="col-md-3">
                                     <span class="text-muted">Ngày lập:</span>

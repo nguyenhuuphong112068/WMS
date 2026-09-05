@@ -80,10 +80,6 @@
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td>
                                         <span class="font-weight-bold">{{ $cn->name }}</span>
-                                        @if (!empty($cn->is_conditional_mixture))
-                                            <span class="badge badge-primary ml-1"
-                                                title="Hỗn hợp SX-KD có điều kiện (Phụ lục II nhóm 2)">Nhóm 2</span>
-                                        @endif
                                     </td>
                                     <td class="md-sub">{{ $cn->cas_no ?: '—' }}</td>
                                     <td data-order="{{ $codes ? (int) ltrim($codes[0], 'N') : 99 }}">

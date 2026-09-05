@@ -3,7 +3,6 @@
     $oldAiIds = array_map('intval', (array) old('active_ingredients_ids', []));
     $oldHazardIds = array_map('intval', (array) old('hazard_category_ids', []));
     $oldPercents = (array) old('content_percent', []);
-    $oldConditional = old('is_conditional_mixture') ? 1 : 0;
 @endphp
 
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
@@ -38,8 +37,6 @@
                         'oldAiIds' => $oldAiIds,
                         'oldHazardIds' => $oldHazardIds,
                         'oldPercents' => $oldPercents,
-                        'oldConditional' => $oldConditional,
-                        'chemCondId' => 'chemConditionalUpdate',
                     ])
 
                     <div class="md-hint">

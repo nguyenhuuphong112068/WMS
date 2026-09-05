@@ -57,10 +57,14 @@
 
 @section('model')
     @include('pages.export.shared.historyModal')
-    @include('pages.export.ChemicalExport.requestModal')
     @include('pages.export.ChemicalExport.disposalModal')
     @include('pages.export.ChemicalExport.disposalDecideModal')
     @include('pages.export.ChemicalExport.disposalCompleteModal')
     @include('pages.export.ChemicalExport.create')
     @include('pages.export.ChemicalExport.update')
+    @include('pages.export.ChemicalExport.picker')
+    @include('pages.export.ChemicalExport.transferImportPickerModal')
+    @include('pages.export.ChemicalExport.transferRequestModal')
+    @include('pages.export.ChemicalExport.transferRequestEditModal')
+    @include('pages.export.ChemicalExport.transferDetailModal')
 @endsection

@@ -112,7 +112,7 @@
 
                 <div class="box">
                     <label>Người Lập Phiếu</label>
-                    <div class="val">{{ $list->created_by ?: '—' }}</div>
+                    <div class="val">{{ $list->updated_by ?: $list->created_by ?: '—' }}</div>
                     <div class="md-sub">
                         {{ $list->created_at ? \Carbon\Carbon::parse($list->created_at)->format('d/m/Y H:i') : '' }}
                     </div>

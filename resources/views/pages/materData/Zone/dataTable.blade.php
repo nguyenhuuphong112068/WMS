@@ -337,7 +337,7 @@
                                                         @endif
                                                     </td>
                                                 @endforeach
-                                                <td>{{ $row->created_by ?: '—' }}</td>
+                                                <td>{{ $row->updated_by ?: $row->created_by ?: '—' }}</td>
                                                 <td class="text-center">
                                                     {{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '—' }}
                                                 </td>

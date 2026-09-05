@@ -4,13 +4,14 @@ namespace App\Http\Controllers\Pages\Import;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\AttachmentBackup;
 use App\Support\Barcode128;
-use App\Support\CategoryUnitConversion;
 use App\Support\ChemicalCode;
 use App\Support\DepartmentChemical;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -30,29 +31,15 @@ class ChemicalImportController extends Controller
 
     private const HISTORY_TABLE = 'chemical_import_histories';
 
+    private const ATTACHMENT_TABLE = 'chemical_import_attachments';
+
+    /** Thư mục lưu file đính kèm, dùng chung cho cả disk private lẫn bản sao lưu public/uploads/. */
+    private const ATTACHMENT_FOLDER = 'chemical_imports';
+
     private const LABEL = 'phiếu nhập hoá chất';
 
     /** Số nhãn tối đa cho một lần in, chặn cả ở trang in lẫn ở đây. */
     private const LABEL_MAX_COPIES = 100;
-
-    /**
-     * Hậu tố cho lô NHẬN TỪ PHÒNG BAN KHÁC.
-     *
-     * Hàng chuyển kho không nhập từ ngoài vào nên mã phải phân biệt được với mã nhập
-     * thường, đồng thời giữ nguyên mã của phòng nhập ĐẦU TIÊN để truy ngược nguồn gốc:
-     *
-     *      C-QC1-7KPMR9J4WD            <- phòng nhập đầu (mua ngoài)
-     *      C-QC1-7KPMR9J4WD-CK01       <- chuyển lần 1
-     *      C-QC1-7KPMR9J4WD-CK02       <- chuyển lần 2 (kể cả chuyển tiếp từ ...-CK01)
-     *
-     * Số thứ tự -CK đếm theo MÃ GỐC trên toàn hệ thống, không đếm theo phòng, vì
-     * chemical_imports.code là duy nhất. -CK chỉ đếm số lần một lô được chuyển đi,
-     * không tiết lộ thứ tự nhập của các lô khác nhau.
-     */
-    private const TRANSFER_MARK = '-CK';
-
-    /** Số thứ tự sau -CK: 2 chữ số, vượt 99 thì tự dài ra (CK100). */
-    private const TRANSFER_SEQ_LENGTH = 2;
 
     /** Sai số cho phép khi so số lượng với nhau (cột decimal 15,4). */
     private const EPSILON = 0.00005;
@@ -73,371 +60,6 @@ class ChemicalImportController extends Controller
         'location_id' => 'Vị trí lưu trữ',
         'note' => 'Ghi chú',
     ];
-
-    /**
-     * NHẬN HOÁ CHẤT TỪ PHÒNG BAN KHÁC.
-     *
-     * Phòng gửi lập phiếu chuyển ở màn hình Sử Dụng Hoá Chất (exports.type = 'transfer'),
-     * hàng nằm ở trạng thái chờ nhận. Phòng nhận vào đây bấm Nhận và khai các thông tin
-     * riêng của kho mình - chủ yếu là ĐỊNH KHU (có thể để trống) - lúc đó mới sinh một
-     * dòng imports mới và cộng vào tồn.
-     *
-     * Thông tin bản chất của lô (hoá chất, số lô, hạn dùng nhà sản xuất, hoá chất vi sinh,
-     * nhà cung cấp gốc) chép nguyên từ lô của phòng gửi, không cho sửa lúc nhận - sửa thì
-     * hai phòng nói về hai thứ khác nhau. Số hoá đơn / ngày hoá đơn để trống vì không mua
-     * từ ngoài. Hạn dùng nội bộ để trống, phòng nhận tự xác định ở màn hình Tồn Kho.
-     */
-    public function receive(Request $request)
-    {
-        $departmentId = $this->departmentId();
-
-        $transfer = $this->pendingTransfer($request->export_id, $departmentId);
-
-        if (! $transfer) {
-            return redirect()->back()->with(
-                'error',
-                'Không tìm thấy lô hoá chất chờ nhận này, có thể phòng gửi đã khoá phiếu chuyển hoặc lô đã được nhận rồi!'
-            );
-        }
-
-        $validator = Validator::make($request->all(), [
-            'export_id' => ['required'],
-            // Định khu để trống được, nhưng đã chọn thì phải là định khu của chính phòng này
-            'location_id' => [
-                'nullable',
-                Rule::exists('locations', 'id')
-                    ->where('department_id', $departmentId)
-                    ->where('status_id', 1),
-            ],
-            'note' => ['nullable', 'max:500'],
-        ], [
-            'location_id.exists' => 'Định khu được chọn không thuộc phòng ban này hoặc đã ngừng sử dụng.',
-            'note.max' => 'Ghi chú tối đa 500 ký tự.',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'receiveErrors')->withInput();
-        }
-
-        /*
-        | Đơn vị tính là của riêng từng phòng, nên số lượng trên phiếu chuyển đang tính
-        | theo đơn vị PHÒNG GỬI. Ghi thẳng vào kho phòng mình là sai đơn vị, phải quy đổi
-        | theo hệ số đã khai ở tab "Hoá Chất Của Phòng".
-        */
-        $receiveUnitId = (int) DB::table(DepartmentChemical::TABLE)
-            ->where('department_id', $departmentId)
-            ->where('category_id', $transfer->category_id)
-            ->value('unit_id');
-
-        if (! $receiveUnitId) {
-            return redirect()->back()->with(
-                'error',
-                'Phòng mình chưa khai hoá chất '.$transfer->category_code.' ở tab "Hoá Chất Của Phòng" nên chưa có '
-                .'đơn vị tính để nhận hàng. Vui lòng khai hoá chất này cho phòng trước khi nhận.'
-            );
-        }
-
-        $amount = CategoryUnitConversion::convert(
-            CategoryUnitConversion::TYPE_CHEMICAL,
-            (int) $transfer->category_id,
-            (float) $transfer->amount,
-            (int) $transfer->source_unit_id,
-            $receiveUnitId
-        );
-
-        if ($amount === null) {
-            return redirect()->back()->with(
-                'error',
-                'Phòng gửi tính theo đơn vị "'.($transfer->unit_short_name ?: $transfer->unit_name).'" còn phòng mình '
-                .'khai đơn vị khác cho hoá chất '.$transfer->category_code.', nhưng chưa có hệ số quy đổi giữa hai đơn '
-                .'vị này. Vui lòng vào tab "Hoá Chất Của Phòng", sửa dòng hoá chất này và khai mục Quy Đổi Đơn Vị.'
-            );
-        }
-
-        // Sinh mã và ghi cả hai bảng trong một transaction: nhận hai lần cùng lúc
-        // thì không được ra hai mã, cũng không được có lô mà phiếu chuyển vẫn "chờ nhận"
-        $result = DB::transaction(function () use ($request, $transfer, $departmentId, $amount, $receiveUnitId) {
-            $code = $this->nextTransferCode($transfer->source_code);
-
-            $id = DB::table(self::TABLE)->insertGetId([
-                'code' => $code,
-                'department_id' => $departmentId,
-                'source_export_id' => $transfer->id,
-                // Nhận lẻ (ít hơn cả lô) thì số lượng đã chốt: không xuất vượt, không cân đối
-                'is_partial_lot' => $transfer->is_partial,
-                // Chép nguyên bản chất của lô từ phòng gửi
-                'category_id' => $transfer->category_id,
-                // Đã quy đổi sang đơn vị của phòng nhận
-                'amount' => $amount,
-                'batch_no' => $transfer->batch_no,
-                'expired_date' => $transfer->expired_date,
-                // Nhận lẻ thì lô nguồn đã mở nên đã có hạn dùng nội bộ -> kế thừa, khỏi xác định lại.
-                // Nhận nguyên thì lô chưa mở, để trống cho phòng nhận tự xác định.
-                'internal_expired_date' => $transfer->is_partial ? $transfer->source_internal_expired_date : null,
-                'is_microbiological_chemicals' => $transfer->is_microbiological_chemicals,
-                'supplier_id' => $transfer->supplier_id,
-                // Thông tin riêng của phòng nhận. Ngày nhận là ngày bấm Nhận hàng, không cho chỉnh
-                'imported_date' => now()->format('Y-m-d'),
-                'imported_by' => $this->actor(),
-                'location_id' => $request->location_id ? (int) $request->location_id : null,
-                'note' => $this->nullIfBlank($request->note),
-                'status_id' => 1,
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            DB::table('chemical_exports')->where('id', $transfer->id)->update([
-                'received_import_id' => $id,
-                'received_at' => now(),
-                'received_by' => $this->actor(),
-                'updated_by' => $this->actor(),
-                'updated_at' => now(),
-            ]);
-
-            // Ghi chú chuyển kho kèm truy vết quy đổi đơn vị (GMP traceability)
-            $historyNote = 'Nhận từ phòng ban '.$transfer->from_department_name.', mã gốc '.$transfer->source_code.' -> mã mới '.$code.'.';
-
-            if ((int) $transfer->source_unit_id !== $receiveUnitId) {
-                $receiveUnit = DB::table('units')->where('id', $receiveUnitId)->first();
-                $historyNote .= ' | Quy đổi ĐV: '
-                    .$transfer->amount.' '.($transfer->unit_short_name ?: $transfer->unit_name)
-                    .' -> '.$amount.' '.($receiveUnit->short_name ?? $receiveUnit->name ?? 'ĐV#'.$receiveUnitId);
-            }
-
-            $this->writeHistory($id, 'Nhận chuyển kho', $historyNote);
-
-            return ['id' => $id, 'code' => $code];
-        });
-
-        AuditTrialController::log(
-            'Nhận chuyển kho',
-            self::TABLE,
-            $result['id'],
-            'Phiếu chuyển: '.$transfer->source_code.' từ '.$transfer->from_department_name,
-            'Mã mới: '.$result['code']
-        );
-
-        return redirect()->back()->with(
-            'success',
-            'Đã nhận hoá chất từ phòng ban '.$transfer->from_department_name.', mã lô tại kho phòng mình là '.$result['code'].'!'
-        );
-    }
-
-    /**
-     * TỪ CHỐI NHẬN lô hoá chất phòng ban khác chuyển sang.
-     *
-     * Dùng khi hàng về không đúng: thiếu số lượng, sai hoá chất, bao bì hỏng...
-     * Từ chối sẽ khoá phiếu chuyển nên số lượng được trả lại tồn của phòng gửi ngay.
-     * Phiếu đã từ chối không mở lại được - phòng gửi phải lập phiếu chuyển mới.
-     *
-     * Chỉ từ chối được lô CHƯA NHẬN. Nhận rồi thì phiếu khoá hoàn toàn, muốn trả hàng
-     * phải lập phiếu chuyển ngược lại cho phòng kia.
-     */
-    public function rejectTransfer(Request $request)
-    {
-        $departmentId = $this->departmentId();
-
-        $transfer = $this->pendingTransfer($request->export_id, $departmentId);
-
-        if (! $transfer) {
-            return redirect()->back()->with(
-                'error',
-                'Không tìm thấy lô hoá chất chờ nhận này, có thể lô đã được nhận hoặc đã bị từ chối rồi!'
-            );
-        }
-
-        $validator = Validator::make($request->all(), [
-            'export_id' => ['required'],
-            'reject_reason' => ['required', 'max:500'],
-        ], [
-            'reject_reason.required' => 'Vui lòng nhập lý do từ chối nhận.',
-            'reject_reason.max' => 'Lý do từ chối tối đa 500 ký tự.',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'rejectErrors')->withInput();
-        }
-
-        $reason = trim($request->reject_reason);
-
-        DB::transaction(function () use ($transfer, $reason) {
-            DB::table('chemical_exports')->where('id', $transfer->id)->update([
-                // Khoá phiếu chuyển -> số lượng quay lại tồn của phòng gửi
-                'status_id' => 0,
-                'rejected_at' => now(),
-                'rejected_by' => $this->actor(),
-                'reject_reason' => $reason,
-                'updated_by' => $this->actor(),
-                'updated_at' => now(),
-            ]);
-
-            // Ghi thẳng vào lịch sử của phiếu chuyển bên màn hình Sử Dụng, để phòng gửi
-            // mở badge lịch sử là thấy ngay vì sao hàng bị trả về
-            $export = DB::table('chemical_exports')->where('id', $transfer->id)->first();
-
-            DB::table('chemical_export_histories')->insert([
-                'export_id' => $export->id,
-                'action' => 'Từ chối nhận',
-                'code' => $export->code,
-                'import_id' => $export->import_id,
-                'amount' => $export->amount,
-                'type' => $export->type,
-                'to_department_id' => $export->to_department_id,
-                'exported_date' => $export->exported_date,
-                'exported_by' => $export->exported_by,
-                'purpose' => $export->purpose,
-                'checked_by' => $export->checked_by,
-                'status_id' => $export->status_id,
-                'change_note' => 'Phòng nhận từ chối nhận hàng. Lý do: '.$reason
-                    .' | Số lượng đã được trả lại tồn của phòng gửi.',
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-            ]);
-        });
-
-        AuditTrialController::log(
-            'Từ chối nhận',
-            'chemical_exports',
-            $transfer->id,
-            'Chờ nhận từ '.$transfer->from_department_name,
-            'Từ chối. Lý do: '.$reason
-        );
-
-        return redirect()->back()->with(
-            'success',
-            'Đã từ chối nhận lô '.$transfer->source_code.' từ phòng ban '.$transfer->from_department_name
-            .'. Số lượng đã được trả lại tồn của phòng gửi.'
-        );
-    }
-
-    /**
-     * Một lô đang chờ phòng ban hiện tại nhận, hoặc null nếu không có / đã nhận rồi.
-     *
-     * Điều kiện: phiếu chuyển còn hiệu lực, đúng phòng nhận, và chưa sinh lô nào
-     * (received_import_id còn trống).
-     */
-    private function pendingTransfer($exportId, int $departmentId)
-    {
-        return $this->markTransferKind(
-            $this->pendingTransferQuery($departmentId)->where('chemical_exports.id', $exportId)->first()
-        );
-    }
-
-    /** Danh sách lô đang chờ phòng ban hiện tại nhận. */
-    private function pendingTransfers(int $departmentId)
-    {
-        return $this->pendingTransferQuery($departmentId)
-            ->orderBy('chemical_exports.exported_date', 'desc')
-            ->orderBy('chemical_exports.id', 'desc')
-            ->get()
-            ->map(fn ($row) => $this->markTransferKind($row));
-    }
-
-    private function pendingTransferQuery(int $departmentId)
-    {
-        return DB::table('chemical_exports')
-            ->join('chemical_imports as source', 'chemical_exports.import_id', '=', 'source.id')
-            ->leftJoin('chemical_categories', 'source.category_id', '=', 'chemical_categories.id')
-            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
-            // Lô đang chờ nhận vẫn tính theo đơn vị của PHÒNG ĐÃ GỬI, vì đó là đơn vị đã
-            // ghi trong imports.amount / exports.amount của lô này.
-            ->tap(fn ($query) => DepartmentChemical::joinUnitOn($query, 'chemical_exports.department_id', 'source.category_id'))
-            ->leftJoin('deparments', 'chemical_exports.department_id', '=', 'deparments.id')
-            ->select(
-                'chemical_exports.id',
-                'chemical_exports.amount',
-                'chemical_exports.exported_date',
-                'chemical_exports.exported_by',
-                'chemical_exports.purpose',
-                'chemical_exports.checked_by',
-                'source.code as source_code',
-                'source.category_id',
-                'source.amount as source_amount',
-                'source.batch_no',
-                'source.expired_date',
-                'source.internal_expired_date as source_internal_expired_date',
-                'source.is_microbiological_chemicals',
-                'source.supplier_id',
-                'chemical_categories.code as category_code',
-                'chem_names.name as chem_name',
-                DepartmentChemical::UNIT_ALIAS.'.unit_id as source_unit_id',
-                'units.short_name as unit_short_name',
-                'units.name as unit_name',
-                'deparments.name as from_department_name',
-                'deparments.shortName as from_department_short'
-            )
-            // Lô nguồn đã cân đối lần nào chưa - đã cân đối thì không còn "nguyên"
-            ->selectSub(
-                DB::table('chemical_balancings')
-                    ->selectRaw('COUNT(*)')
-                    ->whereColumn('chemical_balancings.import_id', 'source.id')
-                    ->where('chemical_balancings.status_id', 1),
-                'source_balancing_times'
-            )
-            // Lô nguồn đã xuất ra lần nào khác chưa (không tính chính phiếu chuyển này)
-            ->selectSub(
-                DB::table('chemical_exports as other')
-                    ->selectRaw('COUNT(*)')
-                    ->whereColumn('other.import_id', 'source.id')
-                    ->whereColumn('other.id', '<>', 'chemical_exports.id')
-                    ->where('other.status_id', 1),
-                'source_other_exports'
-            )
-            ->where('chemical_exports.type', 'transfer')
-            ->where('chemical_exports.status_id', 1)
-            ->where('chemical_exports.to_department_id', $departmentId)
-            ->whereNull('chemical_exports.received_import_id')
-            ->whereNull('chemical_exports.rejected_at');
-    }
-
-    /**
-     * Gắn thêm cờ nhận nguyên / nhận lẻ cho một dòng hàng chờ nhận.
-     *
-     * NHẬN NGUYÊN : lô còn y nguyên như lúc phòng gửi nhập vào và chuyển đi trọn vẹn.
-     *               Phải đủ ba điều kiện: lượng chuyển đúng bằng LƯỢNG NHẬP GỐC
-     *               (imports.amount, KHÔNG cộng cân đối), lô chưa cân đối lần nào, và
-     *               lô chưa xuất ra lần nào khác. Lô chưa bị mở nên vẫn còn hao hụt cân
-     *               đong -> phòng nhận được xuất vượt 5% và được cân đối, nhưng phải tự
-     *               xác định hạn dùng nội bộ.
-     * NHẬN LẺ     : thiếu bất kỳ điều kiện nào ở trên. Phòng gửi đã đụng vào lô rồi nên
-     *               số lượng là con số đã chốt, kế thừa luôn hạn dùng nội bộ của lô nguồn.
-     */
-    private function markTransferKind($row)
-    {
-        if (! $row) {
-            return $row;
-        }
-
-        $row->full_lot_amount = (float) $row->source_amount;
-
-        $row->is_partial = abs((float) $row->amount - (float) $row->source_amount) > self::EPSILON
-            || (int) $row->source_balancing_times > 0
-            || (int) $row->source_other_exports > 0;
-
-        return $row;
-    }
-
-    /**
-     * Mã kế tiếp cho lô nhận từ phòng khác: <mã gốc>-CK<số thứ tự>.
-     *
-     * Mã gốc là mã của phòng nhập ĐẦU TIÊN, tức phần đứng trước "-CK" nếu lô đang
-     * chuyển vốn cũng là hàng chuyển kho. Nhờ vậy chuyển qua bao nhiêu phòng thì mã
-     * vẫn quy về đúng một gốc, không nối chồng "-CK01-CK02".
-     */
-    private function nextTransferCode(string $sourceCode): string
-    {
-        $root = explode(self::TRANSFER_MARK, $sourceCode, 2)[0];
-        $prefix = $root.self::TRANSFER_MARK;
-
-        $next = DB::table(self::TABLE)
-            ->where('code', 'like', $prefix.'%')
-            ->pluck('code')
-            ->map(fn ($code) => (int) substr((string) $code, strlen($prefix)))
-            ->max();
-
-        return $prefix.str_pad((string) (($next ?? 0) + 1), self::TRANSFER_SEQ_LENGTH, '0', STR_PAD_LEFT);
-    }
 
     public function index(Request $request)
     {
@@ -501,12 +123,19 @@ class ChemicalImportController extends Controller
             ]];
         })->toArray();
 
+        $attachments = DB::table(self::ATTACHMENT_TABLE)
+            ->whereIn('chemical_import_id', $datas->pluck('id'))
+            ->orderBy('id', 'asc')
+            ->get()
+            ->groupBy('chemical_import_id');
+
         [$from, $to] = $this->reportRange($request);
 
         return view('pages.import.ChemicalImport.list', [
             'datas' => $datas,
             'categories' => $categories,
             'categoryDefaults' => $categoryDefaults,
+            'attachments' => $attachments,
             // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (thay cột classification đã bỏ)
             'classificationCodes' => \App\Support\ChemicalClassification::codesByCategory(),
             'classificationLabels' => \App\Support\ChemicalClassification::labels(),
@@ -516,12 +145,10 @@ class ChemicalImportController extends Controller
             'report' => $this->importReport($departmentId, $from, $to),
             'reportFrom' => $from,
             'reportTo' => $to,
-            // Hàng phòng ban khác chuyển sang, đang chờ phòng mình nhận
-            'pendingTransfers' => $this->pendingTransfers($departmentId),
             // Số lần điều chỉnh của từng phiếu, hiện thành badge ở góc nút Sửa thay vì một nút riêng
             'historyCounts' => $this->historyCounts($departmentId),
             // Lọc xong thì trang tải lại, quay về đúng tab báo cáo thay vì tab sổ
-            'activeTab' => in_array($request->input('tab'), ['report', 'transfer'], true)
+            'activeTab' => in_array($request->input('tab'), ['report'], true)
                 ? $request->input('tab')
                 : 'book',
         ]);
@@ -727,8 +354,25 @@ class ChemicalImportController extends Controller
 
         $departmentId = $this->departmentId();
 
+        $uploadedFiles = [];
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file->isValid()) {
+                    $path = $file->store('public/'.self::ATTACHMENT_FOLDER);
+                    AttachmentBackup::copy($path, self::ATTACHMENT_FOLDER);
+
+                    $uploadedFiles[] = [
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
+                        'file_size' => $file->getSize(),
+                        'file_type' => $file->getClientMimeType() ?: $file->getClientOriginalExtension(),
+                    ];
+                }
+            }
+        }
+
         // Sinh mã và ghi bản ghi trong cùng một transaction để hai người nhập cùng lúc không trùng mã
-        $result = DB::transaction(function () use ($request, $departmentId) {
+        $result = DB::transaction(function () use ($request, $departmentId, $uploadedFiles) {
             $code = $this->nextCode($departmentId);
 
             $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
@@ -743,6 +387,15 @@ class ChemicalImportController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            foreach ($uploadedFiles as $f) {
+                DB::table(self::ATTACHMENT_TABLE)->insert($f + [
+                    'chemical_import_id' => $id,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             // Mốc đầu tiên của lịch sử: giá trị phiếu lúc mới tạo
             $this->writeHistory($id, 'Thêm mới', 'Tạo mới phiếu nhập, mã xuất nhập '.$code.'.');
@@ -766,6 +419,96 @@ class ChemicalImportController extends Controller
         }
 
         return $redirect;
+    }
+
+    /**
+     * Kiểm tra cảnh báo ngưỡng PL IV theo hoá chất + số lượng đang gõ trong modal Nhập / Điều
+     * chỉnh phiếu nhập hoá chất, TRƯỚC KHI lưu - JS gọi mỗi khi đổi hoá chất hoặc gõ số
+     * lượng (xem pages/import/shared/assets.blade.php). Chỉ hoạt chất Bảng A (nhóm 9) hoặc
+     * hỗn hợp Bảng B (nhóm 10) mới có cảnh báo; hoá chất khác trả về mảng rỗng vì
+     * ActiveIngredientThreshold/MixtureHazardThreshold::projectedForCategory() tự trả null.
+     *
+     * Modal Điều chỉnh gửi kèm original_category_id + original_amount (giá trị đang lưu của
+     * phiếu trước khi sửa) để trừ phần đã tính vào tồn hiện tại - tránh cộng trùng số lượng
+     * cũ của chính phiếu đang sửa vào tồn dự kiến.
+     */
+    public function checkThreshold(Request $request)
+    {
+        $categoryId = (int) $request->category_id;
+        $amount = (float) $request->amount;
+
+        if (! $categoryId || $amount <= 0) {
+            return response()->json(['warnings' => []]);
+        }
+
+        $unitId = (int) DB::table('chemical_department_categories')
+            ->where('department_id', $this->departmentId())
+            ->where('category_id', $categoryId)
+            ->value('unit_id');
+
+        if (! $unitId) {
+            return response()->json(['warnings' => []]);
+        }
+
+        $newRow = collect([(object) ['amount' => $amount, 'unit_id' => $unitId]]);
+
+        $originalAmount = (int) $request->input('original_category_id') === $categoryId
+            ? (float) $request->input('original_amount', 0)
+            : 0.0;
+        $originalRow = $originalAmount > 0
+            ? collect([(object) ['amount' => $originalAmount, 'unit_id' => $unitId]])
+            : collect();
+
+        $companyId = \App\Support\CompanyContext::currentId();
+        $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.');
+        $warnings = [];
+
+        // ----- BẢNG A: theo hoạt chất (× % hàm lượng) -----
+        $newA = \App\Support\ActiveIngredientThreshold::sumEstimateKg($categoryId, $newRow);
+        $oldA = \App\Support\ActiveIngredientThreshold::sumEstimateKg($categoryId, $originalRow);
+        $projA = \App\Support\ActiveIngredientThreshold::projectedForCategory(
+            $categoryId, max($newA['kg'] - $oldA['kg'], 0.0), $companyId
+        );
+
+        if ($projA && ($projA->add_ratio >= 1.0 || $projA->projected_ratio >= \App\Support\ActiveIngredientThreshold::warnRatio())) {
+            $warnings[] = [
+                'level' => $projA->level,
+                'message' => 'Hoá chất "'.$projA->ai_name.'" thuộc nhóm phải xây dựng Kế hoạch phòng ngừa, ứng phó '
+                    .'sự cố hoá chất (Phụ lục IV NĐ 24/2026/NĐ-CP - Bảng A). Số lượng đang nhập ≈ '.$num($projA->add_kg)
+                    .' kg hoạt chất'.($newA['unconvertible'] ? ' (chưa gồm phần chưa quy đổi được)' : '')
+                    .'; cộng tồn hiện tại toàn công ty '.$num($projA->current_kg).' kg thì tổng ≈ '.$num($projA->projected_kg)
+                    .' kg / ngưỡng '.$num($projA->threshold_kg).' kg ('.(int) round($projA->projected_ratio * 100).'%). '
+                    .($projA->add_ratio >= 1.0 ? 'Riêng số lượng đang nhập đã vượt ngưỡng "tồn trữ lớn nhất tại một thời điểm". ' : '')
+                    .($projA->level === \App\Support\ActiveIngredientThreshold::LEVEL_EXCEEDED
+                        ? 'DỰ KIẾN VƯỢT NGƯỠNG nếu lưu phiếu này.'
+                        : 'Dự kiến chạm ngưỡng cảnh báo.'),
+            ];
+        }
+
+        // ----- BẢNG B: theo hỗn hợp (tồn thô, không × %) -----
+        $newB = \App\Support\MixtureHazardThreshold::sumEstimateKg($categoryId, $newRow);
+        $oldB = \App\Support\MixtureHazardThreshold::sumEstimateKg($categoryId, $originalRow);
+        $projB = \App\Support\MixtureHazardThreshold::projectedForCategory(
+            $categoryId, max($newB['kg'] - $oldB['kg'], 0.0), $companyId
+        );
+
+        if ($projB && ($projB->add_ratio >= 1.0 || $projB->projected_ratio >= \App\Support\MixtureHazardThreshold::warnRatio())) {
+            $warnings[] = [
+                'level' => $projB->level,
+                'message' => 'Hỗn hợp "'.$projB->chem_name.'" thuộc nhóm nguy hại Bảng B (Phụ lục IV NĐ 24/2026/NĐ-CP). '
+                    .'Số lượng đang nhập ≈ '.$num($projB->add_kg).' kg thô'
+                    .($newB['unconvertible'] ? ' (chưa quy đổi được)' : '')
+                    .'; cộng tồn hiện tại '.$num($projB->current_kg).' kg thì tổng ≈ '.$num($projB->projected_kg)
+                    .' kg / ngưỡng thấp nhất '.$num($projB->threshold_kg).' kg (nhóm '.$projB->strictest_group.', '
+                    .(int) round($projB->projected_ratio * 100).'%). '
+                    .($projB->add_ratio >= 1.0 ? 'Riêng số lượng đang nhập đã vượt ngưỡng. ' : '')
+                    .($projB->level === \App\Support\MixtureHazardThreshold::LEVEL_EXCEEDED
+                        ? 'DỰ KIẾN VƯỢT NGƯỠNG nếu lưu phiếu này.'
+                        : 'Dự kiến chạm ngưỡng cảnh báo.'),
+            ];
+        }
+
+        return response()->json(['warnings' => $warnings]);
     }
 
     /**
@@ -859,8 +602,9 @@ class ChemicalImportController extends Controller
 
         $payload = $this->payload($request);
         $note = $this->changeNote($current, $payload);
+        $hasNewFiles = $request->hasFile('attachments');
 
-        if ($note === '') {
+        if ($note === '' && ! $hasNewFiles) {
             return redirect()->back()->with('error', 'Không có thông tin nào thay đổi nên chưa ghi nhận điều chỉnh.');
         }
 
@@ -868,13 +612,33 @@ class ChemicalImportController extends Controller
 
         $reason = trim((string) $request->reason);
 
-        DB::transaction(function () use ($current, $payload, $note, $reason) {
+        DB::transaction(function () use ($current, $payload, $note, $reason, $request) {
             DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
                 'updated_by' => $this->actor(),
                 'updated_at' => now(),
             ]);
 
-            $this->writeHistory((int) $current->id, 'Điều chỉnh', $note, $reason);
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    if ($file->isValid()) {
+                        $path = $file->store('public/'.self::ATTACHMENT_FOLDER);
+                        AttachmentBackup::copy($path, self::ATTACHMENT_FOLDER);
+
+                        DB::table(self::ATTACHMENT_TABLE)->insert([
+                            'chemical_import_id' => $current->id,
+                            'file_name' => $file->getClientOriginalName(),
+                            'file_path' => $path,
+                            'file_size' => $file->getSize(),
+                            'file_type' => $file->getClientMimeType() ?: $file->getClientOriginalExtension(),
+                            'created_by' => $this->actor(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+            }
+
+            $this->writeHistory((int) $current->id, 'Điều chỉnh', $note ?: 'Cập nhật tài liệu đính kèm', $reason);
         });
 
         AuditTrialController::log(
@@ -882,7 +646,7 @@ class ChemicalImportController extends Controller
             self::TABLE,
             $current->id,
             $current->code,
-            $current->code.' | '.$note.' | Lý do: '.$reason
+            $current->code.' | '.($note ?: 'Cập nhật tài liệu đính kèm').' | Lý do: '.$reason
         );
 
         return redirect()->back()->with('success', 'Đã ghi nhận điều chỉnh '.self::LABEL.' '.$current->code.'!');
@@ -946,6 +710,56 @@ class ChemicalImportController extends Controller
                 ],
             ]),
         ]);
+    }
+
+    public function downloadAttachment($id)
+    {
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->join(self::TABLE, self::ATTACHMENT_TABLE.'.chemical_import_id', '=', self::TABLE.'.id')
+            ->where(self::ATTACHMENT_TABLE.'.id', $id)
+            ->where(self::TABLE.'.department_id', $this->departmentId())
+            ->select(self::ATTACHMENT_TABLE.'.*')
+            ->first();
+
+        if (! $attachment) {
+            abort(404, 'Không tìm thấy file đính kèm.');
+        }
+
+        if (! Storage::exists($attachment->file_path)) {
+            abort(404, 'File không tồn tại trên hệ thống lưu trữ.');
+        }
+
+        return Storage::response($attachment->file_path, $attachment->file_name, [
+            'Content-Disposition' => 'inline; filename="'.$attachment->file_name.'"',
+        ]);
+    }
+
+    public function deleteAttachment(Request $request)
+    {
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->join(self::TABLE, self::ATTACHMENT_TABLE.'.chemical_import_id', '=', self::TABLE.'.id')
+            ->where(self::ATTACHMENT_TABLE.'.id', $request->id)
+            ->where(self::TABLE.'.department_id', $this->departmentId())
+            ->select(self::ATTACHMENT_TABLE.'.*', self::TABLE.'.code as import_code')
+            ->first();
+
+        if (! $attachment) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy file.'], 404);
+        }
+
+        Storage::delete($attachment->file_path);
+        AttachmentBackup::delete($attachment->file_path, self::ATTACHMENT_FOLDER);
+        DB::table(self::ATTACHMENT_TABLE)->where('id', $attachment->id)->delete();
+
+        AuditTrialController::log(
+            'Xoá tài liệu',
+            self::TABLE,
+            $attachment->chemical_import_id,
+            $attachment->import_code,
+            'Xoá file đính kèm: '.$attachment->file_name
+        );
+
+        return response()->json(['success' => true]);
     }
 
     /**
@@ -1232,6 +1046,7 @@ class ChemicalImportController extends Controller
                     ->where('status_id', 1),
             ],
             'note' => ['nullable', 'max:500'],
+            'attachments.*' => ['nullable', 'file', 'max:10240'],
         ];
     }
 
@@ -1273,6 +1088,7 @@ class ChemicalImportController extends Controller
             'batch_no.max' => 'Số lô tối đa 100 ký tự.',
             'supplier_id.exists' => 'Nhà cung cấp được chọn không tồn tại.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
+            'attachments.*.max' => 'Mỗi file đính kèm không được vượt quá 10MB.',
         ];
     }
 }

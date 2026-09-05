@@ -40,6 +40,7 @@ class PublicChemicalLookupController extends Controller
                 'companies.short_name as company_short_name'
             )
             ->where('deparments.isActive', 1)
+            ->where('deparments.is_general', 1)
             ->orderBy('companies.short_name', 'asc')
             ->orderBy('deparments.name', 'asc')
             ->get();

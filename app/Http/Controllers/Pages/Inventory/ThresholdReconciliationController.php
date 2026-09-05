@@ -28,7 +28,7 @@ class ThresholdReconciliationController extends Controller
 {
     public function index()
     {
-        session()->put(['title' => 'TỒN - ĐỐI CHIẾU NGƯỠNG PL IV NĐ 24/2026']);
+        session()->put(['title' => 'TỒN - ĐỐI CHIẾU NGƯỠNG']);
 
         // Phạm vi đối chiếu gói trong công ty của phòng ban đang chọn: chỉ cộng tồn của
         // các phòng ban thuộc công ty này.
@@ -139,7 +139,7 @@ class ThresholdReconciliationController extends Controller
         }
 
         // Đóng góp lớn nhất lên đầu
-        usort($combinedRows, fn ($a, $b) => $b->peak_ratio <=> $a->peak_ratio);
+        usort($combinedRows, fn($a, $b) => $b->peak_ratio <=> $a->peak_ratio);
 
         $warnRatio = ActiveIngredientThreshold::warnRatio();
         $combinedLevel = $sumPeakRatio >= 1.0
@@ -273,9 +273,9 @@ class ThresholdReconciliationController extends Controller
     /** Gom một dòng đánh giá ngưỡng (Bảng A hoặc B) thành mảng đã format sẵn cho modal. */
     private function thresholdDetailPayload($row, string $table): array
     {
-        $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.') ?: '0';
-        $signed = fn ($v) => ((float) $v > 0 ? '+' : '') . $num($v);
-        $qty = fn ($v, $u) => (abs((float) $v) < 1e-9 ? '—' : $num($v) . ($u ? ' ' . $u : ''));
+        $num = fn($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.') ?: '0';
+        $signed = fn($v) => ((float) $v > 0 ? '+' : '') . $num($v);
+        $qty = fn($v, $u) => (abs((float) $v) < 1e-9 ? '—' : $num($v) . ($u ? ' ' . $u : ''));
         $typeLabels = ['import' => 'Nhập', 'export' => 'Xuất', 'cancel' => 'Huỷ bỏ', 'balancing' => 'Cân đối'];
         // Nhãn cho mức theo ĐỈNH (đã từng đạt) và mức theo tồn HIỆN TẠI
         $peakLabels = [
@@ -322,11 +322,11 @@ class ThresholdReconciliationController extends Controller
             // "Tồn cao nhất dựng lại từ M chứng từ, trong đó K lần nhập"
             'timeline_count' => count($row->timeline),
             'import_count' => count($importRefs),
-            'by_department' => array_map(fn ($d) => [
+            'by_department' => array_map(fn($d) => [
                 'department_name' => $d->department_name,
                 'kg' => $num($d->kg),
             ], $row->by_department),
-            'onhand_rows' => array_map(fn ($o) => [
+            'onhand_rows' => array_map(fn($o) => [
                 'ref' => $o->ref ?? '',
                 'date' => isset($o->date) && $o->date ? \Carbon\Carbon::parse($o->date)->format('d/m/Y') : '—',
                 'category_code' => $o->category_code,
@@ -338,12 +338,12 @@ class ThresholdReconciliationController extends Controller
                 'on_hand' => $num($o->on_hand_unit) . ($o->unit_short ? ' ' . $o->unit_short : ''),
                 'on_hand_kg' => $num($o->on_hand_kg),
             ], $row->onhand_rows),
-            'unconvertible' => array_map(fn ($u) => [
+            'unconvertible' => array_map(fn($u) => [
                 'category_code' => $u->category_code,
                 'chem_name' => $u->chem_name ?? '',
                 'reason' => $u->reason,
             ], $row->unconvertible),
-            'timeline' => array_map(fn ($t) => [
+            'timeline' => array_map(fn($t) => [
                 'date' => \Carbon\Carbon::parse($t->date)->format('d/m/Y'),
                 'type_label' => $typeLabels[$t->type] ?? $t->type,
                 'ref' => $t->ref,

@@ -112,9 +112,7 @@
                 @endif
 
                 <div class="tr-total-caveat">
-                    <i class="fas fa-circle-info mr-1"></i>
-                    Vẫn phải lập Kế hoạch nếu có <b>ít nhất 1</b> hoạt chất Bảng A hoặc <b>1</b> hỗn hợp Bảng B
-                    có tồn trữ lớn nhất ≥ ngưỡng (điểm a khoản 2 Điều 33).
+
                     @if ($cbExceededItems > 0)
                         <b class="text-danger">Hiện đã có {{ $cbExceededItems }} đối tượng vượt ngưỡng.</b>
                     @endif
@@ -197,7 +195,7 @@
             </div>
             <div class="card-body">
 
-                <div class="tr-summary" data-tr-target="mdTable">
+                <div class="tr-summary md-tablebar-item" data-tr-target="mdTable">
                     <div class="tr-sum tr-sum-exceeded" data-tr-level="exceeded" role="button" tabindex="0">
                         <span class="n">{{ $summary['exceeded'] }}</span> Vượt ngưỡng
                     </div>
@@ -225,8 +223,10 @@
                                 <th class="text-right" style="width: 155px"
                                     title="Mức tồn trữ quy ra kg cao nhất đã từng đạt, dựng lại từ chứng từ nhập - xuất - cân đối theo ngày">
                                     Tồn Thực Tế Cao Nhất (kg)</th>
-                                <th class="text-right" style="width: 95px" title="Tồn thực tế hiện tại / Ngưỡng">Tỉ Lệ Hiện Tại</th>
-                                <th class="text-right" style="width: 95px" title="Tồn thực tế cao nhất / Ngưỡng - căn cứ xác định Trạng Thái">Tỉ Lệ Đỉnh</th>
+                                <th class="text-right" style="width: 95px" title="Tồn thực tế hiện tại / Ngưỡng">Tỉ
+                                    Lệ Hiện Tại</th>
+                                <th class="text-right" style="width: 95px"
+                                    title="Tồn thực tế cao nhất / Ngưỡng - căn cứ xác định Trạng Thái">Tỉ Lệ Đỉnh</th>
                                 <th class="text-center" style="width: 140px"
                                     title="Theo tỉ lệ ĐỈNH: đã từng chạm/vượt ngưỡng thì phải xây dựng Kế hoạch phòng ngừa dù nay đã xuất bớt">
                                     Trạng Thái</th>
@@ -277,13 +277,16 @@
                                             <div class="md-sub">ngày {{ $trDate($row->peak_date) }}</div>
                                         @endif
                                     </td>
-                                    <td class="text-right" data-order="{{ $row->ratio === null ? -1 : $row->ratio }}">
+                                    <td class="text-right"
+                                        data-order="{{ $row->ratio === null ? -1 : $row->ratio }}">
                                         {{ $row->ratio === null ? '—' : (int) round($row->ratio * 100) . '%' }}
                                     </td>
-                                    <td class="text-right" data-order="{{ $row->peak_ratio === null ? -1 : $row->peak_ratio }}">
+                                    <td class="text-right"
+                                        data-order="{{ $row->peak_ratio === null ? -1 : $row->peak_ratio }}">
                                         <b>{{ $row->peak_ratio === null ? '—' : (int) round($row->peak_ratio * 100) . '%' }}</b>
                                     </td>
-                                    <td class="text-center" data-order="{{ $row->peak_ratio === null ? -1 : $row->peak_ratio }}">
+                                    <td class="text-center"
+                                        data-order="{{ $row->peak_ratio === null ? -1 : $row->peak_ratio }}">
                                         <span class="inv-badge {{ $trLevelBadge[$row->level] ?? 'inv-badge-out' }}">
                                             {{ $trLevelLabel[$row->level] ?? $row->level }}
                                         </span>
@@ -301,7 +304,8 @@
                                 <tr>
                                     <td colspan="11" class="text-center text-muted py-4">
                                         Chưa có mã danh mục hoá chất nào phân loại Nhóm 9 / Nhóm 10 / hoá chất cấm kèm
-                                        hoạt chất Phụ lục IV. Vào "Danh Mục › Hoá Chất" để phân loại, "Dữ Liệu Gốc › Tên Hoá Chất"
+                                        hoạt chất Phụ lục IV. Vào "Danh Mục › Hoá Chất" để phân loại, "Dữ Liệu Gốc › Tên
+                                        Hoá Chất"
                                         để gắn hoạt chất, và "Dữ Liệu Gốc › Tên Hoạt Chất" để khai ngưỡng.
                                     </td>
                                 </tr>
@@ -325,7 +329,7 @@
             </div>
             <div class="card-body">
 
-                <div class="tr-summary" data-tr-target="mdTableB">
+                <div class="tr-summary md-tablebar-item" data-tr-target="mdTableB">
                     <div class="tr-sum tr-sum-exceeded" data-tr-level="exceeded" role="button" tabindex="0">
                         <span class="n">{{ $tableBSummary['exceeded'] }}</span> Vượt ngưỡng
                     </div>
@@ -349,8 +353,10 @@
                                 <th class="text-right" style="width: 155px"
                                     title="Mức tồn trữ thô quy ra kg cao nhất đã từng đạt, dựng lại từ chứng từ nhập - xuất - cân đối theo ngày">
                                     Tồn Thực Tế Cao Nhất (kg)</th>
-                                <th class="text-right" style="width: 95px" title="Tồn thô hiện tại / Ngưỡng">Tỉ Lệ Hiện Tại</th>
-                                <th class="text-right" style="width: 95px" title="Tồn thô cao nhất / Ngưỡng - căn cứ xác định Trạng Thái">Tỉ Lệ Đỉnh</th>
+                                <th class="text-right" style="width: 95px" title="Tồn thô hiện tại / Ngưỡng">Tỉ Lệ
+                                    Hiện Tại</th>
+                                <th class="text-right" style="width: 95px"
+                                    title="Tồn thô cao nhất / Ngưỡng - căn cứ xác định Trạng Thái">Tỉ Lệ Đỉnh</th>
                                 <th class="text-center" style="width: 140px"
                                     title="Theo tỉ lệ ĐỈNH: đã từng chạm/vượt ngưỡng thì phải xây dựng Kế hoạch phòng ngừa dù nay đã xuất bớt">
                                     Trạng Thái</th>
@@ -382,15 +388,15 @@
                                         @endif
                                     </td>
                                     <td class="text-right" data-order="{{ $row->total_kg }}">
-                                        <button type="button" class="tr-thr-btn" data-id="{{ $row->chem_names_id }}"
-                                            data-table="B" data-focus="onhand"
+                                        <button type="button" class="tr-thr-btn"
+                                            data-id="{{ $row->chem_names_id }}" data-table="B" data-focus="onhand"
                                             title="Bấm để xem các mã xuất nhập tạo nên con số này">
                                             <b>{{ $trNum($row->total_kg) }}</b> <i class="fas fa-list-ul"></i>
                                         </button>
                                     </td>
                                     <td class="text-right" data-order="{{ $row->peak_kg }}">
-                                        <button type="button" class="tr-thr-btn" data-id="{{ $row->chem_names_id }}"
-                                            data-table="B" data-focus="peak"
+                                        <button type="button" class="tr-thr-btn"
+                                            data-id="{{ $row->chem_names_id }}" data-table="B" data-focus="peak"
                                             title="Bấm để xem diễn biến chứng từ tạo nên mức cao nhất">
                                             <b>{{ $trNum($row->peak_kg) }}</b> <i class="fas fa-list-ul"></i>
                                         </button>
@@ -426,7 +432,8 @@
                                     <td colspan="10" class="text-center text-muted py-4">
                                         Chưa có hỗn hợp nào đủ điều kiện Nhóm 10 (cần hoạt chất thuộc Nhóm 9 + tick nhóm
                                         nguy hại
-                                        trên màn "Dữ Liệu Gốc › Tên Hoá Chất" + mã danh mục phân loại Nhóm 9 / Nhóm 10 / hoá
+                                        trên màn "Dữ Liệu Gốc › Tên Hoá Chất" + mã danh mục phân loại Nhóm 9 / Nhóm 10 /
+                                        hoá
                                         chất cấm).
                                     </td>
                                 </tr>
@@ -445,7 +452,7 @@
      |  Dữ liệu lấy qua AJAX từ ThresholdReconciliationController::thresholdDetail().
      ========================================================================= --}}
     <div class="modal fade md-modal" id="thrDetailModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+        <div class="modal-dialog thr-detail-dialog modal-dialog-scrollable" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
@@ -590,11 +597,12 @@
                 r.cells.forEach(function(c) {
                     $row.append(cell('td', c));
                 });
-                if (r._peak) $row.children().last().append($('<span>').addClass('thr-peak-tag').text('ĐỈNH'));
+                if (r._peak) $row.children().last().append($('<span>').addClass('thr-peak-tag').text(
+                    'ĐỈNH'));
                 $tb.append($row);
             });
             $t.append($tb);
-            return $t;
+            return $('<div>').addClass('table-responsive thr-detail-table-wrap').append($t);
         }
 
         function section(title, focusKey, wantFocus, $content) {
@@ -619,9 +627,7 @@
                 ['Gộp từ', row.onhand_count + ' mã xuất nhập còn tồn'],
                 ['Tồn cao nhất', row.peak_kg + ' kg (' + row.peak_ratio_percent + ')'],
                 ['Ngày đạt đỉnh', row.peak_date],
-                ['Dựng từ', row.timeline_count + ' chứng từ (' + row.import_count + ' lần nhập)'],
-                ['Trạng thái (theo đỉnh)', row.level_label],
-                ['Trạng thái hiện tại', row.current_level_label]
+                ['Dựng từ', row.timeline_count + ' chứng từ (' + row.import_count + ' lần nhập)']
             ].forEach(function(f) {
                 $fig.append($('<div>').addClass('fig')
                     .append($('<span>').text(f[0]))
@@ -633,23 +639,27 @@
             var $onhandWrap = $('<div>');
             if (row.onhand_rows.length) {
                 $onhandWrap.append(buildTable(
-                    ['Mã xuất nhập', 'Ngày nhập', 'Mã danh mục', 'Phòng ban', 'SL nhập', 'Cân đối', 'Đã xuất',
+                    ['Mã xuất nhập', 'Ngày nhập', 'Mã danh mục', 'Phòng ban', 'SL nhập', 'Cân đối',
+                        'Đã xuất',
                         'Tồn còn lại', 'Tồn còn lại (kg)'
                     ],
                     row.onhand_rows.map(function(o) {
                         return {
-                            cells: [o.ref, o.date, o.category_code, o.department_name, o.imported, o.balanced,
+                            cells: [o.ref, o.date, o.category_code, o.department_name, o.imported, o
+                                .balanced,
                                 o.exported, o.on_hand, o.on_hand_kg
                             ]
                         };
                     })
                 ));
                 $onhandWrap.append($('<div>').addClass('thr-detail-note').text(
-                    'Tồn thực tế = tổng "Tồn còn lại (kg)" của ' + row.onhand_count + ' mã xuất nhập ở trên = ' +
+                    'Tồn thực tế = tổng "Tồn còn lại (kg)" của ' + row.onhand_count +
+                    ' mã xuất nhập ở trên = ' +
                     row.total_kg + ' kg.'
                 ));
             } else {
-                $onhandWrap.append($('<div>').addClass('thr-detail-empty').text('Không có mã xuất nhập nào còn tồn.'));
+                $onhandWrap.append($('<div>').addClass('thr-detail-empty').text(
+                    'Không có mã xuất nhập nào còn tồn.'));
             }
             if (row.by_department.length) {
                 $onhandWrap.append($('<div>').addClass('thr-detail-note')
@@ -675,20 +685,23 @@
             var $peakWrap = $('<div>');
             if (row.timeline.length) {
                 $peakWrap.append(buildTable(
-                    ['Ngày', 'Loại', 'Mã chứng từ', 'Mã danh mục', 'Phòng ban', 'Biến động', 'Biến động (kg)',
+                    ['Ngày', 'Loại', 'Mã chứng từ', 'Mã danh mục', 'Phòng ban', 'Biến động',
+                        'Biến động (kg)',
                         'Luỹ kế (kg)'
                     ],
                     row.timeline.map(function(t) {
                         return {
                             _peak: t.is_peak,
-                            cells: [t.date, t.type_label, t.ref, t.category_code, t.department_name, t.delta,
+                            cells: [t.date, t.type_label, t.ref, t.category_code, t.department_name,
+                                t.delta,
                                 t.delta_kg, t.running_kg
                             ]
                         };
                     })
                 ));
                 $peakWrap.append($('<div>').addClass('thr-detail-note').text(
-                    'Dựng lại từ ' + row.timeline_count + ' chứng từ đang hiệu lực (' + row.import_count +
+                    'Dựng lại từ ' + row.timeline_count + ' chứng từ đang hiệu lực (' + row
+                    .import_count +
                     ' lần nhập, còn lại là xuất / cân đối), cộng dồn theo ngày. Dòng tô vàng là lúc tồn chạm mức cao nhất. ' +
                     'Chứng từ bị khoá về sau không còn trong chuỗi; cùng một ngày thì cộng (nhập) trước, trừ (xuất) sau.'
                 ));
@@ -705,7 +718,8 @@
         function renderThrDetail(data, wantFocus) {
             var $body = $('#thrDetailModal').find('.thr-detail-body').empty();
             $('#thrDetailModal').find('.thr-detail-subtitle')
-                .text((data.category_code && data.category_code !== '—' ? 'Mã ' + data.category_code + ' · ' : '') +
+                .text((data.category_code && data.category_code !== '—' ? 'Mã ' + data.category_code + ' · ' :
+                        '') +
                     data.chem_name + ' · cảnh báo vàng từ ' + data.warn_percent + '% ngưỡng');
 
             var cards = [];
@@ -894,10 +908,20 @@
         }
 
         /* ---- Modal chi tiết ---- */
+        .thr-detail-dialog {
+            max-width: 80vw;
+        }
+
+        @media (max-width: 992px) {
+            .thr-detail-dialog {
+                max-width: 95vw;
+            }
+        }
+
         .thr-detail-card {
             border: 1px solid var(--primary-lighter);
             border-radius: var(--border-radius-lg, 12px);
-            padding: 16px 18px;
+            padding: 18px 22px;
             margin-bottom: 18px;
         }
 
@@ -908,14 +932,13 @@
         }
 
         .thr-detail-figures {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 10px;
-            margin: 12px 0;
+            margin: 14px 0;
         }
 
         .thr-detail-figures .fig {
-            flex: 1 1 150px;
             background: var(--bg-neutral, #F5F9FD);
             border: 1px solid var(--primary-lighter);
             border-radius: var(--border-radius-md, 8px);
@@ -950,10 +973,20 @@
             border-radius: 0 6px 6px 0;
         }
 
+        .thr-detail-table-wrap {
+            border: 1px solid #dbe6f2;
+            border-radius: var(--border-radius-md, 8px);
+            margin-bottom: 0;
+        }
+
         .thr-detail-section table {
             width: 100%;
             font-size: 0.82rem;
             margin-bottom: 0;
+        }
+
+        .thr-detail-table-wrap table {
+            border: none;
         }
 
         .thr-detail-section table th {

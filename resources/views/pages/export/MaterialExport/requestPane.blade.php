@@ -88,7 +88,7 @@
                             </span>
                         @else — @endif
                     </td>
-                    <td class="md-sub">{{ $req->created_by ?: '—' }}
+                    <td class="md-sub">{{ $req->updated_by ?: $req->created_by ?: '—' }}
                         <br><small>{{ $req->created_at ? \Carbon\Carbon::parse($req->created_at)->format('d/m/Y') : '' }}</small>
                     </td>
                     <td class="text-center">

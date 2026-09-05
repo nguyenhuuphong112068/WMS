@@ -210,6 +210,9 @@
         'classifications' => $dmClassifications,
         'units' => $dmUnits,
     ])
+    @include('pages.category.DepartmentMaterial.categoryPicker', [
+        'categories' => $dmCategories,
+    ])
     @include('pages.category.DepartmentMaterial.update', [
         'mdRoute' => $dmRoute,
         'mdTitle' => $dmTitle,

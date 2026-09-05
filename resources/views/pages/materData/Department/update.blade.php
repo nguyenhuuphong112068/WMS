@@ -37,6 +37,10 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
+                    <div class="form-group form-check">
+                        <input type="checkbox" name="is_common" id="update_is_common" class="form-check-input" value="1">
+                        <label class="form-check-label" for="update_is_common">Phòng ban chung (chỉ để tạo user, không hiện trong Chuyển Bộ Phận, không tham gia nghiệp vụ)</label>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>

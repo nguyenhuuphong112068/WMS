@@ -39,6 +39,9 @@ Route::prefix('/estimate')
             Route::post('updateItem', 'updateItem')->name('updateItem');
             Route::post('deleteItem', 'deleteItem')->name('deleteItem');
 
+            // Cảnh báo ngưỡng PL IV tức thời khi chọn hoá chất / nhập số lượng trong modal
+            Route::get('checkThreshold', 'checkThreshold')->name('checkThreshold');
+
             // Trình ký 2 bước
             Route::post('submit', 'submit')->name('submit');
             Route::post('signManager', 'signManager')->name('signManager');

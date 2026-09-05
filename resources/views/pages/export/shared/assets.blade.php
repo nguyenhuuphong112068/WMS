@@ -7,7 +7,7 @@
 | - Ô chọn Select2 có tìm kiếm, đặt trong modal
 | - Ô mã xuất nhập chỉ đọc, lấy theo phiếu nhập đang chọn (không sinh mã mới)
 | - Dòng nhắc tồn còn lại của phiếu nhập đang chọn
-| - Ô chọn loại phiếu: Sử dụng / Huỷ bỏ
+| - Ô chọn loại phiếu: Sử dụng / Loại bỏ
 |
 | Quy ước để phần JS bên dưới hoạt động:
 | - Ô chọn 1 giá trị      : class="exp-select"
@@ -310,6 +310,25 @@
         background: #FEE2E2;
         color: #B91C1C;
         border: 1px solid #FCA5A5;
+    }
+
+    .exp-req-badge.neutral {
+        background: #F1F5F9;
+        color: #475569;
+        border: 1px solid #CBD5E1;
+    }
+
+    .exp-req-badge.warning {
+        background: #FFEDD5;
+        color: #C2410C;
+        border: 1px solid #FDBA74;
+    }
+
+    /* Chờ phòng nhận xác nhận Nhận - khác "pending" (chờ B cấp phát) */
+    .exp-req-badge.issued {
+        background: #DBEAFE;
+        color: #1D4ED8;
+        border: 1px solid #93C5FD;
     }
 
     /* ---------- Thanh chọn khoảng thời gian của báo cáo ---------- */
@@ -777,19 +796,6 @@
             });
         }
 
-        /** Ô "Phòng ban nhận" chỉ dùng cho loại Chuyển kho, loại khác thì ẩn và xoá trắng */
-        function toggleTransfer($form) {
-            var isTransfer = $form.find('.exp-type input:checked').val() === 'transfer';
-
-            $form.find('.exp-transfer-only').toggle(isTransfer);
-
-            var $dept = $form.find('[name="to_department_id"]');
-
-            if (!isTransfer && $dept.val()) {
-                $dept.val('').trigger('change');
-            }
-        }
-
         /** Căn cứ / Lý do loại bỏ chỉ dùng cho loại Loại bỏ (cancel) */
         function toggleCancel($form) {
             var isCancel = $form.find('.exp-type input:checked').val() === 'cancel';
@@ -807,10 +813,8 @@
             var $form = $(this).closest('form');
 
             paintTypes($form);
-            toggleTransfer($form);
             toggleCancel($form);
 
-            // Chuyển kho không được vượt tồn, hạn mức trên ô số lượng phải tính lại
             $form.find('[name="import_id"]').each(function() {
                 syncImport($(this));
             });
@@ -844,16 +848,13 @@
                 Number($remaining.data('self-amount') || 0) : 0;
             var left = Number(picked.remaining || 0) + extra;
 
-            // Hạn mức xuất = tồn còn lại + phần được phép vượt (mặc định 5%).
-            // Riêng Chuyển kho không được vượt tồn, hàng chuyển đi thành tồn phòng nhận.
-            var isTransfer = $form.find('.exp-type input:checked').val() === 'transfer';
-            var over = isTransfer ? 0 : Number($select.data('over') || 0);
+            // Hạn mức xuất = tồn còn lại + phần được phép vượt (mặc định 5%)
+            var over = Number($select.data('over') || 0);
             var limit = left * (1 + over);
 
             $remaining
                 .text('Tồn còn lại: ' + trimNum(left) + ' ' + (picked.unit || '') +
-                    (over > 0 ? ' - xuất tối đa ' + trimNum(limit) :
-                        (isTransfer ? ' - chuyển kho không được vượt tồn' : '')))
+                    (over > 0 ? ' - xuất tối đa ' + trimNum(limit) : ''))
                 .toggleClass('is-empty', left <= 0);
 
             // Chặn ngay trên form, Controller vẫn kiểm tra lại khi lưu
@@ -962,7 +963,7 @@
 
             $form.find('.exp-select').val('').trigger('change');
 
-            // Mặc định là phiếu Sử dụng, tránh giữ lại lựa chọn Huỷ bỏ của lần mở trước
+            // Mặc định là phiếu Sử dụng, tránh giữ lại lựa chọn Loại bỏ của lần mở trước
             $form.find('.exp-type input').each(function(i) {
                 $(this).prop('checked', i === 0);
             });
@@ -1102,58 +1103,6 @@
                 $body.append($item);
             });
         }
-
-        /* ---------- Trả lời đề nghị chuyển hoá chất ---------- */
-        $(document).on('click', '.btn-exp-respond', function() {
-            var accepted = $(this).data('answer') === 'accepted';
-            var $form = $('#respondModal').find('form');
-
-            $form.find('[name="id"]').val($(this).data('id'));
-            $form.find('[name="app_status"]').val($(this).data('answer'));
-            $form.find('[name="response_note"]').val('');
-            $form.find('.md-error').remove();
-            $form.find('.is-invalid').removeClass('is-invalid');
-
-            $('#respondModal').find('.exp-respond-heading')
-                .text(accepted ? 'Đồng Ý Đề Nghị Chuyển' : 'Từ Chối Đề Nghị Chuyển');
-            $('#respondModal').find('.exp-respond-subtitle').text($(this).data('title') || '');
-
-            // Từ chối thì bắt buộc nói lý do, Controller cũng kiểm tra lại
-            $form.find('.exp-respond-label').text(accepted ? 'Ghi Chú Trả Lời' : 'Lý Do Từ Chối');
-            $form.find('.exp-respond-required').toggle(!accepted);
-            $form.find('[name="response_note"]').prop('required', !accepted);
-            $form.find('.exp-respond-hint').text(accepted ?
-                'Đồng ý mới là trả lời, hàng chưa đi. Sau đó bấm "Lập phiếu" để lập phiếu Chuyển kho.' :
-                'Nêu rõ vì sao không chuyển được để phòng kia biết đường xoay.');
-            $form.find('.exp-respond-submit')
-                .toggleClass('btn-primary', accepted)
-                .toggleClass('btn-danger', !accepted);
-
-            $('#respondModal').modal('show');
-        });
-
-        /* ---------- Lập phiếu Chuyển kho từ một đề nghị đã đồng ý ---------- */
-        $(document).on('click', '.btn-exp-make-transfer', function() {
-            var req = $(this).data('request') || {};
-            var $form = $('#createModal').find('form');
-
-            // Mở modal Thêm mới rồi điền sẵn phần lấy được từ đề nghị; mã lô cụ thể
-            // vẫn do người dùng chọn vì đề nghị chỉ nói danh mục hoá chất
-            $('.btn-md-create').first().trigger('click');
-
-            $form.find('.exp-type input[value="transfer"]').prop('checked', true).trigger('change');
-            $form.find('[name="to_department_id"]').val(req.to_department_id).trigger('change');
-            $form.find('[name="amount"]').val(req.amount);
-            $form.find('[name="purpose"]').val(req.purpose || '');
-
-            // Gắn kèm id đề nghị để Controller nối phiếu chuyển với đề nghị
-            $form.find('[name="request_id"]').remove();
-            $('<input>').attr({
-                type: 'hidden',
-                name: 'request_id',
-                value: req.request_id
-            }).appendTo($form);
-        });
 
         /* ---------- Chuyển tab ---------- */
         $(document).on('click', '.exp-tab', function() {
