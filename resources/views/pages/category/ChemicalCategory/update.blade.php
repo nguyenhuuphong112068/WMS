@@ -3,8 +3,7 @@
 
     // Trang có 2 tab nên có tới 4 form dùng chung kho old(): chỉ điền lại giá trị vừa
     // nhập khi chính form này báo lỗi, không thì để giá trị mặc định.
-    $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
-    $oldCodes = (array) $old('classification', []);
+    $old = fn($key, $default = null) => $bag->any() ? old($key, $default) : $default;
     $oldWarnings = (array) $old('safety_warning', []);
 @endphp
 
@@ -51,9 +50,16 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Tên Hoá Chất <span class="text-danger">*</span></label>
+                                <div class="d-flex align-items-center justify-content-between flex-wrap"
+                                    style="gap: 6px">
+                                    <label class="mb-0">Tên Hoá Chất <span class="text-danger">*</span></label>
+                                    <button type="button" class="btn btn-outline-primary btn-sm cat-pick-chem"
+                                        data-target-form="#updateModal">
+                                        <i class="fas fa-flask mr-1"></i> Chọn từ dữ liệu gốc
+                                    </button>
+                                </div>
                                 <select name="chem_names_id"
-                                    class="form-control cat-select {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
+                                    class="form-control cat-select mt-1 {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
                                     required>
                                     <option value="">-- Chọn tên hoá chất --</option>
                                     @foreach ($chemNames as $option)
@@ -63,6 +69,7 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                <small class="md-sub">Một danh mục chỉ mang một tên hoá chất.</small>
                                 @if ($bag->has('chem_names_id'))
                                     <span class="md-error">{{ $bag->first('chem_names_id') }}</span>
                                 @endif
@@ -105,10 +112,12 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>Hàm Lượng Hoạt Chất (%)</label>
-                                        <input type="number" name="ai_content_percent" step="0.0001" min="0.0001" max="100"
+                                        <input type="number" name="ai_content_percent" step="0.0001" min="0.0001"
+                                            max="100"
                                             class="form-control {{ $bag->has('ai_content_percent') ? 'is-invalid' : '' }}"
                                             value="{{ $old('ai_content_percent') }}" placeholder="Mặc định 100">
-                                        <small class="md-sub">Dùng khi đối chiếu ngưỡng tồn trữ PL IV: khối lượng hoạt chất = tồn (kg) × %.</small>
+                                        <small class="md-sub">Dùng khi đối chiếu ngưỡng tồn trữ PL IV: khối lượng hoạt
+                                            chất = tồn (kg) × %.</small>
                                         @if ($bag->has('ai_content_percent'))
                                             <span class="md-error">{{ $bag->first('ai_content_percent') }}</span>
                                         @endif
@@ -154,24 +163,11 @@
 
                         <div class="col-lg-6">
                             <div class="form-group">
-                                <label>Phân Loại</label>
-                                <div class="cat-check-group {{ $bag->has('classification') ? 'is-invalid' : '' }}">
-                                    @foreach ($classifications as $code => $name)
-                                        <label
-                                            class="cat-check-item {{ in_array($code, $oldCodes) ? 'is-checked' : '' }}">
-                                            <input type="checkbox" class="cat-check-input" name="classification[]"
-                                                value="{{ $code }}" {{ in_array($code, $oldCodes) ? 'checked' : '' }}>
-                                            <span class="cat-check-code">{{ $code }}</span>
-                                            <span class="cat-check-name">{{ $name }}</span>
-                                        </label>
-                                    @endforeach
+                                <label>Phân Loại Nghị định số 24/2026/NĐ-CP</label>
+
+                                <div class="cat-cls-preview mt-2" data-cls-preview>
+                                    <span class="md-empty">Chọn tên hoá chất để xem nhóm phân loại NĐ 24/2026.</span>
                                 </div>
-                                @if ($bag->has('classification'))
-                                    <span class="md-error">{{ $bag->first('classification') }}</span>
-                                @endif
-                                @if ($bag->has('classification.0'))
-                                    <span class="md-error">{{ $bag->first('classification.0') }}</span>
-                                @endif
                             </div>
 
                             <div class="form-group">
@@ -181,8 +177,12 @@
                                         <label
                                             class="cat-check-item has-picto {{ in_array($code, $oldWarnings) ? 'is-checked' : '' }}">
                                             <input type="checkbox" class="cat-check-input" name="safety_warning[]"
-                                                value="{{ $code }}" {{ in_array($code, $oldWarnings) ? 'checked' : '' }}>
-                                            @include('pages.shared.safetyPictogram', ['code' => $code, 'size' => 24])
+                                                value="{{ $code }}"
+                                                {{ in_array($code, $oldWarnings) ? 'checked' : '' }}>
+                                            @include('pages.shared.safetyPictogram', [
+                                                'code' => $code,
+                                                'size' => 24,
+                                            ])
                                             <span class="cat-check-name">{{ $name }}</span>
                                         </label>
                                     @endforeach

@@ -4,11 +4,17 @@
     <div class="card-body">
 
         <div class="md-toolbar">
-            @perm('category_chemical_create')
-                <button type="button" class="btn btn-primary btn-md-create">
-                    <i class="fas fa-plus mr-1"></i> Thêm mới
+            <div class="d-flex flex-wrap align-items-center" style="gap: 10px">
+                @perm('category_chemical_create')
+                    <button type="button" class="btn btn-primary btn-md-create">
+                        <i class="fas fa-plus mr-1"></i> Thêm mới
+                    </button>
+                @endperm
+                <button type="button" class="btn btn-outline-primary" data-toggle="modal"
+                    data-target="#classifyGuideModal">
+                    <i class="fas fa-info-circle mr-1"></i> Chú thích Phụ lục &amp; Nhóm
                 </button>
-            @endperm
+            </div>
             <p class="hint">
                 <i class="fas fa-info-circle mr-1"></i>
                 Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} bản ghi.
@@ -28,7 +34,6 @@
                         <th>Nhà Sản Xuất</th>
                         <th class="text-center" style="width: 105px">Tỉ Trọng d<br><small>(g/ml)</small></th>
                         <th style="width: 180px">Điều Kiện Bảo Quản</th>
-                        <th style="width: 110px">Số Hồ Sơ</th>
                         <th style="width: 170px">Phân Loại</th>
                         <th style="width: 150px" title="Dòng cảnh báo in ở dải giữa nhãn dán lô hàng">
                             Cảnh Báo An Toàn</th>
@@ -47,8 +52,8 @@
                 <tbody>
                     @foreach ($datas as $row)
                         @php
-                            $codes = json_decode($row->classification ?? '', true);
-                            $codes = is_array($codes) ? $codes : [];
+                            // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (không còn cột classification)
+                            $codes = $classificationCodes[$row->id] ?? [];
 
                             $warningCodes = json_decode($row->safety_warning ?? '', true);
                             $warningCodes = is_array($warningCodes) ? $warningCodes : [];
@@ -93,18 +98,17 @@
                                     <span class="md-empty">—</span>
                                 @endif
                             </td>
-                            <td class="md-sub">{{ $row->doc_no ?: '—' }}</td>
                             <td>
                                 @if ($codes)
                                     <div class="cat-chips">
                                         @foreach ($codes as $code)
                                             <span
-                                                class="cat-chip {{ in_array($code, $mdDangerCodes) ? 'danger' : '' }}"
-                                                title="{{ $classifications[$code] ?? $code }}">{{ $code }}</span>
+                                                class="cat-chip {{ \App\Support\ChemicalClassification::toneOfCode($code) }}"
+                                                title="{{ $classificationLabels[$code] ?? $code }}">{{ $code }}</span>
                                         @endforeach
                                     </div>
                                 @else
-                                    <span class="md-empty">—</span>
+                                    <span class="md-empty" title="Suy từ Tên Hoạt Chất / Tên Hoá Chất - chưa thuộc nhóm nào của NĐ 24/2026">—</span>
                                 @endif
                             </td>
                             <td class="md-sub">
@@ -122,10 +126,11 @@
                                     <span class="md-empty">—</span>
                                 @endif
                             </td>
-                            {{-- Ngưỡng tồn trữ Phụ lục IV: Bảng A theo hoạt chất + Bảng B theo hỗn hợp --}}
+                            {{-- Ngưỡng tồn trữ Phụ lục IV: mã danh mục chỉ xét MỘT bảng -
+                                 đơn chất nhóm 9 -> Bảng A, hỗn hợp nhóm 10 -> Bảng B (lọc sẵn ở controller) --}}
                             @php
-                                $thr = $thresholds[$row->id] ?? null;
-                                $thrB = $thresholdsB[$row->id] ?? null;
+                                $thr = $thresholds[$row->id] ?? null;   // chỉ còn khi mã danh mục là đơn chất nhóm 9
+                                $thrB = $thresholdsB[$row->id] ?? null;  // chỉ còn khi mã danh mục là hỗn hợp nhóm 10
                                 $thrNum = fn($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.');
                                 $thrDate = fn($v) => $v ? \Carbon\Carbon::parse($v)->format('d/m/Y') : null;
                                 $thrBadgeMap = ['ok' => 'badge-success', 'warn' => 'badge-warning', 'exceeded' => 'badge-danger'];
@@ -135,11 +140,11 @@
                             @endphp
                             <td class="text-center" data-order="{{ number_format($thrOrder, 4, '.', '') }}">
                                 @if (! $thr && ! $thrB)
-                                    <span class="md-empty" title="Mã danh mục chưa phân loại N9 / N10 / hoá chất cấm, hoặc tên hoá chất chưa gắn hoạt chất PL IV / chưa khai ngưỡng">—</span>
+                                    <span class="md-empty" title="Chỉ đối chiếu ngưỡng PL IV cho mã danh mục là đơn chất nhóm 9 (Bảng A) hoặc hỗn hợp nhóm 10 (Bảng B) đã khai ngưỡng">—</span>
                                 @endif
                                 @if ($thr)
                                     <div class="cat-thr-block">
-                                        <span class="badge badge-secondary">Bảng A</span>
+                                        <span class="badge badge-danger" title="{{ $classificationLabels['N9'] ?? 'Nhóm 9 - Phụ lục IV Bảng A' }}">Nhóm 9</span>
                                         <span class="badge {{ $thrBadgeMap[$thr->level] ?? 'badge-secondary' }}" title="{{ $thr->ai_name }}">{{ $thrLabelMap[$thr->level] ?? $thr->level }}</span>
                                         <div class="md-sub mt-1">Ngưỡng: {{ $thrNum($thr->threshold_kg) }} kg</div>
                                         <button type="button" class="thr-chip" data-id="{{ $row->id }}" data-table="A" data-focus="onhand"
@@ -156,8 +161,8 @@
                                     </div>
                                 @endif
                                 @if ($thrB)
-                                    <div class="cat-thr-block {{ $thr ? 'mt-2 pt-2' : '' }}" @if ($thr) style="border-top:1px dashed var(--primary-lighter)" @endif>
-                                        <span class="badge badge-danger">Bảng B</span>
+                                    <div class="cat-thr-block">
+                                        <span class="badge badge-danger" title="{{ $classificationLabels['N10'] ?? 'Nhóm 10 - Phụ lục IV Bảng B' }}">Nhóm 10</span>
                                         <span class="badge {{ $thrBadgeMap[$thrB->level] ?? 'badge-secondary' }}">{{ $thrLabelMap[$thrB->level] ?? $thrB->level }}</span>
                                         <div class="md-sub mt-1">Ngưỡng: {{ $thrNum($thrB->min_threshold_kg) }} kg (nhóm {{ $thrB->strictest_group }})</div>
                                         <button type="button" class="thr-chip" data-id="{{ $row->id }}" data-table="B" data-focus="onhand"
@@ -227,7 +232,6 @@
                                         'ai_content_percent' => $row->ai_content_percent !== null ? rtrim(rtrim($row->ai_content_percent, '0'), '.') : null,
                                         'storage_condition_id' => $row->storage_condition_id,
                                         'doc_no' => $row->doc_no,
-                                        'classification' => $codes,
                                         'safety_warning' => $warningCodes,
                                     ],
                                 ])
@@ -484,7 +488,7 @@
             function renderCard(row, wantFocus) {
                 var $card = $('<div>').addClass('thr-detail-card');
 
-                $card.append($('<h6>').text((row.table === 'A' ? 'Bảng A — ' : 'Bảng B — ') + row.title));
+                $card.append($('<h6>').text((row.table === 'A' ? 'Nhóm 9 (Bảng A) — ' : 'Nhóm 10 (Bảng B) — ') + row.title));
                 if (row.subtitle) $card.append($('<div>').addClass('md-sub').text(row.subtitle));
 
                 var $fig = $('<div>').addClass('thr-detail-figures');

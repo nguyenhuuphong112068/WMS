@@ -12,12 +12,14 @@ use Illuminate\Support\Facades\DB;
 /**
  * TỒN - ĐỐI CHIẾU NGƯỠNG PHỤ LỤC IV NĐ 24/2026/NĐ-CP
  *
- * Màn hình CHỈ ĐỌC, hai bảng. Phạm vi cộng tồn gói trong CÔNG TY của phòng ban đang chọn
+ * Màn hình CHỈ ĐỌC. Phạm vi cộng tồn gói trong CÔNG TY của phòng ban đang chọn
  * (App\Support\CompanyContext::currentId()) - chỉ các phòng ban thuộc công ty đó:
- *   - BẢNG A: từng hoạt chất được danh mục hoá chất tham chiếu - tổng tồn quy ra kg
- *     (× % hàm lượng) so với active_ingredients.threshold_kg.
- *   - BẢNG B: từng hỗn hợp có hoạt chất Bảng A + đã tick nhóm nguy hại - tổng tồn thô
- *     quy ra kg (KHÔNG × %) so với ngưỡng THẤP NHẤT trong các nhóm đã tick.
+ *   - NHÓM 9 (PL IV Bảng A): từng hoạt chất được danh mục hoá chất tham chiếu - tổng tồn
+ *     quy ra kg (× % hàm lượng) so với active_ingredients.threshold_kg.
+ *   - NHÓM 10 (PL IV Bảng B): từng hỗn hợp có hoạt chất nhóm 9 + đã tick nhóm nguy hại -
+ *     tổng tồn thô quy ra kg (KHÔNG × %) so với ngưỡng THẤP NHẤT trong các nhóm đã tick.
+ *   - TỔNG TỈ LỆ (Điều 33 k2 điểm b): Σ (qxᵢ / QUXᵢ) gộp cả nhóm 9 và nhóm 10; >= 1 thì
+ *     cơ sở phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất.
  *
  * Phần tính nằm ở App\Support\ActiveIngredientThreshold / App\Support\MixtureHazardThreshold
  * để khớp với cảnh báo trên Danh Mục Hoá Chất, Tồn Kho Hoá Chất và Nhập Hoá Chất.
@@ -81,6 +83,71 @@ class ThresholdReconciliationController extends Controller
             })
             ->values();
 
+        // -------------------------------------------------------------------------
+        // ĐIỀU 33 khoản 2 điểm b - "Tổng tỉ lệ khối lượng hoá chất nguy hiểm tồn trữ
+        // trên ngưỡng" gộp CẢ nhóm 9 (PL IV Bảng A) và nhóm 10 (PL IV Bảng B):
+        //     Σ ( qxᵢ / QUXᵢ )
+        //   qxᵢ  = khối lượng tồn trữ lớn nhất tại một thời điểm của hoá chất nguy hiểm i
+        //          (lấy theo Tồn Thực Tế Cao Nhất - peak_kg).
+        //   QUXᵢ = ngưỡng khối lượng tồn trữ lớn nhất quy định tại Bảng A / Bảng B.
+        // Tổng >= 1  => cơ sở phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất,
+        // kể cả khi chưa có chất đơn lẻ nào chạm ngưỡng (điểm a). Chỉ cộng các hoạt chất /
+        // hỗn hợp ĐÃ khai ngưỡng (peak_ratio khác null).
+        // -------------------------------------------------------------------------
+        $combinedRows = [];
+        $sumPeakRatio = 0.0;
+        $sumCurrentRatio = 0.0;
+
+        foreach ($rows as $row) {
+            if ($row->peak_ratio === null) {
+                continue;
+            }
+
+            $sumPeakRatio += (float) $row->peak_ratio;
+            $sumCurrentRatio += (float) $row->ratio;
+            $combinedRows[] = (object) [
+                'group' => 9,
+                'name' => $row->ai_name,
+                'sub' => $row->ai_code ?: ($row->cas_no ? 'CAS ' . $row->cas_no : null),
+                'threshold_kg' => (float) $row->threshold_kg,
+                'peak_kg' => $row->peak_kg,
+                'total_kg' => $row->total_kg,
+                'peak_ratio' => (float) $row->peak_ratio,
+                'ratio' => (float) $row->ratio,
+                'level' => $row->level,
+            ];
+        }
+
+        foreach ($tableBRows as $row) {
+            if ($row->peak_ratio === null) {
+                continue;
+            }
+
+            $sumPeakRatio += (float) $row->peak_ratio;
+            $sumCurrentRatio += (float) $row->ratio;
+            $combinedRows[] = (object) [
+                'group' => 10,
+                'name' => $row->chem_name,
+                'sub' => $row->strictest_group ? ('nhóm nguy hại ' . $row->strictest_group) : null,
+                'threshold_kg' => (float) $row->min_threshold_kg,
+                'peak_kg' => $row->peak_kg,
+                'total_kg' => $row->total_kg,
+                'peak_ratio' => (float) $row->peak_ratio,
+                'ratio' => (float) $row->ratio,
+                'level' => $row->level,
+            ];
+        }
+
+        // Đóng góp lớn nhất lên đầu
+        usort($combinedRows, fn ($a, $b) => $b->peak_ratio <=> $a->peak_ratio);
+
+        $warnRatio = ActiveIngredientThreshold::warnRatio();
+        $combinedLevel = $sumPeakRatio >= 1.0
+            ? ActiveIngredientThreshold::LEVEL_EXCEEDED
+            : ($sumPeakRatio >= $warnRatio
+                ? ActiveIngredientThreshold::LEVEL_WARN
+                : ActiveIngredientThreshold::LEVEL_OK);
+
         return view('pages.inventory.ThresholdReconciliation.list', [
             'rows' => $rows,
             'companyName' => CompanyContext::name($companyId),
@@ -97,9 +164,22 @@ class ThresholdReconciliationController extends Controller
                 'ok' => $tableBRows->where('level', MixtureHazardThreshold::LEVEL_OK)->count(),
             ],
             'warnPercent' => (int) round(ActiveIngredientThreshold::warnRatio() * 100),
-            // Số hoạt chất đã khai ngưỡng nhưng chưa gắn vào tên hoá chất nào -> nhắc khai tiếp
+            // Điều 33 k2 điểm b - tổng tỉ lệ tồn trữ trên ngưỡng gộp nhóm 9 + nhóm 10
+            'combined' => [
+                'rows' => $combinedRows,
+                'sum_peak_ratio' => $sumPeakRatio,
+                'sum_current_ratio' => $sumCurrentRatio,
+                'level' => $combinedLevel,
+            ],
+            // Số hoạt chất nhóm 9 (PL IV bảng A) đã khai ngưỡng nhưng chưa gắn vào tên hoá chất nào
             'unlinkedIngredients' => DB::table('active_ingredients')
-                ->where('is_table_a', 1)
+                ->whereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('active_ingredient_classifications as aic')
+                        ->whereColumn('aic.active_ingredients_id', 'active_ingredients.id')
+                        ->where('aic.appendix', 'IV')
+                        ->where('aic.table_ref', 'A');
+                })
                 ->where('status_id', 1)
                 ->where('app_status', 'approved')
                 ->whereNotNull('threshold_kg')

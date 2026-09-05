@@ -188,7 +188,6 @@ class DepartmentChemical
                 self::TABLE.'.*',
                 'chemical_categories.code as category_code',
                 'chemical_categories.type as category_type',
-                'chemical_categories.classification',
                 'chemical_categories.density as category_density',
                 'chemical_categories.doc_no as category_doc_no',
                 'chemical_categories.shelf_life_months as category_shelf_life_months',
@@ -353,7 +352,6 @@ class DepartmentChemical
             ->select(
                 'chemical_categories.id',
                 'chemical_categories.code',
-                'chemical_categories.classification',
                 'chemical_categories.density',
                 'chem_names.name as chem_name',
                 'manufacturers.name as manufacturer_name',

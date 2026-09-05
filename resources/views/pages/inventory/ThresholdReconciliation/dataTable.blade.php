@@ -34,7 +34,7 @@
             theo từng hoạt chất với
             <b>"Ngưỡng khối lượng hoá chất tồn trữ lớn nhất tại một thời điểm (kg)"</b>
             - Phụ lục IV Nghị định 24/2026/NĐ-CP. Chỉ xét mã danh mục hoá chất đã phân loại
-            <b>N9 (PL IV Bảng A)</b>, <b>N10 (PL IV Bảng B)</b> hoặc <b>hoá chất cấm</b>.
+            <b>Nhóm 9 (PL IV Bảng A)</b>, <b>Nhóm 10 (PL IV Bảng B)</b> hoặc <b>hoá chất cấm</b>.
             Cột <b>Tồn Thực Tế Cao Nhất</b> là mức tồn quy ra kg lớn nhất đã từng đạt, dựng lại
             từ chứng từ nhập - xuất - cân đối theo ngày.
             <b>Trạng Thái</b> lấy theo <b>Tỉ Lệ Đỉnh</b> (Tồn cao nhất / ngưỡng) - đúng nghĩa "lớn nhất
@@ -45,11 +45,150 @@
                 tiết chứng từ tạo nên con số; bấm vào thẻ thống kê để lọc nhanh theo trạng thái.</span>
         </div>
 
-        {{-- ================= CARD BẢNG A ================= --}}
+        {{-- ================= CARD TỔNG TỈ LỆ NHÓM 9 + NHÓM 10 (Điều 33) ================= --}}
+        @php
+            $cb = $combined;
+            $cbPeakPct = (int) round($cb['sum_peak_ratio'] * 100);
+            $cbCurPct = (int) round($cb['sum_current_ratio'] * 100);
+            $cbExceededItems = $summary['exceeded'] + $tableBSummary['exceeded'];
+        @endphp
+        <div class="card md-card tr-card" id="trCardTotal">
+            <div class="card-header tr-card-header">
+                <h5 class="tr-card-title">
+                    <i class="fas fa-calculator mr-2"></i>
+                    Tổng tỉ lệ hoá chất nguy cơ tồn trữ — nhóm 9 và nhóm 10 (Điều 33)
+                </h5>
+                <button type="button" class="btn btn-tool tr-card-toggle" data-target="trCardTotal"
+                    title="Ẩn / hiện nội dung">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
+            <div class="card-body">
+
+                <div class="tr-total-formula">
+                    <b>qx₁ / QUX₁ + qx₂ / QUX₂ + … + qxᵢ / QUXᵢ</b>
+                    — với <i>qxᵢ</i> = khối lượng tồn trữ lớn nhất tại một thời điểm của hoá chất
+                    nguy hiểm <i>i</i> thuộc nhóm 9 (Bảng A) hoặc nhóm 10 (Bảng B), <i>QUXᵢ</i> =
+                    ngưỡng tương ứng quy định tại Phụ lục IV. Cộng trên
+                    @if (!empty($companyName))
+                        công ty <b>"{{ $companyName }}"</b>
+                    @else
+                        công ty đang chọn
+                    @endif
+                    - theo khoản 2 Điều 33 NĐ 24/2026/NĐ-CP.
+                </div>
+
+                <div class="tr-total-grid">
+                    <div class="tr-total-fig lv-{{ $cb['level'] }}">
+                        <span class="lbl">Tổng tỉ lệ theo <b>tồn cao nhất</b> (đỉnh) — căn cứ chính</span>
+                        <span class="val">{{ $trNum($cb['sum_peak_ratio']) }}</span>
+                        <span class="sub">= {{ $cbPeakPct }}% của mốc 1 · gộp {{ count($cb['rows']) }}
+                            hoạt chất / hỗn hợp đã có ngưỡng</span>
+                    </div>
+                    <div class="tr-total-fig">
+                        <span class="lbl">Tổng tỉ lệ theo <b>tồn hiện tại</b></span>
+                        <span class="val">{{ $trNum($cb['sum_current_ratio']) }}</span>
+                        <span class="sub">= {{ $cbCurPct }}% của mốc 1</span>
+                    </div>
+                </div>
+
+                @if ($cb['level'] === 'exceeded')
+                    <div class="tr-total-verdict lv-exceeded">
+                        <i class="fas fa-triangle-exclamation mr-1"></i>
+                        Tổng tỉ lệ ≥ 1 → cơ sở <b>phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất</b>
+                        (điểm b khoản 2 Điều 33), kể cả khi chưa có hoạt chất / hỗn hợp đơn lẻ nào vượt ngưỡng.
+                    </div>
+                @elseif ($cb['level'] === 'warn')
+                    <div class="tr-total-verdict lv-warn">
+                        <i class="fas fa-circle-exclamation mr-1"></i>
+                        Tổng tỉ lệ đã đạt {{ $cbPeakPct }}% mốc 1 — sắp chạm ngưỡng gộp. Cân nhắc kỹ trước khi
+                        nhập thêm hoá chất nhóm 9 / nhóm 10.
+                    </div>
+                @else
+                    <div class="tr-total-verdict lv-ok">
+                        <i class="fas fa-circle-check mr-1"></i>
+                        Tổng tỉ lệ &lt; 1 — chưa thuộc điểm b khoản 2 Điều 33.
+                    </div>
+                @endif
+
+                <div class="tr-total-caveat">
+                    <i class="fas fa-circle-info mr-1"></i>
+                    Vẫn phải lập Kế hoạch nếu có <b>ít nhất 1</b> hoạt chất Bảng A hoặc <b>1</b> hỗn hợp Bảng B
+                    có tồn trữ lớn nhất ≥ ngưỡng (điểm a khoản 2 Điều 33).
+                    @if ($cbExceededItems > 0)
+                        <b class="text-danger">Hiện đã có {{ $cbExceededItems }} đối tượng vượt ngưỡng.</b>
+                    @endif
+                </div>
+
+                <div class="table-responsive mt-3">
+                    <table class="table table-bordered tr-total-table w-100">
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width: 50px">STT</th>
+                                <th style="width: 90px">Nhóm</th>
+                                <th>Hoạt Chất / Hỗn Hợp</th>
+                                <th class="text-right" style="width: 140px">Ngưỡng QUXᵢ (kg)</th>
+                                <th class="text-right" style="width: 150px">Tồn Cao Nhất qxᵢ (kg)</th>
+                                <th class="text-right" style="width: 120px">qxᵢ / QUXᵢ</th>
+                                <th class="text-right" style="width: 130px">Theo Tồn Hiện Tại</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($cb['rows'] as $item)
+                                <tr>
+                                    <td class="text-center">{{ $loop->iteration }}</td>
+                                    <td>
+                                        <span class="tr-grp-badge {{ $item->group === 9 ? 'g9' : 'g10' }}">
+                                            Nhóm {{ $item->group }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="font-weight-bold">{{ $item->name }}</span>
+                                        @if ($item->sub)
+                                            <div class="md-sub">{{ $item->sub }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="text-right">{{ $trNum($item->threshold_kg) }}</td>
+                                    <td class="text-right">{{ $trNum($item->peak_kg) }}</td>
+                                    <td class="text-right">
+                                        <b
+                                            class="{{ $item->level === 'exceeded' ? 'text-danger' : ($item->level === 'warn' ? 'text-warning' : '') }}">
+                                            {{ $trNum($item->peak_ratio) }}
+                                        </b>
+                                        <div class="md-sub">{{ (int) round($item->peak_ratio * 100) }}%</div>
+                                    </td>
+                                    <td class="text-right">
+                                        {{ $trNum($item->ratio) }}
+                                        <div class="md-sub">{{ (int) round($item->ratio * 100) }}%</div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-3">
+                                        Chưa có hoạt chất nhóm 9 hoặc hỗn hợp nhóm 10 nào được khai ngưỡng Phụ lục IV.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                        @if (count($cb['rows']))
+                            <tfoot>
+                                <tr>
+                                    <td colspan="5" class="text-right">Σ ( qxᵢ / QUXᵢ )</td>
+                                    <td class="text-right">{{ $trNum($cb['sum_peak_ratio']) }}</td>
+                                    <td class="text-right">{{ $trNum($cb['sum_current_ratio']) }}</td>
+                                </tr>
+                            </tfoot>
+                        @endif
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {{-- ================= CARD NHÓM 9 (PL IV Bảng A) ================= --}}
         <div class="card md-card tr-card" id="trCardA">
             <div class="card-header tr-card-header">
                 <h5 class="tr-card-title">
-                    <i class="fas fa-flask-vial mr-2"></i> Bảng A — đối chiếu theo từng hoạt chất
+                    <i class="fas fa-flask-vial mr-2"></i> Nhóm 9 — đối chiếu theo từng hoạt chất
                 </h5>
                 <button type="button" class="btn btn-tool tr-card-toggle" data-target="trCardA"
                     title="Ẩn / hiện nội dung">
@@ -100,8 +239,8 @@
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td>
                                         <span class="font-weight-bold">{{ $row->ai_name }}</span>
-                                        <span class="badge badge-danger ml-1" title="Phụ lục IV NĐ 24/2026/NĐ-CP">PL
-                                            IV</span>
+                                        <span class="badge badge-danger ml-1"
+                                            title="Nhóm 9 · Phụ lục IV Bảng A NĐ 24/2026/NĐ-CP">Nhóm 9</span>
                                         @if ($row->ai_code)
                                             <div class="md-sub">{{ $row->ai_code }}</div>
                                         @endif
@@ -161,8 +300,8 @@
                             @empty
                                 <tr>
                                     <td colspan="11" class="text-center text-muted py-4">
-                                        Chưa có mã danh mục hoá chất nào phân loại N9 / N10 / hoá chất cấm kèm hoạt chất
-                                        Phụ lục IV. Vào "Danh Mục › Hoá Chất" để phân loại, "Dữ Liệu Gốc › Tên Hoá Chất"
+                                        Chưa có mã danh mục hoá chất nào phân loại Nhóm 9 / Nhóm 10 / hoá chất cấm kèm
+                                        hoạt chất Phụ lục IV. Vào "Danh Mục › Hoá Chất" để phân loại, "Dữ Liệu Gốc › Tên Hoá Chất"
                                         để gắn hoạt chất, và "Dữ Liệu Gốc › Tên Hoạt Chất" để khai ngưỡng.
                                     </td>
                                 </tr>
@@ -173,11 +312,11 @@
             </div>
         </div>
 
-        {{-- ================= CARD BẢNG B ================= --}}
+        {{-- ================= CARD NHÓM 10 (PL IV Bảng B) ================= --}}
         <div class="card md-card tr-card" id="trCardB">
             <div class="card-header tr-card-header">
                 <h5 class="tr-card-title">
-                    <i class="fas fa-layer-group mr-2"></i> Bảng B — đối chiếu theo hỗn hợp
+                    <i class="fas fa-layer-group mr-2"></i> Nhóm 10 — đối chiếu theo hỗn hợp
                 </h5>
                 <button type="button" class="btn btn-tool tr-card-toggle" data-target="trCardB"
                     title="Ẩn / hiện nội dung">
@@ -225,7 +364,7 @@
                                     <td>
                                         <span class="font-weight-bold">{{ $row->chem_name }}</span>
                                         <span class="badge badge-danger ml-1"
-                                            title="Phụ lục IV NĐ 24/2026/NĐ-CP - Bảng B">Bảng B</span>
+                                            title="Nhóm 10 · Phụ lục IV Bảng B NĐ 24/2026/NĐ-CP">Nhóm 10</span>
                                         @if ($row->has_unconvertible)
                                             <div class="md-sub" style="color: var(--warning, #F59E0B)"
                                                 title="{{ collect($row->unconvertible)->map(fn($u) => $u->category_code . ' — ' . $u->reason)->implode('; ') }}">
@@ -285,9 +424,9 @@
                             @empty
                                 <tr>
                                     <td colspan="10" class="text-center text-muted py-4">
-                                        Chưa có hỗn hợp nào đủ điều kiện Bảng B (cần hoạt chất thuộc Bảng A + tick nhóm
+                                        Chưa có hỗn hợp nào đủ điều kiện Nhóm 10 (cần hoạt chất thuộc Nhóm 9 + tick nhóm
                                         nguy hại
-                                        trên màn "Dữ Liệu Gốc › Tên Hoá Chất" + mã danh mục phân loại N9 / N10 / hoá
+                                        trên màn "Dữ Liệu Gốc › Tên Hoá Chất" + mã danh mục phân loại Nhóm 9 / Nhóm 10 / hoá
                                         chất cấm).
                                     </td>
                                 </tr>
@@ -470,7 +609,7 @@
         function renderCard(row, wantFocus) {
             var $card = $('<div>').addClass('thr-detail-card');
 
-            $card.append($('<h6>').text((row.table === 'A' ? 'Bảng A — ' : 'Bảng B — ') + row.title));
+            $card.append($('<h6>').text((row.table === 'A' ? 'Nhóm 9 — ' : 'Nhóm 10 — ') + row.title));
             if (row.subtitle) $card.append($('<div>').addClass('md-sub').text(row.subtitle));
 
             var $fig = $('<div>').addClass('thr-detail-figures');
@@ -616,7 +755,7 @@
             color: var(--primary);
         }
 
-        /* ---- Card Bảng A / Bảng B ---- */
+        /* ---- Card Nhóm 9 / Nhóm 10 ---- */
         .tr-card {
             margin-bottom: 18px;
         }
@@ -857,6 +996,159 @@
         .thr-detail-empty {
             color: #94a3b8;
             padding: 8px 0;
+        }
+
+        /* ---- Card Tổng tỉ lệ nhóm 9 + nhóm 10 (Điều 33) ---- */
+        .tr-total-formula {
+            background: #fff;
+            border: 1px dashed var(--primary-lighter);
+            border-radius: var(--border-radius-md);
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            font-size: 0.86rem;
+            line-height: 1.6;
+            color: var(--primary-dark);
+        }
+
+        .tr-total-formula b {
+            font-size: 0.95rem;
+            letter-spacing: 0.3px;
+        }
+
+        .tr-total-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .tr-total-fig {
+            flex: 1 1 240px;
+            border: 1px solid var(--primary-lighter);
+            border-radius: var(--border-radius-md);
+            padding: 14px 16px;
+            background: var(--bg-neutral);
+        }
+
+        .tr-total-fig .lbl {
+            display: block;
+            font-size: 0.78rem;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+
+        .tr-total-fig .val {
+            display: block;
+            font-size: 1.7rem;
+            font-weight: 800;
+            line-height: 1.1;
+            color: var(--primary-dark);
+        }
+
+        .tr-total-fig .sub {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.76rem;
+            color: #64748b;
+        }
+
+        .tr-total-fig.lv-exceeded {
+            background: #FEE2E2;
+            border-color: #FCA5A5;
+        }
+
+        .tr-total-fig.lv-exceeded .val {
+            color: #B91C1C;
+        }
+
+        .tr-total-fig.lv-warn {
+            background: #FEF3C7;
+            border-color: #FCD34D;
+        }
+
+        .tr-total-fig.lv-warn .val {
+            color: #B45309;
+        }
+
+        .tr-total-fig.lv-ok {
+            background: #DCFCE7;
+            border-color: #86EFAC;
+        }
+
+        .tr-total-fig.lv-ok .val {
+            color: #15803D;
+        }
+
+        .tr-total-verdict {
+            border-radius: var(--border-radius-md);
+            padding: 10px 14px;
+            font-size: 0.86rem;
+            font-weight: 600;
+            line-height: 1.55;
+        }
+
+        .tr-total-verdict.lv-exceeded {
+            background: #FEE2E2;
+            color: #B91C1C;
+            border: 1px solid #FCA5A5;
+        }
+
+        .tr-total-verdict.lv-warn {
+            background: #FEF3C7;
+            color: #B45309;
+            border: 1px solid #FCD34D;
+        }
+
+        .tr-total-verdict.lv-ok {
+            background: #DCFCE7;
+            color: #15803D;
+            border: 1px solid #86EFAC;
+        }
+
+        .tr-total-caveat {
+            margin-top: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #64748b;
+            line-height: 1.55;
+        }
+
+        .tr-total-table {
+            font-size: 0.84rem;
+        }
+
+        .tr-total-table thead th {
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            font-weight: 600;
+            vertical-align: middle;
+        }
+
+        .tr-total-table tfoot td {
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            font-weight: 800;
+        }
+
+        .tr-grp-badge {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 1px 9px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .tr-grp-badge.g9 {
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            border: 1px solid var(--primary-lighter);
+        }
+
+        .tr-grp-badge.g10 {
+            background: rgba(var(--primary-rgb), 0.16);
+            color: var(--primary-dark);
+            border: 1px solid var(--primary);
         }
     </style>
 @endonce

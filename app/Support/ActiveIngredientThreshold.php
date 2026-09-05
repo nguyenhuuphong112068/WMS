@@ -46,17 +46,6 @@ class ActiveIngredientThreshold
     }
 
     /**
-     * Mã nhóm phân loại danh mục hoá chất bắt buộc phải có thì mới đối chiếu ngưỡng PL IV
-     * (N9 = Bảng A, N10 = Bảng B, CAM = hoá chất cấm). Khai ở config/chemical.php.
-     *
-     * @return array<int, string>
-     */
-    public static function classificationCodes(): array
-    {
-        return (array) config('chemical.threshold_iv.classification_codes', ['N9', 'N10', 'CAM']);
-    }
-
-    /**
      * Hoạt chất (đã duyệt, đang hoạt động) đang được ít nhất một mã danh mục hoá chất
      * tham chiếu, kèm các mã danh mục thuộc hoạt chất đó.
      *
@@ -555,12 +544,14 @@ class ActiveIngredientThreshold
      | ------------------------------------------------------------------------- */
 
     /**
-     * Mã danh mục hoá chất có gắn hoạt chất Bảng A đã duyệt + đang hoạt động.
+     * Mã danh mục hoá chất có gắn hoạt chất thuộc NHÓM 9 (Phụ lục IV Bảng A) đã duyệt +
+     * đang hoạt động. Diện đối chiếu ngưỡng PL IV nay SUY tự động từ phân loại của hoạt
+     * chất - không còn điều kiện tick N9/N10/CAM trên mã danh mục.
      *
      * chem_names gắn NHIỀU hoạt chất (bảng pivot chem_name_active_ingredient) nên một
-     * mã danh mục có thể sinh ra nhiều dòng - mỗi hoạt chất Bảng A một dòng. Tồn của
-     * mã đó được quy cho TỪNG hoạt chất Bảng A của hỗn hợp (nhân cùng ai_content_percent
-     * của mã danh mục); hỗn hợp có 2+ chất Bảng A thì tính theo hướng thận trọng.
+     * mã danh mục có thể sinh ra nhiều dòng - mỗi hoạt chất nhóm 9 một dòng. Tồn của
+     * mã đó được quy cho TỪNG hoạt chất nhóm 9 của hỗn hợp (nhân cùng ai_content_percent
+     * của mã danh mục); hỗn hợp có 2+ chất nhóm 9 thì tính theo hướng thận trọng.
      *
      * @return array<int, object>
      */
@@ -570,15 +561,16 @@ class ActiveIngredientThreshold
             ->join('chem_names as cn', 'cc.chem_names_id', '=', 'cn.id')
             ->join('chem_name_active_ingredient as cnai', 'cnai.chem_names_id', '=', 'cn.id')
             ->join('active_ingredients as ai', 'cnai.active_ingredients_id', '=', 'ai.id')
-            ->where('ai.is_table_a', 1)
+            // Hoạt chất thuộc nhóm 9 = có dòng phân loại Phụ lục IV / bảng A
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('active_ingredient_classifications as aic')
+                    ->whereColumn('aic.active_ingredients_id', 'ai.id')
+                    ->where('aic.appendix', 'IV')
+                    ->where('aic.table_ref', 'A');
+            })
             ->where('ai.status_id', 1)
             ->where('ai.app_status', 'approved')
-            // Chỉ mã danh mục đã phân loại N9 / N10 / CAM mới thuộc diện đối chiếu PL IV
-            ->where(function ($query) {
-                foreach (self::classificationCodes() as $code) {
-                    $query->orWhere('cc.classification', 'like', '%"' . $code . '"%');
-                }
-            })
             ->select(
                 'cc.id as category_id',
                 'cc.code as category_code',

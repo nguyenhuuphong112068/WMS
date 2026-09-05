@@ -89,7 +89,7 @@ class ChemicalDisposalController extends Controller
                 self::EXPORT_TABLE.'.test_report_no',
                 self::EXPORT_TABLE.'.checked_by',
                 'chemical_categories.code as category_code',
-                'chemical_categories.classification',
+                'chemical_imports.category_id as category_id',
                 'chem_names.name as chem_name',
                 'chemical_imports.batch_no',
                 'chemical_imports.expired_date',

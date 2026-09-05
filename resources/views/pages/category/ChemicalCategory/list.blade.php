@@ -23,8 +23,8 @@
     $mdTitle = 'Danh Mục Hoá Chất Công Ty';
     $mdIcon = 'fas fa-flask';
 
-    // Nhóm phân loại tô đỏ để cảnh báo (hoá chất cấm)
-    $mdDangerCodes = ['CAM', 'N4', 'N6'];
+    // Màu chip phân loại NĐ 24/2026 suy từ App\Support\ChemicalClassification::toneOfCode()
+    //   đỏ  = nhóm 9, 10 (Phụ lục IV) · cam = nhóm 4, 6 (hoá chất cấm)
 
     // ----- Tab 2: Hoá Chất Của Phòng -----
     $dcRoute = 'pages.category.departmentChemical.';
@@ -93,8 +93,8 @@
                         'mdLabel' => $dcLabel,
                         'mdTitle' => $dcTitle,
                         'mdIcon' => $dcIcon,
-                        'classifications' => $classifications,
-                        'mdDangerCodes' => $mdDangerCodes,
+                        'classificationLabels' => $classificationLabels,
+                        'classificationCodes' => $classificationCodes,
                     ])
                 </div>
             </div>
@@ -272,10 +272,17 @@
 @endsection
 
 @section('model')
+    @include('pages.shared.classifyGuideModal')
     @include('pages.category.ChemicalCategory.create')
     @include('pages.category.ChemicalCategory.update')
     @include('pages.category.ChemicalCategory.convert')
     @include('pages.category.shared.historyModal')
+
+    {{-- Bảng chọn "Tên Hoá Chất" từ dữ liệu gốc (dùng chung modal Thêm + Cập nhật) --}}
+    @include('pages.category.ChemicalCategory.chemNamePicker', [
+        'chemNames' => $chemNames,
+        'chemNameGroups' => $chemNameGroups,
+    ])
 
     @include('pages.category.DepartmentChemical.create', [
         'mdRoute' => $dcRoute,

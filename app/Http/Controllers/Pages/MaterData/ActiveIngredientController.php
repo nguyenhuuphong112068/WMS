@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\MaterData;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\ChemicalClassification;
 use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,12 +12,16 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * DỮ LIỆU GỐC - TÊN HOẠT CHẤT (Phụ lục IV Nghị định 24/2026/NĐ-CP)
+ * DỮ LIỆU GỐC - TÊN HOẠT CHẤT (Nghị định 24/2026/NĐ-CP)
  *
- * Danh mục hoạt chất phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất, kèm
- * "Ngưỡng khối lượng hoá chất tồn trữ lớn nhất tại một thời điểm (kg)" (cột threshold_kg).
- * Màn hình "Tên Hoá Chất" gắn nhiều hoạt chất qua bảng pivot chem_name_active_ingredient
- * để hệ thống đối chiếu tồn trữ toàn công ty với ngưỡng và cảnh báo.
+ * Mỗi hoạt chất được phân loại theo quy tắc "hình 1" của NĐ 24/2026. Ở màn này khai được
+ * các nhóm ĐƠN CHẤT: 1, 3, 4, 5, 6, 7, 9 (App\Support\ChemicalClassification::
+ * SINGLE_SUBSTANCE_GROUPS). Một hoạt chất có thể thuộc NHIỀU nhóm cùng lúc nên phân loại
+ * lưu ở bảng con active_ingredient_classifications (mỗi dòng một bộ phụ lục / nhóm / bảng).
+ *
+ * Nhóm 9 = "Phụ lục IV Bảng A" - bắt buộc kèm "Ngưỡng khối lượng hoá chất tồn trữ lớn nhất
+ * tại một thời điểm (kg)" (cột threshold_kg). Các nhóm hỗn hợp (2, 8, 10) suy ở màn "Tên
+ * Hoá Chất", không khai ở đây.
  *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", chỉ dùng để cảnh báo sau khi phê duyệt.
  * Sửa lại một bản ghi đã duyệt sẽ đưa về "Chờ duyệt" để duyệt lại.
@@ -24,6 +29,7 @@ use Illuminate\Validation\Rule;
 class ActiveIngredientController extends Controller
 {
     private const TABLE = 'active_ingredients';
+    private const GROUP_TABLE = 'active_ingredient_classifications';
     private const LABEL = 'tên hoạt chất';
 
     /** Tiền tố mã sinh tự động: A00001, A00002... */
@@ -36,7 +42,6 @@ class ActiveIngredientController extends Controller
         'name_en' => 'Tên tiếng Anh',
         'cas_no' => 'Số CAS',
         'chemical_formula' => 'Công thức hoá học',
-        'is_table_a' => 'Thuộc Bảng A PL IV NĐ 24/2026',
         'threshold_kg' => 'Ngưỡng tồn trữ (kg)',
     ];
 
@@ -44,10 +49,36 @@ class ActiveIngredientController extends Controller
     {
         $datas = DB::table(self::TABLE)->orderBy('name', 'asc')->get();
 
+        $ids = $datas->pluck('id')->all();
+        $groupsByAi = ChemicalClassification::groupsForActiveIngredients($ids);
+
+        // Các dòng phân loại thô (phụ lục / nhóm / bảng) để hiện 3 cột riêng + bộ lọc.
+        $clsByAi = DB::table(self::GROUP_TABLE)
+            ->whereIn('active_ingredients_id', $ids ?: [0])
+            ->orderBy('appendix')
+            ->orderByRaw('group_no is null, group_no')
+            ->orderByRaw('table_ref is null, table_ref')
+            ->get(['active_ingredients_id', 'appendix', 'group_no', 'table_ref'])
+            ->groupBy('active_ingredients_id');
+
+        foreach ($datas as $row) {
+            $row->groups = $groupsByAi[$row->id] ?? [];
+            $row->classifications = ($clsByAi[$row->id] ?? collect())
+                ->map(fn ($c) => [
+                    'appendix' => $c->appendix,
+                    'group_no' => $c->group_no === null ? null : (int) $c->group_no,
+                    'table_ref' => $c->table_ref,
+                ])
+                ->values()
+                ->all();
+        }
+
         session()->put(['title' => 'DỮ LIỆU GỐC - TÊN HOẠT CHẤT']);
 
         return view('pages.materData.ActiveIngredient.list', [
             'datas' => $datas,
+            'groupLabels' => ChemicalClassification::GROUPS,
+            'singleSubstanceGroups' => ChemicalClassification::SINGLE_SUBSTANCE_GROUPS,
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
             'historyCounts' => DataMasterHistory::counts(self::TABLE),
         ]);
@@ -61,9 +92,11 @@ class ActiveIngredientController extends Controller
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
         }
 
+        $groups = $this->groupsFromRequest($request);
+
         // Sinh mã trong transaction để hai người thêm cùng lúc không trùng mã
-        $id = DB::transaction(function () use ($request) {
-            return DB::table(self::TABLE)->insertGetId($this->payload($request) + [
+        $id = DB::transaction(function () use ($request, $groups) {
+            $newId = DB::table(self::TABLE)->insertGetId($this->payload($request, $groups) + [
                 'code' => $this->nextCode(),
                 'is_statutory' => 0,
                 'app_status' => 'pending',
@@ -72,9 +105,18 @@ class ActiveIngredientController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            $this->syncGroups($newId, $groups, 0);
+
+            return $newId;
         });
 
-        DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . ': ' . $request->name . '.', self::FIELDS, $this->maps());
+        $note = 'Khai báo mới ' . self::LABEL . ': ' . $request->name . '.';
+        if ($groups) {
+            $note .= ' Phân loại NĐ 24/2026: ' . $this->groupLabels($groups) . '.';
+        }
+
+        DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', $note, self::FIELDS);
 
         AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm ' . self::LABEL . ': ' . $request->name);
 
@@ -95,24 +137,37 @@ class ActiveIngredientController extends Controller
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
-        $payload = $this->payload($request);
-        $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $this->maps());
+        $groups = $this->groupsFromRequest($request);
+        $oldGroups = $this->groupsOf($current->id);
+
+        $payload = $this->payload($request, $groups);
+        $note = DataMasterHistory::note(self::FIELDS, $current, $payload);
+
+        if ($this->normalized($oldGroups) !== $this->normalized($groups)) {
+            $note = trim($note . ' | Phân loại NĐ 24/2026: '
+                . ($this->groupLabels($oldGroups) ?: '—') . ' -> '
+                . ($this->groupLabels($groups) ?: '—'), ' |');
+        }
 
         // Nhắc rõ khi sửa dữ liệu lấy từ nghị định
         if ($current->is_statutory) {
             $note = trim('Sửa dữ liệu luật định. ' . $note);
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
-            // Sửa nội dung thì phải duyệt lại từ đầu
-            'app_status' => 'pending',
-            'approved_by' => null,
-            'approved_at' => null,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($current, $payload, $groups) {
+            DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
+                // Sửa nội dung thì phải duyệt lại từ đầu
+                'app_status' => 'pending',
+                'approved_by' => null,
+                'approved_at' => null,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
 
-        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS, $this->maps());
+            $this->syncGroups($current->id, $groups, (int) $current->is_statutory);
+        });
+
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS);
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->name, $request->name);
 
@@ -140,8 +195,7 @@ class ActiveIngredientController extends Controller
             $current->id,
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->status_id, $newStatus),
-            self::FIELDS,
-            $this->maps()
+            self::FIELDS
         );
 
         AuditTrialController::log(
@@ -198,8 +252,7 @@ class ActiveIngredientController extends Controller
             $current->id,
             $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt',
             DataMasterHistory::approvalNote($current->app_status, $appStatus),
-            self::FIELDS,
-            $this->maps()
+            self::FIELDS
         );
 
         AuditTrialController::log(
@@ -214,6 +267,92 @@ class ActiveIngredientController extends Controller
             'success',
             ($appStatus === 'approved' ? 'Đã duyệt ' : 'Đã từ chối ') . self::LABEL . ' ' . $current->name . '!'
         );
+    }
+
+    /* -------------------------------------------------------------------------
+     |  Phân loại NĐ 24/2026 (bảng con active_ingredient_classifications)
+     | ------------------------------------------------------------------------- */
+
+    /** Danh sách số nhóm đơn chất hợp lệ gửi lên từ form. */
+    private function groupsFromRequest(Request $request): array
+    {
+        $raw = array_map('intval', (array) $request->input('groups', []));
+
+        return $this->normalized(array_intersect($raw, ChemicalClassification::SINGLE_SUBSTANCE_GROUPS));
+    }
+
+    /** Số nhóm đơn chất đang gắn cho một hoạt chất. */
+    private function groupsOf(int $aiId): array
+    {
+        $rows = DB::table(self::GROUP_TABLE)
+            ->where('active_ingredients_id', $aiId)
+            ->get(['appendix', 'group_no', 'table_ref']);
+
+        $groups = [];
+        foreach ($rows as $row) {
+            $group = ChemicalClassification::groupOf($row->appendix, $row->group_no, $row->table_ref);
+            if ($group !== null) {
+                $groups[] = $group;
+            }
+        }
+
+        return $this->normalized($groups);
+    }
+
+    /**
+     * Đồng bộ các dòng phân loại đơn chất: thêm nhóm mới tick, xoá nhóm bỏ chọn.
+     * Chỉ đụng các nhóm đơn chất; các dòng phụ lục / bảng khác (nếu có) không bị ảnh hưởng.
+     */
+    private function syncGroups(int $aiId, array $groups, int $isStatutory): void
+    {
+        $groups = $this->normalized($groups);
+        $existing = $this->groupsOf($aiId);
+
+        foreach (array_diff($existing, $groups) as $group) {
+            [$appendix, $groupNo, $tableRef] = ChemicalClassification::tripleOf($group);
+
+            DB::table(self::GROUP_TABLE)
+                ->where('active_ingredients_id', $aiId)
+                ->where('appendix', $appendix)
+                ->when($groupNo === null, fn ($q) => $q->whereNull('group_no'), fn ($q) => $q->where('group_no', $groupNo))
+                ->when($tableRef === null, fn ($q) => $q->whereNull('table_ref'), fn ($q) => $q->where('table_ref', $tableRef))
+                ->delete();
+        }
+
+        foreach (array_diff($groups, $existing) as $group) {
+            [$appendix, $groupNo, $tableRef] = ChemicalClassification::tripleOf($group);
+
+            DB::table(self::GROUP_TABLE)->insert([
+                'active_ingredients_id' => $aiId,
+                'appendix' => $appendix,
+                'group_no' => $groupNo,
+                'table_ref' => $tableRef,
+                'note' => null,
+                'is_statutory' => $isStatutory,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /** "Nhóm 3, Nhóm 9" - mô tả ngắn cho lịch sử. */
+    private function groupLabels(array $groups): string
+    {
+        $groups = $this->normalized($groups);
+
+        return implode(', ', array_map(fn ($g) => 'Nhóm ' . $g, $groups));
+    }
+
+    /** Bỏ trùng, bỏ giá trị không hợp lệ, sắp tăng dần. */
+    private function normalized(array $groups): array
+    {
+        $groups = array_values(array_unique(array_filter(
+            array_map('intval', $groups),
+            fn ($v) => $v > 0
+        )));
+        sort($groups);
+
+        return $groups;
     }
 
     /**
@@ -237,43 +376,35 @@ class ActiveIngredientController extends Controller
         return \App\Support\Signer::actor();
     }
 
-    /** Bảng tra giá trị đọc được cho lịch sử thay đổi. */
-    private function maps(): array
-    {
-        return [
-            'is_table_a' => [0 => 'Không', 1 => 'Có'],
-        ];
-    }
-
     private function rules($ignoreId = null, ?Request $request = null): array
     {
         $request = $request ?? request();
-        $isTableA = $request->boolean('is_table_a');
+        $isGroup9 = in_array(9, array_map('intval', (array) $request->input('groups', [])), true);
 
         return [
             'name' => ['required', 'max:255', Rule::unique(self::TABLE, 'name')->ignore($ignoreId)],
             'name_en' => ['nullable', 'max:255'],
             'cas_no' => ['nullable', 'max:100'],
             'chemical_formula' => ['nullable', 'max:255'],
-            'is_table_a' => ['nullable', 'boolean'],
-            'threshold_kg' => $isTableA
+            'groups' => ['nullable', 'array'],
+            'groups.*' => ['integer', Rule::in(ChemicalClassification::SINGLE_SUBSTANCE_GROUPS)],
+            'threshold_kg' => $isGroup9
                 ? ['required', 'numeric', 'gt:0', 'max:999999999']
                 : ['nullable', 'numeric', 'gt:0', 'max:999999999'],
         ];
     }
 
-    private function payload(Request $request): array
+    private function payload(Request $request, array $groups): array
     {
-        $isTableA = $request->boolean('is_table_a');
+        $isGroup9 = in_array(9, $groups, true);
 
         return [
             'name' => trim((string) $request->name),
             'name_en' => $this->nullable($request->name_en),
             'cas_no' => $this->nullable($request->cas_no),
             'chemical_formula' => $this->nullable($request->chemical_formula),
-            'is_table_a' => $isTableA ? 1 : 0,
-            // Ngưỡng chỉ có nghĩa với chất thuộc Bảng A; chất thường thì bỏ ngưỡng
-            'threshold_kg' => $isTableA && trim((string) $request->threshold_kg) !== '' ? $request->threshold_kg : null,
+            // Ngưỡng chỉ có nghĩa với hoạt chất thuộc nhóm 9 (Phụ lục IV Bảng A)
+            'threshold_kg' => $isGroup9 && trim((string) $request->threshold_kg) !== '' ? $request->threshold_kg : null,
         ];
     }
 
@@ -293,8 +424,8 @@ class ActiveIngredientController extends Controller
             'name_en.max' => 'Tên chất tối đa 255 ký tự.',
             'cas_no.max' => 'Số CAS tối đa 100 ký tự.',
             'chemical_formula.max' => 'Công thức hoá học tối đa 255 ký tự.',
-            'is_table_a.boolean' => 'Giá trị "Thuộc Bảng A" không hợp lệ.',
-            'threshold_kg.required' => 'Hoạt chất thuộc Bảng A bắt buộc phải có ngưỡng tồn trữ, không được để trống.',
+            'groups.*.in' => 'Nhóm phân loại không hợp lệ (chỉ khai nhóm đơn chất tại màn này).',
+            'threshold_kg.required' => 'Hoạt chất thuộc nhóm 9 (Phụ lục IV Bảng A) bắt buộc phải có ngưỡng tồn trữ, không được để trống.',
             'threshold_kg.numeric' => 'Ngưỡng tồn trữ phải là số.',
             'threshold_kg.gt' => 'Ngưỡng tồn trữ phải lớn hơn 0.',
             'threshold_kg.max' => 'Ngưỡng tồn trữ quá lớn.',

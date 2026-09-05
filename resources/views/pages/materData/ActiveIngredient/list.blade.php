@@ -22,4 +22,5 @@
     @include('pages.materData.shared.history')
     @include('pages.materData.ActiveIngredient.create')
     @include('pages.materData.ActiveIngredient.update')
+    @include('pages.shared.classifyGuideModal')
 @endsection

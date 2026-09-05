@@ -92,7 +92,7 @@
                                     }
                                 @endphp
                                 {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
-                                <tr data-classification="{{ $impCls($row->classification) }}">
+                                <tr data-classification="{{ $impCls($row->category_id) }}">
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td><span class="imp-code">{{ $row->code }}</span></td>
                                     <td>
@@ -384,7 +384,7 @@
                             </thead>
                             <tbody>
                                 @foreach ($report as $row)
-                                    <tr data-classification="{{ $impCls($row->classification) }}">
+                                    <tr data-classification="{{ $impCls($row->category_id) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td><span class="imp-code">{{ $row->category_code }}</span></td>
                                         <td>

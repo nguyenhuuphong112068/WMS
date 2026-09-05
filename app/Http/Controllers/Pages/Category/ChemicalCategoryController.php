@@ -24,8 +24,9 @@ use Illuminate\Validation\Rule;
  * - Tab 2 "Hoá Chất Của Phòng": cách dùng riêng của từng phòng, do DepartmentChemicalController xử lý.
  * Controller này dựng cả trang, nên index() lấy dữ liệu cho cả hai tab.
  *
- * Cột classification lưu danh sách mã nhóm phân loại dạng JSON, ví dụ ["PL2","N1"].
- * Danh sách mã đầy đủ khai báo tại config/chemical.php.
+ * PHÂN LOẠI 10 nhóm theo Nghị định 24/2026/NĐ-CP KHÔNG còn khai ở đây: suy tự động từ dữ
+ * liệu gốc "Tên Hoạt Chất" + "Tên Hoá Chất" (App\Support\ChemicalClassification). Cột
+ * chemical_categories.classification đã bị bỏ; bảng chỉ hiển thị nhóm suy được.
  *
  * ĐƠN VỊ TÍNH không khai ở đây: mỗi phòng nhập / xuất theo đơn vị của phòng mình nên
  * đơn vị nằm ở tab "Hoá Chất Của Phòng" (chemical_department_categories.unit_id).
@@ -55,12 +56,36 @@ class ChemicalCategoryController extends Controller
         'shelf_life_months' => 'Hạn dùng mặc định (tháng)',
         'storage_condition_id' => 'Điều kiện bảo quản',
         'doc_no' => 'Số tài liệu',
-        'classification' => 'Phân loại',
         'safety_warning' => 'Cảnh báo an toàn',
     ];
 
     public function index()
     {
+        // Nhóm NĐ 24/2026 suy theo từng mã danh mục - quyết định xét Bảng A hay Bảng B
+        $categoryGroups = \App\Support\ChemicalClassification::codesByCategory();
+
+        // Ngưỡng Tồn Trữ PL IV: mỗi mã danh mục CHỈ xét MỘT bảng, không xét cả hai.
+        //   - Đơn chất nhóm 9  -> Bảng A (ActiveIngredientThreshold)
+        //   - Hỗn hợp nhóm 10  -> Bảng B (MixtureHazardThreshold)
+        // Bảng A vốn trả về cả mã danh mục hỗn hợp có chứa hoạt chất nhóm 9; lọc bỏ để mã
+        // đó chỉ còn hiện ở Bảng B theo đúng nhóm 10 suy được.
+        $thresholdsA = ActiveIngredientThreshold::forCategories(CompanyContext::currentId());
+        $thresholdsB = MixtureHazardThreshold::forCategories(CompanyContext::currentId());
+
+        foreach (array_keys($thresholdsA) as $catId) {
+            $groups = $categoryGroups[$catId] ?? [];
+
+            if (in_array('N10', $groups, true) || ! in_array('N9', $groups, true)) {
+                unset($thresholdsA[$catId]);
+            }
+        }
+
+        foreach (array_keys($thresholdsB) as $catId) {
+            if (! in_array('N10', $categoryGroups[$catId] ?? [], true)) {
+                unset($thresholdsB[$catId]);
+            }
+        }
+
         $datas = DB::table(self::TABLE)
             ->leftJoin('chem_names', self::TABLE . '.chem_names_id', '=', 'chem_names.id')
             ->leftJoin('manufacturers', self::TABLE . '.manufacturers_id', '=', 'manufacturers.id')
@@ -92,7 +117,12 @@ class ChemicalCategoryController extends Controller
             // Danh mục không còn cột đơn vị; danh sách này chỉ để đổ vào modal Quy Đổi Đơn Vị
             'units' => $this->options('units', []),
             'storageConditions' => $this->options('storage_conditions', $datas->pluck('storage_condition_id')->all()),
-            'classifications' => config('chemical.classifications'),
+            // Nhóm NĐ 24/2026 suy tự động theo từng mã danh mục (không còn tick tay)
+            'classificationCodes' => $categoryGroups,
+            'classificationLabels' => \App\Support\ChemicalClassification::labels(),
+            // Nhóm NĐ 24/2026 theo từng tên hoá chất - dùng cho bảng chọn "dữ liệu gốc" và
+            // ô xem nhanh nhóm phân loại trong modal Thêm / Cập nhật danh mục.
+            'chemNameGroups' => \App\Support\ChemicalClassification::groupsByChemName(),
             'types' => config('chemical.types'),
             'safetyWarnings' => config('chemical.safety_warnings'),
             'nextCode' => $this->previewNextCode(),
@@ -100,8 +130,8 @@ class ChemicalCategoryController extends Controller
             'historyCounts' => $this->historyCounts(),
             // Đối chiếu tồn trữ với ngưỡng Phụ lục IV NĐ 24/2026, theo mã danh mục. Phạm vi
             // cộng tồn gói trong công ty của phòng ban đang chọn.
-            'thresholds' => ActiveIngredientThreshold::forCategories(CompanyContext::currentId()),
-            'thresholdsB' => MixtureHazardThreshold::forCategories(CompanyContext::currentId()),
+            'thresholds' => $thresholdsA,
+            'thresholdsB' => $thresholdsB,
             /*
             | Danh mục dùng chung toàn công ty, nhưng mỗi phòng ban tự khai chất nào phòng
             | mình có dùng (bảng chemical_department_categories). Cột "Phòng Ban Đang Dùng" đọc từ đó.
@@ -233,7 +263,6 @@ class ChemicalCategoryController extends Controller
     /** Trả về lịch sử thay đổi của một dòng danh mục cho modal xem lịch sử. */
     public function history(Request $request)
     {
-        $classifications = config('chemical.classifications');
         $safetyWarnings = config('chemical.safety_warnings');
 
         $rows = DB::table(self::HISTORY_TABLE)
@@ -253,8 +282,9 @@ class ChemicalCategoryController extends Controller
             ->get();
 
         return response()->json([
-            'rows' => $rows->map(function ($row) use ($classifications, $safetyWarnings) {
-                $codes = $this->decodeCodes($row->classification);
+            'rows' => $rows->map(function ($row) use ($safetyWarnings) {
+                // classification chỉ còn trong ảnh chụp lịch sử cũ (cột giữ lại ở bảng history)
+                $codes = $this->decodeCodes($row->classification ?? null);
                 $warningCodes = $this->decodeCodes($row->safety_warning);
 
                 $snapshot = [
@@ -315,12 +345,19 @@ class ChemicalCategoryController extends Controller
             return response()->json(['ok' => false, 'reason' => 'Không tìm thấy mã danh mục hoá chất.']);
         }
 
-        $tableA = array_map(
-            fn ($row) => $this->thresholdDetailPayload($row, 'A'),
-            ActiveIngredientThreshold::detailForCategory($categoryId, $companyId)
-        );
+        // Cùng luật với bảng danh sách: nhóm 10 -> chỉ Bảng B, đơn chất nhóm 9 -> chỉ Bảng A.
+        $groups = \App\Support\ChemicalClassification::codesByCategory()[$categoryId] ?? [];
+        $isN10 = in_array('N10', $groups, true);
+        $isN9 = in_array('N9', $groups, true);
 
-        $tableBRow = MixtureHazardThreshold::detailForCategory($categoryId, $companyId);
+        $tableA = $isN9 && ! $isN10
+            ? array_map(
+                fn ($row) => $this->thresholdDetailPayload($row, 'A'),
+                ActiveIngredientThreshold::detailForCategory($categoryId, $companyId)
+            )
+            : [];
+
+        $tableBRow = $isN10 ? MixtureHazardThreshold::detailForCategory($categoryId, $companyId) : null;
 
         return response()->json([
             'ok' => true,
@@ -520,7 +557,8 @@ class ChemicalCategoryController extends Controller
             'shelf_life_months' => $row->shelf_life_months,
             'storage_condition_id' => $row->storage_condition_id,
             'doc_no' => $row->doc_no,
-            'classification' => $row->classification,
+            // Cột giữ lại cho ảnh chụp cũ; bản ghi mới không còn phân loại thủ công
+            'classification' => null,
             'safety_warning' => $row->safety_warning,
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
@@ -554,7 +592,7 @@ class ChemicalCategoryController extends Controller
                 continue;
             }
 
-            if (in_array($field, ['classification', 'safety_warning'], true)) {
+            if ($field === 'safety_warning') {
                 $parts[] = $title . ': '
                     . (implode(', ', $this->decodeCodes($current->$field)) ?: '—') . ' -> '
                     . (implode(', ', $this->decodeCodes($payload[$field])) ?: '—');
@@ -760,8 +798,6 @@ class ChemicalCategoryController extends Controller
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'storage_condition_id' => ['nullable', 'integer', 'exists:storage_conditions,id'],
             'doc_no' => ['nullable', 'max:20'],
-            'classification' => ['nullable', 'array'],
-            'classification.*' => [Rule::in(array_keys(config('chemical.classifications')))],
             'safety_warning' => ['nullable', 'array'],
             'safety_warning.*' => [Rule::in(array_keys(config('chemical.safety_warnings')))],
         ];
@@ -776,10 +812,6 @@ class ChemicalCategoryController extends Controller
         $shelfLife = trim((string) $request->shelf_life_months);
         $storageConditionId = trim((string) $request->storage_condition_id);
 
-        // Giữ đúng thứ tự khai báo trong config để chuỗi JSON luôn ổn định
-        $selected = (array) $request->input('classification', []);
-        $codes = array_values(array_intersect(array_keys(config('chemical.classifications')), $selected));
-
         $selectedWarnings = (array) $request->input('safety_warning', []);
         $warningCodes = array_values(array_intersect(array_keys(config('chemical.safety_warnings')), $selectedWarnings));
 
@@ -792,7 +824,6 @@ class ChemicalCategoryController extends Controller
             'shelf_life_months' => $shelfLife === '' ? null : (int) $shelfLife,
             'storage_condition_id' => $storageConditionId === '' ? null : (int) $storageConditionId,
             'doc_no' => $docNo === '' ? null : $docNo,
-            'classification' => $codes ? json_encode($codes, JSON_UNESCAPED_UNICODE) : null,
             'safety_warning' => $warningCodes ? json_encode($warningCodes, JSON_UNESCAPED_UNICODE) : null,
         ];
     }
@@ -815,7 +846,6 @@ class ChemicalCategoryController extends Controller
             'shelf_life_months.max' => 'Hạn dùng tối đa 1200 tháng (100 năm).',
             'storage_condition_id.exists' => 'Điều kiện bảo quản không hợp lệ.',
             'doc_no.max' => 'Số tài liệu tối đa 20 ký tự.',
-            'classification.*.in' => 'Nhóm phân loại không hợp lệ.',
             'safety_warning.*.in' => 'Cảnh báo an toàn không hợp lệ.',
         ];
     }

@@ -88,7 +88,7 @@
                                 @foreach ($datas as $row)
                                     @php $expAdjust = (int) ($adjustCounts[$row->id] ?? 0); @endphp
                                     {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
-                                    <tr data-classification="{{ $expCls($row->classification) }}">
+                                    <tr data-classification="{{ $expCls($row->category_id) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td><span class="exp-code">{{ $row->code }}</span></td>
                                         <td>
@@ -282,7 +282,7 @@
                             </thead>
                             <tbody>
                                 @foreach ($report as $row)
-                                    <tr data-classification="{{ $expCls($row->classification) }}">
+                                    <tr data-classification="{{ $expCls($row->category_id) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td><span class="exp-code">{{ $row->category_code }}</span></td>
                                         <td>

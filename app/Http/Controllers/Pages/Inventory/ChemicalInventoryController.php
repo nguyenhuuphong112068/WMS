@@ -105,6 +105,9 @@ class ChemicalInventoryController extends Controller
         return view('pages.inventory.ChemicalInventory.list', [
             'datas' => $datas,
             'summaries' => $this->stockByChemical($datas),
+            // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (thay cột classification đã bỏ)
+            'classificationCodes' => \App\Support\ChemicalClassification::codesByCategory(),
+            'classificationLabels' => \App\Support\ChemicalClassification::labels(),
             'balancings' => $this->balancingHistory($departmentId),
             'zones' => $this->zoneOptions($departmentId),
             'states' => self::STATES,
@@ -494,7 +497,6 @@ class ChemicalInventoryController extends Controller
                 'chemical_imports.invoice_number',
                 'chemical_imports.is_microbiological_chemicals',
                 'chemical_categories.code as category_code',
-                'chemical_categories.classification',
                 DepartmentChemical::shelfLifeColumn(),
                 DepartmentChemical::minStockColumn(),
                 'chem_names.name as chem_name',
@@ -850,8 +852,6 @@ class ChemicalInventoryController extends Controller
                     // Khoá của dòng cộng dồn, nút Biểu Đồ gửi lên chart() theo id này
                     'category_id' => (int) $first->category_id,
                     'category_code' => $first->category_code,
-                    // Giữ lại để bộ lọc Phụ lục / Nhóm hoá chất dùng được ở bảng cộng dồn
-                    'classification' => $first->classification,
                     'chem_name' => $first->chem_name,
                     'unit' => $first->unit_short_name ?: $first->unit_name,
                     'imported' => (float) $rows->sum('imported'),

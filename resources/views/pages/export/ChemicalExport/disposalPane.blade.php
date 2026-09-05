@@ -55,7 +55,7 @@
             </thead>
             <tbody>
                 @forelse ($waitingDisposal as $row)
-                    <tr data-classification="{{ $expCls($row->classification) }}">
+                    <tr data-classification="{{ $expCls($row->category_id) }}">
                         <td class="text-center">
                             <input type="checkbox" class="dsp-pick" value="{{ $row->id }}">
                         </td>

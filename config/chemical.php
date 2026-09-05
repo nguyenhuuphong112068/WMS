@@ -11,26 +11,12 @@
 return [
 
     /*
-     | Nhóm phân loại hoá chất theo "Danh mục hoá chất chung hiện hành".
-     | Khoá = mã lưu xuống cột chemical_categories.classification (dạng JSON).
+     | PHÂN LOẠI HOÁ CHẤT theo 10 nhóm của Nghị định 24/2026/NĐ-CP đã chuyển sang
+     | App\Support\ChemicalClassification (suy tự động từ dữ liệu gốc "Tên Hoạt Chất" +
+     | "Tên Hoá Chất"). Không còn cột chemical_categories.classification, không còn bước
+     | tick tay ở màn Danh Mục Hoá Chất. Bộ lọc / chip lấy nhãn từ
+     | ChemicalClassification::labels() (mã N1..N10).
      */
-    'classifications' => [
-        'PL1' => 'Hoá chất cơ bản thuộc lĩnh vực công nghiệp hoá chất trọng điểm',
-        'PL2' => 'Hoá chất sản xuất, kinh doanh có điều kiện',
-        'PL3' => 'Hoá chất cần kiểm soát đặc biệt',
-        'PL4' => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất',
-        'CAM' => 'Hoá chất cấm',
-        'N1'  => 'Hoá chất sản xuất, kinh doanh có điều kiện (Phụ lục II_nhóm 1)',
-        'N2'  => 'Hỗn hợp chất sản xuất, kinh doanh có điều kiện (Phụ lục II_nhóm 2)',
-        'N3'  => 'Hoá chất cần kiểm soát đặc biệt (Phụ lục III_nhóm 1_bảng A (Tiền chất công nghiệp))',
-        'N4'  => 'Hoá chất cần kiểm soát đặc biệt (Phụ lục III_nhóm 1_bảng B (Hoá chất cấm))',
-        'N5'  => 'Hoá chất cần kiểm soát đặc biệt (Phụ lục III_nhóm 2_bảng A (Tiền chất công nghiệp))',
-        'N6'  => 'Hoá chất cần kiểm soát đặc biệt (Phụ lục III_nhóm 2_bảng B (Hoá chất cấm))',
-        'N7'  => 'Hoá chất cần kiểm soát đặc biệt (Phụ lục III_nhóm 2_bảng C (Hoá chất thuộc các công ước quốc tế về hoá chất))',
-        'N8'  => 'Hỗn hợp chất cần kiểm soát đặc biệt (Phụ lục III)',
-        'N9'  => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng A)',
-        'N10' => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng B)',
-    ],
 
     /*
      | Gợi ý cho ô "Loại" (cột type). Người dùng vẫn gõ được giá trị khác.
@@ -72,20 +58,14 @@ return [
      | tỉ lệ để bắt đầu cảnh báo (so với ngưỡng) và câu trích dẫn dùng chung.
      |
      | warn_ratio : tồn / ngưỡng >= mức này thì cảnh báo vàng; >= 1.0 là cảnh báo đỏ.
+     |
+     | Diện đối chiếu ngưỡng nay SUY tự động: mã danh mục có hoạt chất thuộc nhóm 9
+     | (Phụ lục IV Bảng A) hoặc là hỗn hợp thuộc nhóm 10 (Bảng B) thì tự vào diện, không
+     | cần tick tay nữa (App\Support\ActiveIngredientThreshold / MixtureHazardThreshold).
      */
     'threshold_iv' => [
         'warn_ratio' => 0.8,
         'legal_ref' => 'Nghị định 24/2026/NĐ-CP - Phụ lục IV',
-
-        /*
-         | Chỉ đối chiếu ngưỡng Phụ lục IV cho mã danh mục hoá chất đã được phân loại
-         | vào một trong các nhóm này (cột chemical_categories.classification):
-         |   N9  - Phụ lục IV Bảng A
-         |   N10 - Phụ lục IV Bảng B
-         |   CAM - Hoá chất cấm
-         | Mã không thuộc các nhóm này thì không hiện Ngưỡng / Tồn thực tế / Tồn cao nhất.
-         */
-        'classification_codes' => ['N9', 'N10', 'CAM'],
     ],
 
     /*

@@ -153,10 +153,19 @@
         cursor: help;
     }
 
+    /* Nhóm 9, 10 - phải lập Kế hoạch phòng ngừa, ứng phó sự cố (Phụ lục IV) */
+    .cat-chip.critical,
     .cat-chip.danger {
         background: #FEE2E2;
         color: #B91C1C;
         border-color: #FCA5A5;
+    }
+
+    /* Nhóm 4, 6 - "Hoá chất cấm" (Phụ lục III bảng B) */
+    .cat-chip.banned {
+        background: #FEF3C7;
+        color: #B45309;
+        border-color: #FCD34D;
     }
 
     /* Phòng ban đang dùng - tách màu khỏi chip phân loại để không đọc nhầm hai cột */

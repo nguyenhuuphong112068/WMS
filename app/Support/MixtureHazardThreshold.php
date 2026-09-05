@@ -7,9 +7,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * ĐỐI CHIẾU TỒN TRỮ HỖN HỢP VỚI NGƯỠNG BẢNG B - Phụ lục IV NĐ 24/2026/NĐ-CP.
  *
- * Một tên hoá chất (chem_names) bị xét theo Bảng B khi:
+ * Một tên hoá chất (chem_names) bị xét theo Bảng B (nhóm 10) khi:
  *   - là HỖN HỢP: gắn TỪ 2 hoạt chất trở lên, VÀ
- *   - trong đó có ÍT NHẤT một hoạt chất thuộc Bảng A (active_ingredients.is_table_a = 1, đã duyệt), VÀ
+ *   - trong đó có ÍT NHẤT một hoạt chất thuộc nhóm 9 (Phụ lục IV Bảng A - có dòng
+ *     active_ingredient_classifications appendix='IV', table_ref='A'), đã duyệt, VÀ
  *   - được tick ÍT NHẤT một nhóm nguy hại Bảng B (mixture_hazard_categories, đã duyệt).
  *
  * Đối chiếu: TỔNG tồn trữ quy ra kg của hỗn hợp, cộng trên các phòng ban thuộc MỘT công
@@ -29,17 +30,6 @@ class MixtureHazardThreshold
     public static function warnRatio(): float
     {
         return (float) config('chemical.threshold_iv.warn_ratio', 0.8);
-    }
-
-    /**
-     * Mã nhóm phân loại danh mục hoá chất bắt buộc phải có thì mới đối chiếu ngưỡng PL IV
-     * (N9 = Bảng A, N10 = Bảng B, CAM = hoá chất cấm). Khai ở config/chemical.php.
-     *
-     * @return array<int, string>
-     */
-    public static function classificationCodes(): array
-    {
-        return (array) config('chemical.threshold_iv.classification_codes', ['N9', 'N10', 'CAM']);
     }
 
     /**
@@ -64,7 +54,14 @@ class MixtureHazardThreshold
         $withTableA = DB::table('chem_name_active_ingredient as p')
             ->join('active_ingredients as ai', 'ai.id', '=', 'p.active_ingredients_id')
             ->whereIn('p.chem_names_id', $mixtureIds)
-            ->where('ai.is_table_a', 1)
+            // Thành phần thuộc nhóm 9 = có dòng phân loại Phụ lục IV / bảng A
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('active_ingredient_classifications as aic')
+                    ->whereColumn('aic.active_ingredients_id', 'ai.id')
+                    ->where('aic.appendix', 'IV')
+                    ->where('aic.table_ref', 'A');
+            })
             ->where('ai.status_id', 1)
             ->where('ai.app_status', 'approved')
             ->distinct()
@@ -91,14 +88,10 @@ class MixtureHazardThreshold
         $chemNameIds = $hazardRows->keys()->all();
         $names = DB::table('chem_names')->whereIn('id', $chemNameIds)->pluck('name', 'id');
 
+        // Diện đối chiếu Bảng B nay suy tự động từ điều kiện nhóm 10 ở trên - mọi mã danh
+        // mục của hỗn hợp đủ điều kiện đều thuộc diện, không cần tick N9/N10/CAM nữa.
         $categoriesByChem = DB::table('chemical_categories')
             ->whereIn('chem_names_id', $chemNameIds)
-            // Chỉ mã danh mục đã phân loại N9 / N10 / CAM mới thuộc diện đối chiếu PL IV
-            ->where(function ($query) {
-                foreach (self::classificationCodes() as $code) {
-                    $query->orWhere('classification', 'like', '%"' . $code . '"%');
-                }
-            })
             ->select('id', 'code', 'chem_names_id', 'density')
             ->get()
             ->groupBy('chem_names_id');

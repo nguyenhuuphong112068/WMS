@@ -294,6 +294,41 @@
                                     </a></li>
                             @endperm
                             @perm('materData_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.activeIngredient.list') }}"
+                                        class="nav-link {{ request()->is('materData/activeIngredient') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-danger"></i>
+                                        <p>Tên Hoạt Chất</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.chemName.list') }}"
+                                        class="nav-link {{ request()->is('materData/chemName') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-success"></i>
+                                        <p>Tên Hoá Chất</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.standardName.list') }}"
+                                        class="nav-link {{ request()->is('materData/standardName') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-warning"></i>
+                                        <p>Tên Chuẩn</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.materialName.list') }}"
+                                        class="nav-link {{ request()->is('materData/materialName') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-primary"></i>
+                                        <p>Tên Vật Tư</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.materialClassification.list') }}"
+                                        class="nav-link {{ request()->is('materData/materialClassification') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-success"></i>
+                                        <p>Phân Loại Vật Tư</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.productName.list') }}"
                                         class="nav-link {{ request()->is('materData/productName') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-danger"></i>
@@ -329,47 +364,13 @@
                                     </a></li>
                             @endperm
                             @perm('materData_view')
-                                <li class="nav-item"><a href="{{ route('pages.materData.chemName.list') }}"
-                                        class="nav-link {{ request()->is('materData/chemName') ? 'active' : '' }}"><i
-                                            class="far fa-circle nav-icon text-success"></i>
-                                        <p>Tên Hoá Chất</p>
-                                    </a></li>
-                            @endperm
-                            @perm('materData_view')
-                                <li class="nav-item"><a href="{{ route('pages.materData.activeIngredient.list') }}"
-                                        class="nav-link {{ request()->is('materData/activeIngredient') ? 'active' : '' }}"><i
-                                            class="far fa-circle nav-icon text-danger"></i>
-                                        <p>Tên Hoạt Chất</p>
-                                    </a></li>
-                            @endperm
-                            @perm('materData_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.mixtureHazardCategory.list') }}"
                                         class="nav-link {{ request()->is('materData/mixtureHazardCategory') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-danger"></i>
                                         <p>Nhóm Nguy Hại Bảng B</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
-                                <li class="nav-item"><a href="{{ route('pages.materData.standardName.list') }}"
-                                        class="nav-link {{ request()->is('materData/standardName') ? 'active' : '' }}"><i
-                                            class="far fa-circle nav-icon text-warning"></i>
-                                        <p>Tên Chuẩn</p>
-                                    </a></li>
-                            @endperm
-                            @perm('materData_view')
-                                <li class="nav-item"><a href="{{ route('pages.materData.materialName.list') }}"
-                                        class="nav-link {{ request()->is('materData/materialName') ? 'active' : '' }}"><i
-                                            class="far fa-circle nav-icon text-primary"></i>
-                                        <p>Tên Vật Tư</p>
-                                    </a></li>
-                            @endperm
-                            @perm('materData_view')
-                                <li class="nav-item"><a href="{{ route('pages.materData.materialClassification.list') }}"
-                                        class="nav-link {{ request()->is('materData/materialClassification') ? 'active' : '' }}"><i
-                                            class="far fa-circle nav-icon text-success"></i>
-                                        <p>Phân Loại Vật Tư</p>
-                                    </a></li>
-                            @endperm
+
                             @perm('materData_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.chemManufacturer.list') }}"
                                         class="nav-link {{ request()->is('materData/chemManufacturer') ? 'active' : '' }}"><i
@@ -626,8 +627,7 @@
                                     </a></li>
                             @endperm
                             @perm('stability_plan_view')
-                                <li class="nav-item"><a
-                                        href="{{ route('pages.stabilityAssessment.assessmentPlan.list') }}"
+                                <li class="nav-item"><a href="{{ route('pages.stabilityAssessment.assessmentPlan.list') }}"
                                         class="nav-link {{ request()->is('stabilityAssessment/assessmentPlan*') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-info"></i>
                                         <p>Kế Hoạch Đánh Giá</p>

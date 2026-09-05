@@ -40,11 +40,17 @@
     <div class="card-body">
 
         <div class="md-toolbar">
-            @perm('category_chemical_dept_manage')
-                <button type="button" class="btn btn-primary btn-md-create" data-modal="#dcCreateModal">
-                    <i class="fas fa-plus mr-1"></i> Khai hoá chất
+            <div class="d-flex flex-wrap align-items-center" style="gap: 10px">
+                @perm('category_chemical_dept_manage')
+                    <button type="button" class="btn btn-primary btn-md-create" data-modal="#dcCreateModal">
+                        <i class="fas fa-plus mr-1"></i> Khai hoá chất
+                    </button>
+                @endperm
+                <button type="button" class="btn btn-outline-primary" data-toggle="modal"
+                    data-target="#classifyGuideModal">
+                    <i class="fas fa-info-circle mr-1"></i> Chú thích Phụ lục &amp; Nhóm
                 </button>
-            @endperm
+            </div>
             <p class="hint">
                 <i class="fas fa-info-circle mr-1"></i>
                 Mỗi dòng ở đây cũng là lời khai <b>"phòng tôi có dùng chất này"</b>, hiện ở cột
@@ -79,7 +85,8 @@
                 <tbody>
                     @foreach ($datas as $row)
                         @php
-                            $codes = json_decode($row->classification ?? '', true) ?: [];
+                            // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (không còn cột classification)
+                            $codes = ($classificationCodes ?? [])[$row->category_id] ?? [];
                             // Giá trị đang thực sự có hiệu lực, theo đúng quy tắc fallback của hệ thống
                             $shelfLife = $row->shelf_life_months ?? $row->category_shelf_life_months;
                             $storage = $row->storage_condition_name ?? $row->category_storage_condition_name;
@@ -129,8 +136,8 @@
                                     <div class="cat-chips">
                                         @foreach ($codes as $code)
                                             <span
-                                                class="cat-chip {{ in_array($code, $mdDangerCodes ?? []) ? 'danger' : '' }}"
-                                                title="{{ $classifications[$code] ?? $code }}">{{ $code }}</span>
+                                                class="cat-chip {{ \App\Support\ChemicalClassification::toneOfCode($code) }}"
+                                                title="{{ ($classificationLabels ?? [])[$code] ?? $code }}">{{ $code }}</span>
                                         @endforeach
                                     </div>
                                 @else

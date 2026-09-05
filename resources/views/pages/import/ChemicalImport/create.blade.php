@@ -261,11 +261,10 @@
                                     <td>{{ $category->density !== null ? $category->density : '—' }}</td>
                                     <td>{{ $category->storage_condition_name ?: '—' }}</td>
                                     <td>
-                                        @if($category->classification)
-                                            @foreach(json_decode($category->classification, true) ?? [] as $c)
-                                                <span class="badge badge-secondary">{{ $c }}</span>
-                                            @endforeach
-                                        @endif
+                                        @foreach(($classificationCodes ?? [])[$category->id] ?? [] as $c)
+                                            <span class="badge badge-secondary"
+                                                title="{{ ($classificationLabels ?? [])[$c] ?? $c }}">{{ $c }}</span>
+                                        @endforeach
                                     </td>
                                     <td>{{ $category->unit_short_name }}</td>
                                     <td class="text-center">

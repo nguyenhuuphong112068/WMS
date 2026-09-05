@@ -38,13 +38,11 @@
     $expDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
 
     /**
-     * Mã phân loại (cột JSON chemical_categories.classification) thành chuỗi "PL2,N1"
+     * Nhóm NĐ 24/2026 (suy tự động, mã N1..N10) của một mã danh mục -> chuỗi "N3,N9"
      * để đưa vào data-classification cho bộ lọc Phụ lục / Nhóm hoá chất.
      */
-    $expCls = function ($value) {
-        $codes = json_decode($value ?? '', true);
-
-        return is_array($codes) ? implode(',', $codes) : '';
+    $expCls = function ($categoryId) use ($classificationCodes) {
+        return implode(',', $classificationCodes[$categoryId] ?? []);
     };
 
     // Số liệu tổng của tab báo cáo

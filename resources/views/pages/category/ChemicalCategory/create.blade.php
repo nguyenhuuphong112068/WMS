@@ -4,15 +4,7 @@
     // Trang có 2 tab nên có tới 4 form dùng chung kho old(): chỉ điền lại giá trị vừa
     // nhập khi chính form này báo lỗi, không thì để giá trị mặc định.
     $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
-    $oldCodes = (array) $old('classification', []);
     $oldWarnings = (array) $old('safety_warning', []);
-
-    // Ô "Phân Loại" tách thành các vùng riêng cho dễ đọc.
-    $classGroups = [
-        'Theo Phụ lục (NĐ 24/2026/NĐ-CP)' => ['PL1', 'PL2', 'PL3', 'PL4'],
-        'Theo Nhóm (Phụ lục II / III / IV)' => ['N1', 'N2', 'N3', 'N4', 'N5', 'N6', 'N7', 'N8', 'N9', 'N10'],
-        'Hoá chất cấm' => ['CAM'],
-    ];
 @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
@@ -57,9 +49,16 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Tên Hoá Chất <span class="text-danger">*</span></label>
+                                <div class="d-flex align-items-center justify-content-between flex-wrap"
+                                    style="gap: 6px">
+                                    <label class="mb-0">Tên Hoá Chất <span class="text-danger">*</span></label>
+                                    <button type="button" class="btn btn-outline-primary btn-sm cat-pick-chem"
+                                        data-target-form="#createModal">
+                                        <i class="fas fa-flask mr-1"></i> Chọn từ dữ liệu gốc
+                                    </button>
+                                </div>
                                 <select name="chem_names_id"
-                                    class="form-control cat-select {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
+                                    class="form-control cat-select mt-1 {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
                                     required>
                                     <option value="">-- Chọn tên hoá chất --</option>
                                     @foreach ($chemNames as $option)
@@ -69,6 +68,7 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                <small class="md-sub">Một danh mục chỉ mang một tên hoá chất.</small>
                                 @if ($bag->has('chem_names_id'))
                                     <span class="md-error">{{ $bag->first('chem_names_id') }}</span>
                                 @endif
@@ -128,6 +128,23 @@
                                 </div>
                             </div>
 
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="form-group">
+                                <label>Phân Loại Nghị định số 24/2026/NĐ-CP</label>
+                                <div class="md-hint">
+                                    <i class="fas fa-magic mr-1"></i>
+                                    Phân loại 10 nhóm được <b>suy tự động</b> từ dữ liệu gốc
+                                    <b>Tên Hoạt Chất</b> (nhóm 1, 3–7, 9) và <b>Tên Hoá Chất</b>
+                                    (nhóm 2, 8, 10). Không khai tay ở màn này nữa — bảng danh mục
+                                    hiển thị nhóm suy được ở cột <b>Phân Loại NĐ 24/2026</b>.
+                                </div>
+                                <div class="cat-cls-preview mt-2" data-cls-preview>
+                                    <span class="md-empty">Chọn tên hoá chất để xem nhóm phân loại NĐ 24/2026.</span>
+                                </div>
+                            </div>
+
                             <div class="form-group">
                                 <label>Cảnh Báo An Toàn</label>
                                 <div class="cat-check-group {{ $bag->has('safety_warning') ? 'is-invalid' : '' }}">
@@ -148,34 +165,6 @@
                                 @endif
                                 @if ($bag->has('safety_warning.0'))
                                     <span class="md-error">{{ $bag->first('safety_warning.0') }}</span>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div class="col-lg-6">
-                            <div class="form-group">
-                                <label>Phân Loại</label>
-                                @foreach ($classGroups as $groupTitle => $groupCodes)
-                                    <div class="cat-subgroup">
-                                        <span class="cat-subgroup-title">{{ $groupTitle }}</span>
-                                        <div class="cat-check-group {{ $bag->has('classification') ? 'is-invalid' : '' }}">
-                                            @foreach ($groupCodes as $code)
-                                                <label
-                                                    class="cat-check-item {{ in_array($code, $oldCodes) ? 'is-checked' : '' }}">
-                                                    <input type="checkbox" class="cat-check-input" name="classification[]"
-                                                        value="{{ $code }}" {{ in_array($code, $oldCodes) ? 'checked' : '' }}>
-                                                    <span class="cat-check-code">{{ $code }}</span>
-                                                    <span class="cat-check-name">{{ $classifications[$code] }}</span>
-                                                </label>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endforeach
-                                @if ($bag->has('classification'))
-                                    <span class="md-error">{{ $bag->first('classification') }}</span>
-                                @endif
-                                @if ($bag->has('classification.0'))
-                                    <span class="md-error">{{ $bag->first('classification.0') }}</span>
                                 @endif
                             </div>
                         </div>
@@ -202,7 +191,7 @@
     </div>
 </div>
 
-{{-- Chia 2 cột (thông tin + Cảnh Báo An Toàn ở cột trái, Phân Loại ở cột phải) nên cần khung rộng gấp đôi modal-lg mặc định --}}
+{{-- Chia 2 cột (thông tin ở cột trái, Phân Loại + Cảnh Báo An Toàn ở cột phải) nên cần khung rộng gấp đôi modal-lg mặc định --}}
 <style>
     @media (min-width: 992px) {
         #createModal .modal-dialog {

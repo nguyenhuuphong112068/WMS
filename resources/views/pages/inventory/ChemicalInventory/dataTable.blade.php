@@ -304,7 +304,7 @@
                                 @foreach ($datas as $row)
                                     {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
                                     <tr data-state="{{ $row->state }}"
-                                        data-classification="{{ $invCls($row->classification) }}">
+                                        data-classification="{{ $invCls($row->category_id) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
@@ -541,7 +541,7 @@
                             </thead>
                             <tbody>
                                 @foreach ($summaries as $sum)
-                                    <tr data-classification="{{ $invCls($sum->classification) }}">
+                                    <tr data-classification="{{ $invCls($sum->category_id) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <div class="font-weight-bold">{{ $sum->chem_name ?: '—' }}</div>
@@ -677,7 +677,7 @@
                             <tbody>
                                 @foreach ($datas as $row)
                                     {{-- 4 cấp định khu để JS lọc; mã chưa xếp vị trí thì cả 4 đều rỗng --}}
-                                    <tr data-classification="{{ $invCls($row->classification) }}"
+                                    <tr data-classification="{{ $invCls($row->category_id) }}"
                                         data-warehouse="{{ $row->warehouse_id }}" data-room="{{ $row->room_id }}"
                                         data-shelf="{{ $row->shelf_id }}" data-location="{{ $row->location_id }}"
                                         data-category="{{ $row->category_id }}">
@@ -756,7 +756,7 @@
                             </thead>
                             <tbody>
                                 @foreach ($invExpiringSoon as $row)
-                                    <tr data-classification="{{ $invCls($row->classification) }}">
+                                    <tr data-classification="{{ $invCls($row->category_id) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
@@ -848,7 +848,7 @@
                             </thead>
                             <tbody>
                                 @foreach ($invWaitingInternal as $row)
-                                    <tr data-classification="{{ $invCls($row->classification) }}">
+                                    <tr data-classification="{{ $invCls($row->category_id) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>

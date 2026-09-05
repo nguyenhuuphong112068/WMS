@@ -94,7 +94,7 @@ class ChemicalExportController extends Controller
             ->select(
                 self::TABLE.'.*',
                 'chemical_categories.code as category_code',
-                'chemical_categories.classification',
+                'chemical_imports.category_id as category_id',
                 'chem_names.name as chem_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
@@ -123,6 +123,9 @@ class ChemicalExportController extends Controller
         return view('pages.export.ChemicalExport.list', [
             'datas' => $datas,
             'categories' => $this->categoryOptions($departmentId),
+            // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (thay cột classification đã bỏ)
+            'classificationCodes' => \App\Support\ChemicalClassification::codesByCategory(),
+            'classificationLabels' => \App\Support\ChemicalClassification::labels(),
             'requestsSent' => $requests['sent'],
             'requestsReceived' => $requests['received'],
             'imports' => $this->importOptions($departmentId),
@@ -654,7 +657,6 @@ class ChemicalExportController extends Controller
                 'chemical_categories.id as category_id',
                 'chemical_categories.code as category_code',
                 'chemical_categories.density',
-                'chemical_categories.classification',
                 'chem_names.name as chem_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
@@ -675,7 +677,6 @@ class ChemicalExportController extends Controller
                 'chemical_categories.id',
                 'chemical_categories.code',
                 'chemical_categories.density',
-                'chemical_categories.classification',
                 'chem_names.name',
                 'units.short_name',
                 'units.name',

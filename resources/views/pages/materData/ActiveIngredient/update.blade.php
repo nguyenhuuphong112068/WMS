@@ -1,7 +1,10 @@
-@php $bag = $errors->getBag('updateErrors'); @endphp
+@php
+    $bag = $errors->getBag('updateErrors');
+    $oldGroups = array_map('intval', (array) old('groups', []));
+@endphp
 
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="{{ $mdIcon }}"></i> Cập Nhật {{ $mdTitle }}</h5>
@@ -45,31 +48,12 @@
 
                     @include('pages.materData.shared.formulaInput', ['bag' => $bag])
 
-                    <div class="form-group">
-                        <div class="custom-control custom-checkbox">
-                            <input type="checkbox" class="custom-control-input" id="aiIsTableAUpd" name="is_table_a"
-                                value="1" data-table-a-toggle {{ old('is_table_a') ? 'checked' : '' }}>
-                            <label class="custom-control-label" for="aiIsTableAUpd">
-                                Thuộc <b>Bảng A</b> Phụ lục IV Nghị định 24/2026/NĐ-CP (chất có tên, có ngưỡng tồn trữ)
-                            </label>
-                        </div>
-                        <small class="text-muted d-block mt-1">
-                            Tick chọn nếu hoạt chất thuộc Bảng A Phụ lục IV Nghị định số 24/2026/NĐ-CP (bắt buộc khai báo ngưỡng tồn trữ).
-                        </small>
-                    </div>
-
-                    <div class="form-group" data-table-a-only style="{{ old('is_table_a') ? '' : 'display: none;' }}">
-                        <label>Ngưỡng Khối Lượng Tồn Trữ Lớn Nhất Tại Một Thời Điểm (kg) <span class="text-danger">*</span></label>
-                        <input type="number" name="threshold_kg" step="0.001" min="0.001"
-                            class="form-control {{ $bag->has('threshold_kg') ? 'is-invalid' : '' }}"
-                            value="{{ old('threshold_kg') }}" placeholder="Ví dụ: 50000" {{ old('is_table_a') ? 'required' : '' }}>
-                        @if ($bag->has('threshold_kg'))
-                            <span class="md-error">{{ $bag->first('threshold_kg') }}</span>
-                        @endif
-                        <small class="text-muted d-block mt-1">
-                            Bắt buộc nhập ngưỡng tồn trữ đối với hoạt chất thuộc Bảng A (theo Phụ lục IV Nghị định 24/2026/NĐ-CP).
-                        </small>
-                    </div>
+                    @include('pages.materData.ActiveIngredient.groupFields', [
+                        'bag' => $bag,
+                        'groupLabels' => $groupLabels,
+                        'singleSubstanceGroups' => $singleSubstanceGroups,
+                        'oldGroups' => $oldGroups,
+                    ])
 
                     <div class="md-hint">
                         <i class="fas fa-exclamation-circle mr-1"></i>

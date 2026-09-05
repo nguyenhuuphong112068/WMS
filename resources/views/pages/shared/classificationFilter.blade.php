@@ -1,7 +1,8 @@
 @php
     $clsTarget = $clsTarget ?? 'mdTable';
     $clsLabel = $clsLabel ?? 'Phụ lục / Nhóm hoá chất';
-    $clsList = config('chemical.classifications', []);
+    // 10 nhóm NĐ 24/2026 (mã N1..N10), suy tự động từ dữ liệu gốc.
+    $clsList = \App\Support\ChemicalClassification::labels();
 @endphp
 
 <div class="cls-filter">

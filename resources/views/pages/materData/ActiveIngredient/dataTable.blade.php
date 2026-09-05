@@ -52,13 +52,21 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    @perm('materData_create')
-                        <button type="button" class="btn btn-primary btn-md-create">
-                            <i class="fas fa-plus mr-1"></i> Thêm mới
-                        </button>
-                    @endperm
+                    <div class="d-flex flex-wrap" style="gap: 10px">
+                        @perm('materData_create')
+                            <button type="button" class="btn btn-primary btn-md-create">
+                                <i class="fas fa-plus mr-1"></i> Thêm mới
+                            </button>
+                        @endperm
 
+                        <button type="button" class="btn btn-outline-primary" data-toggle="modal"
+                            data-target="#classifyGuideModal">
+                            <i class="fas fa-info-circle mr-1"></i> Chú thích Phụ lục &amp; Nhóm
+                        </button>
+                    </div>
                 </div>
+
+                @include('pages.materData.shared.classifyFilterBar')
 
                 <div class="table-responsive">
                     <table id="mdTable" class="table table-bordered table-hover w-100">
@@ -69,7 +77,10 @@
                                 <th>Tên chất</th>
                                 <th style="width: 120px">Mã số CAS</th>
                                 <th style="width: 130px">Công Thức</th>
-                                <th class="text-center" style="width: 95px">Bảng A</th>
+                                <th style="width: 90px">Phụ Lục</th>
+                                <th style="width: 70px">Nhóm</th>
+                                <th style="width: 70px">Bảng</th>
+                                <th style="width: 190px">Phân Loại NĐ 24/2026</th>
                                 <th class="text-right" style="width: 140px">Ngưỡng Tồn Trữ (kg)</th>
                                 <th style="width: 140px">Người Tạo</th>
                                 <th class="text-center" style="width: 105px">Ngày Tạo</th>
@@ -80,7 +91,22 @@
                         </thead>
                         <tbody>
                             @foreach ($datas as $row)
-                                <tr>
+                                @php
+                                    $groups = $row->groups ?? [];
+                                    $isGroup9 = in_array(9, $groups, true);
+                                    $groupSearch = collect($groups)->map(fn ($g) => 'Nhóm ' . $g)->implode(' ');
+
+                                    $cls = collect($row->classifications ?? []);
+                                    $apxOrder = ['I' => 1, 'II' => 2, 'III' => 3, 'IV' => 4];
+                                    $apxList = $cls->pluck('appendix')->filter()->unique()
+                                        ->sortBy(fn ($a) => $apxOrder[$a] ?? 9)->values();
+                                    $grpList = $cls->pluck('group_no')
+                                        ->filter(fn ($v) => $v !== null && $v !== '')->unique()->sort()->values();
+                                    $tblList = $cls->pluck('table_ref')->filter()->unique()->sort()->values();
+                                    $clsCodes = collect($groups)->map(fn ($g) => 'N' . $g);
+                                @endphp
+                                <tr data-apx="{{ $apxList->implode(',') }}" data-grp="{{ $grpList->implode(',') }}"
+                                    data-tbl="{{ $tblList->implode(',') }}" data-classification="{{ $clsCodes->implode(',') }}">
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td class="font-weight-bold">
                                         {{ $row->name }}
@@ -104,22 +130,43 @@
                                             <span class="md-empty">—</span>
                                         @endif
                                     </td>
-                                    <td class="text-center" data-order="{{ $row->is_table_a ? 1 : 0 }}">
-                                        @if ($row->is_table_a)
-                                            <span class="badge badge-danger"
-                                                title="Thuộc Bảng A Phụ lục IV NĐ 24/2026/NĐ-CP">Bảng A</span>
-                                        @else
+                                    <td data-search="{{ $apxList->map(fn ($a) => 'Phụ lục ' . $a)->implode(' ') }}">
+                                        @forelse ($apxList as $a)
+                                            <span class="ai-cls-badge">{{ $a }}</span>
+                                        @empty
                                             <span class="md-empty">—</span>
-                                        @endif
+                                        @endforelse
+                                    </td>
+                                    <td class="text-center" data-search="{{ $grpList->map(fn ($g) => 'Nhóm ' . $g)->implode(' ') }}">
+                                        @forelse ($grpList as $g)
+                                            <span class="ai-cls-badge">{{ $g }}</span>
+                                        @empty
+                                            <span class="md-empty">—</span>
+                                        @endforelse
+                                    </td>
+                                    <td class="text-center" data-search="{{ $tblList->map(fn ($t) => 'Bảng ' . $t)->implode(' ') }}">
+                                        @forelse ($tblList as $t)
+                                            <span class="ai-cls-badge">{{ $t }}</span>
+                                        @empty
+                                            <span class="md-empty">—</span>
+                                        @endforelse
+                                    </td>
+                                    <td data-search="{{ $groupSearch }}" data-order="{{ $groups ? min($groups) : 99 }}">
+                                        @forelse ($groups as $g)
+                                            <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }} mr-1 mb-1"
+                                                title="{{ $groupLabels[$g] ?? ('Nhóm ' . $g) }}">Nhóm {{ $g }}</span>
+                                        @empty
+                                            <span class="md-empty">—</span>
+                                        @endforelse
                                     </td>
                                     <td class="text-right" data-order="{{ $row->threshold_kg ?? -1 }}">
-                                        @if (!$row->is_table_a)
+                                        @if (!$isGroup9)
                                             <span class="md-empty">—</span>
                                         @elseif ($kg($row->threshold_kg) !== null)
                                             <span class="ai-threshold">{{ $kg($row->threshold_kg) }}</span>
                                         @else
                                             <span class="md-empty"
-                                                title="Chưa nhập ngưỡng theo Bảng A NĐ 24/2026 - chưa dùng để cảnh báo">Chưa
+                                                title="Chưa nhập ngưỡng theo nhóm 9 NĐ 24/2026 - chưa dùng để cảnh báo">Chưa
                                                 có</span>
                                         @endif
                                     </td>
@@ -150,7 +197,7 @@
                                                 'name_en' => $row->name_en,
                                                 'cas_no' => $row->cas_no,
                                                 'chemical_formula' => $row->chemical_formula,
-                                                'is_table_a' => (int) $row->is_table_a,
+                                                'groups' => array_values($groups),
                                                 'threshold_kg' => $row->threshold_kg,
                                             ],
                                         ])
@@ -175,64 +222,75 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            /* Ô "Ngưỡng tồn trữ" chỉ hiện và bắt buộc khi tick "Thuộc Bảng A". */
-            function aiToggleThreshold(cb) {
-                var $block = $(cb).closest('form').find('[data-table-a-only]');
+            /* Ô "Ngưỡng tồn trữ" chỉ hiện và bắt buộc khi tick "Nhóm 9". */
+            function aiToggleThreshold($form) {
+                var on = $form.find('input[data-g9-toggle]').is(':checked');
+                var $block = $form.find('[data-g9-only]');
                 var $input = $block.find('input[name="threshold_kg"]');
-                $block.toggle(cb.checked);
-                $input.prop('required', cb.checked);
-                if (!cb.checked) {
+                $block.toggle(on);
+                $input.prop('required', on);
+                if (!on) {
                     $input.val('');
                     $input.removeClass('is-invalid');
                     $block.find('.md-error').remove();
                 }
             }
 
-            $(document).on('change', 'input[data-table-a-toggle]', function() {
-                aiToggleThreshold(this);
+            function aiGroupCount($modal) {
+                var n = $modal.find('.ai-group-input:checked').length;
+                $modal.find('[data-group-count]').text(n ? (n + ' nhóm') : '').toggle(n > 0);
+            }
+
+            $(document).on('change', '.ai-group-input', function() {
+                var $modal = $(this).closest('.md-modal');
+                $(this).closest('.ai-group-item').toggleClass('is-checked', this.checked);
+                aiToggleThreshold($modal.find('form'));
+                aiGroupCount($modal);
             });
 
-            /* Nút Thêm mới: đồng bộ trạng thái required cho ngưỡng */
+            /* Nút Thêm mới: bỏ chọn hết, đồng bộ ô ngưỡng */
             $(document).on('click', '.btn-md-create', function() {
-                var modal = $(this).data('modal') || '#createModal';
+                var $modal = $($(this).data('modal') || '#createModal');
+                $modal.find('.ai-group-input').prop('checked', false)
+                    .closest('.ai-group-item').removeClass('is-checked');
                 setTimeout(function() {
-                    $(modal).find('input[data-table-a-toggle]').each(function() {
-                        aiToggleThreshold(this);
-                    });
+                    aiToggleThreshold($modal.find('form'));
+                    aiGroupCount($modal);
                 }, 50);
             });
 
-            /* Nút Sửa: shared.assets điền các ô text bằng .val(), nhưng checkbox phải set
-               .prop('checked') riêng theo data-row. Chạy sau handler của shared.assets. */
+            /* Nút Sửa: shared.assets điền các ô text; checkbox nhóm set theo data-row.groups */
             $(document).on('click', '.btn-md-edit', function() {
                 var row = $(this).data('row') || {};
-                var modal = $(this).data('modal') || '#updateModal';
-                var $cb = $(modal).find('input[data-table-a-toggle]');
-                $cb.prop('checked', !!Number(row.is_table_a));
-                $cb.each(function() {
-                    aiToggleThreshold(this);
+                var $modal = $($(this).data('modal') || '#updateModal');
+                var groups = (row.groups || []).map(String);
+
+                $modal.find('.ai-group-input').each(function() {
+                    var on = groups.indexOf(String(this.value)) !== -1;
+                    $(this).prop('checked', on).closest('.ai-group-item').toggleClass('is-checked', on);
                 });
+                aiToggleThreshold($modal.find('form'));
+                aiGroupCount($modal);
             });
 
             /* Sau khi modal hiện xong thì co giãn ô ngưỡng theo trạng thái checkbox. */
             $(document).on('shown.bs.modal', '.md-modal', function() {
-                $(this).find('input[data-table-a-toggle]').each(function() {
-                    aiToggleThreshold(this);
-                });
+                aiToggleThreshold($(this).find('form'));
+                aiGroupCount($(this));
             });
 
-            /* Kiểm tra trước khi submit: nếu thuộc Bảng A thì ngưỡng phải > 0 */
+            /* Kiểm tra trước khi submit: nếu thuộc nhóm 9 thì ngưỡng phải > 0 */
             $(document).on('submit', '#createModal form, #updateModal form', function(e) {
                 var $form = $(this);
-                var isTableA = $form.find('input[data-table-a-toggle]').is(':checked');
+                var isGroup9 = $form.find('input[data-g9-toggle]').is(':checked');
                 var $threshold = $form.find('input[name="threshold_kg"]');
                 var val = $.trim($threshold.val());
-                if (isTableA && (val === '' || isNaN(val) || Number(val) <= 0)) {
+                if (isGroup9 && (val === '' || isNaN(val) || Number(val) <= 0)) {
                     e.preventDefault();
                     $threshold.addClass('is-invalid');
-                    $form.find('[data-table-a-only] .md-error').remove();
+                    $form.find('[data-g9-only] .md-error').remove();
                     $threshold.after(
-                        '<span class="md-error">Hoạt chất thuộc Bảng A bắt buộc phải có ngưỡng tồn trữ lớn hơn 0.</span>'
+                        '<span class="md-error">Hoạt chất thuộc nhóm 9 bắt buộc phải có ngưỡng tồn trữ lớn hơn 0.</span>'
                     );
                     $threshold.focus();
                     return false;
