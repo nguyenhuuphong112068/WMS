@@ -24,24 +24,11 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-lg-7">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Mã Chất Chuẩn</label>
-                                        <input type="text" class="form-control cat-readonly" value="{{ $nextCode }}"
-                                            readonly tabindex="-1">
-                                        <small class="md-sub">Sinh tự động khi lưu, dạng S00001.</small>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Version</label>
-                                        <input type="text" name="version" class="form-control cat-readonly"
-                                            value="0" readonly tabindex="-1">
-                                        <small class="md-sub">Hệ thống tự động tăng theo Tên và NSX, bắt đầu từ 0.</small>
-                                    </div>
-                                </div>
+                            <div class="form-group">
+                                <label>Mã Chất Chuẩn</label>
+                                <input type="text" class="form-control cat-readonly" value="{{ $nextCode }}"
+                                    readonly tabindex="-1">
+                                <small class="md-sub">Sinh tự động khi lưu, dạng S00001.</small>
                             </div>
 
                             <div class="form-group">
@@ -104,8 +91,8 @@
                                     <div class="form-group">
                                         <label>Tỷ Trọng (g/ml)</label>
                                         <div class="input-group">
-                                            <input type="number" name="density" step="0.0001" min="0.0001"
-                                                class="form-control {{ $bag->has('density') ? 'is-invalid' : '' }}"
+                                            <input type="text" inputmode="decimal" name="density" min="0.0001"
+                                                class="form-control js-decimal {{ $bag->has('density') ? 'is-invalid' : '' }}"
                                                 value="{{ $old('density') }}" placeholder="Ví dụ: 1.04">
                                             <div class="input-group-append">
                                                 <span class="input-group-text">g/ml</span>
@@ -182,9 +169,8 @@
 
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Mã chất chuẩn sinh tự động dạng <b>S00001</b>. Không khai báo trùng tổ hợp
-                        <b>Tên chất chuẩn - Nguồn gốc/NSX - Version</b>; chất chuẩn phát hành version mới là một
-                        dòng danh mục mới. Bản ghi mới ở trạng thái <b>Chờ duyệt</b>, cần được duyệt trước khi dùng.
+                        Mã chất chuẩn sinh tự động dạng <b>S00001</b>. Bản ghi mới ở trạng thái
+                        <b>Chờ duyệt</b>, cần được duyệt trước khi dùng.
                     </div>
                 </div>
 

@@ -113,7 +113,7 @@ class DepartmentChemical
         return self::TABLE.'.min_stock';
     }
 
-    /** Vị trí lưu trữ quy hoạch của phòng, dùng để điền sẵn khi nhập. */
+    /** Định khu của phòng, dùng để điền sẵn khi nhập. */
     public static function defaultLocationColumn()
     {
         return self::TABLE.'.default_location_id as default_location_id';
@@ -182,8 +182,9 @@ class DepartmentChemical
             ->leftJoin('storage_conditions as category_storage', 'chemical_categories.storage_condition_id', '=', 'category_storage.id')
             ->leftJoin('locations', self::TABLE.'.default_location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 self::TABLE.'.*',
                 'chemical_categories.code as category_code',
@@ -200,8 +201,9 @@ class DepartmentChemical
                 'category_storage.name as category_storage_condition_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             // Số CAS gộp của các hoạt chất trong hỗn hợp (chem_names gắn nhiều hoạt chất)
             ->selectSub(self::casNoSubquery('chemical_categories.chem_names_id'), 'cas_no')
@@ -268,14 +270,16 @@ class DepartmentChemical
     {
         return DB::table('locations')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 'locations.id',
                 'locations.code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
@@ -283,8 +287,9 @@ class DepartmentChemical
             ->where(fn ($query) => $query->whereNull('locations.item_type')
                 ->orWhere('locations.item_type', 'chemical'))
             ->orderBy('warehouses.name', 'asc')
-            ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
+            ->orderBy('columns.name', 'asc')
+            ->orderBy('tiers.name', 'asc')
             ->orderBy('locations.code', 'asc')
             ->get();
     }

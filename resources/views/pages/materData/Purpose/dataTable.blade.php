@@ -6,15 +6,11 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    @perm('materData_create')
+                    @perm('materData_standard_create')
                         <button type="button" class="btn btn-primary btn-md-create">
                             <i class="fas fa-plus mr-1"></i> Thêm chỉ tiêu kiểm
                         </button>
                     @endperm
-                    <p class="hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} chỉ tiêu kiểm.
-                    </p>
                 </div>
 
                 <div class="table-responsive">
@@ -48,7 +44,7 @@
                                     <td class="text-center">
                                         <div class="md-actions">
                                             <span class="md-btn-wrap">
-                                                @perm('materData_update')
+                                                @perm('materData_standard_update')
                                                     <button type="button" class="btn btn-sm btn-warning btn-md-edit"
                                                         title="Sửa chỉ tiêu {{ $row->name }}"
                                                         data-row="{{ json_encode([
@@ -67,8 +63,8 @@
                                                 ])
                                             </span>
 
-                                            @perm('materData_deActive')
-                                                <form class="form-md-confirm d-inline"
+                                            @perm('materData_standard_deActive')
+                                                <form class="form-md-confirm d-inline" data-require-reason="1"
                                                     action="{{ route('pages.materData.purpose.deActive') }}" method="POST"
                                                     data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} chỉ tiêu {{ $row->name }}?"
                                                     data-danger="{{ $row->status_id == 1 ? '1' : '' }}">

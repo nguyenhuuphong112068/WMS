@@ -15,11 +15,6 @@
                             <i class="fas fa-plus mr-1"></i> Nhập vật tư
                         </button>
                     @endperm
-                    <p class="hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Đang hiệu lực {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} lô vật tư.
-                        Mã xuất nhập được cấp tự động khi lưu: VT + mã phòng ban + chuỗi ngẫu nhiên.
-                    </p>
                 </div>
 
                 @include('pages.shared.barcodeSearch', [
@@ -95,8 +90,8 @@
                                             <div class="font-weight-bold">
                                                 <span class="md-tag">{{ $row->location_code }}</span>
                                             </div>
-                                            <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
-                                                {{ $row->shelf_name ?: '—' }}</div>
+                                            <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
+                                                {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
                                         @else
                                             <span class="imp-no-location">Chưa xếp vị trí</span>
                                         @endif
@@ -108,25 +103,14 @@
                                         {{ $impDate($row->expired_date) }}
                                     </td>
                                     <td class="text-center">
-                                        @if ($rowAttachments->isNotEmpty())
-                                            <div class="dropdown">
-                                                <button class="btn btn-xs btn-outline-primary dropdown-toggle"
-                                                    type="button" data-toggle="dropdown">
-                                                    <i class="fas fa-paperclip"></i> ({{ $rowAttachments->count() }})
-                                                </button>
-                                                <div class="dropdown-menu dropdown-menu-right shadow-sm">
-                                                    @foreach ($rowAttachments as $att)
-                                                        <a class="dropdown-item small py-2" target="_blank"
-                                                            href="{{ route($impRoute . 'downloadAttachment', ['id' => $att->id]) }}">
-                                                            <i class="fas fa-external-link-alt mr-2 text-primary"></i>
-                                                            {{ $att->file_name }}
-                                                        </a>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                        @else
-                                            <span class="text-muted">—</span>
-                                        @endif
+                                        @include('pages.shared.attachmentList', [
+                                            'attachments' => $rowAttachments,
+                                            'routePrefix' => $impRoute,
+                                            'statusPerm' => 'import_material_attachment_status',
+                                            'code' => $row->code,
+                                            'name' => $row->material_name,
+                                            'typeLabel' => 'Vật tư',
+                                        ])
                                     </td>
                                     <td>
                                         <div class="md-actions">

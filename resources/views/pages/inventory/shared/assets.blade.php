@@ -390,6 +390,46 @@
         box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
     }
 
+    /* ---------- Badge Hạn Dùng bấm được (Retest / Check online) ---------- */
+    .inv-expiry-badge {
+        cursor: pointer;
+        transition: transform var(--transition-fast), filter var(--transition-fast);
+    }
+
+    .inv-expiry-badge:hover {
+        transform: translateY(-1px);
+        filter: brightness(0.95);
+    }
+
+    .inv-expiry-count {
+        display: inline-block;
+        min-width: 16px;
+        height: 16px;
+        margin-left: 5px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        font-size: 0.66rem;
+        font-weight: 700;
+        line-height: 16px;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* ---------- Modal Cập Nhật Hạn Dùng ---------- */
+    .inv-expiry-hist-table td,
+    .inv-expiry-hist-table th {
+        font-size: 0.8rem;
+        vertical-align: middle;
+    }
+
+    .inv-expiry-hist-empty {
+        text-align: center;
+        color: var(--text-muted, #6c757d);
+        padding: 14px 0;
+    }
+
     /* ---------- Modal Lịch Sử Cân Đối ---------- */
     .inv-hist-head {
         display: flex;
@@ -637,7 +677,7 @@
         box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
     }
 
-    /* ---------- Bộ chọn định khu Kho / Phòng / Kệ / Vị trí ---------- */
+    /* ---------- Bộ chọn định khu Kho/Phòng / Kệ/Tủ / Cột / Tầng / Vị trí ---------- */
     .inv-zone-picker {
         display: flex;
         flex-wrap: wrap;
@@ -1000,10 +1040,10 @@
         var zoneTable = invTable('#invZoneTable', [1, 'asc'],
             'Chưa có mã xuất nhập nào ở định khu đang chọn.');
 
-        /* ---------- Lọc tồn theo định khu Kho -> Phòng -> Kệ -> Vị trí ----------
-        | Bốn ô chọn dây chuyền: chọn cấp trên thì cấp dưới chỉ còn các mục thuộc cấp đó.
-        | Chọn tới cấp nào thì lọc tới cấp đó, nên chỉ chọn Kho là thấy cả kho.
-        | Toàn bộ dữ liệu 4 cấp đã nằm sẵn trong [data-zones] nên không phải tải lại trang.
+        /* ---------- Lọc tồn theo định khu Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí ----------
+        | Năm ô chọn dây chuyền: chọn cấp trên thì cấp dưới chỉ còn các mục thuộc cấp đó.
+        | Chọn tới cấp nào thì lọc tới cấp đó, nên chỉ chọn Kho/Phòng là thấy cả kho.
+        | Toàn bộ dữ liệu 5 cấp đã nằm sẵn trong [data-zones] nên không phải tải lại trang.
         */
         var $picker = $('.inv-zone-picker');
 
@@ -1013,12 +1053,13 @@
             // Cấp dưới lọc theo cột nào của cấp trên
             var levels = [
                 { name: 'warehouse', source: 'warehouses', parents: [] },
-                { name: 'room', source: 'rooms', parents: ['warehouse'] },
-                { name: 'shelf', source: 'shelves', parents: ['warehouse', 'room'] },
-                { name: 'location', source: 'locations', parents: ['warehouse', 'room', 'shelf'] },
+                { name: 'shelf', source: 'shelves', parents: ['warehouse'] },
+                { name: 'column', source: 'columns', parents: ['warehouse', 'shelf'] },
+                { name: 'tier', source: 'tiers', parents: ['warehouse', 'shelf', 'column'] },
+                { name: 'location', source: 'locations', parents: ['warehouse', 'shelf', 'column', 'tier'] },
             ];
 
-            var picked = { warehouse: '', room: '', shelf: '', location: '' };
+            var picked = { warehouse: '', shelf: '', column: '', tier: '', location: '' };
 
             function $select(level) {
                 return $picker.find('.inv-zone-select[data-level="' + level + '"]');
@@ -1099,7 +1140,7 @@
             });
 
             $(document).on('click', '.btn-inv-zone-reset', function() {
-                picked = { warehouse: '', room: '', shelf: '', location: '' };
+                picked = { warehouse: '', shelf: '', column: '', tier: '', location: '' };
 
                 fillAll();
                 applyZone();
@@ -1315,6 +1356,163 @@
 
             previewInternal();
             $internal.modal('show');
+        });
+
+        /* ---------- Modal Cập Nhật Hạn Dùng (badge Retest / Check online) ----------
+        | Badge .inv-expiry-badge mang data-row='{import_id, code, chem_name,
+        | expiry_type, expired_date, retest_interval_months}'. Lịch sử các lần cập nhật
+        | lấy từ [data-updates] của modal ('{"<import_id>":[{...}]}'), không truy vấn lại.
+        */
+        var $expiry = $('#expiryUpdateModal');
+
+        /** Date -> yyyy-mm-dd cho input[type=date] */
+        function toDateInput(date) {
+            if (!date) return '';
+
+            var m = String(date.getMonth() + 1).padStart(2, '0');
+            var d = String(date.getDate()).padStart(2, '0');
+
+            return date.getFullYear() + '-' + m + '-' + d;
+        }
+
+        /** Bật/tắt ô ngày, ô chu kỳ và câu nhắc theo hướng xử lý đang chọn */
+        function syncExpiryResolution() {
+            var res = $expiry.find('[name="resolution"]:checked').val();
+            var $dateWrap = $expiry.find('.inv-exp-date-wrap');
+            var $intervalWrap = $expiry.find('.inv-exp-interval-wrap');
+            var $suggestWrap = $expiry.find('.inv-exp-suggest-wrap');
+            var $date = $expiry.find('.inv-exp-date');
+            var $hint = $expiry.find('.inv-exp-hint');
+
+            // Hàm lượng / Độ ẩm / Số phiếu kiểm nghiệm chỉ sửa được khi tiếp tục Retest
+            $expiry.find('.inv-exp-retest-fields').toggle(res === 'retest');
+
+            if (res === 'retest') {
+                $dateWrap.show();
+                $intervalWrap.show();
+                $suggestWrap.show();
+                $date.attr('required', true);
+                $expiry.find('.inv-exp-date-label').html('Hạn Retest Mới <span class="text-danger">*</span>');
+                $hint.text('Ống vẫn ở loại Retest. Nhập hạn kiểm nghiệm lại kế tiếp; bỏ trống chu kỳ thì giữ nguyên chu kỳ đang khai của ống.');
+            } else if (res === 'check_online') {
+                $dateWrap.hide();
+                $intervalWrap.hide();
+                $suggestWrap.hide();
+                $date.removeAttr('required').val('');
+                $hint.text('Ống vẫn ở loại Check online, hạn dùng để trống. Lần cập nhật này chỉ ghi nhận việc đã tra cứu trực tuyến - nên kèm ghi chú và/hoặc file.');
+            } else if (res === 'defined') {
+                $dateWrap.show();
+                $intervalWrap.hide();
+                $suggestWrap.hide();
+                $date.attr('required', true);
+                $expiry.find('.inv-exp-date-label').html('Hạn Sử Dụng <span class="text-danger">*</span>');
+                $hint.text('Sau khi lưu, ống chuyển hẳn sang loại "Hạn dùng xác định": hiển thị ngày bình thường và không còn badge cập nhật ở màn hình này.');
+            } else {
+                $dateWrap.show();
+                $intervalWrap.hide();
+                $suggestWrap.hide();
+                $date.removeAttr('required');
+                $hint.text('');
+            }
+        }
+
+        /** Đổ bảng lịch sử cập nhật hạn dùng của ống đang mở */
+        function fillExpiryHistory(importId) {
+            var updates = ($expiry.data('updates') || {})[importId] || [];
+            var $tbody = $expiry.find('.inv-expiry-hist-table tbody');
+
+            if (!updates.length) {
+                $tbody.html('<tr><td colspan="5" class="inv-expiry-hist-empty">Chưa có lần cập nhật nào.</td></tr>');
+
+                return;
+            }
+
+            $tbody.html(updates.map(function(u) {
+                var files = (u.attachments || []).map(function(f) {
+                    return '<a href="' + esc(f.url) + '" target="_blank" class="d-block text-truncate">' +
+                        '<i class="fas fa-paperclip mr-1"></i>' + esc(f.name) + '</a>';
+                }).join('') || '<span class="md-empty">—</span>';
+
+                return '<tr>' +
+                    '<td class="text-center md-sub">' + esc(u.created_at) + '</td>' +
+                    '<td class="md-sub">' + esc(u.created_by) + '</td>' +
+                    '<td>' + esc(u.change_note) + '</td>' +
+                    '<td class="md-sub">' + (u.note ? esc(u.note) : '—') + '</td>' +
+                    '<td>' + files + '</td>' +
+                    '</tr>';
+            }).join(''));
+        }
+
+        /**
+         * Ẩn/hiện đúng lựa chọn "tiếp tục" theo loại hạn dùng đang có của ống:
+         * Retest chỉ được tiếp tục Retest hoặc chốt hạn xác định; Check online chỉ được
+         * tiếp tục Check online hoặc chốt hạn xác định - không đổi chéo.
+         */
+        function syncExpiryResolutionOptions() {
+            var isRetest = $expiry.find('[name="current_expiry_type"]').val() === 'retest';
+
+            $expiry.find('.inv-exp-res-retest').toggle(isRetest);
+            $expiry.find('.inv-exp-res-online').toggle(!isRetest);
+
+            // Nếu lựa chọn đang chọn bị ẩn đi thì bỏ chọn để không gửi lên loại không hợp lệ
+            var $checked = $expiry.find('[name="resolution"]:checked');
+            if ($checked.length && !$checked.closest('.custom-radio').is(':visible')) {
+                $checked.prop('checked', false);
+            }
+        }
+
+        $(document).on('change', '#expiryUpdateModal [name="resolution"]', syncExpiryResolution);
+
+        $(document).on('click', '#expiryUpdateModal .inv-exp-suggest', function() {
+            var months = Number($expiry.find('[name="retest_interval_months"]').val() || 0);
+
+            if (months <= 0) return;
+
+            $expiry.find('.inv-exp-date').val(toDateInput(addMonths(new Date(), months)));
+        });
+
+        // Modal mở lại sau lỗi validate (server bật): đồng bộ ô + đổ lịch sử theo import_id đang có
+        $expiry.on('shown.bs.modal', function() {
+            syncExpiryResolutionOptions();
+            syncExpiryResolution();
+
+            var importId = $expiry.find('[name="import_id"]').val();
+
+            if (importId) fillExpiryHistory(importId);
+        });
+
+        $(document).on('click', '.inv-expiry-badge', function() {
+            var row = $(this).data('row') || {};
+            var $form = $expiry.find('form');
+            var isRetest = row.expiry_type === 'retest';
+
+            $form.find('[name="import_id"]').val(row.import_id);
+            $form.find('[name="current_expiry_type"]').val(isRetest ? 'retest' : 'check online');
+            $expiry.find('.inv-exp-code').val(row.code || '');
+            $expiry.find('.inv-exp-chem').val(row.chem_name || '');
+            $expiry.find('.inv-exp-current-type').val(isRetest ? 'Cần retest định kỳ' : 'Chưa xác định (Check online)');
+            $expiry.find('.inv-exp-current-date').val(fmtDate(toDate(row.expired_date)) || '—');
+
+            // Chỉ hiện lựa chọn "tiếp tục" đúng loại đang có + lựa chọn "chốt hạn xác định"
+            syncExpiryResolutionOptions();
+
+            // Mặc định giữ nguyên loại hạn dùng đang có
+            $expiry.find('[name="resolution"]').prop('checked', false);
+            $expiry.find(isRetest ? '#expResRetest' : '#expResOnline').prop('checked', true);
+
+            $expiry.find('.inv-exp-date').val(isRetest && row.expired_date ? String(row.expired_date).substr(0, 10) : '');
+            $expiry.find('[name="retest_interval_months"]').val(row.retest_interval_months || '');
+            $form.find('[name="potency"]').val(row.potency || '');
+            $form.find('[name="moisture"]').val(row.moisture || '');
+            $form.find('[name="coa_no"]').val(row.coa_no || '');
+            $form.find('[name="note"]').val('');
+            $form.find('[name="attachments[]"]').val('');
+            $form.find('.is-invalid').removeClass('is-invalid');
+            $form.find('.md-error').remove();
+
+            syncExpiryResolution();
+            fillExpiryHistory(row.import_id);
+            $expiry.modal('show');
         });
 
         /* ---------- Modal Biểu Đồ Nhập - Xuất - Tồn ----------
@@ -1601,3 +1799,5 @@
         });
     });
 </script>
+
+@include('pages.shared.attachmentListAssets')

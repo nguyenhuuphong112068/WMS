@@ -61,7 +61,7 @@
                                         data-remaining="{{ (float)$imp->remaining }}"
                                         data-unit="{{ $imp->unit_short_name ?: '' }}"
                                         data-location="{{ $imp->location_code ?? '' }}">
-                                        {{ $imp->code }} — {{ $imp->standard_name }} (Lô {{ $imp->batch_no ?: '—' }}, HSD {{ $imp->expired_date ? \Carbon\Carbon::parse($imp->expired_date)->format('d/m/Y') : '—' }}, tồn {{ $expNum($imp->remaining) }} {{ $imp->unit_short_name ?: '' }}{{ !empty($imp->location_code) ? ', Vị trí: ' . $imp->location_code : '' }})
+                                        {{ $imp->code }} — {{ $imp->standard_name }} (Lô {{ $imp->batch_no ?: '—' }}, HSD {{ $imp->expired_date ? \Carbon\Carbon::parse($imp->expired_date)->format('d/m/Y') : '—' }}, tồn {{ $expNum($imp->remaining) }} {{ $imp->unit_short_name ?: '' }}{{ !empty($imp->location_code) ? ', Định khu: ' . $imp->location_code : '' }})
                                     </option>
                                 @endforeach
                             </select>
@@ -76,7 +76,7 @@
                             <label class="required font-weight-bold" style="font-size: 0.9rem;">
                                 <i class="fas fa-weight-scale mr-1 text-success"></i> Số Lượng Thực Cấp <span class="text-danger">*</span>
                             </label>
-                            <input type="number" step="0.0001" min="0.0001" name="issued_amount" id="issue_amount" class="form-control text-right font-weight-bold" style="height: 38px !important;" placeholder="0.0000" required>
+                            <input type="text" inputmode="decimal" min="0.0001" name="issued_amount" id="issue_amount" class="form-control text-right font-weight-bold js-decimal" style="height: 38px !important;" placeholder="0.0000" required>
                             @error('issued_amount', 'issueErrors')
                                 <small class="text-danger">{{ $message }}</small>
                             @enderror

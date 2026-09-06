@@ -64,6 +64,7 @@
     @include('pages.export.ChemicalExport.update')
     @include('pages.export.ChemicalExport.picker')
     @include('pages.export.ChemicalExport.transferImportPickerModal')
+    @include('pages.export.ChemicalExport.transferStockPickerModal')
     @include('pages.export.ChemicalExport.transferRequestModal')
     @include('pages.export.ChemicalExport.transferRequestEditModal')
     @include('pages.export.ChemicalExport.transferDetailModal')

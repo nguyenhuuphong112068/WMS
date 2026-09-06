@@ -34,7 +34,7 @@
 
     /** Đường dẫn định khu đầy đủ của một dòng, trống thì trả về null */
     $dsPath = fn($row) => $row->location_code
-        ? ($row->warehouse_name ?: '—') . ' / ' . ($row->room_name ?: '—') . ' / ' . ($row->shelf_name ?: '—')
+        ? ($row->warehouse_name ?: '—') . ' / ' . ($row->shelf_name ?: '—') . ' / ' . ($row->column_name ?: '—') . ' / ' . ($row->tier_name ?: '—')
         : null;
 
     /** Chuỗi JSON mã nhóm chuẩn -> mảng mã, dùng chung cho cả hai tab. */
@@ -74,15 +74,6 @@
                     </a>
                 </li>
             </ul>
-
-            <p class="cat-tabs-note">
-                <i class="fas fa-info-circle mr-1"></i>
-                <b>{{ $mdTitle }}</b> khai bản chất của chất chuẩn (tên, số CAS, nguồn gốc, version,
-                phân nhóm chuẩn) và dùng chung toàn công ty.
-                <b>{{ $dsTitle }}</b> chỉ khai phần riêng của
-                <b>{{ session('user')['selected_department'] ?? 'phòng ban đang chọn' }}</b>:
-                đơn vị tính, hạn dùng nội bộ sau khi mở ống, ngưỡng tồn, vị trí quy hoạch.
-            </p>
 
             <div class="tab-content">
                 <div class="tab-pane fade {{ $activeTab === 'company' ? 'show active' : '' }}" id="tabCompany"
@@ -220,7 +211,6 @@
         'mdIcon' => $dsIcon,
         'categories' => $dsCategories,
         'locations' => $dsLocations,
-        'storageConditions' => $dsStorageConditions,
         'units' => $dsUnits,
         'unitsInUse' => $dsUnitsInUse,
         'conversions' => $dsConversions,
@@ -230,7 +220,6 @@
         'mdTitle' => $dsTitle,
         'mdIcon' => $dsIcon,
         'locations' => $dsLocations,
-        'storageConditions' => $dsStorageConditions,
         'units' => $dsUnits,
         'unitsInUse' => $dsUnitsInUse,
         'conversions' => $dsConversions,

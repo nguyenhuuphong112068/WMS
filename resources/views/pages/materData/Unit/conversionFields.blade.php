@@ -28,8 +28,8 @@
     <div class="col-md-6">
         <div class="form-group">
             <label>Hệ Số Quy Đổi <span class="text-danger">*</span></label>
-            <input type="number" name="factor_to_base" step="0.000001" min="0.000001"
-                class="form-control {{ $bag->has('factor_to_base') ? 'is-invalid' : '' }}"
+            <input type="text" inputmode="decimal" name="factor_to_base" min="0.000001"
+                class="form-control js-decimal {{ $bag->has('factor_to_base') ? 'is-invalid' : '' }}"
                 value="{{ old('factor_to_base', 1) }}" required>
             @if ($bag->has('factor_to_base'))
                 <span class="md-error">{{ $bag->first('factor_to_base') }}</span>

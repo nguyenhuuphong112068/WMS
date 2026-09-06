@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\MaterData;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DataMasterHistory;
@@ -23,6 +24,8 @@ use Illuminate\Validation\Rule;
  */
 class MixtureHazardCategoryController extends Controller
 {
+    use RequiresChangeReason;
+
     private const TABLE = 'mixture_hazard_categories';
     private const LABEL = 'nhóm nguy hại Bảng B';
 
@@ -98,7 +101,11 @@ class MixtureHazardCategoryController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần cập nhật!');
         }
 
-        $validator = Validator::make($request->all(), $this->rules($current->id), $this->messages());
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules($current->id) + $this->changeReasonRules(),
+            $this->messages() + $this->changeReasonMessages()
+        );
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
@@ -113,6 +120,10 @@ class MixtureHazardCategoryController extends Controller
 
         $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $this->maps());
 
+        if ($note === '') {
+            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
+        }
+
         if ($current->is_statutory) {
             $note = trim('Sửa dữ liệu luật định. ' . $note);
         }
@@ -125,7 +136,7 @@ class MixtureHazardCategoryController extends Controller
             'updated_at' => now(),
         ]);
 
-        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS, $this->maps());
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, $this->maps(), $this->changeReason($request));
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $this->shortName($current->name), $this->shortName($request->name));
 
@@ -138,6 +149,10 @@ class MixtureHazardCategoryController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần thay đổi trạng thái!');
+        }
+
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
         }
 
         $newStatus = $current->status_id == 1 ? 0 : 1;
@@ -154,7 +169,8 @@ class MixtureHazardCategoryController extends Controller
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->status_id, $newStatus),
             self::FIELDS,
-            $this->maps()
+            $this->maps(),
+            $this->changeReason($request)
         );
 
         AuditTrialController::log(

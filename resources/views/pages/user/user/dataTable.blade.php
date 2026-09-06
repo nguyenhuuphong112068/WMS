@@ -78,6 +78,7 @@
                                         data-username="{{ $data->userName }}" data-usergroup='@json($data->role_ids)'
                                         data-fullname="{{ $data->fullName }}" data-deparment="{{ $data->deparment }}"
                                         data-group_ids='@json($data->group_ids)'
+                                        data-role_dept_map='@json($data->role_dept_map)'
                                         data-mail="{{ $data->mail }}"
                                         data-toggle="modal" data-target="#UpdateModal">
                                         <i class="fas fa-edit"></i>
@@ -180,6 +181,36 @@
             theme: 'bootstrap4',
             width: '100%'
         });
+        $('.select2-roledept').each(function() {
+            $(this).select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $(this).closest('.modal')
+            });
+        });
+
+        // Hiện hàng "phạm vi phòng ban" của đúng các role đang được chọn
+        function syncRoleDeptRows($modal) {
+            var selected = ($modal.find('select[name="userGroup[]"]').val() || []).map(String);
+            $modal.find('.role-dept-row').each(function() {
+                var show = selected.indexOf(String($(this).data('role'))) !== -1;
+                $(this).toggleClass('d-none', !show);
+            });
+        }
+        window.syncRoleDeptRows = syncRoleDeptRows;
+
+        $(document).on('change', '#createModal select[name="userGroup[]"]', function() {
+            syncRoleDeptRows($('#createModal'));
+        });
+        $(document).on('change', '#UpdateModal select[name="userGroup[]"]', function() {
+            syncRoleDeptRows($('#UpdateModal'));
+        });
+
+        // Mở modal Thêm: xoá sạch phạm vi phòng ban của lần trước
+        $('#createModal').on('show.bs.modal', function() {
+            $(this).find('.select2-roledept').val(null).trigger('change');
+            syncRoleDeptRows($(this));
+        });
 
         // Lọc lại danh sách tổ mỗi khi đổi phòng ban
         $(document).on('change', '#createModal select[name="deparment"], #UpdateModal select[name="deparment"]',
@@ -202,6 +233,15 @@
             // Gán mảng role IDs và trigger change cho Select2
             var roleIds = button.data('usergroup');
             modal.find('select[name="userGroup[]"]').val(roleIds).trigger('change');
+
+            // Nạp phạm vi phòng ban của từng role rồi hiện đúng các hàng
+            var roleDeptMap = button.data('role_dept_map') || {};
+            modal.find('.role-dept-row').each(function() {
+                var rid = String($(this).data('role'));
+                var depts = (roleDeptMap[rid] || []).map(String);
+                $(this).find('select.select2-roledept').val(depts).trigger('change');
+            });
+            if (window.syncRoleDeptRows) window.syncRoleDeptRows(modal);
 
             modal.find('input[name="fullName"]').val(button.data('fullname'));
             modal.find('select[name="deparment"]').val(button.data('deparment'));

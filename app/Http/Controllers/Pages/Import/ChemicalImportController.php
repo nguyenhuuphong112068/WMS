@@ -20,10 +20,10 @@ use Illuminate\Validation\Rule;
  *
  * Ghi nhận từng lần nhập hoá chất vào kho của phòng ban đang chọn.
  *
- * MÃ XUẤT NHẬP (cột code) sinh tự động: "C" + shortName phòng ban + đuôi ngẫu nhiên,
- * ví dụ C-QC1-7KPMR9J4WD. Mã KHÔNG chứa số thứ tự và không gắn với danh mục hoá chất
- * nên khoá / xoá một phiếu nhập không để lại khoảng trống nhìn thấy được qua giao diện.
- * Công thức nằm ở App\Support\ChemicalCode.
+ * MÃ XUẤT NHẬP (cột code) sinh tự động: "C" + id phòng ban (2 chữ số) + đuôi ngẫu nhiên,
+ * ví dụ C-07-7KPMR9J4WD. Mọi mã dài bằng nhau. Mã KHÔNG chứa số thứ tự và không gắn với
+ * danh mục hoá chất nên khoá / xoá một phiếu nhập không để lại khoảng trống nhìn thấy
+ * được qua giao diện. Công thức nằm ở App\Support\ChemicalCode.
  */
 class ChemicalImportController extends Controller
 {
@@ -74,8 +74,9 @@ class ChemicalImportController extends Controller
             // Định khu của lô: locations giữ sẵn id 3 cấp trên nên join tiếp là ra đủ đường dẫn
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             // Lô nhận từ phòng ban khác: truy ngược phiếu chuyển để biết nhận của phòng nào
             ->leftJoin('chemical_exports as source_export', self::TABLE.'.source_export_id', '=', 'source_export.id')
             ->leftJoin('deparments as from_dept', 'source_export.department_id', '=', 'from_dept.id')
@@ -93,8 +94,9 @@ class ChemicalImportController extends Controller
                 'suppliers.address as supplier_address',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
             ->orderBy(self::TABLE.'.imported_date', 'desc')
@@ -346,13 +348,16 @@ class ChemicalImportController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), $this->rules($this->departmentId()), $this->messages());
+        $validator = Validator::make($request->all(), $this->rules($this->departmentId(), null, true), $this->messages());
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
         }
 
         $departmentId = $this->departmentId();
+
+        // "Số lần nhập": 1 lần khai tách thành nhiều lô cùng thông tin, mỗi lô một mã xuất nhập riêng.
+        $quantity = max(1, min(50, (int) $request->input('quantity', 1)));
 
         $uploadedFiles = [];
         if ($request->hasFile('attachments')) {
@@ -372,40 +377,54 @@ class ChemicalImportController extends Controller
         }
 
         // Sinh mã và ghi bản ghi trong cùng một transaction để hai người nhập cùng lúc không trùng mã
-        $result = DB::transaction(function () use ($request, $departmentId, $uploadedFiles) {
-            $code = $this->nextCode($departmentId);
+        $created = DB::transaction(function () use ($request, $departmentId, $quantity, $uploadedFiles) {
+            $payload = $this->payload($request);
+            $rows = [];
 
-            $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
-                'code' => $code,
-                'department_id' => $departmentId,
-                // Ngày nhập là ngày bấm Lưu, người dùng không chọn được
-                'imported_date' => now()->format('Y-m-d'),
-                // Người nhập luôn là người đang đăng nhập, không nhận giá trị từ form
-                'imported_by' => $this->actor(),
-                'status_id' => 1,
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            for ($i = 0; $i < $quantity; $i++) {
+                $code = $this->nextCode($departmentId);
 
-            foreach ($uploadedFiles as $f) {
-                DB::table(self::ATTACHMENT_TABLE)->insert($f + [
-                    'chemical_import_id' => $id,
+                $id = DB::table(self::TABLE)->insertGetId($payload + [
+                    'code' => $code,
+                    'department_id' => $departmentId,
+                    // Ngày nhập là ngày bấm Lưu, người dùng không chọn được
+                    'imported_date' => now()->format('Y-m-d'),
+                    // Người nhập luôn là người đang đăng nhập, không nhận giá trị từ form
+                    'imported_by' => $this->actor(),
+                    'status_id' => 1,
                     'created_by' => $this->actor(),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+                foreach ($uploadedFiles as $f) {
+                    DB::table(self::ATTACHMENT_TABLE)->insert($f + [
+                        'chemical_import_id' => $id,
+                        'created_by' => $this->actor(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                // Mốc đầu tiên của lịch sử: giá trị phiếu lúc mới tạo
+                $this->writeHistory($id, 'Thêm mới', 'Tạo mới phiếu nhập, mã xuất nhập '.$code.'.');
+
+                $rows[] = ['id' => $id, 'code' => $code];
             }
 
-            // Mốc đầu tiên của lịch sử: giá trị phiếu lúc mới tạo
-            $this->writeHistory($id, 'Thêm mới', 'Tạo mới phiếu nhập, mã xuất nhập '.$code.'.');
-
-            return ['id' => $id, 'code' => $code];
+            return $rows;
         });
 
-        AuditTrialController::log('Thêm mới', self::TABLE, $result['id'], 'NA', 'Nhập hoá chất, mã xuất nhập: '.$result['code']);
+        foreach ($created as $row) {
+            AuditTrialController::log('Thêm mới', self::TABLE, $row['id'], 'NA', 'Nhập hoá chất, mã xuất nhập: '.$row['code']);
+        }
 
-        $redirect = redirect()->back()->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'!');
+        $codes = array_column($created, 'code');
+        $msg = count($codes) === 1
+            ? 'Đã tạo '.self::LABEL.' mã '.$codes[0].'!'
+            : 'Đã tạo thành công '.count($codes).' lô hoá chất: '.implode(', ', $codes).'!';
+
+        $redirect = redirect()->back()->with('success', $msg);
 
         // Cảnh báo (không chặn) khi lô vừa nhập đẩy tồn trữ toàn công ty chạm/vượt ngưỡng
         // Phụ lục IV NĐ 24/2026/NĐ-CP - cả Bảng A (theo hoạt chất) và Bảng B (theo hỗn hợp).
@@ -763,6 +782,48 @@ class ChemicalImportController extends Controller
     }
 
     /**
+     * ĐỔI TRẠNG THÁI FILE ĐÍNH KÈM - Đang sử dụng (1) <-> Ngưng sử dụng (0).
+     *
+     * File ngưng sử dụng vẫn mở xem được, chỉ hiển thị kèm nhãn trạng thái. Dùng chung
+     * cho cả màn hình Tồn Kho Hoá Chất (ChemicalInventoryController gọi lại logic này).
+     */
+    public function toggleAttachmentStatus(Request $request)
+    {
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->join(self::TABLE, self::ATTACHMENT_TABLE.'.chemical_import_id', '=', self::TABLE.'.id')
+            ->where(self::ATTACHMENT_TABLE.'.id', $request->id)
+            ->where(self::TABLE.'.department_id', $this->departmentId())
+            ->select(self::ATTACHMENT_TABLE.'.*', self::TABLE.'.code as import_code')
+            ->first();
+
+        if (! $attachment) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy file đính kèm.'], 404);
+        }
+
+        $wasActive = ! isset($attachment->is_active) || $attachment->is_active;
+        $newActive = $wasActive ? 0 : 1;
+
+        DB::table(self::ATTACHMENT_TABLE)->where('id', $attachment->id)->update([
+            'is_active' => $newActive,
+            'status_changed_by' => $this->actor(),
+            'status_changed_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Đổi trạng thái tài liệu',
+            self::TABLE,
+            $attachment->chemical_import_id,
+            $attachment->import_code,
+            'File "'.$attachment->file_name.'": '
+                .($wasActive ? 'Đang sử dụng' : 'Ngưng sử dụng').' -> '
+                .($newActive ? 'Đang sử dụng' : 'Ngưng sử dụng')
+        );
+
+        return response()->json(['success' => true, 'is_active' => $newActive]);
+    }
+
+    /**
      * Ghi một dòng lịch sử, chụp lại giá trị phiếu NGAY SAU khi thay đổi.
      * Gọi sau khi đã ghi xong bảng imports.
      */
@@ -914,28 +975,14 @@ class ChemicalImportController extends Controller
     }
 
     /**
-     * Mã xuất nhập kế tiếp: "C" + shortName phòng ban + đuôi ngẫu nhiên.
+     * Mã xuất nhập kế tiếp: "C" + id phòng ban (2 chữ số) + đuôi ngẫu nhiên.
      *
-     * Không còn số thứ tự, không còn phụ thuộc danh mục hoá chất - xem
-     * App\Support\ChemicalCode. Gọi trong transaction của lúc lưu.
+     * Dùng id nên mọi mã dài bằng nhau. Không còn số thứ tự, không còn phụ thuộc
+     * danh mục hoá chất - xem App\Support\ChemicalCode. Gọi trong transaction lúc lưu.
      */
     private function nextCode(int $departmentId): string
     {
-        return ChemicalCode::next($this->departmentShortName($departmentId));
-    }
-
-    /** shortName của phòng ban để ghép vào mã xuất nhập. */
-    private function departmentShortName(int $departmentId): string
-    {
-        if ($departmentId === $this->departmentId()) {
-            $short = session('user')['selected_department'] ?? null;
-
-            if ($short) {
-                return $short;
-            }
-        }
-
-        return (string) (DB::table('deparments')->where('id', $departmentId)->value('shortName') ?: $departmentId);
+        return ChemicalCode::next($departmentId);
     }
 
     /**
@@ -978,20 +1025,23 @@ class ChemicalImportController extends Controller
     {
         return DB::table('locations')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 'locations.id',
                 'locations.code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
             ->orderBy('warehouses.name', 'asc')
-            ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
+            ->orderBy('columns.name', 'asc')
+            ->orderBy('tiers.name', 'asc')
             ->orderBy('locations.code', 'asc')
             ->get();
     }
@@ -1020,9 +1070,9 @@ class ChemicalImportController extends Controller
      * $importedDate: ngày nhập đã ghi của phiếu (lúc điều chỉnh) hoặc hôm nay (lúc tạo mới),
      * dùng làm mốc cho Hạn sử dụng vì form không còn ô Ngày nhập.
      */
-    private function rules(int $departmentId, ?string $importedDate = null): array
+    private function rules(int $departmentId, ?string $importedDate = null, bool $isCreate = false): array
     {
-        return [
+        $rules = [
             // Chưa khai hoá chất ở tab "Hoá Chất Của Phòng" thì không được nhập vào kho:
             // exists:chemical_categories,id không thôi thì sửa request là nhập được chất của phòng khác
             'category_id' => [
@@ -1048,6 +1098,13 @@ class ChemicalImportController extends Controller
             'note' => ['nullable', 'max:500'],
             'attachments.*' => ['nullable', 'file', 'max:10240'],
         ];
+
+        if ($isCreate) {
+            // "Số lần nhập": chỉ có ở modal Nhập, tách một lần khai thành nhiều lô cùng thông tin
+            $rules['quantity'] = ['nullable', 'integer', 'min:1', 'max:50'];
+        }
+
+        return $rules;
     }
 
     private function payload(Request $request): array
@@ -1081,6 +1138,9 @@ class ChemicalImportController extends Controller
             'amount.required' => 'Vui lòng nhập số lượng.',
             'amount.numeric' => 'Số lượng phải là số.',
             'amount.min' => 'Số lượng phải lớn hơn 0.',
+            'quantity.integer' => 'Số lần nhập phải là số nguyên.',
+            'quantity.min' => 'Số lần nhập tối thiểu là 1.',
+            'quantity.max' => 'Số lần nhập tối đa là 50 trong một lần.',
             'invoice_number.max' => 'Số hoá đơn tối đa 100 ký tự.',
             'invoice_date.date' => 'Ngày hoá đơn không hợp lệ.',
             'expired_date.date' => 'Hạn sử dụng không hợp lệ.',

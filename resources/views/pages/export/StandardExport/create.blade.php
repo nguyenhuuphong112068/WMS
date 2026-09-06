@@ -179,8 +179,8 @@
                         <div class="form-group col-md-3" id="col_export_amount">
                             <label class="required font-weight-bold">Số Lượng Xuất</label>
                             <div class="input-group">
-                                <input type="number" name="amount" id="create_amount" step="0.0001" min="0.0001"
-                                    class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}"
+                                <input type="text" inputmode="decimal" name="amount" id="create_amount" min="0.0001"
+                                    class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
                                     value="{{ old('amount') }}" placeholder="Ví dụ: 2.5" required>
                                 <div class="input-group-append">
                                     <span class="input-group-text exp-unit-name bg-light">---</span>

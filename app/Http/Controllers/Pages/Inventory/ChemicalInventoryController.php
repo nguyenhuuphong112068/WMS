@@ -8,6 +8,7 @@ use App\Support\DepartmentChemical;
 use App\Support\InventoryChart;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -104,6 +105,8 @@ class ChemicalInventoryController extends Controller
 
         return view('pages.inventory.ChemicalInventory.list', [
             'datas' => $datas,
+            // File đính kèm của phiếu nhập, để xem ngay trên màn hình tồn kho
+            'attachments' => $this->attachmentsFor($datas->pluck('id')),
             'summaries' => $this->stockByChemical($datas),
             // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (thay cột classification đã bỏ)
             'classificationCodes' => \App\Support\ChemicalClassification::codesByCategory(),
@@ -464,8 +467,9 @@ class ChemicalInventoryController extends Controller
             // chỉ cần imports.location_id là dựng lại đủ Kho -> Phòng -> Kệ -> Vị trí
             ->leftJoin('locations', 'chemical_imports.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
-            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id');
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id');
 
         // Hạn dùng nội bộ, ngưỡng tồn tối thiểu và đơn vị tính lấy theo cấu hình riêng
         // của phòng ban
@@ -492,11 +496,13 @@ class ChemicalInventoryController extends Controller
                 'chemical_imports.location_id',
                 'locations.code as location_code',
                 'locations.warehouse_id',
-                'locations.room_id',
                 'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('chemical_imports.department_id', $departmentId)
             ->where('chemical_imports.status_id', 1)
@@ -788,7 +794,7 @@ class ChemicalInventoryController extends Controller
     }
 
     /**
-     * Bốn cấp định khu của phòng ban, cho bộ lọc Kho -> Phòng -> Kệ -> Vị Trí.
+     * Năm cấp định khu của phòng ban, cho bộ lọc Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị Trí.
      *
      * Mỗi cấp mang sẵn id của các cấp trên nên phần lọc dây chuyền làm được hoàn toàn
      * ở trình duyệt, không phải tải lại trang mỗi lần đổi lựa chọn.
@@ -804,8 +810,9 @@ class ChemicalInventoryController extends Controller
 
         return [
             'warehouses' => $of('warehouses', ['id', 'code', 'name']),
-            'rooms' => $of('rooms', ['id', 'code', 'name', 'warehouse_id']),
-            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'room_id']),
+            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id']),
+            'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id']),
+            'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id']),
             'locations' => $this->locationOptions($departmentId),
         ];
     }
@@ -817,7 +824,7 @@ class ChemicalInventoryController extends Controller
     private function locationOptions(int $departmentId)
     {
         return DB::table('locations')
-            ->select(['id', 'code', 'warehouse_id', 'room_id', 'shelf_id', 'item_type'])
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type'])
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
@@ -955,6 +962,80 @@ class ChemicalInventoryController extends Controller
             ->where('chemical_imports.status_id', 1)
             ->whereDate('chemical_balancings.balancing_at', '<=', $to)
             ->get();
+    }
+
+    /* ==================================================================
+     | FILE ĐÍNH KÈM PHIẾU NHẬP - xem / đổi trạng thái ngay trên màn hình tồn kho.
+     | Bảng chung với màn hình Nhập Hoá Chất (chemical_import_attachments); ở đây chỉ
+     | cho xem và đổi trạng thái Đang sử dụng / Ngưng sử dụng, không upload / xoá.
+     ================================================================== */
+
+    /** [chemical_import_id => collection file] cho các mã xuất nhập đang hiển thị. */
+    private function attachmentsFor($importIds)
+    {
+        return DB::table('chemical_import_attachments')
+            ->whereIn('chemical_import_id', $importIds)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('chemical_import_id');
+    }
+
+    public function downloadAttachment($id)
+    {
+        $attachment = DB::table('chemical_import_attachments')
+            ->join('chemical_imports', 'chemical_import_attachments.chemical_import_id', '=', 'chemical_imports.id')
+            ->where('chemical_import_attachments.id', $id)
+            ->where('chemical_imports.department_id', $this->departmentId())
+            ->select('chemical_import_attachments.*')
+            ->first();
+
+        if (! $attachment) {
+            abort(404, 'Không tìm thấy file đính kèm.');
+        }
+
+        if (! Storage::exists($attachment->file_path)) {
+            abort(404, 'File không tồn tại trên hệ thống lưu trữ.');
+        }
+
+        return Storage::response($attachment->file_path, $attachment->file_name, [
+            'Content-Disposition' => 'inline; filename="'.$attachment->file_name.'"',
+        ]);
+    }
+
+    public function toggleAttachmentStatus(Request $request)
+    {
+        $attachment = DB::table('chemical_import_attachments')
+            ->join('chemical_imports', 'chemical_import_attachments.chemical_import_id', '=', 'chemical_imports.id')
+            ->where('chemical_import_attachments.id', $request->id)
+            ->where('chemical_imports.department_id', $this->departmentId())
+            ->select('chemical_import_attachments.*', 'chemical_imports.code as import_code')
+            ->first();
+
+        if (! $attachment) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy file đính kèm.'], 404);
+        }
+
+        $wasActive = ! isset($attachment->is_active) || $attachment->is_active;
+        $newActive = $wasActive ? 0 : 1;
+
+        DB::table('chemical_import_attachments')->where('id', $attachment->id)->update([
+            'is_active' => $newActive,
+            'status_changed_by' => $this->actor(),
+            'status_changed_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Đổi trạng thái tài liệu',
+            'chemical_imports',
+            $attachment->chemical_import_id,
+            $attachment->import_code,
+            'File "'.$attachment->file_name.'": '
+                .($wasActive ? 'Đang sử dụng' : 'Ngưng sử dụng').' -> '
+                .($newActive ? 'Đang sử dụng' : 'Ngưng sử dụng')
+        );
+
+        return response()->json(['success' => true, 'is_active' => $newActive]);
     }
 
     private function departmentId(): int

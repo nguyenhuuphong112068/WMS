@@ -17,8 +17,7 @@
                     <div class="md-hint mb-3">
                         <i class="fas fa-info-circle mr-1"></i>
                         Phiếu này chỉ dùng để <b>loại bỏ</b> hàng hỏng / hết hạn. Vật tư đem <b>sử dụng</b> đã
-                        được trừ kho ngay lúc kho cấp phát, Tổ chốt lại ở nút <b>"Sử Dụng Vật Tư"</b> trong
-                        phiếu đề nghị.
+                        được trừ kho ngay lúc kho cấp phát.
                     </div>
 
                     {{-- Nguồn: chọn mã xuất nhập để loại bỏ --}}
@@ -40,8 +39,8 @@
                         <div class="form-group col-md-5">
                             <label>Số lượng <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="number" step="0.0001" min="0.0001" name="amount"
-                                    class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}" value="{{ old('amount') }}" required>
+                                <input type="text" inputmode="decimal" min="0.0001" name="amount"
+                                    class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}" value="{{ old('amount') }}" required>
                                 <div class="input-group-append"><span class="input-group-text me-unit">—</span></div>
                             </div>
                             @if ($bag->has('amount')) <div class="md-error text-danger small">{{ $bag->first('amount') }}</div> @endif
@@ -66,7 +65,7 @@
 
 {{-- ============ ĐIỀU CHỈNH PHIẾU ============ --}}
 {{-- Các ô trong modal bám đúng theo cột của bảng "Sổ sử dụng vật tư": phần chỉ xem
-     (mã xuất nhập, vật tư, tổ, loại, thời gian, người thực hiện) nằm ở khối tóm tắt,
+     (mã xuất nhập, vật tư, loại, thời gian, người thực hiện) nằm ở khối tóm tắt,
      phần được phép sửa (số lượng, sản phẩm / lý do) nằm ở form bên dưới. --}}
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
@@ -91,10 +90,6 @@
                             <span class="md-sub me-up-spec"></span>
                         </div>
                         <div class="cell">
-                            <small>Tổ</small>
-                            <b class="me-up-group">—</b>
-                        </div>
-                        <div class="cell">
                             <small>Loại</small>
                             <b class="me-up-type">—</b>
                         </div>
@@ -112,8 +107,8 @@
                         <div class="form-group col-md-5">
                             <label>Số lượng <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="number" step="0.0001" min="0.0001" name="amount"
-                                    class="form-control {{ $ubag->has('amount') ? 'is-invalid' : '' }}" required>
+                                <input type="text" inputmode="decimal" min="0.0001" name="amount"
+                                    class="form-control js-decimal {{ $ubag->has('amount') ? 'is-invalid' : '' }}" required>
                                 <div class="input-group-append"><span class="input-group-text me-up-unit">—</span></div>
                             </div>
                             @if ($ubag->has('amount')) <div class="md-error text-danger small">{{ $ubag->first('amount') }}</div> @endif
@@ -137,7 +132,7 @@
                     </div>
                     <div class="form-group mb-0">
                         <label>Lý do điều chỉnh</label>
-                        <textarea name="adjust_reason" rows="2" maxlength="500" class="form-control"></textarea>
+                        <textarea name="adjust_reason" rows="2" maxlength="500" data-require-fill class="form-control"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -175,7 +170,6 @@
             $m.find('.me-up-code').text(r.code || '—');
             $m.find('.me-up-material').text(r.material_name || '—');
             $m.find('.me-up-spec').text(r.technical_specification || '');
-            $m.find('.me-up-group').text(r.group_name || '—');
             $m.find('.me-up-time').text(r.created_at || '—');
             $m.find('.me-up-user').text(r.used_by || '—');
             $m.find('.me-up-unit').text(r.unit_short_name || '—');

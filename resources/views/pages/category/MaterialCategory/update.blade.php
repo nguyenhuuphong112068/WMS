@@ -77,6 +77,15 @@
                         Sau khi sửa, bản ghi quay về trạng thái <b>Chờ duyệt</b> và cần được duyệt lại.
                         Nội dung thay đổi được lưu lại ở mục <b>Lịch sử thay đổi</b>.
                     </div>
+                    <div class="form-group">
+                        <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" rows="2" maxlength="500" required
+                            class="form-control {{ $bag->has('change_reason') ? 'is-invalid' : '' }}"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @if ($bag->has('change_reason'))
+                            <span class="md-error">{{ $bag->first('change_reason') }}</span>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="modal-footer">

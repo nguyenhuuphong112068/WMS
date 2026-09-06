@@ -85,6 +85,8 @@
                   @enderror
               </div>
 
+            @include('pages.user.user.roleDeptScope')
+
 
           <div class="form-group">
               {{-- DEPARTMENT--}}

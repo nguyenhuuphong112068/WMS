@@ -90,16 +90,6 @@
 
                     {{-- Thông tin chung + hai nút thao tác nằm gọn trên một hàng --}}
                     <div class="me-req-toolbar mb-3">
-                        <div class="me-field">
-                            <label>Tổ đề nghị <span class="text-danger">*</span></label>
-                            <select name="group_id" class="form-control {{ $bag->has('group_id') ? 'is-invalid' : '' }}" style="min-width: 190px;" required>
-                                <option value="">-- Chọn Tổ --</option>
-                                @foreach ($groups as $g)
-                                    <option value="{{ $g->id }}" {{ old('group_id') == $g->id ? 'selected' : '' }}>{{ $g->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
                         <div class="me-field flex-grow-1" style="min-width: 280px;">
                             <label>Tiêu đề đề nghị</label>
                             <input type="text" name="name" maxlength="255" class="form-control" value="{{ old('name') }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
@@ -117,8 +107,6 @@
                             <i class="fas fa-plus mr-1"></i>Thêm vật tư
                         </button>
                     </div>
-
-                    @if ($bag->has('group_id')) <div class="md-error text-danger small mb-2">{{ $bag->first('group_id') }}</div> @endif
 
                     @if ($categories->isEmpty())
                         <div class="alert alert-warning py-2 px-3 small mb-2" style="border-radius: var(--border-radius-md);">
@@ -168,7 +156,7 @@
         </td>
         <td><textarea name="items[__i__][material_name]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize" placeholder="Vật tư ngoài danh mục..."></textarea></td>
         <td><textarea name="items[__i__][technical_specification]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize me-spec" placeholder="Quy cách..."></textarea></td>
-        <td><input type="number" step="0.0001" min="0.0001" name="items[__i__][requested_amount]" class="form-control form-control-sm text-right" placeholder="0.0000" required></td>
+        <td><input type="text" inputmode="decimal" min="0.0001" name="items[__i__][requested_amount]" class="form-control form-control-sm text-right js-decimal" placeholder="0.0000" required></td>
         <td>
             <select name="items[__i__][requested_unit]" class="form-control form-control-sm me-unit">
                 <option value="">--</option>

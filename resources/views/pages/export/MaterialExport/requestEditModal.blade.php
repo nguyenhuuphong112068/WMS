@@ -14,15 +14,6 @@
 
                     {{-- Thông tin chung + hai nút thao tác nằm gọn trên một hàng --}}
                     <div class="me-req-toolbar mb-3">
-                        <div class="me-field">
-                            <label>Tổ đề nghị <span class="text-danger">*</span></label>
-                            <select name="group_id" class="form-control" style="min-width: 190px;" required>
-                                @foreach ($groups as $g)
-                                    <option value="{{ $g->id }}" {{ $req->group_id == $g->id ? 'selected' : '' }}>{{ $g->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
                         <div class="me-field flex-grow-1" style="min-width: 280px;">
                             <label>Tiêu đề đề nghị</label>
                             <input type="text" name="name" maxlength="255" class="form-control" value="{{ $req->name }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
@@ -59,7 +50,7 @@
                                         </td>
                                         <td><textarea name="items[{{ $i }}][material_name]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize" placeholder="Vật tư ngoài danh mục...">{{ $it->material_name }}</textarea></td>
                                         <td><textarea name="items[{{ $i }}][technical_specification]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize me-spec" placeholder="Quy cách...">{{ $it->technical_specification }}</textarea></td>
-                                        <td><input type="number" step="0.0001" min="0.0001" name="items[{{ $i }}][requested_amount]" class="form-control form-control-sm text-right" value="{{ rtrim(rtrim(number_format((float) $it->requested_amount, 4, '.', ''), '0'), '.') }}" required></td>
+                                        <td><input type="text" inputmode="decimal" min="0.0001" name="items[{{ $i }}][requested_amount]" class="form-control form-control-sm text-right js-decimal" value="{{ rtrim(rtrim(number_format((float) $it->requested_amount, 4, '.', ''), '0'), '.') }}" required></td>
                                         <td>
                                             <select name="items[{{ $i }}][requested_unit]" class="form-control form-control-sm me-unit">
                                                 <option value="">--</option>

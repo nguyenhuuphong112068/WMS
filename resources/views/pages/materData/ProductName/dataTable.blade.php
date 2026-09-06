@@ -6,15 +6,11 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    @perm('materData_create')
+                    @perm('materData_common_create')
                         <button type="button" class="btn btn-primary btn-md-create">
                             <i class="fas fa-plus mr-1"></i> Thêm tên sản phẩm
                         </button>
                     @endperm
-                    <p class="hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} sản phẩm.
-                    </p>
                 </div>
 
                 <div class="table-responsive">
@@ -48,7 +44,7 @@
                                     <td class="text-center">
                                         <div class="md-actions">
                                             <span class="md-btn-wrap">
-                                                @perm('materData_update')
+                                                @perm('materData_common_update')
                                                     <button type="button" class="btn btn-sm btn-warning btn-md-edit"
                                                         title="Sửa sản phẩm {{ $row->name }}"
                                                         data-row="{{ json_encode([
@@ -67,8 +63,8 @@
                                                 ])
                                             </span>
 
-                                            @perm('materData_deActive')
-                                                <form class="form-md-confirm d-inline"
+                                            @perm('materData_common_deActive')
+                                                <form class="form-md-confirm d-inline" data-require-reason="1"
                                                     action="{{ route('pages.materData.productName.deActive') }}" method="POST"
                                                     data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} sản phẩm {{ $row->name }}?"
                                                     data-danger="{{ $row->status_id == 1 ? '1' : '' }}">

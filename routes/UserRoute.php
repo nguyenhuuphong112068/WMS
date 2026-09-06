@@ -53,5 +53,7 @@ Route::prefix('/user')
             ->group(function () {
                 Route::get('', 'index')->name('list');
                 Route::post('store_or_update', 'store_or_update')->name('store_or_update');
+                Route::post('saveRole', 'saveRole')->name('saveRole');
+                Route::post('deleteRole/{id}', 'deleteRole')->name('deleteRole');
             });
     });

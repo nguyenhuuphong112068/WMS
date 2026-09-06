@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\MaterData;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DataMasterHistory;
@@ -13,47 +14,65 @@ use Illuminate\Validation\Rule;
 /**
  * ĐỊNH KHU - Dữ Liệu Gốc
  *
- * Gộp 4 cấp lưu trữ Kho -> Phòng -> Kệ -> Vị Trí vào chung một màn hình,
+ * Gộp 5 cấp lưu trữ Kho -> Kệ/Tủ -> Cột -> Tầng -> Vị Trí vào chung một màn hình,
  * mỗi cấp là một tab và có đầy đủ Thêm / Sửa / Khoá-Mở / Xoá.
  */
 class ZoneController extends Controller
 {
+    use RequiresChangeReason;
+
     /**
-     * Cấu hình 4 cấp định khu. Khoá của mảng chính là tham số {type} trên route,
+     * Cấu hình 5 cấp định khu. Khoá của mảng chính là tham số {type} trên route,
      * nên mọi tên bảng dùng cho Query Builder đều lấy từ đây chứ không lấy từ input.
      */
     private const ZONES = [
         'warehouse' => [
             'table' => 'warehouses',
-            'label' => 'kho',
+            'label' => 'kho/phòng',
             'parents' => [],
             'children' => [
-                ['rooms', 'warehouse_id', 'phòng'],
                 ['shelves', 'warehouse_id', 'kệ/tủ'],
+                ['columns', 'warehouse_id', 'cột'],
+                ['tiers', 'warehouse_id', 'tầng'],
                 ['locations', 'warehouse_id', 'vị trí'],
-            ],
-        ],
-        'room' => [
-            'table' => 'rooms',
-            'label' => 'phòng',
-            'parents' => ['warehouse_id' => 'warehouses'],
-            'children' => [
-                ['shelves', 'room_id', 'kệ/tủ'],
-                ['locations', 'room_id', 'vị trí'],
             ],
         ],
         'shelf' => [
             'table' => 'shelves',
             'label' => 'kệ/tủ',
-            'parents' => ['warehouse_id' => 'warehouses', 'room_id' => 'rooms'],
+            'parents' => ['warehouse_id' => 'warehouses'],
             'children' => [
+                ['columns', 'shelf_id', 'cột'],
+                ['tiers', 'shelf_id', 'tầng'],
                 ['locations', 'shelf_id', 'vị trí'],
+            ],
+        ],
+        'column' => [
+            'table' => 'columns',
+            'label' => 'cột',
+            'parents' => ['warehouse_id' => 'warehouses', 'shelf_id' => 'shelves'],
+            'children' => [
+                ['tiers', 'column_id', 'tầng'],
+                ['locations', 'column_id', 'vị trí'],
+            ],
+        ],
+        'tier' => [
+            'table' => 'tiers',
+            'label' => 'tầng',
+            'parents' => ['warehouse_id' => 'warehouses', 'shelf_id' => 'shelves', 'column_id' => 'columns'],
+            'children' => [
+                ['locations', 'tier_id', 'vị trí'],
             ],
         ],
         'location' => [
             'table' => 'locations',
             'label' => 'vị trí',
-            'parents' => ['warehouse_id' => 'warehouses', 'room_id' => 'rooms', 'shelf_id' => 'shelves'],
+            'parents' => [
+                'warehouse_id' => 'warehouses',
+                'shelf_id' => 'shelves',
+                'column_id' => 'columns',
+                'tier_id' => 'tiers',
+            ],
             'children' => [],
             'itemType' => true,
             // Vị trí chỉ định danh bằng mã (A01, B02...) nên không có cột tên
@@ -75,9 +94,10 @@ class ZoneController extends Controller
 
     /** Nhãn của các cột cấp cha, dùng khi ghi lịch sử thay đổi. */
     private const PARENT_LABELS = [
-        'warehouse_id' => 'Kho',
-        'room_id' => 'Phòng',
+        'warehouse_id' => 'Kho/Phòng',
         'shelf_id' => 'Kệ/Tủ',
+        'column_id' => 'Cột',
+        'tier_id' => 'Tầng',
     ];
 
     public function index()
@@ -91,26 +111,47 @@ class ZoneController extends Controller
             ->orderBy('warehouses.code', 'asc')
             ->get();
 
-        $rooms = DB::table('rooms')
-            ->leftJoin('warehouses', 'rooms.warehouse_id', '=', 'warehouses.id')
-            ->select('rooms.*', 'warehouses.name as warehouse_name')
-            ->where('rooms.department_id', $departmentId)
-            ->orderBy('rooms.code', 'asc')
-            ->get();
-
         $shelves = DB::table('shelves')
             ->leftJoin('warehouses', 'shelves.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'shelves.room_id', '=', 'rooms.id')
-            ->select('shelves.*', 'warehouses.name as warehouse_name', 'rooms.name as room_name')
+            ->select('shelves.*', 'warehouses.name as warehouse_name')
             ->where('shelves.department_id', $departmentId)
             ->orderBy('shelves.code', 'asc')
             ->get();
 
+        $columns = DB::table('columns')
+            ->leftJoin('warehouses', 'columns.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'columns.shelf_id', '=', 'shelves.id')
+            ->select('columns.*', 'warehouses.name as warehouse_name', 'shelves.name as shelf_name')
+            ->where('columns.department_id', $departmentId)
+            ->orderBy('columns.code', 'asc')
+            ->get();
+
+        $tiers = DB::table('tiers')
+            ->leftJoin('warehouses', 'tiers.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'tiers.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'tiers.column_id', '=', 'columns.id')
+            ->select(
+                'tiers.*',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name'
+            )
+            ->where('tiers.department_id', $departmentId)
+            ->orderBy('tiers.code', 'asc')
+            ->get();
+
         $locations = DB::table('locations')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
-            ->select('locations.*', 'warehouses.name as warehouse_name', 'rooms.name as room_name', 'shelves.name as shelf_name')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            ->select(
+                'locations.*',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
             ->where('locations.department_id', $departmentId)
             ->orderBy('locations.code', 'asc')
             ->get();
@@ -119,16 +160,17 @@ class ZoneController extends Controller
 
         return view('pages.materData.Zone.list', [
             'warehouses' => $warehouses,
-            'rooms' => $rooms,
             'shelves' => $shelves,
+            'columns' => $columns,
+            'tiers' => $tiers,
             'locations' => $locations,
             'locationTypes' => self::LOCATION_TYPES,
             /*
-            | Số lần thay đổi của từng mục, khoá là '<bảng>-<id>' vì bốn cấp nằm chung
+            | Số lần thay đổi của từng mục, khoá là '<bảng>-<id>' vì năm cấp nằm chung
             | một trang. Badge trên nút Sửa đọc từ đây, nội dung lịch sử tải sau qua
             | route history khi người dùng bấm vào badge.
             */
-            'historyCounts' => DataMasterHistory::countsOf(['warehouses', 'rooms', 'shelves', 'locations']),
+            'historyCounts' => DataMasterHistory::countsOf(['warehouses', 'shelves', 'columns', 'tiers', 'locations']),
         ]);
     }
 
@@ -191,7 +233,11 @@ class ZoneController extends Controller
             return $this->backToTab($type)->with('error', 'Không tìm thấy ' . $zone['label'] . ' cần cập nhật!');
         }
 
-        $validator = Validator::make($request->all(), $this->rules($zone, $current->id), $this->messages());
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules($zone, $current->id) + $this->changeReasonRules(),
+            $this->messages() + $this->changeReasonMessages()
+        );
 
         if ($validator->fails()) {
             return $this->backToTab($type, 'update')->withErrors($validator, 'update_' . $type);
@@ -199,6 +245,10 @@ class ZoneController extends Controller
 
         $payload = $this->payload($request, $zone);
         $note = DataMasterHistory::note($this->fields($zone), $current, $payload, $this->maps($zone));
+
+        if ($note === '') {
+            return $this->backToTab($type)->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.');
+        }
 
         DB::table($zone['table'])->where('id', $current->id)->update($payload + [
             'updated_by' => $this->actor(),
@@ -209,9 +259,10 @@ class ZoneController extends Controller
             $zone['table'],
             $current->id,
             'Cập nhật',
-            $note ?: 'Lưu lại nhưng nội dung không đổi.',
+            $note,
             $this->fields($zone),
-            $this->maps($zone)
+            $this->maps($zone),
+            $this->changeReason($request)
         );
 
         AuditTrialController::log(
@@ -235,6 +286,10 @@ class ZoneController extends Controller
             return $this->backToTab($type)->with('error', 'Không tìm thấy ' . $zone['label'] . ' cần thay đổi trạng thái!');
         }
 
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
+        }
+
         $newStatus = $current->status_id == 1 ? 0 : 1;
 
         DB::table($zone['table'])->where('id', $current->id)->update([
@@ -249,7 +304,8 @@ class ZoneController extends Controller
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->status_id, $newStatus),
             $this->fields($zone),
-            $this->maps($zone)
+            $this->maps($zone),
+            $this->changeReason($request)
         );
 
         AuditTrialController::log(
@@ -280,6 +336,10 @@ class ZoneController extends Controller
             return $this->backToTab($type)->with('error', 'Không tìm thấy ' . $zone['label'] . ' cần xoá!');
         }
 
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
+        }
+
         foreach ($zone['children'] as [$childTable, $childColumn, $childLabel]) {
             $used = DB::table($childTable)->where($childColumn, $current->id)->count();
 
@@ -300,7 +360,8 @@ class ZoneController extends Controller
             $current->id,
             'Xoá',
             'Xoá hẳn ' . $zone['label'] . ': ' . $this->caption($zone, $current->code, $current->name ?? null) . '.',
-            DataMasterHistory::snapshot($this->fields($zone), $current, $this->maps($zone))
+            DataMasterHistory::snapshot($this->fields($zone), $current, $this->maps($zone)),
+            $this->changeReason($request)
         );
 
         AuditTrialController::log(
@@ -444,12 +505,14 @@ class ZoneController extends Controller
             'code.unique' => 'Mã này đã tồn tại, vui lòng nhập mã khác.',
             'name.required' => 'Vui lòng nhập tên.',
             'name.max' => 'Tên tối đa 255 ký tự.',
-            'warehouse_id.required' => 'Vui lòng chọn kho.',
-            'warehouse_id.exists' => 'Kho được chọn không hợp lệ.',
-            'room_id.required' => 'Vui lòng chọn phòng.',
-            'room_id.exists' => 'Phòng được chọn không hợp lệ.',
+            'warehouse_id.required' => 'Vui lòng chọn kho/phòng.',
+            'warehouse_id.exists' => 'Kho/Phòng được chọn không hợp lệ.',
             'shelf_id.required' => 'Vui lòng chọn kệ/tủ.',
             'shelf_id.exists' => 'Kệ/Tủ được chọn không hợp lệ.',
+            'column_id.required' => 'Vui lòng chọn cột.',
+            'column_id.exists' => 'Cột được chọn không hợp lệ.',
+            'tier_id.required' => 'Vui lòng chọn tầng.',
+            'tier_id.exists' => 'Tầng được chọn không hợp lệ.',
             'item_type.in' => 'Loại lưu trữ được chọn không hợp lệ.',
         ];
     }

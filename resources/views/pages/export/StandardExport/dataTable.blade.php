@@ -56,11 +56,6 @@
                                 <i class="fas fa-plus mr-1"></i> Sử dụng chất chuẩn
                             </button>
                         @endperm
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Tổng cộng <b>{{ $datas->count() }}</b> phiếu.
-                            Được xuất vượt tồn tối đa <b>{{ $overIssuePercent }}%</b> để bù sai số cân đong.
-                        </p>
                     </div>
 
                     @include('pages.shared.barcodeSearch', [

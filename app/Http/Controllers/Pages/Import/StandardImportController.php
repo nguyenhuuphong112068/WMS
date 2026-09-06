@@ -80,8 +80,9 @@ class StandardImportController extends Controller
             // Định khu của ống: locations giữ sẵn id 3 cấp trên nên join tiếp là ra đủ đường dẫn
             ->leftJoin('locations', self::TABLE . '.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 self::TABLE . '.*',
                 'standard_categories.code as category_code',
@@ -97,8 +98,9 @@ class StandardImportController extends Controller
                 'suppliers.address as supplier_address',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where(self::TABLE . '.department_id', $departmentId)
             ->orderBy(self::TABLE . '.imported_date', 'desc')
@@ -505,6 +507,50 @@ class StandardImportController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * ĐỔI TRẠNG THÁI FILE ĐÍNH KÈM - Đang sử dụng (1) <-> Ngưng sử dụng (0).
+     *
+     * File ngưng sử dụng vẫn mở xem được, chỉ hiển thị kèm nhãn trạng thái. Dùng chung
+     * cho cả màn hình Tồn Kho Chất Chuẩn (StandardInventoryController gọi lại logic này).
+     */
+    public function toggleAttachmentStatus(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->join(self::TABLE, self::ATTACHMENT_TABLE . '.standard_import_id', '=', self::TABLE . '.id')
+            ->where(self::ATTACHMENT_TABLE . '.id', $request->id)
+            ->where(self::TABLE . '.department_id', $departmentId)
+            ->select(self::ATTACHMENT_TABLE . '.*', self::TABLE . '.code as import_code')
+            ->first();
+
+        if (! $attachment) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy file đính kèm.'], 404);
+        }
+
+        $wasActive = ! isset($attachment->is_active) || $attachment->is_active;
+        $newActive = $wasActive ? 0 : 1;
+
+        DB::table(self::ATTACHMENT_TABLE)->where('id', $attachment->id)->update([
+            'is_active' => $newActive,
+            'status_changed_by' => $this->actor(),
+            'status_changed_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Đổi trạng thái tài liệu',
+            self::TABLE,
+            $attachment->standard_import_id,
+            $attachment->import_code,
+            'File "' . $attachment->file_name . '": '
+                . ($wasActive ? 'Đang sử dụng' : 'Ngưng sử dụng') . ' -> '
+                . ($newActive ? 'Đang sử dụng' : 'Ngưng sử dụng')
+        );
+
+        return response()->json(['success' => true, 'is_active' => $newActive]);
+    }
+
     public function deActive(Request $request)
     {
         $current = DB::table(self::TABLE)
@@ -740,20 +786,23 @@ class StandardImportController extends Controller
     {
         return DB::table('locations')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 'locations.id',
                 'locations.code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
             ->orderBy('warehouses.name', 'asc')
-            ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
+            ->orderBy('columns.name', 'asc')
+            ->orderBy('tiers.name', 'asc')
             ->orderBy('locations.code', 'asc')
             ->get();
     }

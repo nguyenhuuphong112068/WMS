@@ -22,24 +22,11 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-lg-7">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Mã Chất Chuẩn</label>
-                                        <input type="text" name="code" class="form-control cat-readonly"
-                                            value="{{ $old('code') }}" readonly tabindex="-1">
-                                        <small class="md-sub">Mã đã cấp, không sửa được.</small>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Version</label>
-                                        <input type="text" name="version" class="form-control cat-readonly"
-                                            value="{{ $old('version') }}" readonly tabindex="-1">
-                                        <small class="md-sub">Version tự động cấp, không sửa được.</small>
-                                    </div>
-                                </div>
+                            <div class="form-group">
+                                <label>Mã Chất Chuẩn</label>
+                                <input type="text" name="code" class="form-control cat-readonly"
+                                    value="{{ $old('code') }}" readonly tabindex="-1">
+                                <small class="md-sub">Mã đã cấp, không sửa được.</small>
                             </div>
 
                             <div class="form-group">
@@ -101,8 +88,8 @@
                                     <div class="form-group">
                                         <label>Tỷ Trọng (g/ml)</label>
                                         <div class="input-group">
-                                            <input type="number" name="density" step="0.0001" min="0.0001"
-                                                class="form-control {{ $bag->has('density') ? 'is-invalid' : '' }}"
+                                            <input type="text" inputmode="decimal" name="density" min="0.0001"
+                                                class="form-control js-decimal {{ $bag->has('density') ? 'is-invalid' : '' }}"
                                                 value="{{ $old('density') }}" placeholder="Ví dụ: 1.04">
                                             <div class="input-group-append">
                                                 <span class="input-group-text">g/ml</span>
@@ -176,6 +163,15 @@
                     </div>
 
 
+                    <div class="form-group">
+                        <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" rows="2" maxlength="500" required
+                            class="form-control {{ $bag->has('change_reason') ? 'is-invalid' : '' }}"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @if ($bag->has('change_reason'))
+                            <span class="md-error">{{ $bag->first('change_reason') }}</span>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="modal-footer">

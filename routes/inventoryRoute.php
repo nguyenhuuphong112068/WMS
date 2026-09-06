@@ -37,6 +37,9 @@ Route::prefix('/inventory')
             Route::get('chart', 'chart')->name('chart');
             Route::post('balancing', 'balancing')->name('balancing');
             Route::post('internalExpiry', 'internalExpiry')->name('internalExpiry');
+            // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
+            Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
         });
 
         Route::prefix('/standardInventory')->name('standardInventory.')->controller(StandardInventoryController::class)->group(function () {
@@ -44,6 +47,12 @@ Route::prefix('/inventory')
             Route::post('balancing', 'balancing')->name('balancing');
             Route::post('internalExpiry', 'internalExpiry')->name('internalExpiry');
             Route::post('weightRemark', 'weightRemark')->name('weightRemark');
+            // Cập nhật hạn dùng cho ống Retest / Check online, lưu vết ở standard_expiry_updates
+            Route::post('expiryUpdate', 'expiryUpdate')->name('expiryUpdate');
+            Route::get('expiry-attachment/{id}', 'downloadExpiryAttachment')->name('downloadExpiryAttachment');
+            // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
+            Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
         });
 
         Route::prefix('/materialInventory')->name('materialInventory.')->controller(MaterialInventoryController::class)->group(function () {
@@ -51,6 +60,9 @@ Route::prefix('/inventory')
             // Dữ liệu JSON cho modal Biểu Đồ Nhập - Xuất - Tồn của một vật tư
             Route::get('chart', 'chart')->name('chart');
             Route::post('balancing', 'balancing')->name('balancing');
+            // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
+            Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
         });
 
         // Đối chiếu ngưỡng tồn trữ Phụ lục IV NĐ 24/2026/NĐ-CP - màn hình chỉ đọc, số liệu

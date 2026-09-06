@@ -9,11 +9,6 @@
                     <i class="fas fa-plus mr-1"></i> Thêm mới
                 </button>
             @endperm
-            <p class="hint">
-                <i class="fas fa-info-circle mr-1"></i>
-                Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} bản ghi.
-                Phân loại và đơn vị tính khai ở tab <b>Vật Tư Của Phòng</b>.
-            </p>
         </div>
 
         <div class="table-responsive">

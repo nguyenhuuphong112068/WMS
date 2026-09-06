@@ -16,10 +16,9 @@
             <div class="modal-body">
 
                 <div class="row mb-3">
-                    <div class="col-md-3"><small class="text-muted">Tổ</small><div class="font-weight-bold">{{ $req->group_name }}</div></div>
-                    <div class="col-md-3"><small class="text-muted">Người lập</small><div class="font-weight-bold">{{ $req->created_by }}</div></div>
-                    <div class="col-md-3"><small class="text-muted">Cần BGĐ duyệt</small><div class="font-weight-bold">{{ $req->needs_director ? 'Có' : 'Không' }}</div></div>
-                    <div class="col-md-3"><small class="text-muted">Ghi chú</small><div>{{ $req->note ?: '—' }}</div></div>
+                    <div class="col-md-4"><small class="text-muted">Người lập</small><div class="font-weight-bold">{{ $req->created_by }}</div></div>
+                    <div class="col-md-4"><small class="text-muted">Cần BGĐ duyệt</small><div class="font-weight-bold">{{ $req->needs_director ? 'Có' : 'Không' }}</div></div>
+                    <div class="col-md-4"><small class="text-muted">Ghi chú</small><div>{{ $req->note ?: '—' }}</div></div>
                 </div>
 
                 @if (! $canIssue)
@@ -34,7 +33,6 @@
                         <b>cấp từ nhiều mã xuất nhập</b> (bấm <i class="fas fa-layer-group"></i> cạnh ô cấp phát để xem
                         danh mục tồn kèm khuyến nghị FEFO/FIFO). Kho không đủ hàng thì cấp được bao nhiêu hay bấy nhiêu:
                         mục đó chuyển sang <b>"Cấp phát một phần"</b> và <b>cấp thêm được</b> khi có hàng về.
-                        Sau đó Tổ bấm <b>"Sử Dụng Vật Tư"</b> để ghi nhật ký số thực dùng, hoặc trả phần chưa dùng về kho.
                     </div>
                 @endif
 
@@ -148,23 +146,7 @@
                                                 </div>
                                             @endif
 
-                                            @if (in_array($it->status, ['issued', 'partial']))
-                                                @perm('export_material_request')
-                                                    <button type="button" class="btn btn-xs btn-primary mt-1 btn-me-use"
-                                                        title="{{ $isPartial ? 'Chốt luôn phần đã cấp - chốt xong sẽ không cấp thêm được nữa' : 'Ghi nhật ký số thực dùng, hoặc trả phần chưa dùng về kho' }}"
-                                                        data-item-id="{{ $it->id }}"
-                                                        data-material="{{ $it->display_name }}"
-                                                        data-code="{{ $lots->count() ? $lots->pluck('code')->implode(', ') : ($it->issued_import_code ?: $it->import_code) }}"
-                                                        data-amount="{{ $issuedNum }}"
-                                                        data-unit="{{ $unitLabel }}"
-                                                        data-product="{{ $it->product_name }}"
-                                                        data-request="{{ $req->code }}">
-                                                        <i class="fas fa-hand-holding-medical mr-1"></i>Sử Dụng Vật Tư
-                                                    </button>
-                                                @endperm
-                                            @elseif ($it->status === 'used')
-                                                <span class="badge badge-info mt-1"><i class="fas fa-check mr-1"></i>Đã ghi nhật ký sử dụng</span>
-                                            @elseif ($it->status === 'returned')
+                                            @if ($it->status === 'returned')
                                                 <span class="badge badge-secondary mt-1"><i class="fas fa-rotate-left mr-1"></i>Đã trả về kho</span>
                                             @endif
                                         @endif

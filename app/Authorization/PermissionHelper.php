@@ -2,23 +2,40 @@
 
 use Illuminate\Support\Facades\DB;
 
+if (! function_exists('user_current_department_id')) {
+    /**
+     * Phòng ban đang chọn của phiên hiện tại. Dùng để lọc quyền theo phòng ban.
+     */
+    function user_current_department_id(): ?int
+    {
+        $id = session('user')['selected_department_id'] ?? null;
+
+        return $id ? (int) $id : null;
+    }
+}
+
 if (! function_exists('user_permission_names')) {
     /**
-     * Danh sách tên quyền user thực sự có = quyền từ nhóm quyền (role_permission),
-     * sau đó áp quyền cấp riêng cho user (user_permission) đè lên.
-     * Tài khoản Admin luôn có toàn bộ quyền, không bị chặn bởi user_permission.
-     * Kết quả cache theo user trong 1 request để tránh query lặp.
+     * Danh sách tên quyền user thực sự có, TÍNH THEO PHÒNG BAN ĐANG CHỌN:
+     *   - quyền từ role gán qua user_role có department_id = NULL (áp mọi phòng)
+     *     hoặc = phòng ban đang chọn;
+     *   - sau đó áp quyền cấp riêng cho user (user_permission) đè lên (không phụ thuộc phòng).
+     * Tài khoản Admin luôn có toàn bộ quyền, mọi phòng.
+     * Kết quả cache theo (user, phòng ban) trong 1 request.
      */
-    function user_permission_names($userId): array
+    function user_permission_names($userId, ?int $departmentId = null): array
     {
         static $cache = [];
 
-        if (array_key_exists($userId, $cache)) {
-            return $cache[$userId];
+        $departmentId ??= user_current_department_id();
+        $key = $userId . ':' . ($departmentId ?? 0);
+
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
         }
 
-        if (user_has_any_role($userId, ['Admin'])) {
-            return $cache[$userId] = array_fill_keys(
+        if (user_has_any_role($userId, ['Admin'], $departmentId)) {
+            return $cache[$key] = array_fill_keys(
                 DB::table('permissions')->pluck('name')->all(),
                 true
             );
@@ -30,13 +47,19 @@ if (! function_exists('user_permission_names')) {
             ->join('role_permission', 'permissions.id', '=', 'role_permission.permission_id')
             ->join('user_role', 'role_permission.role_id', '=', 'user_role.role_id')
             ->where('user_role.user_id', $userId)
+            ->where(function ($q) use ($departmentId) {
+                $q->whereNull('user_role.department_id');
+                if ($departmentId) {
+                    $q->orWhere('user_role.department_id', $departmentId);
+                }
+            })
             ->pluck('permissions.name');
 
         foreach ($fromRole as $name) {
             $names[$name] = true;
         }
 
-        // Quyền cấp riêng cho user ghi đè kết quả từ nhóm quyền
+        // Quyền cấp riêng cho user ghi đè kết quả từ nhóm quyền (áp mọi phòng)
         $overrides = DB::table('permissions')
             ->join('user_permission', 'permissions.id', '=', 'user_permission.permission_id')
             ->where('user_permission.user_id', $userId)
@@ -50,7 +73,7 @@ if (! function_exists('user_permission_names')) {
             }
         }
 
-        return $cache[$userId] = $names;
+        return $cache[$key] = $names;
     }
 }
 
@@ -73,14 +96,16 @@ if (! function_exists('user_has_permission')) {
 
 if (! function_exists('user_has_any_role')) {
     /**
-     * Kiểm tra user có thuộc một trong các role được liệt kê không.
-     * Role 'Admin' luôn được coi là có toàn quyền (bỏ qua $roleNames).
-     * Gộp cả role chính (user_management.role_id) lẫn các role gán qua user_role/roles
-     * để tương thích với dữ liệu cũ (chỉ có role chính, chưa gán user_role).
+     * Kiểm tra user có thuộc một trong các role được liệt kê không (theo phòng ban đang chọn).
+     *  - Role chính (user_management.role_id) là danh tính gốc: áp cho MỌI phòng ban.
+     *  - Role gán qua user_role chỉ tính khi department_id = NULL hoặc = phòng ban đang chọn.
+     * Role 'Admin' được coi là toàn quyền (bỏ qua $roleNames).
      */
-    function user_has_any_role($userId, array $roleNames): bool
+    function user_has_any_role($userId, array $roleNames, ?int $departmentId = null): bool
     {
-        $primaryGroup = DB::table('user_management')
+        $departmentId ??= user_current_department_id();
+
+        $primaryRole = DB::table('user_management')
             ->leftJoin('roles', 'roles.id', '=', 'user_management.role_id')
             ->where('user_management.id', $userId)
             ->value('roles.name');
@@ -88,16 +113,84 @@ if (! function_exists('user_has_any_role')) {
         $assignedRoles = DB::table('user_role')
             ->join('roles', 'roles.id', '=', 'user_role.role_id')
             ->where('user_role.user_id', $userId)
+            ->where(function ($q) use ($departmentId) {
+                $q->whereNull('user_role.department_id');
+                if ($departmentId) {
+                    $q->orWhere('user_role.department_id', $departmentId);
+                }
+            })
             ->pluck('roles.name')
             ->all();
 
-        $userRoleNames = array_filter(array_merge([$primaryGroup], $assignedRoles));
+        $userRoleNames = array_filter(array_merge([$primaryRole], $assignedRoles));
 
         if (in_array('Admin', $userRoleNames, true)) {
             return true;
         }
 
         return count(array_intersect($roleNames, $userRoleNames)) > 0;
+    }
+}
+
+if (! function_exists('user_allowed_department_ids')) {
+    /**
+     * Các phòng ban user được phép vào làm việc (chọn ở "Chuyển Bộ Phận").
+     *  - Trả ['*'] nếu user là Admin (role chính) hoặc có role gán với department_id = NULL
+     *    (role áp mọi phòng) -> vào được mọi phòng.
+     *  - Ngược lại: phòng ban chính + các phòng ban đã gán role cụ thể.
+     * Cache theo user trong 1 request.
+     */
+    function user_allowed_department_ids($userId): array
+    {
+        static $cache = [];
+
+        if (array_key_exists($userId, $cache)) {
+            return $cache[$userId];
+        }
+
+        $primaryRole = DB::table('user_management')
+            ->leftJoin('roles', 'roles.id', '=', 'user_management.role_id')
+            ->where('user_management.id', $userId)
+            ->value('roles.name');
+
+        if ($primaryRole === 'Admin') {
+            return $cache[$userId] = ['*'];
+        }
+
+        $hasGlobalRole = DB::table('user_role')
+            ->where('user_id', $userId)
+            ->whereNull('department_id')
+            ->exists();
+
+        if ($hasGlobalRole) {
+            return $cache[$userId] = ['*'];
+        }
+
+        $ids = DB::table('user_role')
+            ->where('user_id', $userId)
+            ->whereNotNull('department_id')
+            ->pluck('department_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $primaryDeptId = DB::table('user_management')->where('id', $userId)->value('deparment_id');
+        if ($primaryDeptId) {
+            $ids[] = (int) $primaryDeptId;
+        }
+
+        return $cache[$userId] = array_values(array_unique($ids));
+    }
+}
+
+if (! function_exists('user_can_access_department')) {
+    /**
+     * User có được phép chọn / làm việc ở phòng ban $departmentId không.
+     */
+    function user_can_access_department($userId, $departmentId): bool
+    {
+        $allowed = user_allowed_department_ids($userId);
+
+        return $allowed === ['*'] || in_array((int) $departmentId, $allowed, true);
     }
 }
 

@@ -114,7 +114,7 @@ class DepartmentStandard
         return self::TABLE.'.min_stock';
     }
 
-    /** Vị trí lưu trữ quy hoạch của phòng, dùng để điền sẵn khi nhập. */
+    /** Định khu của phòng, dùng để điền sẵn khi nhập. */
     public static function defaultLocationColumn()
     {
         return self::TABLE.'.default_location_id as default_location_id';
@@ -156,12 +156,13 @@ class DepartmentStandard
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
-            ->leftJoin('storage_conditions', self::TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
-            ->leftJoin('storage_conditions as category_storage', 'standard_categories.storage_condition_id', '=', 'category_storage.id')
+            // Điều kiện bảo quản luôn lấy thẳng từ Danh Mục Chất Chuẩn của công ty
+            ->leftJoin('storage_conditions', 'standard_categories.storage_condition_id', '=', 'storage_conditions.id')
             ->leftJoin('locations', self::TABLE.'.default_location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 self::TABLE.'.*',
                 'standard_categories.code as category_code',
@@ -176,11 +177,11 @@ class DepartmentStandard
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'storage_conditions.name as storage_condition_name',
-                'category_storage.name as category_storage_condition_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
             ->orderBy('standard_categories.code', 'asc')
@@ -227,14 +228,16 @@ class DepartmentStandard
     {
         return DB::table('locations')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 'locations.id',
                 'locations.code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
@@ -242,8 +245,9 @@ class DepartmentStandard
             ->where(fn ($query) => $query->whereNull('locations.item_type')
                 ->orWhere('locations.item_type', 'standard'))
             ->orderBy('warehouses.name', 'asc')
-            ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
+            ->orderBy('columns.name', 'asc')
+            ->orderBy('tiers.name', 'asc')
             ->orderBy('locations.code', 'asc')
             ->get();
     }
@@ -273,16 +277,6 @@ class DepartmentStandard
             ->get();
     }
 
-    /** Điều kiện bảo quản còn hiệu lực, dùng cho ô chọn của phòng ban. */
-    public static function storageConditionOptions()
-    {
-        return DB::table('storage_conditions')
-            ->select('id', 'name')
-            ->where('status_id', 1)
-            ->orderBy('name', 'asc')
-            ->get();
-    }
-
     /**
      * Chất chuẩn được phép NHẬP KHO của đúng một phòng ban.
      *
@@ -291,7 +285,7 @@ class DepartmentStandard
      * Chuẩn Của Phòng" thì không nhập vào kho được, nên ô chọn của màn hình Nhập đi thẳng
      * từ bảng này ra chứ không duyệt cả danh mục chung của công ty.
      *
-     * Điều kiện bảo quản lấy theo quy tắc chung: của phòng trước, chưa khai thì theo danh mục.
+     * Điều kiện bảo quản luôn lấy theo Danh Mục Chất Chuẩn chung của công ty.
      * Đơn vị tính chỉ có ở standard_department_categories nên lấy thẳng từ dòng khai của phòng.
      *
      * $keepIds là các category_id đang nằm trên phiếu cũ của phòng: giữ lại để modal Điều
@@ -306,8 +300,7 @@ class DepartmentStandard
             ->join('standard_categories', self::TABLE.'.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('storage_conditions', self::TABLE.'.storage_condition_id', '=', 'storage_conditions.id')
-            ->leftJoin('storage_conditions as category_storage', 'standard_categories.storage_condition_id', '=', 'category_storage.id')
+            ->leftJoin('storage_conditions', 'standard_categories.storage_condition_id', '=', 'storage_conditions.id')
             ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
             ->select(
                 'standard_categories.id',
@@ -319,8 +312,7 @@ class DepartmentStandard
                 'standard_names.cas_no as name_cas_no',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
-                // Chuỗi trong DB::raw là hằng, không ghép từ dữ liệu người dùng
-                DB::raw('COALESCE(storage_conditions.name, category_storage.name) as storage_condition_name'),
+                'storage_conditions.name as storage_condition_name',
                 self::shelfLifeColumn(),
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',

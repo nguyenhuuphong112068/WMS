@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\MaterData;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DataMasterHistory;
@@ -23,6 +24,8 @@ use Illuminate\Validation\Rule;
  */
 class CompanyController extends Controller
 {
+    use RequiresChangeReason;
+
     private const TABLE = 'companies';
     private const LABEL = 'công ty';
 
@@ -85,7 +88,11 @@ class CompanyController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần cập nhật!');
         }
 
-        $validator = Validator::make($request->all(), $this->rules($current->id), $this->messages());
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules($current->id) + $this->changeReasonRules(),
+            $this->messages() + $this->changeReasonMessages()
+        );
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
@@ -94,12 +101,16 @@ class CompanyController extends Controller
         $payload = $this->payload($request);
         $note = DataMasterHistory::note(self::FIELDS, $current, $payload);
 
+        if ($note === '') {
+            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
 
-        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS);
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, [], $this->changeReason($request));
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->name, $request->name);
 
@@ -112,6 +123,10 @@ class CompanyController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần thay đổi trạng thái!');
+        }
+
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
         }
 
         // Không cho khoá công ty còn phòng ban đang gắn - tránh mất phạm vi đối chiếu ngưỡng
@@ -136,7 +151,9 @@ class CompanyController extends Controller
             $current->id,
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->status_id, $newStatus),
-            self::FIELDS
+            self::FIELDS,
+            [],
+            $this->changeReason($request)
         );
 
         AuditTrialController::log(

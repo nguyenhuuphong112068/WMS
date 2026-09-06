@@ -453,8 +453,7 @@ class HomeController extends Controller
         $labels = config('estimate.app_statuses');
 
         $records = DB::table('material_request_lists as r')
-            ->leftJoin('groups as g', 'r.group_id', '=', 'g.id')
-            ->select('r.id', 'r.code', 'r.app_status', 'r.submitted_at', 'r.created_at', 'g.name as group_name')
+            ->select('r.id', 'r.code', 'r.name', 'r.app_status', 'r.submitted_at', 'r.created_at')
             ->where('r.department_id', $departmentId)
             ->where('r.status_id', 1)
             ->whereIn('r.app_status', ['pending_manager', 'pending_director'])
@@ -471,7 +470,7 @@ class HomeController extends Controller
                 'icon' => 'fas fa-clipboard-list',
                 'label' => 'Đề nghị cấp phát vật tư',
                 'code' => $record->code,
-                'title' => $record->group_name ? 'Tổ '.$record->group_name : 'Chưa rõ tổ đề nghị',
+                'title' => $record->name ?: 'Đề nghị cấp phát vật tư',
                 'status_label' => $labels[$record->app_status] ?? $record->app_status,
                 'since' => $record->submitted_at ?: $record->created_at,
                 'url' => route('pages.export.materialExport.list'),

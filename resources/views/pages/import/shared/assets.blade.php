@@ -733,6 +733,12 @@
             var categoryId = $select.val();
             var amount = parseFloat($form.find('[name="amount"]').val());
 
+            // "Số lần nhập": modal Nhập tách 1 lần khai thành N lô cùng số lượng, nên
+            // tồn dự kiến để soi ngưỡng phải là amount × số lần. Update không có ô này -> N = 1.
+            var times = parseInt($form.find('[name="quantity"]').val(), 10);
+            if (!times || times < 1) times = 1;
+            if (times > 50) times = 50;
+
             if (!categoryId || !amount || amount <= 0) {
                 renderImpThresholdAlerts($box, []);
                 return;
@@ -740,7 +746,7 @@
 
             $.get($select.data('threshold-url'), {
                 category_id: categoryId,
-                amount: amount,
+                amount: amount * times,
                 original_category_id: $form.find('[name="original_category_id"]').val() || '',
                 original_amount: $form.find('[name="original_amount"]').val() || ''
             }).done(function(res) {
@@ -754,7 +760,7 @@
 
         var impThresholdTimer = null;
 
-        $(document).on('input', '.md-modal [name="amount"]', function() {
+        $(document).on('input', '.md-modal [name="amount"], .md-modal [name="quantity"]', function() {
             var $form = $(this).closest('form');
 
             clearTimeout(impThresholdTimer);
@@ -769,3 +775,5 @@
         });
     });
 </script>
+
+@include('pages.shared.attachmentListAssets')

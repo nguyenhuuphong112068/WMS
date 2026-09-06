@@ -73,7 +73,7 @@
                         </div>
 
                         @if ($meta['hasName'] ?? true)
-                            <div class="form-group mb-0">
+                            <div class="form-group">
                                 <label>Tên {{ $meta['label'] }} <span class="text-danger">*</span></label>
                                 <input type="text" name="name" maxlength="255"
                                     class="form-control inp-name {{ $bag->has('name') ? 'is-invalid' : '' }}" required>
@@ -82,6 +82,16 @@
                                 @endif
                             </div>
                         @endif
+
+                        <div class="form-group mb-0">
+                            <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                            <textarea name="change_reason" rows="2" maxlength="500" required
+                                class="form-control inp-change-reason {{ $bag->has('change_reason') ? 'is-invalid' : '' }}"
+                                placeholder="Nêu rõ lý do sửa mục định khu này"></textarea>
+                            @if ($bag->has('change_reason'))
+                                <span class="zone-error">{{ $bag->first('change_reason') }}</span>
+                            @endif
+                        </div>
                     </div>
 
                     <div class="modal-footer">

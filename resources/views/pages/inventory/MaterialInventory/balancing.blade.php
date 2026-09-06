@@ -51,9 +51,9 @@
                         </div>
                         <div class="form-group col-md-3">
                             <label>Số Lượng Cân Đối <span class="text-danger">*</span></label>
-                            <input type="number" name="balancing_amount" step="0.0001"
+                            <input type="text" inputmode="decimal" name="balancing_amount"
                                 min="{{ $invOldRow->balancing_min_input ?? '' }}" max="{{ $invOldRow->balancing_max_input ?? '' }}"
-                                class="form-control {{ $bag->has('balancing_amount') ? 'is-invalid' : '' }}"
+                                class="form-control js-decimal {{ $bag->has('balancing_amount') ? 'is-invalid' : '' }}"
                                 value="{{ old('balancing_amount') }}" placeholder="Ví dụ: 0.5 hoặc -0.5" required>
                             @if ($bag->has('balancing_amount'))
                                 <span class="md-error text-danger small">{{ $bag->first('balancing_amount') }}</span>

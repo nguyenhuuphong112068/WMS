@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Pages\Export;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\CategoryUnitConversion;
 use App\Support\DepartmentMaterial;
+use App\Support\MaterialCode;
 use App\Support\MaterialPicking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * SỬ DỤNG - SỬ DỤNG VẬT TƯ
@@ -18,20 +21,21 @@ use Illuminate\Support\Facades\Validator;
  *   1. Tổ lập ĐỀ NGHỊ (material_request_lists + items) -> Trình ký.
  *   2. Trưởng/Phó Phòng ký (BẮT BUỘC). Nếu phiếu đánh dấu "cần Ban Giám Đốc" thì ký xong
  *      chuyển tiếp Ban Giám Đốc ký (TUỲ CHỌN). Ký đủ -> approved, issue_status = waiting.
- *   3. Kho CẤP PHÁT từng dòng: chỉ định mã xuất nhập, số lượng. Hàng rời kho ngay lúc này
- *      nên cấp phát TRỪ TỒN TRỰC TIẾP - sinh luôn một bản ghi material_exports (type =
- *      export) gắn với dòng đề nghị, và material_request_items.status = issued.
- *   4. Tổ chốt lại dòng đã cấp bằng "SỬ DỤNG VẬT TƯ" (useStore):
- *        - Ghi nhận sử dụng: sửa phiếu sử dụng về đúng số THỰC DÙNG, phần dư tự về kho
- *          -> status = used.
- *        - Trả về kho: trả lại số chưa dùng; trả hết thì huỷ phiếu sử dụng (status_id = 0)
- *          nên kho hoàn đủ -> status = returned.
+ *   3. Kho CẤP PHÁT từng dòng: chỉ định mã xuất nhập, số lượng. Cấp phát là XUẤT KHO,
+ *      tương đương vật tư đã đem sử dụng - TRỪ TỒN TRỰC TIẾP, sinh luôn một bản ghi
+ *      material_exports (type = export) gắn với dòng đề nghị. Cấp đủ số đề nghị thì
+ *      material_request_items.status = issued; kho thiếu hàng thì cấp được bao nhiêu hay
+ *      bấy nhiêu (status = partial) và cấp thêm cho tới khi đủ. Không có bước chốt lại.
  *
  *   LOẠI BỎ (type = cancel) hàng hỏng / hết hạn không phải "sử dụng" nên lập thẳng trên
  *   material_exports, không cần đề nghị; bắt buộc nhập lý do và không được vượt tồn quá 5%.
  *
- * Trạng thái tồn dùng công thức: nhập + cân đối - đã xuất (kể cả loại bỏ). Vì cấp phát đã
- * sinh sẵn phiếu sử dụng, không có chỗ nào lập phiếu sử dụng thủ công nữa - tránh trừ hai lần.
+ *   CẤP PHÁT LIÊN PHÒNG BAN (type = transfer_out) là hàng chuyển sang phòng khác chứ không
+ *   phải hàng đã dùng - xem khối "ĐỀ NGHỊ CHUYỂN VẬT TƯ LIÊN PHÒNG BAN" bên dưới.
+ *
+ * Trạng thái tồn dùng công thức: nhập + cân đối - đã xuất (kể cả loại bỏ và chuyển đi). Vì
+ * cấp phát đã sinh sẵn phiếu sử dụng, không có chỗ nào lập phiếu sử dụng thủ công nữa -
+ * tránh trừ hai lần.
  */
 class MaterialExportController extends Controller
 {
@@ -43,6 +47,10 @@ class MaterialExportController extends Controller
 
     private const REQ_ITEM = 'material_request_items';
 
+    private const TRANSFER_REQUEST_TABLE = 'material_transfer_requests';
+
+    private const TRANSFER_ITEM_TABLE = 'material_transfer_items';
+
     private const LABEL = 'phiếu sử dụng vật tư';
 
     private const EPSILON = 0.00005;
@@ -50,6 +58,13 @@ class MaterialExportController extends Controller
     private const OVER_ISSUE_RATIO = 0.05;
 
     public const TYPES = ['export' => 'Sử dụng', 'cancel' => 'Loại bỏ'];
+
+    /**
+     * Loại phiếu CẤP PHÁT LIÊN PHÒNG BAN - không nằm trong TYPES vì không chọn được ở form
+     * Sử Dụng chung, chỉ sinh ra qua transferIssueStore(). Trừ tồn phòng gửi như mọi phiếu
+     * xuất khác, nhưng hàng không mất đi mà thành tồn của phòng nhận.
+     */
+    private const TYPE_TRANSFER_OUT = 'transfer_out';
 
     /** Trường theo dõi khi điều chỉnh phiếu sử dụng: cột => tên hiển thị. */
     private const FIELDS = [
@@ -72,15 +87,17 @@ class MaterialExportController extends Controller
             ->leftJoin('material_imports', self::TABLE.'.import_id', '=', 'material_imports.id')
             ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
-            ->leftJoin('groups', self::TABLE.'.group_id', '=', 'groups.id')
             ->leftJoin(self::REQ_ITEM, self::TABLE.'.request_item_id', '=', self::REQ_ITEM.'.id')
             ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
+            // Phòng ban nhận, chỉ có ở phiếu cấp phát liên phòng ban (type = transfer_out)
+            ->leftJoin('deparments', self::TABLE.'.to_department_id', '=', 'deparments.id')
             ->select(
                 self::TABLE.'.*',
                 'material_names.name as material_name',
                 'material_categories.technical_specification',
-                'groups.name as group_name',
                 'units.short_name as unit_short_name',
+                'deparments.name as to_department_name',
+                'deparments.shortName as to_department_short',
                 self::REQ_ITEM.'.purpose'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
@@ -89,8 +106,7 @@ class MaterialExportController extends Controller
             ->get();
 
         $requestLists = DB::table(self::REQ_LIST)
-            ->leftJoin('groups', self::REQ_LIST.'.group_id', '=', 'groups.id')
-            ->select(self::REQ_LIST.'.*', 'groups.name as group_name')
+            ->select(self::REQ_LIST.'.*')
             ->where(self::REQ_LIST.'.department_id', $departmentId)
             ->orderBy(self::REQ_LIST.'.id', 'desc')
             ->get()
@@ -149,11 +165,31 @@ class MaterialExportController extends Controller
 
         session()->put(['title' => 'SỬ DỤNG - SỬ DỤNG VẬT TƯ']);
 
+        // Đề nghị chuyển vật tư LIÊN PHÒNG BAN: đã gửi đi (mình là A) / cần cấp phát (mình là B)
+        $transfer = $this->transferRequestsData($departmentId);
+
+        // Vật tư phòng mình đã khai ở tab "Vật Tư Của Phòng" - dùng để cảnh báo ngay trên
+        // phiếu khi có mục đang "chờ nhận" mà phòng mình chưa khai (chưa có đơn vị tính),
+        // thay vì để bấm Nhận xong mới báo lỗi.
+        $declaredCategoryIds = DB::table(DepartmentMaterial::TABLE)
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->pluck('category_id')
+            ->all();
+
+        /*
+        | Tab nào đang mở: ?tab= trên URL là chính; các action liên phòng ban dùng
+        | redirect()->back() (không đổi URL) nên tự flash activeTab qua session.
+        */
+        $tabs = ['book', 'request', 'transfer'];
+        $activeTab = in_array($request->query('tab'), $tabs, true)
+            ? $request->query('tab')
+            : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'book');
+
         return view('pages.export.MaterialExport.list', [
             'exports' => $exports,
             'requestLists' => $requestLists,
             'requestItems' => $requestItems,
-            'groups' => $this->groupOptions($departmentId),
             'categories' => $categories,
             'units' => $this->unitOptions(),
             'availableImports' => $availableImports,
@@ -169,7 +205,16 @@ class MaterialExportController extends Controller
             'canSignManager' => $this->canSignRequest('manager'),
             'canSignDirector' => $this->canSignRequest('director'),
             'overIssuePercent' => (int) round(self::OVER_ISSUE_RATIO * 100),
-            'activeTab' => $request->query('tab') === 'request' ? 'request' : 'book',
+            // ---- Tab "Đề nghị chuyển liên phòng ban" ----
+            'transferSent' => $transfer['sent'],
+            'transferReceived' => $transfer['received'],
+            'transferItems' => $transfer['items'],
+            'transferCategories' => $this->transferCategoryOptions($departmentId),
+            'transferDepartments' => $this->departmentOptions($departmentId),
+            'transferOwnLocations' => DepartmentMaterial::locationOptions($departmentId),
+            'declaredCategoryIds' => $declaredCategoryIds,
+            'currentDepartmentId' => $departmentId,
+            'activeTab' => $activeTab,
         ]);
     }
 
@@ -194,8 +239,7 @@ class MaterialExportController extends Controller
         $isDraft = $request->input('action_type', 'send') === 'draft';
 
         $deptStr = str_pad((string) $departmentId, 2, '0', STR_PAD_LEFT);
-        $groupStr = str_pad((string) $request->group_id, 2, '0', STR_PAD_LEFT);
-        $prefix = $deptStr.$groupStr.date('dmy').'_';
+        $prefix = $deptStr.date('dmy').'_';
 
         $latest = DB::table(self::REQ_LIST)->where('code', 'LIKE', $prefix.'%')->orderBy('id', 'desc')->value('code');
         $seq = 1;
@@ -209,7 +253,6 @@ class MaterialExportController extends Controller
             $listId = DB::table(self::REQ_LIST)->insertGetId([
                 'code' => $code,
                 'department_id' => $departmentId,
-                'group_id' => (int) $request->group_id,
                 'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
                 'app_status' => $isDraft ? 'draft' : 'pending_manager',
@@ -269,7 +312,6 @@ class MaterialExportController extends Controller
 
         DB::transaction(function () use ($request, $req, $isDraft) {
             DB::table(self::REQ_LIST)->where('id', $req->id)->update([
-                'group_id' => (int) $request->group_id,
                 'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
                 'needs_director' => $request->boolean('needs_director'),
@@ -616,14 +658,13 @@ class MaterialExportController extends Controller
                 'updated_at' => now(),
             ]);
 
-            // Cấp phát là hàng đã rời kho: mỗi lô một phiếu sử dụng để trừ tồn ngay.
-            // Tổ chốt lại sau bằng "Sử Dụng Vật Tư" (ghi số thực dùng) hoặc trả về kho.
+            // Cấp phát là hàng đã rời kho (xuất kho = đem sử dụng): mỗi lô một phiếu sử
+            // dụng để trừ tồn ngay, không có bước chốt lại.
             foreach ($lines as $line) {
                 $exportId = DB::table(self::TABLE)->insertGetId([
                     'code' => $line['import']->code,
                     'import_id' => (int) $line['import']->id,
                     'department_id' => $departmentId,
-                    'group_id' => $req->group_id,
                     'request_item_id' => $item->id,
                     'amount' => $line['amount'],
                     'type' => 'export',
@@ -704,146 +745,6 @@ class MaterialExportController extends Controller
     }
 
     /* ==========================================================
-     |  SỬ DỤNG VẬT TƯ ĐÃ CẤP PHÁT
-     |
-     |  Kho cấp phát là đã trừ tồn, nên ở đây Tổ chỉ chốt lại phiếu sử dụng đã có:
-     |    - Ghi nhận sử dụng: nhập số THỰC DÙNG, phần chưa dùng tự cộng lại kho.
-     |    - Trả về kho: nhập số TRẢ LẠI, trả hết thì phiếu sử dụng bị huỷ, kho hoàn đủ.
-     |  Hai việc quy về một phép tính nên dùng chung một action.
-     ========================================================== */
-
-    public function useStore(Request $request)
-    {
-        $departmentId = $this->departmentId();
-
-        $validator = Validator::make($request->all(), [
-            'item_id' => ['required', 'exists:'.self::REQ_ITEM.',id'],
-            'action' => ['required', 'in:use,return'],
-            'amount' => ['required', 'numeric', 'min:0'],
-            'product_name' => ['nullable', 'string', 'max:255'],
-            'test_report_no' => ['nullable', 'string', 'max:100'],
-            'reason' => ['nullable', 'string', 'max:500'],
-        ], [
-            'item_id.required' => 'Không tìm thấy mục đề nghị cần ghi nhận.',
-            'action.required' => 'Vui lòng chọn Sử dụng hoặc Trả về kho.',
-            'amount.required' => 'Vui lòng nhập số lượng.',
-        ]);
-
-        $back = fn (string $key, string $message) => redirect()->back()
-            ->with($key, $message)
-            ->with('activeTab', 'request');
-
-        if ($validator->fails()) {
-            return $back('error', $validator->errors()->first());
-        }
-
-        $item = DB::table(self::REQ_ITEM)->where('id', $request->item_id)->first();
-        $req = $item ? DB::table(self::REQ_LIST)->where('id', $item->request_list_id)->where('department_id', $departmentId)->first() : null;
-
-        if (! $item || ! $req) {
-            return $back('error', 'Không tìm thấy mục đề nghị của phòng ban này!');
-        }
-
-        // Cấp một phần cũng chốt được: Tổ dùng luôn phần đã nhận, không chờ đủ số đề nghị.
-        if (! in_array($item->status, ['issued', 'partial'], true)) {
-            return $back('error', 'Mục này chưa được cấp phát, hoặc đã chốt sử dụng / trả về kho rồi!');
-        }
-
-        /*
-        | Một dòng có thể đã được cấp từ nhiều lô nên có nhiều phiếu sử dụng. Xếp theo thứ
-        | tự đã cấp (cũng là thứ tự nên xuất): phần THỰC DÙNG tính vào các lô đầu, phần trả
-        | lại kho cắt ngược từ lô cuối - lô hạn gần nhất coi như đã dùng trước.
-        */
-        $exports = DB::table(self::TABLE)
-            ->where('request_item_id', $item->id)
-            ->where('type', 'export')
-            ->where('status_id', 1)
-            ->orderBy('id', 'asc')
-            ->get();
-
-        if ($exports->isEmpty()) {
-            return $back('error', 'Không tìm thấy phiếu sử dụng của mục đề nghị này!');
-        }
-
-        $issued = (float) ($item->issued_amount ?: $exports->sum('amount'));
-        $amount = (float) $request->amount;
-        $isReturn = $request->input('action') === 'return';
-
-        if ($amount > $issued + self::EPSILON) {
-            return $back('error', 'Số lượng không được vượt quá số đã cấp phát ('.$this->number($issued).' '.$item->issued_unit.').');
-        }
-
-        // Quy cả hai hành động về "số thực tính là đã dùng"
-        $usedAmount = $isReturn ? $issued - $amount : $amount;
-        $returnedAmount = $issued - $usedAmount;
-        $unit = $item->issued_unit ?: $item->requested_unit;
-
-        if (! $isReturn && $usedAmount <= self::EPSILON) {
-            return $back('error', 'Số lượng sử dụng phải lớn hơn 0. Không dùng gì thì chọn "Trả về kho".');
-        }
-
-        if ($isReturn && $amount <= self::EPSILON) {
-            return $back('error', 'Số lượng trả về kho phải lớn hơn 0.');
-        }
-
-        $fullyReturned = $usedAmount <= self::EPSILON;
-
-        DB::transaction(function () use ($item, $exports, $request, $usedAmount, $unit, $fullyReturned) {
-            $left = $usedAmount;
-
-            foreach ($exports as $export) {
-                $issuedOfLot = (float) $export->amount;
-                $usedOfLot = min($left, $issuedOfLot);
-                $left = max($left - $usedOfLot, 0);
-
-                $returnedOfLot = $issuedOfLot - $usedOfLot;
-                $lotReturned = $usedOfLot <= self::EPSILON;
-
-                $note = $lotReturned
-                    ? 'Trả toàn bộ '.$this->number($issuedOfLot).' '.$unit.' của mã '.$export->code.' về kho'
-                    : 'Ghi nhận sử dụng '.$this->number($usedOfLot).' '.$unit.' của mã '.$export->code
-                        .($returnedOfLot > self::EPSILON ? ', trả lại kho '.$this->number($returnedOfLot).' '.$unit : '');
-
-                DB::table(self::TABLE)->where('id', $export->id)->update([
-                    // Phiếu bị trả hết thì huỷ (status_id = 0) và giữ nguyên số để còn tra cứu
-                    'amount' => $lotReturned ? $issuedOfLot : $usedOfLot,
-                    'product_name' => $this->nullIfBlank($request->product_name ?: $export->product_name),
-                    'test_report_no' => $this->nullIfBlank($request->test_report_no ?: $export->test_report_no),
-                    'reason' => $this->nullIfBlank($request->reason ?: $export->reason),
-                    'status_id' => $lotReturned ? 0 : 1,
-                    'used_by' => $this->actor(),
-                    'updated_by' => $this->actor(),
-                    'updated_at' => now(),
-                ]);
-
-                $this->logHistory($export->id, $lotReturned ? 'Trả về kho' : 'Ghi nhận sử dụng', $note.($request->reason ? ' | Lý do: '.$request->reason : ''));
-            }
-
-            DB::table(self::REQ_ITEM)->where('id', $item->id)->update([
-                'status' => $fullyReturned ? 'returned' : 'used',
-                'product_name' => $this->nullIfBlank($request->product_name ?: $item->product_name),
-                'updated_at' => now(),
-            ]);
-        });
-
-        AuditTrialController::log(
-            $fullyReturned ? 'Trả vật tư về kho' : 'Ghi nhận sử dụng vật tư',
-            self::REQ_ITEM,
-            $item->id,
-            $item->status,
-            ($fullyReturned ? 'returned' : 'used').', dùng '.$this->number($usedAmount).' / cấp '.$this->number($issued)
-        );
-
-        return $back(
-            'success',
-            $fullyReturned
-                ? 'Đã trả '.$this->number($returnedAmount).' '.$unit.' về kho cho đề nghị '.$req->code.'!'
-                : 'Đã ghi nhận sử dụng '.$this->number($usedAmount).' '.$unit
-                    .($returnedAmount > self::EPSILON ? ' (trả lại kho '.$this->number($returnedAmount).' '.$unit.')' : '').'!'
-        );
-    }
-
-    /* ==========================================================
      |  PHIẾU LOẠI BỎ (trừ tồn) - hàng hỏng / hết hạn, không qua đề nghị
      ========================================================== */
 
@@ -863,11 +764,10 @@ class MaterialExportController extends Controller
         $type = 'cancel';
         $import = null;
         $item = null;
-        $groupId = null;
 
         // Chạy trong after() để lỗi tự thêm không bị passes() xoá khi gọi fails()
-        $validator->after(function ($v) use ($request, $departmentId, &$import, &$item, &$groupId) {
-            [$import, $item, $groupId] = $this->resolveUseTarget($v, $request, $departmentId);
+        $validator->after(function ($v) use ($request, $departmentId, &$import, &$item) {
+            [$import, $item] = $this->resolveUseTarget($v, $request, $departmentId);
         });
 
         if ($validator->fails()) {
@@ -878,7 +778,6 @@ class MaterialExportController extends Controller
             'code' => $import->code,
             'import_id' => (int) $import->id,
             'department_id' => $departmentId,
-            'group_id' => $groupId,
             'request_item_id' => $item?->id,
             'amount' => (float) $request->amount,
             'type' => $type,
@@ -916,6 +815,10 @@ class MaterialExportController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!');
+        }
+
+        if ($guard = $this->transferOutGuard($current, 'sửa')) {
+            return $guard;
         }
 
         $validator = Validator::make($request->all(), [
@@ -999,6 +902,10 @@ class MaterialExportController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
+        }
+
+        if ($guard = $this->transferOutGuard($current, 'khoá / mở khoá')) {
+            return $guard;
         }
 
         $newStatus = $current->status_id == 1 ? 0 : 1;
@@ -1107,8 +1014,975 @@ class MaterialExportController extends Controller
 
 
     /* ==========================================================
+     |  ĐỀ NGHỊ CHUYỂN VẬT TƯ LIÊN PHÒNG BAN
+     |
+     |  Mô hình 3 bước, giống hệt "Đề nghị chuyển hoá chất liên phòng ban"
+     |  (ChemicalExportController): A đề nghị -> B cấp phát (trừ tồn B ngay bằng một phiếu
+     |  material_exports type = transfer_out, mục sang "Chờ nhận") -> A bấm Nhận thì mới
+     |  tạo dòng material_imports cho A. A từ chối nhận thì khoá phiếu transfer_out là tồn
+     |  của B tự hoàn lại.
+     |
+     |  material_transfer_requests.department_id    = phòng ĐỀ NGHỊ (A, cần vật tư).
+     |  material_transfer_requests.to_department_id = phòng ĐƯỢC ĐỀ NGHỊ (B, đang giữ vật tư).
+     ========================================================== */
+
+    /**
+     * Phiếu cấp phát liên phòng ban không được sửa / khoá ở sổ sử dụng.
+     *
+     * Số lượng trên phiếu đã thành tồn của phòng nhận (hoặc đang chờ phòng nhận xác nhận),
+     * sửa ở đây là lệch giữa hai phòng. Muốn thu hồi thì phòng nhận Từ chối nhận.
+     *
+     * @return \Illuminate\Http\RedirectResponse|null null nghĩa là được phép đi tiếp
+     */
+    private function transferOutGuard($current, string $action)
+    {
+        if ($current->type !== self::TYPE_TRANSFER_OUT) {
+            return null;
+        }
+
+        return redirect()->back()->with(
+            'error',
+            'Phiếu cấp phát liên phòng ban '.$current->code.' không '.$action.' được ở đây. '
+            .'Đây là phiếu do tính năng "Đề nghị chuyển vật tư liên phòng ban" tạo ra, '
+            .'chỉ thay đổi được qua thao tác Nhận / Từ chối nhận của phòng nhận.'
+        );
+    }
+
+    /**
+     * PHÒNG A TẠO ĐỀ NGHỊ CHUYỂN VẬT TƯ LIÊN PHÒNG BAN (bước 1/3)
+     */
+    public function transferRequestStore(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), $this->transferRules($departmentId), $this->transferMessages());
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'transferCreateErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput()
+                ->with('activeTab', 'transfer');
+        }
+
+        $isDraft = $request->input('action_type', 'send') === 'draft';
+        $status = $isDraft ? 'draft' : 'pending';
+        $toDepartmentId = (int) $request->to_department_id;
+        $code = $this->nextMaterialTransferCode($departmentId, $toDepartmentId);
+
+        $listId = DB::transaction(function () use ($request, $departmentId, $toDepartmentId, $code, $status) {
+            $listId = DB::table(self::TRANSFER_REQUEST_TABLE)->insertGetId([
+                'code' => $code,
+                'department_id' => $departmentId,
+                'to_department_id' => $toDepartmentId,
+                'status' => $status,
+                'note' => $this->nullIfBlank($request->note),
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->insertTransferItems($listId, $request, $status);
+
+            return $listId;
+        });
+
+        $toDeptName = $this->departmentName($toDepartmentId);
+
+        AuditTrialController::log(
+            $isDraft ? 'Lưu tạm đề nghị chuyển vật tư liên phòng ban' : 'Tạo đề nghị chuyển vật tư liên phòng ban',
+            self::TRANSFER_REQUEST_TABLE,
+            $listId,
+            'NA',
+            ($isDraft ? 'Lưu tạm đề nghị ' : 'Tạo đề nghị chuyển liên phòng ban ').$code
+                .' gửi đến '.$toDeptName.' ('.count((array) $request->items).' mục)'
+        );
+
+        return redirect()->route('pages.export.materialExport.list', ['tab' => 'transfer'])->with(
+            'success',
+            $isDraft
+                ? 'Đã lưu tạm đề nghị chuyển vật tư liên phòng ban '.$code.'! Bạn có thể gửi đề nghị khi sẵn sàng.'
+                : 'Đã gửi đề nghị chuyển vật tư liên phòng ban '.$code.' đến '.$toDeptName.' thành công!'
+        );
+    }
+
+    /**
+     * PHÒNG A ĐIỀU CHỈNH ĐỀ NGHỊ LIÊN PHÒNG BAN ĐANG LƯU TẠM
+     */
+    public function transferRequestUpdate(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $req = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('id', $request->transfer_request_id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $req || $req->status !== 'draft') {
+            return redirect()->back()
+                ->with('error', 'Chỉ có thể điều chỉnh phiếu đề nghị đang ở trạng thái Lưu tạm!')
+                ->with('activeTab', 'transfer');
+        }
+
+        $validator = Validator::make($request->all(), $this->transferRules($departmentId), $this->transferMessages());
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'transferCreateErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput()
+                ->with('activeTab', 'transfer');
+        }
+
+        $isDraft = $request->input('action_type', 'draft') === 'draft';
+        $status = $isDraft ? 'draft' : 'pending';
+        $toDepartmentId = (int) $request->to_department_id;
+
+        DB::transaction(function () use ($request, $req, $toDepartmentId, $status) {
+            DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $req->id)->update([
+                'to_department_id' => $toDepartmentId,
+                'status' => $status,
+                'note' => $this->nullIfBlank($request->note),
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            // Không xoá cứng: bỏ hiệu lực các mục cũ (active = 0) rồi thêm lại từ đầu
+            DB::table(self::TRANSFER_ITEM_TABLE)->where('transfer_request_id', $req->id)->update([
+                'active' => 0,
+                'updated_at' => now(),
+            ]);
+
+            $this->insertTransferItems($req->id, $request, $status);
+        });
+
+        $toDeptName = $this->departmentName($toDepartmentId);
+
+        AuditTrialController::log(
+            $isDraft ? 'Cập nhật đề nghị chuyển vật tư liên phòng ban' : 'Gửi đề nghị chuyển vật tư liên phòng ban sau cập nhật',
+            self::TRANSFER_REQUEST_TABLE,
+            $req->id,
+            'draft',
+            ($isDraft ? 'Cập nhật đề nghị ' : 'Gửi đề nghị ').$req->code.' gửi đến '.$toDeptName
+                .' ('.count((array) $request->items).' mục)'
+        );
+
+        return redirect()->route('pages.export.materialExport.list', ['tab' => 'transfer'])->with(
+            'success',
+            $isDraft
+                ? 'Đã cập nhật lưu tạm đề nghị '.$req->code.' thành công!'
+                : 'Đã cập nhật và gửi đề nghị '.$req->code.' thành công!'
+        );
+    }
+
+    /**
+     * GỬI ĐỀ NGHỊ LIÊN PHÒNG BAN ĐÃ LƯU TẠM
+     */
+    public function transferRequestSend(Request $request)
+    {
+        $req = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('id', $request->transfer_request_id)
+            ->where('department_id', $this->departmentId())
+            ->first();
+
+        if (! $req || $req->status !== 'draft') {
+            return redirect()->back()
+                ->with('error', 'Không tìm thấy phiếu đề nghị lưu tạm cần gửi!')
+                ->with('activeTab', 'transfer');
+        }
+
+        DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $req->id)->update([
+            'status' => 'pending',
+            'updated_by' => $this->actor(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table(self::TRANSFER_ITEM_TABLE)
+            ->where('transfer_request_id', $req->id)
+            ->where('status', 'draft')
+            ->update(['status' => 'pending', 'updated_at' => now()]);
+
+        AuditTrialController::log(
+            'Gửi đề nghị chuyển vật tư liên phòng ban',
+            self::TRANSFER_REQUEST_TABLE,
+            $req->id,
+            'draft',
+            'Gửi đề nghị chuyển liên phòng ban: '.$req->code
+        );
+
+        return redirect()->route('pages.export.materialExport.list', ['tab' => 'transfer'])
+            ->with('success', 'Đã gửi đề nghị chuyển liên phòng ban mã '.$req->code.' thành công!');
+    }
+
+    /**
+     * HUỶ ĐỀ NGHỊ LIÊN PHÒNG BAN ĐANG LƯU TẠM
+     */
+    public function transferRequestDestroy(Request $request)
+    {
+        $req = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('id', $request->transfer_request_id)
+            ->where('department_id', $this->departmentId())
+            ->first();
+
+        if (! $req) {
+            return redirect()->back()->with('error', 'Không tìm thấy phiếu đề nghị này.')->with('activeTab', 'transfer');
+        }
+
+        if ($req->status !== 'draft') {
+            return redirect()->back()->with('error', 'Chỉ có thể huỷ phiếu đang ở trạng thái Lưu tạm.')->with('activeTab', 'transfer');
+        }
+
+        DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $req->id)->update([
+            'status' => 'canceled',
+            'updated_by' => $this->actor(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Huỷ đề nghị chuyển vật tư liên phòng ban',
+            self::TRANSFER_REQUEST_TABLE,
+            $req->id,
+            $req->code,
+            'Đã huỷ đề nghị chuyển liên phòng ban đang lưu tạm'
+        );
+
+        return redirect()->back()->with('success', 'Đã huỷ phiếu đề nghị '.$req->code.' thành công!')->with('activeTab', 'transfer');
+    }
+
+    /**
+     * DANH MỤC VẬT TƯ + TỒN KHO CỦA PHÒNG ĐƯỢC ĐỀ NGHỊ, trả JSON cho picker chọn nhiều.
+     *
+     * Phòng A lập đề nghị cần nhìn thấy phòng B (phòng sẽ cấp phát) đang có những vật tư
+     * gì và còn bao nhiêu, nên bảng chọn phải đọc kho của B chứ không phải kho của mình.
+     * Vì phòng B chỉ được chọn ngay trên form nên dữ liệu nạp bằng AJAX, không dựng sẵn
+     * tồn của mọi phòng vào trang.
+     */
+    public function transferDepartmentStock(Request $request)
+    {
+        $departmentId = (int) $request->query('department_id');
+
+        if ($departmentId <= 0 || $departmentId === $this->departmentId()) {
+            return response()->json(['ok' => false, 'message' => 'Vui lòng chọn phòng ban đang giữ vật tư trước khi mở danh mục.']);
+        }
+
+        $department = DB::table('deparments')->where('id', $departmentId)->where('isActive', 1)->first();
+
+        if (! $department) {
+            return response()->json(['ok' => false, 'message' => 'Phòng ban được chọn không tồn tại hoặc đã ngừng hoạt động.']);
+        }
+
+        // Tồn của từng lô trong kho phòng B, gom theo danh mục vật tư
+        $lots = MaterialPicking::lots($departmentId)->groupBy('category_id');
+
+        $rows = DepartmentMaterial::importCategoryOptions($departmentId)->map(function ($category) use ($lots) {
+            $group = $lots->get($category->id, collect());
+
+            return [
+                'id' => (int) $category->id,
+                'code' => $category->code,
+                'material_name' => $category->material_name,
+                'technical_specification' => $category->technical_specification,
+                'manufacturer_name' => $category->manufacturer_name ?: $category->manufacturer_short_name,
+                'classification_name' => $category->classification_name,
+                'unit' => $category->unit_short_name ?: $category->unit_name,
+                'remaining' => (float) $group->sum('remaining'),
+                'lots' => (int) $group->where('remaining', '>', self::EPSILON)->count(),
+            ];
+        })->values();
+
+        return response()->json([
+            'ok' => true,
+            'department_name' => $department->name,
+            'department_short' => $department->shortName,
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * PHÒNG B CẤP PHÁT CHO 1 MỤC ĐỀ NGHỊ LIÊN PHÒNG BAN (bước 2/3)
+     *
+     * Chỉ trừ tồn mã xuất nhập nguồn tại B bằng một dòng material_exports
+     * type = transfer_out - CHƯA tạo tồn cho A. Mục chuyển sang status 'issued' (chờ
+     * nhận); dòng material_imports thật cho A chỉ sinh ra ở bước A bấm Nhận, lúc đó mới
+     * chắc A đã khai vật tư này và có đơn vị tính để quy đổi.
+     */
+    public function transferIssueStore(Request $request)
+    {
+        $departmentId = $this->departmentId(); // B
+
+        $error = function (string $message) use ($request) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $message]);
+            }
+
+            return redirect()->back()->with('error', $message)->with('activeTab', 'transfer');
+        };
+
+        $validator = Validator::make($request->all(), [
+            'item_id' => ['required', 'exists:'.self::TRANSFER_ITEM_TABLE.',id'],
+            'import_id' => ['required', 'exists:material_imports,id'],
+            'issued_amount' => ['required', 'numeric', 'min:0.0001'],
+            'issued_unit' => ['nullable', 'string', 'max:50'],
+        ], [
+            'item_id.required' => 'Không tìm thấy mục đề nghị cần cấp phát.',
+            'import_id.required' => 'Vui lòng chọn mã xuất nhập trong kho để cấp phát.',
+            'issued_amount.required' => 'Vui lòng nhập số lượng cấp phát.',
+            'issued_amount.min' => 'Số lượng cấp phát phải lớn hơn 0.',
+        ]);
+
+        if ($validator->fails()) {
+            return $error($validator->errors()->first());
+        }
+
+        $item = DB::table(self::TRANSFER_ITEM_TABLE)
+            ->where('id', $request->item_id)
+            ->where('active', 1)
+            ->where('status', 'pending')
+            ->first();
+
+        if (! $item) {
+            return $error('Không tìm thấy mục đề nghị hoặc mục này đã được xử lý!');
+        }
+
+        $transferReq = DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $item->transfer_request_id)->first();
+
+        if (! $transferReq || (int) $transferReq->to_department_id !== $departmentId) {
+            return $error('Không tìm thấy phiếu đề nghị thuộc phòng ban này!');
+        }
+
+        $sourceImport = DB::table('material_imports')
+            ->where('id', $request->import_id)
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->first();
+
+        if (! $sourceImport) {
+            return $error('Không tìm thấy mã xuất nhập trong kho phòng ban này!');
+        }
+
+        if ((int) $sourceImport->category_id !== (int) $item->category_id) {
+            return $error('Mã xuất nhập được chọn không đúng vật tư của mục đề nghị!');
+        }
+
+        if ($sourceImport->expired_date && now()->startOfDay()->gt(\Carbon\Carbon::parse($sourceImport->expired_date))) {
+            return $error('Mã xuất nhập '.$sourceImport->code.' đã hết hạn sử dụng, không được cấp phát!');
+        }
+
+        /*
+        | Chuyển liên phòng ban KHÔNG được xuất vượt tồn: hàng chuyển đi thành tồn của
+        | phòng nhận, cho vượt là tự sinh thêm hàng trong hệ thống. Mốc chặn là tồn CÒN
+        | HỨA ĐƯỢC - phần đang giữ cho một đợt lấy hàng còn treo không đem chuyển được.
+        */
+        $available = $this->available($sourceImport);
+        $issuedAmount = round((float) $request->issued_amount, 4);
+
+        if ($issuedAmount > $available + self::EPSILON) {
+            $held = $this->remaining($sourceImport) - $available;
+
+            return $error(
+                'Mã xuất nhập '.$sourceImport->code.' chỉ còn hứa được '.$this->number($available)
+                .($held > self::EPSILON ? ' (đang giữ '.$this->number($held).' cho đợt lấy hàng)' : '')
+                .', không đủ để cấp phát '.$this->number($issuedAmount).'.'
+            );
+        }
+
+        $aDepartmentId = (int) $transferReq->department_id;
+        $aDeptName = $this->departmentName($aDepartmentId);
+        $issuedAt = now();
+        $issuedUnit = $this->nullIfBlank($request->issued_unit ?: $item->requested_unit);
+
+        $exportId = DB::transaction(function () use (
+            $item, $sourceImport, $departmentId, $aDepartmentId, $issuedAmount, $issuedUnit, $issuedAt
+        ) {
+            // Trừ tồn phòng nguồn (B) - tồn của A chờ đến khi A bấm Nhận mới được tạo
+            $exportId = DB::table(self::TABLE)->insertGetId([
+                'code' => $sourceImport->code,
+                'import_id' => (int) $sourceImport->id,
+                'department_id' => $departmentId,
+                'to_department_id' => $aDepartmentId,
+                'transfer_item_id' => $item->id,
+                'amount' => $issuedAmount,
+                'type' => self::TYPE_TRANSFER_OUT,
+                'used_by' => $this->actor(),
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => $issuedAt,
+                'updated_at' => $issuedAt,
+            ]);
+
+            $this->logHistory(
+                $exportId,
+                'Cấp phát',
+                'Cấp phát liên phòng ban: chuyển '.$this->number($issuedAmount).' '.($issuedUnit ?: '')
+                .' sang phòng '.$this->departmentName($aDepartmentId).', chờ phòng nhận xác nhận.'
+            );
+
+            DB::table(self::TRANSFER_ITEM_TABLE)->where('id', $item->id)->update([
+                'status' => 'issued',
+                'import_id' => (int) $sourceImport->id,
+                'import_code' => $sourceImport->code,
+                'issued_amount' => $issuedAmount,
+                'issued_unit' => $issuedUnit,
+                'issued_by' => $this->actor(),
+                'issued_at' => $issuedAt,
+                'updated_at' => $issuedAt,
+            ]);
+
+            $this->refreshTransferStatus((int) $item->transfer_request_id, $issuedAt);
+
+            return $exportId;
+        });
+
+        AuditTrialController::log(
+            'Cấp phát vật tư liên phòng ban',
+            self::TABLE,
+            $exportId,
+            'NA',
+            'Chuyển '.$sourceImport->code.' số lượng '.$this->number($issuedAmount).' đến phòng '.$aDeptName.', chờ phòng nhận xác nhận.'
+        );
+
+        $message = 'Đã cấp phát mã xuất nhập '.$sourceImport->code.' thành công, chờ phòng '.$aDeptName.' xác nhận nhận hàng!';
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'issued_amount' => $issuedAmount,
+                    'issued_unit' => $issuedUnit,
+                    'issued_by' => $this->actor(),
+                    'issued_at' => $issuedAt->format('d/m/Y H:i'),
+                    'import_code' => $sourceImport->code,
+                ],
+            ]);
+        }
+
+        return redirect()->route('pages.export.materialExport.list', ['tab' => 'transfer'])->with('success', $message);
+    }
+
+    /**
+     * PHÒNG B TỪ CHỐI CẤP PHÁT 1 MỤC ĐỀ NGHỊ LIÊN PHÒNG BAN
+     */
+    public function transferRequestReject(Request $request)
+    {
+        $departmentId = $this->departmentId(); // B
+
+        $validator = Validator::make($request->all(), [
+            'item_id' => ['required', 'exists:'.self::TRANSFER_ITEM_TABLE.',id'],
+            'reject_note' => ['required', 'max:500'],
+        ], [
+            'reject_note.required' => 'Vui lòng nhập lý do từ chối.',
+            'reject_note.max' => 'Lý do từ chối tối đa 500 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->with('error', $validator->errors()->first())->with('activeTab', 'transfer');
+        }
+
+        $item = DB::table(self::TRANSFER_ITEM_TABLE)
+            ->where('id', $request->item_id)
+            ->where('active', 1)
+            ->where('status', 'pending')
+            ->first();
+
+        if (! $item) {
+            return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!')->with('activeTab', 'transfer');
+        }
+
+        $transferReq = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('id', $item->transfer_request_id)
+            ->where('to_department_id', $departmentId)
+            ->first();
+
+        if (! $transferReq) {
+            return redirect()->back()->with('error', 'Không tìm thấy phiếu đề nghị thuộc phòng ban này!')->with('activeTab', 'transfer');
+        }
+
+        DB::table(self::TRANSFER_ITEM_TABLE)->where('id', $item->id)->update([
+            'status' => 'rejected',
+            'reject_note' => trim((string) $request->reject_note),
+            'updated_at' => now(),
+        ]);
+
+        $this->refreshTransferStatus((int) $item->transfer_request_id, now());
+
+        AuditTrialController::log(
+            'Từ chối cấp phát vật tư liên phòng ban',
+            self::TRANSFER_ITEM_TABLE,
+            $item->id,
+            'pending',
+            'Từ chối cấp phát: '.$request->reject_note
+        );
+
+        return redirect()->route('pages.export.materialExport.list', ['tab' => 'transfer'])
+            ->with('success', 'Đã từ chối mục đề nghị cấp phát liên phòng ban.');
+    }
+
+    /**
+     * PHÒNG A NHẬN VẬT TƯ ĐÃ ĐƯỢC CẤP PHÁT (bước 3/3)
+     *
+     * Đến đây mới thật sự tạo dòng material_imports cho A: bắt buộc A đã khai vật tư này
+     * ở tab "Vật Tư Của Phòng" (mới có đơn vị tính để quy đổi qua CategoryUnitConversion),
+     * rồi tự chọn định khu của phòng mình. Mã lô mới sinh theo chuẩn mã vật tư của phòng A
+     * (App\Support\MaterialCode), mã nguồn được ghi lại ở ghi chú để còn truy vết.
+     */
+    public function transferReceiveStore(Request $request)
+    {
+        $departmentId = $this->departmentId(); // A
+
+        $error = function (string $message) use ($request) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $message]);
+            }
+
+            return redirect()->back()->with('error', $message)->with('activeTab', 'transfer');
+        };
+
+        $validator = Validator::make($request->all(), [
+            'item_id' => ['required', 'exists:'.self::TRANSFER_ITEM_TABLE.',id'],
+            'dest_location_id' => ['nullable'],
+        ], [
+            'item_id.required' => 'Không tìm thấy mục cần nhận.',
+        ]);
+
+        if ($validator->fails()) {
+            return $error($validator->errors()->first());
+        }
+
+        $item = DB::table(self::TRANSFER_ITEM_TABLE)
+            ->where('id', $request->item_id)
+            ->where('active', 1)
+            ->where('status', 'issued')
+            ->first();
+
+        if (! $item) {
+            return $error('Không tìm thấy mục cần nhận hoặc mục này đã được xử lý!');
+        }
+
+        $transferReq = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('id', $item->transfer_request_id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $transferReq) {
+            return $error('Không tìm thấy phiếu đề nghị thuộc phòng ban này!');
+        }
+
+        $sourceImport = DB::table('material_imports')->where('id', $item->import_id)->first();
+
+        if (! $sourceImport) {
+            return $error('Không tìm thấy mã xuất nhập nguồn của mục này!');
+        }
+
+        $bDepartmentId = (int) $transferReq->to_department_id;
+        $bDeptName = $this->departmentName($bDepartmentId);
+
+        // Phòng A phải đã khai vật tư này thì mới có đơn vị tính để nhận
+        $aCategoryRow = DB::table(DepartmentMaterial::TABLE)
+            ->where('department_id', $departmentId)
+            ->where('category_id', $item->category_id)
+            ->where('status_id', 1)
+            ->first();
+
+        if (! $aCategoryRow) {
+            return $error('Phòng bạn chưa khai vật tư này ở tab "Vật Tư Của Phòng" nên chưa nhận được. Vui lòng khai trước rồi quay lại nhận.');
+        }
+
+        $aUnitId = (int) $aCategoryRow->unit_id;
+
+        if (! $aUnitId) {
+            return $error('Phòng bạn chưa khai đơn vị tính cho vật tư này ở tab "Vật Tư Của Phòng" nên chưa có đơn vị để nhận hàng.');
+        }
+
+        $bUnitId = (int) DB::table(DepartmentMaterial::TABLE)
+            ->where('department_id', $bDepartmentId)
+            ->where('category_id', $item->category_id)
+            ->value('unit_id');
+
+        $convertedAmount = CategoryUnitConversion::convert(
+            CategoryUnitConversion::TYPE_MATERIAL,
+            (int) $item->category_id,
+            (float) $item->issued_amount,
+            $bUnitId ?: null,
+            $aUnitId
+        );
+
+        if ($convertedAmount === null) {
+            return $error(
+                'Phòng bạn tính theo đơn vị khác với phòng '.$bDeptName.' cho vật tư này, nhưng chưa có hệ số '
+                .'quy đổi giữa hai đơn vị. Vui lòng vào tab "Vật Tư Của Phòng", sửa dòng vật tư này và khai mục Quy Đổi Đơn Vị.'
+            );
+        }
+
+        $destLocationId = $request->filled('dest_location_id') ? (int) $request->dest_location_id : null;
+
+        if ($destLocationId) {
+            $locOk = DB::table('locations')
+                ->where('id', $destLocationId)
+                ->where('department_id', $departmentId)
+                ->where('status_id', 1)
+                ->exists();
+
+            if (! $locOk) {
+                return $error('Định khu được chọn không thuộc phòng ban bạn!');
+            }
+        }
+
+        $exportRow = DB::table(self::TABLE)
+            ->where('transfer_item_id', $item->id)
+            ->where('type', self::TYPE_TRANSFER_OUT)
+            ->first();
+
+        if (! $exportRow) {
+            return $error('Không tìm thấy phiếu chuyển tương ứng!');
+        }
+
+        $receivedAt = now();
+        $note = 'Nhận chuyển liên phòng ban từ '.$bDeptName.', mã nguồn '.$sourceImport->code.'.';
+
+        $result = DB::transaction(function () use (
+            $item, $sourceImport, $exportRow, $departmentId, $destLocationId, $convertedAmount, $receivedAt, $note
+        ) {
+            $newCode = MaterialCode::next($departmentId);
+
+            $newImportId = DB::table('material_imports')->insertGetId([
+                'code' => $newCode,
+                'department_id' => $departmentId,
+                'category_id' => (int) $item->category_id,
+                'source_export_id' => $exportRow->id,
+                'transfer_item_id' => $item->id,
+                'amount' => $convertedAmount,
+                // Ngày nhập là thời điểm bấm Nhận, hạn dùng giữ nguyên của lô nguồn
+                'imported_date' => $receivedAt->format('Y-m-d'),
+                'imported_by' => $this->actor(),
+                'expired_date' => $sourceImport->expired_date,
+                'location_id' => $destLocationId,
+                'note' => $note,
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => $receivedAt,
+                'updated_at' => $receivedAt,
+            ]);
+
+            DB::table('material_import_histories')->insert([
+                'material_import_id' => $newImportId,
+                'action' => 'Thêm mới',
+                'code' => $newCode,
+                'category_id' => (int) $item->category_id,
+                'amount' => $convertedAmount,
+                'imported_date' => $receivedAt->format('Y-m-d'),
+                'imported_by' => $this->actor(),
+                'expired_date' => $sourceImport->expired_date,
+                'location_id' => $destLocationId,
+                'note' => $note,
+                'status_id' => 1,
+                'change_note' => $note.' Mã mới của phòng: '.$newCode.'.',
+                'created_by' => $this->actor(),
+                'created_at' => $receivedAt,
+            ]);
+
+            DB::table(self::TRANSFER_ITEM_TABLE)->where('id', $item->id)->update([
+                'status' => 'received',
+                'dest_location_id' => $destLocationId,
+                'new_import_id' => $newImportId,
+                'received_by' => $this->actor(),
+                'received_at' => $receivedAt,
+                'updated_at' => $receivedAt,
+            ]);
+
+            $this->refreshTransferStatus((int) $item->transfer_request_id, $receivedAt);
+
+            return ['new_import_id' => $newImportId, 'new_code' => $newCode];
+        });
+
+        AuditTrialController::log(
+            'Nhận chuyển vật tư liên phòng ban',
+            'material_imports',
+            $result['new_import_id'],
+            'NA',
+            'Nhận từ phòng '.$bDeptName.', mã nguồn '.$sourceImport->code.' -> mã mới '.$result['new_code']
+        );
+
+        $message = 'Đã nhận hàng, mã xuất nhập mới: '.$result['new_code'].'!';
+
+        if ($request->ajax()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()->route('pages.export.materialExport.list', ['tab' => 'transfer'])->with('success', $message);
+    }
+
+    /**
+     * PHÒNG A TỪ CHỐI NHẬN 1 MỤC ĐÃ ĐƯỢC CẤP PHÁT
+     *
+     * Hoàn tồn cho B bằng cách khoá dòng material_exports type = transfer_out tương ứng
+     * (status_id = 0) - mọi công thức tồn chỉ cộng phiếu xuất status_id = 1 nên lô nguồn
+     * coi như chưa từng bị trừ.
+     */
+    public function transferReceiveReject(Request $request)
+    {
+        $departmentId = $this->departmentId(); // A
+
+        $validator = Validator::make($request->all(), [
+            'item_id' => ['required', 'exists:'.self::TRANSFER_ITEM_TABLE.',id'],
+            'return_note' => ['required', 'max:500'],
+        ], [
+            'return_note.required' => 'Vui lòng nhập lý do từ chối nhận.',
+            'return_note.max' => 'Lý do từ chối nhận tối đa 500 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->with('error', $validator->errors()->first())->with('activeTab', 'transfer');
+        }
+
+        $item = DB::table(self::TRANSFER_ITEM_TABLE)
+            ->where('id', $request->item_id)
+            ->where('active', 1)
+            ->where('status', 'issued')
+            ->first();
+
+        if (! $item) {
+            return redirect()->back()->with('error', 'Không tìm thấy mục cần từ chối nhận!')->with('activeTab', 'transfer');
+        }
+
+        $transferReq = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('id', $item->transfer_request_id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $transferReq) {
+            return redirect()->back()->with('error', 'Không tìm thấy phiếu đề nghị thuộc phòng ban này!')->with('activeTab', 'transfer');
+        }
+
+        $exportRow = DB::table(self::TABLE)
+            ->where('transfer_item_id', $item->id)
+            ->where('type', self::TYPE_TRANSFER_OUT)
+            ->first();
+
+        if (! $exportRow) {
+            return redirect()->back()->with('error', 'Không tìm thấy phiếu chuyển tương ứng!')->with('activeTab', 'transfer');
+        }
+
+        $returnedAt = now();
+        $returnNote = trim((string) $request->return_note);
+
+        DB::transaction(function () use ($item, $exportRow, $returnedAt, $returnNote) {
+            DB::table(self::TABLE)->where('id', $exportRow->id)->update([
+                'status_id' => 0,
+                'updated_by' => $this->actor(),
+                'updated_at' => $returnedAt,
+            ]);
+
+            $this->logHistory($exportRow->id, 'Khoá', 'Phòng nhận từ chối nhận: '.$returnNote.' - hoàn tồn kho phòng gửi.');
+
+            DB::table(self::TRANSFER_ITEM_TABLE)->where('id', $item->id)->update([
+                'status' => 'returned',
+                'return_note' => $returnNote,
+                'returned_by' => $this->actor(),
+                'returned_at' => $returnedAt,
+                'updated_at' => $returnedAt,
+            ]);
+
+            $this->refreshTransferStatus((int) $item->transfer_request_id, $returnedAt);
+        });
+
+        AuditTrialController::log(
+            'Từ chối nhận chuyển vật tư liên phòng ban',
+            self::TRANSFER_ITEM_TABLE,
+            $item->id,
+            'issued',
+            'Từ chối nhận, hoàn tồn phiếu '.$exportRow->code.': '.$returnNote
+        );
+
+        return redirect()->route('pages.export.materialExport.list', ['tab' => 'transfer'])
+            ->with('success', 'Đã từ chối nhận, tồn kho phòng gửi đã được hoàn lại.');
+    }
+
+    /* ==========================================================
      |  HÀM DÙNG CHUNG
      ========================================================== */
+
+    /** Thêm các dòng vật tư của một phiếu đề nghị liên phòng ban. */
+    private function insertTransferItems(int $listId, Request $request, string $status): void
+    {
+        foreach ((array) $request->items as $item) {
+            DB::table(self::TRANSFER_ITEM_TABLE)->insert([
+                'transfer_request_id' => $listId,
+                'category_id' => (int) $item['category_id'],
+                'requested_amount' => (float) ($item['requested_amount'] ?? 0),
+                'requested_unit' => $this->nullIfBlank($item['requested_unit'] ?? null),
+                'note' => $this->nullIfBlank($item['note'] ?? null),
+                'status' => $status,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Trạng thái tổng của phiếu đề nghị liên phòng ban, suy từ trạng thái từng mục con.
+     *
+     * completed chỉ tính khi TẤT CẢ mục đã received - còn mục nào issued (chờ phòng nhận
+     * xác nhận) thì dù đã cấp phát hết, phiếu vẫn coi là partial.
+     */
+    private function refreshTransferStatus(int $transferRequestId, $at): void
+    {
+        $items = DB::table(self::TRANSFER_ITEM_TABLE)
+            ->where('transfer_request_id', $transferRequestId)
+            ->where('active', 1)
+            ->get();
+
+        $total = $items->count();
+        $pending = $items->where('status', 'pending')->count();
+        $issued = $items->where('status', 'issued')->count();
+        $received = $items->where('status', 'received')->count();
+
+        $status = match (true) {
+            $total === 0 || $pending === $total => 'pending',
+            $pending === 0 && $issued === 0 => $received > 0 ? 'completed' : 'rejected',
+            default => 'partial',
+        };
+
+        DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $transferRequestId)->update([
+            'status' => $status,
+            'updated_by' => $this->actor(),
+            'updated_at' => $at,
+        ]);
+    }
+
+    /**
+     * Đề nghị liên phòng ban PHÒNG MÌNH GỬI ĐI (mình là A) và GỬI ĐẾN PHÒNG MÌNH (mình là
+     * B), kèm các mục con group theo transfer_request_id. Cùng hình dạng với
+     * transferRequestsData() của ChemicalExportController.
+     */
+    private function transferRequestsData(int $departmentId): array
+    {
+        $base = fn () => DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->select(self::TRANSFER_REQUEST_TABLE.'.*')
+            ->orderBy(self::TRANSFER_REQUEST_TABLE.'.created_at', 'desc');
+
+        $sent = $base()
+            ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.to_department_id', '=', 'deparments.id')
+            ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
+            ->where(self::TRANSFER_REQUEST_TABLE.'.department_id', $departmentId)
+            ->get();
+
+        $received = $base()
+            ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.department_id', '=', 'deparments.id')
+            ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
+            ->where(self::TRANSFER_REQUEST_TABLE.'.to_department_id', $departmentId)
+            ->get();
+
+        $requestIds = $sent->pluck('id')->merge($received->pluck('id'))->unique();
+
+        $items = DB::table(self::TRANSFER_ITEM_TABLE)
+            ->leftJoin('material_categories', self::TRANSFER_ITEM_TABLE.'.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('locations', self::TRANSFER_ITEM_TABLE.'.dest_location_id', '=', 'locations.id')
+            ->where(self::TRANSFER_ITEM_TABLE.'.active', 1)
+            ->whereIn(self::TRANSFER_ITEM_TABLE.'.transfer_request_id', $requestIds)
+            ->select(
+                self::TRANSFER_ITEM_TABLE.'.*',
+                'material_categories.code as category_code',
+                'material_categories.technical_specification',
+                'material_names.name as material_name',
+                'locations.code as dest_location_code'
+            )
+            ->orderBy(self::TRANSFER_ITEM_TABLE.'.id')
+            ->get()
+            ->groupBy('transfer_request_id');
+
+        return ['sent' => $sent, 'received' => $received, 'items' => $items];
+    }
+
+    /** Mã đề nghị liên phòng ban: LPB-<shortName A>-<shortName B>-ddMMyy-<số thứ tự trong ngày>. */
+    private function nextMaterialTransferCode(int $fromDepartmentId, int $toDepartmentId): string
+    {
+        $fromShort = DB::table('deparments')->where('id', $fromDepartmentId)->value('shortName') ?: 'NA';
+        $toShort = DB::table('deparments')->where('id', $toDepartmentId)->value('shortName') ?: 'NA';
+        $prefix = 'LPB-'.$fromShort.'-'.$toShort.'-'.date('dmy').'-';
+
+        $latestCode = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('code', 'LIKE', $prefix.'%')
+            ->orderBy('id', 'desc')
+            ->value('code');
+
+        $seq = 1;
+
+        if ($latestCode) {
+            $parts = explode('-', $latestCode);
+            $seq = (int) end($parts) + 1;
+        }
+
+        return $prefix.str_pad((string) $seq, 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Vật tư để chọn khi gửi đề nghị liên phòng ban: cả danh mục chung đã duyệt, không
+     * giới hạn ở phần phòng mình đã khai - phòng mình đang thiếu nên mới phải đi xin.
+     * Đơn vị hiện trên ô chọn là đơn vị PHÒNG MÌNH đã khai (nếu có).
+     */
+    private function transferCategoryOptions(int $departmentId)
+    {
+        return DB::table('material_categories')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_categories.id'))
+            ->select(
+                'material_categories.id',
+                'material_categories.code',
+                'material_categories.technical_specification',
+                'material_names.name as material_name',
+                'units.short_name as unit_short_name'
+            )
+            ->where('material_categories.status_id', 1)
+            ->where('material_categories.app_status', 'approved')
+            ->orderBy('material_names.name', 'asc')
+            ->get();
+    }
+
+    /** Phòng ban nhận đề nghị chuyển: mọi phòng đang hoạt động, trừ phòng đang đứng. */
+    private function departmentOptions(int $departmentId)
+    {
+        return DB::table('deparments')
+            ->select('id', 'name', 'shortName')
+            ->where('isActive', 1)
+            ->where('id', '<>', $departmentId)
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    private function departmentName($id): string
+    {
+        return (string) (DB::table('deparments')->where('id', $id)->value('name') ?: '—');
+    }
+
+    private function transferRules(int $departmentId): array
+    {
+        return [
+            'to_department_id' => ['required', 'exists:deparments,id', Rule::notIn([$departmentId])],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.category_id' => ['required', 'exists:material_categories,id'],
+            'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
+            'items.*.note' => ['nullable', 'string', 'max:500'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ];
+    }
+
+    private function transferMessages(): array
+    {
+        return [
+            'to_department_id.required' => 'Vui lòng chọn phòng ban nguồn (đang giữ vật tư).',
+            'to_department_id.exists' => 'Phòng ban được chọn không tồn tại.',
+            'to_department_id.not_in' => 'Không thể tạo đề nghị liên phòng ban gửi đến chính phòng mình.',
+            'items.required' => 'Vui lòng thêm ít nhất một vật tư đề nghị.',
+            'items.min' => 'Vui lòng thêm ít nhất một vật tư đề nghị.',
+            'items.*.category_id.required' => 'Vui lòng chọn vật tư.',
+            'items.*.category_id.exists' => 'Vật tư được chọn không tồn tại.',
+            'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',
+            'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
+        ];
+    }
 
     private function insertRequestItems(int $listId, Request $request): void
     {
@@ -1134,17 +2008,14 @@ class MaterialExportController extends Controller
 
     /**
      * Xác định mã xuất nhập cho một phiếu LOẠI BỎ và chặn xuất vượt tồn.
-     * Phiếu sử dụng không đi qua đây: kho sinh sẵn lúc cấp phát (issueStore), Tổ chỉ chốt
-     * lại bằng useStore().
+     * Phiếu sử dụng không đi qua đây: kho sinh sẵn lúc cấp phát (issueStore).
      */
     private function resolveUseTarget($validator, Request $request, int $departmentId): array
     {
-        $groupId = $request->filled('group_id') ? (int) $request->group_id : null;
-
         if (! $request->filled('import_id')) {
             $validator->errors()->add('import_id', 'Vui lòng chọn mã xuất nhập cần loại bỏ.');
 
-            return [null, null, null];
+            return [null, null];
         }
 
         $import = DB::table('material_imports')->where('id', $request->import_id)->where('department_id', $departmentId)->where('status_id', 1)->first();
@@ -1156,7 +2027,7 @@ class MaterialExportController extends Controller
         if (! $import) {
             $validator->errors()->add('import_id', 'Không tìm thấy mã xuất nhập trong kho phòng ban này.');
 
-            return [null, null, null];
+            return [null, null];
         }
 
         if (is_numeric($request->amount)) {
@@ -1170,7 +2041,7 @@ class MaterialExportController extends Controller
             }
         }
 
-        return [$import, null, $groupId];
+        return [$import, null];
     }
 
     /** Cập nhật issue_status của đề nghị theo trạng thái các dòng. */
@@ -1389,16 +2260,6 @@ class MaterialExportController extends Controller
             ->pluck('times', 'material_export_id');
     }
 
-    private function groupOptions(int $departmentId)
-    {
-        return DB::table('groups')
-            ->select('id', 'name')
-            ->where('department_id', $departmentId)
-            ->where('status_id', 1)
-            ->orderBy('name', 'asc')
-            ->get();
-    }
-
     private function unitOptions()
     {
         return DB::table('units')
@@ -1458,7 +2319,6 @@ class MaterialExportController extends Controller
     private function requestRules(): array
     {
         return [
-            'group_id' => ['required', 'exists:groups,id'],
             'name' => ['nullable', 'string', 'max:255'],
             'needs_director' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
@@ -1477,8 +2337,6 @@ class MaterialExportController extends Controller
     private function requestMessages(): array
     {
         return [
-            'group_id.required' => 'Vui lòng chọn Tổ đề nghị.',
-            'group_id.exists' => 'Tổ được chọn không tồn tại.',
             'items.required' => 'Vui lòng thêm ít nhất một vật tư đề nghị.',
             'items.min' => 'Vui lòng thêm ít nhất một vật tư đề nghị.',
             'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',

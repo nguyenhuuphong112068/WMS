@@ -2,7 +2,7 @@
 |--------------------------------------------------------------------------
 | TỒN - TỒN KHO VẬT TƯ THEO VỊ TRÍ (sơ đồ thẻ)
 |--------------------------------------------------------------------------
-| Vẽ đúng cây định khu Kho -> Phòng -> Kệ/Tủ -> Vị trí. Mỗi vị trí là một ô
+| Vẽ đúng cây định khu Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí. Mỗi vị trí là một ô
 | trên lưới, tô màu theo tình trạng hàng đang đứng ở đó:
 |   xám (trống) - xanh (bình thường) - vàng (cần chú ý) - đỏ (hết hạn / âm kho)
 | Bấm vào ô mở modal xem đủ các mã xuất nhập đang nằm tại vị trí đó.
@@ -69,15 +69,28 @@
     .mz-wh.is-closed .mz-wh-body { display: none; }
     .mz-wh-body { padding: 16px 18px 4px; }
 
-    /* ---------- Phòng ---------- */
-    .mz-room { border-left: 3px solid var(--primary-lighter); padding-left: 14px; margin-bottom: 16px; }
-    .mz-room-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--primary-dark); font-weight: 700; }
-    .mz-room-head .tag { background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 2px 10px; font-size: .7rem; font-weight: 700; }
-
     /* ---------- Kệ / Tủ ---------- */
-    .mz-shelf { background: var(--bg-neutral); border: 1px solid #E6EEF7; border-radius: var(--border-radius-md); padding: 12px 14px; margin-bottom: 12px; }
-    .mz-shelf-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .88rem; font-weight: 700; color: var(--text-main); }
-    .mz-shelf-head .sub { margin-left: auto; font-size: .72rem; font-weight: 600; color: #64748B; }
+    .mz-shelf { border-left: 3px solid var(--primary-lighter); padding-left: 14px; margin-bottom: 16px; }
+    .mz-shelf-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--primary-dark); font-weight: 700; }
+    .mz-shelf-head .tag { background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 2px 10px; font-size: .7rem; font-weight: 700; }
+
+    /* ---------- Cột ---------- */
+    .mz-column { background: var(--bg-neutral); border: 1px solid #E6EEF7; border-radius: var(--border-radius-md); padding: 12px 14px; margin-bottom: 12px; }
+    .mz-column-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .88rem; font-weight: 700; color: var(--text-main); }
+    .mz-column-head .sub { margin-left: auto; font-size: .72rem; font-weight: 600; color: #64748B; }
+
+    /* ---------- Tầng ---------- */
+    .mz-tier { margin-bottom: 12px; }
+    .mz-tier:last-child { margin-bottom: 0; }
+    .mz-tier-head {
+        display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+        font-size: .76rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: .4px;
+    }
+    .mz-tier-head .tag {
+        background: #fff; border: 1px solid #DCE7F3; color: var(--primary); border-radius: 999px;
+        padding: 1px 9px; font-size: .68rem; font-weight: 700; text-transform: none; letter-spacing: 0;
+    }
+    .mz-tier-head .sub { margin-left: auto; font-size: .7rem; font-weight: 600; color: #94A3B8; text-transform: none; letter-spacing: 0; }
 
     /* ---------- Ô vị trí ---------- */
     .mz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; }
@@ -128,9 +141,10 @@
 
 <div class="mz-head">
     <div class="mz-stats">
-        <div class="mz-stat"><b>{{ $mzTotals['warehouses'] }}</b><span>Kho</span></div>
-        <div class="mz-stat"><b>{{ $mzTotals['rooms'] }}</b><span>Phòng</span></div>
+        <div class="mz-stat"><b>{{ $mzTotals['warehouses'] }}</b><span>Kho / Phòng</span></div>
         <div class="mz-stat"><b>{{ $mzTotals['shelves'] }}</b><span>Kệ / Tủ</span></div>
+        <div class="mz-stat"><b>{{ $mzTotals['columns'] }}</b><span>Cột</span></div>
+        <div class="mz-stat"><b>{{ $mzTotals['tiers'] }}</b><span>Tầng</span></div>
         <div class="mz-stat"><b>{{ $mzTotals['filled'] }}/{{ $mzTotals['locations'] }}</b><span>Vị trí có hàng</span></div>
         <div class="mz-stat"><b>{{ $mzTotals['lots'] }}</b><span>Mã xuất nhập</span></div>
         <div class="mz-stat"><b>{{ $mzTotals['materials'] }}</b><span>Vật tư</span></div>
@@ -194,7 +208,7 @@
             <div>
                 <div class="mz-wh-title">{{ $wh['name'] }}</div>
                 <div class="mz-wh-sub">
-                    {{ $wh['code'] ? $wh['code'] . ' · ' : '' }}{{ $wh['stat']['rooms'] }} phòng ·
+                    {{ $wh['code'] ? $wh['code'] . ' · ' : '' }}{{ $wh['stat']['shelves'] }} kệ/tủ ·
                     {{ $wh['stat']['filled'] }}/{{ $wh['stat']['locations'] }} vị trí có hàng
                 </div>
             </div>
@@ -208,77 +222,98 @@
         </div>
 
         <div class="mz-wh-body">
-            @foreach ($wh['rooms'] as $room)
-                <div class="mz-room">
-                    <div class="mz-room-head">
-                        <i class="fas fa-door-open"></i> {{ $room['name'] }}
-                        @if ($room['code'])
-                            <span class="tag">{{ $room['code'] }}</span>
+            @foreach ($wh['shelves'] as $shelf)
+                <div class="mz-shelf">
+                    <div class="mz-shelf-head">
+                        <i class="fas fa-layer-group"></i> {{ $shelf['name'] }}
+                        @if ($shelf['code'])
+                            <span class="tag">{{ $shelf['code'] }}</span>
                         @endif
-                        <span class="tag">{{ $room['stat']['shelves'] }} kệ/tủ</span>
-                        <span class="tag">{{ $room['stat']['lots'] }} mã</span>
+                        <span class="tag">{{ $shelf['stat']['columns'] }} cột</span>
+                        <span class="tag">{{ $shelf['stat']['lots'] }} mã</span>
                     </div>
 
-                    @foreach ($room['shelves'] as $shelf)
-                        <div class="mz-shelf">
-                            <div class="mz-shelf-head">
-                                <i class="fas fa-th-large" style="color: var(--primary-light)"></i>
-                                {{ $shelf['name'] }}
-                                @if ($shelf['code'])
-                                    <span class="md-tag">{{ $shelf['code'] }}</span>
+                    @foreach ($shelf['columns'] as $column)
+                        <div class="mz-column">
+                            <div class="mz-column-head">
+                                <i class="fas fa-grip-lines-vertical" style="color: var(--primary-light)"></i>
+                                {{ $column['name'] }}
+                                @if ($column['code'])
+                                    <span class="md-tag">{{ $column['code'] }}</span>
                                 @endif
                                 <span class="sub">
-                                    {{ $shelf['stat']['filled'] }}/{{ $shelf['stat']['locations'] }} vị trí có hàng ·
-                                    {{ $shelf['stat']['lots'] }} mã
+                                    {{ $column['stat']['tiers'] }} tầng ·
+                                    {{ $column['stat']['filled'] }}/{{ $column['stat']['locations'] }} vị trí có hàng ·
+                                    {{ $column['stat']['lots'] }} mã
                                 </span>
                             </div>
 
-                            <div class="mz-grid">
-                                @foreach ($shelf['locations'] as $loc)
-                                    @php
-                                        $mzSearch = mb_strtolower(
-                                            trim(
-                                                $loc['code'] .
-                                                    ' ' .
-                                                    $shelf['name'] .
-                                                    ' ' .
-                                                    implode(' ', array_column($loc['preview'], 'name')),
-                                            ),
-                                        );
-                                    @endphp
-                                    <button type="button" class="mz-cell is-{{ $loc['state'] }}"
-                                        data-key="{{ $loc['key'] }}" data-state="{{ $loc['state'] }}"
-                                        data-search="{{ $mzSearch }}"
-                                        {{ $loc['state'] === 'empty' ? 'disabled' : '' }}>
-                                        <div class="mz-cell-top">
-                                            <span class="mz-cell-code">{{ $loc['code'] }}</span>
-                                            <span class="mz-cell-lots">{{ $loc['stat']['lots'] }}</span>
-                                        </div>
-                                        <div class="mz-cell-items">
-                                            @forelse ($loc['preview'] as $item)
-                                                <div>
-                                                    <span class="nm">· {{ $item['name'] }}</span>
-                                                    <span class="qty">{{ $item['amount'] }}
-                                                        <span class="u">{{ $item['unit'] }}</span></span>
+                            @foreach ($column['tiers'] as $tier)
+                                <div class="mz-tier">
+                                    <div class="mz-tier-head">
+                                        <i class="fas fa-bars"></i> {{ $tier['name'] }}
+                                        @if ($tier['code'])
+                                            <span class="tag">{{ $tier['code'] }}</span>
+                                        @endif
+                                        <span class="sub">
+                                            {{ $tier['stat']['filled'] }}/{{ $tier['stat']['locations'] }} vị trí có
+                                            hàng · {{ $tier['stat']['lots'] }} mã
+                                        </span>
+                                    </div>
+
+                                    <div class="mz-grid">
+                                        @foreach ($tier['locations'] as $loc)
+                                            @php
+                                                $mzSearch = mb_strtolower(
+                                                    trim(
+                                                        $loc['code'] .
+                                                            ' ' .
+                                                            $shelf['name'] .
+                                                            ' ' .
+                                                            $column['name'] .
+                                                            ' ' .
+                                                            $tier['name'] .
+                                                            ' ' .
+                                                            implode(' ', array_column($loc['preview'], 'name')),
+                                                    ),
+                                                );
+                                            @endphp
+                                            <button type="button" class="mz-cell is-{{ $loc['state'] }}"
+                                                data-key="{{ $loc['key'] }}" data-state="{{ $loc['state'] }}"
+                                                data-search="{{ $mzSearch }}"
+                                                {{ $loc['state'] === 'empty' ? 'disabled' : '' }}>
+                                                <div class="mz-cell-top">
+                                                    <span class="mz-cell-code">{{ $loc['code'] }}</span>
+                                                    <span class="mz-cell-lots">{{ $loc['stat']['lots'] }}</span>
                                                 </div>
-                                            @empty
-                                                <span class="mz-cell-empty-note">Đang trống</span>
-                                            @endforelse
-                                            @if ($loc['stat']['materials'] > count($loc['preview']))
-                                                <div><span class="nm">·
-                                                        +{{ $loc['stat']['materials'] - count($loc['preview']) }} vật tư
-                                                        khác</span></div>
-                                            @endif
-                                        </div>
-                                        <div class="mz-cell-foot">
-                                            {{ $loc['stat']['materials'] }} vật tư
-                                            @if ($loc['stat']['alerts'] > 0)
-                                                · <span class="alert">{{ $loc['stat']['alerts'] }} cần chú ý</span>
-                                            @endif
-                                        </div>
-                                    </button>
-                                @endforeach
-                            </div>
+                                                <div class="mz-cell-items">
+                                                    @forelse ($loc['preview'] as $item)
+                                                        <div>
+                                                            <span class="nm">· {{ $item['name'] }}</span>
+                                                            <span class="qty">{{ $item['amount'] }}
+                                                                <span class="u">{{ $item['unit'] }}</span></span>
+                                                        </div>
+                                                    @empty
+                                                        <span class="mz-cell-empty-note">Đang trống</span>
+                                                    @endforelse
+                                                    @if ($loc['stat']['materials'] > count($loc['preview']))
+                                                        <div><span class="nm">·
+                                                                +{{ $loc['stat']['materials'] - count($loc['preview']) }}
+                                                                vật tư khác</span></div>
+                                                    @endif
+                                                </div>
+                                                <div class="mz-cell-foot">
+                                                    {{ $loc['stat']['materials'] }} vật tư
+                                                    @if ($loc['stat']['alerts'] > 0)
+                                                        · <span class="alert">{{ $loc['stat']['alerts'] }} cần
+                                                            chú ý</span>
+                                                    @endif
+                                                </div>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
                         </div>
                     @endforeach
                 </div>
@@ -288,7 +323,8 @@
 @empty
     <div class="mz-empty">
         <i class="fas fa-map-marked-alt"></i>
-        Chưa khai báo định khu cho phòng ban này. Vào <b>Dữ Liệu Gốc → Định Khu</b> để tạo Kho / Phòng / Kệ-Tủ / Vị trí,
+        Chưa khai báo định khu cho phòng ban này. Vào <b>Dữ Liệu Gốc → Định Khu</b> để tạo Kho-Phòng / Kệ-Tủ / Cột / Tầng /
+    Vị trí,
         sau đó xếp vị trí cho từng mã nhập.
     </div>
 @endforelse

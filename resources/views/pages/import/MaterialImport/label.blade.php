@@ -33,6 +33,13 @@
 
     $lblName = $import->material_name ?: '';
     $lblNameSize = mb_strlen($lblName) > 40 ? 2.8 : (mb_strlen($lblName) > 26 ? 3.4 : 4.2);
+
+    // Dòng thông tin luôn giữ 1 dòng; cỡ chữ tự co theo độ dài để giá trị dài (vd
+    // "Người nhập") không bị cắt cụt bằng "…". Ngày tháng luôn ngắn nên vẫn 2.2mm.
+    $lblValSize = function ($value) {
+        $n = mb_strlen(trim((string) $value));
+        return $n > 30 ? 1.5 : ($n > 24 ? 1.7 : ($n > 18 ? 1.9 : 2.2));
+    };
 @endphp
 <!DOCTYPE html>
 <html lang="vi">
@@ -209,19 +216,19 @@
                 <div class="info">
                     <div class="line">
                         <span class="caption">Vị trí</span>
-                        <span class="value">{{ $import->location_code ?: '-' }}</span>
+                        <span class="value" style="font-size: {{ $lblValSize($import->location_code ?: '-') }}mm">{{ $import->location_code ?: '-' }}</span>
                     </div>
                     <div class="line">
                         <span class="caption">Người nhập</span>
-                        <span class="value">{{ $import->imported_by ?: '—' }}</span>
+                        <span class="value" style="font-size: {{ $lblValSize($import->imported_by ?: '—') }}mm">{{ $import->imported_by ?: '—' }}</span>
                     </div>
                     <div class="line">
                         <span class="caption">Ngày nhập</span>
-                        <span class="value">{{ $lblDate($import->imported_date) }}</span>
+                        <span class="value" style="font-size: {{ $lblValSize($lblDate($import->imported_date)) }}mm">{{ $lblDate($import->imported_date) }}</span>
                     </div>
                     <div class="line">
                         <span class="caption">Hạn dùng</span>
-                        <span class="value">{{ $lblDate($import->expired_date) ?: '—' }}</span>
+                        <span class="value" style="font-size: {{ $lblValSize($lblDate($import->expired_date) ?: '—') }}mm">{{ $lblDate($import->expired_date) ?: '—' }}</span>
                     </div>
                 </div>
 

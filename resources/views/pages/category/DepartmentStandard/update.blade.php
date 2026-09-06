@@ -72,8 +72,8 @@
 
                         <div class="form-group col-md-6">
                             <label>Ngưỡng Tồn Tối Thiểu</label>
-                            <input type="number" name="min_stock" min="0" step="0.0001"
-                                class="form-control {{ $bag->has('min_stock') ? 'is-invalid' : '' }}"
+                            <input type="text" inputmode="decimal" name="min_stock" min="0"
+                                class="form-control js-decimal {{ $bag->has('min_stock') ? 'is-invalid' : '' }}"
                                 value="{{ $old('min_stock') }}" placeholder="Để trống = cảnh báo theo tỉ lệ 20%">
                             @if ($bag->has('min_stock'))
                                 <span class="md-error">{{ $bag->first('min_stock') }}</span>
@@ -82,43 +82,25 @@
                         </div>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label>Vị Trí Lưu Trữ Quy Hoạch</label>
-                            <select name="default_location_id"
-                                class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chưa quy hoạch --</option>
-                                @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}"
-                                        {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
-                                        {{ $location->warehouse_name ?: '—' }} /
-                                        {{ $location->room_name ?: '—' }} /
-                                        {{ $location->shelf_name ?: '—' }} /
-                                        {{ $location->code }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @if ($bag->has('default_location_id'))
-                                <span class="md-error">{{ $bag->first('default_location_id') }}</span>
-                            @endif
-                        </div>
-
-                        <div class="form-group col-md-6">
-                            <label>Điều Kiện Bảo Quản</label>
-                            <select name="storage_condition_id"
-                                class="form-control cat-select {{ $bag->has('storage_condition_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Theo danh mục --</option>
-                                @foreach ($storageConditions as $condition)
-                                    <option value="{{ $condition->id }}"
-                                        {{ $old('storage_condition_id') == $condition->id ? 'selected' : '' }}>
-                                        {{ $condition->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @if ($bag->has('storage_condition_id'))
-                                <span class="md-error">{{ $bag->first('storage_condition_id') }}</span>
-                            @endif
-                        </div>
+                    <div class="form-group">
+                        <label>Định Khu</label>
+                        <select name="default_location_id"
+                            class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
+                            <option value="">-- Chưa định khu --</option>
+                            @foreach ($locations as $location)
+                                <option value="{{ $location->id }}"
+                                    {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
+                                    {{ $location->warehouse_name ?: '—' }} /
+                                    {{ $location->shelf_name ?: '—' }} /
+                                    {{ $location->column_name ?: '—' }} /
+                                    {{ $location->tier_name ?: '—' }} /
+                                    {{ $location->code }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if ($bag->has('default_location_id'))
+                            <span class="md-error">{{ $bag->first('default_location_id') }}</span>
+                        @endif
                     </div>
 
                     <div class="form-group">
@@ -134,6 +116,15 @@
                         <i class="fas fa-info-circle mr-1"></i>
                         Để trống ô nào thì ô đó tự chạy theo <b>Danh Mục Chất Chuẩn</b>. Cấu hình này chỉ áp dụng cho
                         phòng ban <b>{{ session('user')['selected_department'] }}</b>.
+                    </div>
+                    <div class="form-group">
+                        <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" rows="2" maxlength="500" required
+                            class="form-control {{ $bag->has('change_reason') ? 'is-invalid' : '' }}"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @if ($bag->has('change_reason'))
+                            <span class="md-error">{{ $bag->first('change_reason') }}</span>
+                        @endif
                     </div>
                 </div>
 
@@ -157,8 +148,7 @@
             var $form = $('#dsUpdateModal').find('form');
 
             $form.find('.ds-standard-view').val(
-                (row.category_code || '') + ' - ' + (row.standard_name || '') +
-                (row.version !== undefined && row.version !== null ? ' (v' + row.version + ')' : ''));
+                (row.category_code || '') + ' - ' + (row.standard_name || ''));
 
             $form.find('.ds-shelf-hint').text(row.category_shelf_life_months ?
                 'Để trống thì lấy mặc định của danh mục: ' + row.category_shelf_life_months + ' tháng.' :
@@ -169,6 +159,9 @@
                 var field = $(this).attr('name');
                 $(this).val(row[field] === undefined || row[field] === null ? '' : row[field]).trigger('change');
             });
+
+            // Lý do điều chỉnh phải nhập lại mỗi lần sửa
+            $form.find('[name="change_reason"]').val('');
         });
 
         /* ---------- Modal Thêm mới: nhắc mặc định theo chất chuẩn đang chọn ---------- */

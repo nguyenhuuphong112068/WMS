@@ -1249,6 +1249,55 @@ class StandardExportController extends Controller
     }
 
     /**
+     * DANH MỤC CHẤT CHUẨN + TỒN KHO CỦA PHÒNG ĐƯỢC ĐỀ NGHỊ, trả JSON cho picker chọn nhiều.
+     *
+     * Phòng A lập đề nghị cần nhìn thấy phòng B (phòng sẽ cấp phát) đang có chất chuẩn gì
+     * và còn bao nhiêu ống, nên bảng chọn phải đọc kho của B chứ không phải kho của mình.
+     * Vì phòng B chỉ được chọn ngay trên form nên dữ liệu nạp bằng AJAX, không dựng sẵn
+     * tồn của mọi phòng vào trang.
+     */
+    public function transferDepartmentStock(Request $request)
+    {
+        $departmentId = (int) $request->query('department_id');
+
+        if ($departmentId <= 0 || $departmentId === $this->departmentId()) {
+            return response()->json(['ok' => false, 'message' => 'Vui lòng chọn phòng ban đang giữ chuẩn trước khi mở danh mục.']);
+        }
+
+        $department = DB::table('deparments')->where('id', $departmentId)->where('isActive', 1)->first();
+
+        if (! $department) {
+            return response()->json(['ok' => false, 'message' => 'Phòng ban được chọn không tồn tại hoặc đã ngừng hoạt động.']);
+        }
+
+        // Tồn của từng ống trong kho phòng B, gom theo danh mục chất chuẩn
+        $lots = $this->importOptions($departmentId)->groupBy('category_id');
+
+        $rows = DepartmentStandard::importCategoryOptions($departmentId)->map(function ($category) use ($lots) {
+            $group = $lots->get($category->id, collect());
+
+            return [
+                'id' => (int) $category->id,
+                'code' => $category->code,
+                'version' => $category->version,
+                'name' => $category->standard_name,
+                'cas_no' => $category->name_cas_no,
+                'manufacturer_name' => $category->manufacturer_name ?: $category->manufacturer_short_name,
+                'storage_condition_name' => $category->storage_condition_name,
+                'unit' => $category->unit_short_name ?: $category->unit_name,
+                'remaining' => (float) $group->sum('remaining'),
+                'lots' => (int) $group->where('remaining', '>', self::EPSILON)->count(),
+            ];
+        })->values();
+
+        return response()->json([
+            'ok' => true,
+            'department_name' => $department->name,
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
      * PHÒNG B CẤP PHÁT CHO 1 MỤC ĐỀ NGHỊ LIÊN PHÒNG BAN (bước 2/3)
      *
      * Chỉ trừ tồn ống nguồn tại B (standard_exports, type = transfer_out) - CHƯA tạo tồn

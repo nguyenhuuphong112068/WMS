@@ -15,11 +15,6 @@
                     <i class="fas fa-info-circle mr-1"></i> Chú thích Phụ lục &amp; Nhóm
                 </button>
             </div>
-            <p class="hint">
-                <i class="fas fa-info-circle mr-1"></i>
-                Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} bản ghi.
-                Rê chuột vào mã phân loại để xem tên đầy đủ.
-            </p>
         </div>
 
         @include('pages.shared.classificationFilter', ['clsTarget' => 'mdTable'])

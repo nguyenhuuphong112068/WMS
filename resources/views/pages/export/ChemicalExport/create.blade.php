@@ -191,8 +191,8 @@
                 '<div class="md-sub">' + esc(data.code) + ' · còn ' + trimNum(data.remaining) + ' ' + esc(data.unit || '') +
                 (data.expired_date ? ' · HSD ' + esc(data.expired_date) : '') + '</div>' +
                 '</td>' +
-                '<td><input type="number" step="0.0001" min="0.0001" max="' + trimNum(data.max_issue) +
-                '" name="items[' + importId + '][amount]" class="form-control form-control-sm" placeholder="Số lượng" required></td>' +
+                '<td><input type="text" inputmode="decimal" min="0.0001" max="' + trimNum(data.max_issue) +
+                '" name="items[' + importId + '][amount]" class="form-control form-control-sm js-decimal" placeholder="Số lượng" required></td>' +
                 '<td><select name="items[' + importId + '][checked_by]" class="form-control form-control-sm">' +
                 checkerOptionsHtml() + '</select></td>' +
                 '<td><input type="text" name="items[' + importId + '][purpose]" maxlength="500" class="form-control form-control-sm" placeholder="Mục đích / lý do"></td>' +

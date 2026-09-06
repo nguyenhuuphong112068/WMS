@@ -170,6 +170,21 @@
             word-break: break-word;
         }
 
+        .md-history-reason {
+            background: #FFF7ED;
+            border: 1px solid #FED7AA;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 0.83rem;
+            color: #9A3412;
+            margin-bottom: 8px;
+            word-break: break-word;
+        }
+
+        .md-history-reason b {
+            color: #7C2D12;
+        }
+
         .md-history-snapshot {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -279,6 +294,13 @@
 
                     if (row.change_note) {
                         $('<div>').addClass('md-history-note').text(row.change_note).appendTo($item);
+                    }
+
+                    if (row.change_reason) {
+                        $('<div>').addClass('md-history-reason')
+                            .append($('<b>').text('Lý do điều chỉnh: '))
+                            .append(document.createTextNode(row.change_reason))
+                            .appendTo($item);
                     }
 
                     var $snapshot = $('<div>').addClass('md-history-snapshot');

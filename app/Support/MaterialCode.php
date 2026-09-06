@@ -7,8 +7,12 @@ use Illuminate\Support\Facades\DB;
 /**
  * MÃ LÔ VẬT TƯ - một chỗ duy nhất định nghĩa cách sinh mã.
  *
- *      "M" + "-" + deparments.shortName + "-" + <đuôi ngẫu nhiên 10 ký tự>
- *      M-QC1-7KPMR9J4WD
+ *      "M" + "-" + deparments.id (đệm 0 cho đủ 2 chữ số) + "-" + <đuôi ngẫu nhiên 10 ký tự>
+ *      M-07-7KPMR9J4WD
+ *
+ * Dùng id phòng ban thay cho shortName để mọi mã dài BẰNG NHAU (luôn 15 ký tự):
+ * shortName do người dùng tự nhập, dài ngắn tuỳ ý và có thể chứa dấu "-" trùng với
+ * dấu ngăn. id là số, cố định, không bao giờ đổi sau khi tạo phòng ban.
  *
  * KHÁC mã cũ (shortName + "VT" + yy + mm + số thứ tự 4 chữ số): mã mới KHÔNG chứa
  * số thứ tự. Khoá / xoá một phiếu nhập không để lại "khoảng trống" nhìn thấy được
@@ -36,6 +40,9 @@ class MaterialCode
     /** Số ký tự ngẫu nhiên ở đuôi mã. */
     public const RANDOM_LENGTH = 10;
 
+    /** Số chữ số của phần id phòng ban trong mã (đệm 0 về đúng độ dài này). */
+    public const DEPT_LENGTH = 2;
+
     /** Crockford Base32 bỏ nguyên âm A, E (đã sẵn không có I, L, O, U). */
     private const ALPHABET = '0123456789BCDFGHJKMNPQRSTVWXYZ';
 
@@ -52,10 +59,16 @@ class MaterialCode
         return $tail;
     }
 
-    /** Ghép mã từ mã phòng ban và đuôi ngẫu nhiên. */
-    public static function build(string $shortName, string $tail): string
+    /** Phần phòng ban trong mã: id đệm 0 về đúng DEPT_LENGTH chữ số. */
+    public static function deptCode(int $departmentId): string
     {
-        return self::KIND.self::SEP.$shortName.self::SEP.$tail;
+        return str_pad((string) $departmentId, self::DEPT_LENGTH, '0', STR_PAD_LEFT);
+    }
+
+    /** Ghép mã từ id phòng ban và đuôi ngẫu nhiên. */
+    public static function build(int $departmentId, string $tail): string
+    {
+        return self::KIND.self::SEP.self::deptCode($departmentId).self::SEP.$tail;
     }
 
     /**
@@ -63,10 +76,10 @@ class MaterialCode
      *
      * Gọi trong transaction của lúc lưu: sinh đuôi ngẫu nhiên, trùng thì sinh lại.
      */
-    public static function next(string $shortName): string
+    public static function next(int $departmentId): string
     {
         do {
-            $code = self::build($shortName, self::randomTail());
+            $code = self::build($departmentId, self::randomTail());
         } while (DB::table(self::TABLE)->where('code', $code)->exists());
 
         return $code;

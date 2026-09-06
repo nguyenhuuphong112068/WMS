@@ -16,12 +16,6 @@
             <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát vật tư
         </button>
     @endperm
-    <p class="hint">
-        <i class="fas fa-info-circle mr-1"></i>
-        Tổ lập đề nghị → <b>Trưởng/Phó Phòng</b> duyệt (bắt buộc) → <b>Ban Giám Đốc</b> duyệt (nếu phiếu đánh dấu cần)
-        → kho <b>cấp phát</b> từng dòng (<b>trừ tồn ngay</b>) → Tổ bấm <b>"Sử Dụng Vật Tư"</b> để ghi nhật ký sử dụng
-        hoặc trả về kho.
-    </p>
 </div>
 
 <div class="table-responsive">
@@ -30,7 +24,6 @@
             <tr>
                 <th class="text-center" style="width:45px">STT</th>
                 <th style="width:150px">Mã Đề Nghị</th>
-                <th style="width:120px">Tổ</th>
                 <th class="text-center" style="width:70px">Số Mục</th>
                 <th style="width:130px">Trạng Thái</th>
                 <th style="width:320px">Trình Ký</th>
@@ -52,7 +45,6 @@
                         @if ($req->name) <div class="md-sub small font-weight-bold" style="color: var(--primary-dark);">{{ $req->name }}</div> @endif
                         @if ($req->note) <div class="md-sub small text-muted">{{ $req->note }}</div> @endif
                     </td>
-                    <td class="md-sub">{{ $req->group_name ?: '—' }}</td>
                     <td class="text-center"><span class="md-tag">{{ $items->count() }}</span></td>
                     <td>
                         <span class="md-badge {{ $b['class'] }}">{{ $b['label'] }}</span>
@@ -136,7 +128,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-center text-muted">Chưa có đề nghị cấp phát vật tư nào.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted">Chưa có đề nghị cấp phát vật tư nào.</td></tr>
             @endforelse
         </tbody>
     </table>

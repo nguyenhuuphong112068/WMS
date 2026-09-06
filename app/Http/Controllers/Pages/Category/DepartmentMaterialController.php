@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Pages\Category;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\CategoryUnitConversion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -18,7 +20,11 @@ use Illuminate\Validation\Rule;
  * Danh mục vật tư (material_categories) dùng chung toàn công ty vì nó mô tả BẢN CHẤT của
  * vật tư: tên, nhà sản xuất, thông tin kỹ thuật. Màn hình này khai phần CÁCH DÙNG của
  * riêng phòng ban đang chọn: phân loại theo bộ nhóm của phòng, đơn vị tính, ngưỡng tồn
- * tối thiểu.
+ * tối thiểu, định khu.
+ *
+ * ĐỊNH KHU (default_location_id) là chỗ DỰ KIẾN để vật tư, chỉ dùng để điền sẵn ô vị trí
+ * lúc nhập. Vị trí THỰC TẾ của từng lô nằm ở material_imports.location_id, hai cái này
+ * khác nhau và không thay thế cho nhau được.
  *
  * Mỗi dòng ở đây cũng chính là lời khai "phòng tôi có dùng vật tư này", dùng cho cột
  * "Phòng Ban Đang Dùng" ở tab Danh Mục Vật Tư Công Ty.
@@ -27,6 +33,8 @@ use Illuminate\Validation\Rule;
  */
 class DepartmentMaterialController extends Controller
 {
+    use RequiresChangeReason;
+
     private const TABLE = 'material_department_categories';
 
     private const LABEL = 'vật tư của phòng';
@@ -36,6 +44,7 @@ class DepartmentMaterialController extends Controller
         $departmentId = $this->departmentId();
 
         $validator = Validator::make($request->all(), $this->rules($departmentId), $this->messages());
+        $this->checkConversions($validator, $request, (int) $request->category_id, $departmentId);
 
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dmCreateErrors')->withInput();
@@ -49,6 +58,8 @@ class DepartmentMaterialController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $this->saveConversions($request, (int) $request->category_id, $departmentId);
 
         AuditTrialController::log(
             'Thêm mới',
@@ -76,7 +87,13 @@ class DepartmentMaterialController extends Controller
 
         // Không cho đổi vật tư của một dòng đã khai: đó là khoá của dòng. Khai nhầm thì
         // khoá dòng cũ rồi khai dòng mới, để giữ vết.
-        $validator = Validator::make($request->all(), $this->rules($departmentId, true), $this->messages());
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules($departmentId, true) + $this->changeReasonRules(),
+            $this->messages() + $this->changeReasonMessages()
+        );
+
+        $this->checkConversions($validator, $request, (int) $current->category_id, $departmentId);
 
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dmUpdateErrors')->withInput();
@@ -87,8 +104,11 @@ class DepartmentMaterialController extends Controller
             'updated_at' => now(),
         ]);
 
+        $this->saveConversions($request, (int) $current->category_id, $departmentId);
+
         $units = DB::table('units')->pluck('name', 'id');
         $classifications = DB::table('material_classifications')->pluck('name', 'id');
+        $locations = DB::table('locations')->pluck('code', 'id');
 
         AuditTrialController::log(
             'Cập nhật',
@@ -96,10 +116,13 @@ class DepartmentMaterialController extends Controller
             $current->id,
             'phân loại: '.($classifications[$current->classification_id] ?? 'chưa khai')
                 .' | đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
-                .' | ngưỡng: '.($current->min_stock ?? 'chưa khai'),
+                .' | ngưỡng: '.($current->min_stock ?? 'chưa khai')
+                .' | định khu: '.($locations[$current->default_location_id] ?? 'chưa khai'),
             'phân loại: '.($classifications[(int) $request->classification_id] ?? 'chưa khai')
                 .' | đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
                 .' | ngưỡng: '.($request->min_stock ?: 'chưa khai')
+                .' | định khu: '.($locations[(int) $request->default_location_id] ?? 'chưa khai')
+                .' | Lý do: '.$this->changeReason($request)
         );
 
         return $this->backToTab()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
@@ -116,6 +139,10 @@ class DepartmentMaterialController extends Controller
             return $this->backToTab()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
         }
 
+        if ($this->changeReason($request) === '') {
+            return $this->backToTab()->with('error', 'Vui lòng nhập lý do điều chỉnh.');
+        }
+
         $newStatus = $current->status_id == 1 ? 0 : 1;
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
@@ -129,7 +156,7 @@ class DepartmentMaterialController extends Controller
             self::TABLE,
             $current->id,
             'status_id: '.$current->status_id,
-            'status_id: '.$newStatus
+            'status_id: '.$newStatus.' | Lý do: '.$this->changeReason($request)
         );
 
         return $this->backToTab()->with(
@@ -149,6 +176,13 @@ class DepartmentMaterialController extends Controller
             ],
             'unit_id' => ['required', 'integer', 'exists:units,id'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
+            // Định khu phải thuộc ĐÚNG phòng ban đang chọn, không mượn được của phòng khác
+            'default_location_id' => [
+                'nullable',
+                Rule::exists('locations', 'id')
+                    ->where('department_id', $departmentId)
+                    ->where('status_id', 1),
+            ],
             'note' => ['nullable', 'max:500'],
         ];
 
@@ -168,12 +202,52 @@ class DepartmentMaterialController extends Controller
         return $rules;
     }
 
+    /**
+     * Bắt khai hệ số quy đổi khi phòng chọn đơn vị lệch với đơn vị phòng khác đang dùng.
+     *
+     * Cùng một mã vật tư mà mỗi phòng một đơn vị thì lúc CHUYỂN VẬT TƯ LIÊN PHÒNG BAN hệ
+     * thống phải biết đổi qua lại; thiếu hệ số là phòng nhận không nhận hàng được.
+     */
+    private function checkConversions($validator, Request $request, int $categoryId, int $departmentId): void
+    {
+        $validator->after(function ($validator) use ($request, $categoryId, $departmentId) {
+            $missing = CategoryUnitConversion::missingFor(
+                CategoryUnitConversion::TYPE_MATERIAL,
+                $categoryId,
+                $departmentId,
+                (int) $request->unit_id,
+                (array) $request->input('conversions', [])
+            );
+
+            foreach ($missing as $unit) {
+                $validator->errors()->add(
+                    'conversions.'.$unit->unit_id,
+                    'Vui lòng khai hệ số quy đổi sang '.($unit->unit_short_name ?: $unit->unit_name)
+                    .' - đơn vị phòng '.($unit->department_short ?: $unit->department_name).' đang dùng cho vật tư này.'
+                );
+            }
+        });
+    }
+
+    private function saveConversions(Request $request, int $categoryId, int $departmentId): void
+    {
+        CategoryUnitConversion::saveDeclarations(
+            CategoryUnitConversion::TYPE_MATERIAL,
+            $categoryId,
+            $departmentId,
+            (int) $request->unit_id,
+            (array) $request->input('conversions', []),
+            $this->actor()
+        );
+    }
+
     private function payload(Request $request): array
     {
         return [
             'classification_id' => $request->classification_id ? (int) $request->classification_id : null,
             'unit_id' => (int) $request->unit_id,
             'min_stock' => $this->nullIfBlank($request->min_stock),
+            'default_location_id' => $request->default_location_id ? (int) $request->default_location_id : null,
             'note' => $this->nullIfBlank($request->note),
         ];
     }
@@ -196,6 +270,7 @@ class DepartmentMaterialController extends Controller
             'unit_id.exists' => 'Đơn vị tính không hợp lệ.',
             'min_stock.numeric' => 'Ngưỡng tồn tối thiểu phải là số.',
             'min_stock.min' => 'Ngưỡng tồn tối thiểu không được âm.',
+            'default_location_id.exists' => 'Định khu không thuộc phòng ban đang chọn.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
         ];
     }

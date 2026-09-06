@@ -54,17 +54,51 @@
         <div class="card md-card">
             <div class="card-body">
 
-                {{-- ---------- KỲ BÁO CÁO ---------- --}}
-                <form method="GET" class="form-inline mb-3" style="gap: 8px;">
-                    <label class="mr-1 font-weight-bold">Kỳ:</label>
-                    <input type="date" name="from_date" value="{{ $period['from'] }}" class="form-control form-control-sm">
-                    <span class="mx-1">→</span>
-                    <input type="date" name="to_date" value="{{ $period['to'] }}" class="form-control form-control-sm">
-                    <button class="btn btn-sm btn-primary ml-2"><i class="fas fa-search mr-1"></i>Xem kỳ</button>
-                    <span class="ml-3 md-sub">
-                        {{ $invPeriodLabel }} ({{ $period['days'] }} ngày){{ $period['is_current'] ? ' — kỳ còn hôm nay, tồn cuối kỳ = tồn hiện tại' : '' }}
-                        — chỉ hiện mã còn tồn cuối kỳ, có sử dụng hoặc có loại bỏ trong kỳ
-                    </span>
+                {{-- ============ KỲ BÁO CÁO ============ --}}
+                <form method="GET" action="{{ route('pages.inventory.materialInventory.list') }}" class="inv-period"
+                    id="invPeriodForm">
+                    <div class="inv-period-title">
+                        <i class="fas fa-calendar-week"></i> Kỳ báo cáo
+                    </div>
+
+                    <div class="inv-period-field">
+                        <label for="invFromDate">Từ ngày</label>
+                        <input type="date" id="invFromDate" name="from_date" class="form-control"
+                            value="{{ $period['from'] }}">
+                    </div>
+
+                    <div class="inv-period-field">
+                        <label for="invToDate">Đến ngày</label>
+                        <input type="date" id="invToDate" name="to_date" class="form-control"
+                            value="{{ $period['to'] }}">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-sm inv-period-apply">
+                        <i class="fas fa-search mr-1"></i> Xem kỳ
+                    </button>
+
+                    {{-- Bấm mốc nhanh là điền sẵn hai ô ngày rồi gửi luôn, không phải chọn tay --}}
+                    <div class="inv-period-quick">
+                        @foreach ($invPeriodPresets as $preset)
+                            <button type="button" class="inv-period-chip {{ $preset['active'] ? 'is-active' : '' }}"
+                                data-from="{{ $preset['from'] }}" data-to="{{ $preset['to'] }}">
+                                {{ $preset['label'] }}
+                            </button>
+                        @endforeach
+                    </div>
+
+                    <div class="inv-period-note">
+                        @if ($period['is_current'])
+                            <i class="fas fa-circle-check"></i> Kỳ đang chạy - Tồn Cuối Kỳ chính là tồn thực tế
+                            đang có trong kho.
+                        @else
+                            <i class="fas fa-clock-rotate-left"></i> Đang xem lại kỳ đã qua - mọi số liệu tính đến
+                            hết ngày {{ $invDate($period['to']) }}.
+                        @endif
+                        <span class="inv-period-days">{{ $period['days'] }} ngày</span>
+                        <span class="inv-period-rule"><i class="fas fa-filter"></i>Chỉ hiện mã còn tồn cuối kỳ,
+                            có sử dụng hoặc có loại bỏ trong kỳ.</span>
+                    </div>
                 </form>
 
                 <div class="mi-tabs">
@@ -109,6 +143,8 @@
                                     <th class="text-right" style="width:100px">Tổng Tồn Vật Tư</th>
                                     <th class="text-center" style="width:95px">Hạn Dùng</th>
                                     <th class="text-center" style="width:95px">Trạng Thái</th>
+                                    <th class="text-center" style="width:55px" title="File hồ sơ đính kèm của phiếu nhập">
+                                        <i class="fas fa-paperclip"></i></th>
                                     <th class="text-center" style="width:110px">Thao Tác</th>
                                 </tr>
                             </thead>
@@ -116,7 +152,10 @@
                                 @foreach ($datas as $row)
                                     <tr data-state="{{ $row->state }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td><span class="inv-code font-weight-bold">{{ $row->code }}</span></td>
+                                        <td data-order="{{ $row->code }}">
+                                            <span class="inv-code font-weight-bold">{{ $row->code }}</span>
+                                            <div class="md-sub"><span class="md-tag">{{ $row->category_code ?: '—' }}</span></div>
+                                        </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->material_name ?: '—' }}</div>
                                             <div class="md-sub small text-muted">
@@ -128,7 +167,7 @@
                                         <td class="md-sub">
                                             @if ($row->location_code)
                                                 <span class="md-tag">{{ $row->location_code }}</span>
-                                                <div>{{ $row->warehouse_name }} / {{ $row->room_name }} / {{ $row->shelf_name }}</div>
+                                                <div>{{ $row->warehouse_name }} / {{ $row->shelf_name }} / {{ $row->column_name }} / {{ $row->tier_name }}</div>
                                             @else <span class="text-muted">—</span> @endif
                                         </td>
                                         <td class="text-right">{{ $invNum($row->opening) }}</td>
@@ -141,6 +180,16 @@
                                         <td class="text-right">{{ $invNum($row->category_remaining) }}</td>
                                         <td class="text-center md-sub" data-order="{{ $row->expired_date ?: '9999-12-31' }}">{{ $invDate($row->expired_date) }}</td>
                                         <td class="text-center"><span class="mi-badge {{ $row->state }}">{{ $row->state_label }}</span></td>
+                                        <td class="text-center">
+                                            @include('pages.shared.attachmentList', [
+                                                'attachments' => $attachments->get($row->id) ?? collect(),
+                                                'routePrefix' => 'pages.inventory.materialInventory.',
+                                                'statusPerm' => 'import_material_attachment_status',
+                                                'code' => $row->code,
+                                                'name' => $row->material_name,
+                                                'typeLabel' => 'Vật tư',
+                                            ])
+                                        </td>
                                         <td class="text-center">
                                             <div class="mi-actions">
                                             @perm('inventory_material_balancing')
@@ -178,6 +227,7 @@
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width:45px">STT</th>
+                                    <th style="width:130px">Mã Vật Tư</th>
                                     <th>Vật Tư</th>
                                     <th class="text-center" style="width:90px">Số Lô</th>
                                     <th class="text-right" style="width:100px">Tồn Đầu Kỳ</th>
@@ -194,6 +244,7 @@
                                 @foreach ($summaries as $s)
                                     <tr>
                                         <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td><span class="md-tag">{{ $s->category_code ?: '—' }}</span></td>
                                         <td>
                                             <div class="font-weight-bold">{{ $s->material_name ?: '—' }}</div>
                                             <div class="md-sub small text-muted">
@@ -315,7 +366,7 @@
         var mzIndex = @json($zoneMap['index']);
         var mzState = '';
 
-        // Lọc ô vị trí theo tình trạng + từ khoá, rồi ẩn luôn kệ/phòng/kho không còn ô nào
+        // Lọc ô vị trí theo tình trạng + từ khoá, rồi ẩn luôn tầng/cột/kệ/kho không còn ô nào
         function mzApply() {
             var q = ($('#mzSearch').val() || '').toString().trim().toLowerCase();
 
@@ -329,14 +380,17 @@
                 $(this).css('display', okState && okText ? '' : 'none');
             });
 
-            $('#miPaneZone .mz-shelf').each(function () {
+            $('#miPaneZone .mz-tier').each(function () {
                 $(this).css('display', $(this).find('.mz-cell:visible').length ? '' : 'none');
             });
-            $('#miPaneZone .mz-room').each(function () {
-                $(this).css('display', $(this).find('.mz-shelf:visible').length ? '' : 'none');
+            $('#miPaneZone .mz-column').each(function () {
+                $(this).css('display', $(this).find('.mz-tier:visible').length ? '' : 'none');
+            });
+            $('#miPaneZone .mz-shelf').each(function () {
+                $(this).css('display', $(this).find('.mz-column:visible').length ? '' : 'none');
             });
             $('#miPaneZone .mz-wh').each(function () {
-                $(this).css('display', $(this).find('.mz-room:visible').length ? '' : 'none');
+                $(this).css('display', $(this).find('.mz-shelf:visible').length ? '' : 'none');
             });
 
             var total = $('#miPaneZone .mz-wh').length;

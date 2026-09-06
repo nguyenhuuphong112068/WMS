@@ -70,6 +70,15 @@
     /** Hạn dùng nhà sản xuất chưa xác định, tra cứu trực tuyến khi dùng (standard_imports.expiry_type). */
     $invIsCheckOnline = fn($row) => in_array($row->expiry_type ?? null, ['check online', 'undetermined', 'unlimited']);
 
+    /** Ống cần kiểm nghiệm lại định kỳ (retest) - expired_date là hạn retest do NSX công bố. */
+    $invIsRetest = fn($row) => ($row->expiry_type ?? null) === 'retest';
+
+    /** Loại hạn dùng cho phép bấm badge cập nhật ngay trên bảng tồn. */
+    $invCanExpiryUpdate = fn($row) => $invIsRetest($row) || $invIsCheckOnline($row);
+
+    // Số lần đã cập nhật hạn dùng của mỗi ống, cho badge số nhỏ trên badge hạn dùng
+    $invExpiryUpdateCount = collect($expiryUpdates)->map(fn($rows) => count($rows))->toArray();
+
     /**
      * Mã nhóm chuẩn (cột JSON standard_categories.groups) thành chuỗi "PRS,VKN"
      * để đưa vào data-groups cho bộ lọc Phân nhóm chuẩn.
@@ -127,4 +136,6 @@
     @include('pages.inventory.StandardInventory.balancingHistory')
     @include('pages.inventory.StandardInventory.internalExpiry')
     @include('pages.inventory.StandardInventory.weightRemarkModal')
+    @include('pages.inventory.StandardInventory.expiryUpdate')
+    @include('pages.shared.attachmentListModal')
 @endsection

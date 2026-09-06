@@ -41,7 +41,8 @@
                             @if ($bag->has('category_id'))
                                 <div class="md-error text-danger small mt-1">{{ $bag->first('category_id') }}</div>
                             @endif
-                            <small class="text-muted">Mã xuất nhập (VT + mã phòng ban + chuỗi ngẫu nhiên) được cấp tự động khi bấm Lưu.</small>
+                            <small class="text-muted">Mã xuất nhập (VT + mã phòng ban + chuỗi ngẫu nhiên) được cấp tự
+                                động khi bấm Lưu.</small>
                             <div class="md-hint mi-info mt-1"></div>
                         </div>
                     </div>
@@ -50,8 +51,8 @@
                         <div class="form-group col-md-4">
                             <label>Số lượng / lô <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="number" step="0.0001" min="0.0001" name="amount"
-                                    class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}"
+                                <input type="text" inputmode="decimal" min="0.0001" name="amount"
+                                    class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
                                     value="{{ old('amount') }}" required>
                                 <div class="input-group-append"><span class="input-group-text mi-unit">—</span></div>
                             </div>
@@ -60,7 +61,7 @@
                             @endif
                         </div>
                         <div class="form-group col-md-4">
-                            <label>Số lô cần nhập</label>
+                            <label>Số lần nhập</label>
                             <input type="number" min="1" max="50" name="quantity" class="form-control"
                                 value="{{ old('quantity', 1) }}">
                             <small class="text-muted">Nhập nhiều lô cùng thông tin, mỗi lô một mã.</small>
@@ -76,15 +77,15 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-12">
-                            <label>Vị trí lưu trữ</label>
+                            <label>Định Khu</label>
                             <select name="location_id"
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chưa xếp vị trí --</option>
+                                <option value="">-- Chưa định khu --</option>
                                 @foreach ($locations as $loc)
                                     <option value="{{ $loc->id }}"
                                         {{ old('location_id') == $loc->id ? 'selected' : '' }}>
                                         {{ $loc->code }} — {{ $loc->warehouse_name }} /
-                                        {{ $loc->room_name }} / {{ $loc->shelf_name }}
+                                        {{ $loc->shelf_name }} / {{ $loc->column_name }} / {{ $loc->tier_name }}
                                     </option>
                                 @endforeach
                             </select>
@@ -114,32 +115,44 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        function syncCat($sel) {
+        /*
+        | $fillLocation = true khi người dùng vừa tự đổi vật tư: lúc đó mới điền lại ô vị
+        | trí theo định khu. Lúc chỉ mở lại modal (kể cả mở lại sau khi báo lỗi) thì giữ
+        | nguyên vị trí đang chọn, không đè lên thứ người dùng đã nhập.
+        */
+        function syncCat($sel, fillLocation) {
             var defaults = $sel.data('defaults') || {};
             var d = defaults[$sel.val()] || {};
             var $modal = $sel.closest('.modal');
             $modal.find('.mi-unit').text(d.unit_short_name || '—');
             $modal.find('.mi-info').html(d.info_html || '');
+
+            /* Điền sẵn định khu phòng đã khai cho vật tư này; thủ kho vẫn đổi được */
+            var $location = $modal.find('select[name="location_id"]');
+            if (fillLocation && $location.length) {
+                $location.val(d.location_id ? String(d.location_id) : '').trigger('change');
+            }
         }
         $(document).on('change', '#createModal .mi-category', function() {
-            syncCat($(this));
+            syncCat($(this), true);
         });
         $(document).on('click', '.btn-md-create', function() {
             setTimeout(function() {
-                syncCat($('#createModal .mi-category'));
+                syncCat($('#createModal .mi-category'), false);
             }, 60);
         });
         @if ($bag->any())
             $(function() {
                 $('#createModal').modal('show');
-                syncCat($('#createModal .mi-category'));
+                syncCat($('#createModal .mi-category'), false);
             });
         @endif
     });
 </script>
 
 {{-- Modal Chọn Vật Tư (danh mục vật tư phòng đang dùng) --}}
-<div class="modal fade" id="selectMaterialModal" tabindex="-1" role="dialog" style="z-index: 1060;" data-backdrop="static">
+<div class="modal fade" id="selectMaterialModal" tabindex="-1" role="dialog" style="z-index: 1060;"
+    data-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document" style="max-width: 60%;">
         <div class="modal-content">
             <div class="modal-header">
@@ -168,7 +181,8 @@
                                     <td>
                                         <div class="md-sub">{{ $c->manufacturer_name ?: '—' }}</div>
                                         @if ($c->manufacturer_short_name)
-                                            <span class="badge badge-light border">{{ $c->manufacturer_short_name }}</span>
+                                            <span
+                                                class="badge badge-light border">{{ $c->manufacturer_short_name }}</span>
                                         @endif
                                     </td>
                                     <td>{{ $c->technical_specification ?: '—' }}</td>
@@ -205,7 +219,9 @@
                 emptyTable: 'Phòng chưa khai vật tư nào ở tab "Vật Tư Của Phòng" nên chưa có gì để nhập.',
                 zeroRecords: 'Không tìm thấy vật tư phù hợp trong danh mục của phòng.'
             },
-            order: [[1, 'asc']]
+            order: [
+                [1, 'asc']
+            ]
         });
 
         $(document).on('click', '.btn-select-material', function() {

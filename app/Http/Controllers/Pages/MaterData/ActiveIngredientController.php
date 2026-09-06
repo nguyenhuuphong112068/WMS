@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\MaterData;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\ChemicalClassification;
@@ -29,6 +30,8 @@ use Illuminate\Validation\Rule;
  */
 class ActiveIngredientController extends Controller
 {
+    use RequiresChangeReason;
+
     private const TABLE = 'active_ingredients';
     private const GROUP_TABLE = 'active_ingredient_classifications';
     private const LABEL = 'tên hoạt chất';
@@ -132,7 +135,11 @@ class ActiveIngredientController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần cập nhật!');
         }
 
-        $validator = Validator::make($request->all(), $this->rules($current->id, $request), $this->messages());
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules($current->id, $request) + $this->changeReasonRules(),
+            $this->messages() + $this->changeReasonMessages()
+        );
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
@@ -148,6 +155,10 @@ class ActiveIngredientController extends Controller
             $note = trim($note . ' | Phân loại NĐ 24/2026: '
                 . ($this->groupLabels($oldGroups) ?: '—') . ' -> '
                 . ($this->groupLabels($groups) ?: '—'), ' |');
+        }
+
+        if ($note === '') {
+            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
         }
 
         // Nhắc rõ khi sửa dữ liệu lấy từ nghị định
@@ -168,7 +179,7 @@ class ActiveIngredientController extends Controller
             $this->syncGroups($current->id, $groups, (int) $current->is_statutory);
         });
 
-        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS);
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, [], $this->changeReason($request));
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->name, $request->name);
 
@@ -181,6 +192,10 @@ class ActiveIngredientController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần thay đổi trạng thái!');
+        }
+
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
         }
 
         $newStatus = $current->status_id == 1 ? 0 : 1;
@@ -196,7 +211,9 @@ class ActiveIngredientController extends Controller
             $current->id,
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->status_id, $newStatus),
-            self::FIELDS
+            self::FIELDS,
+            [],
+            $this->changeReason($request)
         );
 
         AuditTrialController::log(

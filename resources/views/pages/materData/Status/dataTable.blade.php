@@ -5,7 +5,7 @@
             <h3 class="card-title">Danh sách Trạng Thái</h3>
         </div>
         <div class="card-body">
-            @perm('materData_create')
+            @perm('materData_common_create')
                 <button class="btn btn-success btn-create mb-2" data-toggle="modal" data-target="#createModal" style="width: 155px">
                     <i class="fas fa-plus"></i> Thêm mới
                 </button>
@@ -38,7 +38,7 @@
                             <td>{{ \Carbon\Carbon::parse($data->created_at)->format('d/m/Y') }}</td>
                             <td class="text-center align-middle">
                                 <span class="md-btn-wrap">
-                                    @perm('materData_update')
+                                    @perm('materData_common_update')
                                         <button type="button" class="btn btn-warning btn-edit mb-1"
                                             data-id="{{ $data->id }}"
                                             data-name="{{ $data->name }}"
@@ -56,7 +56,7 @@
                                     ])
                                 </span>
 
-                                @perm('materData_deActive')
+                                @perm('materData_common_deActive')
                                     <form class="form-deActive d-inline" action="{{ route('pages.materData.status.deActive') }}" method="POST">
                                         @csrf
                                         <input type="hidden" name="id" value="{{ $data->id }}">
@@ -103,6 +103,7 @@
 
             modal.find('#update_id').val(button.data('id'));
             modal.find('#update_name').val(button.data('name'));
+            modal.find('[name="change_reason"]').val('');
         });
 
         $('.form-deActive').on('submit', function(e) {
@@ -116,13 +117,31 @@
                 title: `Xác nhận ${actionText}?`,
                 text: `Bạn có chắc chắn muốn ${actionText} trạng thái: ${name}?`,
                 icon: 'warning',
+                input: 'textarea',
+                inputLabel: 'Lý do điều chỉnh',
+                inputPlaceholder: 'Nêu rõ lý do khoá / mở khoá bản ghi này',
+                inputAttributes: {
+                    maxlength: '500'
+                },
                 showCancelButton: true,
                 confirmButtonColor: '#28a745',
                 cancelButtonColor: '#d33',
                 confirmButtonText: 'Đồng ý',
-                cancelButtonText: 'Hủy'
+                cancelButtonText: 'Hủy',
+                preConfirm: (reason) => {
+                    if (!reason || !reason.trim()) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do điều chỉnh');
+                    }
+                    return reason;
+                }
             }).then((result) => {
                 if (result.isConfirmed) {
+                    $(form).find('input[name="change_reason"]').remove();
+                    const rs = document.createElement('input');
+                    rs.type = 'hidden';
+                    rs.name = 'change_reason';
+                    rs.value = result.value || '';
+                    form.appendChild(rs);
                     form.submit();
                 }
             });

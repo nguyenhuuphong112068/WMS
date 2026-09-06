@@ -126,8 +126,8 @@
                                                 </div>
                                             </td>
                                             <td class="align-middle text-right">
-                                                <input type="number" step="0.0001" min="0.0001" name="issued_amount"
-                                                    class="form-control text-right font-weight-bold input-issue-amount"
+                                                <input type="text" inputmode="decimal" min="0.0001" name="issued_amount"
+                                                    class="form-control text-right font-weight-bold input-issue-amount js-decimal"
                                                     value="{{ (float) $item->requested_amount }}"
                                                     style="height: 38px !important; min-height: 38px !important; font-size: 0.88rem;" required>
                                             </td>
@@ -152,9 +152,9 @@
                                                     {{-- Phòng mình (A) đang nhận: tự khai 4 thông tin riêng của phòng mình --}}
                                                     <div class="mt-1">
                                                         <select name="dest_location_id" class="form-control input-dest-location-receive mb-1" style="height: 32px !important; min-height: 32px !important; font-size: 0.78rem;">
-                                                            <option value="">-- Vị trí lưu --</option>
+                                                            <option value="">-- Định khu --</option>
                                                             @foreach ($transferOwnLocations as $loc)
-                                                                <option value="{{ $loc->id }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->room_name }}/{{ $loc->shelf_name }})@endif</option>
+                                                                <option value="{{ $loc->id }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->shelf_name }}/{{ $loc->column_name }}/{{ $loc->tier_name }})@endif</option>
                                                             @endforeach
                                                         </select>
                                                         <select name="dest_purpose_id" class="form-control input-dest-purpose-receive mb-1" style="height: 32px !important; min-height: 32px !important; font-size: 0.78rem;">

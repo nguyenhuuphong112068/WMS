@@ -235,8 +235,18 @@
                 <!-- Droplist Menu Chuyển Bộ Phận  -->
                 @php
                     $currentDept = session('user')['selected_department'] ?? session('user')['department'] ?? null;
+
+                    // Phòng ban user được phép làm việc (Admin -> tất cả; user thường -> phòng được gán role).
+                    // Phòng ban chung (is_general = 0, VD: BOD, Cung Ứng) chỉ để tạo user, không có kho riêng.
+                    $allowedDeptIds = user_allowed_department_ids(session('user')['userId'] ?? 0);
+                    $switchableDepts = DB::table('deparments')
+                        ->where('isActive', 1)
+                        ->where('is_general', 1)
+                        ->when($allowedDeptIds !== ['*'], fn ($q) => $q->whereIn('id', $allowedDeptIds ?: [0]))
+                        ->orderBy('shortName', 'asc')
+                        ->get();
                 @endphp
-                @if (user_has_any_role(session('user')['userId'], ['Admin']))
+                @if ($switchableDepts->count() > 1)
                     <li class="nav-item has-treeview">
                         <a href="#" class="nav-link">
                             <i class="fas fa-building"></i>
@@ -246,16 +256,7 @@
                             </p>
                         </a>
                         <ul class="nav nav-treeview">
-                            @php
-                                // Phòng ban chung (is_general = 0, VD: BOD, Cung Ứng) chỉ để tạo user,
-                                // không có kho hàng riêng nên không hiện trong Chuyển Bộ Phận.
-                                $departments = DB::table('deparments')
-                                    ->where('isActive', 1)
-                                    ->where('is_general', 1)
-                                    ->orderBy('shortName', 'asc')
-                                    ->get();
-                            @endphp
-                            @foreach ($departments as $dept)
+                            @foreach ($switchableDepts as $dept)
                                 <li class="nav-item">
                                     <a href="{{ route('switch', ['selected_department' => $dept->shortName, 'redirect' => url()->current()]) }}"
                                         class="nav-link">
@@ -277,7 +278,7 @@
                 @endif
 
                 <!-- Droplist Menu Dữ Liệu Gốc  -->
-                @permAny(['materData_view'])
+                @permAny(['materData_material_view', 'materData_chemical_view', 'materData_standard_view', 'materData_common_view'])
                     <li class="nav-item has-treeview {{ str_contains(url()->current(), 'materData') ? 'menu-open' : '' }}">
                         <a href="#"
                             class="nav-link {{ str_contains(url()->current(), 'materData') ? 'active' : '' }}">
@@ -288,91 +289,91 @@
                             </p>
                         </a>
                         <ul class="nav nav-treeview">
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.company.list') }}"
                                         class="nav-link {{ request()->is('materData/company') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-primary"></i>
                                         <p>Công Ty</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.department.list') }}"
                                         class="nav-link {{ request()->is('materData/department') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-info"></i>
                                         <p>Phòng Ban</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.group.list') }}"
                                         class="nav-link {{ request()->is('materData/group') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-success"></i>
                                         <p>Tổ</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_chemical_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.activeIngredient.list') }}"
                                         class="nav-link {{ request()->is('materData/activeIngredient') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-danger"></i>
                                         <p>Tên Hoạt Chất</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_chemical_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.chemName.list') }}"
                                         class="nav-link {{ request()->is('materData/chemName') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-success"></i>
                                         <p>Tên Hoá Chất</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_standard_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.standardName.list') }}"
                                         class="nav-link {{ request()->is('materData/standardName') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-warning"></i>
                                         <p>Tên Chuẩn</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_material_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.materialName.list') }}"
                                         class="nav-link {{ request()->is('materData/materialName') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-primary"></i>
                                         <p>Tên Vật Tư</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_material_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.materialClassification.list') }}"
                                         class="nav-link {{ request()->is('materData/materialClassification') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-success"></i>
                                         <p>Phân Loại Vật Tư</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.productName.list') }}"
                                         class="nav-link {{ request()->is('materData/productName') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-danger"></i>
                                         <p>Tên Sản Phẩm</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_standard_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.purpose.list') }}"
                                         class="nav-link {{ request()->is('materData/purpose') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-info"></i>
                                         <p>Chỉ Tiêu Kiểm</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.status.list') }}"
                                         class="nav-link {{ request()->is('materData/status') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-warning"></i>
                                         <p>Trạng Thái</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.zone.list') }}"
                                         class="nav-link {{ request()->is('materData/zone*') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-primary"></i>
                                         <p>Định Khu</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_chemical_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.mixtureHazardCategory.list') }}"
                                         class="nav-link {{ request()->is('materData/mixtureHazardCategory') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-danger"></i>
@@ -380,35 +381,35 @@
                                     </a></li>
                             @endperm
 
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.chemManufacturer.list') }}"
                                         class="nav-link {{ request()->is('materData/chemManufacturer') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-secondary"></i>
                                         <p>Nhà Sản Xuất</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.chemSupplier.list') }}"
                                         class="nav-link {{ request()->is('materData/chemSupplier') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-danger"></i>
                                         <p>Nhà Cung Cấp</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.packagingSpecification.list') }}"
                                         class="nav-link {{ request()->is('materData/packagingSpecification') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-info"></i>
                                         <p>Quy Cách Đóng Gói</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.unit.list') }}"
                                         class="nav-link {{ request()->is('materData/unit') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-warning"></i>
                                         <p>Đơn Vị Tính</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_view')
+                            @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.storageCondition.list') }}"
                                         class="nav-link {{ request()->is('materData/storageCondition') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-dark"></i>

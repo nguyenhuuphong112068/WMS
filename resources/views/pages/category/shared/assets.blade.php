@@ -309,6 +309,21 @@
         word-break: break-word;
     }
 
+    .cat-history-reason {
+        background: #FFF7ED;
+        border: 1px solid #FED7AA;
+        border-radius: 6px;
+        padding: 7px 10px;
+        font-size: 0.83rem;
+        color: #9A3412;
+        margin-bottom: 8px;
+        word-break: break-word;
+    }
+
+    .cat-history-reason b {
+        color: #7C2D12;
+    }
+
     .cat-history-snapshot {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -389,6 +404,9 @@
 
                 $(this).prop('checked', checked).closest('.cat-check-item').toggleClass('is-checked', checked);
             });
+
+            // Lý do điều chỉnh phải nhập lại mỗi lần sửa, không giữ nội dung của lần trước
+            $form.find('[name="change_reason"]').val('');
         });
 
         /* ---------- Xem lịch sử thay đổi ---------- */
@@ -447,6 +465,13 @@
 
                 if (row.change_note) {
                     $('<div>').addClass('cat-history-note').text(row.change_note).appendTo($item);
+                }
+
+                if (row.change_reason) {
+                    $('<div>').addClass('cat-history-reason')
+                        .append($('<b>').text('Lý do điều chỉnh: '))
+                        .append(document.createTextNode(row.change_reason))
+                        .appendTo($item);
                 }
 
                 var $snapshot = $('<div>').addClass('cat-history-snapshot');

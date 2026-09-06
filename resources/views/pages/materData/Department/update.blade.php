@@ -41,6 +41,15 @@
                         <input type="checkbox" name="is_common" id="update_is_common" class="form-check-input" value="1">
                         <label class="form-check-label" for="update_is_common">Phòng ban chung (chỉ để tạo user, không hiện trong Chuyển Bộ Phận, không tham gia nghiệp vụ)</label>
                     </div>
+                    <div class="form-group">
+                        <label for="update_change_reason">Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" id="update_change_reason" rows="2" maxlength="500" required
+                            class="form-control @error('change_reason', 'updateErrors') is-invalid @enderror"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @error('change_reason', 'updateErrors')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>

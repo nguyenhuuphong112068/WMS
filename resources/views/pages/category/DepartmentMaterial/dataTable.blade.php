@@ -3,7 +3,7 @@
 @php
     // Danh sách nhóm để lọc bảng: chỉ lấy các nhóm THỰC SỰ đang xuất hiện trong bảng này.
     $dmFilterGroups = $datas
-        ->filter(fn ($row) => $row->classification_id && $row->classification_name)
+        ->filter(fn($row) => $row->classification_id && $row->classification_name)
         ->unique('classification_id')
         ->pluck('classification_name', 'classification_id')
         ->sort();
@@ -31,11 +31,7 @@
                     </select>
                 </div>
             </div>
-            <p class="hint">
-                <i class="fas fa-info-circle mr-1"></i>
-                Mỗi dòng ở đây cũng là lời khai <b>"phòng tôi có dùng vật tư này"</b>, hiện ở cột
-                <b>Phòng Ban Đang Dùng</b> của tab Danh Mục Vật Tư Công Ty.
-            </p>
+
         </div>
 
         <div class="table-responsive">
@@ -50,6 +46,7 @@
                         <th style="width: 110px">Phân Loại</th>
                         <th class="text-center" style="width: 65px">Đơn Vị</th>
                         <th class="text-right" style="width: 120px">Ngưỡng Tồn Tối Thiểu</th>
+                        <th style="width: 190px">Định Khu</th>
                         <th style="width: 130px">Ghi Chú</th>
                         <th class="text-center" style="width: 90px">Sử Dụng</th>
                         <th class="text-center" style="width: 85px">Thao Tác</th>
@@ -98,6 +95,16 @@
                                 @endif
                             </td>
                             <td class="md-sub">
+                                @if ($row->location_code)
+                                    <div class="font-weight-bold">
+                                        <span class="md-tag">{{ $row->location_code }}</span>
+                                    </div>
+                                    <div>{{ $dmPath($row) }}</div>
+                                @else
+                                    <span class="md-empty">Chưa định khu</span>
+                                @endif
+                            </td>
+                            <td class="md-sub">
                                 @if ($row->note)
                                     <span class="md-note" title="{{ $row->note }}">{{ $row->note }}</span>
                                 @else
@@ -122,6 +129,7 @@
                                                 'classification_id' => $row->classification_id,
                                                 'unit_id' => $row->unit_id,
                                                 'min_stock' => $row->min_stock,
+                                                'default_location_id' => $row->default_location_id,
                                                 'note' => $row->note,
                                                 'material_name' => $row->material_name,
                                                 'manufacturer_name' => $row->manufacturer_name,
@@ -131,8 +139,8 @@
                                     @endperm
 
                                     @perm('category_material_dept_manage')
-                                        <form class="form-md-confirm d-inline"
-                                            action="{{ route($mdRoute . 'deActive') }}" method="POST"
+                                        <form class="form-md-confirm d-inline" data-require-reason="1" action="{{ route($mdRoute . 'deActive') }}"
+                                            method="POST"
                                             data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $mdLabel }}?"
                                             data-text="{{ $row->status_id == 1 ? 'Sau khi khoá, vật tư' : 'Sau khi mở khoá, vật tư' }} &quot;{{ $row->material_name }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn tính là phòng đang dùng.' : 'sẽ dùng lại khai báo riêng của phòng.' }}"
                                             data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
@@ -186,7 +194,8 @@
                 if (settings.nTable.id !== 'dmTable') return true;
                 if (dmGroupWant === 'all') return true;
 
-                var classificationId = ($(settings.aoData[index].nTr).attr('data-classification') || '').trim();
+                var classificationId = ($(settings.aoData[index].nTr).attr('data-classification') || '')
+                    .trim();
 
                 return dmGroupWant === 'none' ? classificationId === '' : classificationId === dmGroupWant;
             });

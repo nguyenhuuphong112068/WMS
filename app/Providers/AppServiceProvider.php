@@ -23,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
         /*
         | Directive kiểm tra quyền dùng trong Blade, bọc quanh các nút thao tác:
         |
-        |   @perm('materData_create')  ... @endperm      -> có quyền này
+        |   @perm('materData_common_create')  ... @endperm   -> có quyền này
         |   @permAny(['a', 'b'])       ... @endpermAny   -> có ít nhất một trong các quyền
         |
         | Muốn làm ngược lại (hiện khi KHÔNG có quyền) thì dùng @unlessperm / @endunlessperm.

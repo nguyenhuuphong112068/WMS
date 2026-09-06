@@ -278,6 +278,9 @@
                 $form.find('[name="' + field + '"]').val(row[field] === null ? '' : row[field]);
             });
 
+            // Lý do điều chỉnh phải nhập lại mỗi lần sửa, không giữ nội dung của lần trước
+            $form.find('[name="change_reason"]').val('');
+
             $(modal).modal('show');
         });
 
@@ -352,24 +355,33 @@
          | hộp xác nhận. Đây là thành phần thứ 2 của chữ ký điện tử (21 CFR Part 11
          | §11.200) - dùng cho các bước Trình ký / Ký duyệt / Phê duyệt / Từ chối.
          | Mật khẩu được gắn vào form dưới tên "sign_password" rồi mới submit.
+         |
+         | data-require-reason="1": bắt buộc nhập lý do điều chỉnh - dùng cho Khoá / Mở khoá
+         | dữ liệu gốc và danh mục. Lý do được gắn vào form dưới tên "change_reason".
+         | Hai cờ này không dùng chung trên một nút (duyệt cần mật khẩu, khoá cần lý do).
         */
         $(document).on('submit', '.form-md-confirm', function(e) {
             e.preventDefault();
             var form = this;
             var needPassword = String($(form).data('require-password') || '') === '1';
+            var needReason = String($(form).data('require-reason') || '') === '1';
 
             Swal.fire({
                 title: $(form).data('title'),
                 text: $(form).data('text'),
                 icon: 'warning',
                 showCancelButton: true,
-                input: needPassword ? 'password' : undefined,
-                inputLabel: needPassword ? 'Nhập lại mật khẩu của bạn để ký xác nhận' : undefined,
-                inputPlaceholder: needPassword ? 'Mật khẩu đăng nhập' : undefined,
+                input: needPassword ? 'password' : (needReason ? 'textarea' : undefined),
+                inputLabel: needPassword ? 'Nhập lại mật khẩu của bạn để ký xác nhận' :
+                    (needReason ? 'Lý do điều chỉnh' : undefined),
+                inputPlaceholder: needPassword ? 'Mật khẩu đăng nhập' :
+                    (needReason ? 'Nêu rõ lý do khoá / mở khoá bản ghi này' : undefined),
                 inputAttributes: needPassword ? {
                     autocomplete: 'current-password',
                     autocapitalize: 'off'
-                } : undefined,
+                } : (needReason ? {
+                    maxlength: '500'
+                } : undefined),
                 confirmButtonColor: $(form).data('danger') ? '#DC2626' : '#2E7BC4',
                 cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Đồng ý',
@@ -379,7 +391,12 @@
                         Swal.showValidationMessage('Vui lòng nhập mật khẩu để ký xác nhận');
                     }
                     return value;
-                } : undefined
+                } : (needReason ? function(value) {
+                    if (!value || !value.trim()) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do điều chỉnh');
+                    }
+                    return value;
+                } : undefined)
             }).then(function(result) {
                 if (!result.isConfirmed) return;
 
@@ -390,6 +407,15 @@
                     pw.name = 'sign_password';
                     pw.value = result.value || '';
                     form.appendChild(pw);
+                }
+
+                if (needReason) {
+                    $(form).find('input[name="change_reason"]').remove();
+                    var rs = document.createElement('input');
+                    rs.type = 'hidden';
+                    rs.name = 'change_reason';
+                    rs.value = result.value || '';
+                    form.appendChild(rs);
                 }
 
                 form.submit();

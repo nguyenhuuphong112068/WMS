@@ -15,8 +15,8 @@
 
 <div class="est-amount-row">
     <div class="col-amount">
-        <input type="number" step="0.0001" min="0.0001" name="amounts[{{ $index }}][amount]"
-            data-field="amount" class="form-control" value="{{ $amount }}" placeholder="Ví dụ: 5">
+        <input type="text" inputmode="decimal" min="0.0001" name="amounts[{{ $index }}][amount]"
+            data-field="amount" class="form-control js-decimal" value="{{ $amount }}" placeholder="Ví dụ: 5">
     </div>
 
     <div class="col-unit">

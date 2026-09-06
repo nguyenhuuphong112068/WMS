@@ -157,7 +157,7 @@
                                 <th style="min-width: 230px" class="text-left">Khuyến Nghị</th>
                                 <th style="width: 105px">Hạn Dùng</th>
                                 <th style="width: 105px">Ngày Nhập</th>
-                                <th style="width: 105px">Vị Trí</th>
+                                <th style="width: 105px">Định Khu</th>
                                 <th style="width: 130px" class="text-right">Còn Hứa Được</th>
                                 <th style="width: 130px">Cấp Từ Lô Này</th>
                             </tr>
@@ -289,7 +289,7 @@
             $form.find('.me-issue-lines').append(
                 '<div class="me-issue-line">'
                 + '<select class="form-control form-control-sm me-issue-lot" name="lots[' + index + '][import_id]">' + options.join('') + '</select>'
-                + '<input type="number" step="0.0001" min="0" class="form-control form-control-sm me-issue-amount"'
+                + '<input type="text" inputmode="decimal" min="0" class="form-control form-control-sm me-issue-amount js-decimal"'
                 + ' name="lots[' + index + '][amount]" value="' + (amount ? num(amount) : '') + '">'
                 + '<button type="button" class="btn btn-sm btn-outline-primary me-issue-pick"'
                 + ' title="Danh mục tồn có thể cấp phát của vật tư này"><i class="fas fa-layer-group"></i></button>'
@@ -335,7 +335,7 @@
 
                 var html = lotBadges(lot)
                     + '<span class="ml-1">còn hứa được <b>' + num(lot.available) + ' ' + esc(lot.unit) + '</b>'
-                    + (lot.location ? ' · vị trí ' + esc(lot.location) : '') + '</span>';
+                    + (lot.location ? ' · định khu ' + esc(lot.location) : '') + '</span>';
 
                 if (amount > lot.available + EPS) {
                     html += '<span class="me-badge danger ml-1">vượt tồn khả dụng của lô</span>';
@@ -514,7 +514,7 @@
                 );
 
                 $row.children('td').last().append(
-                    $('<input type="number" step="0.0001" min="0" class="form-control form-control-sm me-lot-take">')
+                    $('<input type="text" inputmode="decimal" min="0" class="form-control form-control-sm me-lot-take js-decimal">')
                         .attr('placeholder', lot.selectable ? '0' : '—')
                         .attr('max', lot.available)
                         .prop('disabled', !lot.selectable)

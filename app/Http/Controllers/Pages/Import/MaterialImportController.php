@@ -19,9 +19,9 @@ use Illuminate\Validation\Rule;
  *
  * Ghi nhận từng lô vật tư nhập vào kho của phòng ban đang chọn.
  *
- * MÃ LÔ VẬT TƯ sinh tự động: "M" + shortName phòng ban + đuôi ngẫu nhiên, ví dụ
- * M-QC1-7KPMR9J4WD. Không còn số thứ tự nên xoá phiếu không lộ khoảng trống trên
- * giao diện. Công thức nằm ở App\Support\MaterialCode.
+ * MÃ LÔ VẬT TƯ sinh tự động: "M" + id phòng ban (2 chữ số) + đuôi ngẫu nhiên, ví dụ
+ * M-07-7KPMR9J4WD. Mọi mã dài bằng nhau. Không còn số thứ tự nên xoá phiếu không lộ
+ * khoảng trống trên giao diện. Công thức nằm ở App\Support\MaterialCode.
  *
  * Phiếu nhập chỉ khoá (deActive) chứ không xoá cứng, để mã lô không bị cấp lại.
  * Vật tư là hàng tiêu hao nên phiếu nhập gọn: không có nhóm chuẩn, số lô, nhà cung cấp,
@@ -68,8 +68,9 @@ class MaterialImportController extends Controller
             ->leftJoin('material_classifications', DepartmentMaterial::TABLE.'.classification_id', '=', 'material_classifications.id')
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 self::TABLE.'.*',
                 'material_categories.technical_specification',
@@ -82,8 +83,9 @@ class MaterialImportController extends Controller
                 'units.name as unit_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
             ->orderBy(self::TABLE.'.imported_date', 'desc')
@@ -113,6 +115,8 @@ class MaterialImportController extends Controller
             return [$category->id => [
                 'unit_short_name' => $category->unit_short_name,
                 'min_stock' => $category->min_stock,
+                // Định khu phòng đã khai ở tab "Vật Tư Của Phòng" - điền sẵn ô vị trí lưu trữ
+                'location_id' => $category->default_location_id,
                 'info_html' => implode(' | ', $info),
             ]];
         })->toArray();
@@ -231,7 +235,6 @@ class MaterialImportController extends Controller
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
         }
 
-        $shortName = $this->departmentShortName();
         $quantity = max(1, min(50, (int) $request->input('quantity', 1)));
 
         $uploadedFiles = [];
@@ -253,11 +256,11 @@ class MaterialImportController extends Controller
 
         $createdCodes = [];
 
-        DB::transaction(function () use ($request, $departmentId, $shortName, $quantity, $uploadedFiles, &$createdCodes) {
+        DB::transaction(function () use ($request, $departmentId, $quantity, $uploadedFiles, &$createdCodes) {
             $payload = $this->payload($request);
 
             for ($i = 0; $i < $quantity; $i++) {
-                $code = MaterialCode::next($shortName);
+                $code = MaterialCode::next($departmentId);
 
                 $id = DB::table(self::TABLE)->insertGetId($payload + [
                     'code' => $code,
@@ -472,6 +475,48 @@ class MaterialImportController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * ĐỔI TRẠNG THÁI FILE ĐÍNH KÈM - Đang sử dụng (1) <-> Ngưng sử dụng (0).
+     *
+     * File ngưng sử dụng vẫn mở xem được, chỉ hiển thị kèm nhãn trạng thái. Dùng chung
+     * cho cả màn hình Tồn Kho Vật Tư (MaterialInventoryController gọi lại logic này).
+     */
+    public function toggleAttachmentStatus(Request $request)
+    {
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->join(self::TABLE, self::ATTACHMENT_TABLE.'.material_import_id', '=', self::TABLE.'.id')
+            ->where(self::ATTACHMENT_TABLE.'.id', $request->id)
+            ->where(self::TABLE.'.department_id', $this->departmentId())
+            ->select(self::ATTACHMENT_TABLE.'.*', self::TABLE.'.code as import_code')
+            ->first();
+
+        if (! $attachment) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy file đính kèm.'], 404);
+        }
+
+        $wasActive = ! isset($attachment->is_active) || $attachment->is_active;
+        $newActive = $wasActive ? 0 : 1;
+
+        DB::table(self::ATTACHMENT_TABLE)->where('id', $attachment->id)->update([
+            'is_active' => $newActive,
+            'status_changed_by' => $this->actor(),
+            'status_changed_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Đổi trạng thái tài liệu',
+            self::TABLE,
+            $attachment->material_import_id,
+            $attachment->import_code,
+            'File "'.$attachment->file_name.'": '
+                .($wasActive ? 'Đang sử dụng' : 'Ngưng sử dụng').' -> '
+                .($newActive ? 'Đang sử dụng' : 'Ngưng sử dụng')
+        );
+
+        return response()->json(['success' => true, 'is_active' => $newActive]);
+    }
+
     public function deActive(Request $request)
     {
         $current = DB::table(self::TABLE)
@@ -605,15 +650,6 @@ class MaterialImportController extends Controller
     private function departmentId(): int
     {
         return (int) (session('user')['selected_department_id'] ?? 0);
-    }
-
-    private function departmentShortName(): string
-    {
-        return (string) (
-            session('user')['selected_department']
-            ?? DB::table('deparments')->where('id', $this->departmentId())->value('shortName')
-            ?? ''
-        );
     }
 
     private function actor(): string

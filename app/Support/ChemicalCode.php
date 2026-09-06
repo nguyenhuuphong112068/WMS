@@ -7,8 +7,12 @@ use Illuminate\Support\Facades\DB;
 /**
  * MÃ XUẤT NHẬP HOÁ CHẤT - một chỗ duy nhất định nghĩa cách sinh mã.
  *
- *      "C" + "-" + deparments.shortName + "-" + <đuôi ngẫu nhiên 10 ký tự>
- *      C-QC1-7KPMR9J4WD
+ *      "C" + "-" + deparments.id (đệm 0 cho đủ 2 chữ số) + "-" + <đuôi ngẫu nhiên 10 ký tự>
+ *      C-07-7KPMR9J4WD
+ *
+ * Dùng id phòng ban thay cho shortName để mọi mã dài BẰNG NHAU (luôn 15 ký tự):
+ * shortName do người dùng tự nhập, dài ngắn tuỳ ý và có thể chứa dấu "-" trùng với
+ * dấu ngăn. id là số, cố định, không bao giờ đổi sau khi tạo phòng ban.
  *
  * KHÁC mã cũ (department_id + category_id + số thứ tự 8 chữ số): mã mới KHÔNG chứa
  * số thứ tự và không gắn với danh mục hoá chất. Nhờ vậy khoá / xoá một phiếu nhập
@@ -38,6 +42,9 @@ class ChemicalCode
     /** Số ký tự ngẫu nhiên ở đuôi mã. */
     public const RANDOM_LENGTH = 10;
 
+    /** Số chữ số của phần id phòng ban trong mã (đệm 0 về đúng độ dài này). */
+    public const DEPT_LENGTH = 2;
+
     /** Crockford Base32 bỏ nguyên âm A, E (đã sẵn không có I, L, O, U). */
     private const ALPHABET = '0123456789BCDFGHJKMNPQRSTVWXYZ';
 
@@ -54,10 +61,16 @@ class ChemicalCode
         return $tail;
     }
 
-    /** Ghép mã từ mã phòng ban và đuôi ngẫu nhiên. Tách riêng để chỗ nào cũng ghép giống nhau. */
-    public static function build(string $shortName, string $tail): string
+    /** Phần phòng ban trong mã: id đệm 0 về đúng DEPT_LENGTH chữ số. */
+    public static function deptCode(int $departmentId): string
     {
-        return self::KIND.self::SEP.$shortName.self::SEP.$tail;
+        return str_pad((string) $departmentId, self::DEPT_LENGTH, '0', STR_PAD_LEFT);
+    }
+
+    /** Ghép mã từ id phòng ban và đuôi ngẫu nhiên. Tách riêng để chỗ nào cũng ghép giống nhau. */
+    public static function build(int $departmentId, string $tail): string
+    {
+        return self::KIND.self::SEP.self::deptCode($departmentId).self::SEP.$tail;
     }
 
     /**
@@ -66,10 +79,10 @@ class ChemicalCode
      * Gọi trong transaction của lúc lưu: sinh đuôi ngẫu nhiên, nếu vô tình trùng thì
      * sinh lại. Không đọc MAX() nên hai người nhập cùng lúc cũng không lệ thuộc thứ tự.
      */
-    public static function next(string $shortName): string
+    public static function next(int $departmentId): string
     {
         do {
-            $code = self::build($shortName, self::randomTail());
+            $code = self::build($departmentId, self::randomTail());
         } while (DB::table(self::TABLE)->where('code', $code)->exists());
 
         return $code;

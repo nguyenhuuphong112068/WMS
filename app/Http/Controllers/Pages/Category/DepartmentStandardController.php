@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\Category;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
@@ -20,7 +21,7 @@ use Illuminate\Validation\Rule;
  * Danh mục chất chuẩn (standard_categories) dùng chung toàn công ty vì nó mô tả BẢN
  * CHẤT của chất chuẩn. Màn hình này khai phần CÁCH DÙNG của riêng phòng ban đang chọn:
  * đơn vị tính, hạn dùng nội bộ sau khi mở ống, ngưỡng tồn tối thiểu, vị trí lưu trữ quy
- * hoạch, điều kiện bảo quản.
+ * hoạch. Điều kiện bảo quản luôn theo Danh Mục Chất Chuẩn của công ty, phòng không khai riêng.
  *
  * Để trống một ô nghĩa là "theo mặc định của danh mục" - xem App\Support\DepartmentStandard.
  *
@@ -34,6 +35,8 @@ use Illuminate\Validation\Rule;
  */
 class DepartmentStandardController extends Controller
 {
+    use RequiresChangeReason;
+
     private const TABLE = 'standard_department_categories';
 
     private const LABEL = 'chất chuẩn của phòng';
@@ -87,7 +90,11 @@ class DepartmentStandardController extends Controller
 
         // Không cho đổi chất chuẩn của một dòng đã khai: đó là khoá của dòng.
         // Khai nhầm thì khoá dòng cũ rồi khai dòng mới, để giữ vết.
-        $validator = Validator::make($request->all(), $this->rules($departmentId, true), $this->messages());
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules($departmentId, true) + $this->changeReasonRules(),
+            $this->messages() + $this->changeReasonMessages()
+        );
 
         $this->checkConversions($validator, $request, (int) $current->category_id, $departmentId);
 
@@ -114,6 +121,7 @@ class DepartmentStandardController extends Controller
             'đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
                 .' | hạn: '.($request->shelf_life_months ?: 'mặc định')
                 .' | ngưỡng: '.($request->min_stock ?: 'mặc định')
+                .' | Lý do: '.$this->changeReason($request)
         );
 
         return $this->backToTab()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
@@ -130,6 +138,10 @@ class DepartmentStandardController extends Controller
             return $this->backToTab()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
         }
 
+        if ($this->changeReason($request) === '') {
+            return $this->backToTab()->with('error', 'Vui lòng nhập lý do điều chỉnh.');
+        }
+
         $newStatus = $current->status_id == 1 ? 0 : 1;
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
@@ -143,7 +155,7 @@ class DepartmentStandardController extends Controller
             self::TABLE,
             $current->id,
             'status_id: '.$current->status_id,
-            'status_id: '.$newStatus
+            'status_id: '.$newStatus.' | Lý do: '.$this->changeReason($request)
         );
 
         return $this->backToTab()->with(
@@ -158,8 +170,7 @@ class DepartmentStandardController extends Controller
             'unit_id' => ['required', 'integer', 'exists:units,id'],
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
-            'storage_condition_id' => ['nullable', 'exists:storage_conditions,id'],
-            // Vị trí phải thuộc ĐÚNG phòng ban đang chọn, không mượn được của phòng khác
+            // Định khu phải thuộc ĐÚNG phòng ban đang chọn, không mượn được của phòng khác
             'default_location_id' => [
                 'nullable',
                 Rule::exists('locations', 'id')
@@ -230,7 +241,9 @@ class DepartmentStandardController extends Controller
             'unit_id' => (int) $request->unit_id,
             'shelf_life_months' => $this->nullIfBlank($request->shelf_life_months),
             'min_stock' => $this->nullIfBlank($request->min_stock),
-            'storage_condition_id' => $request->storage_condition_id ? (int) $request->storage_condition_id : null,
+            // Điều kiện bảo quản luôn theo Danh Mục Chất Chuẩn của công ty: phòng không khai
+            // riêng nữa, luôn ghi null để xoá mọi giá trị cũ đã từng khai.
+            'storage_condition_id' => null,
             'default_location_id' => $request->default_location_id ? (int) $request->default_location_id : null,
             'note' => $this->nullIfBlank($request->note),
         ];
@@ -256,8 +269,7 @@ class DepartmentStandardController extends Controller
             'shelf_life_months.max' => 'Hạn dùng nội bộ tối đa 1200 tháng (100 năm).',
             'min_stock.numeric' => 'Ngưỡng tồn tối thiểu phải là số.',
             'min_stock.min' => 'Ngưỡng tồn tối thiểu không được âm.',
-            'default_location_id.exists' => 'Vị trí lưu trữ không thuộc phòng ban đang chọn.',
-            'storage_condition_id.exists' => 'Điều kiện bảo quản được chọn không tồn tại.',
+            'default_location_id.exists' => 'Định khu không thuộc phòng ban đang chọn.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
         ];
     }

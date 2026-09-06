@@ -71,8 +71,8 @@
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label>Số Lượng <span class="text-danger">*</span></label>
-                            <input type="number" name="amount" step="0.0001" min="0.0001"
-                                class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}"
+                            <input type="text" inputmode="decimal" name="amount" min="0.0001"
+                                class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
                                 value="{{ old('amount') }}" required>
                             @if ($bag->has('amount'))
                                 <span class="md-error">{{ $bag->first('amount') }}</span>
@@ -147,7 +147,7 @@
 
                     <div class="form-group">
                         <label>Lý Do Điều Chỉnh</label>
-                        <textarea name="adjust_reason" rows="2" maxlength="500"
+                        <textarea name="adjust_reason" rows="2" maxlength="500" data-require-fill
                             class="form-control {{ $bag->has('adjust_reason') ? 'is-invalid' : '' }}"
                             placeholder="Ví dụ: Ghi nhầm số lượng, chỉnh lại theo sổ cân">{{ old('adjust_reason') }}</textarea>
                         @if ($bag->has('adjust_reason'))

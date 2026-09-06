@@ -25,6 +25,15 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
+                    <div class="form-group">
+                        <label for="update_change_reason">Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" id="update_change_reason" rows="2" maxlength="500" required
+                            class="form-control @error('change_reason', 'updateErrors') is-invalid @enderror"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @error('change_reason', 'updateErrors')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>

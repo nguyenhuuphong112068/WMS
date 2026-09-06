@@ -27,6 +27,16 @@
                         <i class="fas fa-exclamation-circle mr-1"></i>
                         Đổi tên phân loại sẽ áp dụng ngay cho mọi vật tư của phòng đang gán phân loại này.
                     </div>
+
+                    <div class="form-group">
+                        <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" rows="2" maxlength="500" required
+                            class="form-control @error('change_reason', 'updateErrors') is-invalid @enderror"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @error('change_reason', 'updateErrors')
+                            <span class="md-error">{{ $message }}</span>
+                        @enderror
+                    </div>
                 </div>
 
                 <div class="modal-footer">

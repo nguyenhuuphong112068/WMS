@@ -35,7 +35,7 @@
         letter-spacing: 0;
     }
 
-    /* Sơ đồ phân cấp Kho -> Phòng -> Kệ -> Vị trí */
+    /* Sơ đồ phân cấp Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí */
     .zone-flow {
         display: flex;
         align-items: center;
@@ -280,7 +280,7 @@
                             id="zonePane-{{ $key }}" role="tabpanel">
 
                             <div class="zone-toolbar">
-                                @if ($meta['canCreate'] && user_can('materData_create'))
+                                @if ($meta['canCreate'] && user_can('materData_common_create'))
                                     <button type="button" class="btn btn-primary btn-zone-create"
                                         data-type="{{ $key }}">
                                         <i class="fas fa-plus mr-1"></i> Thêm {{ $meta['label'] }}
@@ -290,16 +290,12 @@
                                         <i class="fas fa-plus mr-1"></i> Thêm {{ $meta['label'] }}
                                     </button>
                                 @endif
-                                <p class="hint">
-                                    @if ($meta['canCreate'])
-                                        <i class="fas fa-info-circle mr-1"></i>
-                                        Tổng {{ $meta['rows']->count() }} {{ $meta['lower'] }},
-                                        đang hoạt động {{ $meta['rows']->where('status_id', 1)->count() }}.
-                                    @else
+                                @unless ($meta['canCreate'])
+                                    <p class="hint">
                                         <i class="fas fa-exclamation-triangle text-warning mr-1"></i>
                                         {{ $meta['blockMsg'] }}
-                                    @endif
-                                </p>
+                                    </p>
+                                @endunless
                             </div>
 
                             <div class="table-responsive">
@@ -351,7 +347,7 @@
                                                 <td>
                                                     <div class="zone-actions">
                                                         <span class="md-btn-wrap">
-                                                            @perm('materData_update')
+                                                            @perm('materData_common_update')
                                                                 <button type="button" class="btn btn-sm btn-warning btn-zone-edit"
                                                                     title="Sửa"
                                                                     data-type="{{ $key }}"
@@ -359,8 +355,9 @@
                                                                     data-code="{{ $row->code }}"
                                                                     data-name="{{ ($meta['hasName'] ?? true) ? $row->name : '' }}"
                                                                     data-warehouse="{{ $row->warehouse_id ?? '' }}"
-                                                                    data-room="{{ $row->room_id ?? '' }}"
                                                                     data-shelf="{{ $row->shelf_id ?? '' }}"
+                                                                    data-column="{{ $row->column_id ?? '' }}"
+                                                                    data-tier="{{ $row->tier_id ?? '' }}"
                                                                     data-item-type="{{ $row->item_type ?? '' }}">
                                                                     <i class="fas fa-edit"></i>
                                                                 </button>
@@ -374,7 +371,7 @@
                                                             ])
                                                         </span>
 
-                                                        @perm('materData_deActive')
+                                                        @perm('materData_common_deActive')
                                                             <form class="form-zone-confirm d-inline"
                                                                 action="{{ route($zoneRoute . 'deActive', $key) }}"
                                                                 method="POST"
@@ -391,7 +388,7 @@
                                                             </form>
                                                         @endperm
 
-                                                        @perm('materData_deActive')
+                                                        @perm('materData_common_deActive')
                                                             <form class="form-zone-confirm d-inline"
                                                                 action="{{ route($zoneRoute . 'destroy', $key) }}"
                                                                 method="POST"
@@ -423,7 +420,7 @@
 <script src="{{ asset('js/sweetalert2.all.min.js') }}"></script>
 
 <script>
-    // Dữ liệu cấp cha để đổ động cho các ô chọn trong modal (Kho -> Phòng -> Kệ).
+    // Dữ liệu cấp cha để đổ động cho các ô chọn trong modal (Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng).
     var zoneData = @json($zoneCascade);
 
     var zoneTypes = @json(array_keys($zoneMeta));
@@ -461,27 +458,36 @@
             if ($select.val() === null) $select.val('');
         }
 
-        // Đồng bộ cả chuỗi Kho -> Phòng -> Kệ trong một form.
+        // Đồng bộ cả chuỗi Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng trong một form.
         function syncForm($form, selected) {
             selected = selected || {};
 
             var $warehouse = $form.find('.sel-warehouse');
-            var $room = $form.find('.sel-room');
             var $shelf = $form.find('.sel-shelf');
+            var $column = $form.find('.sel-column');
+            var $tier = $form.find('.sel-tier');
 
             fillSelect($warehouse, 'warehouse', null, selected.warehouse_id);
-            fillSelect($room, 'room', $warehouse.val(), selected.room_id);
-            fillSelect($shelf, 'shelf', $room.val(), selected.shelf_id);
+            fillSelect($shelf, 'shelf', $warehouse.val(), selected.shelf_id);
+            fillSelect($column, 'column', $shelf.val(), selected.column_id);
+            fillSelect($tier, 'tier', $column.val(), selected.tier_id);
         }
 
         $(document).on('change', '.sel-warehouse', function() {
             var $form = $(this).closest('form');
-            fillSelect($form.find('.sel-room'), 'room', $(this).val(), null);
-            fillSelect($form.find('.sel-shelf'), 'shelf', $form.find('.sel-room').val(), null);
+            fillSelect($form.find('.sel-shelf'), 'shelf', $(this).val(), null);
+            fillSelect($form.find('.sel-column'), 'column', $form.find('.sel-shelf').val(), null);
+            fillSelect($form.find('.sel-tier'), 'tier', $form.find('.sel-column').val(), null);
         });
 
-        $(document).on('change', '.sel-room', function() {
-            fillSelect($(this).closest('form').find('.sel-shelf'), 'shelf', $(this).val(), null);
+        $(document).on('change', '.sel-shelf', function() {
+            var $form = $(this).closest('form');
+            fillSelect($form.find('.sel-column'), 'column', $(this).val(), null);
+            fillSelect($form.find('.sel-tier'), 'tier', $form.find('.sel-column').val(), null);
+        });
+
+        $(document).on('change', '.sel-column', function() {
+            fillSelect($(this).closest('form').find('.sel-tier'), 'tier', $(this).val(), null);
         });
 
         /* ---------- Mở modal Thêm mới / Cập nhật ---------- */
@@ -507,10 +513,15 @@
             $form.find('.inp-id').val(row.id);
             $form.find('.inp-code').val(row.code);
             $form.find('.inp-name').val(row.name);
+            // Lý do điều chỉnh phải nhập lại mỗi lần sửa
+            $form.find('.inp-change-reason').val('');
+            // Loại lưu trữ phải hiện đúng giá trị đang lưu, không thì bấm Lưu là mất loại
+            $form.find('.sel-item-type').val(row.itemType || '');
             syncForm($form, {
                 warehouse_id: row.warehouse,
-                room_id: row.room,
-                shelf_id: row.shelf
+                shelf_id: row.shelf,
+                column_id: row.column,
+                tier_id: row.tier
             });
             $modal.modal('show');
         });
@@ -583,17 +594,20 @@
             $reopenForm.find('.inp-id').val(old.id || '');
             $reopenForm.find('.inp-code').val(old.code || '');
             $reopenForm.find('.inp-name').val(old.name || '');
+            $reopenForm.find('.inp-change-reason').val(old.change_reason || '');
+            $reopenForm.find('.sel-item-type').val(old.item_type || '');
             syncForm($reopenForm, {
                 warehouse_id: old.warehouse_id,
-                room_id: old.room_id,
-                shelf_id: old.shelf_id
+                shelf_id: old.shelf_id,
+                column_id: old.column_id,
+                tier_id: old.tier_id
             });
 
             showTab(parts[0]);
             $reopen.modal('show');
         }
 
-        /* ---------- Xác nhận Khoá / Mở khoá / Xoá ---------- */
+        /* ---------- Xác nhận Khoá / Mở khoá / Xoá (bắt buộc nhập lý do điều chỉnh) ---------- */
         $(document).on('submit', '.form-zone-confirm', function(e) {
             e.preventDefault();
             var form = this;
@@ -602,13 +616,32 @@
                 title: $(form).data('title'),
                 text: $(form).data('text'),
                 icon: 'warning',
+                input: 'textarea',
+                inputLabel: 'Lý do điều chỉnh',
+                inputPlaceholder: 'Nêu rõ lý do khoá / mở khoá / xoá mục định khu này',
+                inputAttributes: {
+                    maxlength: '500'
+                },
                 showCancelButton: true,
                 confirmButtonColor: $(form).data('danger') ? '#DC2626' : '#2E7BC4',
                 cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Đồng ý',
-                cancelButtonText: 'Huỷ'
+                cancelButtonText: 'Huỷ',
+                preConfirm: function(reason) {
+                    if (!reason || !reason.trim()) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do điều chỉnh');
+                    }
+                    return reason;
+                }
             }).then(function(result) {
-                if (result.isConfirmed) form.submit();
+                if (!result.isConfirmed) return;
+                $(form).find('input[name="change_reason"]').remove();
+                var rs = document.createElement('input');
+                rs.type = 'hidden';
+                rs.name = 'change_reason';
+                rs.value = result.value || '';
+                form.appendChild(rs);
+                form.submit();
             });
         });
 

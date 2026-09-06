@@ -87,8 +87,9 @@ class MaterialPicking
                 'units.short_name as unit_short_name',
                 'locations.code as location_code',
                 'locations.warehouse_id',
-                'locations.room_id',
-                'locations.shelf_id'
+                'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id'
             )
             ->where('material_imports.department_id', $departmentId)
             ->where('material_imports.status_id', 1)
@@ -238,7 +239,7 @@ class MaterialPicking
         return $lines;
     }
 
-    /** Đường đi tới từng vị trí: [kho, phòng, kệ, mã vị trí] để sắp thứ tự lấy hàng. */
+    /** Đường đi tới từng vị trí: [kho, kệ, cột, tầng, mã vị trí] để sắp thứ tự lấy hàng. */
     private static function locationPaths(array $locationIds): array
     {
         if (! $locationIds) {
@@ -246,13 +247,14 @@ class MaterialPicking
         }
 
         return DB::table('locations')
-            ->select('id', 'code', 'warehouse_id', 'room_id', 'shelf_id')
+            ->select('id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id')
             ->whereIn('id', array_unique($locationIds))
             ->get()
             ->mapWithKeys(fn ($loc) => [$loc->id => [
                 (int) ($loc->warehouse_id ?? PHP_INT_MAX),
-                (int) ($loc->room_id ?? PHP_INT_MAX),
                 (int) ($loc->shelf_id ?? PHP_INT_MAX),
+                (int) ($loc->column_id ?? PHP_INT_MAX),
+                (int) ($loc->tier_id ?? PHP_INT_MAX),
                 (string) $loc->code,
             ]])
             ->all();

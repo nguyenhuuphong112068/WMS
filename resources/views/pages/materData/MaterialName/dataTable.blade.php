@@ -7,15 +7,11 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    @perm('materData_create')
+                    @perm('materData_material_create')
                         <button type="button" class="btn btn-primary btn-md-create">
                             <i class="fas fa-plus mr-1"></i> Thêm mới
                         </button>
                     @endperm
-                    <p class="hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} bản ghi.
-                    </p>
                 </div>
 
                 <div class="table-responsive">

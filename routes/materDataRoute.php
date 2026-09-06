@@ -84,10 +84,10 @@ Route::prefix('/materData')
             Route::post('deActive', 'deActive')->name('deActive');
         });
 
-        // Định Khu: Kho - Phòng - Kệ - Vị Trí gộp chung một màn hình, {type} là cấp đang thao tác
+        // Định Khu: Kho/Phòng - Kệ/Tủ - Cột - Tầng - Vị Trí gộp chung một màn hình, {type} là cấp đang thao tác
         Route::prefix('/zone')->name('zone.')
             ->controller(ZoneController::class)
-            ->where(['type' => 'warehouse|room|shelf|location'])
+            ->where(['type' => 'warehouse|shelf|column|tier|location'])
             ->group(function () {
                 Route::get('', 'index')->name('list');
                 Route::get('{type}/history', 'history')->name('history');

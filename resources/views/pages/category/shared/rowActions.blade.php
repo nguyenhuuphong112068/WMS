@@ -63,7 +63,7 @@
     @endif
 
     @if (user_can($permPrefix . 'deActive'))
-    <form class="form-md-confirm d-inline" action="{{ route($prefix . 'deActive') }}" method="POST"
+    <form class="form-md-confirm d-inline" data-require-reason="1" action="{{ route($prefix . 'deActive') }}" method="POST"
         data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $label }}?"
         data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, {{ $label }} &quot;{{ $title }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn xuất hiện khi chọn dữ liệu.' : 'sẽ được dùng lại bình thường.' }}"
         data-danger="{{ $row->status_id == 1 ? '1' : '' }}">

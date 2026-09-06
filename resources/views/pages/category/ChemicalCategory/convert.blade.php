@@ -24,7 +24,7 @@
                     <div class="col-5">
                         <div class="form-group">
                             <label>Số Lượng</label>
-                            <input type="number" class="form-control cat-convert-qty" step="0.000001" min="0.000001"
+                            <input type="text" inputmode="decimal" class="form-control cat-convert-qty js-decimal" min="0.000001"
                                 value="1">
                         </div>
                     </div>

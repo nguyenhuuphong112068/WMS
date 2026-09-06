@@ -51,11 +51,7 @@
                     <i class="fas fa-info-circle mr-1"></i> Chú thích Phụ lục &amp; Nhóm
                 </button>
             </div>
-            <p class="hint">
-                <i class="fas fa-info-circle mr-1"></i>
-                Mỗi dòng ở đây cũng là lời khai <b>"phòng tôi có dùng chất này"</b>, hiện ở cột
-                <b>Phòng Ban Đang Dùng</b> của tab Danh Mục Hoá Chất Công Ty.
-            </p>
+
         </div>
 
         @include('pages.shared.classificationFilter', ['clsTarget' => 'dcTable'])
@@ -75,7 +71,7 @@
                         <th class="text-center" style="width: 135px">Hạn Dùng Nội Bộ<br><small>(tháng)</small>
                         </th>
                         <th class="text-right" style="width: 130px">Ngưỡng Tồn Tối Thiểu</th>
-                        <th style="width: 200px">Vị Trí Quy Hoạch</th>
+                        <th style="width: 200px">Định Khu</th>
                         <th style="width: 170px">Điều Kiện Bảo Quản</th>
                         <th style="width: 160px">Ghi Chú</th>
                         <th class="text-center" style="width: 100px">Sử Dụng</th>
@@ -168,13 +164,12 @@
                                     </div>
                                     <div>{{ $dcPath($row) }}</div>
                                 @else
-                                    <span class="md-empty">Chưa quy hoạch</span>
+                                    <span class="md-empty">Chưa định khu</span>
                                 @endif
                             </td>
                             <td class="md-sub">
                                 @if ($storage)
-                                    <span class="md-note"
-                                        title="{{ $storage }}">{{ $storage }}</span>
+                                    <span class="md-note" title="{{ $storage }}">{{ $storage }}</span>
                                     @if ($row->storage_condition_name === null)
                                         <div><span class="dc-source is-default">Theo danh mục</span></div>
                                     @endif
@@ -184,8 +179,7 @@
                             </td>
                             <td class="md-sub">
                                 @if ($row->note)
-                                    <span class="md-note"
-                                        title="{{ $row->note }}">{{ $row->note }}</span>
+                                    <span class="md-note" title="{{ $row->note }}">{{ $row->note }}</span>
                                 @else
                                     <span class="md-empty">—</span>
                                 @endif
@@ -200,8 +194,7 @@
                             <td>
                                 <div class="md-actions">
                                     @perm('category_chemical_dept_manage')
-                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                            title="Sửa"
+                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
                                             data-modal="#dcUpdateModal"
                                             data-row="{{ json_encode([
                                                 'id' => $row->id,
@@ -222,8 +215,8 @@
                                     @endperm
 
                                     @perm('category_chemical_dept_manage')
-                                        <form class="form-md-confirm d-inline"
-                                            action="{{ route($mdRoute . 'deActive') }}" method="POST"
+                                        <form class="form-md-confirm d-inline" data-require-reason="1" action="{{ route($mdRoute . 'deActive') }}"
+                                            method="POST"
                                             data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $mdLabel }}?"
                                             data-text="{{ $row->status_id == 1 ? 'Sau khi khoá, hoá chất' : 'Sau khi mở khoá, hoá chất' }} &quot;{{ $row->chem_name }}&quot; {{ $row->status_id == 1 ? 'sẽ quay về dùng mặc định của danh mục và không còn tính là phòng đang dùng.' : 'sẽ dùng lại cấu hình riêng của phòng.' }}"
                                             data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
@@ -232,8 +225,7 @@
                                             <button type="submit"
                                                 class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
                                                 title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                <i
-                                                    class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
+                                                <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
                                             </button>
                                         </form>
                                     @endperm

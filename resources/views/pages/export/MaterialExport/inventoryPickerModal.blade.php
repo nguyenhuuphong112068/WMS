@@ -18,7 +18,7 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                             </div>
-                            <input type="text" id="mePickerSearchInput" class="form-control" placeholder="Tìm theo tên vật tư, quy cách, nhà sản xuất...">
+                            <input type="text" id="mePickerSearchInput" class="form-control" placeholder="Tìm theo mã vật tư, tên vật tư, quy cách, nhà sản xuất...">
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -41,6 +41,7 @@
                             <tr class="text-center">
                                 <th style="width: 40px"><input type="checkbox" id="mePickerCheckAll" title="Chọn tất cả"></th>
                                 <th style="width: 45px">STT</th>
+                                <th style="width: 110px">Mã Vật Tư</th>
                                 <th style="min-width: 220px">Tên Vật Tư</th>
                                 <th style="min-width: 180px">Quy Cách</th>
                                 <th style="min-width: 160px">Nhà Sản Xuất</th>
@@ -57,6 +58,7 @@
                                 @endphp
                                 <tr class="me-picker-row"
                                     data-category-id="{{ $mat->id }}"
+                                    data-code="{{ $mat->code ?: '' }}"
                                     data-name="{{ $mat->material_name }}"
                                     data-specification="{{ $mat->technical_specification ?: '' }}"
                                     data-manufacturer-name="{{ $mat->manufacturer_name ?: '' }}"
@@ -66,6 +68,9 @@
                                         <input type="checkbox" class="me-picker-checkbox" value="{{ $mat->id }}">
                                     </td>
                                     <td class="text-center align-middle text-muted">{{ $loop->iteration }}</td>
+                                    <td class="align-middle">
+                                        <span class="badge badge-secondary px-2 py-1" style="font-size: 0.82rem;">{{ $mat->code ?: '—' }}</span>
+                                    </td>
                                     <td class="align-middle font-weight-bold text-dark">{{ $mat->material_name }}</td>
                                     <td class="align-middle">{{ $mat->technical_specification ?: '—' }}</td>
                                     <td class="align-middle">{{ $mat->manufacturer_name ?: '—' }}</td>
@@ -84,7 +89,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
+                                    <td colspan="9" class="text-center text-muted py-4">
                                         Phòng chưa khai vật tư nào trong <b>Danh Mục &rarr; Vật Tư Của Phòng</b>.
                                     </td>
                                 </tr>
@@ -125,7 +130,8 @@
 
             $('#mePickerTable tbody tr.me-picker-row').each(function () {
                 var haystack = [
-                    $(this).data('name'), $(this).data('specification'), $(this).data('manufacturer-name')
+                    $(this).data('code'), $(this).data('name'),
+                    $(this).data('specification'), $(this).data('manufacturer-name')
                 ].join(' ').toLowerCase();
                 var stock = parseFloat($(this).data('stock')) || 0;
 

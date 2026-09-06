@@ -76,8 +76,9 @@ class PublicChemicalLookupController extends Controller
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
             ->leftJoin('locations', 'chemical_imports.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
-            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id');
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id');
 
         // Đơn vị tính lấy theo khai báo của phòng ban đang chọn
         $query = DepartmentChemical::joinUnit($query, $departmentId, 'chemical_imports.category_id');
@@ -97,11 +98,13 @@ class PublicChemicalLookupController extends Controller
                 'units.name as unit_name',
                 'locations.code as location_code',
                 'locations.warehouse_id',
-                'locations.room_id',
                 'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('chemical_imports.department_id', $departmentId)
             ->where('chemical_imports.status_id', 1)
@@ -152,7 +155,7 @@ class PublicChemicalLookupController extends Controller
     }
 
     /**
-     * Gom các lô còn tồn thành cây Kho -> Phòng -> Kệ/Tủ -> Vị trí để vẽ thẻ.
+     * Gom các lô còn tồn thành cây Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí để vẽ thẻ.
      * Chỉ dựng những nhánh CÓ HÀNG khớp điều kiện tra cứu, ô trống không đưa vào.
      */
     private function buildZoneMap($stock): array
@@ -165,17 +168,21 @@ class PublicChemicalLookupController extends Controller
 
         foreach ($located->groupBy('location_id') as $locationId => $locRows) {
             $first = $locRows->first();
-            $wName = $first->warehouse_name ?: 'Chưa gán kho';
-            $rName = $first->room_name ?: 'Chưa gán phòng';
+            $wName = $first->warehouse_name ?: 'Chưa gán kho/phòng';
             $sName = $first->shelf_name ?: 'Chưa gán kệ/tủ';
-            $path = $wName.' / '.$rName.' / '.$sName;
+            $cName = $first->column_name ?: 'Chưa gán cột';
+            $tName = $first->tier_name ?: 'Chưa gán tầng';
+            $path = $wName.' / '.$sName.' / '.$cName.' / '.$tName;
 
             $node = $this->locationNode('L'.$locationId, $first->location_code ?: '—', $path, $locRows);
 
             $warehouses[$wName]['name'] ??= $wName;
-            $warehouses[$wName]['rooms'][$rName]['name'] ??= $rName;
-            $warehouses[$wName]['rooms'][$rName]['shelves'][$sName]['name'] ??= $sName;
-            $warehouses[$wName]['rooms'][$rName]['shelves'][$sName]['locations'][] = $node;
+            $branch = &$warehouses[$wName]['shelves'][$sName];
+            $branch['name'] ??= $sName;
+            $branch['columns'][$cName]['name'] ??= $cName;
+            $branch['columns'][$cName]['tiers'][$tName]['name'] ??= $tName;
+            $branch['columns'][$cName]['tiers'][$tName]['locations'][] = $node;
+            unset($branch);
 
             $index[$node['key']] = [
                 'code' => $node['code'],
@@ -189,40 +196,50 @@ class PublicChemicalLookupController extends Controller
         $tree = [];
         $totalLocations = 0;
         $totalLots = 0;
-        $roomCount = 0;
         $shelfCount = 0;
+        $columnCount = 0;
+        $tierCount = 0;
         $catSet = [];
 
         ksort($warehouses);
         foreach ($warehouses as $w) {
-            ksort($w['rooms']);
-            $wRooms = [];
+            ksort($w['shelves']);
+            $wShelves = [];
 
-            foreach ($w['rooms'] as $r) {
-                $roomCount++;
-                ksort($r['shelves']);
-                $rShelves = [];
+            foreach ($w['shelves'] as $s) {
+                $shelfCount++;
+                ksort($s['columns']);
+                $sColumns = [];
 
-                foreach ($r['shelves'] as $s) {
-                    $shelfCount++;
-                    usort($s['locations'], fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']));
+                foreach ($s['columns'] as $c) {
+                    $columnCount++;
+                    ksort($c['tiers']);
+                    $cTiers = [];
 
-                    foreach ($s['locations'] as $loc) {
-                        $totalLocations++;
-                        $totalLots += $loc['stat']['lots'];
-                        foreach ($loc['catIds'] as $cid) {
-                            $catSet[$cid] = true;
+                    foreach ($c['tiers'] as $t) {
+                        $tierCount++;
+                        usort($t['locations'], fn ($a, $b) => strcmp((string) $a['code'], (string) $b['code']));
+
+                        foreach ($t['locations'] as $loc) {
+                            $totalLocations++;
+                            $totalLots += $loc['stat']['lots'];
+                            foreach ($loc['catIds'] as $cid) {
+                                $catSet[$cid] = true;
+                            }
                         }
+
+                        $cTiers[] = $t;
                     }
 
-                    $rShelves[] = $s;
+                    $c['tiers'] = $cTiers;
+                    $sColumns[] = $c;
                 }
 
-                $r['shelves'] = $rShelves;
-                $wRooms[] = $r;
+                $s['columns'] = $sColumns;
+                $wShelves[] = $s;
             }
 
-            $w['rooms'] = $wRooms;
+            $w['shelves'] = $wShelves;
             $tree[] = $w;
         }
 
@@ -231,8 +248,9 @@ class PublicChemicalLookupController extends Controller
             'unzoned' => $this->unzonedNodes($unzonedRows),
             'totals' => [
                 'warehouses' => count($tree),
-                'rooms' => $roomCount,
                 'shelves' => $shelfCount,
+                'columns' => $columnCount,
+                'tiers' => $tierCount,
                 'locations' => $totalLocations,
                 'lots' => $totalLots,
                 'chemicals' => count($catSet),
@@ -329,8 +347,9 @@ class PublicChemicalLookupController extends Controller
             'unzoned' => [],
             'totals' => [
                 'warehouses' => 0,
-                'rooms' => 0,
                 'shelves' => 0,
+                'columns' => 0,
+                'tiers' => 0,
                 'locations' => 0,
                 'lots' => 0,
                 'chemicals' => 0,

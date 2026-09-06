@@ -43,10 +43,10 @@
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-3">
                             <label>Số Lượng <span class="text-danger">*</span></label>
-                            <input type="number" name="amount" step="0.0001" min="0.0001"
-                                class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}"
+                            <input type="text" inputmode="decimal" name="amount" min="0.0001"
+                                class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
                                 value="{{ old('amount') }}" placeholder="Ví dụ: 25.5" required>
                             @if ($bag->has('amount'))
                                 <span class="md-error">{{ $bag->first('amount') }}</span>
@@ -54,7 +54,18 @@
                             <small class="md-sub">Theo đơn vị gốc của hoá chất trong Danh Mục.</small>
                         </div>
 
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-3">
+                            <label>Số Lần Nhập <span class="text-danger">*</span></label>
+                            <input type="number" name="quantity" min="1" max="50"
+                                class="form-control {{ $bag->has('quantity') ? 'is-invalid' : '' }}"
+                                value="{{ old('quantity', 1) }}" required>
+                            @if ($bag->has('quantity'))
+                                <span class="md-error">{{ $bag->first('quantity') }}</span>
+                            @endif
+                            <small class="md-sub">Tách thành nhiều lô cùng thông tin, mỗi lô một mã xuất nhập.</small>
+                        </div>
+
+                        <div class="form-group col-md-3">
                             <label>Số Lô</label>
                             <input type="text" name="batch_no" maxlength="100"
                                 class="form-control {{ $bag->has('batch_no') ? 'is-invalid' : '' }}"
@@ -64,7 +75,7 @@
                             @endif
                         </div>
 
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-3">
                             <label>Nhà Cung Cấp</label>
                             <select name="supplier_id" class="form-control imp-select {{ $bag->has('supplier_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chọn nhà cung cấp --</option>
@@ -85,16 +96,17 @@
                     <div class="form-row">
                         {{-- Vị trí lưu trữ: chọn cấp sâu nhất, ba cấp Kho/Phòng/Kệ suy ra từ đó --}}
                         <div class="form-group col-md-12">
-                            <label>Vị Trí Lưu Trữ</label>
+                            <label>Định Khu</label>
                             <select name="location_id"
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chưa xếp vị trí --</option>
+                                <option value="">-- Chưa định khu --</option>
                                 @foreach ($locations as $location)
                                     <option value="{{ $location->id }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
-                                        {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
+                                        {{ $location->column_name ?: '—' }} /
+                                        {{ $location->tier_name ?: '—' }} /
                                         {{ $location->code }}
                                     </option>
                                 @endforeach
@@ -102,8 +114,8 @@
                             @if ($bag->has('location_id'))
                                 <span class="md-error">{{ $bag->first('location_id') }}</span>
                             @endif
-                            <small class="md-sub">Dạng Kho / Phòng / Kệ/Tủ / Vị trí. Để trống thì mã này hiện
-                                "Chưa xếp vị trí" ở màn hình Tồn Kho.</small>
+                            <small class="md-sub">Dạng Kho / Kệ/Tủ / Cột / Tầng / Mã định khu. Để trống thì mã này hiện
+                                "Chưa định khu" ở màn hình Tồn Kho.</small>
                         </div>
                     </div>
 
@@ -208,23 +220,38 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        $(document).on('change', '#createModal select[name="category_id"]', function() {
-            var catId = $(this).val();
-            var defaultsMap = @json($categoryDefaults ?? []);
-            var item = defaultsMap[catId] || null;
-            var $form = $(this).closest('form');
-            
+        var chemDefaults = @json($categoryDefaults ?? []);
+
+        /*
+        | fillLocation = true chỉ khi người dùng tự đổi hoá chất: lúc đó mới điền sẵn
+        | định khu phòng đã khai cho hoá chất này. Mở lại modal sau lỗi validate thì
+        | giữ nguyên định khu đang chọn, không đè lên thứ người dùng đã nhập.
+        */
+        function syncChemCategory($sel, fillLocation) {
+            var item = chemDefaults[$sel.val()] || null;
+            var $form = $sel.closest('form');
+
             if (item && item.info_html) {
                 $form.find('.chem-info-box').html(item.info_html);
                 $form.find('.chem-info-box-wrap').slideDown('fast');
             } else {
                 $form.find('.chem-info-box-wrap').hide();
             }
+
+            if (fillLocation) {
+                $form.find('select[name="location_id"]')
+                    .val(item && item.location_id ? String(item.location_id) : '')
+                    .trigger('change');
+            }
+        }
+
+        $(document).on('change', '#createModal select[name="category_id"]', function() {
+            syncChemCategory($(this), true);
         });
-        
-        // Trigger if there's old input
+
+        // Mở lại sau lỗi validate: dựng lại hộp thông tin, giữ nguyên định khu người dùng đã chọn
         if ($('#createModal select[name="category_id"]').val()) {
-            $('#createModal select[name="category_id"]').trigger('change');
+            syncChemCategory($('#createModal select[name="category_id"]'), false);
         }
     });
 </script>

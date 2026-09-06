@@ -19,13 +19,13 @@ return new class extends Migration
         // ----- 2. Danh Mục -----
         [2, 'category_material_approve', 'Duyệt Danh Mục Vật Tư', 'Duyệt mã vật tư trong danh mục'],
         [2, 'category_material_reject', 'Từ Chối Danh Mục Vật Tư', 'Đánh dấu từ chối mã vật tư'],
-        [2, 'category_material_dept_manage', 'Quản Lý Định Mức Vật Tư Theo Phòng Ban', 'Thêm / sửa / khoá định mức vật tư của phòng ban'],
+        [2, 'category_material_dept_manage', 'Quản lý danh mục vật tư phòng', 'Thêm / sửa / khoá định mức vật tư của phòng ban'],
         [2, 'category_chemical_approve', 'Duyệt Danh Mục Hoá Chất', 'Duyệt mã hoá chất trong danh mục'],
         [2, 'category_chemical_reject', 'Từ Chối Danh Mục Hoá Chất', 'Đánh dấu từ chối mã hoá chất'],
-        [2, 'category_chemical_dept_manage', 'Quản Lý Định Mức Hoá Chất Theo Phòng Ban', 'Thêm / sửa / khoá định mức hoá chất của phòng ban'],
+        [2, 'category_chemical_dept_manage', 'Quản lý danh mục hóa chất phòng', 'Thêm / sửa / khoá định mức hoá chất của phòng ban'],
         [2, 'category_standard_approve', 'Duyệt Danh Mục Chất Chuẩn', 'Duyệt mã chất chuẩn trong danh mục'],
         [2, 'category_standard_reject', 'Từ Chối Danh Mục Chất Chuẩn', 'Đánh dấu từ chối mã chất chuẩn'],
-        [2, 'category_standard_dept_manage', 'Quản Lý Định Mức Chất Chuẩn Theo Phòng Ban', 'Thêm / sửa / khoá định mức chất chuẩn của phòng ban'],
+        [2, 'category_standard_dept_manage', 'Quản lý danh mục chất chuẩn phòng', 'Thêm / sửa / khoá định mức chất chuẩn của phòng ban'],
 
         // ----- 3. Nhập -----
         [3, 'import_material_label', 'In Nhãn Vật Tư', 'In nhãn cho phiếu nhập vật tư'],
@@ -43,11 +43,11 @@ return new class extends Migration
         // ----- 5. Tồn Kho -----
         [5, 'inventory_material_balancing', 'Cân Đối Tồn Kho Vật Tư', 'Điều chỉnh cân đối số liệu tồn kho vật tư'],
         [5, 'inventory_chemical_balancing', 'Cân Đối Tồn Kho Hoá Chất', 'Điều chỉnh cân đối số liệu tồn kho hoá chất'],
-        [5, 'inventory_standard_balancing', 'Cân Đối Tồn Kho Chất Chuẩn', 'Điều chỉnh cân đối số liệu tồn kho chất chuẩn'],
+
         [5, 'inventory_material_stocktake', 'Kiểm Kê Kho Vật Tư', 'Mở kỳ kiểm kê, đếm và chốt kết quả kiểm kê vật tư'],
         [5, 'inventory_chemical_internalExpiry', 'Đặt Hạn Dùng Nội Bộ Hoá Chất', 'Thiết lập hạn dùng nội bộ cho lô hoá chất'],
         [5, 'inventory_standard_internalExpiry', 'Đặt Hạn Dùng Nội Bộ Chất Chuẩn', 'Thiết lập hạn dùng nội bộ cho lô chất chuẩn'],
-        [5, 'inventory_standard_weight', 'Ghi Chú Cân Chất Chuẩn', 'Ghi nhận ghi chú khối lượng cân của chất chuẩn'],
+        [5, 'inventory_standard_weight', 'Nhận xét chuẩn ngoài giới hạn', 'Ghi nhận ghi chú khối lượng cân của chất chuẩn'],
 
         // ----- 6. Dự Trù -----
         [6, 'estimate_material_delete', 'Huỷ Phiếu Dự Trù Vật Tư', 'Huỷ phiếu dự trù vật tư'],

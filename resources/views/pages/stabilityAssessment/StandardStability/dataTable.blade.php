@@ -12,12 +12,6 @@
                             <i class="fas fa-plus mr-1"></i> Lập phiếu đánh giá
                         </button>
                     @endperm
-                    <p class="hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Chỉ <b>{{ $assessGroupName }} ({{ $assessGroupCode }})</b> mới phải đánh giá hạn dùng, mỗi
-                        ống chuẩn chỉ có <b>một phiếu còn hiệu lực</b>. Trạng thái phiếu tự chạy theo tiến độ các
-                        mốc, mốc đến hạn trong <b>{{ $dueSoonDays }} ngày</b> được cảnh báo trên bảng.
-                    </p>
                 </div>
 
                 {{-- Lọc nhanh theo trạng thái phiếu: mỗi dòng mang sẵn data-state --}}

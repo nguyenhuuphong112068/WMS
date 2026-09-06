@@ -19,8 +19,8 @@ class WarehouseModel extends Model
         'created_by',
     ];
 
-    public function rooms()
+    public function shelves()
     {
-        return $this->hasMany(\App\Models\masterData\Room\RoomModel::class, 'warehouse_id');
+        return $this->hasMany(\App\Models\masterData\Shelf\ShelfModel::class, 'warehouse_id');
     }
 }

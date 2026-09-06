@@ -33,7 +33,11 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="d-flex align-items-center">
+                        <div class="d-flex align-items-center" style="gap: 8px;">
+                            <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-std-stock-picker"
+                                data-target-rows="#tableTransferRows tbody">
+                                <i class="fas fa-vial mr-1"></i> Danh mục chất chuẩn phòng nguồn
+                            </button>
                             <button type="button" class="btn btn-sm btn-outline-primary btn-add-transfer-row shadow-sm">
                                 <i class="fas fa-plus mr-1"></i> Thêm chất chuẩn
                             </button>
@@ -59,6 +63,7 @@
                         <table class="table table-bordered mb-0" id="tableTransferRows" style="font-size: 0.9rem;">
                             <thead class="bg-light">
                                 <tr class="text-center">
+                                    <th style="width: 130px">Mã Chất Chuẩn</th>
                                     <th style="min-width: 260px">Chất Chuẩn <span class="text-danger">*</span></th>
                                     <th style="min-width: 130px">Số Lượng ĐN <span class="text-danger">*</span></th>
                                     <th style="min-width: 100px">ĐVT</th>
@@ -67,20 +72,23 @@
                                     <th style="min-width: 45px" class="text-center">#</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody data-next-idx="1">
                                 <tr class="transfer-row">
+                                    <td class="text-center">
+                                        <span class="badge badge-secondary px-2 py-1 std-transfer-code" style="font-size: 0.82rem;"></span>
+                                    </td>
                                     <td>
                                         <select name="items[0][category_id]" class="form-control select-transfer-category" required>
                                             <option value="">-- Chọn chất chuẩn --</option>
                                             @foreach ($standardCategories as $cat)
-                                                <option value="{{ $cat->id }}" data-unit="{{ $cat->unit_short_name ?: $cat->unit_name }}">
-                                                    {{ $cat->standard_name }} ({{ $cat->code }} v{{ $cat->version }})
+                                                <option value="{{ $cat->id }}" data-code="{{ $cat->code }} v{{ $cat->version }}" data-unit="{{ $cat->unit_short_name ?: $cat->unit_name }}">
+                                                    {{ $cat->code }} v{{ $cat->version }} - {{ $cat->standard_name }}
                                                 </option>
                                             @endforeach
                                         </select>
                                     </td>
                                     <td>
-                                        <input type="number" step="0.0001" min="0.0001" name="items[0][requested_amount]" class="form-control text-right" placeholder="0.0000" required>
+                                        <input type="text" inputmode="decimal" min="0.0001" name="items[0][requested_amount]" class="form-control text-right js-decimal" placeholder="0.0000" required>
                                     </td>
                                     <td>
                                         <select name="items[0][requested_unit]" class="form-control select-transfer-unit">
@@ -137,9 +145,35 @@
 @endif
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var transferRowIdx = 1;
+    /**
+     * Thêm một dòng chất chuẩn vào bảng đề nghị liên phòng ban và trả về dòng vừa thêm.
+     * Chỉ số items[i] đếm riêng từng bảng ở data-next-idx nên form tạo và các form điều
+     * chỉnh không đụng nhau. Picker "Danh mục chất chuẩn phòng nguồn" cũng gọi hàm này.
+     */
+    window.stdAddTransferRow = function (tbody) {
+        var $tbody = $(tbody);
+        var next = parseInt($tbody.attr('data-next-idx') || $tbody.children('tr').length, 10);
+        var $newRow = $tbody.children('tr').first().clone();
 
+        $newRow.find('select, input, textarea').each(function () {
+            var name = $(this).attr('name');
+
+            if (name) {
+                $(this).attr('name', name.replace(/items\[\d+\]/, 'items[' + next + ']'));
+            }
+
+            $(this).val(null);
+        });
+
+        $newRow.find('.std-transfer-code').text('');
+        $tbody.attr('data-next-idx', next + 1);
+        $tbody.append($newRow);
+        $tbody.find('.btn-remove-transfer-row').prop('disabled', $tbody.children('tr').length <= 1);
+
+        return $tbody.children('tr').last();
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
         $(document).on('click', '.btn-submit-transfer-action', function() {
             var action = $(this).data('action') || 'send';
             $('#transferRequestActionType').val(action);
@@ -150,34 +184,30 @@
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        $('.btn-add-transfer-row').click(function() {
-            var $tbody = $('#tableTransferRows tbody');
-            var $newRow = $tbody.find('tr:first').clone();
+        // Chọn chất chuẩn thì hiện mã và điền sẵn đơn vị phòng mình đang dùng cho chuẩn đó
+        $(document).on('change', '.select-transfer-category', function() {
+            var $option = $(this).find('option:selected');
+            var $row = $(this).closest('tr');
+            var unit = $option.data('unit') || '';
 
-            $newRow.find('select, input, textarea').each(function() {
-                var name = $(this).attr('name');
-                if (name) {
-                    $(this).attr('name', name.replace(/items\[\d+\]/, 'items[' + transferRowIdx + ']'));
-                }
-                $(this).val(null);
-            });
+            $row.find('.std-transfer-code').text($option.data('code') || '');
 
-            $newRow.find('.btn-remove-transfer-row').prop('disabled', false);
-            $tbody.append($newRow);
-            transferRowIdx++;
-            updateTransferDeleteButtons();
-        });
-
-        $(document).on('click', '.btn-remove-transfer-row', function() {
-            if ($('#tableTransferRows tbody tr').length > 1) {
-                $(this).closest('tr').remove();
-                updateTransferDeleteButtons();
+            if (unit && $row.find('select[name*="[requested_unit]"] option[value="' + unit + '"]').length) {
+                $row.find('select[name*="[requested_unit]"]').val(unit);
             }
         });
 
-        function updateTransferDeleteButtons() {
-            var rows = $('#tableTransferRows tbody tr');
-            rows.find('.btn-remove-transfer-row').prop('disabled', rows.length <= 1);
-        }
+        $(document).on('click', '.btn-add-transfer-row', function() {
+            window.stdAddTransferRow('#tableTransferRows tbody');
+        });
+
+        $(document).on('click', '.btn-remove-transfer-row', function() {
+            var $tbody = $(this).closest('tbody');
+
+            if ($tbody.children('tr').length > 1) {
+                $(this).closest('tr').remove();
+                $tbody.find('.btn-remove-transfer-row').prop('disabled', $tbody.children('tr').length <= 1);
+            }
+        });
     });
 </script>

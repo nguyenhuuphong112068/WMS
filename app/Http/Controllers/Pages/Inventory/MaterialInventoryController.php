@@ -8,6 +8,7 @@ use App\Support\DepartmentMaterial;
 use App\Support\InventoryChart;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -19,6 +20,10 @@ use Illuminate\Support\Facades\Validator;
  *                        + SUM(material_balancings.balancing_amount)   (status_id = 1)
  *                        - SUM(material_exports.amount where type='export')
  *                        - SUM(material_exports.amount where type='cancel')
+ *                        - SUM(material_exports.amount where type='transfer_out')
+ *
+ * type = 'transfer_out' là phần cấp phát liên phòng ban - hàng đã rời kho phòng mình,
+ * gộp chung vào cột "đã sử dụng" của báo cáo (xem usedByImport).
  *
  * LỌC THEO KỲ: chỉ hiện mã xuất nhập CÓ PHÁT SINH hoặc CÒN TỒN trong kỳ - còn tồn cuối
  * kỳ, hoặc có sử dụng, hoặc có loại bỏ (xem movedInPeriod). Mã đã hết sạch từ kỳ trước,
@@ -68,6 +73,8 @@ class MaterialInventoryController extends Controller
 
         return view('pages.inventory.MaterialInventory.list', [
             'datas' => $datas,
+            // File đính kèm của phiếu nhập, để xem ngay trên màn hình tồn kho
+            'attachments' => $this->attachmentsFor($datas->pluck('id')),
             'summaries' => $this->stockByMaterial($datas),
             'balancings' => $this->balancingHistory($departmentId),
             'zones' => $zones,
@@ -299,8 +306,9 @@ class MaterialInventoryController extends Controller
             ->leftJoin('material_classifications', DepartmentMaterial::TABLE.'.classification_id', '=', 'material_classifications.id')
             ->leftJoin('locations', 'material_imports.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
-            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id');
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id');
 
         return $query
             ->select(
@@ -310,6 +318,7 @@ class MaterialInventoryController extends Controller
                 'material_imports.amount',
                 'material_imports.imported_date',
                 'material_imports.expired_date',
+                'material_categories.code as category_code',
                 'material_categories.technical_specification',
                 DepartmentMaterial::minStockColumn(),
                 'material_classifications.name as classification_name',
@@ -320,11 +329,13 @@ class MaterialInventoryController extends Controller
                 'material_imports.location_id',
                 'locations.code as location_code',
                 'locations.warehouse_id',
-                'locations.room_id',
                 'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('material_imports.department_id', $departmentId)
             ->where('material_imports.status_id', 1)
@@ -434,6 +445,13 @@ class MaterialInventoryController extends Controller
         });
     }
 
+    /**
+     * Phần đã ra khỏi kho của từng mã xuất nhập, cắt theo kỳ báo cáo.
+     *
+     * Cấp phát LIÊN PHÒNG BAN (type = transfer_out) gộp chung vào phần "đã sử dụng": hàng
+     * đã rời kho phòng mình nên phải trừ khỏi tồn, chỉ khác là nó thành tồn của phòng nhận
+     * chứ không mất đi. Không gộp thì tồn cuối kỳ lệch đúng bằng phần đã chuyển đi.
+     */
     private function usedByImport(int $departmentId, string $from, string $to)
     {
         $start = $from.' 00:00:00';
@@ -441,11 +459,11 @@ class MaterialInventoryController extends Controller
 
         return DB::table('material_exports')
             ->select('import_id')
-            ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at < ? THEN amount ELSE 0 END) as used_before", [$start])
+            ->selectRaw("SUM(CASE WHEN type IN ('export','transfer_out') AND created_at < ? THEN amount ELSE 0 END) as used_before", [$start])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at < ? THEN amount ELSE 0 END) as cancelled_before", [$start])
-            ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as used_in", [$start, $end])
+            ->selectRaw("SUM(CASE WHEN type IN ('export','transfer_out') AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as used_in", [$start, $end])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as cancelled_in", [$start, $end])
-            ->selectRaw("SUM(CASE WHEN type = 'export' AND created_at <= ? THEN amount ELSE 0 END) as used_to", [$end])
+            ->selectRaw("SUM(CASE WHEN type IN ('export','transfer_out') AND created_at <= ? THEN amount ELSE 0 END) as used_to", [$end])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at <= ? THEN amount ELSE 0 END) as cancelled_to", [$end])
             ->selectRaw('SUM(CASE WHEN created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as times_in', [$start, $end])
             ->selectRaw('SUM(CASE WHEN created_at <= ? THEN 1 ELSE 0 END) as times', [$end])
@@ -518,8 +536,9 @@ class MaterialInventoryController extends Controller
 
         return [
             'warehouses' => $of('warehouses', ['id', 'code', 'name']),
-            'rooms' => $of('rooms', ['id', 'code', 'name', 'warehouse_id']),
-            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'room_id']),
+            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id']),
+            'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id']),
+            'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id']),
             'locations' => $this->locationOptions($departmentId),
         ];
     }
@@ -531,7 +550,7 @@ class MaterialInventoryController extends Controller
     private function locationOptions(int $departmentId)
     {
         return DB::table('locations')
-            ->select(['id', 'code', 'warehouse_id', 'room_id', 'shelf_id', 'item_type'])
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type'])
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
@@ -550,6 +569,7 @@ class MaterialInventoryController extends Controller
                 return (object) [
                     // Khoá của dòng cộng dồn, nút Biểu Đồ gửi lên chart() theo id này
                     'category_id' => (int) $first->category_id,
+                    'category_code' => $first->category_code,
                     'material_name' => $first->material_name,
                     'manufacturer_short_name' => $first->manufacturer_short_name,
                     'technical_specification' => $first->technical_specification,
@@ -610,7 +630,7 @@ class MaterialInventoryController extends Controller
      ========================================================== */
 
     /**
-     * Dựng sơ đồ Kho -> Phòng -> Kệ/Tủ -> Vị trí để vẽ dạng thẻ (card - grid).
+     * Dựng sơ đồ Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí để vẽ dạng thẻ (card - grid).
      *
      * Khung lấy từ DANH MỤC ĐỊNH KHU nên ô đang trống vẫn hiện ra - người dùng nhìn được
      * chỗ nào còn xếp được hàng. Định khu đã ngừng hoạt động mà vẫn còn tồn thì lấy tên
@@ -622,8 +642,9 @@ class MaterialInventoryController extends Controller
     private function zoneMap($datas, array $zones): array
     {
         $warehouses = $zones['warehouses']->keyBy('id');
-        $rooms = $zones['rooms']->keyBy('id');
         $shelves = $zones['shelves']->keyBy('id');
+        $columns = $zones['columns']->keyBy('id');
+        $tiers = $zones['tiers']->keyBy('id');
         $locations = $zones['locations']->keyBy('id');
 
         $rowsByLocation = $datas->filter(fn ($row) => $row->location_id)->groupBy('location_id');
@@ -637,56 +658,73 @@ class MaterialInventoryController extends Controller
                     'id' => (int) $locationId,
                     'code' => $first->location_code,
                     'warehouse_id' => $first->warehouse_id,
-                    'room_id' => $first->room_id,
                     'shelf_id' => $first->shelf_id,
+                    'column_id' => $first->column_id,
+                    'tier_id' => $first->tier_id,
                 ];
             }
             if ($first->warehouse_id && ! $warehouses->has($first->warehouse_id)) {
                 $warehouses[$first->warehouse_id] = (object) ['id' => $first->warehouse_id, 'code' => null, 'name' => $first->warehouse_name];
             }
-            if ($first->room_id && ! $rooms->has($first->room_id)) {
-                $rooms[$first->room_id] = (object) ['id' => $first->room_id, 'code' => null, 'name' => $first->room_name];
-            }
             if ($first->shelf_id && ! $shelves->has($first->shelf_id)) {
                 $shelves[$first->shelf_id] = (object) ['id' => $first->shelf_id, 'code' => null, 'name' => $first->shelf_name];
             }
+            if ($first->column_id && ! $columns->has($first->column_id)) {
+                $columns[$first->column_id] = (object) ['id' => $first->column_id, 'code' => null, 'name' => $first->column_name];
+            }
+            if ($first->tier_id && ! $tiers->has($first->tier_id)) {
+                $tiers[$first->tier_id] = (object) ['id' => $first->tier_id, 'code' => null, 'name' => $first->tier_name];
+            }
         }
 
-        // Gom vị trí vào đúng nhánh Kho -> Phòng -> Kệ/Tủ (khoá 0 = chưa gán cấp đó)
+        // Gom vị trí vào đúng nhánh Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng (khoá 0 = chưa gán cấp đó)
         $tree = [];
         $index = [];
 
         foreach ($locations->sortBy('code') as $loc) {
             $wKey = (int) ($loc->warehouse_id ?: 0);
-            $rKey = (int) ($loc->room_id ?: 0);
             $sKey = (int) ($loc->shelf_id ?: 0);
+            $cKey = (int) ($loc->column_id ?: 0);
+            $tKey = (int) ($loc->tier_id ?: 0);
 
             $w = $warehouses->get($wKey);
-            $r = $rooms->get($rKey);
             $s = $shelves->get($sKey);
+            $c = $columns->get($cKey);
+            $t = $tiers->get($tKey);
 
             $tree[$wKey] ??= [
                 'id' => $wKey ?: null,
                 'code' => $w->code ?? null,
-                'name' => $w->name ?? 'Chưa gán kho',
-                'rooms' => [],
-            ];
-            $tree[$wKey]['rooms'][$rKey] ??= [
-                'id' => $rKey ?: null,
-                'code' => $r->code ?? null,
-                'name' => $r->name ?? 'Chưa gán phòng',
+                'name' => $w->name ?? 'Chưa gán kho/phòng',
                 'shelves' => [],
             ];
-            $tree[$wKey]['rooms'][$rKey]['shelves'][$sKey] ??= [
+            $tree[$wKey]['shelves'][$sKey] ??= [
                 'id' => $sKey ?: null,
                 'code' => $s->code ?? null,
                 'name' => $s->name ?? 'Chưa gán kệ/tủ',
+                'columns' => [],
+            ];
+            $tree[$wKey]['shelves'][$sKey]['columns'][$cKey] ??= [
+                'id' => $cKey ?: null,
+                'code' => $c->code ?? null,
+                'name' => $c->name ?? 'Chưa gán cột',
+                'tiers' => [],
+            ];
+            $tree[$wKey]['shelves'][$sKey]['columns'][$cKey]['tiers'][$tKey] ??= [
+                'id' => $tKey ?: null,
+                'code' => $t->code ?? null,
+                'name' => $t->name ?? 'Chưa gán tầng',
                 'locations' => [],
             ];
 
+            // Nhánh sâu nhất (tầng) - trỏ thẳng vào để khỏi viết lại cả đường dẫn bốn cấp
+            $branch = &$tree[$wKey]['shelves'][$sKey]['columns'][$cKey]['tiers'][$tKey];
+
             $node = $this->zoneNode($loc, $rowsByLocation->get($loc->id, collect()));
-            $node['path'] = $tree[$wKey]['name'].' / '.$tree[$wKey]['rooms'][$rKey]['name']
-                .' / '.$tree[$wKey]['rooms'][$rKey]['shelves'][$sKey]['name'];
+            $node['path'] = $tree[$wKey]['name']
+                .' / '.$tree[$wKey]['shelves'][$sKey]['name']
+                .' / '.$tree[$wKey]['shelves'][$sKey]['columns'][$cKey]['name']
+                .' / '.$branch['name'];
 
             $index[$node['key']] = [
                 'code' => $node['code'],
@@ -697,10 +735,11 @@ class MaterialInventoryController extends Controller
                 'items' => $node['items'],
             ];
 
-            $tree[$wKey]['rooms'][$rKey]['shelves'][$sKey]['locations'][] = $node;
+            $branch['locations'][] = $node;
+            unset($branch);
         }
 
-        // Cộng dồn ngược từ vị trí lên kệ/tủ -> phòng -> kho
+        // Cộng dồn ngược từ vị trí lên tầng -> cột -> kệ/tủ -> kho
         $blank = ['locations' => 0, 'filled' => 0, 'lots' => 0, 'alerts' => 0, 'categories' => []];
         $add = function (array $acc, array $stat): array {
             $acc['locations'] += $stat['locations'];
@@ -718,45 +757,56 @@ class MaterialInventoryController extends Controller
             return $acc;
         };
 
-        $tops = $blank + ['rooms' => 0, 'shelves' => 0];
+        $tops = $blank + ['shelves' => 0, 'columns' => 0, 'tiers' => 0];
         $outWarehouses = [];
 
         foreach (collect($tree)->sortBy('name') as $w) {
             $wAcc = $blank;
-            $wRooms = [];
+            $wShelves = [];
 
-            foreach (collect($w['rooms'])->sortBy('name') as $r) {
-                $rAcc = $blank;
-                $rShelves = [];
+            foreach (collect($w['shelves'])->sortBy('name') as $s) {
+                $sAcc = $blank;
+                $sColumns = [];
 
-                foreach (collect($r['shelves'])->sortBy('name') as $s) {
-                    $sAcc = $blank;
+                foreach (collect($s['columns'])->sortBy('name') as $c) {
+                    $cAcc = $blank;
+                    $cTiers = [];
 
-                    foreach ($s['locations'] as $loc) {
-                        $sAcc = $add($sAcc, $loc['stat']);
+                    foreach (collect($c['tiers'])->sortBy('name') as $t) {
+                        $tAcc = $blank;
+
+                        foreach ($t['locations'] as $loc) {
+                            $tAcc = $add($tAcc, $loc['stat']);
+                        }
+
+                        $cAcc = $add($cAcc, $tAcc);
+                        $t['stat'] = $close($tAcc);
+                        $t['locations'] = array_map(function ($loc) {
+                            unset($loc['stat']['categories']);
+
+                            return $loc;
+                        }, $t['locations']);
+                        $cTiers[] = $t;
                     }
 
-                    $rAcc = $add($rAcc, $sAcc);
-                    $s['stat'] = $close($sAcc);
-                    $s['locations'] = array_map(function ($loc) {
-                        unset($loc['stat']['categories']);
-
-                        return $loc;
-                    }, $s['locations']);
-                    $rShelves[] = $s;
+                    $sAcc = $add($sAcc, $cAcc);
+                    $c['tiers'] = $cTiers;
+                    $c['stat'] = $close($cAcc) + ['tiers' => count($cTiers)];
+                    $tops['tiers'] += count($cTiers);
+                    $sColumns[] = $c;
                 }
 
-                $wAcc = $add($wAcc, $rAcc);
-                $r['shelves'] = $rShelves;
-                $r['stat'] = $close($rAcc) + ['shelves' => count($rShelves)];
-                $tops['shelves'] += count($rShelves);
-                $wRooms[] = $r;
+                $wAcc = $add($wAcc, $sAcc);
+                $s['columns'] = $sColumns;
+                $s['stat'] = $close($sAcc) + ['columns' => count($sColumns)];
+                $tops['columns'] += count($sColumns);
+                $wShelves[] = $s;
             }
 
             $tops = $add($tops, $wAcc);
-            $tops['rooms'] += count($wRooms);
-            $w['rooms'] = $wRooms;
-            $w['stat'] = $close($wAcc) + ['rooms' => count($wRooms)];
+            $tops['shelves'] += count($wShelves);
+            $w['shelves'] = $wShelves;
+            $w['stat'] = $close($wAcc) + ['shelves' => count($wShelves)];
             $outWarehouses[] = $w;
         }
 
@@ -919,6 +969,80 @@ class MaterialInventoryController extends Controller
             ->where('material_imports.status_id', 1)
             ->where('material_balancings.balancing_at', '<=', $to.' 23:59:59')
             ->get();
+    }
+
+    /* ==================================================================
+     | FILE ĐÍNH KÈM PHIẾU NHẬP - xem / đổi trạng thái ngay trên màn hình tồn kho.
+     | Bảng chung với màn hình Nhập Vật Tư (material_import_attachments); ở đây chỉ cho
+     | xem và đổi trạng thái Đang sử dụng / Ngưng sử dụng, không upload / xoá.
+     ================================================================== */
+
+    /** [material_import_id => collection file] cho các mã xuất nhập đang hiển thị. */
+    private function attachmentsFor($importIds)
+    {
+        return DB::table('material_import_attachments')
+            ->whereIn('material_import_id', $importIds)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('material_import_id');
+    }
+
+    public function downloadAttachment($id)
+    {
+        $attachment = DB::table('material_import_attachments')
+            ->join('material_imports', 'material_import_attachments.material_import_id', '=', 'material_imports.id')
+            ->where('material_import_attachments.id', $id)
+            ->where('material_imports.department_id', $this->departmentId())
+            ->select('material_import_attachments.*')
+            ->first();
+
+        if (! $attachment) {
+            abort(404, 'Không tìm thấy file đính kèm.');
+        }
+
+        if (! Storage::exists($attachment->file_path)) {
+            abort(404, 'File không tồn tại trên hệ thống lưu trữ.');
+        }
+
+        return Storage::response($attachment->file_path, $attachment->file_name, [
+            'Content-Disposition' => 'inline; filename="'.$attachment->file_name.'"',
+        ]);
+    }
+
+    public function toggleAttachmentStatus(Request $request)
+    {
+        $attachment = DB::table('material_import_attachments')
+            ->join('material_imports', 'material_import_attachments.material_import_id', '=', 'material_imports.id')
+            ->where('material_import_attachments.id', $request->id)
+            ->where('material_imports.department_id', $this->departmentId())
+            ->select('material_import_attachments.*', 'material_imports.code as import_code')
+            ->first();
+
+        if (! $attachment) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy file đính kèm.'], 404);
+        }
+
+        $wasActive = ! isset($attachment->is_active) || $attachment->is_active;
+        $newActive = $wasActive ? 0 : 1;
+
+        DB::table('material_import_attachments')->where('id', $attachment->id)->update([
+            'is_active' => $newActive,
+            'status_changed_by' => $this->actor(),
+            'status_changed_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Đổi trạng thái tài liệu',
+            'material_imports',
+            $attachment->material_import_id,
+            $attachment->import_code,
+            'File "'.$attachment->file_name.'": '
+                .($wasActive ? 'Đang sử dụng' : 'Ngưng sử dụng').' -> '
+                .($newActive ? 'Đang sử dụng' : 'Ngưng sử dụng')
+        );
+
+        return response()->json(['success' => true, 'is_active' => $newActive]);
     }
 
     private function departmentId(): int

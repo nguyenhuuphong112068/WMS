@@ -33,7 +33,7 @@
 
                 <div class="md-toolbar">
                     <div class="d-flex flex-wrap align-items-center" style="gap: 10px">
-                        @perm('materData_create')
+                        @perm('materData_chemical_create')
                             <button type="button" class="btn btn-primary btn-md-create">
                                 <i class="fas fa-plus mr-1"></i> Thêm mới
                             </button>
@@ -43,10 +43,6 @@
                             <i class="fas fa-info-circle mr-1"></i> Chú thích Phụ lục &amp; Nhóm
                         </button>
                     </div>
-                    <p class="hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} bản ghi.
-                    </p>
                 </div>
 
                 @include('pages.materData.shared.classifyFilterBar')
@@ -307,7 +303,7 @@
                     var $row = $('<div class="chem-percent-row"></div>');
                     $row.append($('<span class="chem-percent-name"></span>').text(name));
                     $row.append(
-                        $('<input type="number" step="0.0001" min="0" max="100" class="form-control form-control-sm">')
+                        $('<input type="text" inputmode="decimal" min="0" max="100" class="form-control form-control-sm js-decimal">')
                         .attr('name', 'content_percent[' + id + ']')
                         .attr('data-percent-input', '1')
                         .attr('data-ai', id)

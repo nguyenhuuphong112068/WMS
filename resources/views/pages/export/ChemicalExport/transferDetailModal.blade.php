@@ -77,7 +77,7 @@
                                         <th style="min-width: 100px" class="text-right">SL Cấp Phát <span class="text-danger">*</span></th>
                                         <th style="min-width: 90px">ĐVT</th>
                                     @else
-                                        <th style="min-width: 200px">Mã Cấp / Vị Trí Nhận</th>
+                                        <th style="min-width: 200px">Mã Cấp / Định Khu Nhận</th>
                                         <th style="min-width: 100px" class="text-right">SL Cấp Phát</th>
                                         <th style="min-width: 90px">ĐVT</th>
                                     @endif
@@ -113,8 +113,8 @@
                                                 </div>
                                             </td>
                                             <td class="align-middle text-right">
-                                                <input type="number" step="0.0001" min="0.0001" name="issued_amount"
-                                                    class="form-control text-right font-weight-bold input-issue-amount"
+                                                <input type="text" inputmode="decimal" min="0.0001" name="issued_amount"
+                                                    class="form-control text-right font-weight-bold input-issue-amount js-decimal"
                                                     value="{{ (float) $item->requested_amount }}"
                                                     style="height: 38px !important; min-height: 38px !important; font-size: 0.88rem;" required>
                                             </td>
@@ -138,9 +138,9 @@
                                                 @if (! $iAmSource && $item->status === 'issued')
                                                     {{-- Phòng mình (A) đang nhận: tự chọn vị trí lưu của phòng mình --}}
                                                     <select name="dest_location_id" class="form-control input-dest-location-receive mt-1" style="height: 34px !important; min-height: 34px !important; font-size: 0.82rem;">
-                                                        <option value="">-- Chọn vị trí lưu --</option>
+                                                        <option value="">-- Chọn định khu --</option>
                                                         @foreach ($transferOwnLocations as $loc)
-                                                            <option value="{{ $loc->id }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->room_name }}/{{ $loc->shelf_name }})@endif</option>
+                                                            <option value="{{ $loc->id }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->shelf_name }}/{{ $loc->column_name }}/{{ $loc->tier_name }})@endif</option>
                                                         @endforeach
                                                     </select>
                                                     @if (! in_array((int) $item->category_id, $declaredCategoryIds, true))

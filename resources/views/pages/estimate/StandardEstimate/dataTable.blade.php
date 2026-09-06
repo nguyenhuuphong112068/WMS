@@ -12,10 +12,6 @@
                             <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
                         </button>
                     @endperm
-                    <p class="hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Phiếu chỉ sửa được khi còn <b>Nháp</b> hoặc <b>Bị từ chối</b>. Trình ký xong là khoá nội dung.
-                    </p>
                 </div>
 
                 <ul class="nav nav-tabs mb-3" id="estimateTabs" role="tablist">

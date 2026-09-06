@@ -45,7 +45,7 @@ class DataMasterHistory
      * Ghi một lần thay đổi: tự đọc lại bản ghi trong bảng gốc để chụp giá trị mới nhất.
      * Gọi SAU khi đã insert / update xong.
      */
-    public static function record(string $table, int $recordId, string $action, ?string $note, array $fields, array $maps = []): void
+    public static function record(string $table, int $recordId, string $action, ?string $note, array $fields, array $maps = [], ?string $reason = null): void
     {
         $row = DB::table($table)->where('id', $recordId)->first();
 
@@ -53,14 +53,14 @@ class DataMasterHistory
             return;
         }
 
-        self::write($table, $recordId, $action, $note, self::snapshot($fields, $row, $maps));
+        self::write($table, $recordId, $action, $note, self::snapshot($fields, $row, $maps), $reason);
     }
 
     /**
      * Ghi một lần thay đổi với ảnh chụp tự dựng sẵn.
      * Dùng cho thao tác Xoá - lúc đó bản ghi không còn để đọc lại nữa.
      */
-    public static function write(string $table, int $recordId, string $action, ?string $note, array $snapshot = []): void
+    public static function write(string $table, int $recordId, string $action, ?string $note, array $snapshot = [], ?string $reason = null): void
     {
         DB::table(self::TABLE)->insert([
             'table_name' => $table,
@@ -68,6 +68,7 @@ class DataMasterHistory
             'action' => $action,
             'snapshot' => json_encode($snapshot, JSON_UNESCAPED_UNICODE),
             'change_note' => $note,
+            'change_reason' => $reason,
             'created_by' => \App\Support\Signer::actor(),
             'created_at' => now(),
         ]);
@@ -116,6 +117,7 @@ class DataMasterHistory
             ->map(fn ($row) => [
                 'action' => $row->action,
                 'change_note' => $row->change_note,
+                'change_reason' => $row->change_reason ?? null,
                 'created_by' => $row->created_by ?: 'NA',
                 'created_at' => $row->created_at ? Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
                 'snapshot' => json_decode($row->snapshot ?? '', true) ?: [],

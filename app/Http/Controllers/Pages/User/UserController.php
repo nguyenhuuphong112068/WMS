@@ -24,6 +24,14 @@ class UserController extends Controller
                     ->select('deparments.*', 'companies.name as company_name', 'companies.short_name as company_short')
                     ->get();
                 $roles = DB::table('roles')->get();
+
+                // Danh sách phòng ban để gán phạm vi cho từng role (mọi công ty, chỉ phòng nghiệp vụ)
+                $allDepartments = DB::table('deparments')
+                    ->where('isActive', true)
+                    ->where('is_general', 1)
+                    ->orderBy('shortName', 'asc')
+                    ->get(['id', 'shortName', 'name']);
+
                 $groups = DB::table('groups')
                     ->leftJoin('deparments', 'groups.department_id', '=', 'deparments.id')
                     ->where('groups.status_id', 1)
@@ -53,8 +61,17 @@ class UserController extends Controller
                             ->where('user_id', $user->id)
                             ->get();
 
-                        $user->role_ids = $roles->pluck('role_id')->toArray();
-                        $user->role_names = $roles->pluck('name')->join(', ');
+                        $user->role_ids = $roles->pluck('role_id')->unique()->values()->toArray();
+                        $user->role_names = $roles->pluck('name')->unique()->join(', ');
+
+                        // Phạm vi phòng ban của từng role: { roleId: [deptId, ...] } (rỗng = mọi phòng)
+                        $user->role_dept_map = DB::table('user_role')
+                            ->where('user_id', $user->id)
+                            ->whereNotNull('department_id')
+                            ->get(['role_id', 'department_id'])
+                            ->groupBy('role_id')
+                            ->map(fn ($rows) => $rows->pluck('department_id')->map(fn ($d) => (int) $d)->values())
+                            ->toArray();
 
                         // Tổ của user (một user có thể ở nhiều tổ)
                         $user->group_ids = DB::table('user_group')
@@ -70,6 +87,7 @@ class UserController extends Controller
                 return view('pages.user.user.list',[
                         'datas' => $datas,
                         'deparments' => $deparments,
+                        'allDepartments' => $allDepartments,
                         'roles' => $roles,
                         'groups' => $groups]);
         }
@@ -161,14 +179,7 @@ class UserController extends Controller
                         'created_at' => now(),
                 ]);
 
-                $rolesToInsert = [];
-                foreach ($userGroups as $role_id) {
-                    $rolesToInsert[] = [
-                        'user_id' => $user_id,
-                        'role_id' => $role_id
-                    ];
-                }
-                DB::table('user_role')->insert($rolesToInsert);
+                $this->syncUserRoles($user_id, $userGroups, $request->input('roleDept', []));
 
                 $this->syncUserGroups($user_id, $request->group_id);
 
@@ -259,16 +270,8 @@ class UserController extends Controller
                     ]);
                 }
 
-                // Sync roles
-                DB::table('user_role')->where('user_id', $request->id)->delete();
-                $rolesToInsert = [];
-                foreach ($userGroups as $role_id) {
-                    $rolesToInsert[] = [
-                        'user_id' => $request->id,
-                        'role_id' => $role_id
-                    ];
-                }
-                DB::table('user_role')->insert($rolesToInsert);
+                // Sync roles + phạm vi phòng ban của từng role
+                $this->syncUserRoles($request->id, $userGroups, $request->input('roleDept', []));
 
                 // Sync tổ (một user có thể ở nhiều tổ)
                 $this->syncUserGroups($request->id, $request->group_id);
@@ -279,6 +282,46 @@ class UserController extends Controller
                 );
 
                 return redirect()->back()->with('success', 'Đã cập nhật thành công!');
+        }
+
+        /**
+         * Ghi lại role của user vào user_role, kèm phạm vi phòng ban cho từng role.
+         *  - $roleIds     : mảng id role được chọn
+         *  - $roleDeptMap : [roleId => [deptId, ...]]; role không có trong map (hoặc mảng rỗng)
+         *                   -> lưu 1 dòng department_id = NULL (role áp cho mọi phòng ban)
+         */
+        private function syncUserRoles($userId, $roleIds, $roleDeptMap): void
+        {
+                DB::table('user_role')->where('user_id', $userId)->delete();
+
+                $roleIds = collect($roleIds ?? [])
+                        ->filter(fn ($id) => is_numeric($id))
+                        ->map(fn ($id) => (int) $id)
+                        ->unique();
+
+                if ($roleIds->isEmpty()) {
+                        return;
+                }
+
+                $rows = [];
+                foreach ($roleIds as $roleId) {
+                        $deptIds = collect($roleDeptMap[$roleId] ?? [])
+                                ->filter(fn ($d) => is_numeric($d))
+                                ->map(fn ($d) => (int) $d)
+                                ->unique()
+                                ->values();
+
+                        if ($deptIds->isEmpty()) {
+                                $rows[] = ['user_id' => $userId, 'role_id' => $roleId, 'department_id' => null];
+                                continue;
+                        }
+
+                        foreach ($deptIds as $deptId) {
+                                $rows[] = ['user_id' => $userId, 'role_id' => $roleId, 'department_id' => $deptId];
+                        }
+                }
+
+                DB::table('user_role')->insert($rows);
         }
 
         /**

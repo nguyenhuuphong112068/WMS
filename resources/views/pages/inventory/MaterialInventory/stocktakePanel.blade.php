@@ -188,7 +188,7 @@
                             </td>
                             <td class="text-center">
                                 @if ($stCounting)
-                                    <input type="number" step="0.0001" min="0" class="form-control form-control-sm text-right st-actual"
+                                    <input type="text" inputmode="decimal" min="0" class="form-control form-control-sm text-right st-actual js-decimal"
                                         name="items[{{ $row->id }}][actual_amount]"
                                         value="{{ $row->actual_amount === null ? '' : rtrim(rtrim(number_format((float) $row->actual_amount, 4, '.', ''), '0'), '.') }}"
                                         placeholder="Số đếm">

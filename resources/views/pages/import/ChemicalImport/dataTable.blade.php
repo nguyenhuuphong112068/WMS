@@ -30,10 +30,6 @@
                             <i class="fas fa-plus mr-1"></i> Nhập hoá chất
                         </button>
                     @endperm
-                    <p class="hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Đang hiệu lực {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} phiếu.
-                    </p>
                 </div>
 
                 @include('pages.shared.barcodeSearch', [
@@ -104,8 +100,8 @@
                                             <div class="font-weight-bold">
                                                 <span class="md-tag">{{ $row->location_code }}</span>
                                             </div>
-                                            <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
-                                                {{ $row->shelf_name ?: '—' }}</div>
+                                            <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
+                                                {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
                                         @else
                                             <span class="imp-no-location">Chưa xếp vị trí</span>
                                         @endif
@@ -141,25 +137,14 @@
                                     </td>
                                     <td class="md-sub">{{ $row->imported_by ?: '—' }}</td>
                                     <td class="text-center">
-                                        @if ($rowAttachments->isNotEmpty())
-                                            <div class="dropdown">
-                                                <button class="btn btn-xs btn-outline-primary dropdown-toggle"
-                                                    type="button" data-toggle="dropdown">
-                                                    <i class="fas fa-paperclip"></i> ({{ $rowAttachments->count() }})
-                                                </button>
-                                                <div class="dropdown-menu dropdown-menu-right shadow-sm">
-                                                    @foreach ($rowAttachments as $att)
-                                                        <a class="dropdown-item small py-2" target="_blank"
-                                                            href="{{ route($impRoute . 'downloadAttachment', ['id' => $att->id]) }}">
-                                                            <i class="fas fa-external-link-alt mr-2 text-primary"></i>
-                                                            {{ $att->file_name }}
-                                                        </a>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                        @else
-                                            <span class="text-muted">—</span>
-                                        @endif
+                                        @include('pages.shared.attachmentList', [
+                                            'attachments' => $rowAttachments,
+                                            'routePrefix' => $impRoute,
+                                            'statusPerm' => 'import_chemical_attachment_status',
+                                            'code' => $row->code,
+                                            'name' => $row->chem_name,
+                                            'typeLabel' => 'Hoá chất',
+                                        ])
                                     </td>
                                     <td>
                                         <div class="md-actions">
@@ -265,16 +250,6 @@
                                 data-to="{{ now()->format('Y-m-d') }}">Năm nay</button>
                         </div>
                     </form>
-
-                    <div class="md-toolbar">
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Cộng dồn các phiếu nhập còn hiệu lực từ <b>{{ $impDate($reportFrom) }}</b> đến
-                            <b>{{ $impDate($reportTo) }}</b>, gom theo mã danh mục hoá chất
-                            ({{ $report->count() }} mã, {{ $impNum($impReportTimes) }} lượt nhập). Cột <b>Quy Đổi
-                                (Kg)</b> dùng tỉ trọng d (g/ml) khai báo trong Danh Mục Hoá Chất.
-                        </p>
-                    </div>
 
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'impReportTable'])
 

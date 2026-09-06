@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\MaterData;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\ChemicalClassification;
@@ -33,6 +34,8 @@ use Illuminate\Validation\Rule;
  */
 class ChemNameController extends Controller
 {
+    use RequiresChangeReason;
+
     private const TABLE = 'chem_names';
     private const LABEL = 'tên hoá chất';
     private const AI_PIVOT = 'chem_name_active_ingredient';
@@ -160,7 +163,11 @@ class ChemNameController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần cập nhật!');
         }
 
-        $validator = Validator::make($request->all(), $this->rules($current->id), $this->messages());
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules($current->id) + $this->changeReasonRules(),
+            $this->messages() + $this->changeReasonMessages()
+        );
         $validator->after(fn ($v) => $this->checkTableBPrerequisite($v, $request));
 
         if ($validator->fails()) {
@@ -190,6 +197,10 @@ class ChemNameController extends Controller
             $noteParts[] = 'Phân loại nhóm nguy hại (nhóm 10): ' . ($this->hazardLabels($oldHazardIds) ?: '—') . ' → ' . ($this->hazardLabels($hazardIds) ?: '—') . '.';
         }
 
+        if (! $noteParts) {
+            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
+        }
+
         DB::transaction(function () use ($current, $payload, $aiIds, $hazardIds, $percents) {
             DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
                 // Sửa nội dung thì phải duyệt lại từ đầu
@@ -208,9 +219,10 @@ class ChemNameController extends Controller
             self::TABLE,
             $current->id,
             'Cập nhật',
-            $noteParts ? implode(' ', $noteParts) : 'Lưu lại nhưng nội dung không đổi.',
+            implode(' ', $noteParts),
             self::FIELDS,
-            $this->maps()
+            $this->maps(),
+            $this->changeReason($request)
         );
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->name, $request->name);
@@ -224,6 +236,10 @@ class ChemNameController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần thay đổi trạng thái!');
+        }
+
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
         }
 
         $newStatus = $current->status_id == 1 ? 0 : 1;
@@ -240,7 +256,8 @@ class ChemNameController extends Controller
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->status_id, $newStatus),
             self::FIELDS,
-            $this->maps()
+            $this->maps(),
+            $this->changeReason($request)
         );
 
         AuditTrialController::log(

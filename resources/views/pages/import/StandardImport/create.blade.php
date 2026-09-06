@@ -76,8 +76,8 @@
                         <div class="form-group col-md-3">
                             <label>Lượng / Ống <span class="text-danger">*</span> <span id="sd-unit-label"
                                     class="text-primary font-weight-bold"></span></label>
-                            <input type="number" name="amount" step="0.0001" min="0.0001"
-                                class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}"
+                            <input type="text" inputmode="decimal" name="amount" min="0.0001"
+                                class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
                                 value="{{ old('amount') }}" placeholder="Ví dụ: 50" required>
                             @if ($bag->has('amount'))
                                 <span class="md-error">{{ $bag->first('amount') }}</span>
@@ -85,7 +85,7 @@
                         </div>
 
                         <div class="form-group col-md-3">
-                            <label>Số Ống Nhập <span class="text-danger">*</span></label>
+                            <label>Số Lần Nhập <span class="text-danger">*</span></label>
                             <input type="number" name="quantity" min="1" max="50"
                                 class="form-control {{ $bag->has('quantity') ? 'is-invalid' : '' }}"
                                 value="{{ old('quantity', 1) }}" required>
@@ -95,7 +95,7 @@
                         </div>
 
                         <div class="form-group col-md-3">
-                            <label>Vị Trí Lưu Trữ</label>
+                            <label>Định Khu</label>
                             <select name="location_id"
                                 class="form-control imp-select sd-location-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chọn --</option>
@@ -103,8 +103,9 @@
                                     <option value="{{ $location->id }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
-                                        {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
+                                        {{ $location->column_name ?: '—' }} /
+                                        {{ $location->tier_name ?: '—' }} /
                                         {{ $location->code }}
                                     </option>
                                 @endforeach
@@ -425,10 +426,10 @@
                 var previewMap = $form.find('.sd-code-preview').data('codes') || {};
                 $form.find('.sd-code-preview').val(previewMap[item.group_key] || item.group_code || '');
 
-                // Vị trí lưu trữ gợi ý
-                if (item.location_id) {
-                    $form.find('.sd-location-select').val(item.location_id).trigger('change');
-                }
+                // Định khu gợi ý theo danh mục phòng; thủ kho vẫn đổi được
+                $form.find('.sd-location-select')
+                    .val(item.location_id ? String(item.location_id) : '')
+                    .trigger('change');
 
                 // Cần xác định lại hạn dùng nội bộ: Chỉ được chọn khi standard_categories.shelf_life_months > 0
                 var shelfLife = parseInt(item.shelf_life_months, 10) || 0;

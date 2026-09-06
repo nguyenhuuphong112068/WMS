@@ -34,6 +34,17 @@
     /** Bỏ số 0 thừa ở phần thập phân: 12.5000 -> 12.5 */
     $dmNum = fn($value) => $value === null ? null : rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
 
+    /** Đường dẫn định khu đầy đủ của một dòng (Kho / Kệ-Tủ / Cột / Tầng), trống thì trả về null */
+    $dmPath = fn($row) => $row->location_code
+        ? ($row->warehouse_name ?: '—') .
+            ' / ' .
+            ($row->shelf_name ?: '—') .
+            ' / ' .
+            ($row->column_name ?: '—') .
+            ' / ' .
+            ($row->tier_name ?: '—')
+        : null;
+
     /*
     | Tab đang mở khi vào trang. Lưu ở tab 2 xong mà nhảy về tab 1 thì rất khó dùng, nên
     | DepartmentMaterialController luôn kèm activeTab = 'department' lúc quay lại.
@@ -64,14 +75,6 @@
                     </a>
                 </li>
             </ul>
-
-            <p class="cat-tabs-note">
-                <i class="fas fa-info-circle mr-1"></i>
-                <b>{{ $mdTitle }}</b> khai bản chất của vật tư và dùng chung toàn công ty.
-                <b>{{ $dmTitle }}</b> chỉ khai phần riêng của
-                <b>{{ session('user')['selected_department'] ?? 'phòng ban đang chọn' }}</b>:
-                phân loại, đơn vị tính, ngưỡng tồn tối thiểu.
-            </p>
 
             <div class="tab-content">
                 <div class="tab-pane fade {{ $activeTab === 'company' ? 'show active' : '' }}" id="tabCompany"
@@ -209,6 +212,9 @@
         'categories' => $dmCategories,
         'classifications' => $dmClassifications,
         'units' => $dmUnits,
+        'locations' => $dmLocations,
+        'unitsInUse' => $dmUnitsInUse,
+        'conversions' => $dmConversions,
     ])
     @include('pages.category.DepartmentMaterial.categoryPicker', [
         'categories' => $dmCategories,
@@ -219,5 +225,8 @@
         'mdIcon' => $dmIcon,
         'classifications' => $dmClassifications,
         'units' => $dmUnits,
+        'locations' => $dmLocations,
+        'unitsInUse' => $dmUnitsInUse,
+        'conversions' => $dmConversions,
     ])
 @endsection

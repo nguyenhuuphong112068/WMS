@@ -219,15 +219,24 @@
         .clk-wh.is-closed .clk-wh-body { display: none; }
         .clk-wh-body { padding: 16px 18px 4px; }
 
-        /* ---------- Phòng ---------- */
-        .clk-room { border-left: 3px solid var(--primary-lighter); padding-left: 14px; margin-bottom: 16px; }
-        .clk-room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--primary-dark); font-weight: 700; }
-        .clk-room-head .tag { background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 2px 10px; font-size: .7rem; font-weight: 700; }
-
         /* ---------- Kệ / Tủ ---------- */
-        .clk-shelf { background: var(--bg-neutral); border: 1px solid #E6EEF7; border-radius: var(--border-radius-md); padding: 12px 14px; margin-bottom: 12px; }
-        .clk-shelf-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .88rem; font-weight: 700; color: var(--text-main); }
-        .clk-shelf-head .sub { margin-left: auto; font-size: .72rem; font-weight: 600; color: #64748B; }
+        .clk-shelf { border-left: 3px solid var(--primary-lighter); padding-left: 14px; margin-bottom: 16px; }
+        .clk-shelf-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--primary-dark); font-weight: 700; }
+        .clk-shelf-head .tag { background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 2px 10px; font-size: .7rem; font-weight: 700; }
+
+        /* ---------- Cột ---------- */
+        .clk-column { background: var(--bg-neutral); border: 1px solid #E6EEF7; border-radius: var(--border-radius-md); padding: 12px 14px; margin-bottom: 12px; }
+        .clk-column-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .88rem; font-weight: 700; color: var(--text-main); }
+        .clk-column-head .sub { margin-left: auto; font-size: .72rem; font-weight: 600; color: #64748B; }
+
+        /* ---------- Tầng ---------- */
+        .clk-tier { margin-bottom: 12px; }
+        .clk-tier:last-child { margin-bottom: 0; }
+        .clk-tier-head {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px;
+            font-size: .76rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: .4px;
+        }
+        .clk-tier-head .sub { margin-left: auto; font-size: .7rem; font-weight: 600; color: #94A3B8; text-transform: none; letter-spacing: 0; }
 
         /* ---------- Ô vị trí ---------- */
         .clk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
@@ -356,9 +365,10 @@
             @else
                 <div class="clk-head">
                     <div class="clk-stats">
-                        <div class="clk-stat"><b>{{ $t['warehouses'] }}</b><span>Kho</span></div>
-                        <div class="clk-stat"><b>{{ $t['rooms'] }}</b><span>Phòng</span></div>
+                        <div class="clk-stat"><b>{{ $t['warehouses'] }}</b><span>Kho / Phòng</span></div>
                         <div class="clk-stat"><b>{{ $t['shelves'] }}</b><span>Kệ / Tủ</span></div>
+                        <div class="clk-stat"><b>{{ $t['columns'] }}</b><span>Cột</span></div>
+                        <div class="clk-stat"><b>{{ $t['tiers'] }}</b><span>Tầng</span></div>
                         <div class="clk-stat"><b>{{ $t['locations'] }}</b><span>Vị trí có hàng</span></div>
                         <div class="clk-stat"><b>{{ $t['lots'] }}</b><span>Mã lô</span></div>
                         <div class="clk-stat"><b>{{ $t['chemicals'] }}</b><span>Hoá chất</span></div>
@@ -392,10 +402,12 @@
                 @foreach ($result['warehouses'] as $wh)
                     @php
                         $whLots = 0; $whLoc = 0;
-                        foreach ($wh['rooms'] as $rm) {
-                            foreach ($rm['shelves'] as $sh) {
-                                $whLoc += count($sh['locations']);
-                                foreach ($sh['locations'] as $lc) { $whLots += $lc['stat']['lots']; }
+                        foreach ($wh['shelves'] as $sh) {
+                            foreach ($sh['columns'] as $cl) {
+                                foreach ($cl['tiers'] as $tr) {
+                                    $whLoc += count($tr['locations']);
+                                    foreach ($tr['locations'] as $lc) { $whLots += $lc['stat']['lots']; }
+                                }
                             }
                         }
                     @endphp
@@ -405,7 +417,7 @@
                             <span class="ic"><i class="bi bi-building"></i></span>
                             <div>
                                 <div class="clk-wh-title">{{ $wh['name'] }}</div>
-                                <div class="clk-wh-sub">{{ count($wh['rooms']) }} phòng · {{ $whLoc }} vị trí có hàng</div>
+                                <div class="clk-wh-sub">{{ count($wh['shelves']) }} kệ/tủ · {{ $whLoc }} vị trí có hàng</div>
                             </div>
                             <div class="clk-wh-meta">
                                 <span class="clk-pill">{{ $whLots }} lô</span>
@@ -413,58 +425,67 @@
                         </div>
 
                         <div class="clk-wh-body">
-                            @foreach ($wh['rooms'] as $room)
-                                <div class="clk-room">
-                                    <div class="clk-room-head">
-                                        <i class="bi bi-door-open"></i> {{ $room['name'] }}
-                                        <span class="tag">{{ count($room['shelves']) }} kệ/tủ</span>
+                            @foreach ($wh['shelves'] as $shelf)
+                                <div class="clk-shelf">
+                                    <div class="clk-shelf-head">
+                                        <i class="bi bi-stack"></i> {{ $shelf['name'] }}
+                                        <span class="tag">{{ count($shelf['columns']) }} cột</span>
                                     </div>
 
-                                    @foreach ($room['shelves'] as $shelf)
-                                        <div class="clk-shelf">
-                                            <div class="clk-shelf-head">
+                                    @foreach ($shelf['columns'] as $column)
+                                        <div class="clk-column">
+                                            <div class="clk-column-head">
                                                 <i class="bi bi-grid-3x3-gap" style="color: var(--primary-light)"></i>
-                                                {{ $shelf['name'] }}
-                                                <span class="sub">{{ count($shelf['locations']) }} vị trí có hàng</span>
+                                                {{ $column['name'] }}
+                                                <span class="sub">{{ count($column['tiers']) }} tầng</span>
                                             </div>
 
-                                            <div class="clk-grid">
-                                                @foreach ($shelf['locations'] as $loc)
-                                                    @php
-                                                        $cellSearch = mb_strtolower(
-                                                            trim(
-                                                                $loc['code'] . ' ' . $shelf['name'] . ' ' . $room['name'] . ' ' .
-                                                                    implode(' ', array_column($loc['preview'], 'name')),
-                                                            ),
-                                                        );
-                                                    @endphp
-                                                    <button type="button" class="clk-cell" data-key="{{ $loc['key'] }}"
-                                                        data-search="{{ $cellSearch }}">
-                                                        <div class="clk-cell-top">
-                                                            <span class="clk-cell-code">{{ $loc['code'] }}</span>
-                                                            <span class="clk-cell-lots">{{ $loc['stat']['lots'] }}</span>
-                                                        </div>
-                                                        <div class="clk-cell-path">{{ $loc['path'] }}</div>
-                                                        <div class="clk-cell-items">
-                                                            @foreach ($loc['preview'] as $item)
-                                                                <div>
-                                                                    <span class="nm">· {{ $item['name'] }}</span>
-                                                                    <span class="qty">{{ $item['amount'] }}
-                                                                        <span class="u">{{ $item['unit'] }}</span></span>
+                                            @foreach ($column['tiers'] as $tier)
+                                                <div class="clk-tier">
+                                                    <div class="clk-tier-head">
+                                                        <i class="bi bi-list"></i> {{ $tier['name'] }}
+                                                        <span class="sub">{{ count($tier['locations']) }} vị trí có hàng</span>
+                                                    </div>
+
+                                                    <div class="clk-grid">
+                                                        @foreach ($tier['locations'] as $loc)
+                                                            @php
+                                                                $cellSearch = mb_strtolower(
+                                                                    trim(
+                                                                        $loc['code'] . ' ' . $shelf['name'] . ' ' . $column['name'] . ' ' . $tier['name'] . ' ' .
+                                                                            implode(' ', array_column($loc['preview'], 'name')),
+                                                                    ),
+                                                                );
+                                                            @endphp
+                                                            <button type="button" class="clk-cell" data-key="{{ $loc['key'] }}"
+                                                                data-search="{{ $cellSearch }}">
+                                                                <div class="clk-cell-top">
+                                                                    <span class="clk-cell-code">{{ $loc['code'] }}</span>
+                                                                    <span class="clk-cell-lots">{{ $loc['stat']['lots'] }}</span>
                                                                 </div>
-                                                            @endforeach
-                                                            @if ($loc['stat']['chemicals'] > count($loc['preview']))
-                                                                <div><span class="nm">·
-                                                                        +{{ $loc['stat']['chemicals'] - count($loc['preview']) }}
-                                                                        hoá chất khác</span></div>
-                                                            @endif
-                                                        </div>
-                                                        <div class="clk-cell-foot">
-                                                            {{ $loc['stat']['chemicals'] }} hoá chất · {{ $loc['stat']['lots'] }} lô — bấm xem chi tiết
-                                                        </div>
-                                                    </button>
-                                                @endforeach
-                                            </div>
+                                                                <div class="clk-cell-path">{{ $loc['path'] }}</div>
+                                                                <div class="clk-cell-items">
+                                                                    @foreach ($loc['preview'] as $item)
+                                                                        <div>
+                                                                            <span class="nm">· {{ $item['name'] }}</span>
+                                                                            <span class="qty">{{ $item['amount'] }}
+                                                                                <span class="u">{{ $item['unit'] }}</span></span>
+                                                                        </div>
+                                                                    @endforeach
+                                                                    @if ($loc['stat']['chemicals'] > count($loc['preview']))
+                                                                        <div><span class="nm">·
+                                                                                +{{ $loc['stat']['chemicals'] - count($loc['preview']) }}
+                                                                                hoá chất khác</span></div>
+                                                                    @endif
+                                                                </div>
+                                                                <div class="clk-cell-foot">
+                                                                    {{ $loc['stat']['chemicals'] }} hoá chất · {{ $loc['stat']['lots'] }} lô — bấm xem chi tiết
+                                                                </div>
+                                                            </button>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endforeach
                                         </div>
                                     @endforeach
                                 </div>
@@ -551,14 +572,17 @@
                     var ok = q === '' || ($(this).data('search') || '').toString().indexOf(q) >= 0;
                     $(this).css('display', ok ? '' : 'none');
                 });
-                $('.clk-shelf').each(function () {
+                $('.clk-tier').each(function () {
                     $(this).css('display', $(this).find('.clk-cell:visible').length ? '' : 'none');
                 });
-                $('.clk-room').each(function () {
-                    $(this).css('display', $(this).find('.clk-shelf:visible').length ? '' : 'none');
+                $('.clk-column').each(function () {
+                    $(this).css('display', $(this).find('.clk-tier:visible').length ? '' : 'none');
+                });
+                $('.clk-shelf').each(function () {
+                    $(this).css('display', $(this).find('.clk-column:visible').length ? '' : 'none');
                 });
                 $('.clk-wh').each(function () {
-                    $(this).css('display', $(this).find('.clk-room:visible').length ? '' : 'none');
+                    $(this).css('display', $(this).find('.clk-shelf:visible').length ? '' : 'none');
                 });
 
                 var total = $('.clk-wh').length;

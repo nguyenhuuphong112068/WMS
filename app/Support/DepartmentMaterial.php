@@ -103,12 +103,15 @@ class DepartmentMaterial
             ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
             ->select(
                 'material_categories.id',
+                'material_categories.code',
                 'material_categories.technical_specification',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'material_classifications.name as classification_name',
                 self::TABLE.'.min_stock',
+                // Định khu phòng đã khai cho vật tư này - màn hình Nhập điền sẵn vào ô vị trí
+                self::TABLE.'.default_location_id',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
@@ -127,7 +130,7 @@ class DepartmentMaterial
     }
 
     /**
-     * Vị trí lưu trữ của đúng phòng ban đang chọn, kèm đường dẫn Kho / Phòng / Kệ.
+     * Định khu của đúng phòng ban đang chọn, kèm đường dẫn Kho / Kệ-Tủ / Cột / Tầng.
      *
      * Lọc theo locations.item_type để không xếp nhầm hàng vào ô của loại khác;
      * ô chưa khai loại được coi là dùng chung nên vẫn chọn được.
@@ -136,14 +139,16 @@ class DepartmentMaterial
     {
         return DB::table('locations')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 'locations.id',
                 'locations.code',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
@@ -151,8 +156,9 @@ class DepartmentMaterial
             ->where(fn ($query) => $query->whereNull('locations.item_type')
                 ->orWhere('locations.item_type', 'material'))
             ->orderBy('warehouses.name', 'asc')
-            ->orderBy('rooms.name', 'asc')
             ->orderBy('shelves.name', 'asc')
+            ->orderBy('columns.name', 'asc')
+            ->orderBy('tiers.name', 'asc')
             ->orderBy('locations.code', 'asc')
             ->get();
     }
@@ -168,6 +174,12 @@ class DepartmentMaterial
             ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('material_classifications', self::TABLE.'.classification_id', '=', 'material_classifications.id')
             ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
+            // Định khu phòng đã khai cho vật tư, kèm đường dẫn Kho / Kệ-Tủ / Cột / Tầng
+            ->leftJoin('locations', self::TABLE.'.default_location_id', '=', 'locations.id')
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 self::TABLE.'.*',
                 'material_categories.code as category_code',
@@ -177,7 +189,12 @@ class DepartmentMaterial
                 'manufacturers.short_name as manufacturer_short_name',
                 'material_classifications.name as classification_name',
                 'units.short_name as unit_short_name',
-                'units.name as unit_name'
+                'units.name as unit_name',
+                'locations.code as location_code',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
             ->orderBy('material_names.name', 'asc')

@@ -32,8 +32,8 @@
 
 <div class="form-group" data-g9-only style="{{ in_array(9, $oldGroups, true) ? '' : 'display: none;' }}">
     <label>Ngưỡng Khối Lượng Tồn Trữ Lớn Nhất Tại Một Thời Điểm (kg) <span class="text-danger">*</span></label>
-    <input type="number" name="threshold_kg" step="0.001" min="0.001"
-        class="form-control {{ $bag->has('threshold_kg') ? 'is-invalid' : '' }}"
+    <input type="text" inputmode="decimal" name="threshold_kg" min="0.001"
+        class="form-control js-decimal {{ $bag->has('threshold_kg') ? 'is-invalid' : '' }}"
         value="{{ old('threshold_kg') }}" placeholder="Ví dụ: 50000" {{ in_array(9, $oldGroups, true) ? 'required' : '' }}>
     @if ($bag->has('threshold_kg'))
         <span class="md-error">{{ $bag->first('threshold_kg') }}</span>

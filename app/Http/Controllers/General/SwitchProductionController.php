@@ -15,6 +15,12 @@ class SwitchProductionController extends Controller
         $user = $request->session()->get('user', []);
         $selected_department_id = DB::table('deparments')->where('shortName', $selected_dept_name)->value('id');
 
+        // Chỉ cho chuyển sang phòng ban user được cấp (role gán theo phòng, hoặc phòng chính)
+        if ($selected_department_id
+            && !user_can_access_department($user['userId'] ?? 0, $selected_department_id)) {
+            return redirect()->back()->with('error', 'Bạn không được phân quyền làm việc ở phòng ban này.');
+        }
+
         // Đổi phòng ban là đổi luôn công ty đang làm việc (mỗi phòng ban thuộc một công ty)
         $companyId = \App\Support\CompanyContext::resolveForDepartment(
             $selected_department_id ? (int) $selected_department_id : null

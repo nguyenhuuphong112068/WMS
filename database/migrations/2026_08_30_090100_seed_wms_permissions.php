@@ -67,7 +67,7 @@ return new class extends Migration
         [4, 'export_chemical_issue', 'Xuất Kho Hoá Chất', 'Thực hiện xuất kho hoá chất'],
         [4, 'export_standard_view', 'Xem Cấp Phát Chất Chuẩn', 'Mở màn hình Sử Dụng Chất Chuẩn'],
         [4, 'export_standard_request', 'Đề Nghị Cấp Phát Chất Chuẩn', 'Lập đề nghị cấp phát chất chuẩn'],
-        [4, 'export_standard_approve', 'Duyệt Cấp Phát Chất Chuẩn', 'Ký duyệt đề nghị cấp phát chất chuẩn'],
+
         [4, 'export_standard_issue', 'Xuất Kho Chất Chuẩn', 'Thực hiện xuất kho chất chuẩn'],
 
         // ----- 5. Tồn Kho -----

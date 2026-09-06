@@ -13,13 +13,16 @@ class LocationModel extends Model
 
     protected $fillable = [
         'code',
+        'warehouse_id',
         'shelf_id',
+        'column_id',
+        'tier_id',
         'status_id',
         'created_by',
     ];
 
-    public function shelf()
+    public function tier()
     {
-        return $this->belongsTo(\App\Models\masterData\Shelf\ShelfModel::class, 'shelf_id');
+        return $this->belongsTo(\App\Models\masterData\Tier\TierModel::class, 'tier_id');
     }
 }

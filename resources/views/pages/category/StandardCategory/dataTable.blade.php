@@ -9,11 +9,6 @@
                     <i class="fas fa-plus mr-1"></i> Thêm mới
                 </button>
             @endperm
-            <p class="hint">
-                <i class="fas fa-info-circle mr-1"></i>
-                Đang hoạt động {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} bản ghi.
-                Rê chuột vào mã nhóm chuẩn để xem tên đầy đủ.
-            </p>
         </div>
 
         @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'mdTable'])
@@ -29,7 +24,6 @@
                         <th style="width: 160px">Nguồn Gốc / NSX</th>
                         <th class="text-center" style="width: 100px">Tỷ Trọng</th>
                         <th style="width: 165px">Điều Kiện Bảo Quản</th>
-                        <th class="text-center" style="width: 85px">Version</th>
                         <th style="width: 200px" title="Nhóm chuẩn quyết định mã ống chuẩn khi nhập kho">
                             Phân Nhóm Chuẩn</th>
                         <th style="width: 170px"
@@ -82,9 +76,6 @@
                                 @else
                                     <span class="md-empty">—</span>
                                 @endif
-                            </td>
-                            <td class="text-center" data-order="{{ $row->version }}">
-                                <span class="sgr-version">v{{ $row->version }}</span>
                             </td>
                             <td>
                                 @if ($sdCodes)
@@ -144,7 +135,6 @@
                                         'manufacturers_id' => $row->manufacturers_id,
                                         'density' => $row->density !== null ? rtrim(rtrim((string) $row->density, '0'), '.') : null,
                                         'storage_condition_id' => $row->storage_condition_id,
-                                        'version' => $row->version,
                                         'groups' => $sdCodes,
                                         'doc_no' => $row->doc_no,
                                         'note' => $row->note,

@@ -165,8 +165,8 @@
                                         {{-- SL Cấp Phát: Nhập tay trực tiếp --}}
                                         <td class="align-middle text-right">
                                             @if ($item->status === 'pending')
-                                                <input type="number" step="0.0001" min="0.0001" name="issued_amount"
-                                                    class="form-control text-right font-weight-bold input-issue-amount"
+                                                <input type="text" inputmode="decimal" min="0.0001" name="issued_amount"
+                                                    class="form-control text-right font-weight-bold input-issue-amount js-decimal"
                                                     value="{{ (float)($item->issued_amount ?? $item->requested_amount) }}"
                                                     style="height: 38px !important; min-height: 38px !important; font-size: 0.88rem;" required>
                                             @else
@@ -537,7 +537,7 @@
                     <div class="input-group-prepend">
                         <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                     </div>
-                    <input type="text" id="stdPickerSearch" class="form-control" placeholder="Tìm mã ống, lô, vị trí...">
+                    <input type="text" id="stdPickerSearch" class="form-control" placeholder="Tìm mã ống, lô, định khu...">
                 </div>
 
                 <div class="table-responsive border rounded" style="max-height: 55vh; overflow-y: auto;">
@@ -549,7 +549,7 @@
                                 <th>Lô</th>
                                 <th class="text-right">Tồn</th>
                                 <th>ĐVT</th>
-                                <th>Vị Trí</th>
+                                <th>Định Khu</th>
                                 <th>Hạn Dùng</th>
                                 <th>Trạng Thái</th>
                                 <th style="width: 90px;">Chọn</th>

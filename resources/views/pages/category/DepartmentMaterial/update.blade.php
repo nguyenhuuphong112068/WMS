@@ -48,7 +48,7 @@
                         <div class="form-group col-md-6">
                             <label>Đơn Vị Tính <span class="text-danger">*</span></label>
                             <select name="unit_id"
-                                class="form-control cat-select {{ $bag->has('unit_id') ? 'is-invalid' : '' }}" required>
+                                class="form-control cat-select dm-unit {{ $bag->has('unit_id') ? 'is-invalid' : '' }}" required>
                                 <option value="">-- Chọn đơn vị tính --</option>
                                 @foreach ($units as $unit)
                                     <option value="{{ $unit->id }}" data-short="{{ $unit->short_name }}"
@@ -65,15 +65,48 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Ngưỡng Tồn Tối Thiểu</label>
-                        <input type="number" name="min_stock" min="0" step="0.0001"
-                            class="form-control {{ $bag->has('min_stock') ? 'is-invalid' : '' }}"
-                            value="{{ $old('min_stock') }}" placeholder="Để trống nếu chưa đặt ngưỡng">
-                        @if ($bag->has('min_stock'))
-                            <span class="md-error">{{ $bag->first('min_stock') }}</span>
-                        @endif
-                        <small class="md-sub">Theo <b class="dm-unit-hint">đơn vị</b> đã chọn ở trên.</small>
+                    @include('pages.category.shared.unitConversion', [
+                        'prefix' => 'dm',
+                        'bag' => $bag,
+                        'unitsInUse' => $unitsInUse,
+                        'conversions' => $conversions,
+                        'label' => 'vật tư',
+                    ])
+
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>Ngưỡng Tồn Tối Thiểu</label>
+                            <input type="text" inputmode="decimal" name="min_stock" min="0"
+                                class="form-control js-decimal {{ $bag->has('min_stock') ? 'is-invalid' : '' }}"
+                                value="{{ $old('min_stock') }}" placeholder="Để trống nếu chưa đặt ngưỡng">
+                            @if ($bag->has('min_stock'))
+                                <span class="md-error">{{ $bag->first('min_stock') }}</span>
+                            @endif
+                            <small class="md-sub">Theo <b class="dm-unit-hint">đơn vị</b> đã chọn ở trên.</small>
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label>Định Khu</label>
+                            <select name="default_location_id"
+                                class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
+                                <option value="">-- Chưa định khu --</option>
+                                @foreach ($locations as $location)
+                                    <option value="{{ $location->id }}"
+                                        {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
+                                        {{ $location->warehouse_name ?: '—' }} /
+                                        {{ $location->shelf_name ?: '—' }} /
+                                        {{ $location->column_name ?: '—' }} /
+                                        {{ $location->tier_name ?: '—' }} /
+                                        {{ $location->code }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @if ($bag->has('default_location_id'))
+                                <span class="md-error">{{ $bag->first('default_location_id') }}</span>
+                            @endif
+                            <small class="md-sub">Đổi định khu chỉ đổi chỗ điền sẵn khi nhập, các lô đã xếp định khu
+                                giữ nguyên.</small>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -82,6 +115,15 @@
                             class="form-control {{ $bag->has('note') ? 'is-invalid' : '' }}">{{ $old('note') }}</textarea>
                         @if ($bag->has('note'))
                             <span class="md-error">{{ $bag->first('note') }}</span>
+                        @endif
+                    </div>
+                    <div class="form-group">
+                        <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" rows="2" maxlength="500" required
+                            class="form-control {{ $bag->has('change_reason') ? 'is-invalid' : '' }}"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @if ($bag->has('change_reason'))
+                            <span class="md-error">{{ $bag->first('change_reason') }}</span>
                         @endif
                     </div>
                 </div>
@@ -119,6 +161,9 @@
 
             var short = $form.find('.cat-select[name="unit_id"] option:selected').data('short');
             $form.find('.dm-unit-hint').text(short || 'đơn vị');
+
+            // Lý do điều chỉnh phải nhập lại mỗi lần sửa
+            $form.find('[name="change_reason"]').val('');
         });
     });
 </script>

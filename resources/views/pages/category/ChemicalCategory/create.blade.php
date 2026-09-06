@@ -98,8 +98,8 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>Tỉ Trọng d (g/ml)</label>
-                                        <input type="number" name="density" step="0.0001" min="0.0001"
-                                            class="form-control {{ $bag->has('density') ? 'is-invalid' : '' }}"
+                                        <input type="text" inputmode="decimal" name="density" min="0.0001"
+                                            class="form-control js-decimal {{ $bag->has('density') ? 'is-invalid' : '' }}"
                                             value="{{ $old('density') }}" placeholder="Ví dụ: 1.04">
                                         <small class="md-sub">Dùng để quy đổi giữa kg và lít.</small>
                                         @if ($bag->has('density'))

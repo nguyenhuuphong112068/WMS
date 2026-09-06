@@ -129,7 +129,7 @@
                                         <input type="hidden" name="items[0][purpose_id]" class="input-req-purpose">
                                     </td>
                                     <td>
-                                        <input type="number" step="0.0001" min="0.0001" name="items[0][requested_amount]" class="form-control text-right" placeholder="0.0000" required>
+                                        <input type="text" inputmode="decimal" min="0.0001" name="items[0][requested_amount]" class="form-control text-right js-decimal" placeholder="0.0000" required>
                                     </td>
                                     <td>
                                         <select name="items[0][requested_unit]" class="form-control select-req-unit">

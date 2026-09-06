@@ -7,6 +7,47 @@
     $invToday = \Carbon\Carbon::today();
     $invPeriodLabel = \Carbon\Carbon::parse($period['from'])->format('d/m/Y') . ' - ' . \Carbon\Carbon::parse($period['to'])->format('d/m/Y');
 
+    /*
+    | Mốc chọn nhanh, mỗi mốc là TRỌN kỳ (đến ngày cuối tháng / quý / năm) cho khớp
+    | với kỳ mặc định. Ngày cuối kỳ ở tương lai không làm sai số liệu vì chưa có
+    | phát sinh nào sau hôm nay.
+    |
+    | "Toàn bộ" lấy từ ngày nhập xa nhất đang có nên tồn đầu kỳ bằng 0 và mọi phát
+    | sinh đều nằm trong kỳ - đúng bằng cách xem tồn trước đây.
+    */
+    $invEarliest = $datas->min('imported_date');
+    $invEarliest = $invEarliest ? substr((string) $invEarliest, 0, 10) : $invToday->copy()->startOfYear()->format('Y-m-d');
+
+    $invPeriodPresets = collect([
+        [
+            'label' => 'Tháng này',
+            'from' => $invToday->copy()->startOfMonth()->format('Y-m-d'),
+            'to' => $invToday->copy()->endOfMonth()->format('Y-m-d'),
+        ],
+        [
+            'label' => 'Tháng trước',
+            'from' => $invToday->copy()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d'),
+            'to' => $invToday->copy()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d'),
+        ],
+        [
+            'label' => 'Quý này',
+            'from' => $invToday->copy()->startOfQuarter()->format('Y-m-d'),
+            'to' => $invToday->copy()->endOfQuarter()->format('Y-m-d'),
+        ],
+        [
+            'label' => 'Năm nay',
+            'from' => $invToday->copy()->startOfYear()->format('Y-m-d'),
+            'to' => $invToday->copy()->endOfYear()->format('Y-m-d'),
+        ],
+        [
+            'label' => 'Toàn bộ',
+            'from' => $invEarliest,
+            'to' => $invToday->copy()->endOfMonth()->format('Y-m-d'),
+        ],
+    ])
+        ->map(fn($preset) => $preset + ['active' => $preset['from'] === $period['from'] && $preset['to'] === $period['to']])
+        ->all();
+
     // [import_id => [{balancing_amount, balancing_by, balancing_at}]] cho modal lịch sử cân đối
     $invBalancingMap = $balancings->map(fn($rows) => $rows->map(fn($r) => [
         'balancing_amount' => (float) $r->balancing_amount,
@@ -27,4 +68,5 @@
     @include('pages.inventory.MaterialInventory.stocktakeDetail')
     {{-- Modal camera cho ô quét QR của tab Kiểm Kê Định Kỳ --}}
     @include('pages.shared.cameraScan')
+    @include('pages.shared.attachmentListModal')
 @endsection

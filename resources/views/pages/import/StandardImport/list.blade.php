@@ -51,4 +51,5 @@
     @include('pages.import.StandardImport.create')
     @include('pages.import.StandardImport.update')
     @include('pages.import.StandardImport.historyModal')
+    @include('pages.shared.attachmentListModal')
 @endsection

@@ -99,8 +99,8 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>Tỉ Trọng d (g/ml)</label>
-                                        <input type="number" name="density" step="0.0001" min="0.0001"
-                                            class="form-control {{ $bag->has('density') ? 'is-invalid' : '' }}"
+                                        <input type="text" inputmode="decimal" name="density" min="0.0001"
+                                            class="form-control js-decimal {{ $bag->has('density') ? 'is-invalid' : '' }}"
                                             value="{{ $old('density') }}" placeholder="Ví dụ: 1.04">
                                         <small class="md-sub">Dùng để quy đổi giữa kg và lít.</small>
                                         @if ($bag->has('density'))
@@ -112,9 +112,9 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>Hàm Lượng Hoạt Chất (%)</label>
-                                        <input type="number" name="ai_content_percent" step="0.0001" min="0.0001"
+                                        <input type="text" inputmode="decimal" name="ai_content_percent" min="0.0001"
                                             max="100"
-                                            class="form-control {{ $bag->has('ai_content_percent') ? 'is-invalid' : '' }}"
+                                            class="form-control js-decimal {{ $bag->has('ai_content_percent') ? 'is-invalid' : '' }}"
                                             value="{{ $old('ai_content_percent') }}" placeholder="Mặc định 100">
                                         <small class="md-sub">Dùng khi đối chiếu ngưỡng tồn trữ PL IV: khối lượng hoạt
                                             chất = tồn (kg) × %.</small>
@@ -204,6 +204,15 @@
                         Sau khi sửa, bản ghi quay về trạng thái <b>Chờ duyệt</b> và cần được duyệt lại.
                         Không được trùng tổ hợp <b>Tên hoá chất - Loại - Nhà sản xuất</b> với bản ghi khác.
                         Nội dung thay đổi được lưu lại ở mục <b>Lịch sử thay đổi</b>.
+                    </div>
+                    <div class="form-group">
+                        <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" rows="2" maxlength="500" required
+                            class="form-control {{ $bag->has('change_reason') ? 'is-invalid' : '' }}"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @if ($bag->has('change_reason'))
+                            <span class="md-error">{{ $bag->first('change_reason') }}</span>
+                        @endif
                     </div>
                 </div>
 

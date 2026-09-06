@@ -331,6 +331,28 @@
         border: 1px solid #93C5FD;
     }
 
+    /* ---------- Ô tick chọn nhiều dòng trong các bảng picker ----------
+       Checkbox mặc định của trình duyệt quá nhỏ so với dòng bảng, người dùng phải nhắm
+       mới bấm trúng. Phóng to và tô theo màu chủ đạo cho mọi picker chọn nhiều. */
+    .pick-check,
+    #mePickerCheckAll, .me-picker-checkbox,
+    #matStockCheckAll, .mat-stock-checkbox,
+    #expPickerCheckAll, .exp-picker-check,
+    #pickerCheckAll, .picker-item-checkbox,
+    #dspCheckAll, .dsp-pick {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        vertical-align: middle;
+        accent-color: var(--primary);
+    }
+
+    /* Ô chứa checkbox rộng thoáng hơn để bấm cả vùng quanh ô tick */
+    .pick-check, .me-picker-checkbox, .mat-stock-checkbox,
+    .exp-picker-check, .picker-item-checkbox, .dsp-pick {
+        margin: 4px;
+    }
+
     /* ---------- Thanh chọn khoảng thời gian của báo cáo ---------- */
     .exp-range {
         display: flex;

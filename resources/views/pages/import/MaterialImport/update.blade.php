@@ -35,8 +35,8 @@
                     <div class="form-row">
                         <div class="form-group col-md-4">
                             <label>Số lượng <span class="text-danger">*</span></label>
-                            <input type="number" step="0.0001" min="0.0001" name="amount"
-                                class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}" required>
+                            <input type="text" inputmode="decimal" min="0.0001" name="amount"
+                                class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}" required>
                             @if ($bag->has('amount')) <div class="md-error text-danger small">{{ $bag->first('amount') }}</div> @endif
                         </div>
                         <div class="form-group col-md-4">
@@ -51,12 +51,12 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Vị trí lưu trữ</label>
+                        <label>Định Khu</label>
                         <select name="location_id" class="form-control imp-select">
-                            <option value="">-- Chưa xếp vị trí --</option>
+                            <option value="">-- Chưa định khu --</option>
                             @foreach ($locations as $loc)
                                 <option value="{{ $loc->id }}">
-                                    {{ $loc->code }} — {{ $loc->warehouse_name }} / {{ $loc->room_name }} / {{ $loc->shelf_name }}
+                                    {{ $loc->code }} — {{ $loc->warehouse_name }} / {{ $loc->shelf_name }} / {{ $loc->column_name }} / {{ $loc->tier_name }}
                                 </option>
                             @endforeach
                         </select>
@@ -76,7 +76,7 @@
 
                     <div class="form-group">
                         <label>Lý do điều chỉnh <span class="text-danger">*</span></label>
-                        <textarea name="reason" rows="2" maxlength="500"
+                        <textarea name="reason" rows="2" maxlength="500" data-require-fill
                             class="form-control {{ $bag->has('reason') ? 'is-invalid' : '' }}">{{ old('reason') }}</textarea>
                         @if ($bag->has('reason')) <div class="md-error text-danger small">{{ $bag->first('reason') }}</div> @endif
                     </div>

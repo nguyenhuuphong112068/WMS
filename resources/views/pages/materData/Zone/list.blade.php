@@ -7,34 +7,21 @@
     |--------------------------------------------------------------------------
     | Khai báo tại đây để dataTable / create / update cùng đọc một nguồn,
     | tránh lệch nhau khi thêm cột hoặc đổi nhãn.
+    |
+    | Năm cấp: Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị Trí.
     */
 
     $zoneRoute = 'pages.materData.zone.';
 
-    $activeWarehouses = $warehouses->where('status_id', 1);
-    $activeRooms = $rooms->where('status_id', 1);
-    $activeShelves = $shelves->where('status_id', 1);
-
     $zoneMeta = [
         'warehouse' => [
-            'label' => 'Kho',
+            'label' => 'Kho/Phòng',
             'table' => 'warehouses',
-            'lower' => 'kho',
+            'lower' => 'kho/phòng',
             'icon' => 'fas fa-warehouse',
             'rows' => $warehouses,
             'parents' => [],
             'cols' => [],
-            'canCreate' => true,
-            'blockMsg' => '',
-        ],
-        'room' => [
-            'label' => 'Phòng',
-            'table' => 'rooms',
-            'lower' => 'phòng',
-            'icon' => 'fas fa-door-open',
-            'rows' => $rooms,
-            'parents' => ['warehouse'],
-            'cols' => ['warehouse_name' => 'Kho'],
             'canCreate' => true,
             'blockMsg' => '',
         ],
@@ -44,8 +31,30 @@
             'lower' => 'kệ/tủ',
             'icon' => 'fas fa-layer-group',
             'rows' => $shelves,
-            'parents' => ['warehouse', 'room'],
-            'cols' => ['warehouse_name' => 'Kho', 'room_name' => 'Phòng'],
+            'parents' => ['warehouse'],
+            'cols' => ['warehouse_name' => 'Kho/Phòng'],
+            'canCreate' => true,
+            'blockMsg' => '',
+        ],
+        'column' => [
+            'label' => 'Cột',
+            'table' => 'columns',
+            'lower' => 'cột',
+            'icon' => 'fas fa-grip-lines-vertical',
+            'rows' => $columns,
+            'parents' => ['warehouse', 'shelf'],
+            'cols' => ['warehouse_name' => 'Kho/Phòng', 'shelf_name' => 'Kệ/Tủ'],
+            'canCreate' => true,
+            'blockMsg' => '',
+        ],
+        'tier' => [
+            'label' => 'Tầng',
+            'table' => 'tiers',
+            'lower' => 'tầng',
+            'icon' => 'fas fa-bars',
+            'rows' => $tiers,
+            'parents' => ['warehouse', 'shelf', 'column'],
+            'cols' => ['warehouse_name' => 'Kho/Phòng', 'shelf_name' => 'Kệ/Tủ', 'column_name' => 'Cột'],
             'canCreate' => true,
             'blockMsg' => '',
         ],
@@ -55,8 +64,13 @@
             'lower' => 'vị trí',
             'icon' => 'fas fa-map-pin',
             'rows' => $locations,
-            'parents' => ['warehouse', 'room', 'shelf'],
-            'cols' => ['warehouse_name' => 'Kho', 'room_name' => 'Phòng', 'shelf_name' => 'Kệ/Tủ'],
+            'parents' => ['warehouse', 'shelf', 'column', 'tier'],
+            'cols' => [
+                'warehouse_name' => 'Kho/Phòng',
+                'shelf_name' => 'Kệ/Tủ',
+                'column_name' => 'Cột',
+                'tier_name' => 'Tầng',
+            ],
             'canCreate' => true,
             'blockMsg' => '',
             // Chỉ cấp vị trí mới khai loại lưu trữ - đây mới là chỗ thực sự đựng hàng.
@@ -74,12 +88,13 @@
 
     // Mô tả các ô chọn cấp cha dùng trong modal (đổ dữ liệu động bằng JS theo cấp trên).
     $zoneParents = [
-        'warehouse' => ['field' => 'warehouse_id', 'label' => 'Kho', 'class' => 'sel-warehouse', 'placeholder' => '-- Chọn kho (tuỳ chọn) --'],
-        'room' => ['field' => 'room_id', 'label' => 'Phòng', 'class' => 'sel-room', 'placeholder' => '-- Chọn phòng (tuỳ chọn) --'],
+        'warehouse' => ['field' => 'warehouse_id', 'label' => 'Kho/Phòng', 'class' => 'sel-warehouse', 'placeholder' => '-- Chọn kho/phòng (tuỳ chọn) --'],
         'shelf' => ['field' => 'shelf_id', 'label' => 'Kệ/Tủ', 'class' => 'sel-shelf', 'placeholder' => '-- Chọn kệ/tủ (tuỳ chọn) --'],
+        'column' => ['field' => 'column_id', 'label' => 'Cột', 'class' => 'sel-column', 'placeholder' => '-- Chọn cột (tuỳ chọn) --'],
+        'tier' => ['field' => 'tier_id', 'label' => 'Tầng', 'class' => 'sel-tier', 'placeholder' => '-- Chọn tầng (tuỳ chọn) --'],
     ];
 
-    // Dữ liệu 3 cấp cha đẩy xuống JS để đổ ô chọn dây chuyền Kho -> Phòng -> Kệ.
+    // Dữ liệu 4 cấp cha đẩy xuống JS để đổ ô chọn dây chuyền Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng.
     $zoneOption = fn($row, $parent) => [
         'id' => $row->id,
         'code' => $row->code,
@@ -90,8 +105,9 @@
 
     $zoneCascade = [
         'warehouse' => $warehouses->map(fn($r) => $zoneOption($r, null))->values(),
-        'room' => $rooms->map(fn($r) => $zoneOption($r, $r->warehouse_id))->values(),
-        'shelf' => $shelves->map(fn($r) => $zoneOption($r, $r->room_id))->values(),
+        'shelf' => $shelves->map(fn($r) => $zoneOption($r, $r->warehouse_id))->values(),
+        'column' => $columns->map(fn($r) => $zoneOption($r, $r->shelf_id))->values(),
+        'tier' => $tiers->map(fn($r) => $zoneOption($r, $r->column_id))->values(),
     ];
 
     // Giá trị vừa nhập, chỉ dùng lại khi có form bị lỗi validate.

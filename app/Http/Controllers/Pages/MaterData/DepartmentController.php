@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\MaterData;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Validator;
  */
 class DepartmentController extends Controller
 {
+    use RequiresChangeReason;
+
     private const TABLE = 'deparments';
 
     /** Các cột người dùng nhập - dùng chung cho ảnh chụp và mô tả thay đổi của lịch sử. */
@@ -93,14 +96,14 @@ class DepartmentController extends Controller
             'company_id' => 'required|integer|exists:companies,id',
             'shortName' => 'required|unique:deparments,shortName,' . $request->id,
             'name' => 'required|unique:deparments,name,' . $request->id,
-        ], [
+        ] + $this->changeReasonRules(), [
             'company_id.required' => 'Vui lòng chọn Công Ty',
             'company_id.exists' => 'Công Ty không hợp lệ.',
             'name.required' => 'Vui lòng nhập Tên Phòng Ban',
             'name.unique' => 'Tên Phòng Ban đã tồn tại.',
             'shortName.required' => 'Vui lòng nhập Tên Viết Tắt',
             'shortName.unique' => 'Tên Viết Tắt đã tồn tại.',
-        ]);
+        ] + $this->changeReasonMessages());
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
@@ -109,11 +112,15 @@ class DepartmentController extends Controller
         $payload = $this->payload($request);
         $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $this->maps());
 
+        if ($note === '') {
+            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             'updated_at' => now(),
         ]);
 
-        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS, $this->maps());
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, $this->maps(), $this->changeReason($request));
 
         return redirect()->back()->with('success', 'Cập nhật thành công!');
     }
@@ -124,6 +131,10 @@ class DepartmentController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy phòng ban cần thay đổi trạng thái!');
+        }
+
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
         }
 
         $newStatus = $current->isActive ? 0 : 1;
@@ -139,7 +150,8 @@ class DepartmentController extends Controller
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->isActive, $newStatus),
             self::FIELDS,
-            $this->maps()
+            $this->maps(),
+            $this->changeReason($request)
         );
 
         return redirect()->back()->with('success', 'Đã thay đổi trạng thái thành công!');

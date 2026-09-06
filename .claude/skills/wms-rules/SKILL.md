@@ -1,6 +1,6 @@
 ---
 name: wms-rules
-description: Quy tắc bắt buộc khi code dự án WMS (Laravel Blade - Quản Lý Kho). Dùng skill này MỖI KHI tạo/sửa Controller, View Blade, Route, migration, đặt tên bảng CSDL, giao diện, màu sắc, khi thêm thư viện JS/CSS/font/icon hoặc plugin frontend, và khi tổ chức thư mục file trong dự án này. Bao gồm - chỉ dùng Query Builder trong Controller, CẤM dùng CDN vì server deploy không có internet (mọi thư viện phải tải về public/ và nạp qua asset()), quy tắc đặt tên bảng CSDL, bảng màu xanh dương nhạt, chuẩn giao diện chuyên nghiệp, và cấu trúc thư mục theo nhóm chức năng trên leftNAV.
+description: Quy tắc bắt buộc khi code dự án WMS (Laravel Blade - Quản Lý Kho). Dùng skill này MỖI KHI tạo/sửa Controller, View Blade, Route, migration, đặt tên bảng CSDL, giao diện, màu sắc, khi thêm thư viện JS/CSS/font/icon hoặc plugin frontend, và khi tổ chức thư mục file trong dự án này. Bao gồm - chỉ dùng Query Builder trong Controller, CẤM dùng CDN vì server deploy không có internet (mọi thư viện phải tải về public/ và nạp qua asset()), quy tắc đặt tên bảng CSDL, bảng màu xanh dương nhạt, chuẩn giao diện chuyên nghiệp, cấm thêm div/p diễn giải thêm (hint/note) ở màn hình dataTable/list, và cấu trúc thư mục theo nhóm chức năng trên leftNAV.
 ---
 
 # Quy Tắc Chung Dự Án WMS (Quản Lý Kho)
@@ -77,7 +77,20 @@ Biến CSS được khai báo tập trung tại [resources/views/layout/css.blad
 
 ---
 
-## 4. Chỉ dùng thư viện offline — CẤM mọi link CDN
+## 4. Không thêm div/p diễn giải thêm ở màn hình danh sách (dataTable, list)
+
+**Cấm** viết thêm các đoạn `<p class="hint">`, `<p class="cat-tabs-note">`, `<div class="md-hint">`... chỉ để giải thích thêm bằng chữ cho người dùng ở phía trên hoặc trong toolbar của bảng dữ liệu (`dataTable.blade.php`, `list.blade.php`) — kiểu như đếm "Đang hoạt động X/Y bản ghi", giải thích quan hệ giữa 2 tab, giải thích quy tắc nghiệp vụ, hướng dẫn cách dùng bộ lọc...
+
+- ❌ Không tự ý thêm dòng chữ kiểu `<i class="fas fa-info-circle mr-1"></i> Ghi chú: ...` bên trên bảng "cho người dùng dễ hiểu" nếu không được yêu cầu.
+- ❌ Không viết lại các dòng thông tin diễn giải kiểu này dù đã từng thấy ở màn hình khác trong dự án — các màn hình cũ còn sót lại loại này cũng cần được dọn khi đụng tới.
+- ✅ Vẫn giữ nút/link dẫn tới chú thích khi nó là **hành động chức năng thật** (ví dụ nút "Chú thích Phụ lục & Nhóm" mở modal giải thích mã phân loại) — khác với đoạn văn giải thích tĩnh nằm lì trên trang.
+- ✅ Vẫn giữ cảnh báo gắn liền với một điều khiển đang bị khoá/disable ngay cạnh nó (ví dụ nút "Thêm" bị `disabled` kèm 1 dòng lý do vì sao chưa thêm được) — đây là phản hồi trạng thái cần thiết, không phải "diễn giải thêm".
+- Tên cột, tooltip (`title="..."`), placeholder, label input là đủ; không cần thêm đoạn văn giải thích phía trên bảng.
+- Nếu nghiệp vụ thực sự cần giải thích dài, đưa vào tài liệu hướng dẫn sử dụng ngoài màn hình, không nhúng cứng vào giao diện.
+
+---
+
+## 5. Chỉ dùng thư viện offline — CẤM mọi link CDN
 
 **Server triển khai (máy con tại nhà máy) KHÔNG có internet.** Mọi thư viện, font, icon, file ngôn ngữ phải nằm sẵn trong dự án và nạp qua `asset()`.
 
@@ -124,7 +137,7 @@ grep -rIn "cdn\.\|googleapis\|jsdelivr\|unpkg\|cloudflare\|bootstrapcdn\|use\.fo
 
 ---
 
-## 5. Cấu trúc thư mục theo nhóm chức năng trên leftNAV
+## 6. Cấu trúc thư mục theo nhóm chức năng trên leftNAV
 
 Hệ thống là **một khối thống nhất**, không chia phân hệ. Không có màn hình chọn phân hệ, không có `session('module')`, không có thư mục `Material/` / `Chemical/` / `General/` trong `Pages/`.
 
@@ -204,7 +217,7 @@ Không đặt file lạc thư mục. Không tạo lại cấu trúc phân hệ (
 
 ---
 
-## 6. Quy tắc đặt tên bảng CSDL
+## 7. Quy tắc đặt tên bảng CSDL
 
 **Không dùng tiền tố.** Tên bảng viết thẳng theo nội dung bảng: `chem_names`, `material_names`, `units`, `packaging_specifications`, `warehouses`, `statuses`... Không thêm `wms_`, `gen_`, `mat_`, `che_` hay bất kỳ tiền tố phân hệ / phân nhóm nào.
 
@@ -243,7 +256,7 @@ $datas = DB::table('materials')
 
 ---
 
-## 7. Ngày thao tác do hệ thống ghi, người dùng KHÔNG được chỉnh
+## 8. Ngày thao tác do hệ thống ghi, người dùng KHÔNG được chỉnh
 
 **Bắt buộc:** ngày của một thao tác nhập / xuất / cấp phát là **thời điểm thực hiện thao tác**, do server tự lấy bằng `now()`. Tuyệt đối không đưa ô cho người dùng tự chọn.
 
@@ -265,7 +278,7 @@ $datas = DB::table('materials')
 
 ---
 
-## 8. Quy ước khác đang áp dụng
+## 9. Quy ước khác đang áp dụng
 
 - Thông tin đăng nhập nằm trong `session('user')`: `userId`, `userName`, `fullName`, `userGroup`, `department`, `selected_department`, `selected_department_id`.
 - Đăng nhập thành công vào thẳng `pages.home`. Không có bước chọn phân hệ, không dùng `session('module')`.
@@ -273,3 +286,14 @@ $datas = DB::table('materials')
 - Kiểm tra quyền bằng `user_has_any_role($userId, ['Admin'])` / `user_has_permission(...)` ở cả view và controller.
 - Tiêu đề trang đặt bằng `session()->put(['title' => '...'])` trong controller, topNAV tự hiển thị.
 - Ngôn ngữ hiển thị: Tiếng Việt có dấu. Ngày giờ lưu DB dạng `Y-m-d H:i:s`, hiển thị `d/m/Y`.
+
+---
+
+## 10. Luôn giao tiếp với người dùng bằng tiếng Việt
+
+**Bắt buộc:** mọi phản hồi, giải thích, tóm tắt, câu hỏi, thông báo tiến độ... gửi cho người dùng đều viết bằng **tiếng Việt có dấu**.
+
+- ❌ Không trả lời bằng tiếng Anh, kể cả phần tóm tắt cuối hay giải thích kỹ thuật.
+- ✅ Giữ nguyên tiếng Anh cho: tên biến / hàm / class, lệnh terminal, tên route, tên cột CSDL, đoạn code, thông báo lỗi gốc của framework.
+- ✅ Thuật ngữ kỹ thuật phổ biến (controller, migration, route, view, commit...) được dùng xen trong câu tiếng Việt.
+- Tiêu đề, gạch đầu dòng, bảng trong câu trả lời cũng viết bằng tiếng Việt.

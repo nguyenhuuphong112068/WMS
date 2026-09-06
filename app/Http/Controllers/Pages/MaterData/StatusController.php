@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\MaterData;
 
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Validator;
  */
 class StatusController extends Controller
 {
+    use RequiresChangeReason;
+
     private const TABLE = 'statuses';
 
     /** Các cột người dùng nhập - dùng chung cho ảnh chụp và mô tả thay đổi của lịch sử. */
@@ -71,10 +74,10 @@ class StatusController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|unique:statuses,name,' . $request->id,
-        ], [
+        ] + $this->changeReasonRules(), [
             'name.required' => 'Vui lòng nhập Tên Trạng Thái',
             'name.unique' => 'Tên Trạng Thái đã tồn tại.',
-        ]);
+        ] + $this->changeReasonMessages());
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
@@ -83,11 +86,15 @@ class StatusController extends Controller
         $payload = $this->payload($request);
         $note = DataMasterHistory::note(self::FIELDS, $current, $payload);
 
+        if ($note === '') {
+            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             'updated_at' => now(),
         ]);
 
-        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.', self::FIELDS);
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, [], $this->changeReason($request));
 
         return redirect()->back()->with('success', 'Cập nhật thành công!');
     }
@@ -98,6 +105,10 @@ class StatusController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy trạng thái cần thay đổi!');
+        }
+
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
         }
 
         $newStatus = $current->active ? 0 : 1;
@@ -112,7 +123,9 @@ class StatusController extends Controller
             $current->id,
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->active, $newStatus),
-            self::FIELDS
+            self::FIELDS,
+            [],
+            $this->changeReason($request)
         );
 
         return redirect()->back()->with('success', 'Đã thay đổi trạng thái thành công!');

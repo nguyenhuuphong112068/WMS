@@ -7,10 +7,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * QUY ĐỔI ĐƠN VỊ GIỮA CÁC PHÒNG BAN CHO CÙNG MỘT MÃ
  *
- * Đơn vị tính là của riêng từng phòng (chemical_department_categories / standard_department_categories), nên
- * cùng một mã hoá chất hoặc chất chuẩn có thể tồn tại nhiều đơn vị khác nhau trong hệ
- * thống. Lớp này trả lời đúng một câu hỏi: đổi X đơn vị của phòng A thành bao nhiêu đơn
- * vị của phòng B.
+ * Đơn vị tính là của riêng từng phòng (chemical_department_categories /
+ * standard_department_categories / material_department_categories), nên cùng một mã hoá
+ * chất, chất chuẩn hay vật tư có thể tồn tại nhiều đơn vị khác nhau trong hệ thống. Lớp
+ * này trả lời đúng một câu hỏi: đổi X đơn vị của phòng A thành bao nhiêu đơn vị của phòng B.
  *
  * Thứ tự tra cứu:
  * 1. Cùng một đơn vị            -> hệ số 1.
@@ -30,6 +30,8 @@ class CategoryUnitConversion
     public const TYPE_CHEMICAL = 'chemical';
 
     public const TYPE_STANDARD = 'standard';
+
+    public const TYPE_MATERIAL = 'material';
 
     /**
      * Các đơn vị mà CÁC PHÒNG KHÁC đã khai cho từng mã: [category_id => [đơn vị]].
@@ -137,7 +139,11 @@ class CategoryUnitConversion
             return null;
         }
 
-        $density = DB::table(self::categoryTable($type))->where('id', $categoryId)->value('density');
+        // Vật tư là hàng đếm được (cái / hộp / gói), danh mục không khai tỉ trọng nên
+        // material_categories không có cột density - chỉ đổi được trong cùng nhóm đơn vị.
+        $density = $type === self::TYPE_MATERIAL
+            ? null
+            : DB::table(self::categoryTable($type))->where('id', $categoryId)->value('density');
 
         return UnitConverter::convert(1.0, $from, $to, $density === null ? null : (float) $density);
     }
@@ -261,11 +267,19 @@ class CategoryUnitConversion
 
     private static function departmentTable(string $type): string
     {
-        return $type === self::TYPE_STANDARD ? 'standard_department_categories' : 'chemical_department_categories';
+        return match ($type) {
+            self::TYPE_STANDARD => 'standard_department_categories',
+            self::TYPE_MATERIAL => 'material_department_categories',
+            default => 'chemical_department_categories',
+        };
     }
 
     private static function categoryTable(string $type): string
     {
-        return $type === self::TYPE_STANDARD ? 'standard_categories' : 'chemical_categories';
+        return match ($type) {
+            self::TYPE_STANDARD => 'standard_categories',
+            self::TYPE_MATERIAL => 'material_categories',
+            default => 'chemical_categories',
+        };
     }
 }

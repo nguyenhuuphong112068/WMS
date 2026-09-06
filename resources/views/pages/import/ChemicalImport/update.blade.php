@@ -37,8 +37,8 @@
 
                         <div class="form-group col-md-4">
                             <label>Số Lượng <span class="text-danger">*</span></label>
-                            <input type="number" name="amount" step="0.0001" min="0.0001"
-                                class="form-control {{ $bag->has('amount') ? 'is-invalid' : '' }}"
+                            <input type="text" inputmode="decimal" name="amount" min="0.0001"
+                                class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
                                 value="{{ old('amount') }}" required>
                             @if ($bag->has('amount'))
                                 <span class="md-error">{{ $bag->first('amount') }}</span>
@@ -83,16 +83,17 @@
                     <div class="form-row">
                         {{-- Vị trí lưu trữ: chọn cấp sâu nhất, ba cấp Kho/Phòng/Kệ suy ra từ đó --}}
                         <div class="form-group col-md-12">
-                            <label>Vị Trí Lưu Trữ</label>
+                            <label>Định Khu</label>
                             <select name="location_id"
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chưa xếp vị trí --</option>
+                                <option value="">-- Chưa định khu --</option>
                                 @foreach ($locations as $location)
                                     <option value="{{ $location->id }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
-                                        {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
+                                        {{ $location->column_name ?: '—' }} /
+                                        {{ $location->tier_name ?: '—' }} /
                                         {{ $location->code }}
                                     </option>
                                 @endforeach
@@ -172,7 +173,7 @@
 
                     <div class="form-group imp-reason">
                         <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
-                        <textarea name="reason" rows="2" maxlength="500"
+                        <textarea name="reason" rows="2" maxlength="500" data-require-fill
                             class="form-control {{ $bag->has('reason') ? 'is-invalid' : '' }}"
                             placeholder="Ví dụ: Ghi sai số lô theo phiếu giao hàng, chỉnh lại cho khớp chứng từ.">{{ old('reason') }}</textarea>
                         @if ($bag->has('reason'))

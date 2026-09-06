@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Pages\Inventory;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\AttachmentBackup;
 use App\Support\DepartmentStandard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -73,6 +75,17 @@ class StandardInventoryController extends Controller
      */
     private const BALANCING_MAX_RATIO = 0.05;
 
+    /** Bảng lịch sử cập nhật hạn dùng (badge Retest / Check online). */
+    private const EXPIRY_UPDATE_TABLE = 'standard_expiry_updates';
+
+    private const EXPIRY_ATTACHMENT_TABLE = 'standard_expiry_update_attachments';
+
+    /** Thư mục lưu file đính kèm, dùng chung cho disk private lẫn bản sao public/uploads/. */
+    private const EXPIRY_ATTACHMENT_FOLDER = 'standard_expiry_updates';
+
+    /** Chỉ ống chuẩn thuộc các loại hạn dùng này mới được cập nhật hạn dùng ở màn hình tồn. */
+    private const EXPIRY_UPDATABLE_TYPES = ['retest', 'check online', 'undetermined', 'unlimited'];
+
     /** Tên hiển thị của từng trạng thái tồn, dùng chung cho bảng và bộ lọc. */
     public const STATES = [
         'in' => 'Còn hàng',
@@ -95,8 +108,11 @@ class StandardInventoryController extends Controller
 
         return view('pages.inventory.StandardInventory.list', [
             'datas' => $datas,
+            // File đính kèm của phiếu nhập, để xem ngay trên màn hình tồn kho
+            'attachments' => $this->attachmentsFor($datas->pluck('id')),
             'summaries' => $this->stockByStandard($datas),
             'balancings' => $this->balancingHistory($departmentId),
+            'expiryUpdates' => $this->expiryUpdateHistory($departmentId),
             'zones' => $this->zoneOptions($departmentId),
             'states' => self::STATES,
             'groups' => config('standard.groups'),
@@ -407,6 +423,345 @@ class StandardInventoryController extends Controller
     }
 
     /**
+     * CẬP NHẬT HẠN DÙNG - badge "Retest" / "Check online" trên bảng tồn.
+     *
+     * Sau mỗi lần kiểm nghiệm lại (retest) hoặc tra cứu hạn trực tuyến (check online),
+     * người phụ trách chọn một trong ba hướng:
+     *
+     *      - retest       : tiếp tục retest, nhập hạn retest mới (+ chu kỳ nếu đổi)
+     *      - check_online : tiếp tục check online, hạn dùng để trống
+     *      - defined      : chốt hạn dùng xác định -> expiry_type chuyển hẳn 'Specify',
+     *                       ống hết badge, không cập nhật ở đây nữa
+     *
+     * Mỗi lần lưu ghi thêm một dòng standard_expiry_updates (giá trị cũ -> mới, ghi chú,
+     * file đính kèm) và một dòng Audit Trail. Bảng lịch sử chỉ ghi thêm.
+     */
+    public function expiryUpdate(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $import = DB::table('standard_imports')
+            ->leftJoin('standard_categories', 'standard_imports.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->select(
+                'standard_imports.id',
+                'standard_imports.code',
+                'standard_imports.expiry_type',
+                'standard_imports.expired_date',
+                'standard_imports.retest_interval_months',
+                'standard_imports.potency',
+                'standard_imports.moisture',
+                'standard_imports.coa_no',
+                'standard_names.name as standard_name'
+            )
+            ->where('standard_imports.id', $request->import_id)
+            ->where('standard_imports.department_id', $departmentId)
+            ->where('standard_imports.status_id', 1)
+            ->first();
+
+        if (! $import) {
+            return redirect()->back()->with('error', 'Không tìm thấy mã ống chuẩn cần cập nhật hạn dùng!');
+        }
+
+        if (! in_array($import->expiry_type, self::EXPIRY_UPDATABLE_TYPES, true)) {
+            return redirect()->back()->with(
+                'error',
+                'Chỉ cập nhật được hạn dùng cho ống chuẩn loại Retest hoặc Check online.'
+            );
+        }
+
+        $validator = Validator::make($request->all(), [
+            'import_id' => ['required', 'exists:standard_imports,id'],
+            'resolution' => ['required', 'in:retest,check_online,defined'],
+            'expired_date' => ['nullable', 'date', 'required_if:resolution,retest', 'required_if:resolution,defined'],
+            'retest_interval_months' => ['nullable', 'integer', 'min:1', 'max:120'],
+            // Kết quả kiểm nghiệm lại, chỉ nhận khi tiếp tục Retest
+            'potency' => ['nullable', 'string', 'max:100'],
+            'moisture' => ['nullable', 'string', 'max:100'],
+            'coa_no' => ['nullable', 'string', 'max:100'],
+            'note' => ['nullable', 'string', 'max:500'],
+            'attachments.*' => ['nullable', 'file', 'max:10240'],
+        ], [
+            'import_id.required' => 'Vui lòng chọn mã ống chuẩn cần cập nhật.',
+            'import_id.exists' => 'Mã ống chuẩn cần cập nhật không tồn tại.',
+            'resolution.required' => 'Vui lòng chọn hướng xử lý hạn dùng.',
+            'resolution.in' => 'Hướng xử lý hạn dùng không hợp lệ.',
+            'expired_date.date' => 'Hạn dùng không hợp lệ.',
+            'expired_date.required_if' => 'Vui lòng nhập hạn dùng mới.',
+            'retest_interval_months.integer' => 'Chu kỳ retest phải là số nguyên (tháng).',
+            'retest_interval_months.min' => 'Chu kỳ retest tối thiểu 1 tháng.',
+            'retest_interval_months.max' => 'Chu kỳ retest tối đa 120 tháng.',
+            'potency.max' => 'Hàm lượng tối đa 100 ký tự.',
+            'moisture.max' => 'Độ ẩm tối đa 100 ký tự.',
+            'coa_no.max' => 'Số phiếu kiểm nghiệm tối đa 100 ký tự.',
+            'note.max' => 'Ghi chú tối đa 500 ký tự.',
+            'attachments.*.file' => 'File đính kèm không hợp lệ.',
+            'attachments.*.max' => 'Mỗi file đính kèm không được vượt quá 10MB.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator, 'expiryUpdateErrors')->withInput();
+        }
+
+        // Không cho đổi chéo Retest <-> Check online: chỉ được tiếp tục đúng loại đang có,
+        // hoặc chốt sang hạn dùng xác định.
+        $currentIsRetest = $import->expiry_type === 'retest';
+        $allowedResolutions = $currentIsRetest ? ['retest', 'defined'] : ['check_online', 'defined'];
+
+        if (! in_array($request->resolution, $allowedResolutions, true)) {
+            return redirect()->back()
+                ->withErrors(['resolution' => $currentIsRetest
+                    ? 'Ống Retest chỉ được tiếp tục Retest hoặc chốt hạn dùng xác định, không chuyển sang Check online.'
+                    : 'Ống Check online chỉ được tiếp tục Check online hoặc chốt hạn dùng xác định, không chuyển sang Retest.'],
+                    'expiryUpdateErrors')
+                ->withInput();
+        }
+
+        // "check online" gộp các biến thể undetermined / unlimited để so sánh cho đúng
+        $norm = fn ($type) => in_array($type, ['check online', 'undetermined', 'unlimited'], true) ? 'check online' : $type;
+
+        $newType = match ($request->resolution) {
+            'retest' => 'retest',
+            'check_online' => 'check online',
+            'defined' => 'Specify',
+        };
+
+        $newExpiredDate = null;
+        $newInterval = null;
+
+        if ($request->resolution === 'retest') {
+            $newExpiredDate = \Carbon\Carbon::parse($request->expired_date)->format('Y-m-d');
+            $newInterval = $request->filled('retest_interval_months')
+                ? (int) $request->retest_interval_months
+                : ($import->retest_interval_months !== null ? (int) $import->retest_interval_months : null);
+        } elseif ($request->resolution === 'defined') {
+            $newExpiredDate = \Carbon\Carbon::parse($request->expired_date)->format('Y-m-d');
+        }
+
+        $oldDate = $import->expired_date ? substr((string) $import->expired_date, 0, 10) : null;
+        $hasFiles = $request->hasFile('attachments');
+        $noteText = trim((string) $request->note) ?: null;
+
+        /*
+        | KẾT QUẢ KIỂM NGHIỆM LẠI - chỉ nhận khi TIẾP TỤC RETEST.
+        | Sau mỗi lần retest, ống thường có Hàm lượng / Độ ẩm mới và một Số phiếu kiểm
+        | nghiệm (CoA) mới; cho sửa luôn trên standard_imports, các hướng khác giữ nguyên.
+        */
+        $trimOrNull = fn ($value) => ($value = trim((string) $value)) !== '' ? $value : null;
+        $isRetest = $request->resolution === 'retest';
+
+        $oldPotency = $trimOrNull($import->potency);
+        $oldMoisture = $trimOrNull($import->moisture);
+        $oldCoaNo = $trimOrNull($import->coa_no);
+
+        $newPotency = $isRetest ? $trimOrNull($request->potency) : $oldPotency;
+        $newMoisture = $isRetest ? $trimOrNull($request->moisture) : $oldMoisture;
+        $newCoaNo = $isRetest ? $trimOrNull($request->coa_no) : $oldCoaNo;
+
+        // Không đổi gì mà cũng không ghi chú / không file thì không có gì để lưu
+        $unchanged = $norm($import->expiry_type) === $norm($newType)
+            && $oldDate === $newExpiredDate
+            && (int) ($import->retest_interval_months ?? 0) === (int) ($newInterval ?? 0)
+            && $oldPotency === $newPotency
+            && $oldMoisture === $newMoisture
+            && $oldCoaNo === $newCoaNo;
+
+        if ($unchanged && ! $noteText && ! $hasFiles) {
+            return redirect()->back()
+                ->withErrors(['note' => 'Chưa có thay đổi nào để lưu. Hãy nhập hạn dùng mới, ghi chú hoặc đính kèm file.'], 'expiryUpdateErrors')
+                ->withInput();
+        }
+
+        $fmt = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : 'Trống';
+
+        $changeParts = [];
+        if ($norm($import->expiry_type) !== $norm($newType)) {
+            $changeParts[] = 'Loại hạn dùng: '.$this->expiryTypeLabel($import->expiry_type).' → '.$this->expiryTypeLabel($newType);
+        }
+        if ($oldDate !== $newExpiredDate) {
+            $changeParts[] = 'Hạn dùng: '.$fmt($oldDate).' → '.$fmt($newExpiredDate);
+        }
+        if ($newType === 'retest' && (int) ($import->retest_interval_months ?? 0) !== (int) ($newInterval ?? 0)) {
+            $changeParts[] = 'Chu kỳ retest: '
+                .($import->retest_interval_months ? $import->retest_interval_months.' tháng' : 'Trống')
+                .' → '.($newInterval ? $newInterval.' tháng' : 'Trống');
+        }
+        $showText = fn ($value) => ($value === null || $value === '') ? 'Trống' : $value;
+        if ($oldPotency !== $newPotency) {
+            $changeParts[] = 'Hàm lượng: '.$showText($oldPotency).' → '.$showText($newPotency);
+        }
+        if ($oldMoisture !== $newMoisture) {
+            $changeParts[] = 'Độ ẩm: '.$showText($oldMoisture).' → '.$showText($newMoisture);
+        }
+        if ($oldCoaNo !== $newCoaNo) {
+            $changeParts[] = 'Số phiếu kiểm nghiệm: '.$showText($oldCoaNo).' → '.$showText($newCoaNo);
+        }
+        $changeNote = $changeParts ? implode('; ', $changeParts) : 'Không đổi hạn dùng, chỉ ghi nhận lần kiểm tra.';
+
+        // Upload file 1 lần (mẫu StandardImportController::store)
+        $uploadedFiles = [];
+        if ($hasFiles) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file && $file->isValid()) {
+                    $path = $file->store('public/'.self::EXPIRY_ATTACHMENT_FOLDER);
+                    AttachmentBackup::copy($path, self::EXPIRY_ATTACHMENT_FOLDER);
+
+                    $uploadedFiles[] = [
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
+                        'file_size' => $file->getSize(),
+                        'file_type' => $file->getClientMimeType() ?: $file->getClientOriginalExtension(),
+                    ];
+                }
+            }
+        }
+
+        DB::transaction(function () use ($import, $departmentId, $newType, $newExpiredDate, $newInterval, $oldDate, $changeNote, $noteText, $uploadedFiles, $oldPotency, $newPotency, $oldMoisture, $newMoisture, $oldCoaNo, $newCoaNo) {
+            DB::table('standard_imports')->where('id', $import->id)->update([
+                'expiry_type' => $newType,
+                'expired_date' => $newExpiredDate,
+                'retest_interval_months' => $newInterval,
+                'potency' => $newPotency,
+                'moisture' => $newMoisture,
+                'coa_no' => $newCoaNo,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            $updateId = DB::table(self::EXPIRY_UPDATE_TABLE)->insertGetId([
+                'standard_import_id' => (int) $import->id,
+                'department_id' => $departmentId,
+                'old_expiry_type' => $import->expiry_type,
+                'new_expiry_type' => $newType,
+                'old_expired_date' => $oldDate,
+                'new_expired_date' => $newExpiredDate,
+                'retest_interval_months' => $newInterval,
+                'old_potency' => $oldPotency,
+                'new_potency' => $newPotency,
+                'old_moisture' => $oldMoisture,
+                'new_moisture' => $newMoisture,
+                'old_coa_no' => $oldCoaNo,
+                'new_coa_no' => $newCoaNo,
+                'change_note' => $changeNote,
+                'note' => $noteText,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+            ]);
+
+            foreach ($uploadedFiles as $f) {
+                DB::table(self::EXPIRY_ATTACHMENT_TABLE)->insert([
+                    'standard_expiry_update_id' => $updateId,
+                    'file_name' => $f['file_name'],
+                    'file_path' => $f['file_path'],
+                    'file_size' => $f['file_size'],
+                    'file_type' => $f['file_type'],
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            AuditTrialController::log(
+                'Cập nhật hạn dùng',
+                'standard_imports',
+                $import->id,
+                $this->expiryTypeLabel($import->expiry_type).' - '.($oldDate ? \Carbon\Carbon::parse($oldDate)->format('d/m/Y') : 'chưa có hạn'),
+                $changeNote
+            );
+        });
+
+        return redirect()->back()->with(
+            'success',
+            'Đã cập nhật hạn dùng mã ống chuẩn '.$import->code.': '.$changeNote
+        );
+    }
+
+    /**
+     * Mở file đính kèm của một lần cập nhật hạn dùng (mẫu StandardImportController::downloadAttachment).
+     */
+    public function downloadExpiryAttachment($id)
+    {
+        $departmentId = $this->departmentId();
+
+        $attachment = DB::table(self::EXPIRY_ATTACHMENT_TABLE)
+            ->join(self::EXPIRY_UPDATE_TABLE, self::EXPIRY_ATTACHMENT_TABLE.'.standard_expiry_update_id', '=', self::EXPIRY_UPDATE_TABLE.'.id')
+            ->join('standard_imports', self::EXPIRY_UPDATE_TABLE.'.standard_import_id', '=', 'standard_imports.id')
+            ->where(self::EXPIRY_ATTACHMENT_TABLE.'.id', $id)
+            ->where('standard_imports.department_id', $departmentId)
+            ->select(self::EXPIRY_ATTACHMENT_TABLE.'.*')
+            ->first();
+
+        if (! $attachment) {
+            abort(404, 'Không tìm thấy file đính kèm.');
+        }
+
+        if (! Storage::exists($attachment->file_path)) {
+            abort(404, 'File không tồn tại trên hệ thống lưu trữ.');
+        }
+
+        return Storage::response($attachment->file_path, $attachment->file_name, [
+            'Content-Disposition' => 'inline; filename="'.$attachment->file_name.'"',
+        ]);
+    }
+
+    /**
+     * Lịch sử cập nhật hạn dùng để hiện trong modal, gom theo mã ống chuẩn.
+     * [import_id => [{thời điểm, người, nội dung đổi, ghi chú, file đính kèm}]].
+     */
+    private function expiryUpdateHistory(int $departmentId): array
+    {
+        $updates = DB::table(self::EXPIRY_UPDATE_TABLE)
+            ->join('standard_imports', self::EXPIRY_UPDATE_TABLE.'.standard_import_id', '=', 'standard_imports.id')
+            ->where('standard_imports.department_id', $departmentId)
+            ->select(self::EXPIRY_UPDATE_TABLE.'.*')
+            ->orderBy(self::EXPIRY_UPDATE_TABLE.'.id', 'desc')
+            ->get();
+
+        if ($updates->isEmpty()) {
+            return [];
+        }
+
+        // Lấy file đính kèm bằng một câu phụ, gom theo id lần cập nhật (tránh nhân dòng / N+1)
+        $files = DB::table(self::EXPIRY_ATTACHMENT_TABLE)
+            ->whereIn('standard_expiry_update_id', $updates->pluck('id'))
+            ->orderBy('id', 'asc')
+            ->get()
+            ->groupBy('standard_expiry_update_id');
+
+        $fmt = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
+
+        return $updates
+            ->groupBy('standard_import_id')
+            ->map(fn ($rows) => $rows->map(fn ($row) => [
+                'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
+                'created_by' => $row->created_by ?: 'NA',
+                'change_note' => $row->change_note ?: '—',
+                'note' => $row->note ?: '',
+                'old_type_label' => $this->expiryTypeLabel($row->old_expiry_type),
+                'new_type_label' => $this->expiryTypeLabel($row->new_expiry_type),
+                'old_expired_date' => $fmt($row->old_expired_date),
+                'new_expired_date' => $fmt($row->new_expired_date),
+                'attachments' => collect($files[$row->id] ?? [])->map(fn ($f) => [
+                    'name' => $f->file_name,
+                    'url' => route('pages.inventory.standardInventory.downloadExpiryAttachment', ['id' => $f->id]),
+                ])->values()->all(),
+            ])->values()->all())
+            ->toArray();
+    }
+
+    /** Tên hiển thị của loại hạn dùng (mẫu StandardImportController::history). */
+    private function expiryTypeLabel(?string $type): string
+    {
+        return match ($type) {
+            'check online', 'undetermined', 'unlimited' => 'Chưa xác định (Check online)',
+            'retest' => 'Cần retest định kỳ',
+            'Specify', 'defined' => 'Hạn dùng xác định',
+            'Requires_re-evaluation' => 'Cần xác định lại hạn dùng nội bộ',
+            default => $type ?: '—',
+        };
+    }
+
+    /**
      * Tồn theo từng mã ống chuẩn của phòng ban đang chọn.
      *
      * Lấy phiếu nhập và số lượng đã xuất bằng hai câu truy vấn rồi ghép trong PHP:
@@ -430,8 +785,9 @@ class StandardInventoryController extends Controller
             // chỉ cần standard_imports.location_id là dựng lại đủ Kho -> Phòng -> Kệ -> Vị trí
             ->leftJoin('locations', 'standard_imports.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('rooms', 'locations.room_id', '=', 'rooms.id')
-            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id');
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id');
 
         // Hạn dùng nội bộ và ngưỡng tồn tối thiểu lấy theo cấu hình riêng của phòng ban
         return DepartmentStandard::join($query, $departmentId, 'standard_imports.category_id')
@@ -444,9 +800,12 @@ class StandardInventoryController extends Controller
                 'standard_imports.imported_date',
                 'standard_imports.expired_date',
                 'standard_imports.expiry_type',
+                'standard_imports.retest_interval_months',
                 'standard_imports.internal_expired_date',
                 'standard_imports.batch_no',
                 'standard_imports.coa_no',
+                'standard_imports.potency',
+                'standard_imports.moisture',
                 'standard_imports.invoice_number',
                 'standard_imports.weight_controlled',
                 'standard_imports.weight_deviation_remark',
@@ -465,11 +824,13 @@ class StandardInventoryController extends Controller
                 'standard_imports.location_id',
                 'locations.code as location_code',
                 'locations.warehouse_id',
-                'locations.room_id',
                 'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
                 'warehouses.name as warehouse_name',
-                'rooms.name as room_name',
-                'shelves.name as shelf_name'
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
@@ -808,8 +1169,9 @@ class StandardInventoryController extends Controller
 
         return [
             'warehouses' => $of('warehouses', ['id', 'code', 'name']),
-            'rooms' => $of('rooms', ['id', 'code', 'name', 'warehouse_id']),
-            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'room_id']),
+            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id']),
+            'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id']),
+            'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id']),
             'locations' => $this->locationOptions($departmentId),
         ];
     }
@@ -821,7 +1183,7 @@ class StandardInventoryController extends Controller
     private function locationOptions(int $departmentId)
     {
         return DB::table('locations')
-            ->select(['id', 'code', 'warehouse_id', 'room_id', 'shelf_id', 'item_type'])
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type'])
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
@@ -906,6 +1268,81 @@ class StandardInventoryController extends Controller
         }
 
         return 'in';
+    }
+
+    /* ==================================================================
+     | FILE ĐÍNH KÈM PHIẾU NHẬP - xem / đổi trạng thái ngay trên màn hình tồn kho.
+     | Bảng chung với màn hình Nhập Chất Chuẩn (standard_import_attachments); khác với
+     | standard_expiry_update_attachments (file của lần cập nhật hạn dùng). Ở đây chỉ cho
+     | xem và đổi trạng thái Đang sử dụng / Ngưng sử dụng, không upload / xoá.
+     ================================================================== */
+
+    /** [standard_import_id => collection file] cho các mã ống chuẩn đang hiển thị. */
+    private function attachmentsFor($importIds)
+    {
+        return DB::table('standard_import_attachments')
+            ->whereIn('standard_import_id', $importIds)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('standard_import_id');
+    }
+
+    public function downloadAttachment($id)
+    {
+        $attachment = DB::table('standard_import_attachments')
+            ->join('standard_imports', 'standard_import_attachments.standard_import_id', '=', 'standard_imports.id')
+            ->where('standard_import_attachments.id', $id)
+            ->where('standard_imports.department_id', $this->departmentId())
+            ->select('standard_import_attachments.*')
+            ->first();
+
+        if (! $attachment) {
+            abort(404, 'Không tìm thấy file đính kèm.');
+        }
+
+        if (! Storage::exists($attachment->file_path)) {
+            abort(404, 'File không tồn tại trên hệ thống lưu trữ.');
+        }
+
+        return Storage::response($attachment->file_path, $attachment->file_name, [
+            'Content-Disposition' => 'inline; filename="'.$attachment->file_name.'"',
+        ]);
+    }
+
+    public function toggleAttachmentStatus(Request $request)
+    {
+        $attachment = DB::table('standard_import_attachments')
+            ->join('standard_imports', 'standard_import_attachments.standard_import_id', '=', 'standard_imports.id')
+            ->where('standard_import_attachments.id', $request->id)
+            ->where('standard_imports.department_id', $this->departmentId())
+            ->select('standard_import_attachments.*', 'standard_imports.code as import_code')
+            ->first();
+
+        if (! $attachment) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy file đính kèm.'], 404);
+        }
+
+        $wasActive = ! isset($attachment->is_active) || $attachment->is_active;
+        $newActive = $wasActive ? 0 : 1;
+
+        DB::table('standard_import_attachments')->where('id', $attachment->id)->update([
+            'is_active' => $newActive,
+            'status_changed_by' => $this->actor(),
+            'status_changed_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Đổi trạng thái tài liệu',
+            'standard_imports',
+            $attachment->standard_import_id,
+            $attachment->import_code,
+            'File "'.$attachment->file_name.'": '
+                .($wasActive ? 'Đang sử dụng' : 'Ngưng sử dụng').' -> '
+                .($newActive ? 'Đang sử dụng' : 'Ngưng sử dụng')
+        );
+
+        return response()->json(['success' => true, 'is_active' => $newActive]);
     }
 
     private function departmentId(): int

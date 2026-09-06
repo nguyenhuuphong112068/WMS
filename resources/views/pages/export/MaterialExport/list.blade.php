@@ -37,7 +37,6 @@
     @include('pages.export.MaterialExport.reject')
     @include('pages.export.MaterialExport.requestModal')
     @include('pages.export.MaterialExport.inventoryPickerModal')
-    @include('pages.export.MaterialExport.useModal')
     @foreach ($requestLists->whereIn('app_status', ['draft', 'rejected']) as $req)
         @include('pages.export.MaterialExport.requestEditModal', ['req' => $req, 'items' => $requestItems->get($req->id, collect())])
     @endforeach
@@ -46,4 +45,11 @@
     @endforeach
     {{-- Đặt sau các phiếu chi tiết: dựng dòng cấp phát + bảng chọn mã xuất nhập cho mọi mục còn chờ --}}
     @include('pages.export.MaterialExport.issueLotPickerModal')
+
+    {{-- Tab "Đề nghị chuyển liên phòng ban" --}}
+    @include('pages.export.MaterialExport.transferRequestModal')
+    @include('pages.export.MaterialExport.transferRequestEditModal')
+    @include('pages.export.MaterialExport.transferDetailModal')
+    @include('pages.export.MaterialExport.transferStockPickerModal')
+    @include('pages.export.MaterialExport.transferImportPickerModal')
 @endsection

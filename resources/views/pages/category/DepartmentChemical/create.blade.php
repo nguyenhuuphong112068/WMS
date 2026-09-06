@@ -87,8 +87,8 @@
 
                         <div class="form-group col-md-6">
                             <label>Ngưỡng Tồn Tối Thiểu</label>
-                            <input type="number" name="min_stock" min="0" step="0.0001"
-                                class="form-control {{ $bag->has('min_stock') ? 'is-invalid' : '' }}"
+                            <input type="text" inputmode="decimal" name="min_stock" min="0"
+                                class="form-control js-decimal {{ $bag->has('min_stock') ? 'is-invalid' : '' }}"
                                 value="{{ $old('min_stock') }}" placeholder="Để trống = cảnh báo theo tỉ lệ 20%">
                             @if ($bag->has('min_stock'))
                                 <span class="md-error">{{ $bag->first('min_stock') }}</span>
@@ -100,16 +100,17 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label>Vị Trí Lưu Trữ Quy Hoạch</label>
+                            <label>Định Khu</label>
                             <select name="default_location_id"
                                 class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chưa quy hoạch --</option>
+                                <option value="">-- Chưa định khu --</option>
                                 @foreach ($locations as $location)
                                     <option value="{{ $location->id }}"
                                         {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
-                                        {{ $location->room_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
+                                        {{ $location->column_name ?: '—' }} /
+                                        {{ $location->tier_name ?: '—' }} /
                                         {{ $location->code }}
                                     </option>
                                 @endforeach
@@ -117,7 +118,7 @@
                             @if ($bag->has('default_location_id'))
                                 <span class="md-error">{{ $bag->first('default_location_id') }}</span>
                             @endif
-                            <small class="md-sub">Chỗ <b>dự kiến</b> để hàng. Vị trí thật của từng lô vẫn khai lúc
+                            <small class="md-sub">Chỗ <b>dự kiến</b> để hàng. Định khu thật của từng lô vẫn khai lúc
                                 nhập.</small>
                         </div>
 

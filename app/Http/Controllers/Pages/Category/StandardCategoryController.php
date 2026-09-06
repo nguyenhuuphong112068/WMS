@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
@@ -34,6 +35,7 @@ use Illuminate\Validation\Rule;
  */
 class StandardCategoryController extends Controller
 {
+    use RequiresChangeReason;
     use VerifiesSignature;
 
     private const TABLE = 'standard_categories';
@@ -109,7 +111,6 @@ class StandardCategoryController extends Controller
             'dsDatas' => $dsDatas,
             'dsCategories' => DepartmentStandard::categoryOptions($dsDatas->pluck('category_id')->all()),
             'dsLocations' => DepartmentStandard::locationOptions($departmentId),
-            'dsStorageConditions' => DepartmentStandard::storageConditionOptions(),
             'dsUnits' => DepartmentStandard::unitOptions($dsDatas->pluck('unit_id')->all()),
             /*
             | Đơn vị các phòng KHÁC đang dùng cho từng chất chuẩn. Phòng đang khai chọn
@@ -166,7 +167,11 @@ class StandardCategoryController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!');
         }
 
-        $validator = Validator::make($request->all(), $this->rules(), $this->messages());
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules() + $this->changeReasonRules(),
+            $this->messages() + $this->changeReasonMessages()
+        );
 
         $this->checkDuplicate($validator, $request, $current->id);
 
@@ -177,6 +182,10 @@ class StandardCategoryController extends Controller
         $payload = $this->payload($request);
         $note = $this->changeNote($current, $payload);
 
+        if ($note === '') {
+            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
+        }
+
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             // Sửa nội dung thì phải duyệt lại từ đầu
             'app_status' => 'pending',
@@ -186,7 +195,7 @@ class StandardCategoryController extends Controller
             'updated_at' => now(),
         ]);
 
-        $this->writeHistory($current->id, 'Cập nhật', $note ?: 'Lưu lại nhưng nội dung không đổi.');
+        $this->writeHistory($current->id, 'Cập nhật', $note, $this->changeReason($request));
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $note ?: 'Không đổi', $current->code);
 
@@ -199,6 +208,10 @@ class StandardCategoryController extends Controller
 
         if (! $current) {
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
+        }
+
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
         }
 
         $newStatus = $current->status_id == 1 ? 0 : 1;
@@ -214,7 +227,8 @@ class StandardCategoryController extends Controller
             $current->id,
             $action,
             'Trạng thái sử dụng: '.($current->status_id == 1 ? 'Hoạt động' : 'Đã khoá')
-            .' -> '.($newStatus == 1 ? 'Hoạt động' : 'Đã khoá')
+            .' -> '.($newStatus == 1 ? 'Hoạt động' : 'Đã khoá'),
+            $this->changeReason($request)
         );
 
         AuditTrialController::log($action, self::TABLE, $current->id, 'status_id: '.$current->status_id, 'status_id: '.$newStatus);
@@ -283,6 +297,7 @@ class StandardCategoryController extends Controller
                 return [
                     'action' => $row->action,
                     'change_note' => $row->change_note,
+                    'change_reason' => $row->change_reason,
                     'created_by' => $row->created_by ?: 'NA',
                     'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
                     'snapshot' => $snapshot,
@@ -325,7 +340,7 @@ class StandardCategoryController extends Controller
     }
 
     /** Chụp lại giá trị bản ghi ngay sau khi thay đổi vào bảng lịch sử. */
-    private function writeHistory(int $id, string $action, ?string $note): void
+    private function writeHistory(int $id, string $action, ?string $note, ?string $reason = null): void
     {
         $row = DB::table(self::TABLE)->where('id', $id)->first();
 
@@ -350,6 +365,7 @@ class StandardCategoryController extends Controller
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
             'change_note' => $note,
+            'change_reason' => $reason,
             'created_by' => $this->actor(),
             'created_at' => now(),
         ]);

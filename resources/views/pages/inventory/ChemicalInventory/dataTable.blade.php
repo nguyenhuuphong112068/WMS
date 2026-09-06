@@ -164,6 +164,8 @@
                                     <th class="text-center" style="width: 120px">Hạn Dùng</th>
                                     <th class="text-center" style="width: 125px">Hạn Nội Bộ</th>
                                     <th class="text-center" style="width: 115px">Trạng Thái</th>
+                                    <th class="text-center" style="width: 60px" title="File hồ sơ đính kèm của phiếu nhập">
+                                        <i class="fas fa-paperclip"></i></th>
                                     <th class="text-center" style="width: 190px">Thao Tác</th>
                                 </tr>
                             </thead>
@@ -191,13 +193,13 @@
                                         </td>
                                         {{-- Vị trí THỰC TẾ của lô, sắp xếp theo đường dẫn định khu --}}
                                         <td class="md-sub"
-                                            data-order="{{ $row->location_code ? $row->warehouse_name . '/' . $row->room_name . '/' . $row->shelf_name . '/' . $row->location_code : 'zzz' }}">
+                                            data-order="{{ $row->location_code ? $row->warehouse_name . '/' . $row->shelf_name . '/' . $row->column_name . '/' . $row->tier_name . '/' . $row->location_code : 'zzz' }}">
                                             @if ($row->location_code)
                                                 <div class="font-weight-bold">
                                                     <span class="md-tag">{{ $row->location_code }}</span>
                                                 </div>
-                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
-                                                    {{ $row->shelf_name ?: '—' }}</div>
+                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
+                                                    {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
                                             @else
                                                 <span class="inv-zone-none">Chưa xếp vị trí</span>
                                             @endif
@@ -314,6 +316,16 @@
                                                 class="inv-badge inv-badge-{{ $row->state }}">{{ $row->state_label }}</span>
                                         </td>
                                         <td class="text-center">
+                                            @include('pages.shared.attachmentList', [
+                                                'attachments' => $attachments->get($row->id) ?? collect(),
+                                                'routePrefix' => 'pages.inventory.chemicalInventory.',
+                                                'statusPerm' => 'import_chemical_attachment_status',
+                                                'code' => $row->code,
+                                                'name' => $row->chem_name,
+                                                'typeLabel' => 'Hoá chất',
+                                            ])
+                                        </td>
+                                        <td class="text-center">
                                             @if ($row->can_internal_expiry)
                                                 @perm('inventory_chemical_internalExpiry')
                                                     <button type="button" class="btn btn-sm btn-outline-primary btn-inv-internal mb-1"
@@ -377,14 +389,6 @@
 
                 {{-- ============ TỒN CỘNG DỒN THEO HOÁ CHẤT ============ --}}
                 <div class="inv-pane" id="invPaneChem">
-
-                    <div class="md-toolbar">
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Cộng tồn của tất cả mã xuất nhập về từng hoá chất trong danh mục. Nên dùng trước phiếu có hạn
-                            gần nhất.
-                        </p>
-                    </div>
 
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'invSummaryTable'])
 
@@ -480,33 +484,30 @@
                 {{-- ============ TỒN THEO ĐỊNH KHU ============ --}}
                 <div class="inv-pane" id="invPaneZone">
 
-                    <div class="md-toolbar">
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Chọn dần <b>Kho → Phòng → Kệ/Tủ → Vị trí</b> để xem hoá chất đang chứa ở đó. Chọn tới cấp nào
-                            thì lọc tới cấp đó - chỉ chọn Kho là thấy toàn bộ hàng trong kho. Vị trí lấy theo
-                            <b>chỗ để thực tế</b> của từng mã xuất nhập, không phải vị trí quy hoạch.
-                        </p>
-                    </div>
-
-                    {{-- 4 ô chọn dây chuyền: chọn cấp trên thì cấp dưới tự lọc lại --}}
+                    {{-- 5 ô chọn dây chuyền: chọn cấp trên thì cấp dưới tự lọc lại --}}
                     <div class="inv-zone-picker" data-zones="{{ json_encode($zones) }}">
                         <div class="inv-zone-field">
-                            <label><i class="fas fa-warehouse"></i> Kho</label>
+                            <label><i class="fas fa-warehouse"></i> Kho/Phòng</label>
                             <select class="form-control inv-zone-select" data-level="warehouse">
-                                <option value="">Tất cả kho</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-door-open"></i> Phòng</label>
-                            <select class="form-control inv-zone-select" data-level="room">
-                                <option value="">Tất cả phòng</option>
+                                <option value="">Tất cả kho/phòng</option>
                             </select>
                         </div>
                         <div class="inv-zone-field">
                             <label><i class="fas fa-layer-group"></i> Kệ/Tủ</label>
                             <select class="form-control inv-zone-select" data-level="shelf">
                                 <option value="">Tất cả kệ/tủ</option>
+                            </select>
+                        </div>
+                        <div class="inv-zone-field">
+                            <label><i class="fas fa-grip-lines-vertical"></i> Cột</label>
+                            <select class="form-control inv-zone-select" data-level="column">
+                                <option value="">Tất cả cột</option>
+                            </select>
+                        </div>
+                        <div class="inv-zone-field">
+                            <label><i class="fas fa-bars"></i> Tầng</label>
+                            <select class="form-control inv-zone-select" data-level="tier">
+                                <option value="">Tất cả tầng</option>
                             </select>
                         </div>
                         <div class="inv-zone-field">
@@ -543,10 +544,11 @@
                             </thead>
                             <tbody>
                                 @foreach ($datas as $row)
-                                    {{-- 4 cấp định khu để JS lọc; mã chưa xếp vị trí thì cả 4 đều rỗng --}}
+                                    {{-- 5 cấp định khu để JS lọc; mã chưa xếp vị trí thì cả 5 đều rỗng --}}
                                     <tr data-classification="{{ $invCls($row->category_id) }}"
-                                        data-warehouse="{{ $row->warehouse_id }}" data-room="{{ $row->room_id }}"
-                                        data-shelf="{{ $row->shelf_id }}" data-location="{{ $row->location_id }}"
+                                        data-warehouse="{{ $row->warehouse_id }}" data-shelf="{{ $row->shelf_id }}"
+                                        data-column="{{ $row->column_id }}" data-tier="{{ $row->tier_id }}"
+                                        data-location="{{ $row->location_id }}"
                                         data-category="{{ $row->category_id }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td class="md-sub">
@@ -554,8 +556,8 @@
                                                 <div class="font-weight-bold">
                                                     <span class="md-tag">{{ $row->location_code }}</span>
                                                 </div>
-                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->room_name ?: '—' }} /
-                                                    {{ $row->shelf_name ?: '—' }}</div>
+                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
+                                                    {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
                                             @else
                                                 <span class="inv-zone-none">Chưa xếp vị trí</span>
                                             @endif
@@ -594,15 +596,6 @@
 
                 {{-- ============ HẠN DÙNG DƯỚI 6 THÁNG ============ --}}
                 <div class="inv-pane" id="invPaneExpiring">
-
-                    <div class="md-toolbar">
-                        <p class="hint">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                            Các mã xuất nhập <b>còn tồn</b> và hết hạn trong vòng <b>{{ $expiringSoonMonths }}
-                                tháng</b> tới, gần hết hạn nhất xếp trước. Hạn xét ở đây là <b>hạn áp dụng</b>: lấy
-                            hạn dùng nội bộ nếu đã xác định, chưa xác định thì lấy hạn nhà sản xuất.
-                        </p>
-                    </div>
 
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'invExpiringTable'])
 
@@ -687,15 +680,6 @@
 
                 {{-- ============ CHƯA XÁC ĐỊNH HẠN DÙNG NỘI BỘ ============ --}}
                 <div class="inv-pane" id="invPaneInternal">
-
-                    <div class="md-toolbar">
-                        <p class="hint inv-blocking">
-                            <i class="fas fa-ban mr-1"></i>
-                            Các mã xuất nhập dưới đây <b>chưa được sử dụng</b>: hoá chất có khai báo hạn dùng mặc định
-                            trong Danh Mục nhưng chưa xác định hạn dùng nội bộ. Màn hình Sử Dụng Hoá Chất không cho
-                            chọn những phiếu này cho tới khi bấm <b>Hạn nội bộ</b> để xác định.
-                        </p>
-                    </div>
 
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'invInternalTable'])
 

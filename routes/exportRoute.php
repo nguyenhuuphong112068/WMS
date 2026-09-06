@@ -31,6 +31,8 @@ Route::prefix('/export')
             // Tra lô theo mã xuất nhập khi quét mã vạch trên nhãn, trả JSON cho form xuất
             Route::get('lookup', 'lookup')->name('lookup');
             // Đề nghị chuyển hoá chất LIÊN PHÒNG BAN: A đề nghị -> B cấp phát (trừ tồn B) -> A nhận (tạo tồn A)
+            // Danh mục + tồn kho của phòng được đề nghị, trả JSON cho picker chọn nhiều hoá chất
+            Route::get('transferDepartmentStock', 'transferDepartmentStock')->name('transferDepartmentStock');
             Route::post('transferRequestStore', 'transferRequestStore')->name('transferRequestStore');
             Route::post('transferRequestUpdate', 'transferRequestUpdate')->name('transferRequestUpdate');
             Route::post('transferRequestSend', 'transferRequestSend')->name('transferRequestSend');
@@ -86,6 +88,8 @@ Route::prefix('/export')
             Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
 
             // Đề nghị cấp phát chuẩn LIÊN PHÒNG BAN: A đề nghị -> B cấp phát (trừ tồn B) -> A nhận (tạo tồn A)
+            // Danh mục + tồn kho của phòng được đề nghị, trả JSON cho picker chọn nhiều chất chuẩn
+            Route::get('transferDepartmentStock', 'transferDepartmentStock')->name('transferDepartmentStock');
             Route::post('transferRequestStore', 'transferRequestStore')->name('transferRequestStore');
             Route::post('transferRequestUpdate', 'transferRequestUpdate')->name('transferRequestUpdate');
             Route::post('transferRequestSend', 'transferRequestSend')->name('transferRequestSend');
@@ -98,8 +102,8 @@ Route::prefix('/export')
 
         /*
         | SỬ DỤNG VẬT TƯ - bắt buộc qua đề nghị được phê duyệt (Trưởng/Phó Phòng bắt
-        | buộc, Ban Giám Đốc tuỳ chọn) rồi kho cấp phát. Cấp phát trừ tồn ngay; Tổ chỉ
-        | chốt lại đã dùng bao nhiêu hoặc trả về kho (useStore).
+        | buộc, Ban Giám Đốc tuỳ chọn) rồi kho cấp phát. Cấp phát là xuất kho, trừ tồn
+        | ngay và tính luôn là vật tư đã đem sử dụng - không có bước chốt lại.
         | Loại bỏ (type = cancel) hàng hỏng thì lập thẳng, không cần đề nghị.
         */
         Route::prefix('/materialExport')->name('materialExport.')->controller(MaterialExportController::class)->group(function () {
@@ -120,11 +124,20 @@ Route::prefix('/export')
             Route::post('requestReject', 'requestReject')->name('requestReject');
             Route::post('requestDestroy', 'requestDestroy')->name('requestDestroy');
 
-            // Cấp phát của kho
+            // Cấp phát của kho (xuất kho = đem sử dụng)
             Route::post('issueStore', 'issueStore')->name('issueStore');
             Route::post('issueReject', 'issueReject')->name('issueReject');
 
-            // Tổ chốt dòng đã cấp phát: ghi nhận sử dụng hoặc trả về kho
-            Route::post('useStore', 'useStore')->name('useStore');
+            // Đề nghị chuyển vật tư LIÊN PHÒNG BAN: A đề nghị -> B cấp phát (trừ tồn B) -> A nhận (tạo tồn A)
+            // Danh mục + tồn kho của phòng được đề nghị, trả JSON cho picker chọn nhiều vật tư
+            Route::get('transferDepartmentStock', 'transferDepartmentStock')->name('transferDepartmentStock');
+            Route::post('transferRequestStore', 'transferRequestStore')->name('transferRequestStore');
+            Route::post('transferRequestUpdate', 'transferRequestUpdate')->name('transferRequestUpdate');
+            Route::post('transferRequestSend', 'transferRequestSend')->name('transferRequestSend');
+            Route::post('transferRequestDestroy', 'transferRequestDestroy')->name('transferRequestDestroy');
+            Route::post('transferIssueStore', 'transferIssueStore')->name('transferIssueStore');
+            Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
+            Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
+            Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
         });
     });

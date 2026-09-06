@@ -13,6 +13,20 @@
                         <i class="fas fa-file-signature mr-1"></i> Đề nghị cấp phát vật tư
                         <span class="exp-tab-count">{{ $requestLists->count() }}</span>
                     </button>
+                    <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}" data-pane="mePaneTransfer">
+                        <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
+                        @php
+                            // Cần cấp phát (mình là B) + đã cấp, chờ mình xác nhận Nhận (mình là A)
+                            $mtPending = $transferReceived->whereIn('status', ['pending', 'partial'])->count();
+                            $mtAwaitingReceipt = $transferSent->pluck('id')
+                                ->flatMap(fn($id) => $transferItems[$id] ?? collect())
+                                ->where('status', 'issued')->count();
+                            $mtBadgeCount = $mtPending + $mtAwaitingReceipt;
+                        @endphp
+                        @if ($mtBadgeCount)
+                            <span class="exp-tab-count">{{ $mtBadgeCount }}</span>
+                        @endif
+                    </button>
                 </div>
 
                 {{-- ============ SỔ SỬ DỤNG ============ --}}
@@ -23,11 +37,6 @@
                                 <i class="fas fa-trash-alt mr-1"></i> Loại bỏ vật tư hỏng / hết hạn
                             </button>
                         @endperm
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Muốn <b>sử dụng</b> vật tư phải lập <b>đề nghị cấp phát</b> ở tab bên cạnh và chờ duyệt.
-                            Ở đây chỉ lập phiếu <b>loại bỏ</b> hàng hỏng / hết hạn (không cần đề nghị).
-                        </p>
                     </div>
 
                     <div class="table-responsive">
@@ -37,7 +46,6 @@
                                     <th class="text-center" style="width:45px">STT</th>
                                     <th style="width:150px">Mã Xuất Nhập</th>
                                     <th>Vật Tư</th>
-                                    <th style="width:110px">Tổ</th>
                                     <th class="text-right" style="width:100px">Số Lượng</th>
                                     <th class="text-center" style="width:90px">Loại</th>
                                     <th class="text-center" style="width:120px">Thời Gian</th>
@@ -56,14 +64,18 @@
                                             <div class="font-weight-bold">{{ $row->material_name ?: '—' }}</div>
                                             <div class="md-sub small text-muted">{{ $row->technical_specification }}</div>
                                         </td>
-                                        <td class="md-sub">{{ $row->group_name ?: '—' }}</td>
                                         <td class="text-right">
                                             {{ $expNum($row->amount) }} <span class="md-sub">{{ $row->unit_short_name }}</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge badge-{{ $row->type === 'cancel' ? 'danger' : 'success' }}">
-                                                {{ \App\Http\Controllers\Pages\Export\MaterialExportController::TYPES[$row->type] ?? $row->type }}
-                                            </span>
+                                            @if ($row->type === 'transfer_out')
+                                                {{-- Phiếu do tab "Đề nghị chuyển liên phòng ban" sinh ra: hàng sang phòng khác, không phải hàng đã dùng --}}
+                                                <span class="badge badge-primary">Chuyển đi</span>
+                                            @else
+                                                <span class="badge badge-{{ $row->type === 'cancel' ? 'danger' : 'success' }}">
+                                                    {{ \App\Http\Controllers\Pages\Export\MaterialExportController::TYPES[$row->type] ?? $row->type }}
+                                                </span>
+                                            @endif
                                             @unless ($row->status_id) <div><span class="badge badge-secondary mt-1">Đã khoá</span></div> @endunless
                                         </td>
                                         <td class="text-center md-sub" data-order="{{ $row->created_at }}">{{ $expDateTime($row->created_at) }}</td>
@@ -74,12 +86,18 @@
                                         <td class="md-sub">
                                             @if ($row->type === 'cancel')
                                                 <span class="text-danger">{{ $row->reason ?: '—' }}</span>
+                                            @elseif ($row->type === 'transfer_out')
+                                                <span class="text-primary">Cấp phát liên phòng ban đến {{ $row->to_department_name ?: '—' }}</span>
                                             @else
                                                 {{ $row->purpose ?: '—' }}
                                             @endif
                                         </td>
                                         <td class="md-sub">{{ $row->used_by ?: '—' }}</td>
                                         <td class="text-center">
+                                            @if ($row->type === 'transfer_out')
+                                                {{-- Phiếu cấp phát liên phòng ban chỉ đổi được qua thao tác Nhận / Từ chối nhận của phòng nhận --}}
+                                                <span class="md-sub text-muted">—</span>
+                                            @else
                                             <div class="md-actions">
                                                 <span class="exp-btn-wrap">
                                                     @perm('export_material_issue')
@@ -94,7 +112,6 @@
                                                                 'reason' => $row->reason,
                                                                 'material_name' => $row->material_name,
                                                                 'technical_specification' => $row->technical_specification,
-                                                                'group_name' => $row->group_name,
                                                                 'purpose' => $row->purpose,
                                                                 'unit_short_name' => $row->unit_short_name,
                                                                 'used_by' => $row->used_by,
@@ -124,6 +141,7 @@
                                                     </form>
                                                 @endperm
                                             </div>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -137,6 +155,9 @@
                     @include('pages.export.MaterialExport.requestPane')
                 </div>
 
+                {{-- ============ ĐỀ NGHỊ CHUYỂN LIÊN PHÒNG BAN ============ --}}
+                @include('pages.export.MaterialExport.transferPane')
+
             </div>
         </div>
     </div>
@@ -144,7 +165,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([6, 'desc']).draw();
+        if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([5, 'desc']).draw();
 
         // Điền form loại bỏ / điều chỉnh
         $(document).on('click', '.btn-md-create', function () {

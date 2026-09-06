@@ -37,7 +37,7 @@
 
     /** Đường dẫn định khu đầy đủ của một dòng, trống thì trả về null */
     $dcPath = fn($row) => $row->location_code
-        ? ($row->warehouse_name ?: '—') . ' / ' . ($row->room_name ?: '—') . ' / ' . ($row->shelf_name ?: '—')
+        ? ($row->warehouse_name ?: '—') . ' / ' . ($row->shelf_name ?: '—') . ' / ' . ($row->column_name ?: '—') . ' / ' . ($row->tier_name ?: '—')
         : null;
 
     /*
@@ -70,14 +70,6 @@
                     </a>
                 </li>
             </ul>
-
-            <p class="cat-tabs-note">
-                <i class="fas fa-info-circle mr-1"></i>
-                <b>{{ $mdTitle }}</b> khai bản chất của chất và dùng chung toàn công ty.
-                <b>{{ $dcTitle }}</b> chỉ khai phần riêng của
-                <b>{{ session('user')['selected_department'] ?? 'phòng ban đang chọn' }}</b>:
-                đơn vị tính, hạn dùng nội bộ, ngưỡng tồn, vị trí quy hoạch.
-            </p>
 
             <div class="tab-content">
                 <div class="tab-pane fade {{ $activeTab === 'company' ? 'show active' : '' }}" id="tabCompany"

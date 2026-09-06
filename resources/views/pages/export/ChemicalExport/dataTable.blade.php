@@ -63,11 +63,6 @@
                                 <i class="fas fa-plus mr-1"></i> Sử dụng hoá chất
                             </button>
                         @endperm
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            Đang hiệu lực {{ $datas->where('status_id', 1)->count() }}/{{ $datas->count() }} phiếu.
-                            Chỉ phiếu hiệu lực mới trừ tồn của phiếu nhập.
-                        </p>
                     </div>
 
                     @include('pages.shared.barcodeSearch', [
@@ -271,12 +266,6 @@
                                 data-to="{{ now()->format('Y-m-d') }}">Năm nay</button>
                         </div>
                     </form>
-
-                    <div class="md-toolbar">
-                        <p class="hint">
-
-                        </p>
-                    </div>
 
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'expReportTable'])
 

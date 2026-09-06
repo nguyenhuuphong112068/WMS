@@ -1,6 +1,6 @@
 {{--
-| KHỐI "QUY ĐỔI ĐƠN VỊ" - dùng chung cho 4 modal khai báo của phòng
-| (Hoá Chất Của Phòng và Chất Chuẩn Của Phòng, cả Thêm mới lẫn Cập nhật).
+| KHỐI "QUY ĐỔI ĐƠN VỊ" - dùng chung cho 6 modal khai báo của phòng
+| (Hoá Chất, Chất Chuẩn và Vật Tư Của Phòng, cả Thêm mới lẫn Cập nhật).
 |
 | Đơn vị tính là của riêng từng phòng, nên cùng một mã có thể đang được phòng khác dùng
 | bằng đơn vị khác. Khi đó phải khai hệ số quy đổi, nếu không lúc CHUYỂN KHO hệ thống
@@ -9,11 +9,12 @@
 | Hệ số đọc theo chiều: 1 <đơn vị phòng đang khai> = <hệ số> <đơn vị phòng kia>.
 |
 | Biến vào:
-| - $prefix     : 'ds' (chất chuẩn) hoặc 'dc' (hoá chất), để không đụng modal của tab kia
+| - $prefix     : 'ds' (chất chuẩn), 'dc' (hoá chất) hoặc 'dm' (vật tư), để không đụng
+|                 modal của tab kia
 | - $bag        : error bag của chính form đang dựng
 | - $unitsInUse : [category_id => [đơn vị phòng khác đang dùng]]
 | - $conversions: [category_id => ['<from>-<to>' => hệ số đã khai]]
-| - $label      : 'chất chuẩn' hoặc 'hoá chất', chỉ dùng trong câu chữ
+| - $label      : 'chất chuẩn', 'hoá chất' hoặc 'vật tư', chỉ dùng trong câu chữ
 --}}
 
 <div class="cuc-box" data-prefix="{{ $prefix }}" data-units-in-use="{{ json_encode($unitsInUse) }}"
@@ -154,7 +155,7 @@
         }
 
         /* Đổi mã (modal Thêm mới) hoặc đổi đơn vị -> tính lại các ô cần khai */
-        $(document).on('change', '.ds-category, .dc-category', function() {
+        $(document).on('change', '.ds-category, .dc-category, .dm-category', function() {
             var $form = $(this).closest('form');
             var $box = $form.find('.cuc-box');
 
@@ -162,12 +163,12 @@
             cucRefresh($box);
         });
 
-        $(document).on('change', '.ds-unit, .dc-unit', function() {
+        $(document).on('change', '.ds-unit, .dc-unit, .dm-unit', function() {
             cucRefresh($(this).closest('form').find('.cuc-box'));
         });
 
         /* Modal Cập nhật: mã nằm ở dòng đang sửa chứ không có ô chọn */
-        $(document).on('click', '.btn-md-edit[data-modal="#dsUpdateModal"], .btn-md-edit[data-modal="#dcUpdateModal"]',
+        $(document).on('click', '.btn-md-edit[data-modal="#dsUpdateModal"], .btn-md-edit[data-modal="#dcUpdateModal"], .btn-md-edit[data-modal="#dmUpdateModal"]',
             function() {
                 var row = $(this).data('row') || {};
                 var $box = $($(this).data('modal')).find('.cuc-box');
@@ -184,7 +185,7 @@
         $('.cuc-box').each(function() {
             var $box = $(this);
             var $form = $box.closest('form');
-            var $category = $form.find('.ds-category, .dc-category');
+            var $category = $form.find('.ds-category, .dc-category, .dm-category');
 
             if ($category.length) {
                 $box.find('.cuc-category').val($category.val());

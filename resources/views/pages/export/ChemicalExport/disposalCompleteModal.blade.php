@@ -30,8 +30,8 @@
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label>Tổng Khối Lượng Phế Phẩm Rắn (kg)</label>
-                            <input type="number" name="solid_weight" step="0.0001" min="0"
-                                class="form-control {{ $dspDoneBag->has('solid_weight') ? 'is-invalid' : '' }}"
+                            <input type="text" inputmode="decimal" name="solid_weight" min="0"
+                                class="form-control js-decimal {{ $dspDoneBag->has('solid_weight') ? 'is-invalid' : '' }}"
                                 value="{{ old('solid_weight') }}">
                             @if ($dspDoneBag->has('solid_weight'))
                                 <span class="md-error">{{ $dspDoneBag->first('solid_weight') }}</span>
@@ -40,8 +40,8 @@
 
                         <div class="form-group col-md-6">
                             <label>Tổng Khối Lượng Phế Phẩm Lỏng (kg)</label>
-                            <input type="number" name="liquid_weight" step="0.0001" min="0"
-                                class="form-control {{ $dspDoneBag->has('liquid_weight') ? 'is-invalid' : '' }}"
+                            <input type="text" inputmode="decimal" name="liquid_weight" min="0"
+                                class="form-control js-decimal {{ $dspDoneBag->has('liquid_weight') ? 'is-invalid' : '' }}"
                                 value="{{ old('liquid_weight') }}">
                             @if ($dspDoneBag->has('liquid_weight'))
                                 <span class="md-error">{{ $dspDoneBag->first('liquid_weight') }}</span>

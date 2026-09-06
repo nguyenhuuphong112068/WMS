@@ -200,9 +200,11 @@ class MasterDataApprovalSmokeTest extends TestCase
                 $this->assertNotNull($row->approved_at, "[$key] Thiếu thời điểm duyệt.");
 
                 // UPDATE -> phải quay lại chờ duyệt và xoá dấu vết duyệt cũ
+                // Từ nay mọi thao tác điều chỉnh dữ liệu gốc bắt buộc nhập lý do.
                 $updated = array_merge($payload, [
                     'id' => $row->id,
                     'name' => $payload['name'] . ' Sua',
+                    'change_reason' => 'Kiểm thử cập nhật',
                 ]);
 
                 $this->withSession($session)
@@ -222,16 +224,22 @@ class MasterDataApprovalSmokeTest extends TestCase
                     ->assertSessionHas('success');
                 $this->assertEquals('rejected', DB::table($table)->where('id', $row->id)->value('app_status'));
 
-                // KHOÁ / MỞ KHOÁ
+                // KHOÁ / MỞ KHOÁ -> bắt buộc kèm lý do điều chỉnh
                 $this->withSession($session)
-                    ->post($screen['url'] . '/deActive', ['id' => $row->id])
+                    ->post($screen['url'] . '/deActive', ['id' => $row->id, 'change_reason' => 'Kiểm thử khoá'])
                     ->assertSessionHas('success');
                 $this->assertEquals(0, DB::table($table)->where('id', $row->id)->value('status_id'));
 
                 $this->withSession($session)
-                    ->post($screen['url'] . '/deActive', ['id' => $row->id])
+                    ->post($screen['url'] . '/deActive', ['id' => $row->id, 'change_reason' => 'Kiểm thử mở khoá'])
                     ->assertSessionHas('success');
                 $this->assertEquals(1, DB::table($table)->where('id', $row->id)->value('status_id'));
+
+                // Thiếu lý do -> bị chặn
+                $this->withSession($session)
+                    ->post($screen['url'] . '/deActive', ['id' => $row->id])
+                    ->assertSessionHas('error');
+                $this->assertEquals(1, DB::table($table)->where('id', $row->id)->value('status_id'), "[$key] Khoá không có lý do vẫn phải bị chặn.");
 
                 // Thao tác trên id không tồn tại -> báo lỗi, không vỡ trang
                 $this->withSession($session)

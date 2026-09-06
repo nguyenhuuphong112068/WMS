@@ -26,7 +26,7 @@
                                 <th class="text-center" style="width:45px">STT</th>
                                 <th style="width:140px">Mã Xuất Nhập</th>
                                 <th>Vật Tư</th>
-                                <th style="width:100px">Vị Trí</th>
+                                <th style="width:100px">Định Khu</th>
                                 <th class="text-right" style="width:110px">Tồn Sổ Sách</th>
                                 <th class="text-right" style="width:105px">Thực Tế</th>
                                 <th class="text-right" style="width:105px">Chênh Lệch</th>
