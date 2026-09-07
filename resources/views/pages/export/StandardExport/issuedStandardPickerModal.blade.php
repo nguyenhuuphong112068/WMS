@@ -98,7 +98,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 expired: $btn.data('expired'),
                 return_standard: $btn.data('return-standard'),
                 product_name: $btn.data('product') || '',
-                testing: $btn.data('testing') || ''
+                testing: $btn.data('testing') || '',
+                weight_controlled: $btn.data('weight-controlled'),
+                is_first_use: $btn.data('first-use')
             });
         }
 

@@ -102,6 +102,13 @@
                                                 title="{{ $classificationLabels[$code] ?? $code }}">{{ $code }}</span>
                                         @endforeach
                                     </div>
+                                    @if (\App\Support\ChemicalClassification::isSpecialControl($codes))
+                                        <div class="mt-1">
+                                            <span class="badge-special-control" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                            </span>
+                                        </div>
+                                    @endif
                                 @else
                                     <span class="md-empty" title="Suy từ Tên Hoạt Chất / Tên Hoá Chất - chưa thuộc nhóm nào của NĐ 24/2026">—</span>
                                 @endif

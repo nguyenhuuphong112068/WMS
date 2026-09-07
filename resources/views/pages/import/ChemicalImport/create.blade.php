@@ -1,7 +1,7 @@
 @php $bag = $errors->getBag('createErrors'); @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg" role="document">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg" role="document" style="max-width: 1050px;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="{{ $impIcon }}"></i> Nhập Hoá Chất</h5>
@@ -45,9 +45,12 @@
                     <div class="form-row">
                         <div class="form-group col-md-3">
                             <label>Số Lượng <span class="text-danger">*</span></label>
-                            <input type="text" inputmode="decimal" name="amount" min="0.0001"
-                                class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
-                                value="{{ old('amount') }}" placeholder="Ví dụ: 25.5" required>
+                            <div class="input-group">
+                                <input type="text" inputmode="decimal" name="amount" min="0.0001"
+                                    class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
+                                    value="{{ old('amount') }}" placeholder="Ví dụ: 25.5" required>
+                                <div class="input-group-append"><span class="input-group-text chem-unit">—</span></div>
+                            </div>
                             @if ($bag->has('amount'))
                                 <span class="md-error">{{ $bag->first('amount') }}</span>
                             @endif
@@ -231,6 +234,8 @@
             var item = chemDefaults[$sel.val()] || null;
             var $form = $sel.closest('form');
 
+            $form.find('.chem-unit').text(item && item.unit ? item.unit : '—');
+
             if (item && item.info_html) {
                 $form.find('.chem-info-box').html(item.info_html);
                 $form.find('.chem-info-box-wrap').slideDown('fast');
@@ -297,10 +302,18 @@
                                     <td>{{ $category->density !== null ? $category->density : '—' }}</td>
                                     <td>{{ $category->storage_condition_name ?: '—' }}</td>
                                     <td>
-                                        @foreach(($classificationCodes ?? [])[$category->id] ?? [] as $c)
+                                        @php $catCls = ($classificationCodes ?? [])[$category->id] ?? []; @endphp
+                                        @foreach($catCls as $c)
                                             <span class="badge badge-secondary"
                                                 title="{{ ($classificationLabels ?? [])[$c] ?? $c }}">{{ $c }}</span>
                                         @endforeach
+                                        @if (\App\Support\ChemicalClassification::isSpecialControl($catCls))
+                                            <div class="mt-1">
+                                                <span class="badge-special-control" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                    <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                </span>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td>{{ $category->unit_short_name }}</td>
                                     <td class="text-center">

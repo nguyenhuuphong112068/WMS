@@ -15,6 +15,12 @@
     // Bước 2 của nghiệp vụ huỷ bỏ: gom phiếu loại bỏ thành đợt xin quyết định huỷ
     $dspRoute = 'pages.export.chemicalDisposal.';
 
+    /**
+     * Hoá chất thuộc Nhóm HC Cấm (Luật Đầu tư 2025, số 143/2025/QH15) - bắt buộc khai
+     * Người Kiểm Tra trên phiếu sử dụng, hoá chất thường thì không.
+     */
+    $expBanned = fn($categoryId) => in_array('N11', $classificationCodes[$categoryId] ?? [], true);
+
     // Dữ liệu phiếu nhập cho JS: mã xuất nhập + tồn còn lại + hạn mức xuất theo từng import_id
     $expImportMap = $imports
         ->mapWithKeys(
@@ -23,6 +29,8 @@
                     'code' => $import->code,
                     'remaining' => (float) $import->remaining,
                     'unit' => $import->unit_short_name ?: '',
+                    // JS bật/tắt bắt buộc ô Người Kiểm Tra theo cờ này
+                    'banned' => $expBanned($import->category_id),
                 ],
             ],
         )
@@ -44,6 +52,10 @@
     $expCls = function ($categoryId) use ($classificationCodes) {
         return implode(',', $classificationCodes[$categoryId] ?? []);
     };
+
+    /** Hoá chất thuộc nhóm 3..8 (Phụ lục III - kiểm soát đặc biệt). */
+    $expIsSpecial = fn($categoryId) => \App\Support\ChemicalClassification::isSpecialControl($classificationCodes[$categoryId] ?? []);
+
 
     // Số liệu tổng của tab báo cáo
     $expReportTimes = $report->sum('times');

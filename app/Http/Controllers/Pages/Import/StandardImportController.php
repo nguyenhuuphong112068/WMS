@@ -7,6 +7,7 @@ use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
 use App\Support\Barcode128;
 use App\Support\DepartmentStandard;
+use App\Support\ListRange;
 use App\Support\StandardCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +71,12 @@ class StandardImportController extends Controller
     {
         $departmentId = $this->departmentId();
 
+        // Sổ nhập chỉ lấy đúng một trang trong khoảng ngày đang lọc (mặc định 30 ngày
+        // gần nhất), không nạp toàn bộ phiếu nhập của phòng như trước.
+        $bookRange = ListRange::of($request, 'book_');
+        $bookKeyword = ListRange::keyword($request, 'book_');
+        $bookPerPage = ListRange::perPage($request, 'book_');
+
         $datas = DB::table(self::TABLE)
             ->leftJoin('standard_categories', self::TABLE . '.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
@@ -103,9 +110,21 @@ class StandardImportController extends Controller
                 'tiers.name as tier_name'
             )
             ->where(self::TABLE . '.department_id', $departmentId)
+            ->tap(ListRange::dateFilter(self::TABLE . '.imported_date', $bookRange))
+            ->tap(ListRange::search([
+                self::TABLE . '.code',
+                self::TABLE . '.batch_no',
+                self::TABLE . '.coa_no',
+                self::TABLE . '.invoice_number',
+                'standard_categories.code',
+                'standard_names.name',
+                'suppliers.name',
+                'locations.code',
+            ], $bookKeyword))
             ->orderBy(self::TABLE . '.imported_date', 'desc')
             ->orderBy(self::TABLE . '.id', 'desc')
-            ->get();
+            ->paginate($bookPerPage, ['*'], ListRange::pageName('book_'))
+            ->withQueryString();
 
         session()->put(['title' => 'NHẬP - NHẬP CHẤT CHUẨN']);
 
@@ -163,6 +182,9 @@ class StandardImportController extends Controller
             'codePreviews' => StandardCode::previews($departmentId, $this->departmentShortName(), now()->format('Y-m-d')),
             'historyCounts' => $this->historyCounts($departmentId),
             'activeTab' => 'book',
+            'bookRange' => $bookRange,
+            'bookKeyword' => $bookKeyword,
+            'bookPerPage' => $bookPerPage,
         ]);
     }
 

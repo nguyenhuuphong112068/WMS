@@ -136,6 +136,7 @@
     @include('pages.inventory.StandardInventory.balancingHistory')
     @include('pages.inventory.StandardInventory.internalExpiry')
     @include('pages.inventory.StandardInventory.weightRemarkModal')
+    @include('pages.inventory.StandardInventory.tareWeightModal')
     @include('pages.inventory.StandardInventory.expiryUpdate')
     @include('pages.shared.attachmentListModal')
 @endsection

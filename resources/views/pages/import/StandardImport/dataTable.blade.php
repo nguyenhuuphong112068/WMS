@@ -53,6 +53,17 @@
                         @endperm
                     </div>
 
+                    @include('pages.shared.rangeFilter', [
+                        'rfRoute' => $impRoute . 'list',
+                        'rfTab' => 'book',
+                        'rfPrefix' => 'book_',
+                        'rfRange' => $bookRange,
+                        'rfPerPage' => $bookPerPage,
+                        'rfKeyword' => $bookKeyword,
+                        'rfDateLabel' => 'Ngày nhập',
+                        'rfPlaceholder' => 'Mã ống chuẩn, tên chất chuẩn, số lô, CoA, NCC...',
+                    ])
+
                     @include('pages.shared.barcodeSearch', [
                         'scanTitle' => 'Quét mã vạch',
                         'scanTables' => [
@@ -68,7 +79,7 @@
                     @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'mdTable'])
 
                     <div class="table-responsive">
-                        <table id="mdTable" class="table table-bordered table-hover w-100">
+                        <table id="mdTable" class="table table-bordered table-hover w-100" data-server-paged>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 45px">STT</th>
@@ -112,7 +123,7 @@
                                     @endphp
                                     {{-- data-groups để bộ lọc Phân nhóm chuẩn nhận ra dòng này --}}
                                     <tr data-groups="{{ $impGroups($row->groups) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td class="text-center">{{ $datas->firstItem() + $loop->index }}</td>
                                         <td>
                                             <div class="imp-code font-weight-bold">{{ $row->code }}</div>
                                             <div class="mt-1">
@@ -296,15 +307,15 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @include('pages.shared.paginator', [
+                        'pgItems' => $datas,
+                        'pgTab' => 'book',
+                        'pgUnit' => 'phiếu nhập',
+                    ])
                 </div>
 
             </div>
         </div>
     </div>
 </div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        $('#mdTable').DataTable().order([8, 'desc']).draw();
-    });
-</script>

@@ -191,6 +191,24 @@
                             @endif
                         </div>
 
+                        {{-- 1b. Khối Lượng Bì + Chuẩn - chỉ ống kiểm soát khối lượng, lần dùng đầu tiên --}}
+                        <div class="form-group col-md-3 d-none" id="col_gross_weight">
+                            <label class="required font-weight-bold text-primary">
+                                <i class="fas fa-balance-scale mr-1"></i> Khối Lượng Bì + Chuẩn
+                            </label>
+                            <div class="input-group">
+                                <input type="text" inputmode="decimal" name="gross_weight_before" id="create_gross_weight"
+                                    class="form-control js-decimal {{ $bag->has('gross_weight_before') ? 'is-invalid' : '' }}"
+                                    value="{{ old('gross_weight_before') }}" placeholder="Cân trước khi dùng">
+                                <div class="input-group-append">
+                                    <span class="input-group-text exp-unit-name bg-light">---</span>
+                                </div>
+                            </div>
+                            @if ($bag->has('gross_weight_before'))
+                                <span class="md-error d-block">{{ $bag->first('gross_weight_before') }}</span>
+                            @endif
+                        </div>
+
                         {{-- 2. Tên Sản Phẩm --}}
                         <div class="form-group col-md-3 exp-usage-col">
                             <label>Tên Sản Phẩm</label>
@@ -318,7 +336,11 @@
             $('#create_import_id')
                 .data('requested-amount', data.requested_amount !== undefined ? data.requested_amount : '')
                 .data('remaining', data.remaining !== undefined ? data.remaining : 0)
-                .data('unit', data.unit || '');
+                .data('unit', data.unit || '')
+                .data('weight-controlled', data.weight_controlled == 1 ? 1 : 0)
+                .data('first-use', data.is_first_use == 1 ? 1 : 0);
+
+            toggleGrossWeight();
             
             $('#display_std_title').text(data.std_name ? data.std_name.toUpperCase() : '—');
             $('#display_import_code').text(data.import_code || '—');
@@ -394,6 +416,27 @@
             $('#createModal form').data('swal-confirmed', false);
         };
 
+        /*
+        | Ống chuẩn có kiểm soát khối lượng, ở lần SỬ DỤNG đầu tiên phải cân và ghi lại
+        | khối lượng "Bì + Chuẩn". Phiếu loại bỏ không phải là một lần sử dụng nên không hỏi.
+        */
+        function toggleGrossWeight() {
+            var $col = $('#col_gross_weight');
+            var wasVisible = !$col.hasClass('d-none');
+            var type = $('.radio-exp-type:checked').val();
+            var need = type === 'export'
+                && $('#create_import_id').data('weight-controlled') == 1
+                && $('#create_import_id').data('first-use') == 1;
+
+            $col.toggleClass('d-none', !need);
+            $('#create_gross_weight').prop('required', need);
+
+            // Chỉ xoá số đã nhập khi ô đang hiện rồi bị ẩn đi, tránh mất giá trị nhập lại sau lỗi
+            if (!need && wasVisible) {
+                $('#create_gross_weight').val('');
+            }
+        }
+
         // Toggle buttons and fields based on type
         $('.radio-exp-type').on('change', function() {
             let type = $(this).val();
@@ -413,6 +456,8 @@
                 $('.exp-usage-col').removeClass('d-none');
                 $('.exp-cancel-col').addClass('d-none');
             }
+
+            toggleGrossWeight();
         });
         $('.radio-exp-type:checked').trigger('change');
 
@@ -576,6 +621,8 @@
                                 data-attachments='${JSON.stringify(item.attachments || [])}'
                                 data-expiry-type="${item.expiry_type || ''}"
                                 data-return-standard="${item.return_standard == 1 || item.return_standard === true ? 1 : 0}"
+                                data-weight-controlled="${item.weight_controlled == 1 ? 1 : 0}"
+                                data-first-use="${item.is_first_use ? 1 : 0}"
                                 data-expired="${item.import_expired_date ? item.import_expired_date.substring(0,10) : ''}">
                                 Chọn
                             </button>
@@ -623,7 +670,9 @@
                         expired: item.import_expired_date ? item.import_expired_date.substring(0,10) : '',
                         return_standard: item.return_standard,
                         product_name: item.product_name || '',
-                        testing: criteria
+                        testing: criteria,
+                        weight_controlled: item.weight_controlled,
+                        is_first_use: item.is_first_use
                     });
                 }
             });

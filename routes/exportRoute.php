@@ -101,8 +101,9 @@ Route::prefix('/export')
         });
 
         /*
-        | SỬ DỤNG VẬT TƯ - bắt buộc qua đề nghị được phê duyệt (Trưởng/Phó Phòng bắt
-        | buộc, Ban Giám Đốc tuỳ chọn) rồi kho cấp phát. Cấp phát là xuất kho, trừ tồn
+        | SỬ DỤNG VẬT TƯ - bắt buộc qua đề nghị được phê duyệt rồi kho cấp phát. Số bước
+        | ký và người ký từng bước do người lập phiếu tự khai (0 bước = duyệt thẳng đến
+        | người cấp phát). Cấp phát là xuất kho, trừ tồn
         | ngay và tính luôn là vật tư đã đem sử dụng - không có bước chốt lại.
         | Loại bỏ (type = cancel) hàng hỏng thì lập thẳng, không cần đề nghị.
         */
@@ -119,8 +120,7 @@ Route::prefix('/export')
             Route::post('requestStore', 'requestStore')->name('requestStore');
             Route::post('requestUpdate', 'requestUpdate')->name('requestUpdate');
             Route::post('requestSubmit', 'requestSubmit')->name('requestSubmit');
-            Route::post('requestSignManager', 'requestSignManager')->name('requestSignManager');
-            Route::post('requestSignDirector', 'requestSignDirector')->name('requestSignDirector');
+            Route::post('requestSign', 'requestSign')->name('requestSign');
             Route::post('requestReject', 'requestReject')->name('requestReject');
             Route::post('requestDestroy', 'requestDestroy')->name('requestDestroy');
 

@@ -262,8 +262,8 @@
                         <select id="chemAiPickerGroup" class="custom-select custom-select-sm chem-aip-group">
                             <option value="">Tất cả phân loại NĐ 24/2026</option>
                             @foreach ($pickerGroups as $g)
-                                <option value="{{ $g }}" title="{{ $groupLabels[$g] ?? ('Nhóm ' . $g) }}">
-                                    Nhóm {{ $g }}
+                                <option value="{{ $g }}" title="{{ $groupLabels[$g] ?? \App\Support\ChemicalClassification::shortLabel($g) }}">
+                                    {{ \App\Support\ChemicalClassification::shortLabel($g) }}
                                 </option>
                             @endforeach
                         </select>
@@ -298,7 +298,7 @@
                                         $aiGroups = $ai->groups ?? [];
                                         $search = trim($ai->name . ' ' . $ai->cas_no . ' ' . $ai->chemical_formula
                                             . ' ' . $fxPlain($ai->chemical_formula)
-                                            . ' ' . collect($aiGroups)->map(fn ($g) => 'Nhóm ' . $g)->implode(' '));
+                                            . ' ' . collect($aiGroups)->map(fn ($g) => \App\Support\ChemicalClassification::shortLabel($g))->implode(' '));
                                     @endphp
                                     <tr class="chem-ai-pick-row" data-id="{{ $ai->id }}" data-name="{{ $ai->name }}"
                                         data-groups="{{ implode(',', $aiGroups) }}" data-search="{{ $search }}">
@@ -329,7 +329,7 @@
                                         <td class="align-middle" data-groups="{{ implode(',', $aiGroups) }}">
                                             @forelse ($aiGroups as $g)
                                                 <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }} mr-1 mb-1"
-                                                    title="{{ $groupLabels[$g] ?? ('Nhóm ' . $g) }}">Nhóm {{ $g }}</span>
+                                                    title="{{ $groupLabels[$g] ?? \App\Support\ChemicalClassification::shortLabel($g) }}">{{ \App\Support\ChemicalClassification::shortLabel($g) }}</span>
                                             @empty
                                                 <span class="md-empty">Không thuộc</span>
                                             @endforelse

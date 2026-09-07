@@ -32,15 +32,21 @@
                 <i class="fas fa-plus mr-1"></i> Tạo đề nghị chuyển liên phòng ban
             </button>
         @endperm
-        <p class="hint">
-            <i class="fas fa-info-circle mr-1"></i>
-            Đề nghị và cấp phát hoá chất <b>giữa các phòng ban</b>. Cấp phát trừ tồn phòng gửi ngay, phòng
-            nhận tự chọn vị trí lưu và xác nhận Nhận thì mới thật sự có tồn.
-        </p>
     </div>
 
     <h6 class="font-weight-bold text-primary mt-3 mb-2"><i class="fas fa-paper-plane mr-1"></i> Đề nghị phòng mình đã gửi đi</h6>
-    <div class="table-responsive mb-4">
+
+    @include('pages.shared.rangeFilter', [
+        'rfRoute' => $expRoute . 'list',
+        'rfTab' => 'request',
+        'rfPrefix' => 'tsent_',
+        'rfRange' => $transferSentRange,
+        'rfPerPage' => $transferSentPerPage,
+        'rfSearch' => false,
+        'rfDateLabel' => 'Ngày lập',
+    ])
+
+    <div class="table-responsive">
         <table id="chemTransferSentTable" class="table table-bordered table-hover w-100 exp-req-table">
             <thead>
                 <tr class="text-center">
@@ -61,7 +67,7 @@
                         $awaitingReceiptCount = $items->where('status', 'issued')->count();
                     @endphp
                     <tr>
-                        <td class="text-center align-middle">{{ $loop->iteration }}</td>
+                        <td class="text-center align-middle">{{ $transferSent->firstItem() + $loop->index }}</td>
                         <td class="align-middle">
                             <span class="exp-code font-weight-bold">{{ $req->code }}</span>
                             @if ($req->note)
@@ -126,7 +132,26 @@
         </table>
     </div>
 
+    @include('pages.shared.paginator', [
+        'pgItems' => $transferSent,
+        'pgTab' => 'request',
+        'pgUnit' => 'đề nghị',
+    ])
+
+    <div class="mb-4"></div>
+
     <h6 class="font-weight-bold text-success mb-2"><i class="fas fa-inbox mr-1"></i> Đề nghị phòng ban khác gửi đến - cần cấp phát</h6>
+
+    @include('pages.shared.rangeFilter', [
+        'rfRoute' => $expRoute . 'list',
+        'rfTab' => 'request',
+        'rfPrefix' => 'trecv_',
+        'rfRange' => $transferReceivedRange,
+        'rfPerPage' => $transferReceivedPerPage,
+        'rfSearch' => false,
+        'rfDateLabel' => 'Ngày lập',
+    ])
+
     <div class="table-responsive">
         <table id="chemTransferReceivedTable" class="table table-bordered table-hover w-100 exp-req-table">
             <thead>
@@ -145,7 +170,7 @@
                 @forelse ($transferReceived as $req)
                     @php $items = $transferItems[$req->id] ?? collect(); @endphp
                     <tr>
-                        <td class="text-center align-middle">{{ $loop->iteration }}</td>
+                        <td class="text-center align-middle">{{ $transferReceived->firstItem() + $loop->index }}</td>
                         <td class="align-middle">
                             <span class="exp-code font-weight-bold">{{ $req->code }}</span>
                             @if ($req->note)
@@ -195,4 +220,10 @@
             </tbody>
         </table>
     </div>
+
+    @include('pages.shared.paginator', [
+        'pgItems' => $transferReceived,
+        'pgTab' => 'request',
+        'pgUnit' => 'đề nghị',
+    ])
 </div>

@@ -72,6 +72,16 @@
                                         <div class="font-weight-bold">{{ $import->chem_name ?: '—' }}</div>
                                         <div class="md-sub">
                                             <span class="md-tag">{{ $import->category_code ?: '—' }}</span>
+                                            @if ($expBanned($import->category_id))
+                                                <span class="badge badge-warning text-dark ml-1">
+                                                    {{ \App\Support\ChemicalClassification::shortLabel(11) }}
+                                                </span>
+                                            @endif
+                                            @if ($expIsSpecial($import->category_id))
+                                                <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                    <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                </span>
+                                            @endif
                                             @if ($import->batch_no)
                                                 <span class="ml-1">Lô {{ $import->batch_no }}</span>
                                             @endif
@@ -116,7 +126,7 @@
 
 @php
     // Dữ liệu đầy đủ của từng phiếu nhập (khoá theo id) để dựng dòng trong modal Sử Dụng Hoá Chất
-    $expImportDataJs = $imports->where('selectable', true)->mapWithKeys(function ($import) {
+    $expImportDataJs = $imports->where('selectable', true)->mapWithKeys(function ($import) use ($expBanned) {
         return [
             $import->id => [
                 'code' => $import->code,
@@ -127,6 +137,9 @@
                 'max_issue' => round((float) $import->max_amount, 4),
                 'unit' => $import->unit_short_name,
                 'expired_date' => $import->expired_date ? \Carbon\Carbon::parse($import->expired_date)->format('d/m/Y') : null,
+                // Hoá chất cấm: dòng trong modal Sử Dụng bắt buộc chọn Người Kiểm Tra
+                'banned' => $expBanned($import->category_id),
+                'banned_label' => \App\Support\ChemicalClassification::shortLabel(11),
             ],
         ];
     });

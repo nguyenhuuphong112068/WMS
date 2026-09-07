@@ -74,11 +74,13 @@
                     {{-- Nhóm 2: Số lượng, Số ống nhập, Vị trí lưu trữ, Chỉ tiêu kiểm --}}
                     <div class="form-row">
                         <div class="form-group col-md-3">
-                            <label>Lượng / Ống <span class="text-danger">*</span> <span id="sd-unit-label"
-                                    class="text-primary font-weight-bold"></span></label>
-                            <input type="text" inputmode="decimal" name="amount" min="0.0001"
-                                class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
-                                value="{{ old('amount') }}" placeholder="Ví dụ: 50" required>
+                            <label>Lượng / Ống <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" inputmode="decimal" name="amount" min="0.0001"
+                                    class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
+                                    value="{{ old('amount') }}" placeholder="Ví dụ: 50" required>
+                                <div class="input-group-append"><span class="input-group-text sd-unit">—</span></div>
+                            </div>
                             @if ($bag->has('amount'))
                                 <span class="md-error">{{ $bag->first('amount') }}</span>
                             @endif
@@ -415,11 +417,7 @@
                     $form.find('.sd-info-box-wrap').hide();
                 }
 
-                if (item.unit_short_name) {
-                    $form.find('#sd-unit-label').text('(' + item.unit_short_name + ')');
-                } else {
-                    $form.find('#sd-unit-label').text('');
-                }
+                $form.find('.sd-unit').text(item.unit_short_name || '—');
 
                 // Nhóm chuẩn & Code preview
                 $form.find('.sd-group-input').val(item.group_key || '');
@@ -455,6 +453,7 @@
                 }
             } else {
                 $form.find('.sd-info-box-wrap').hide();
+                $form.find('.sd-unit').text('—');
                 $form.find('.sd-group-input').val('');
                 $form.find('.sd-code-preview').val($form.find('.sd-code-preview').data('placeholder') || '');
                 $form.find('.sd-auto-calc-btn-wrap').hide();

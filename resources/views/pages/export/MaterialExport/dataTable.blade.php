@@ -11,20 +11,15 @@
                     </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'request' ? 'is-active' : '' }}" data-pane="mePaneRequest">
                         <i class="fas fa-file-signature mr-1"></i> Đề nghị cấp phát vật tư
-                        <span class="exp-tab-count">{{ $requestLists->count() }}</span>
+                        @if ($requestLists->total())
+                            <span class="exp-tab-count">{{ $requestLists->total() }}</span>
+                        @endif
                     </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}" data-pane="mePaneTransfer">
                         <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
-                        @php
-                            // Cần cấp phát (mình là B) + đã cấp, chờ mình xác nhận Nhận (mình là A)
-                            $mtPending = $transferReceived->whereIn('status', ['pending', 'partial'])->count();
-                            $mtAwaitingReceipt = $transferSent->pluck('id')
-                                ->flatMap(fn($id) => $transferItems[$id] ?? collect())
-                                ->where('status', 'issued')->count();
-                            $mtBadgeCount = $mtPending + $mtAwaitingReceipt;
-                        @endphp
-                        @if ($mtBadgeCount)
-                            <span class="exp-tab-count">{{ $mtBadgeCount }}</span>
+                        {{-- Do Controller đếm trên toàn bộ dữ liệu, không chỉ trang đang xem --}}
+                        @if ($transferBadgeCount)
+                            <span class="exp-tab-count">{{ $transferBadgeCount }}</span>
                         @endif
                     </button>
                 </div>
@@ -39,8 +34,19 @@
                         @endperm
                     </div>
 
+                    @include('pages.shared.rangeFilter', [
+                        'rfRoute' => $expRoute . 'list',
+                        'rfTab' => 'book',
+                        'rfPrefix' => 'book_',
+                        'rfRange' => $bookRange,
+                        'rfPerPage' => $bookPerPage,
+                        'rfKeyword' => $bookKeyword,
+                        'rfDateLabel' => 'Ngày sử dụng',
+                        'rfPlaceholder' => 'Mã xuất nhập, tên vật tư, người dùng, mục đích...',
+                    ])
+
                     <div class="table-responsive">
-                        <table id="mdTable" class="table table-bordered table-hover w-100">
+                        <table id="mdTable" class="table table-bordered table-hover w-100" data-server-paged>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width:45px">STT</th>
@@ -58,8 +64,13 @@
                             <tbody>
                                 @foreach ($exports as $row)
                                     <tr>
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td><span class="exp-code font-weight-bold">{{ $row->code }}</span></td>
+                                        <td class="text-center">{{ $exports->firstItem() + $loop->index }}</td>
+                                        <td>
+                                            <span class="exp-code font-weight-bold">{{ $row->code }}</span>
+                                            @if ($row->category_code)
+                                                <div class="md-sub"><span class="md-tag">{{ $row->category_code }}</span></div>
+                                            @endif
+                                        </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->material_name ?: '—' }}</div>
                                             <div class="md-sub small text-muted">{{ $row->technical_specification }}</div>
@@ -111,6 +122,7 @@
                                                                 'product_name' => $row->product_name,
                                                                 'reason' => $row->reason,
                                                                 'material_name' => $row->material_name,
+                                                                'category_code' => $row->category_code,
                                                                 'technical_specification' => $row->technical_specification,
                                                                 'purpose' => $row->purpose,
                                                                 'unit_short_name' => $row->unit_short_name,
@@ -148,6 +160,12 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @include('pages.shared.paginator', [
+                        'pgItems' => $exports,
+                        'pgTab' => 'book',
+                        'pgUnit' => 'phiếu sử dụng',
+                    ])
                 </div>
 
                 {{-- ============ ĐỀ NGHỊ CẤP PHÁT ============ --}}

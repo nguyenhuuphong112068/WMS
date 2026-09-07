@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
 use App\Support\DepartmentMaterial;
+use App\Support\ListRange;
 use App\Support\MaterialCode;
 use App\Support\QrCode;
 use Illuminate\Http\Request;
@@ -59,6 +60,11 @@ class MaterialImportController extends Controller
     {
         $departmentId = $this->departmentId();
 
+        // Sổ nhập chỉ lấy đúng một trang trong khoảng ngày đang lọc (mặc định 30 ngày
+        // gần nhất), không nạp toàn bộ phiếu nhập của phòng như trước.
+        $bookRange = ListRange::of($request, 'book_');
+        $bookKeyword = ListRange::keyword($request, 'book_');
+
         $datas = DB::table(self::TABLE)
             ->leftJoin('material_categories', self::TABLE.'.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
@@ -73,6 +79,7 @@ class MaterialImportController extends Controller
             ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
             ->select(
                 self::TABLE.'.*',
+                'material_categories.code as category_code',
                 'material_categories.technical_specification',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
@@ -88,9 +95,18 @@ class MaterialImportController extends Controller
                 'tiers.name as tier_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
+            ->tap(ListRange::dateFilter(self::TABLE.'.imported_date', $bookRange))
+            ->tap(ListRange::search([
+                self::TABLE.'.code',
+                'material_names.name',
+                'material_categories.technical_specification',
+                'locations.code',
+                self::TABLE.'.note',
+            ], $bookKeyword))
             ->orderBy(self::TABLE.'.imported_date', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')
-            ->get();
+            ->paginate(ListRange::perPage($request, 'book_'), ['*'], ListRange::pageName('book_'))
+            ->withQueryString();
 
         session()->put(['title' => 'NHẬP - NHẬP VẬT TƯ']);
 
@@ -134,6 +150,9 @@ class MaterialImportController extends Controller
             'attachments' => $attachments,
             'locations' => DepartmentMaterial::locationOptions($departmentId),
             'historyCounts' => $this->historyCounts($departmentId),
+            'bookRange' => $bookRange,
+            'bookKeyword' => $bookKeyword,
+            'bookPerPage' => ListRange::perPage($request, 'book_'),
         ]);
     }
 

@@ -17,7 +17,30 @@
 
                 <div class="row mb-3">
                     <div class="col-md-4"><small class="text-muted">Người lập</small><div class="font-weight-bold">{{ $req->created_by }}</div></div>
-                    <div class="col-md-4"><small class="text-muted">Cần BGĐ duyệt</small><div class="font-weight-bold">{{ $req->needs_director ? 'Có' : 'Không' }}</div></div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Quy trình ký duyệt</small>
+                        @php $signs = $requestSigns->get($req->id, collect()); @endphp
+                        @if ($signs->isEmpty())
+                            <div class="font-weight-bold">Không cần ký duyệt</div>
+                        @else
+                            <div>
+                                @foreach ($signs as $s)
+                                    <div class="md-sub">
+                                        <b>{{ $s->step_no }}.</b>
+                                        {{ $s->signer_full_name ?: ($s->user_name ?: ($s->role_names ?: '—')) }}
+                                        —
+                                        @if ($s->status === 'signed')
+                                            <span class="text-success">Đã ký {{ $expDateTime($s->signed_at) }}</span>
+                                        @elseif ($s->status === 'rejected')
+                                            <span class="text-danger">Từ chối: {{ $s->reject_reason }}</span>
+                                        @else
+                                            <span class="text-muted">{{ $reqSignStatuses[$s->status] ?? $s->status }}</span>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
                     <div class="col-md-4"><small class="text-muted">Ghi chú</small><div>{{ $req->note ?: '—' }}</div></div>
                 </div>
 
@@ -74,6 +97,9 @@
                                 <tr>
                                     <td>
                                         <div class="font-weight-bold">{{ $it->display_name ?: '—' }}</div>
+                                        @if ($it->category_code)
+                                            <div class="md-sub"><span class="md-tag">{{ $it->category_code }}</span></div>
+                                        @endif
                                         @unless ($it->category_id) <span class="badge badge-secondary">Ngoài danh mục</span> @endunless
                                     </td>
                                     <td class="md-sub">{{ $it->technical_specification ?: '—' }}</td>

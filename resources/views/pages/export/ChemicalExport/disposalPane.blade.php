@@ -21,13 +21,6 @@
                 <i class="fas fa-file-signature mr-1"></i> Xin quyết định huỷ (<span class="dsp-picked">0</span>)
             </button>
         @endperm
-        <p class="hint">
-            <i class="fas fa-info-circle mr-1"></i>
-            Huỷ hoá chất đi <b>hai bước</b>. <b>Bước 1 - Loại bỏ</b>: lập phiếu <b>Loại bỏ</b> ở tab Sổ sử dụng, hoá
-            chất trừ tồn ngay và về đây chờ. <b>Bước 2 - Huỷ</b>: gom nhiều phiếu thành một đợt, trình
-            <b>TP. ĐBCL</b> và <b>Ban Giám Đốc</b>; có quyết định rồi thì in được biểu mẫu
-            <b>{{ \App\Http\Controllers\Pages\Export\ChemicalDisposalController::FORM['form_no'] }}</b>.
-        </p>
     </div>
 
     {{-- ---------- Hàng chờ huỷ ---------- --}}
@@ -62,7 +55,14 @@
                         <td class="text-center">{{ $loop->iteration }}</td>
                         <td><span class="exp-code">{{ $row->code }}</span></td>
                         <td>
-                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
+                            <div class="font-weight-bold">
+                                {{ $row->chem_name ?: '—' }}
+                                @if ($expIsSpecial($row->category_id))
+                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                    </span>
+                                @endif
+                            </div>
                             <div class="md-sub"><span class="md-tag">{{ $row->category_code ?: '—' }}</span></div>
                         </td>
                         <td class="md-sub">{{ $row->batch_no ?: '—' }}</td>
@@ -101,9 +101,17 @@
     {{-- ---------- Các đợt xin quyết định huỷ ---------- --}}
     <h6 class="exp-req-title">
         <i class="fas fa-clipboard-check mr-1"></i> Các đợt xin quyết định huỷ
-        <span class="md-sub">({{ $disposals->count() }} đợt, {{ $disposals->where('app_status', 'pending')->count() }}
-            đang chờ quyết định)</span>
     </h6>
+
+    @include('pages.shared.rangeFilter', [
+        'rfRoute' => $expRoute . 'list',
+        'rfTab' => 'disposal',
+        'rfPrefix' => 'dsp_',
+        'rfRange' => $disposalRange,
+        'rfPerPage' => $disposalPerPage,
+        'rfSearch' => false,
+        'rfDateLabel' => 'Ngày lập đợt',
+    ])
 
     @forelse ($disposals as $batch)
         <div class="dsp-card {{ $batch->status_id == 1 ? '' : 'is-locked' }}">
@@ -320,4 +328,10 @@
             <b>Xin quyết định huỷ</b>.
         </div>
     @endforelse
+
+    @include('pages.shared.paginator', [
+        'pgItems' => $disposals,
+        'pgTab' => 'disposal',
+        'pgUnit' => 'đợt huỷ',
+    ])
 </div>

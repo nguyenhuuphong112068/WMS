@@ -18,8 +18,18 @@
     @endperm
 </div>
 
+@include('pages.shared.rangeFilter', [
+    'rfRoute' => $expRoute . 'list',
+    'rfTab' => 'request',
+    'rfPrefix' => 'req_',
+    'rfRange' => $reqRange,
+    'rfPerPage' => $reqPerPage,
+    'rfSearch' => false,
+    'rfDateLabel' => 'Ngày lập',
+])
+
 <div class="table-responsive">
-    <table id="meReqTable" class="table table-bordered table-hover w-100 md-table">
+    <table id="meReqTable" class="table table-bordered table-hover w-100 md-table" data-server-paged>
         <thead>
             <tr>
                 <th class="text-center" style="width:45px">STT</th>
@@ -40,7 +50,7 @@
                     $editable = in_array($req->app_status, ['draft', 'rejected']) && user_can('export_material_request');
                 @endphp
                 <tr>
-                    <td class="text-center">{{ $loop->iteration }}</td>
+                    <td class="text-center">{{ $requestLists->firstItem() + $loop->index }}</td>
                     <td><span class="exp-code font-weight-bold">{{ $req->code }}</span>
                         @if ($req->name) <div class="md-sub small font-weight-bold" style="color: var(--primary-dark);">{{ $req->name }}</div> @endif
                         @if ($req->note) <div class="md-sub small text-muted">{{ $req->note }}</div> @endif
@@ -53,25 +63,32 @@
                         @endif
                     </td>
                     <td>
-                        <div class="me-flow">
-                            @foreach ($reqSignSteps as $k => $step)
-                                @php
-                                    $signedAt = $req->{$step['signed_at']} ?? null;
-                                    $cls = 'step';
-                                    if ($signedAt) $cls .= ' done';
-                                    elseif ($req->app_status === 'rejected' && $req->reject_step === $k) $cls .= ' rejected';
-                                    elseif ($req->app_status === $step['from']) $cls .= ' current';
-                                    if ($k === 'director' && ! $req->needs_director && ! $signedAt) $cls .= ' skip';
-                                @endphp
-                                <span class="{{ $cls }}" title="{{ $step['label'] }}">
-                                    @if ($signedAt) <i class="fas fa-check"></i>
-                                    @elseif (str_contains($cls, 'rejected')) <i class="fas fa-times"></i>
-                                    @else {{ $step['no'] }} @endif
-                                    {{ $step['label'] }}
-                                    @if ($k === 'director' && ! $req->needs_director) <em>(không cần)</em> @endif
-                                </span>
-                            @endforeach
-                        </div>
+                        @php $signs = $requestSigns->get($req->id, collect()); @endphp
+                        @if ($signs->isEmpty())
+                            <span class="md-sub">Không cần ký duyệt</span>
+                        @else
+                            <div class="me-flow">
+                                @foreach ($signs as $s)
+                                    @php
+                                        // Bước đã ký / bị từ chối / đang chờ ký; các bước phía sau còn mờ
+                                        $cls = 'step';
+                                        if ($s->status === 'signed') $cls .= ' done';
+                                        elseif ($s->status === 'rejected') $cls .= ' rejected';
+                                        elseif ($req->app_status === 'pending_sign' && (int) $req->current_step === (int) $s->step_no) $cls .= ' current';
+                                        else $cls .= ' skip';
+
+                                        // Phiếu cũ không chỉ định đích danh thì hiện chức danh được ký thay
+                                        $who = $s->signer_full_name ?: ($s->user_name ?: ($s->role_names ?: '—'));
+                                    @endphp
+                                    <span class="{{ $cls }}" title="Bước {{ $s->step_no }}: {{ $who }}{{ $s->signed_at ? ' — đã ký ' . \Carbon\Carbon::parse($s->signed_at)->format('d/m/Y H:i') : '' }}">
+                                        @if ($s->status === 'signed') <i class="fas fa-check"></i>
+                                        @elseif ($s->status === 'rejected') <i class="fas fa-times"></i>
+                                        @else {{ $s->step_no }} @endif
+                                        {{ $who }}
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
                     </td>
                     <td class="text-center md-sub">
                         @if ($req->issue_status)
@@ -94,7 +111,8 @@
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSubmit') }}" method="POST"
-                                    data-title="Trình ký đề nghị {{ $req->code }}?" data-text="Đề nghị sẽ chuyển sang chờ Trưởng/Phó Phòng duyệt.">
+                                    data-title="Trình ký đề nghị {{ $req->code }}?"
+                                    data-text="{{ $signs->isEmpty() ? 'Đề nghị không khai bước ký nào nên sẽ được duyệt ngay, kho có thể cấp phát.' : 'Đề nghị sẽ chuyển tới người ký bước 1 trong ' . $signs->count() . ' bước.' }}">
                                     @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
                                     <button type="submit" class="btn btn-sm btn-success" title="Trình ký"><i class="fas fa-paper-plane"></i></button>
                                 </form>
@@ -105,21 +123,18 @@
                                 </form>
                             @endif
 
-                            @if ($req->app_status === 'pending_manager' && $canSignManager && user_can('export_material_approve'))
-                                <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSignManager') }}" method="POST"
-                                    data-title="Duyệt bước Trưởng/Phó Phòng?" data-text="Đề nghị {{ $req->code }} {{ $req->needs_director ? 'sẽ chuyển lên Ban Giám Đốc.' : 'sẽ được duyệt và kho có thể cấp phát.' }}">
+                            {{-- Chỉ đúng người được chỉ định ở bước đang chờ mới thấy nút Ký / Từ chối --}}
+                            @if ($req->can_sign && user_can('export_material_approve'))
+                                @php $isLastStep = (int) $req->pending_sign->step_no >= (int) $req->sign_step_count; @endphp
+                                <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSign') }}" method="POST"
+                                    data-require-password="1"
+                                    data-title="Ký duyệt bước {{ $req->pending_sign->step_no }}/{{ $req->sign_step_count }}?"
+                                    data-text="Đề nghị {{ $req->code }} {{ $isLastStep ? 'sẽ được duyệt và kho có thể cấp phát.' : 'sẽ chuyển tới người ký bước ' . ($req->pending_sign->step_no + 1) . '.' }}">
                                     @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
-                                    <button type="submit" class="btn btn-sm btn-success" title="Duyệt"><i class="fas fa-signature"></i></button>
+                                    <button type="submit" class="btn btn-sm btn-success" title="Ký duyệt">
+                                        <i class="fas fa-{{ $isLastStep ? 'stamp' : 'signature' }}"></i>
+                                    </button>
                                 </form>
-                            @endif
-                            @if ($req->app_status === 'pending_director' && $canSignDirector && user_can('export_material_approve'))
-                                <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSignDirector') }}" method="POST"
-                                    data-title="Ban Giám Đốc phê duyệt {{ $req->code }}?" data-text="Duyệt xong kho có thể cấp phát.">
-                                    @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
-                                    <button type="submit" class="btn btn-sm btn-success" title="Phê duyệt"><i class="fas fa-stamp"></i></button>
-                                </form>
-                            @endif
-                            @if (user_can('export_material_approve') && (($req->app_status === 'pending_manager' && $canSignManager) || ($req->app_status === 'pending_director' && $canSignDirector)))
                                 <button type="button" class="btn btn-sm btn-outline-danger btn-req-reject" data-id="{{ $req->id }}" data-code="{{ $req->code }}" title="Từ chối">
                                     <i class="fas fa-times"></i>
                                 </button>
@@ -133,3 +148,9 @@
         </tbody>
     </table>
 </div>
+
+@include('pages.shared.paginator', [
+    'pgItems' => $requestLists,
+    'pgTab' => 'request',
+    'pgUnit' => 'đề nghị',
+])

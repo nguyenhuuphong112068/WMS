@@ -40,7 +40,7 @@
                         </tbody>
                     </table>
 
-                    <h6 class="cg-h">Mười một nhóm phân loại ("hình 1" + nhóm 11 Luật Đầu tư)</h6>
+                    <h6 class="cg-h">Mười một nhóm phân loại ("hình 1" + Nhóm HC Cấm theo Luật Đầu tư)</h6>
                     <table class="table table-sm table-bordered cg-table cg-groups mb-2">
                         <thead>
                             <tr>
@@ -52,7 +52,7 @@
                             @foreach (\App\Support\ChemicalClassification::GROUPS as $g => $label)
                                 <tr>
                                     <td class="text-center">
-                                        <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }}">Nhóm {{ $g }}</span>
+                                        <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }}">{{ \App\Support\ChemicalClassification::shortLabel($g) }}</span>
                                     </td>
                                     <td>{{ $label }}</td>
                                 </tr>
@@ -62,13 +62,13 @@
 
                     <div class="cg-legend mb-4">
                         <span><span class="badge badge-danger">&nbsp;</span> Nhóm 9, 10 – phải lập Kế hoạch phòng ngừa, ứng phó sự cố (Phụ lục IV)</span>
-                        <span><span class="badge badge-warning text-dark">&nbsp;</span> Nhóm 4, 6, 11 – hoá chất cấm (Phụ lục III bảng B / Luật Đầu tư 2025)</span>
+                        <span><span class="badge badge-warning text-dark">&nbsp;</span> Nhóm 4, 6, Nhóm HC Cấm – hoá chất cấm (Phụ lục III bảng B / Luật Đầu tư 2025)</span>
                         <span><span class="badge badge-primary">&nbsp;</span> Các nhóm còn lại</span>
                     </div>
 
                     <div class="md-hint mb-4">
                         <i class="fas fa-info-circle mr-1"></i>
-                        <b>Nhóm 11</b> không thuộc Nghị định 24/2026/NĐ-CP - là "Hoá chất cấm" theo
+                        <b>Nhóm HC Cấm</b> không thuộc Nghị định 24/2026/NĐ-CP - là "Hoá chất cấm" theo
                         <b>Luật Đầu tư 2025, số 143/2025/QH15</b>, gộp chung vào danh sách phân loại để khai
                         và cảnh báo cùng một chỗ với các nhóm hoạt chất khác.
                     </div>

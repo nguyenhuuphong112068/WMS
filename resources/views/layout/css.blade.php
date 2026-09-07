@@ -183,6 +183,29 @@
                   font-size: 0.9rem;
             }
 
+            /* Badge "Kiểm soát đặc biệt" (Phụ lục III NĐ 24/2026 - Nhóm 3..8) */
+            .badge-special-control {
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 4px;
+                  background: #EDE9FE;
+                  color: #6D28D9;
+                  border: 1px solid #C4B5FD;
+                  border-radius: 6px;
+                  padding: 2px 7px;
+                  font-size: 0.74rem;
+                  font-weight: 700;
+                  line-height: 1.35;
+                  white-space: nowrap;
+                  vertical-align: middle;
+                  box-shadow: 0 1px 2px rgba(109, 40, 217, 0.08);
+            }
+            .badge-special-control i {
+                  font-size: 0.72rem;
+                  color: #7C3AED;
+            }
+
+
             .table td .md-empty,
             table.dataTable td .md-empty,
             .table td .md-note,

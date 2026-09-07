@@ -42,7 +42,18 @@
     <h6 class="font-weight-bold text-primary mt-3 mb-2">
         <i class="fas fa-paper-plane mr-1"></i> Đề nghị phòng mình đã gửi đi
     </h6>
-    <div class="table-responsive mb-4">
+
+    @include('pages.shared.rangeFilter', [
+        'rfRoute' => $expRoute . 'list',
+        'rfTab' => 'transfer',
+        'rfPrefix' => 'tsent_',
+        'rfRange' => $transferSentRange,
+        'rfPerPage' => $transferSentPerPage,
+        'rfSearch' => false,
+        'rfDateLabel' => 'Ngày lập',
+    ])
+
+    <div class="table-responsive">
         <table id="matTransferSentTable" class="table table-bordered table-hover w-100 exp-req-table">
             <thead>
                 <tr class="text-center">
@@ -63,7 +74,7 @@
                         $awaitingReceiptCount = $items->where('status', 'issued')->count();
                     @endphp
                     <tr>
-                        <td class="text-center align-middle">{{ $loop->iteration }}</td>
+                        <td class="text-center align-middle">{{ $transferSent->firstItem() + $loop->index }}</td>
                         <td class="align-middle">
                             <span class="exp-code font-weight-bold">{{ $req->code }}</span>
                             @if ($req->note)
@@ -134,9 +145,28 @@
         </table>
     </div>
 
+    @include('pages.shared.paginator', [
+        'pgItems' => $transferSent,
+        'pgTab' => 'transfer',
+        'pgUnit' => 'đề nghị',
+    ])
+
+    <div class="mb-4"></div>
+
     <h6 class="font-weight-bold text-success mb-2">
         <i class="fas fa-inbox mr-1"></i> Đề nghị phòng ban khác gửi đến - cần cấp phát
     </h6>
+
+    @include('pages.shared.rangeFilter', [
+        'rfRoute' => $expRoute . 'list',
+        'rfTab' => 'transfer',
+        'rfPrefix' => 'trecv_',
+        'rfRange' => $transferReceivedRange,
+        'rfPerPage' => $transferReceivedPerPage,
+        'rfSearch' => false,
+        'rfDateLabel' => 'Ngày lập',
+    ])
+
     <div class="table-responsive">
         <table id="matTransferReceivedTable" class="table table-bordered table-hover w-100 exp-req-table">
             <thead>
@@ -155,7 +185,7 @@
                 @forelse ($transferReceived as $req)
                     @php $items = $transferItems[$req->id] ?? collect(); @endphp
                     <tr>
-                        <td class="text-center align-middle">{{ $loop->iteration }}</td>
+                        <td class="text-center align-middle">{{ $transferReceived->firstItem() + $loop->index }}</td>
                         <td class="align-middle">
                             <span class="exp-code font-weight-bold">{{ $req->code }}</span>
                             @if ($req->note)
@@ -201,4 +231,10 @@
             </tbody>
         </table>
     </div>
+
+    @include('pages.shared.paginator', [
+        'pgItems' => $transferReceived,
+        'pgTab' => 'transfer',
+        'pgUnit' => 'đề nghị',
+    ])
 </div>

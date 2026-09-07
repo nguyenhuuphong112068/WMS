@@ -3,7 +3,7 @@
     <tr>
         <th style="min-width: 240px">Vật tư (danh mục)</th>
         <th style="min-width: 180px">Hoặc tên tự nhập</th>
-        <th style="min-width: 200px">Quy cách</th>
+        <th style="min-width: 200px">Thông tin kỹ thuật</th>
         <th style="min-width: 110px" class="text-right">SL đề nghị</th>
         <th style="min-width: 110px">Đơn vị</th>
         <th style="min-width: 190px">Thiết bị liên quan</th>

@@ -94,7 +94,7 @@
                                 @php
                                     $groups = $row->groups ?? [];
                                     $isGroup9 = in_array(9, $groups, true);
-                                    $groupSearch = collect($groups)->map(fn ($g) => 'Nhóm ' . $g)->implode(' ');
+                                    $groupSearch = collect($groups)->map(fn ($g) => \App\Support\ChemicalClassification::shortLabel($g))->implode(' ');
 
                                     $cls = collect($row->classifications ?? []);
                                     $apxOrder = ['I' => 1, 'II' => 2, 'III' => 3, 'IV' => 4];
@@ -110,8 +110,23 @@
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td class="font-weight-bold">
                                         {{ $row->name }}
+                                        @if ($row->is_collective)
+                                            <span class="ai-collective-badge"
+                                                title="Dòng khai theo nhóm chất của nghị định - tồn của các chất thành viên được cộng chung vào ngưỡng này">Mục
+                                                gộp</span>
+                                        @endif
                                         @if ($row->code)
                                             <div class="md-sub">{{ $row->code }}</div>
+                                        @endif
+                                        @if ($row->parent_name)
+                                            <div class="md-sub" title="Tồn của chất này cộng vào ngưỡng của mục gộp">
+                                                <i class="fas fa-level-up-alt fa-rotate-90 mr-1"></i>{{ $row->parent_name }}
+                                                @if ((float) $row->equiv_factor != 1.0)
+                                                    (hệ số {{ rtrim(rtrim(number_format((float) $row->equiv_factor, 6, '.', ''), '0'), '.') }})
+                                                @endif
+                                            </div>
+                                        @elseif ($row->member_count)
+                                            <div class="md-sub">{{ $row->member_count }} chất thành viên cộng vào ngưỡng này</div>
                                         @endif
                                     </td>
                                     <td class="md-sub">{{ $row->name_en ?: '—' }}</td>
@@ -154,7 +169,7 @@
                                     <td data-search="{{ $groupSearch }}" data-order="{{ $groups ? min($groups) : 99 }}">
                                         @forelse ($groups as $g)
                                             <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }} mr-1 mb-1"
-                                                title="{{ $groupLabels[$g] ?? ('Nhóm ' . $g) }}">Nhóm {{ $g }}</span>
+                                                title="{{ $groupLabels[$g] ?? \App\Support\ChemicalClassification::shortLabel($g) }}">{{ \App\Support\ChemicalClassification::shortLabel($g) }}</span>
                                         @empty
                                             <span class="md-empty">—</span>
                                         @endforelse
@@ -162,6 +177,9 @@
                                     <td class="text-right" data-order="{{ $row->threshold_kg ?? -1 }}">
                                         @if (!$isGroup9)
                                             <span class="md-empty">—</span>
+                                        @elseif ($row->parent_name && $kg($row->threshold_kg) === null)
+                                            <span class="md-sub" title="Tồn của chất này cộng vào ngưỡng của mục gộp {{ $row->parent_name }}">Theo
+                                                mục gộp</span>
                                         @elseif ($kg($row->threshold_kg) !== null)
                                             <span class="ai-threshold">{{ $kg($row->threshold_kg) }}</span>
                                         @else
@@ -197,8 +215,12 @@
                                                 'name_en' => $row->name_en,
                                                 'cas_no' => $row->cas_no,
                                                 'chemical_formula' => $row->chemical_formula,
-                                                'groups' => array_values($groups),
+                                                // Nạp lại checkbox theo nhóm KHAI RIÊNG, không lấy nhóm thừa hưởng
+                                                // từ mục gộp - nếu không, lưu lại sẽ đẻ ra dòng phân loại thừa.
+                                                'groups' => array_values($row->own_groups ?? []),
                                                 'threshold_kg' => $row->threshold_kg,
+                                                'parent_id' => $row->parent_id,
+                                                'equiv_factor' => rtrim(rtrim(number_format((float) $row->equiv_factor, 6, '.', ''), '0'), '.'),
                                             ],
                                         ])
                                     </td>
@@ -218,6 +240,18 @@
             font-weight: 700;
             color: var(--primary-dark);
         }
+
+        .ai-collective-badge {
+            display: inline-block;
+            margin-left: 4px;
+            padding: 1px 7px;
+            border: 1px solid var(--primary-dark);
+            border-radius: 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            background: var(--primary-soft);
+        }
     </style>
 
     <script>
@@ -236,10 +270,25 @@
                 }
             }
 
+            /* Ô "Hệ số quy đổi" chỉ hiện khi đã chọn một mục gộp. */
+            function aiToggleParent($form) {
+                var on = !!$form.find('[data-parent-select]').val();
+                var $block = $form.find('[data-parent-only]');
+                $block.toggle(on);
+                if (!on) {
+                    $block.find('input[name="equiv_factor"]').val('1').removeClass('is-invalid');
+                    $block.find('.md-error').remove();
+                }
+            }
+
             function aiGroupCount($modal) {
                 var n = $modal.find('.ai-group-input:checked').length;
                 $modal.find('[data-group-count]').text(n ? (n + ' nhóm') : '').toggle(n > 0);
             }
+
+            $(document).on('change', '[data-parent-select]', function() {
+                aiToggleParent($(this).closest('form'));
+            });
 
             $(document).on('change', '.ai-group-input', function() {
                 var $modal = $(this).closest('.md-modal');
@@ -255,6 +304,7 @@
                     .closest('.ai-group-item').removeClass('is-checked');
                 setTimeout(function() {
                     aiToggleThreshold($modal.find('form'));
+                    aiToggleParent($modal.find('form'));
                     aiGroupCount($modal);
                 }, 50);
             });
@@ -270,12 +320,14 @@
                     $(this).prop('checked', on).closest('.ai-group-item').toggleClass('is-checked', on);
                 });
                 aiToggleThreshold($modal.find('form'));
+                aiToggleParent($modal.find('form'));
                 aiGroupCount($modal);
             });
 
-            /* Sau khi modal hiện xong thì co giãn ô ngưỡng theo trạng thái checkbox. */
+            /* Sau khi modal hiện xong thì co giãn ô ngưỡng / hệ số theo dữ liệu đã nạp. */
             $(document).on('shown.bs.modal', '.md-modal', function() {
                 aiToggleThreshold($(this).find('form'));
+                aiToggleParent($(this).find('form'));
                 aiGroupCount($(this));
             });
 

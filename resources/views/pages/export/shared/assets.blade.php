@@ -20,6 +20,17 @@
 @include('pages.materData.shared.assets')
 
 <style>
+    /* ---------- Phiếu Tạm: dòng đang vượt hạn mức 105% ---------- */
+    .draft-row-over>td {
+        background: #FEF2F2;
+    }
+
+    .draft-row-over .exp-required-note {
+        margin-top: 4px;
+        font-size: 0.72rem;
+        color: #B91C1C;
+    }
+
     /* ---------- Ô chọn Select2 trong modal ---------- */
     .md-modal .select2-container--bootstrap4 .select2-selection {
         border-radius: var(--border-radius-md);
@@ -259,6 +270,12 @@
         font-size: 0.72rem;
         font-weight: 700;
         text-align: center;
+    }
+
+    /* Số phiếu Hoá chất Cấm (Nhóm 11) - tông cam để cảnh báo, khớp badgeClass() của
+       App\Support\ChemicalClassification cho các nhóm BANNED_GROUPS */
+    .exp-tab-count-banned {
+        background: #F59E0B;
     }
 
     /* ---------- Đề nghị chuyển hoá chất ---------- */
@@ -857,6 +874,18 @@
             var $remaining = $form.find('.exp-remaining');
 
             $code.val(picked ? picked.code : ($code.data('placeholder') || ''));
+
+            // Người Kiểm Tra chỉ dùng cho hoá chất thuộc Nhóm HC Cấm (Luật Đầu tư 2025,
+            // số 143/2025/QH15): hoá chất thường thì giấu hẳn ô này đi. Giá trị cũ vẫn giữ
+            // nguyên trong form để lần sửa này không vô tình xoá mất người kiểm tra đã ghi.
+            var $checker = $form.find('[name="checked_by"]');
+
+            if ($checker.length) {
+                var banned = !!(picked && picked.banned);
+
+                $checker.prop('required', banned);
+                $form.find('.exp-checker-group').toggle(banned);
+            }
 
             if (!$remaining.length) return;
 

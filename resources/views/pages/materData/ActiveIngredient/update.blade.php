@@ -53,6 +53,7 @@
                         'groupLabels' => $groupLabels,
                         'singleSubstanceGroups' => $singleSubstanceGroups,
                         'oldGroups' => $oldGroups,
+                        'collectives' => $collectives,
                     ])
 
                     <div class="md-hint">

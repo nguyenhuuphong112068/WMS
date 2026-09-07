@@ -75,6 +75,10 @@
         return implode(',', $classificationCodes[$categoryId] ?? []);
     };
 
+    /** Hoá chất thuộc nhóm 3..8 (Phụ lục III - kiểm soát đặc biệt). */
+    $invIsSpecial = fn($categoryId) => \App\Support\ChemicalClassification::isSpecialControl($classificationCodes[$categoryId] ?? []);
+
+
     /*
     | Cách tính từng trạng thái tồn, đưa vào tooltip của nút lọc thay vì in thành
     | một hàng chú thích riêng trên màn hình.

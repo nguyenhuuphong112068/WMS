@@ -87,6 +87,7 @@
                         <div class="cell">
                             <small>Vật tư</small>
                             <b class="me-up-material">—</b>
+                            <span class="md-sub me-up-catcode"></span>
                             <span class="md-sub me-up-spec"></span>
                         </div>
                         <div class="cell">
@@ -169,6 +170,7 @@
 
             $m.find('.me-up-code').text(r.code || '—');
             $m.find('.me-up-material').text(r.material_name || '—');
+            $m.find('.me-up-catcode').text(r.category_code || '');
             $m.find('.me-up-spec').text(r.technical_specification || '');
             $m.find('.me-up-time').text(r.created_at || '—');
             $m.find('.me-up-user').text(r.used_by || '—');

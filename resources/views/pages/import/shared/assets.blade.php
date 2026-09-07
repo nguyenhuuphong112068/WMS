@@ -63,6 +63,28 @@
         font-size: 0.76rem;
     }
 
+    /* ---------- Modal có form bọc body + footer ----------
+       Ở các modal Nhập, thẻ <form> bọc cả .modal-body lẫn .modal-footer nên
+       cơ chế cuộn của .modal-dialog-scrollable không giữ được nút Lưu khi
+       nội dung dài. Cho <form> thành cột co giãn để body tự cuộn, footer luôn hiện. */
+    .md-modal .modal-dialog-scrollable .modal-content > form {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        max-height: 100%;
+        overflow: hidden;
+    }
+
+    .md-modal .modal-dialog-scrollable .modal-content > form > .modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .md-modal .modal-dialog-scrollable .modal-content > form > .modal-footer {
+        flex-shrink: 0;
+    }
+
     /* ---------- Ô tick hoá chất vi sinh ---------- */
     .imp-switch {
         display: flex;

@@ -90,6 +90,11 @@
                                 data-title="Phiếu {{ $list->code }}">
                                 <i class="fas fa-route mr-1"></i> Theo dõi trình ký
                             </button>
+
+                            <button type="button" class="btn btn-outline-primary ml-1" data-toggle="modal"
+                                data-target="#classifyGuideModal">
+                                <i class="fas fa-info-circle mr-1"></i> Chú thích Phụ lục &amp; Nhóm
+                            </button>
                         </div>
 
                         <p class="hint">
@@ -108,6 +113,7 @@
                                 <tr>
                                     <th class="text-center" style="width: 55px">STT</th>
                                     <th style="width: 200px">Hoá Chất</th>
+                                    <th style="width: 130px">Nhóm Hoá Chất</th>
                                     <th>Thông Tin Kỹ Thuật</th>
                                     <th>Mục Đích Sử Dụng</th>
                                     <th style="width: 200px">Số Lượng Dự Trù</th>
@@ -140,6 +146,30 @@
                                                     <i class="fas fa-triangle-exclamation mr-1"></i>{{ $warning['message'] }}
                                                 </div>
                                             @endforeach
+                                        </td>
+                                        <td>
+                                            @php
+                                                // Nhóm NĐ 24/2026 suy theo mã danh mục; hoá chất ngoài danh mục không suy được
+                                                $estClsCodes = $item->category_id
+                                                    ? (($classificationCodes ?? [])[$item->category_id] ?? [])
+                                                    : [];
+                                            @endphp
+                                            @if ($estClsCodes)
+                                                <div class="est-cls-chips">
+                                                    @foreach ($estClsCodes as $estClsCode)
+                                                        <span class="est-cls-chip {{ \App\Support\ChemicalClassification::toneOfCode($estClsCode) }}"
+                                                            title="{{ ($classificationLabels ?? [])[$estClsCode] ?? $estClsCode }}">{{ $estClsCode }}</span>
+                                                    @endforeach
+                                                </div>
+                                                {{-- Nhóm 3..8 thuộc Phụ lục III: gắn nhãn cảnh báo cho người ký duyệt --}}
+                                                @if (\App\Support\ChemicalClassification::isSpecialControl($estClsCodes))
+                                                    <div class="est-cls-special mt-1">
+                                                        <i class="fas fa-shield-alt mr-1"></i>{{ \App\Support\ChemicalClassification::SPECIAL_CONTROL_LABEL }}
+                                                    </div>
+                                                @endif
+                                            @else
+                                                <span class="md-empty">—</span>
+                                            @endif
                                         </td>
                                         <td class="md-sub">
                                             @if ($item->category_manufacturer_name)
@@ -333,4 +363,7 @@
     @endif
 
     @include('pages.estimate.shared.historyModal')
+
+    {{-- Chú thích 4 Phụ lục + 10 nhóm NĐ 24/2026 cho cột "Nhóm Hoá Chất" --}}
+    @include('pages.shared.classifyGuideModal')
 @endsection

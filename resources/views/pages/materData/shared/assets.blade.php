@@ -290,9 +290,23 @@
         //
         // Tách thành hàm dùng chung để màn hình nào nạp lại một vùng bảng bằng AJAX
         // (ví dụ tab Kiểm Kê Định Kỳ) gọi lại được: mdInitTables(vùng vừa thay).
+        //
+        // Bảng NHẬP LIỆU trong modal (dòng do JS thêm/bớt) gắn data-no-datatable để
+        // đứng ngoài: DataTables không biết các dòng thêm bằng jQuery nên phần đếm dòng,
+        // tìm kiếm và phân trang sẽ sai, sắp xếp lại còn làm mất dòng đang nhập dở.
+        //
+        // Bảng ĐÃ PHÂN TRANG Ở SERVER (màn hình Nhập / Sử Dụng) gắn data-server-paged:
+        // Controller chỉ gửi về đúng một trang nên phải TẮT phân trang và sắp xếp mặc
+        // định của DataTables - bật vào sẽ thành hai tầng phân trang chồng nhau, và
+        // sắp xếp lại chỉ đúng trong trang đang xem nên làm người dùng hiểu sai thứ tự.
+        // Ô Tìm kiếm của DataTables vẫn giữ để lọc nhanh trong trang; muốn tìm trên
+        // toàn bộ dữ liệu thì dùng ô Tìm kiếm của bộ lọc (chạy ở server).
         window.mdInitTables = function(root) {
-            $(root ? $(root) : $(document)).find('#mdTable, table.md-table').each(function() {
+            $(root ? $(root) : $(document)).find('#mdTable, table.md-table')
+                .not('[data-no-datatable]').each(function() {
                 if ($.fn.dataTable.isDataTable(this)) return;
+
+                var serverPaged = $(this).is('[data-server-paged]');
 
                 /*
                 | Nhiều màn hình dùng forelse/empty của Blade và chèn sẵn một dòng
@@ -316,11 +330,16 @@
                 $(this).DataTable({
                     autoWidth: false,
                     responsive: true,
+                    paging: !serverPaged,
+                    info: !serverPaged,
+                    lengthChange: !serverPaged,
                     pageLength: 25,
                     search: {
                         smart: false
                     },
-                    order: [
+                    // Bảng phân trang ở server đã được Controller sắp xếp sẵn (mới nhất
+                    // lên trước), giữ nguyên thứ tự đó thay vì sắp lại theo cột 1
+                    order: serverPaged ? [] : [
                         [1, 'asc']
                     ],
                     lengthMenu: [

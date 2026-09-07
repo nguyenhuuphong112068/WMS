@@ -98,47 +98,27 @@
                         </div>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label>Định Khu</label>
-                            <select name="default_location_id"
-                                class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chưa định khu --</option>
-                                @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}"
-                                        {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
-                                        {{ $location->warehouse_name ?: '—' }} /
-                                        {{ $location->shelf_name ?: '—' }} /
-                                        {{ $location->column_name ?: '—' }} /
-                                        {{ $location->tier_name ?: '—' }} /
-                                        {{ $location->code }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @if ($bag->has('default_location_id'))
-                                <span class="md-error">{{ $bag->first('default_location_id') }}</span>
-                            @endif
-                            <small class="md-sub">Chỗ <b>dự kiến</b> để hàng. Định khu thật của từng lô vẫn khai lúc
-                                nhập.</small>
-                        </div>
-
-                        <div class="form-group col-md-6">
-                            <label>Điều Kiện Bảo Quản</label>
-                            <select name="storage_condition_id"
-                                class="form-control cat-select {{ $bag->has('storage_condition_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Theo danh mục --</option>
-                                @foreach ($storageConditions as $condition)
-                                    <option value="{{ $condition->id }}"
-                                        {{ $old('storage_condition_id') == $condition->id ? 'selected' : '' }}>
-                                        {{ $condition->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @if ($bag->has('storage_condition_id'))
-                                <span class="md-error">{{ $bag->first('storage_condition_id') }}</span>
-                            @endif
-                            <small class="md-sub">Chỉ chọn khi phòng bảo quản khác với danh mục.</small>
-                        </div>
+                    <div class="form-group">
+                        <label>Định Khu</label>
+                        <select name="default_location_id"
+                            class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
+                            <option value="">-- Chưa định khu --</option>
+                            @foreach ($locations as $location)
+                                <option value="{{ $location->id }}"
+                                    {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
+                                    {{ $location->warehouse_name ?: '—' }} /
+                                    {{ $location->shelf_name ?: '—' }} /
+                                    {{ $location->column_name ?: '—' }} /
+                                    {{ $location->tier_name ?: '—' }} /
+                                    {{ $location->code }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if ($bag->has('default_location_id'))
+                            <span class="md-error">{{ $bag->first('default_location_id') }}</span>
+                        @endif
+                        <small class="md-sub">Chỗ <b>dự kiến</b> để hàng. Định khu thật của từng lô vẫn khai lúc
+                            nhập.</small>
                     </div>
 
                     <div class="form-group">

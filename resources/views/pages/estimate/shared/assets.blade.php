@@ -326,6 +326,53 @@
         color: #64748b;
     }
 
+    /* ---------- Chip nhóm hoá chất NĐ 24/2026 trên bảng chi tiết ---------- */
+    .est-cls-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .est-cls-chip {
+        display: inline-block;
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        border: 1px solid var(--primary-lighter);
+        border-radius: 999px;
+        padding: 1px 9px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        cursor: help;
+    }
+
+    /* Nhóm 9, 10 - phải lập Kế hoạch phòng ngừa, ứng phó sự cố (Phụ lục IV) */
+    .est-cls-chip.critical {
+        background: #FEE2E2;
+        color: #B91C1C;
+        border-color: #FCA5A5;
+    }
+
+    /* Nhóm 4, 6, 11 - hoá chất cấm */
+    .est-cls-chip.banned {
+        background: #FEF3C7;
+        color: #B45309;
+        border-color: #FCD34D;
+    }
+
+    /* Nhãn khối Phụ lục III (nhóm 3..8) - hoá chất kiểm soát đặc biệt */
+    .est-cls-special {
+        display: inline-block;
+        background: #EDE9FE;
+        color: #6D28D9;
+        border: 1px solid #C4B5FD;
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+
     /* ---------- Nhãn hoá chất ngoài danh mục ---------- */
     .est-outside {
         display: inline-block;

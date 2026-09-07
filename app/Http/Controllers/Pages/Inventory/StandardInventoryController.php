@@ -423,6 +423,85 @@ class StandardInventoryController extends Controller
     }
 
     /**
+     * Ghi khối lượng "Bì sau khi sử dụng" của ống chuẩn có kiểm soát khối lượng.
+     *
+     * Chỉ nhập được khi ống đã có khối lượng "Bì + Chuẩn" ghi lúc sử dụng lần đầu,
+     * vì hai số này luôn đi thành một cặp để đối chiếu lượng chuẩn đã lấy ra.
+     */
+    public function tareWeight(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $import = DB::table('standard_imports')
+            ->where('id', $request->import_id)
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->first();
+
+        if (! $import) {
+            return redirect()->back()->with('error', 'Không tìm thấy mã ống chuẩn!');
+        }
+
+        if (! $import->weight_controlled) {
+            return redirect()->back()->with('error', 'Ống chuẩn '.$import->code.' không khai báo kiểm soát khối lượng.');
+        }
+
+        if ($import->gross_weight_before === null) {
+            return redirect()->back()->with(
+                'error',
+                'Ống chuẩn '.$import->code.' chưa có Khối lượng Bì + Chuẩn nên chưa nhập được khối lượng bì sau khi sử dụng.'
+            );
+        }
+
+        $validator = Validator::make($request->all(), [
+            'import_id' => ['required', 'exists:standard_imports,id'],
+            'tare_weight_after' => ['required', 'numeric', 'min:0'],
+        ], [
+            'tare_weight_after.required' => 'Vui lòng nhập Khối lượng bì sau khi sử dụng.',
+            'tare_weight_after.numeric' => 'Khối lượng bì sau khi sử dụng phải là số.',
+            'tare_weight_after.min' => 'Khối lượng bì sau khi sử dụng không được âm.',
+        ]);
+
+        $validator->after(function ($validator) use ($request, $import) {
+            if (! is_numeric($request->tare_weight_after)) {
+                return;
+            }
+
+            // Bì sau khi dùng luôn nhẹ hơn cả bì lẫn chuẩn, lớn hơn là cân sai hoặc nhầm ống
+            if ((float) $request->tare_weight_after > (float) $import->gross_weight_before) {
+                $validator->errors()->add(
+                    'tare_weight_after',
+                    'Khối lượng bì sau khi sử dụng không được lớn hơn Khối lượng Bì + Chuẩn ('
+                    .$this->number((float) $import->gross_weight_before).').'
+                );
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput()->with('error', $validator->errors()->first());
+        }
+
+        DB::table('standard_imports')->where('id', $import->id)->update([
+            'tare_weight_after' => (float) $request->tare_weight_after,
+            'updated_by' => $this->actor(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Cân khối lượng',
+            'standard_imports',
+            $import->id,
+            $import->tare_weight_after !== null ? $this->number((float) $import->tare_weight_after) : 'Trống',
+            'Khối lượng bì sau khi sử dụng của ống '.$import->code.': '.$this->number((float) $request->tare_weight_after)
+        );
+
+        return redirect()->back()->with(
+            'success',
+            'Đã lưu khối lượng bì sau khi sử dụng cho mã ống chuẩn '.$import->code
+        );
+    }
+
+    /**
      * CẬP NHẬT HẠN DÙNG - badge "Retest" / "Check online" trên bảng tồn.
      *
      * Sau mỗi lần kiểm nghiệm lại (retest) hoặc tra cứu hạn trực tuyến (check online),
@@ -809,6 +888,8 @@ class StandardInventoryController extends Controller
                 'standard_imports.invoice_number',
                 'standard_imports.weight_controlled',
                 'standard_imports.weight_deviation_remark',
+                'standard_imports.gross_weight_before',
+                'standard_imports.tare_weight_after',
                 'standard_imports.standard_form',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',

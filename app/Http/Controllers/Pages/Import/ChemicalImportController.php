@@ -8,6 +8,7 @@ use App\Support\AttachmentBackup;
 use App\Support\Barcode128;
 use App\Support\ChemicalCode;
 use App\Support\DepartmentChemical;
+use App\Support\ListRange;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,6 +66,12 @@ class ChemicalImportController extends Controller
     {
         $departmentId = $this->departmentId();
 
+        // Sổ nhập chỉ lấy đúng một trang trong khoảng ngày đang lọc (mặc định 30 ngày
+        // gần nhất), không nạp toàn bộ phiếu nhập của phòng như trước.
+        $bookRange = ListRange::of($request, 'book_');
+        $bookKeyword = ListRange::keyword($request, 'book_');
+        $bookPerPage = ListRange::perPage($request, 'book_');
+
         $datas = DB::table(self::TABLE)
             ->leftJoin('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
@@ -99,9 +106,20 @@ class ChemicalImportController extends Controller
                 'tiers.name as tier_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
+            ->tap(ListRange::dateFilter(self::TABLE.'.imported_date', $bookRange))
+            ->tap(ListRange::search([
+                self::TABLE.'.code',
+                self::TABLE.'.batch_no',
+                self::TABLE.'.invoice_number',
+                'chemical_categories.code',
+                'chem_names.name',
+                'suppliers.name',
+                'locations.code',
+            ], $bookKeyword))
             ->orderBy(self::TABLE.'.imported_date', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')
-            ->get();
+            ->paginate($bookPerPage, ['*'], ListRange::pageName('book_'))
+            ->withQueryString();
 
         session()->put(['title' => 'NHẬP - NHẬP HOÁ CHẤT']);
 
@@ -122,6 +140,7 @@ class ChemicalImportController extends Controller
             return [$category->id => [
                 'location_id' => $dc->default_location_id ?? null,
                 'info_html' => implode(' | ', $info),
+                'unit' => $category->unit_short_name ?: '',
             ]];
         })->toArray();
 
@@ -147,6 +166,9 @@ class ChemicalImportController extends Controller
             'report' => $this->importReport($departmentId, $from, $to),
             'reportFrom' => $from,
             'reportTo' => $to,
+            'bookRange' => $bookRange,
+            'bookKeyword' => $bookKeyword,
+            'bookPerPage' => $bookPerPage,
             // Số lần điều chỉnh của từng phiếu, hiện thành badge ở góc nút Sửa thay vì một nút riêng
             'historyCounts' => $this->historyCounts($departmentId),
             // Lọc xong thì trang tải lại, quay về đúng tab báo cáo thay vì tab sổ

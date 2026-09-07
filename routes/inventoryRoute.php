@@ -47,6 +47,7 @@ Route::prefix('/inventory')
             Route::post('balancing', 'balancing')->name('balancing');
             Route::post('internalExpiry', 'internalExpiry')->name('internalExpiry');
             Route::post('weightRemark', 'weightRemark')->name('weightRemark');
+            Route::post('tareWeight', 'tareWeight')->name('tareWeight');
             // Cập nhật hạn dùng cho ống Retest / Check online, lưu vết ở standard_expiry_updates
             Route::post('expiryUpdate', 'expiryUpdate')->name('expiryUpdate');
             Route::get('expiry-attachment/{id}', 'downloadExpiryAttachment')->name('downloadExpiryAttachment');

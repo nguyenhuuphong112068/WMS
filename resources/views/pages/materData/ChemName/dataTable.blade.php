@@ -78,7 +78,7 @@
                                     // Ngưỡng của tên hoá chất: hỗn hợp thuộc nhóm 10 thì lấy ngưỡng nhóm nguy hại thấp nhất
                                     $governThr = $row->is_table_b ? $row->min_hazard_threshold_kg : $minTableAThr;
                                     $groups = $row->derived_groups ?? [];
-                                    $groupSearch = collect($groups)->map(fn ($g) => 'Nhóm ' . $g)->implode(' ');
+                                    $groupSearch = collect($groups)->map(fn ($g) => \App\Support\ChemicalClassification::shortLabel($g))->implode(' ');
 
                                     $cls = collect($row->classifications ?? []);
                                     $apxOrder = ['I' => 1, 'II' => 2, 'III' => 3, 'IV' => 4];
@@ -99,7 +99,7 @@
                                                 <span class="md-formula">{{ $ai->name }}</span>
                                                 @foreach ($ai->groups as $g)
                                                     <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }} ml-1"
-                                                        title="{{ $groupLabels[$g] ?? ('Nhóm ' . $g) }}">Nhóm {{ $g }}</span>
+                                                        title="{{ $groupLabels[$g] ?? \App\Support\ChemicalClassification::shortLabel($g) }}">{{ \App\Support\ChemicalClassification::shortLabel($g) }}</span>
                                                 @endforeach
                                                 @if ($ai->content_percent !== null)
                                                     <span class="md-sub ml-1">{{ $pct($ai->content_percent) }}%</span>
@@ -168,7 +168,7 @@
                                         data-order="{{ $groups ? min($groups) : 99 }}">
                                         @forelse ($groups as $g)
                                             <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }} mr-1 mb-1"
-                                                title="{{ $groupLabels[$g] ?? ('Nhóm ' . $g) }}">Nhóm {{ $g }}</span>
+                                                title="{{ $groupLabels[$g] ?? \App\Support\ChemicalClassification::shortLabel($g) }}">{{ \App\Support\ChemicalClassification::shortLabel($g) }}</span>
                                         @empty
                                             <span class="md-empty">Không thuộc</span>
                                         @endforelse

@@ -33,16 +33,9 @@
                     <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}"
                         data-pane="expPaneTransfer">
                         <i class="fas fa-people-arrows mr-1"></i> Đề nghị cấp phát chuẩn liên phòng ban
-                        @php
-                            // Cần cấp phát (mình là B) + đã cấp, chờ mình xác nhận Nhận (mình là A)
-                            $stdTransferPending = $transferReceived->whereIn('status', ['pending', 'partial'])->count();
-                            $stdTransferAwaitingReceipt = $transferSent->pluck('id')
-                                ->flatMap(fn ($id) => $transferItems[$id] ?? collect())
-                                ->where('status', 'issued')->count();
-                            $stdTransferBadgeCount = $stdTransferPending + $stdTransferAwaitingReceipt;
-                        @endphp
-                        @if ($stdTransferBadgeCount)
-                            <span class="exp-tab-count">{{ $stdTransferBadgeCount }}</span>
+                        {{-- Do Controller đếm trên toàn bộ dữ liệu, không chỉ trang đang xem --}}
+                        @if ($transferBadgeCount)
+                            <span class="exp-tab-count">{{ $transferBadgeCount }}</span>
                         @endif
                     </button>
                 </div>
@@ -58,6 +51,17 @@
                         @endperm
                     </div>
 
+                    @include('pages.shared.rangeFilter', [
+                        'rfRoute' => $expRoute . 'list',
+                        'rfTab' => 'book',
+                        'rfPrefix' => 'book_',
+                        'rfRange' => $bookRange,
+                        'rfPerPage' => $bookPerPage,
+                        'rfKeyword' => $bookKeyword,
+                        'rfDateLabel' => 'Ngày sử dụng',
+                        'rfPlaceholder' => 'Mã ống chuẩn, tên chất chuẩn, số lô, chỉ tiêu...',
+                    ])
+
                     @include('pages.shared.barcodeSearch', [
                         'scanTitle' => 'Quét mã vạch',
                         'scanTables' => [
@@ -68,7 +72,7 @@
                     @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'mdTable'])
 
                     <div class="table-responsive">
-                        <table id="mdTable" class="table table-bordered table-hover w-100">
+                        <table id="mdTable" class="table table-bordered table-hover w-100" data-server-paged>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 50px">STT</th>
@@ -86,18 +90,17 @@
                             <tbody>
                                 @foreach ($datas as $row)
                                     <tr data-groups="{{ $expGroups($row->groups) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td class="text-center">{{ $datas->firstItem() + $loop->index }}</td>
                                         <td>
                                             <span class="exp-code">{{ $row->code }}</span>
-                                            <div class="mt-1">
-                                                <span class="sd-group-tag">{{ $expGroupName($row->group_code) }}</span>
+                                            <div class="md-sub mt-1">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
                                             </div>
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
                                             <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                                <span class="sgr-version ml-1">v{{ $row->category_version }}</span>
+                                                <span class="sd-group-tag">{{ $expGroupName($row->group_code) }}</span>
                                                 @if ($row->standard_batch_no ?? $row->batch_no)
                                                     <span class="ml-1">Lô {{ $row->standard_batch_no ?? $row->batch_no }}</span>
                                                 @endif
@@ -145,23 +148,7 @@
                                             <div class="md-actions text-center">
                                                 @php $expAdjust = (int) ($adjustCounts[$row->id] ?? 0); @endphp
                                                 <span class="exp-btn-wrap">
-                                                    @perm('export_standard_issue')
-                                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                            title="Cập nhật phiếu"
-                                                            data-row="{{ json_encode([
-                                                                 'id' => $row->id,
-                                                                 'import_id' => $row->import_id,
-                                                                 'group_id' => $row->group_id,
-                                                                 'amount' => $row->amount,
-                                                                 'type' => $row->type,
-                                                                 'product_name' => $row->product_name,
-                                                                 'batch_no' => $row->batch_no,
-                                                                 'testing' => $row->testing,
-                                                                 'reason' => $row->reason,
-                                                             ]) }}">
-                                                            <i class="fas fa-edit"></i>
-                                                        </button>
-                                                    @endperm
+
 
                                                     @if ($expAdjust > 0)
                                                         <button type="button" class="exp-count-badge btn-exp-history"
@@ -177,6 +164,12 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @include('pages.shared.paginator', [
+                        'pgItems' => $datas,
+                        'pgTab' => 'book',
+                        'pgUnit' => 'phiếu sử dụng',
+                    ])
                 </div>
 
                 {{-- ============ ĐỀ NGHỊ CẤP PHÁT CHUẨN NỘI BỘ ============ --}}
@@ -192,8 +185,5 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Bảng dùng chung sắp theo cột 1, riêng sổ sử dụng cần xem lần dùng gần nhất trước
-        // (cột 6 = Ngày Sử Dụng)
-        $('#mdTable').DataTable().order([6, 'desc']).draw();
     });
 </script>

@@ -19,11 +19,6 @@
                             <input type="text" name="name" maxlength="255" class="form-control" value="{{ $req->name }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
                         </div>
 
-                        <label class="me-check mb-0">
-                            <input type="checkbox" name="needs_director" value="1" {{ $req->needs_director ? 'checked' : '' }}>
-                            Cần Ban Giám Đốc phê duyệt
-                        </label>
-
                         <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqEditModal_{{ $req->id }} .me-edit-rows">
                             <i class="fas fa-boxes-stacked mr-1"></i>Danh mục tồn của phòng
                         </button>
@@ -49,7 +44,7 @@
                                             </select>
                                         </td>
                                         <td><textarea name="items[{{ $i }}][material_name]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize" placeholder="Vật tư ngoài danh mục...">{{ $it->material_name }}</textarea></td>
-                                        <td><textarea name="items[{{ $i }}][technical_specification]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize me-spec" placeholder="Quy cách...">{{ $it->technical_specification }}</textarea></td>
+                                        <td><textarea name="items[{{ $i }}][technical_specification]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize me-spec" placeholder="Thông tin kỹ thuật..." {{ $it->category_id ? 'readonly' : '' }}>{{ $it->technical_specification }}</textarea></td>
                                         <td><input type="text" inputmode="decimal" min="0.0001" name="items[{{ $i }}][requested_amount]" class="form-control form-control-sm text-right js-decimal" value="{{ rtrim(rtrim(number_format((float) $it->requested_amount, 4, '.', ''), '0'), '.') }}" required></td>
                                         <td>
                                             <select name="items[{{ $i }}][requested_unit]" class="form-control form-control-sm me-unit">
@@ -66,6 +61,14 @@
                                 @endforeach
                             </tbody>
                         </table>
+                    </div>
+
+                    {{-- Bước ký chỉ định đích danh mới nạp lại được; bước cũ khai theo chức danh
+                         (phiếu chuyển từ luồng Trưởng Phòng -> Ban Giám Đốc) phải chọn lại người ký. --}}
+                    <div class="mt-3">
+                        @include('pages.export.MaterialExport.signFlowFields', [
+                            'flowSigners' => ($requestSigns->get($req->id, collect()))->pluck('user_id')->filter()->values()->all(),
+                        ])
                     </div>
 
                     <div class="form-group mt-3 mb-0">

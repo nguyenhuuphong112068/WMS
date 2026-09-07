@@ -87,8 +87,11 @@
                                 value="{{ old('exported_by') }}">
                         </div>
 
-                        <div class="form-group col-md-6">
-                            <label>Người Kiểm Tra</label>
+                        {{-- Chỉ hiện khi phiếu nhập đang chọn là hoá chất thuộc Nhóm HC Cấm (Luật
+                             Đầu tư 2025, số 143/2025/QH15); hoá chất thường không khai người kiểm
+                             tra nên JS giấu cả ô đi. --}}
+                        <div class="form-group col-md-6 exp-checker-group" style="display: none">
+                            <label>Người Kiểm Tra <span class="text-danger">*</span></label>
                             <select name="checked_by"
                                 class="form-control exp-select {{ $bag->has('checked_by') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chọn người kiểm tra --</option>
@@ -102,6 +105,10 @@
                             @if ($bag->has('checked_by'))
                                 <span class="md-error">{{ $bag->first('checked_by') }}</span>
                             @endif
+                            <small class="md-sub">
+                                Hoá chất thuộc {{ \App\Support\ChemicalClassification::shortLabel(11) }} (Luật Đầu tư
+                                2025, số 143/2025/QH15) bắt buộc có người kiểm tra.
+                            </small>
                         </div>
                     </div>
 
@@ -174,6 +181,9 @@
 @if ($bag->any())
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Mở lại modal với dữ liệu vừa nhập: phải phát sự kiện change để ô Người Kiểm
+            // Tra hiện / ẩn đúng theo phiếu nhập đang chọn (không có cú bấm nút Sửa ở đây)
+            $('#updateModal [name="import_id"]').trigger('change');
             $('#updateModal').modal('show');
         });
     </script>

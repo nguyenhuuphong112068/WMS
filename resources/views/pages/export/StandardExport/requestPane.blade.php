@@ -58,11 +58,17 @@
                 <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát chuẩn
             </button>
         @endperm
-        <p class="hint">
-            <i class="fas fa-info-circle mr-1"></i>
-            Chất chuẩn được quản lý nghiêm ngặt theo <b>Tổ</b>: Tổ lập đề nghị ➔ Quản lý kho cấp phát ➔ Nhân viên tổ chỉ được dùng chuẩn đã cấp.
-        </p>
     </div>
+
+    @include('pages.shared.rangeFilter', [
+        'rfRoute' => $expRoute . 'list',
+        'rfTab' => 'request',
+        'rfPrefix' => 'req_',
+        'rfRange' => $reqRange,
+        'rfPerPage' => $reqPerPage,
+        'rfSearch' => false,
+        'rfDateLabel' => 'Ngày lập',
+    ])
 
     <div class="table-responsive">
         <table id="stdRequestTable" class="table table-bordered table-hover w-100 exp-req-table">
@@ -84,7 +90,7 @@
                         $items = $requestItems[$req->id] ?? collect();
                     @endphp
                     <tr>
-                        <td class="text-center align-middle">{{ $loop->iteration }}</td>
+                        <td class="text-center align-middle">{{ $requests->firstItem() + $loop->index }}</td>
                         <td class="align-middle">
                             <span class="exp-code font-weight-bold">{{ $req->code }}</span>
                             @if ($req->note)
@@ -147,4 +153,10 @@
             </tbody>
         </table>
     </div>
+
+    @include('pages.shared.paginator', [
+        'pgItems' => $requests,
+        'pgTab' => 'request',
+        'pgUnit' => 'đề nghị',
+    ])
 </div>

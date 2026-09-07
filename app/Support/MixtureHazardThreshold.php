@@ -53,14 +53,25 @@ class MixtureHazardThreshold
 
         $withTableA = DB::table('chem_name_active_ingredient as p')
             ->join('active_ingredients as ai', 'ai.id', '=', 'p.active_ingredients_id')
+            // Mục gộp mà thành phần này là thành viên (active_ingredients.parent_id)
+            ->leftJoin('active_ingredients as pai', function ($join) {
+                $join->on('pai.id', '=', 'ai.parent_id')
+                    ->where('pai.status_id', 1)
+                    ->where('pai.app_status', 'approved');
+            })
             ->whereIn('p.chem_names_id', $mixtureIds)
-            // Thành phần thuộc nhóm 9 = có dòng phân loại Phụ lục IV / bảng A
+            // Thành phần thuộc nhóm 9 = CHÍNH NÓ có dòng phân loại Phụ lục IV / bảng A, hoặc
+            // nó là thành viên của một mục gộp thuộc Phụ lục IV / bảng A (ví dụ HgCl₂ nằm
+            // trong "Thủy ngân và các hợp chất của thủy ngân").
             ->whereExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('active_ingredient_classifications as aic')
-                    ->whereColumn('aic.active_ingredients_id', 'ai.id')
                     ->where('aic.appendix', 'IV')
-                    ->where('aic.table_ref', 'A');
+                    ->where('aic.table_ref', 'A')
+                    ->where(function ($inner) {
+                        $inner->whereColumn('aic.active_ingredients_id', 'ai.id')
+                            ->orWhereColumn('aic.active_ingredients_id', 'pai.id');
+                    });
             })
             ->where('ai.status_id', 1)
             ->where('ai.app_status', 'approved')

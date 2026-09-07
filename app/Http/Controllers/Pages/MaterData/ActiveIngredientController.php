@@ -47,6 +47,8 @@ class ActiveIngredientController extends Controller
         'cas_no' => 'Số CAS',
         'chemical_formula' => 'Công thức hoá học',
         'threshold_kg' => 'Ngưỡng tồn trữ (kg)',
+        'parent_id' => 'Thuộc mục gộp',
+        'equiv_factor' => 'Hệ số quy đổi về mục gộp',
     ];
 
     public function index()
@@ -65,7 +67,17 @@ class ActiveIngredientController extends Controller
             ->get(['active_ingredients_id', 'appendix', 'group_no', 'table_ref'])
             ->groupBy('active_ingredients_id');
 
+        // Mục gộp: tên để hiện ở cột, và số chất thành viên đang trỏ về
+        $collectiveNames = $this->collectives()->pluck('name', 'id');
+        $memberCounts = DB::table(self::TABLE)
+            ->whereNotNull('parent_id')
+            ->groupBy('parent_id')
+            ->select('parent_id', DB::raw('count(*) as total'))
+            ->pluck('total', 'parent_id');
+
         foreach ($datas as $row) {
+            // groups = nhóm hiển thị (đã gồm nhóm thừa hưởng từ mục gộp);
+            // own_groups = nhóm KHAI RIÊNG ở màn này, dùng để nạp lại checkbox khi sửa.
             $row->groups = $groupsByAi[$row->id] ?? [];
             $row->classifications = ($clsByAi[$row->id] ?? collect())
                 ->map(fn ($c) => [
@@ -75,6 +87,9 @@ class ActiveIngredientController extends Controller
                 ])
                 ->values()
                 ->all();
+            $row->own_groups = $this->groupsOf((int) $row->id);
+            $row->parent_name = $row->parent_id ? ($collectiveNames[$row->parent_id] ?? null) : null;
+            $row->member_count = (int) ($memberCounts[$row->id] ?? 0);
         }
 
         session()->put(['title' => 'DỮ LIỆU GỐC - TÊN HOẠT CHẤT']);
@@ -83,9 +98,32 @@ class ActiveIngredientController extends Controller
             'datas' => $datas,
             'groupLabels' => ChemicalClassification::GROUPS,
             'singleSubstanceGroups' => ChemicalClassification::SINGLE_SUBSTANCE_GROUPS,
+            // Danh sách mục gộp để chọn ở ô "Thuộc mục gộp"
+            'collectives' => $this->collectives(),
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
             'historyCounts' => DataMasterHistory::counts(self::TABLE),
         ]);
+    }
+
+    /**
+     * Các dòng "mục gộp" của nghị định ("Thủy ngân và các hợp chất của thủy ngân", "Các hợp
+     * chất xyanua"...) - đích để gắn một chất cụ thể vào (parent_id).
+     */
+    private function collectives()
+    {
+        return DB::table(self::TABLE)
+            ->where('is_collective', 1)
+            ->where('status_id', 1)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'threshold_kg']);
+    }
+
+    /** Đổi giá trị cột khoá ngoại thành chữ dễ đọc trong lịch sử thay đổi. */
+    private function historyMaps(): array
+    {
+        return [
+            'parent_id' => DB::table(self::TABLE)->pluck('name', 'id')->all(),
+        ];
     }
 
     public function store(Request $request)
@@ -120,7 +158,7 @@ class ActiveIngredientController extends Controller
             $note .= ' Phân loại NĐ 24/2026: ' . $this->groupLabels($groups) . '.';
         }
 
-        DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', $note, self::FIELDS);
+        DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', $note, self::FIELDS, $this->historyMaps());
 
         AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm ' . self::LABEL . ': ' . $request->name);
 
@@ -148,8 +186,9 @@ class ActiveIngredientController extends Controller
         $groups = $this->groupsFromRequest($request);
         $oldGroups = $this->groupsOf($current->id);
 
-        $payload = $this->payload($request, $groups);
-        $note = DataMasterHistory::note(self::FIELDS, $current, $payload);
+        $payload = $this->payload($request, $groups, $current);
+        $maps = $this->historyMaps();
+        $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $maps);
 
         if ($this->normalized($oldGroups) !== $this->normalized($groups)) {
             $note = trim($note . ' | Phân loại NĐ 24/2026: '
@@ -179,7 +218,7 @@ class ActiveIngredientController extends Controller
             $this->syncGroups($current->id, $groups, (int) $current->is_statutory);
         });
 
-        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, [], $this->changeReason($request));
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, $maps, $this->changeReason($request));
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->name, $request->name);
 
@@ -409,12 +448,29 @@ class ActiveIngredientController extends Controller
             'threshold_kg' => $isGroup9
                 ? ['required', 'numeric', 'gt:0', 'max:999999999']
                 : ['nullable', 'numeric', 'gt:0', 'max:999999999'],
+            // Chỉ được trỏ về một dòng ĐANG là mục gộp và không được trỏ về chính mình
+            // (mục gộp không lồng nhau nên chuỗi cha - con luôn chỉ sâu 1 cấp).
+            'parent_id' => [
+                'nullable',
+                'integer',
+                Rule::exists(self::TABLE, 'id')->where(fn ($q) => $q->where('is_collective', 1)->where('status_id', 1)),
+                Rule::notIn($ignoreId === null ? [] : [$ignoreId]),
+            ],
+            'equiv_factor' => ['nullable', 'numeric', 'gt:0', 'max:1000'],
         ];
     }
 
-    private function payload(Request $request, array $groups): array
+    private function payload(Request $request, array $groups, $current = null): array
     {
         $isGroup9 = in_array(9, $groups, true);
+        $parentId = (int) $request->input('parent_id') ?: null;
+        $equivFactor = trim((string) $request->input('equiv_factor'));
+
+        // Bản thân dòng này là MỤC GỘP thì không được là thành viên của mục gộp khác
+        // (mục gộp không lồng nhau).
+        if ($current && ! empty($current->is_collective)) {
+            $parentId = null;
+        }
 
         return [
             'name' => trim((string) $request->name),
@@ -423,6 +479,17 @@ class ActiveIngredientController extends Controller
             'chemical_formula' => $this->nullable($request->chemical_formula),
             // Ngưỡng chỉ có nghĩa với hoạt chất thuộc nhóm 9 (Phụ lục IV Bảng A)
             'threshold_kg' => $isGroup9 && trim((string) $request->threshold_kg) !== '' ? $request->threshold_kg : null,
+            // Mục gộp mà chất này là thành viên - tồn của nó cộng vào ngưỡng của mục gộp
+            'parent_id' => $parentId,
+            // Hệ số quy đổi chỉ có nghĩa khi thuộc mục gộp; không thuộc thì trả về 1.
+            // Format đúng decimal(9,6) để so sánh với giá trị cũ trong lịch sử không bị
+            // lệch chuỗi ("1" vs "1.000000") gây báo thay đổi ảo.
+            'equiv_factor' => number_format(
+                $parentId && $equivFactor !== '' ? (float) $equivFactor : 1.0,
+                6,
+                '.',
+                ''
+            ),
         ];
     }
 
@@ -447,6 +514,11 @@ class ActiveIngredientController extends Controller
             'threshold_kg.numeric' => 'Ngưỡng tồn trữ phải là số.',
             'threshold_kg.gt' => 'Ngưỡng tồn trữ phải lớn hơn 0.',
             'threshold_kg.max' => 'Ngưỡng tồn trữ quá lớn.',
+            'parent_id.exists' => 'Mục gộp không hợp lệ (chỉ chọn được dòng khai theo nhóm chất, đang hoạt động).',
+            'parent_id.not_in' => 'Không thể chọn chính hoạt chất này làm mục gộp của nó.',
+            'equiv_factor.numeric' => 'Hệ số quy đổi phải là số.',
+            'equiv_factor.gt' => 'Hệ số quy đổi phải lớn hơn 0.',
+            'equiv_factor.max' => 'Hệ số quy đổi quá lớn.',
         ];
     }
 }

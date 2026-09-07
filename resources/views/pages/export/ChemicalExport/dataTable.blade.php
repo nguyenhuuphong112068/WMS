@@ -17,19 +17,29 @@
                         data-pane="expPaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ sử dụng hoá chất
                     </button>
+                    <button type="button" class="exp-tab {{ $activeTab === 'draft' ? 'is-active' : '' }}"
+                        data-pane="expPaneDraft">
+                        <i class="fas fa-cart-shopping mr-1"></i> Phiếu Tạm
+                        @if ($drafts->count())
+                            <span class="exp-tab-count">{{ $drafts->count() }}</span>
+                        @endif
+                    </button>
+                    <button type="button" class="exp-tab {{ $activeTab === 'banned' ? 'is-active' : '' }}"
+                        data-pane="expPaneBanned">
+                        <i class="fas fa-ban mr-1"></i> Hoá chất Cấm
+                        {{-- Số lô đang còn tồn (chưa xuất hết) do Controller đếm, không phải
+                             đếm trên trang sổ đang hiển thị --}}
+                        @if ($bannedActiveLots)
+                            <span class="exp-tab-count exp-tab-count-banned">{{ $bannedActiveLots }}</span>
+                        @endif
+                    </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'request' ? 'is-active' : '' }}"
                         data-pane="expPaneRequest">
                         <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
-                        @php
-                            // Cần cấp phát (mình là B) + đã cấp, chờ mình xác nhận Nhận (mình là A)
-                            $expReqPending = $transferReceived->whereIn('status', ['pending', 'partial'])->count();
-                            $expReqAwaitingReceipt = $transferSent->pluck('id')
-                                ->flatMap(fn ($id) => $transferItems[$id] ?? collect())
-                                ->where('status', 'issued')->count();
-                            $expReqBadgeCount = $expReqPending + $expReqAwaitingReceipt;
-                        @endphp
-                        @if ($expReqBadgeCount)
-                            <span class="exp-tab-count">{{ $expReqBadgeCount }}</span>
+                        {{-- Cần cấp phát (mình là B) + đã cấp, chờ mình xác nhận Nhận (mình là A),
+                             do Controller đếm trên toàn bộ dữ liệu chứ không chỉ trang đang xem --}}
+                        @if ($transferBadgeCount)
+                            <span class="exp-tab-count">{{ $transferBadgeCount }}</span>
                         @endif
                     </button>
                     @perm('export_chemical_disposal_view')
@@ -41,13 +51,6 @@
                             @endif
                         </button>
                         @endperm
-                    <button type="button" class="exp-tab {{ $activeTab === 'draft' ? 'is-active' : '' }}"
-                        data-pane="expPaneDraft">
-                        <i class="fas fa-cart-shopping mr-1"></i> Phiếu Tạm
-                        @if ($drafts->count())
-                            <span class="exp-tab-count">{{ $drafts->count() }}</span>
-                        @endif
-                    </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'report' ? 'is-active' : '' }}"
                         data-pane="expPaneReport">
                         <i class="fas fa-chart-column mr-1"></i> Báo cáo theo khoảng thời gian
@@ -65,6 +68,17 @@
                         @endperm
                     </div>
 
+                    @include('pages.shared.rangeFilter', [
+                        'rfRoute' => $expRoute . 'list',
+                        'rfTab' => 'book',
+                        'rfPrefix' => 'book_',
+                        'rfRange' => $bookRange,
+                        'rfPerPage' => $bookPerPage,
+                        'rfKeyword' => $bookKeyword,
+                        'rfDateLabel' => 'Ngày sử dụng',
+                        'rfPlaceholder' => 'Mã xuất nhập, tên hoá chất, mục đích, người sử dụng...',
+                    ])
+
                     @include('pages.shared.barcodeSearch', [
                         'scanTitle' => 'Quét mã vạch',
                         'scanTables' => [
@@ -80,7 +94,7 @@
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'mdTable'])
 
                     <div class="table-responsive">
-                        <table id="mdTable" class="table table-bordered table-hover w-100">
+                        <table id="mdTable" class="table table-bordered table-hover w-100" data-server-paged>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
@@ -100,16 +114,25 @@
                                     @php $expAdjust = (int) ($adjustCounts[$row->id] ?? 0); @endphp
                                     {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
                                     <tr data-classification="{{ $expCls($row->category_id) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td><span class="exp-code">{{ $row->code }}</span></td>
+                                        <td class="text-center">{{ $datas->firstItem() + $loop->index }}</td>
                                         <td>
-                                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
-                                            <div class="md-sub">
+                                            <span class="exp-code">{{ $row->code }}</span>
+                                            <div class="md-sub mt-1">
                                                 <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                                @if ($row->batch_no)
-                                                    <span class="md-sub ml-1">Lô {{ $row->batch_no }}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="font-weight-bold">
+                                                {{ $row->chem_name ?: '—' }}
+                                                @if ($expIsSpecial($row->category_id))
+                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                    </span>
                                                 @endif
                                             </div>
+                                            @if ($row->batch_no)
+                                                <div class="md-sub">Lô {{ $row->batch_no }}</div>
+                                            @endif
                                         </td>
                                         <td class="text-right">
                                             <span
@@ -220,16 +243,25 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @include('pages.shared.paginator', [
+                        'pgItems' => $datas,
+                        'pgTab' => 'book',
+                        'pgUnit' => 'phiếu sử dụng',
+                    ])
                 </div>
+
+                {{-- ============ PHIẾU TẠM (LƯU TẠM TỪ PICKER TỒN KHO CỦA PHÒNG) ============ --}}
+                @include('pages.export.ChemicalExport.draftPane')
+
+                {{-- ============ HOÁ CHẤT CẤM (NHÓM 11 - LUẬT ĐẦU TƯ 2025, SỐ 143/2025/QH15) ============ --}}
+                @include('pages.export.ChemicalExport.bannedPane')
 
                 {{-- ============ ĐỀ NGHỊ CHUYỂN HOÁ CHẤT LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.ChemicalExport.transferPane')
 
                 {{-- ============ HOÁ CHẤT CHỜ HUỶ (BƯỚC 2 CỦA HUỶ BỎ) ============ --}}
                 @include('pages.export.ChemicalExport.disposalPane')
-
-                {{-- ============ PHIẾU TẠM (LƯU TẠM TỪ PICKER CHỌN NHIỀU) ============ --}}
-                @include('pages.export.ChemicalExport.draftPane')
 
                 <div class="exp-pane {{ $activeTab === 'report' ? 'is-active' : '' }}" id="expPaneReport">
 
@@ -289,7 +321,14 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td><span class="exp-code">{{ $row->category_code }}</span></td>
                                         <td>
-                                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
+                                            <div class="font-weight-bold">
+                                                {{ $row->chem_name ?: '—' }}
+                                                @if ($expIsSpecial($row->category_id))
+                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                    </span>
+                                                @endif
+                                            </div>
                                             <div class="md-sub">
                                                 {{ $row->code_count }} mã xuất nhập · đơn vị {{ $row->unit }}
                                                 @if ($row->density !== null)
@@ -350,7 +389,28 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Bảng dùng chung sắp theo cột 1, riêng phiếu sử dụng cần xem lần gần nhất trước
-        $('#mdTable').DataTable().order([5, 'desc']).draw();
+        // Tiêu đề bảng có 2 hàng (nhóm cột "Khối lượng") nên sắp xếp phải bám hàng dưới.
+        // Sổ đã được Controller phân trang và cộng dồn số dư theo đúng thứ tự thời gian
+        // nên tắt phân trang / sắp xếp lại của DataTables, giữ nguyên thứ tự server gửi về.
+        $('#expBannedTable').DataTable({
+            autoWidth: false,
+            orderCellsTop: true,
+            paging: false,
+            info: false,
+            lengthChange: false,
+            ordering: false,
+            language: {
+                search: 'Tìm kiếm:',
+                lengthMenu: 'Hiển thị _MENU_ dòng',
+                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                infoEmpty: 'Không có dữ liệu',
+                zeroRecords: 'Không tìm thấy dòng nào phù hợp',
+                emptyTable: 'Chưa có dữ liệu Sổ Hoá chất Cấm.',
+                paginate: {
+                    previous: 'Trước',
+                    next: 'Sau'
+                }
+            }
+        });
     });
 </script>

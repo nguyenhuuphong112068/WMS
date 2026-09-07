@@ -487,6 +487,7 @@ class ChemicalInventoryController extends Controller
                 'chemical_imports.invoice_number',
                 'chemical_imports.is_microbiological_chemicals',
                 'chemical_categories.code as category_code',
+                'chemical_categories.type as category_type',
                 DepartmentChemical::shelfLifeColumn(),
                 DepartmentChemical::minStockColumn(),
                 'chem_names.name as chem_name',

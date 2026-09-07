@@ -14,7 +14,11 @@
     $expReqBadge = $expReqBadge ?? fn($status) => $expReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
     $expNum = $expNum ?? fn($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
     $expDate = $expDate ?? fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
-    $transferAll = $transferSent->merge($transferReceived)->unique('id');
+    // $transferSent / $transferReceived giờ là LengthAwarePaginator (đã phân trang) chứ
+    // không còn là Collection thường - phải lấy đúng danh sách bản ghi qua getCollection()
+    // trước khi gộp, nếu không merge() sẽ đọc theo toArray() của paginator (mảng
+    // 'current_page', 'data', 'total'...) chứ không phải danh sách phiếu.
+    $transferAll = $transferSent->getCollection()->merge($transferReceived->getCollection())->unique('id');
 @endphp
 
 @foreach ($transferAll as $req)
@@ -92,6 +96,11 @@
                                         <td class="align-middle">
                                             <span class="font-weight-bold text-dark">{{ $item->chem_name }}</span>
                                             <span class="badge badge-secondary ml-1">{{ $item->category_code }}</span>
+                                            @if ($expIsSpecial($item->category_id))
+                                                <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                    <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                </span>
+                                            @endif
                                         </td>
                                         <td class="align-middle text-right font-weight-bold text-primary">
                                             {{ $expNum($item->requested_amount) }} {{ $item->requested_unit }}

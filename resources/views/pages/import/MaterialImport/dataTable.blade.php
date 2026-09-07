@@ -17,6 +17,16 @@
                     @endperm
                 </div>
 
+                @include('pages.shared.rangeFilter', [
+                    'rfRoute' => $impRoute . 'list',
+                    'rfPrefix' => 'book_',
+                    'rfRange' => $bookRange,
+                    'rfPerPage' => $bookPerPage,
+                    'rfKeyword' => $bookKeyword,
+                    'rfDateLabel' => 'Ngày nhập',
+                    'rfPlaceholder' => 'Mã xuất nhập, tên vật tư, vị trí, ghi chú...',
+                ])
+
                 @include('pages.shared.barcodeSearch', [
                     'scanTitle' => 'Quét mã QR',
                     'scanTables' => [
@@ -25,7 +35,7 @@
                 ])
 
                 <div class="table-responsive">
-                    <table id="mdTable" class="table table-bordered table-hover w-100">
+                    <table id="mdTable" class="table table-bordered table-hover w-100" data-server-paged>
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 45px">STT</th>
@@ -58,9 +68,14 @@
                                         $row->min_stock !== null && (float) $row->amount <= (float) $row->min_stock;
                                 @endphp
                                 <tr>
-                                    <td class="text-center">{{ $loop->iteration }}</td>
+                                    <td class="text-center">{{ $datas->firstItem() + $loop->index }}</td>
                                     <td>
                                         <div class="imp-code font-weight-bold">{{ $row->code }}</div>
+                                        @if ($row->category_code)
+                                            <div class="md-sub mt-1">
+                                                <span class="md-tag">{{ $row->category_code }}</span>
+                                            </div>
+                                        @endif
                                         @unless ($row->status_id)
                                             <span class="badge badge-secondary mt-1">Đã khoá</span>
                                         @endunless
@@ -173,15 +188,9 @@
                     </table>
                 </div>
 
+                @include('pages.shared.paginator', ['pgItems' => $datas, 'pgUnit' => 'phiếu nhập'])
+
             </div>
         </div>
     </div>
 </div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        if ($.fn.DataTable.isDataTable('#mdTable')) {
-            $('#mdTable').DataTable().order([6, 'desc']).draw();
-        }
-    });
-</script>

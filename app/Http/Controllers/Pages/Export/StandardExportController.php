@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
 use App\Support\DepartmentStandard;
+use App\Support\ListRange;
 use App\Support\StandardCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -63,9 +64,24 @@ class StandardExportController extends Controller
         'cancel' => 'Loại bỏ',
     ];
 
+    /**
+     * Trạng thái đề nghị chuyển liên phòng ban còn DỞ DANG - bộ lọc khoảng ngày luôn
+     * giữ lại các đề nghị này dù đã ngoài khoảng lọc.
+     */
+    private const TRANSFER_PENDING_STATUSES = ['draft', 'pending', 'partial'];
+
+    /** Đề nghị cấp phát chuẩn của Tổ còn DỞ DANG. */
+    private const REQ_PENDING_STATUSES = ['pending', 'partial'];
+
     public function index(Request $request)
     {
         $departmentId = $this->departmentId();
+
+        // Sổ sử dụng chỉ lấy đúng một trang trong khoảng ngày đang lọc (mặc định 30 ngày
+        // gần nhất), không nạp toàn bộ phiếu sử dụng của phòng như trước.
+        $bookRange = ListRange::of($request, 'book_');
+        $bookKeyword = ListRange::keyword($request, 'book_');
+        $bookPerPage = ListRange::perPage($request, 'book_');
 
         $datas = DB::table(self::TABLE)
             ->leftJoin('standard_imports', self::TABLE.'.import_id', '=', 'standard_imports.id')
@@ -89,11 +105,25 @@ class StandardExportController extends Controller
                 'groups.name as group_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
+            ->tap(ListRange::dateFilter(self::TABLE.'.created_at', $bookRange))
+            ->tap(ListRange::search([
+                self::TABLE.'.code',
+                'standard_categories.code',
+                'standard_names.name',
+                self::TABLE.'.product_name',
+                self::TABLE.'.batch_no',
+                self::TABLE.'.testing',
+            ], $bookKeyword))
             ->orderBy(self::TABLE.'.created_at', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')
-            ->get();
+            ->paginate($bookPerPage, ['*'], ListRange::pageName('book_'))
+            ->withQueryString();
 
-        // Danh sách Đề nghị cấp phát chuẩn của các Tổ
+        // Danh sách Đề nghị cấp phát chuẩn của các Tổ: lọc theo ngày lập nhưng luôn giữ
+        // các đề nghị còn dở dang (chưa cấp xong) dù đã ngoài khoảng lọc.
+        $reqRange = ListRange::of($request, 'req_');
+        $reqPerPage = ListRange::perPage($request, 'req_');
+
         $requests = DB::table('standard_request_lists')
             ->leftJoin('groups', 'standard_request_lists.group_id', '=', 'groups.id')
             ->select(
@@ -101,8 +131,15 @@ class StandardExportController extends Controller
                 'groups.name as group_name'
             )
             ->where('standard_request_lists.department_id', $departmentId)
+            ->tap(ListRange::dateFilterKeepPending(
+                'standard_request_lists.created_at',
+                $reqRange,
+                'standard_request_lists.status',
+                self::REQ_PENDING_STATUSES
+            ))
             ->orderBy('standard_request_lists.created_at', 'desc')
-            ->get();
+            ->paginate($reqPerPage, ['*'], ListRange::pageName('req_'))
+            ->withQueryString();
 
         $requestItems = DB::table('standard_request_items')
             ->leftJoin('standard_request_lists', 'standard_request_items.request_list_id', '=', 'standard_request_lists.id')
@@ -127,7 +164,9 @@ class StandardExportController extends Controller
                 'purposes.name as purpose_name',
                 DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
             )
-            ->where('standard_request_lists.department_id', $departmentId)
+            // Chỉ lấy dòng của đúng những đề nghị đang hiển thị trên trang (đã phân trang
+            // ở trên), không kéo toàn bộ lịch sử của phòng ban về nữa.
+            ->whereIn('standard_request_items.request_list_id', $requests->pluck('id'))
             ->get()
             ->groupBy('request_list_id');
 
@@ -237,7 +276,7 @@ class StandardExportController extends Controller
         });
 
         // Đề nghị cấp phát chuẩn LIÊN PHÒNG BAN: đã gửi đi (mình là A) / cần cấp phát (mình là B)
-        $transfer = $this->transferRequestsData($departmentId);
+        $transfer = $this->transferRequestsData($departmentId, $request);
 
         // Vị trí lưu CỦA CHÍNH PHÒNG MÌNH, dùng khi mình là A bấm Nhận (bước 3) - khác B
         // chọn hộ vị trí như cơ chế cũ, giờ luôn là phòng đang đăng nhập tự chọn cho mình.
@@ -282,10 +321,20 @@ class StandardExportController extends Controller
             'transferSent' => $transfer['sent'],
             'transferReceived' => $transfer['received'],
             'transferItems' => $transfer['items'],
+            'transferBadgeCount' => $transfer['badgeCount'],
+            'transferSentRange' => $transfer['sentRange'],
+            'transferSentPerPage' => $transfer['sentPerPage'],
+            'transferReceivedRange' => $transfer['receivedRange'],
+            'transferReceivedPerPage' => $transfer['receivedPerPage'],
             'transferDepartments' => $this->transferDepartmentOptions($departmentId),
             'transferOwnLocations' => $transferOwnLocations,
             'declaredCategoryIds' => $declaredCategoryIds,
             'currentDepartmentId' => $departmentId,
+            'bookRange' => $bookRange,
+            'bookKeyword' => $bookKeyword,
+            'bookPerPage' => $bookPerPage,
+            'reqRange' => $reqRange,
+            'reqPerPage' => $reqPerPage,
         ]);
     }
 
@@ -382,6 +431,8 @@ class StandardExportController extends Controller
                 'standard_imports.moisture',
                 'standard_imports.standard_form',
                 'standard_imports.expiry_type',
+                'standard_imports.weight_controlled',
+                'standard_imports.gross_weight_before',
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_names.name as standard_name',
@@ -420,13 +471,26 @@ class StandardExportController extends Controller
         $used = $this->sumByImport(self::TABLE, 'amount', $departmentId);
         $balanced = $this->sumByImport('standard_balancings', 'balancing_amount', $departmentId);
 
-        $issuedItems->transform(function ($item) use ($attachments, $used, $balanced) {
+        // Ống chuẩn đã từng có phiếu SỬ DỤNG: dùng để nhận ra lần sử dụng đầu tiên,
+        // lúc đó ống kiểm soát khối lượng mới phải cân "Bì + Chuẩn".
+        $everUsed = DB::table(self::TABLE)
+            ->where('department_id', $departmentId)
+            ->where('type', 'export')
+            ->whereIn('import_id', $importIds)
+            ->distinct()
+            ->pluck('import_id')
+            ->flip();
+
+        $issuedItems->transform(function ($item) use ($attachments, $used, $balanced, $everUsed) {
             $item->attachments = $attachments->get($item->import_id, collect())->values();
             
             $amount = (float) $item->import_amount;
             $itemUsed = (float) ($used[$item->import_id] ?? 0);
             $itemBalanced = (float) ($balanced[$item->import_id] ?? 0);
             $item->actual_remaining = max($amount + $itemBalanced - $itemUsed, 0);
+
+            // Chỉ hỏi khối lượng "Bì + Chuẩn" một lần: ống chưa từng xuất và chưa có số cân
+            $item->is_first_use = ! $everUsed->has($item->import_id) && $item->gross_weight_before === null;
 
             return $item;
         });
@@ -1810,6 +1874,29 @@ class StandardExportController extends Controller
 
         $this->logHistory($id, 'Thêm mới');
 
+        /*
+        | Số cân "Bì + Chuẩn" gắn với ỐNG chứ không gắn với phiếu, nên ghi thẳng vào
+        | standard_imports và chỉ ghi một lần - lần sử dụng đầu tiên.
+        */
+        if ($request->type === 'export'
+            && $import->weight_controlled
+            && $import->gross_weight_before === null
+            && is_numeric($request->gross_weight_before)) {
+            DB::table('standard_imports')->where('id', $import->id)->update([
+                'gross_weight_before' => (float) $request->gross_weight_before,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            AuditTrialController::log(
+                'Cân khối lượng',
+                'standard_imports',
+                $import->id,
+                'Trống',
+                'Khối lượng Bì + Chuẩn trước khi dùng của ống '.$import->code.': '.$this->number((float) $request->gross_weight_before)
+            );
+        }
+
         AuditTrialController::log(
             'Thêm mới',
             self::TABLE,
@@ -2125,6 +2212,18 @@ class StandardExportController extends Controller
     }
 
     /**
+     * Ống chuẩn đã từng có phiếu SỬ DỤNG chưa. Chỉ hỏi khối lượng "Bì + Chuẩn" ở
+     * lần đầu, ống dùng từ trước khi có tính năng này không bị chặn lại.
+     */
+    private function hasUsage(int $importId): bool
+    {
+        return DB::table(self::TABLE)
+            ->where('import_id', $importId)
+            ->where('type', 'export')
+            ->exists();
+    }
+
+    /**
      * Tồn còn lại của một ống chuẩn, có thể bỏ qua một phiếu xuất đang được sửa.
      *
      * Tồn = số lượng nhập + số đã cân đối - số đã xuất (kể cả phần huỷ bỏ).
@@ -2215,6 +2314,23 @@ class StandardExportController extends Controller
                 }
             }
 
+            /*
+            | Ống chuẩn có kiểm soát khối lượng: lần SỬ DỤNG đầu tiên phải cân và ghi lại
+            | khối lượng "Bì + Chuẩn". Ống đã có số cân, hoặc đã từng xuất trước khi mở
+            | tính năng này, thì không hỏi lại nữa.
+            */
+            if ($ignoreExportId === null
+                && $request->type === 'export'
+                && $import->weight_controlled
+                && $import->gross_weight_before === null
+                && ! $this->hasUsage((int) $import->id)
+                && ! is_numeric($request->gross_weight_before)) {
+                $validator->errors()->add(
+                    'gross_weight_before',
+                    'Ống chuẩn '.$import->code.' có kiểm soát khối lượng, lần sử dụng đầu tiên phải nhập Khối lượng Bì + Chuẩn.'
+                );
+            }
+
             if (! is_numeric($request->amount)) {
                 return;
             }
@@ -2259,6 +2375,8 @@ class StandardExportController extends Controller
             'batch_no' => ['nullable', 'max:100'],
             'testing' => ['nullable', 'max:255'],
             'reason' => ['nullable', 'max:500'],
+            // Khối lượng "Bì + Chuẩn" cân trước lần dùng đầu, chỉ ống kiểm soát khối lượng mới có
+            'gross_weight_before' => ['nullable', 'numeric', 'min:0.0001'],
             'request_item_id' => ['nullable', 'exists:standard_request_items,id'],
             // Chỉ ghi vào lịch sử điều chỉnh, không lưu thành cột của standard_exports
             'adjust_reason' => ['nullable', 'max:500'],
@@ -2334,6 +2452,8 @@ class StandardExportController extends Controller
             'amount.min' => 'Số lượng phải lớn hơn 0.',
             'type.required' => 'Vui lòng chọn loại phiếu.',
             'type.in' => 'Loại phiếu không hợp lệ.',
+            'gross_weight_before.numeric' => 'Khối lượng Bì + Chuẩn phải là số.',
+            'gross_weight_before.min' => 'Khối lượng Bì + Chuẩn phải lớn hơn 0.',
             'adjust_reason.max' => 'Lý do điều chỉnh tối đa 500 ký tự.',
         ];
     }
@@ -2343,23 +2463,40 @@ class StandardExportController extends Controller
      * kèm các mục con group theo transfer_request_id. Cùng hình dạng với transferRequests()
      * của ChemicalExportController.
      */
-    private function transferRequestsData(int $departmentId): array
+    private function transferRequestsData(int $departmentId, Request $request): array
     {
         $base = fn () => DB::table(self::TRANSFER_REQUEST_TABLE)
             ->select(self::TRANSFER_REQUEST_TABLE.'.*')
             ->orderBy(self::TRANSFER_REQUEST_TABLE.'.created_at', 'desc');
 
+        $sentRange = ListRange::of($request, 'tsent_');
+        $receivedRange = ListRange::of($request, 'trecv_');
+
         $sent = $base()
             ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.to_department_id', '=', 'deparments.id')
             ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
             ->where(self::TRANSFER_REQUEST_TABLE.'.department_id', $departmentId)
-            ->get();
+            ->tap(ListRange::dateFilterKeepPending(
+                self::TRANSFER_REQUEST_TABLE.'.created_at',
+                $sentRange,
+                self::TRANSFER_REQUEST_TABLE.'.status',
+                self::TRANSFER_PENDING_STATUSES
+            ))
+            ->paginate(ListRange::perPage($request, 'tsent_'), ['*'], ListRange::pageName('tsent_'))
+            ->withQueryString();
 
         $received = $base()
             ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.department_id', '=', 'deparments.id')
             ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
             ->where(self::TRANSFER_REQUEST_TABLE.'.to_department_id', $departmentId)
-            ->get();
+            ->tap(ListRange::dateFilterKeepPending(
+                self::TRANSFER_REQUEST_TABLE.'.created_at',
+                $receivedRange,
+                self::TRANSFER_REQUEST_TABLE.'.status',
+                self::TRANSFER_PENDING_STATUSES
+            ))
+            ->paginate(ListRange::perPage($request, 'trecv_'), ['*'], ListRange::pageName('trecv_'))
+            ->withQueryString();
 
         $requestIds = $sent->pluck('id')->merge($received->pluck('id'))->unique();
 
@@ -2384,7 +2521,37 @@ class StandardExportController extends Controller
             ->get()
             ->groupBy('transfer_request_id');
 
-        return ['sent' => $sent, 'received' => $received, 'items' => $items];
+        /*
+        | Huy hiệu trên nút tab: đếm bằng truy vấn riêng chứ không đếm trên $sent /
+        | $received nữa - hai danh sách đó giờ chỉ còn một trang.
+        */
+        $pendingIssue = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('to_department_id', $departmentId)
+            ->whereIn('status', ['pending', 'partial'])
+            ->count();
+
+        $awaitingReceipt = DB::table(self::TRANSFER_ITEM_TABLE)
+            ->join(
+                self::TRANSFER_REQUEST_TABLE,
+                self::TRANSFER_ITEM_TABLE.'.transfer_request_id',
+                '=',
+                self::TRANSFER_REQUEST_TABLE.'.id'
+            )
+            ->where(self::TRANSFER_REQUEST_TABLE.'.department_id', $departmentId)
+            ->where(self::TRANSFER_ITEM_TABLE.'.active', 1)
+            ->where(self::TRANSFER_ITEM_TABLE.'.status', 'issued')
+            ->count();
+
+        return [
+            'sent' => $sent,
+            'received' => $received,
+            'items' => $items,
+            'badgeCount' => $pendingIssue + $awaitingReceipt,
+            'sentRange' => $sentRange,
+            'sentPerPage' => ListRange::perPage($request, 'tsent_'),
+            'receivedRange' => $receivedRange,
+            'receivedPerPage' => ListRange::perPage($request, 'trecv_'),
+        ];
     }
 
     /** Mọi phòng ban đang hoạt động, trừ phòng đang đứng - cùng hoặc khác công ty đều được. */

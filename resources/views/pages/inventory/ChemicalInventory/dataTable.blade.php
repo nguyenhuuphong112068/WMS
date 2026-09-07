@@ -177,14 +177,25 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
-                                            <div class="md-sub">Nhập {{ $invDate($row->imported_date) }}</div>
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
                                             <div class="md-sub">
                                                 <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="font-weight-bold">
+                                                {{ $row->chem_name ?: '—' }}
+                                                @if ($invIsSpecial($row->category_id))
+                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <div class="md-sub">
+                                                @if (!empty($row->category_type))
+                                                    <span class="md-tag">{{ $row->category_type }}</span>
+                                                @endif
                                                 @if ($row->batch_no)
-                                                    <span class="ml-1">Lô {{ $row->batch_no }}</span>
+                                                    <span class="{{ !empty($row->category_type) ? 'ml-1' : '' }}">Lô {{ $row->batch_no }}</span>
                                                 @endif
                                                 @if ($row->supplier_name)
                                                     <span class="ml-1">· {{ $row->supplier_name }}</span>
@@ -415,7 +426,14 @@
                                     <tr data-classification="{{ $invCls($sum->category_id) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
-                                            <div class="font-weight-bold">{{ $sum->chem_name ?: '—' }}</div>
+                                            <div class="font-weight-bold">
+                                                {{ $sum->chem_name ?: '—' }}
+                                                @if ($invIsSpecial($sum->category_id))
+                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                    </span>
+                                                @endif
+                                            </div>
                                             <div class="md-sub">
                                                 <span class="md-tag">{{ $sum->category_code ?: '—' }}</span>
                                             </div>
@@ -564,15 +582,20 @@
                                         </td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
+                                            <div class="md-sub">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                            </div>
                                             @if ($row->batch_no)
                                                 <div class="md-sub">Lô {{ $row->batch_no }}</div>
                                             @endif
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                            </div>
+                                            @if (!empty($row->category_type))
+                                                <div class="md-sub">
+                                                    <span class="md-tag">{{ $row->category_type }}</span>
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="text-right" data-order="{{ $row->gap }}">
                                             <span
@@ -620,16 +643,28 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
+                                            <div class="md-sub">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                            </div>
                                             @if ($row->batch_no)
                                                 <div class="md-sub">Lô {{ $row->batch_no }}</div>
                                             @endif
                                         </td>
                                         <td>
-                                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
+                                            <div class="font-weight-bold">
+                                                {{ $row->chem_name ?: '—' }}
+                                                @if ($invIsSpecial($row->category_id))
+                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                    </span>
+                                                @endif
+                                            </div>
                                             <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                                @if (!empty($row->category_type))
+                                                    <span class="md-tag">{{ $row->category_type }}</span>
+                                                @endif
                                                 @if ($row->supplier_name)
-                                                    <span class="ml-1">· {{ $row->supplier_name }}</span>
+                                                    <span class="{{ !empty($row->category_type) ? 'ml-1' : '' }}">· {{ $row->supplier_name }}</span>
                                                 @endif
                                             </div>
                                         </td>
@@ -703,14 +738,27 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
+                                            <div class="md-sub">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                            </div>
                                             @if ($row->batch_no)
                                                 <div class="md-sub">Lô {{ $row->batch_no }}</div>
                                             @endif
                                         </td>
                                         <td>
-                                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
-                                            <div class="md-sub"><span
-                                                    class="md-tag">{{ $row->category_code ?: '—' }}</span></div>
+                                            <div class="font-weight-bold">
+                                                {{ $row->chem_name ?: '—' }}
+                                                @if ($invIsSpecial($row->category_id))
+                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            @if (!empty($row->category_type))
+                                                <div class="md-sub">
+                                                    <span class="md-tag">{{ $row->category_type }}</span>
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="text-right" data-order="{{ $row->gap }}">
                                             <span class="inv-remaining {{ $row->remaining > 0 ? '' : 'is-zero' }}">{{ $invNum($row->gap) }}</span>

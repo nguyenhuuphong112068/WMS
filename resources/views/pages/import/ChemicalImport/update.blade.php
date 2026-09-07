@@ -1,7 +1,7 @@
 @php $bag = $errors->getBag('updateErrors'); @endphp
 
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg" role="document" style="max-width: 1050px;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="{{ $impIcon }}"></i> Điều Chỉnh Phiếu Nhập Hoá Chất</h5>

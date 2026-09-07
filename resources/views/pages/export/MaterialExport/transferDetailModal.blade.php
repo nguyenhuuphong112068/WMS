@@ -17,7 +17,7 @@
         'returned' => ['label' => 'Đã từ chối nhận', 'class' => 'rejected'],
     ];
     $mtBadge = $mtBadge ?? fn($status) => $mtStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
-    $mtAll = $transferSent->merge($transferReceived)->unique('id');
+    $mtAll = $transferSent->getCollection()->merge($transferReceived->getCollection())->unique('id');
 @endphp
 
 <style>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pages\Export;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentChemical;
+use App\Support\ListRange;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,12 @@ class ChemicalDisposalController extends Controller
         'rejected' => 'Không được duyệt',
         'done' => 'Đã huỷ xong',
     ];
+
+    /**
+     * Đợt huỷ CHƯA XONG - bộ lọc khoảng ngày luôn giữ lại các đợt này dù đã ngoài
+     * khoảng lọc, tránh giấu mất một đợt cũ còn đang chờ quyết định.
+     */
+    private const PENDING_STATUSES = ['draft', 'pending'];
 
     /** Phương pháp huỷ, đúng hai lựa chọn khoanh tròn trên biểu mẫu. */
     public const METHODS = [
@@ -110,15 +117,25 @@ class ChemicalDisposalController extends Controller
      *
      * Lấy toàn bộ phiếu của các đợt trong MỘT truy vấn rồi gắn vào đợt, tránh chạy
      * một truy vấn cho mỗi đợt khi màn hình có nhiều đợt.
+     *
+     * Chỉ lấy đúng một trang trong khoảng ngày đang lọc; các đợt CHƯA XONG (đang gom
+     * phiếu / chờ quyết định) luôn được giữ lại dù đã ngoài khoảng lọc.
      */
-    public static function batches(int $departmentId)
+    public static function batches(int $departmentId, array $range, int $perPage)
     {
         $rows = DB::table(self::TABLE)
             ->where('department_id', $departmentId)
+            ->tap(ListRange::dateFilterKeepPending(
+                self::TABLE.'.created_at',
+                $range,
+                self::TABLE.'.app_status',
+                self::PENDING_STATUSES
+            ))
             ->orderByDesc('period_year')
             ->orderByDesc('period_month')
             ->orderByDesc('id')
-            ->get();
+            ->paginate($perPage, ['*'], ListRange::pageName('dsp_'))
+            ->withQueryString();
 
         if ($rows->isEmpty()) {
             return $rows;
@@ -126,7 +143,7 @@ class ChemicalDisposalController extends Controller
 
         $items = self::itemsOf($rows->pluck('id')->all())->groupBy('disposal_id');
 
-        return $rows->map(function ($row) use ($items) {
+        return $rows->through(function ($row) use ($items) {
             $row->items = $items->get($row->id, collect());
             $row->item_count = $row->items->count();
             $row->total_kg = $row->items->whereNotNull('amount_kg')->sum('amount_kg');

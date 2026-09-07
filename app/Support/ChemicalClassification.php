@@ -59,6 +59,15 @@ class ChemicalClassification
     /** @deprecated Giữ để tương thích - dùng badgeClass() / BANNED_GROUPS. */
     public const DANGER_GROUPS = [4, 6];
 
+    /**
+     * Nhóm 3..8 = toàn bộ Phụ lục III (đơn chất nhóm 3-7 + hỗn hợp nhóm 8) - hoá chất
+     * cần kiểm soát đặc biệt, phải gắn nhãn cảnh báo ở mọi màn nghiệp vụ.
+     */
+    public const SPECIAL_CONTROL_GROUPS = [3, 4, 5, 6, 7, 8];
+
+    /** Nhãn hiển thị của khối kiểm soát đặc biệt (Phụ lục III). */
+    public const SPECIAL_CONTROL_LABEL = 'Hoá chất kiểm soát đặc biệt';
+
     /** Nhóm khai được ở màn "Tên Hoạt Chất" (đơn chất). */
     public const SINGLE_SUBSTANCE_GROUPS = [1, 3, 4, 5, 6, 7, 9, 11];
 
@@ -136,6 +145,15 @@ class ChemicalClassification
         return self::GROUPS[$group] ?? ('Nhóm ' . $group);
     }
 
+    /**
+     * Nhãn ngắn hiển thị dạng chip/badge: 'Nhóm 1'..'Nhóm 10' theo đúng số nhóm NĐ 24/2026.
+     * Riêng nhóm 11 không thuộc NĐ 24/2026 nên không đánh số, hiển thị 'Nhóm HC Cấm'.
+     */
+    public static function shortLabel(int $group): string
+    {
+        return $group === 11 ? 'Nhóm HC Cấm' : 'Nhóm ' . $group;
+    }
+
     /** Mã hiển thị ngắn: 1 -> 'N1'. */
     public static function code(int $group): string
     {
@@ -154,6 +172,24 @@ class ChemicalClassification
         }
 
         return 'badge-primary';
+    }
+
+    /**
+     * Danh sách nhóm (hoặc mã 'N3'...) có thuộc Phụ lục III - kiểm soát đặc biệt hay không.
+     *
+     * @param  array  $groupsOrCodes  [3, 8] hoặc ['N3', 'N8']
+     */
+    public static function isSpecialControl(array $groupsOrCodes): bool
+    {
+        foreach ($groupsOrCodes as $value) {
+            $group = (int) ltrim((string) $value, 'Nn');
+
+            if (in_array($group, self::SPECIAL_CONTROL_GROUPS, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Hạng màu theo mã N: 'critical' | 'banned' | '' - cho chip không dùng lớp Bootstrap. */
@@ -194,6 +230,11 @@ class ChemicalClassification
     }
 
     /**
+     * Hoạt chất là THÀNH VIÊN của một mục gộp (active_ingredients.parent_id - ví dụ
+     * "Thuỷ ngân(II) clorua" thuộc "Thủy ngân và các hợp chất của thủy ngân") THỪA HƯỞNG
+     * mọi nhóm của mục gộp, cộng với nhóm khai riêng của chính nó. Nghị định liệt kê cả
+     * nhóm chất nên chất cụ thể trong nhóm cũng mang đúng các nhóm đó, không phải khai lại.
+     *
      * @param  int[]  $aiIds
      * @return array<int, int[]>  [active_ingredients_id => [số nhóm]]
      */
@@ -205,11 +246,22 @@ class ChemicalClassification
             return [];
         }
 
+        // [id hoạt chất được hỏi => id mục gộp cha đã duyệt, đang hoạt động]
+        $parentOf = DB::table('active_ingredients as ai')
+            ->join('active_ingredients as pai', 'pai.id', '=', 'ai.parent_id')
+            ->whereIn('ai.id', $aiIds)
+            ->where('pai.status_id', 1)
+            ->where('pai.app_status', 'approved')
+            ->get(['ai.id as child_id', 'pai.id as parent_id'])
+            ->pluck('parent_id', 'child_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
         $rows = DB::table('active_ingredient_classifications')
-            ->whereIn('active_ingredients_id', $aiIds)
+            ->whereIn('active_ingredients_id', array_values(array_unique(array_merge($aiIds, array_values($parentOf)))))
             ->get(['active_ingredients_id', 'appendix', 'group_no', 'table_ref']);
 
-        $out = [];
+        $byIngredient = [];
 
         foreach ($rows as $row) {
             $group = self::groupOf($row->appendix, $row->group_no, $row->table_ref);
@@ -218,7 +270,21 @@ class ChemicalClassification
                 continue;
             }
 
-            $out[(int) $row->active_ingredients_id][$group] = true;
+            $byIngredient[(int) $row->active_ingredients_id][$group] = true;
+        }
+
+        $out = [];
+
+        foreach ($aiIds as $aiId) {
+            $groups = $byIngredient[$aiId] ?? [];
+
+            if (isset($parentOf[$aiId])) {
+                $groups += $byIngredient[$parentOf[$aiId]] ?? [];
+            }
+
+            if ($groups) {
+                $out[$aiId] = $groups;
+            }
         }
 
         foreach ($out as $aiId => $groups) {

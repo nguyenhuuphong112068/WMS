@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Pages\Export;
 
+use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\General\NotificationController;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
+use App\Support\CompanyContext;
 use App\Support\DepartmentMaterial;
+use App\Support\ListRange;
 use App\Support\MaterialCode;
 use App\Support\MaterialPicking;
 use Illuminate\Http\Request;
@@ -18,9 +22,13 @@ use Illuminate\Validation\Rule;
  *
  * Khác chất chuẩn: vật tư BẮT BUỘC phải qua ĐỀ NGHỊ được phê duyệt trước khi lấy ra dùng.
  *
- *   1. Tổ lập ĐỀ NGHỊ (material_request_lists + items) -> Trình ký.
- *   2. Trưởng/Phó Phòng ký (BẮT BUỘC). Nếu phiếu đánh dấu "cần Ban Giám Đốc" thì ký xong
- *      chuyển tiếp Ban Giám Đốc ký (TUỲ CHỌN). Ký đủ -> approved, issue_status = waiting.
+ *   1. Tổ lập ĐỀ NGHỊ (material_request_lists + items) -> Trình ký. Ngay trên phiếu, người
+ *      lập tự khai QUY TRÌNH KÝ DUYỆT: số bước ký và người ký của từng bước
+ *      (material_request_signs). Khai 0 bước thì trình ký là duyệt luôn, phiếu đi thẳng
+ *      đến người cấp phát.
+ *   2. Ký lần lượt theo step_no, mỗi bước đúng người được chỉ định ký (nhập lại mật khẩu -
+ *      21 CFR Part 11). Ký hết bước cuối -> approved, issue_status = waiting. Mỗi lần
+ *      chuyển bước đều gửi thông báo cho người phải ký tiếp; từ chối thì báo người lập.
  *   3. Kho CẤP PHÁT từng dòng: chỉ định mã xuất nhập, số lượng. Cấp phát là XUẤT KHO,
  *      tương đương vật tư đã đem sử dụng - TRỪ TỒN TRỰC TIẾP, sinh luôn một bản ghi
  *      material_exports (type = export) gắn với dòng đề nghị. Cấp đủ số đề nghị thì
@@ -39,6 +47,8 @@ use Illuminate\Validation\Rule;
  */
 class MaterialExportController extends Controller
 {
+    use VerifiesSignature;
+
     private const TABLE = 'material_exports';
 
     private const HISTORY_TABLE = 'material_export_histories';
@@ -47,9 +57,24 @@ class MaterialExportController extends Controller
 
     private const REQ_ITEM = 'material_request_items';
 
+    /** Các bước ký của một đề nghị - mỗi bước một dòng, thứ tự theo step_no. */
+    private const REQ_SIGN = 'material_request_signs';
+
     private const TRANSFER_REQUEST_TABLE = 'material_transfer_requests';
 
     private const TRANSFER_ITEM_TABLE = 'material_transfer_items';
+
+    /**
+     * Trạng thái đề nghị chuyển liên phòng ban còn DỞ DANG - bộ lọc khoảng ngày luôn
+     * giữ lại các đề nghị này dù đã ngoài khoảng lọc.
+     */
+    private const TRANSFER_PENDING_STATUSES = ['draft', 'pending', 'partial'];
+
+    /** Đề nghị cấp phát còn DỞ DANG: chưa ký duyệt xong. */
+    private const REQ_PENDING_APP_STATUSES = ['draft', 'pending_sign'];
+
+    /** Đề nghị cấp phát đã duyệt nhưng kho chưa cấp đủ. */
+    private const REQ_PENDING_ISSUE_STATUSES = ['waiting', 'partial'];
 
     private const LABEL = 'phiếu sử dụng vật tư';
 
@@ -65,6 +90,9 @@ class MaterialExportController extends Controller
      * xuất khác, nhưng hàng không mất đi mà thành tồn của phòng nhận.
      */
     private const TYPE_TRANSFER_OUT = 'transfer_out';
+
+    /** Danh sách người ký chọn được - nạp một lần cho cả request, xem signerOptions(). */
+    private $signerOptions = null;
 
     /** Trường theo dõi khi điều chỉnh phiếu sử dụng: cột => tên hiển thị. */
     private const FIELDS = [
@@ -83,6 +111,12 @@ class MaterialExportController extends Controller
     {
         $departmentId = $this->departmentId();
 
+        // Sổ sử dụng chỉ lấy đúng một trang trong khoảng ngày đang lọc (mặc định 30 ngày
+        // gần nhất), không nạp toàn bộ phiếu sử dụng của phòng như trước.
+        $bookRange = ListRange::of($request, 'book_');
+        $bookKeyword = ListRange::keyword($request, 'book_');
+        $bookPerPage = ListRange::perPage($request, 'book_');
+
         $exports = DB::table(self::TABLE)
             ->leftJoin('material_imports', self::TABLE.'.import_id', '=', 'material_imports.id')
             ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
@@ -94,6 +128,7 @@ class MaterialExportController extends Controller
             ->select(
                 self::TABLE.'.*',
                 'material_names.name as material_name',
+                'material_categories.code as category_code',
                 'material_categories.technical_specification',
                 'units.short_name as unit_short_name',
                 'deparments.name as to_department_name',
@@ -101,21 +136,51 @@ class MaterialExportController extends Controller
                 self::REQ_ITEM.'.purpose'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
+            ->tap(ListRange::dateFilter(self::TABLE.'.created_at', $bookRange))
+            ->tap(ListRange::search([
+                self::TABLE.'.code',
+                'material_imports.code',
+                'material_categories.code',
+                'material_names.name',
+                'material_categories.technical_specification',
+                self::TABLE.'.used_by',
+                self::REQ_ITEM.'.purpose',
+            ], $bookKeyword))
             ->orderBy(self::TABLE.'.created_at', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')
-            ->get();
+            ->paginate($bookPerPage, ['*'], ListRange::pageName('book_'))
+            ->withQueryString();
+
+        // Đề nghị cấp phát: lọc theo ngày lập nhưng LUÔN giữ các đề nghị còn dở dang
+        // (chưa ký duyệt xong hoặc kho chưa cấp đủ) dù đã ngoài khoảng lọc.
+        $reqRange = ListRange::of($request, 'req_');
+        $reqPerPage = ListRange::perPage($request, 'req_');
 
         $requestLists = DB::table(self::REQ_LIST)
             ->select(self::REQ_LIST.'.*')
             ->where(self::REQ_LIST.'.department_id', $departmentId)
+            ->tap(ListRange::dateFilterKeep(
+                self::REQ_LIST.'.created_at',
+                $reqRange,
+                fn ($query) => $query
+                    ->orWhereIn(self::REQ_LIST.'.app_status', self::REQ_PENDING_APP_STATUSES)
+                    ->orWhereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES)
+            ))
             ->orderBy(self::REQ_LIST.'.id', 'desc')
-            ->get()
-            ->map(function ($req) {
-                $req->pending_step = $this->requestPendingStep($req->app_status);
-                $req->can_sign = $req->pending_step ? $this->canSignRequest($req->pending_step) : false;
+            ->paginate($reqPerPage, ['*'], ListRange::pageName('req_'))
+            ->withQueryString();
 
-                return $req;
-            });
+        // Bước ký của các đề nghị đang hiện: request_list_id => danh sách bước theo step_no
+        $requestSigns = $this->signRows($requestLists->pluck('id'));
+
+        $requestLists->through(function ($req) use ($requestSigns) {
+            $pending = $this->pendingSign($req, $requestSigns->get($req->id, collect()));
+
+            $req->pending_sign = $pending;
+            $req->can_sign = $pending ? $this->canSignRow($pending) : false;
+
+            return $req;
+        });
 
         $requestItems = DB::table(self::REQ_ITEM)
             ->leftJoin('material_categories', self::REQ_ITEM.'.category_id', '=', 'material_categories.id')
@@ -124,6 +189,7 @@ class MaterialExportController extends Controller
             ->select(
                 self::REQ_ITEM.'.*',
                 'material_names.name as category_material_name',
+                'material_categories.code as category_code',
                 'material_imports.code as issued_import_code'
             )
             ->where(self::REQ_ITEM.'.active', 1)
@@ -142,8 +208,8 @@ class MaterialExportController extends Controller
         $categories = DepartmentMaterial::importCategoryOptions($departmentId);
 
         $stockByCategory = $availableImports->groupBy('category_id')->map(fn ($group) => [
-            'total_remaining' => (float) $group->sum('remaining'),
-            'total_lots' => (int) $group->where('remaining', '>', self::EPSILON)->count(),
+            'total_remaining' => (float) $group->where('suggestable', true)->sum('remaining'),
+            'total_lots' => (int) $group->where('suggestable', true)->count(),
         ]);
 
         $departmentMaterialInventory = $categories->map(function ($cat) use ($stockByCategory) {
@@ -166,7 +232,7 @@ class MaterialExportController extends Controller
         session()->put(['title' => 'SỬ DỤNG - SỬ DỤNG VẬT TƯ']);
 
         // Đề nghị chuyển vật tư LIÊN PHÒNG BAN: đã gửi đi (mình là A) / cần cấp phát (mình là B)
-        $transfer = $this->transferRequestsData($departmentId);
+        $transfer = $this->transferRequestsData($departmentId, $request);
 
         // Vật tư phòng mình đã khai ở tab "Vật Tư Của Phòng" - dùng để cảnh báo ngay trên
         // phiếu khi có mục đang "chờ nhận" mà phòng mình chưa khai (chưa có đơn vị tính),
@@ -199,16 +265,26 @@ class MaterialExportController extends Controller
             'departmentMaterialInventory' => $departmentMaterialInventory,
             'adjustCounts' => $this->adjustCounts($departmentId),
             'reqAppStatuses' => config('material.request_app_statuses'),
-            'reqSignSteps' => config('material.request_sign_steps'),
+            'reqSignStatuses' => config('material.request_sign_statuses'),
             'reqIssueStatuses' => config('material.request_issue_statuses'),
             'reqItemStatuses' => config('material.request_item_statuses'),
-            'canSignManager' => $this->canSignRequest('manager'),
-            'canSignDirector' => $this->canSignRequest('director'),
+            'requestSigns' => $requestSigns,
+            'signerOptions' => $this->signerOptions(),
             'overIssuePercent' => (int) round(self::OVER_ISSUE_RATIO * 100),
             // ---- Tab "Đề nghị chuyển liên phòng ban" ----
             'transferSent' => $transfer['sent'],
             'transferReceived' => $transfer['received'],
             'transferItems' => $transfer['items'],
+            'transferBadgeCount' => $transfer['badgeCount'],
+            'transferSentRange' => $transfer['sentRange'],
+            'transferSentPerPage' => $transfer['sentPerPage'],
+            'transferReceivedRange' => $transfer['receivedRange'],
+            'transferReceivedPerPage' => $transfer['receivedPerPage'],
+            'bookRange' => $bookRange,
+            'bookKeyword' => $bookKeyword,
+            'bookPerPage' => $bookPerPage,
+            'reqRange' => $reqRange,
+            'reqPerPage' => $reqPerPage,
             'transferCategories' => $this->transferCategoryOptions($departmentId),
             'transferDepartments' => $this->departmentOptions($departmentId),
             'transferOwnLocations' => DepartmentMaterial::locationOptions($departmentId),
@@ -249,22 +325,28 @@ class MaterialExportController extends Controller
         }
         $code = $prefix.str_pad((string) $seq, 2, '0', STR_PAD_LEFT);
 
-        $listId = DB::transaction(function () use ($request, $departmentId, $code, $isDraft) {
-            $listId = DB::table(self::REQ_LIST)->insertGetId([
+        $stepCount = count($this->signerIds($request));
+        $flow = $isDraft
+            ? ['app_status' => 'draft', 'current_step' => null, 'issue_status' => null]
+            : $this->submitPayload($stepCount);
+
+        $listId = DB::transaction(function () use ($request, $departmentId, $code, $isDraft, $flow, $stepCount) {
+            $listId = DB::table(self::REQ_LIST)->insertGetId($flow + [
                 'code' => $code,
                 'department_id' => $departmentId,
                 'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
-                'app_status' => $isDraft ? 'draft' : 'pending_manager',
-                'needs_director' => $request->boolean('needs_director'),
+                'sign_step_count' => $stepCount,
                 'submitted_by' => $isDraft ? null : $this->actor(),
                 'submitted_at' => $isDraft ? null : now(),
                 'created_by' => $this->actor(),
+                'created_user_id' => (int) (session('user')['userId'] ?? 0) ?: null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             $this->insertRequestItems($listId, $request);
+            $this->insertRequestSigns($listId, $request);
 
             return $listId;
         });
@@ -274,12 +356,16 @@ class MaterialExportController extends Controller
             self::REQ_LIST,
             $listId,
             'NA',
-            'Đề nghị '.$code.' ('.count($request->items).' mục)'
+            'Đề nghị '.$code.' ('.count($request->items).' mục, '.$stepCount.' bước ký)'
         );
+
+        if (! $isDraft) {
+            $this->notifySubmitted($this->findRequest($listId), $stepCount);
+        }
 
         return redirect()->route('pages.export.materialExport.list', ['tab' => 'request'])->with(
             'success',
-            $isDraft ? 'Đã lưu tạm đề nghị '.$code.'!' : 'Đã trình ký đề nghị '.$code.' lên Trưởng/Phó Phòng!'
+            $isDraft ? 'Đã lưu tạm đề nghị '.$code.'!' : $this->submitMessage($code, $stepCount)
         );
     }
 
@@ -309,17 +395,18 @@ class MaterialExportController extends Controller
         }
 
         $isDraft = $request->input('action_type', 'draft') === 'draft';
+        $stepCount = count($this->signerIds($request));
+        $flow = $isDraft
+            ? ['app_status' => 'draft', 'current_step' => null, 'issue_status' => null]
+            : $this->submitPayload($stepCount);
 
-        DB::transaction(function () use ($request, $req, $isDraft) {
-            DB::table(self::REQ_LIST)->where('id', $req->id)->update([
+        DB::transaction(function () use ($request, $req, $isDraft, $flow, $stepCount) {
+            DB::table(self::REQ_LIST)->where('id', $req->id)->update($flow + [
                 'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
-                'needs_director' => $request->boolean('needs_director'),
-                'app_status' => $isDraft ? 'draft' : 'pending_manager',
+                'sign_step_count' => $stepCount,
                 'submitted_by' => $isDraft ? $req->submitted_by : $this->actor(),
                 'submitted_at' => $isDraft ? $req->submitted_at : now(),
-                'manager_signed_by' => null, 'manager_signed_at' => null,
-                'director_signed_by' => null, 'director_signed_at' => null,
                 'rejected_by' => null, 'rejected_at' => null, 'reject_step' => null, 'reject_reason' => null,
                 'updated_by' => $this->actor(),
                 'updated_at' => now(),
@@ -332,13 +419,27 @@ class MaterialExportController extends Controller
                 'updated_at' => now(),
             ]);
             $this->insertRequestItems($req->id, $request);
+
+            // Quy trình ký khai lại từ đầu: các bước cũ (kể cả bước đã bị từ chối) hết hiệu lực
+            $this->deactivateSigns($req->id);
+            $this->insertRequestSigns($req->id, $request);
         });
 
-        AuditTrialController::log('Cập nhật đề nghị cấp phát vật tư', self::REQ_LIST, $req->id, $req->code, $isDraft ? 'Lưu tạm' : 'Trình ký lại');
+        AuditTrialController::log(
+            'Cập nhật đề nghị cấp phát vật tư',
+            self::REQ_LIST,
+            $req->id,
+            $req->code,
+            ($isDraft ? 'Lưu tạm' : 'Trình ký lại').', '.$stepCount.' bước ký'
+        );
+
+        if (! $isDraft) {
+            $this->notifySubmitted($this->findRequest($req->id), $stepCount);
+        }
 
         return redirect()->route('pages.export.materialExport.list', ['tab' => 'request'])->with(
             'success',
-            $isDraft ? 'Đã lưu đề nghị '.$req->code.'!' : 'Đã trình ký lại đề nghị '.$req->code.'!'
+            $isDraft ? 'Đã lưu đề nghị '.$req->code.'!' : $this->submitMessage($req->code, $stepCount, true)
         );
     }
 
@@ -358,32 +459,128 @@ class MaterialExportController extends Controller
             return redirect()->back()->with('error', 'Đề nghị '.$req->code.' chưa có mục nào, chưa trình ký được!')->with('activeTab', 'request');
         }
 
-        DB::table(self::REQ_LIST)->where('id', $req->id)->update([
-            'app_status' => 'pending_manager',
-            'submitted_by' => $this->actor(),
-            'submitted_at' => now(),
-            'manager_signed_by' => null, 'manager_signed_at' => null,
-            'director_signed_by' => null, 'director_signed_at' => null,
-            'rejected_by' => null, 'rejected_at' => null, 'reject_step' => null, 'reject_reason' => null,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
+        // Quy trình ký đã khai sẵn lúc lập / sửa phiếu, chỉ cần đưa các bước về chờ ký lại
+        $stepCount = (int) DB::table(self::REQ_SIGN)
+            ->where('request_list_id', $req->id)
+            ->where('active', 1)
+            ->count();
 
-        AuditTrialController::log('Trình ký đề nghị cấp phát vật tư', self::REQ_LIST, $req->id, $req->code, 'app_status: pending_manager');
+        $flow = $this->submitPayload($stepCount);
 
-        return redirect()->back()->with('success', 'Đã trình ký đề nghị '.$req->code.' lên Trưởng/Phó Phòng!')->with('activeTab', 'request');
+        DB::transaction(function () use ($req, $flow, $stepCount) {
+            DB::table(self::REQ_LIST)->where('id', $req->id)->update($flow + [
+                'sign_step_count' => $stepCount,
+                'submitted_by' => $this->actor(),
+                'submitted_at' => now(),
+                'rejected_by' => null, 'rejected_at' => null, 'reject_step' => null, 'reject_reason' => null,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table(self::REQ_SIGN)->where('request_list_id', $req->id)->where('active', 1)->update([
+                'status' => 'pending',
+                'signed_by' => null,
+                'signed_at' => null,
+                'reject_reason' => null,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        AuditTrialController::log(
+            'Trình ký đề nghị cấp phát vật tư',
+            self::REQ_LIST,
+            $req->id,
+            $req->code,
+            'app_status: '.$flow['app_status'].', '.$stepCount.' bước ký'
+        );
+
+        $this->notifySubmitted($this->findRequest($req->id), $stepCount);
+
+        return redirect()->back()
+            ->with('success', $this->submitMessage($req->code, $stepCount))
+            ->with('activeTab', 'request');
     }
 
-    public function requestSignManager(Request $request)
+    /**
+     * KÝ MỘT BƯỚC của đề nghị.
+     *
+     * Chỉ đúng người được chỉ định ở bước đang chờ mới ký được, và phải nhập lại mật khẩu
+     * (21 CFR Part 11 §11.200). Ký xong bước cuối thì phiếu được duyệt, kho cấp phát được.
+     */
+    public function requestSign(Request $request)
     {
-        return $this->requestSign($request, 'manager');
+        $req = $this->findRequest($request->request_list_id);
+
+        if (! $req) {
+            return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần ký duyệt!')->with('activeTab', 'request');
+        }
+
+        $sign = $this->currentSign($req);
+
+        if (! $sign) {
+            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước chờ ký nên không ký được!')->with('activeTab', 'request');
+        }
+
+        if (! $this->canSignRow($sign)) {
+            return redirect()->back()
+                ->with('error', 'Bước '.$sign->step_no.' của đề nghị '.$req->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không ký thay được!')
+                ->with('activeTab', 'request');
+        }
+
+        if ($guard = $this->guardSignature($request, self::REQ_LIST, $req->id, 'Ký duyệt đề nghị cấp phát vật tư')) {
+            return $guard->with('activeTab', 'request');
+        }
+
+        $stepCount = (int) $req->sign_step_count;
+        $stepNo = (int) $sign->step_no;
+        $isLast = $stepNo >= $stepCount;
+        $signedAt = now();
+
+        DB::transaction(function () use ($req, $sign, $stepNo, $isLast, $signedAt) {
+            DB::table(self::REQ_SIGN)->where('id', $sign->id)->update([
+                'status' => 'signed',
+                'signed_by' => $this->actor(),
+                'signed_at' => $signedAt,
+                'updated_by' => $this->actor(),
+                'updated_at' => $signedAt,
+            ]);
+
+            DB::table(self::REQ_LIST)->where('id', $req->id)->update([
+                'app_status' => $isLast ? 'approved' : 'pending_sign',
+                'current_step' => $isLast ? null : $stepNo + 1,
+                'issue_status' => $isLast ? 'waiting' : $req->issue_status,
+                'updated_by' => $this->actor(),
+                'updated_at' => $signedAt,
+            ]);
+        });
+
+        AuditTrialController::log(
+            'Ký duyệt đề nghị cấp phát vật tư',
+            self::REQ_LIST,
+            $req->id,
+            'Bước '.$stepNo.'/'.$stepCount.' - app_status: '.$req->app_status,
+            'app_status: '.($isLast ? 'approved' : 'pending_sign')
+        );
+
+        $fresh = $this->findRequest($req->id);
+
+        if ($isLast) {
+            $this->notifyIssuers($fresh);
+            $this->notifyCreator($fresh, 'Đề nghị cấp phát vật tư '.$req->code.' đã được ký duyệt đủ '.$stepCount.' bước, chờ kho cấp phát.', 'Đã duyệt');
+        } else {
+            $this->notifyStep($fresh, $stepNo + 1, $stepCount);
+        }
+
+        return redirect()->back()->with(
+            'success',
+            $isLast
+                ? 'Đã ký bước '.$stepNo.'/'.$stepCount.' - đề nghị '.$req->code.' được phê duyệt, kho có thể cấp phát.'
+                : 'Đã ký bước '.$stepNo.'/'.$stepCount.' cho đề nghị '.$req->code.'! Đã chuyển tới người ký bước '.($stepNo + 1).'.'
+        )->with('activeTab', 'request');
     }
 
-    public function requestSignDirector(Request $request)
-    {
-        return $this->requestSign($request, 'director');
-    }
-
+    /** TỪ CHỐI tại bước đang chờ ký: phiếu quay về "Bị từ chối", Tổ sửa rồi trình ký lại. */
     public function requestReject(Request $request)
     {
         $req = $this->findRequest($request->request_list_id);
@@ -392,14 +589,16 @@ class MaterialExportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần từ chối!')->with('activeTab', 'request');
         }
 
-        $step = $this->requestPendingStep($req->app_status);
+        $sign = $this->currentSign($req);
 
-        if (! $step) {
+        if (! $sign) {
             return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước chờ ký nên không từ chối được!')->with('activeTab', 'request');
         }
 
-        if (! $this->canSignRequest($step)) {
-            return redirect()->back()->with('error', 'Bạn không có quyền ký bước "'.config('material.request_sign_steps')[$step]['label'].'"!')->with('activeTab', 'request');
+        if (! $this->canSignRow($sign)) {
+            return redirect()->back()
+                ->with('error', 'Bước '.$sign->step_no.' của đề nghị '.$req->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không từ chối thay được!')
+                ->with('activeTab', 'request');
         }
 
         $validator = Validator::make($request->all(), [
@@ -413,17 +612,45 @@ class MaterialExportController extends Controller
             return redirect()->back()->withErrors($validator, 'requestRejectErrors')->withInput()->with('activeTab', 'request');
         }
 
-        DB::table(self::REQ_LIST)->where('id', $req->id)->update([
-            'app_status' => 'rejected',
-            'rejected_by' => $this->actor(),
-            'rejected_at' => now(),
-            'reject_step' => $step,
-            'reject_reason' => $request->reject_reason,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
+        if ($guard = $this->guardSignature($request, self::REQ_LIST, $req->id, 'Từ chối đề nghị cấp phát vật tư')) {
+            return $guard->with('activeTab', 'request');
+        }
 
-        AuditTrialController::log('Từ chối đề nghị cấp phát vật tư', self::REQ_LIST, $req->id, 'app_status: '.$req->app_status, 'app_status: rejected');
+        $rejectedAt = now();
+
+        DB::transaction(function () use ($req, $sign, $request, $rejectedAt) {
+            DB::table(self::REQ_SIGN)->where('id', $sign->id)->update([
+                'status' => 'rejected',
+                'reject_reason' => $request->reject_reason,
+                'updated_by' => $this->actor(),
+                'updated_at' => $rejectedAt,
+            ]);
+
+            DB::table(self::REQ_LIST)->where('id', $req->id)->update([
+                'app_status' => 'rejected',
+                'current_step' => null,
+                'rejected_by' => $this->actor(),
+                'rejected_at' => $rejectedAt,
+                'reject_step' => (string) $sign->step_no,
+                'reject_reason' => $request->reject_reason,
+                'updated_by' => $this->actor(),
+                'updated_at' => $rejectedAt,
+            ]);
+        });
+
+        AuditTrialController::log(
+            'Từ chối đề nghị cấp phát vật tư',
+            self::REQ_LIST,
+            $req->id,
+            'Bước '.$sign->step_no.' - app_status: '.$req->app_status,
+            'app_status: rejected - '.$request->reject_reason
+        );
+
+        $this->notifyCreator(
+            $req,
+            'Đề nghị cấp phát vật tư '.$req->code.' bị trả về ở bước '.$sign->step_no.': '.$request->reject_reason,
+            'Bị từ chối'
+        );
 
         return redirect()->back()->with('success', 'Đã từ chối đề nghị '.$req->code.'. Tổ cần sửa lại rồi trình ký lại.')->with('activeTab', 'request');
     }
@@ -447,49 +674,284 @@ class MaterialExportController extends Controller
         return redirect()->back()->with('success', 'Đã huỷ đề nghị '.$req->code.'.')->with('activeTab', 'request');
     }
 
-    /** Ghi nhận một bước ký của đề nghị: kiểm tra đúng bước, đúng quyền rồi chuyển trạng thái. */
-    private function requestSign(Request $request, string $step)
+    /* ==========================================================
+     |  QUY TRÌNH KÝ DUYỆT TỰ CHỌN
+     |
+     |  Người lập phiếu khai bao nhiêu bước ký thì bảng material_request_signs có bấy
+     |  nhiêu dòng còn hiệu lực, mỗi dòng gắn đúng một người ký. Không khai bước nào thì
+     |  trình ký là duyệt luôn - phiếu đi thẳng đến người cấp phát.
+     ========================================================== */
+
+    /** Cột trạng thái khi phiếu được TRÌNH KÝ. Không có bước ký nào thì duyệt thẳng. */
+    private function submitPayload(int $stepCount): array
     {
-        $config = config('material.request_sign_steps')[$step];
-        $req = $this->findRequest($request->request_list_id);
+        return $stepCount > 0
+            ? ['app_status' => 'pending_sign', 'current_step' => 1, 'issue_status' => null]
+            : ['app_status' => 'approved', 'current_step' => null, 'issue_status' => 'waiting'];
+    }
 
-        if (! $req) {
-            return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần ký duyệt!')->with('activeTab', 'request');
+    private function submitMessage(string $code, int $stepCount, bool $again = false): string
+    {
+        if ($stepCount === 0) {
+            return 'Đề nghị '.$code.' không cần ký duyệt nên đã được duyệt ngay, kho có thể cấp phát.';
         }
 
-        if ($req->app_status !== $config['from']) {
-            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước "'.$config['label'].'"!')->with('activeTab', 'request');
+        return 'Đã trình ký'.($again ? ' lại' : '').' đề nghị '.$code.' qua '.$stepCount.' bước duyệt!';
+    }
+
+    /**
+     * Ghi QUY TRÌNH KÝ của một phiếu: mỗi phần tử signers[] là một bước, theo đúng thứ tự
+     * người dùng xếp trên form.
+     */
+    private function insertRequestSigns(int $listId, Request $request): void
+    {
+        $people = $this->signerOptions()->keyBy('id');
+
+        foreach ($this->signerIds($request) as $index => $userId) {
+            $person = $people->get($userId);
+
+            DB::table(self::REQ_SIGN)->insert([
+                'request_list_id' => $listId,
+                'step_no' => $index + 1,
+                'user_id' => $userId,
+                'user_name' => $person ? $this->personName($person) : null,
+                'status' => 'pending',
+                'active' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
+    }
 
-        if (! $this->canSignRequest($step)) {
-            return redirect()->back()->with('error', 'Bạn không có quyền ký bước "'.$config['label'].'"!')->with('activeTab', 'request');
-        }
-
-        // Trưởng/Phó Phòng ký xong: sang Ban Giám Đốc nếu phiếu cần, ngược lại duyệt luôn
-        $to = ($step === 'manager' && $req->needs_director) ? 'pending_director' : 'approved';
-
-        $payload = [
-            'app_status' => $to,
-            $config['signed_by'] => $this->actor(),
-            $config['signed_at'] => now(),
+    /** Sửa phiếu là khai lại quy trình: không xoá cứng, chỉ bỏ hiệu lực các bước cũ. */
+    private function deactivateSigns(int $listId): void
+    {
+        DB::table(self::REQ_SIGN)->where('request_list_id', $listId)->update([
+            'active' => 0,
             'updated_by' => $this->actor(),
             'updated_at' => now(),
-        ];
+        ]);
+    }
 
-        if ($to === 'approved') {
-            $payload['issue_status'] = 'waiting';
+    /** Id người ký trên form, giữ nguyên thứ tự và bỏ các ô để trống. */
+    private function signerIds(Request $request): array
+    {
+        $ids = [];
+
+        foreach ((array) $request->input('signers', []) as $value) {
+            $id = (int) $value;
+
+            if ($id > 0 && ! in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
         }
 
-        DB::table(self::REQ_LIST)->where('id', $req->id)->update($payload);
+        return $ids;
+    }
 
-        AuditTrialController::log('Ký duyệt đề nghị cấp phát vật tư', self::REQ_LIST, $req->id, 'app_status: '.$req->app_status, 'app_status: '.$to);
+    /** Các bước ký còn hiệu lực của một loạt phiếu: request_list_id => bước theo step_no. */
+    private function signRows($listIds)
+    {
+        $listIds = collect($listIds)->filter()->values();
 
-        return redirect()->back()->with(
-            'success',
-            $to === 'approved'
-                ? 'Đã phê duyệt đề nghị '.$req->code.'! Kho có thể cấp phát.'
-                : 'Đã ký bước '.$config['label'].' cho đề nghị '.$req->code.'! Chuyển lên Ban Giám Đốc.'
-        )->with('activeTab', 'request');
+        if ($listIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table(self::REQ_SIGN)
+            ->leftJoin('user_management', 'user_management.id', '=', self::REQ_SIGN.'.user_id')
+            ->leftJoin('deparments', 'deparments.id', '=', 'user_management.deparment_id')
+            ->select(
+                self::REQ_SIGN.'.*',
+                'user_management.fullName as signer_full_name',
+                'deparments.shortName as signer_department_short'
+            )
+            ->where(self::REQ_SIGN.'.active', 1)
+            ->whereIn(self::REQ_SIGN.'.request_list_id', $listIds)
+            ->orderBy(self::REQ_SIGN.'.step_no', 'asc')
+            ->get()
+            ->groupBy('request_list_id');
+    }
+
+    /** Dòng bước ký đang chờ của một phiếu, đọc thẳng từ DB. */
+    private function currentSign($req)
+    {
+        if ($req->app_status !== 'pending_sign' || ! $req->current_step) {
+            return null;
+        }
+
+        return DB::table(self::REQ_SIGN)
+            ->where('request_list_id', $req->id)
+            ->where('active', 1)
+            ->where('step_no', (int) $req->current_step)
+            ->first();
+    }
+
+    /** Bước đang chờ ký, lấy từ bộ bước đã nạp sẵn ở index() để khỏi truy vấn lại từng phiếu. */
+    private function pendingSign($req, $signs)
+    {
+        if ($req->app_status !== 'pending_sign' || ! $req->current_step) {
+            return null;
+        }
+
+        return collect($signs)->firstWhere('step_no', (int) $req->current_step);
+    }
+
+    /**
+     * Người đang đăng nhập có ký được bước này không.
+     *
+     * Phiếu mới chỉ định đích danh user_id. Phiếu cũ (chuyển từ luồng Trưởng Phòng ->
+     * Ban Giám Đốc) không có user_id nên vẫn cho ai thuộc role ghi ở role_names ký,
+     * đúng như trước đây.
+     */
+    private function canSignRow($sign): bool
+    {
+        $userId = (int) (session('user')['userId'] ?? 0);
+
+        if ($sign->user_id) {
+            return (int) $sign->user_id === $userId;
+        }
+
+        $roles = array_values(array_filter(array_map('trim', explode(',', (string) $sign->role_names))));
+
+        return $roles ? user_has_any_role($userId, $roles) : false;
+    }
+
+    /**
+     * Người có thể được chọn làm người ký: user đang hoạt động thuộc CÙNG CÔNG TY với
+     * phòng ban đang chọn, để còn trình ký lên cấp trên ngoài phòng (Ban Giám Đốc...).
+     *
+     * Một lần lưu phiếu hỏi tới danh sách này nhiều lần (dựng rule, ghi bước ký, đổ ô
+     * chọn) nên giữ lại kết quả trong suốt request.
+     */
+    private function signerOptions()
+    {
+        if ($this->signerOptions !== null) {
+            return $this->signerOptions;
+        }
+
+        $companyId = CompanyContext::currentId();
+        $departmentIds = CompanyContext::departmentIds($companyId);
+
+        return $this->signerOptions = DB::table('user_management')
+            ->leftJoin('deparments', 'deparments.id', '=', 'user_management.deparment_id')
+            ->leftJoin('roles', 'roles.id', '=', 'user_management.role_id')
+            ->select(
+                'user_management.id',
+                'user_management.fullName',
+                'user_management.userName',
+                'deparments.shortName as department_short',
+                'roles.name as role_name'
+            )
+            ->where('user_management.isActive', 1)
+            ->when($companyId, fn ($query) => $query->where(function ($sub) use ($companyId, $departmentIds) {
+                /*
+                | Công ty của một người suy từ PHÒNG BAN họ làm việc, giống cách
+                | CompanyContext suy công ty của phiên đăng nhập - cột company_id trên
+                | user_management có thể còn lệch với phòng ban đã đổi sau này.
+                */
+                if ($departmentIds) {
+                    $sub->whereIn('user_management.deparment_id', $departmentIds);
+                }
+
+                // Tài khoản chưa gắn phòng ban thì mới xét tới cột công ty của chính họ
+                $sub->orWhere(fn ($q) => $q->whereNull('user_management.deparment_id')
+                    ->where('user_management.company_id', $companyId));
+            }))
+            ->orderBy('user_management.fullName', 'asc')
+            ->get();
+    }
+
+    /** "Họ Tên (userName)" - cùng dạng với App\Support\Signer::actor() để đối chiếu chữ ký. */
+    private function personName($person): string
+    {
+        $fullName = trim((string) ($person->fullName ?? ''));
+        $userName = trim((string) ($person->userName ?? ''));
+
+        if ($userName === '') {
+            return $fullName ?: 'NA';
+        }
+
+        return $fullName !== '' ? $fullName.' ('.$userName.')' : $userName;
+    }
+
+    /* ---------- Thông báo cho người phải xử lý tiếp ---------- */
+
+    /** Sau khi trình ký: báo người ký bước 1, hoặc báo thẳng người cấp phát khi 0 bước. */
+    private function notifySubmitted($req, int $stepCount): void
+    {
+        if (! $req) {
+            return;
+        }
+
+        if ($stepCount > 0) {
+            $this->notifyStep($req, 1, $stepCount);
+
+            return;
+        }
+
+        $this->notifyIssuers($req);
+    }
+
+    /** Báo cho người ký của một bước rằng đã tới lượt mình. */
+    private function notifyStep($req, int $stepNo, int $stepCount): void
+    {
+        $sign = DB::table(self::REQ_SIGN)
+            ->where('request_list_id', $req->id)
+            ->where('active', 1)
+            ->where('step_no', $stepNo)
+            ->first();
+
+        // Phiếu cũ khai theo role chứ không đích danh ai thì không có người để báo
+        if (! $sign || ! $sign->user_id) {
+            return;
+        }
+
+        $this->notify(
+            'Đề nghị cấp phát vật tư '.$req->code.' đang chờ bạn ký duyệt (bước '.$stepNo.'/'.$stepCount.').',
+            'Chờ ký duyệt',
+            (int) $req->id,
+            [(int) $sign->user_id]
+        );
+    }
+
+    /** Báo cho người cấp phát của phòng rằng có phiếu đã duyệt, chờ xuất kho. */
+    private function notifyIssuers($req): void
+    {
+        $this->notify(
+            'Đề nghị cấp phát vật tư '.$req->code.' đã được duyệt, chờ kho cấp phát.',
+            'Chờ cấp phát',
+            (int) $req->id,
+            users_with_permission('export_material_issue', (int) $req->department_id)
+        );
+    }
+
+    private function notifyCreator($req, string $message, string $activityType): void
+    {
+        $this->notify($message, $activityType, (int) $req->id, [(int) ($req->created_user_id ?? 0)]);
+    }
+
+    /**
+     * Gửi thông báo vào chuông, kèm đường dẫn mở đúng tab Đề nghị.
+     * NotificationController tự bỏ người gửi ra khỏi danh sách nhận.
+     */
+    private function notify(string $message, string $activityType, int $referenceId, array $userIds): void
+    {
+        $userIds = array_values(array_unique(array_filter($userIds)));
+
+        if (! $userIds) {
+            return;
+        }
+
+        NotificationController::sendNotification(
+            $message,
+            $activityType,
+            $referenceId,
+            $userIds,
+            [],
+            route('pages.export.materialExport.list', ['tab' => 'request'])
+        );
     }
 
     /* ==========================================================
@@ -1855,23 +2317,40 @@ class MaterialExportController extends Controller
      * B), kèm các mục con group theo transfer_request_id. Cùng hình dạng với
      * transferRequestsData() của ChemicalExportController.
      */
-    private function transferRequestsData(int $departmentId): array
+    private function transferRequestsData(int $departmentId, Request $request): array
     {
         $base = fn () => DB::table(self::TRANSFER_REQUEST_TABLE)
             ->select(self::TRANSFER_REQUEST_TABLE.'.*')
             ->orderBy(self::TRANSFER_REQUEST_TABLE.'.created_at', 'desc');
 
+        $sentRange = ListRange::of($request, 'tsent_');
+        $receivedRange = ListRange::of($request, 'trecv_');
+
         $sent = $base()
             ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.to_department_id', '=', 'deparments.id')
             ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
             ->where(self::TRANSFER_REQUEST_TABLE.'.department_id', $departmentId)
-            ->get();
+            ->tap(ListRange::dateFilterKeepPending(
+                self::TRANSFER_REQUEST_TABLE.'.created_at',
+                $sentRange,
+                self::TRANSFER_REQUEST_TABLE.'.status',
+                self::TRANSFER_PENDING_STATUSES
+            ))
+            ->paginate(ListRange::perPage($request, 'tsent_'), ['*'], ListRange::pageName('tsent_'))
+            ->withQueryString();
 
         $received = $base()
             ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.department_id', '=', 'deparments.id')
             ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
             ->where(self::TRANSFER_REQUEST_TABLE.'.to_department_id', $departmentId)
-            ->get();
+            ->tap(ListRange::dateFilterKeepPending(
+                self::TRANSFER_REQUEST_TABLE.'.created_at',
+                $receivedRange,
+                self::TRANSFER_REQUEST_TABLE.'.status',
+                self::TRANSFER_PENDING_STATUSES
+            ))
+            ->paginate(ListRange::perPage($request, 'trecv_'), ['*'], ListRange::pageName('trecv_'))
+            ->withQueryString();
 
         $requestIds = $sent->pluck('id')->merge($received->pluck('id'))->unique();
 
@@ -1892,7 +2371,37 @@ class MaterialExportController extends Controller
             ->get()
             ->groupBy('transfer_request_id');
 
-        return ['sent' => $sent, 'received' => $received, 'items' => $items];
+        /*
+        | Huy hiệu trên nút tab: đếm bằng truy vấn riêng chứ không đếm trên $sent /
+        | $received nữa - hai danh sách đó giờ chỉ còn một trang.
+        */
+        $pendingIssue = DB::table(self::TRANSFER_REQUEST_TABLE)
+            ->where('to_department_id', $departmentId)
+            ->whereIn('status', ['pending', 'partial'])
+            ->count();
+
+        $awaitingReceipt = DB::table(self::TRANSFER_ITEM_TABLE)
+            ->join(
+                self::TRANSFER_REQUEST_TABLE,
+                self::TRANSFER_ITEM_TABLE.'.transfer_request_id',
+                '=',
+                self::TRANSFER_REQUEST_TABLE.'.id'
+            )
+            ->where(self::TRANSFER_REQUEST_TABLE.'.department_id', $departmentId)
+            ->where(self::TRANSFER_ITEM_TABLE.'.active', 1)
+            ->where(self::TRANSFER_ITEM_TABLE.'.status', 'issued')
+            ->count();
+
+        return [
+            'sent' => $sent,
+            'received' => $received,
+            'items' => $items,
+            'badgeCount' => $pendingIssue + $awaitingReceipt,
+            'sentRange' => $sentRange,
+            'sentPerPage' => ListRange::perPage($request, 'tsent_'),
+            'receivedRange' => $receivedRange,
+            'receivedPerPage' => ListRange::perPage($request, 'trecv_'),
+        ];
     }
 
     /** Mã đề nghị liên phòng ban: LPB-<shortName A>-<shortName B>-ddMMyy-<số thứ tự trong ngày>. */
@@ -2278,22 +2787,6 @@ class MaterialExportController extends Controller
             ->first();
     }
 
-    private function requestPendingStep(?string $appStatus): ?string
-    {
-        foreach (config('material.request_sign_steps') as $step => $config) {
-            if ($config['from'] === $appStatus) {
-                return $step;
-            }
-        }
-
-        return null;
-    }
-
-    private function canSignRequest(string $step): bool
-    {
-        return user_has_any_role(session('user')['userId'] ?? 0, config('material.request_sign_steps')[$step]['roles']);
-    }
-
     private function departmentId(): int
     {
         return (int) (session('user')['selected_department_id'] ?? 0);
@@ -2320,8 +2813,10 @@ class MaterialExportController extends Controller
     {
         return [
             'name' => ['nullable', 'string', 'max:255'],
-            'needs_director' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
+            // Quy trình ký: mảng rỗng = 0 bước, phiếu đi thẳng đến người cấp phát
+            'signers' => ['nullable', 'array', 'max:20'],
+            'signers.*' => ['required', 'integer', 'distinct', Rule::in($this->signerOptions()->pluck('id')->all())],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['nullable'],
             'items.*.material_name' => ['nullable', 'string', 'max:255'],
@@ -2337,6 +2832,10 @@ class MaterialExportController extends Controller
     private function requestMessages(): array
     {
         return [
+            'signers.max' => 'Quy trình ký duyệt tối đa 20 bước.',
+            'signers.*.required' => 'Vui lòng chọn người ký cho mỗi bước duyệt, hoặc xoá bước đó đi.',
+            'signers.*.distinct' => 'Một người chỉ được ký một bước trong cùng đề nghị.',
+            'signers.*.in' => 'Người ký được chọn không thuộc công ty của bạn.',
             'items.required' => 'Vui lòng thêm ít nhất một vật tư đề nghị.',
             'items.min' => 'Vui lòng thêm ít nhất một vật tư đề nghị.',
             'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',

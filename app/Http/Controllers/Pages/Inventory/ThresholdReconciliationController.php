@@ -187,6 +187,17 @@ class ThresholdReconciliationController extends Controller
                     $query->select('active_ingredients_id')
                         ->from('chem_name_active_ingredient');
                 })
+                // Mục gộp không tự gắn vào tên hoá chất nào - nó nhận tồn qua các chất
+                // thành viên (parent_id). Có thành viên đã gắn thì không coi là bỏ sót.
+                ->whereNotExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('active_ingredients as child')
+                        ->whereColumn('child.parent_id', 'active_ingredients.id')
+                        ->whereIn('child.id', function ($inner) {
+                            $inner->select('active_ingredients_id')
+                                ->from('chem_name_active_ingredient');
+                        });
+                })
                 ->orderBy('name')
                 ->pluck('name'),
         ]);
@@ -331,6 +342,8 @@ class ThresholdReconciliationController extends Controller
                 'date' => isset($o->date) && $o->date ? \Carbon\Carbon::parse($o->date)->format('d/m/Y') : '—',
                 'category_code' => $o->category_code,
                 'chem_name' => $o->chem_name ?? '',
+                // Hoạt chất thành viên đóng góp vào mục gộp (rỗng nếu hoạt chất đứng riêng)
+                'member_name' => $o->member_name ?? '',
                 'department_name' => $o->department_name,
                 'imported' => $qty($o->imported ?? 0, $o->unit_short),
                 'balanced' => isset($o->balanced) ? ($signed($o->balanced) === '0' ? '—' : $signed($o->balanced) . ($o->unit_short ? ' ' . $o->unit_short : '')) : '—',
@@ -348,6 +361,7 @@ class ThresholdReconciliationController extends Controller
                 'type_label' => $typeLabels[$t->type] ?? $t->type,
                 'ref' => $t->ref,
                 'category_code' => $t->category_code,
+                'member_name' => $t->member_name ?? '',
                 'department_name' => $t->department_name,
                 'delta' => $signed($t->delta_unit) . ($t->unit_short ? ' ' . $t->unit_short : ''),
                 'delta_kg' => $signed($t->delta_kg),

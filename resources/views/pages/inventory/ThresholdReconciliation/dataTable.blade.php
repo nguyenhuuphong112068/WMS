@@ -244,6 +244,12 @@
                                         @if ($row->ai_code)
                                             <div class="md-sub">{{ $row->ai_code }}</div>
                                         @endif
+                                        @if (!empty($row->members))
+                                            <div class="md-sub"
+                                                title="Mục gộp của nghị định - tồn của các chất thành viên được cộng chung vào ngưỡng này">
+                                                Gộp tồn của: {{ implode(', ', $row->members) }}
+                                            </div>
+                                        @endif
                                         @if ($row->has_unconvertible)
                                             <div class="md-sub" style="color: var(--warning, #F59E0B)"
                                                 title="{{ collect($row->unconvertible)->map(fn($u) => $u->category_code . ' — ' . $u->reason)->implode('; ') }}">
@@ -645,7 +651,8 @@
                     ],
                     row.onhand_rows.map(function(o) {
                         return {
-                            cells: [o.ref, o.date, o.category_code, o.department_name, o.imported, o
+                            cells: [o.ref, o.date, o.category_code + (o.member_name ? ' · ' + o
+                                    .member_name : ''), o.department_name, o.imported, o
                                 .balanced,
                                 o.exported, o.on_hand, o.on_hand_kg
                             ]
@@ -692,7 +699,8 @@
                     row.timeline.map(function(t) {
                         return {
                             _peak: t.is_peak,
-                            cells: [t.date, t.type_label, t.ref, t.category_code, t.department_name,
+                            cells: [t.date, t.type_label, t.ref, t.category_code + (t.member_name ?
+                                    ' · ' + t.member_name : ''), t.department_name,
                                 t.delta,
                                 t.delta_kg, t.running_kg
                             ]

@@ -14,7 +14,10 @@
     $stdReqBadge = $stdReqBadge ?? fn($status) => $stdReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
     $expNum = $expNum ?? fn($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
     $expDate = $expDate ?? fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
-    $transferAll = $transferSent->merge($transferReceived)->unique('id');
+    // $transferSent / $transferReceived giờ là LengthAwarePaginator (đã phân trang) chứ
+    // không còn là Collection, nên phải lấy getCollection() trước khi merge, tránh việc
+    // paginator bị đổ thành mảng meta (current_page, from, last_page...) làm unique('id') lỗi.
+    $transferAll = $transferSent->getCollection()->merge($transferReceived->getCollection())->unique('id');
 @endphp
 
 @foreach ($transferAll as $req)

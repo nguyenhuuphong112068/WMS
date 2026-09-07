@@ -208,6 +208,42 @@ if (! function_exists('user_can')) {
     }
 }
 
+if (! function_exists('users_with_permission')) {
+    /**
+     * Tra NGƯỢC: id các user đang hoạt động có quyền $permissionName TẠI phòng ban
+     * $departmentId (và được phép vào làm việc ở phòng đó).
+     *
+     * Dùng để gửi thông báo cho đúng nhóm người phụ trách một bước nghiệp vụ, ví dụ
+     * "phiếu đã duyệt, kho cấp phát đi" -> mọi user có export_material_issue của phòng.
+     * Số user trong hệ thống nhỏ nên duyệt từng người, tận dụng cache của
+     * user_permission_names() thay vì dựng một truy vấn gộp khó đọc.
+     *
+     * @return array<int>
+     */
+    function users_with_permission(string $permissionName, ?int $departmentId = null): array
+    {
+        $departmentId ??= user_current_department_id();
+
+        $userIds = DB::table('user_management')->where('isActive', 1)->pluck('id')->all();
+
+        $matched = [];
+
+        foreach ($userIds as $userId) {
+            if (! isset(user_permission_names($userId, $departmentId)[$permissionName])) {
+                continue;
+            }
+
+            if ($departmentId && ! user_can_access_department($userId, $departmentId)) {
+                continue;
+            }
+
+            $matched[] = (int) $userId;
+        }
+
+        return $matched;
+    }
+}
+
 if (! function_exists('user_can_any')) {
     /**
      * Có ít nhất một trong các quyền được liệt kê.

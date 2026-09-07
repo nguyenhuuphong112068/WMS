@@ -114,6 +114,9 @@ class ChemicalEstimateController extends Controller
             'histories' => self::historiesOf($list->id),
             'categories' => $this->categoryOptions($list->department_id),
             'categoryLevels' => $this->categoryThresholdLevels(CompanyContext::resolveForDepartment($list->department_id)),
+            // Nhóm NĐ 24/2026 suy tự động theo mã danh mục, hiển thị ở cột "Nhóm Hoá Chất"
+            'classificationCodes' => \App\Support\ChemicalClassification::codesByCategory(),
+            'classificationLabels' => \App\Support\ChemicalClassification::labels(),
             'units' => $this->unitOptions(),
             'appStatuses' => config('estimate.app_statuses'),
             'signSteps' => config('estimate.sign_steps'),

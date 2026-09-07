@@ -5,8 +5,9 @@
     |--------------------------------------------------------------------------
     | SỬ DỤNG - SỬ DỤNG VẬT TƯ
     |--------------------------------------------------------------------------
-    | Vật tư bắt buộc qua đề nghị được phê duyệt (Trưởng/Phó Phòng bắt buộc, Ban Giám
-    | Đốc tuỳ chọn) rồi kho cấp phát; loại bỏ hàng hỏng thì lập thẳng.
+    | Vật tư bắt buộc qua đề nghị được phê duyệt rồi kho cấp phát; số bước ký và người ký
+    | từng bước do người lập phiếu tự khai (0 bước = duyệt thẳng đến người cấp phát).
+    | Loại bỏ hàng hỏng thì lập thẳng, không cần đề nghị.
     */
 
     $expRoute = 'pages.export.materialExport.';

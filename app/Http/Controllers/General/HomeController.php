@@ -442,28 +442,44 @@ class HomeController extends Controller
         return $rows;
     }
 
-    /** Đề nghị cấp phát vật tư đang chờ Trưởng/Phó Phòng hoặc Ban Giám Đốc ký. */
+    /**
+     * Đề nghị cấp phát vật tư đang chờ ký.
+     *
+     * Số bước ký và người ký từng bước do người lập phiếu tự khai, nên "đang chờ tôi"
+     * là bước hiện tại (material_request_lists.current_step) chỉ đích danh mình.
+     */
     private function materialRequestApprovals(int $departmentId): array
     {
         if ($departmentId <= 0) {
             return [];
         }
 
-        $steps = config('estimate.sign_steps');
-        $labels = config('estimate.app_statuses');
+        $userId = (int) (session('user')['userId'] ?? 0);
 
         $records = DB::table('material_request_lists as r')
-            ->select('r.id', 'r.code', 'r.name', 'r.app_status', 'r.submitted_at', 'r.created_at')
+            ->leftJoin('material_request_signs as s', function ($join) {
+                $join->on('s.request_list_id', '=', 'r.id')
+                    ->on('s.step_no', '=', 'r.current_step')
+                    ->where('s.active', 1);
+            })
+            ->select(
+                'r.id', 'r.code', 'r.name', 'r.app_status', 'r.current_step', 'r.sign_step_count',
+                'r.submitted_at', 'r.created_at',
+                's.user_id as signer_user_id', 's.user_name as signer_name', 's.role_names as signer_roles'
+            )
             ->where('r.department_id', $departmentId)
             ->where('r.status_id', 1)
-            ->whereIn('r.app_status', ['pending_manager', 'pending_director'])
+            ->where('r.app_status', 'pending_sign')
             ->orderBy('r.submitted_at')
             ->get();
 
         $rows = [];
 
         foreach ($records as $record) {
-            $step = $record->app_status === 'pending_manager' ? 'manager' : 'director';
+            // Phiếu cũ chưa chỉ định đích danh thì vẫn xét theo chức danh như luồng trước
+            $waitingMe = $record->signer_user_id
+                ? (int) $record->signer_user_id === $userId
+                : $this->canSign(array_values(array_filter(array_map('trim', explode(',', (string) $record->signer_roles)))));
 
             $rows[] = [
                 'group' => 'Trình ký',
@@ -471,10 +487,11 @@ class HomeController extends Controller
                 'label' => 'Đề nghị cấp phát vật tư',
                 'code' => $record->code,
                 'title' => $record->name ?: 'Đề nghị cấp phát vật tư',
-                'status_label' => $labels[$record->app_status] ?? $record->app_status,
+                'status_label' => 'Chờ ký bước '.$record->current_step.'/'.$record->sign_step_count
+                    .($record->signer_name ? ' — '.$record->signer_name : ''),
                 'since' => $record->submitted_at ?: $record->created_at,
-                'url' => route('pages.export.materialExport.list'),
-                'waiting_me' => $this->canSign($steps[$step]['roles']),
+                'url' => route('pages.export.materialExport.list', ['tab' => 'request']),
+                'waiting_me' => $waitingMe,
             ];
         }
 

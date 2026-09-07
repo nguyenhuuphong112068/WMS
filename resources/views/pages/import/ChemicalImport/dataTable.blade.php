@@ -32,6 +32,17 @@
                     @endperm
                 </div>
 
+                @include('pages.shared.rangeFilter', [
+                    'rfRoute' => $impRoute . 'list',
+                    'rfTab' => 'book',
+                    'rfPrefix' => 'book_',
+                    'rfRange' => $bookRange,
+                    'rfPerPage' => $bookPerPage,
+                    'rfKeyword' => $bookKeyword,
+                    'rfDateLabel' => 'Ngày nhập',
+                    'rfPlaceholder' => 'Mã xuất nhập, tên hoá chất, số lô, hoá đơn, NCC...',
+                ])
+
                 @include('pages.shared.barcodeSearch', [
                     'scanTitle' => 'Quét mã vạch',
                     'scanTables' => [
@@ -42,7 +53,7 @@
                 @include('pages.shared.classificationFilter', ['clsTarget' => 'mdTable'])
 
                 <div class="table-responsive">
-                    <table id="mdTable" class="table table-bordered table-hover w-100">
+                    <table id="mdTable" class="table table-bordered table-hover w-100" data-server-paged>
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 60px">STT</th>
@@ -79,10 +90,17 @@
                                 @endphp
                                 {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
                                 <tr data-classification="{{ $impCls($row->category_id) }}">
-                                    <td class="text-center">{{ $loop->iteration }}</td>
+                                    <td class="text-center">{{ $datas->firstItem() + $loop->index }}</td>
                                     <td><span class="imp-code">{{ $row->code }}</span></td>
                                     <td>
-                                        <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
+                                        <div class="font-weight-bold">
+                                            {{ $row->chem_name ?: '—' }}
+                                            @if ($impIsSpecial($row->category_id))
+                                                <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                    <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                </span>
+                                            @endif
+                                        </div>
                                         <div class="md-sub">
                                             <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
                                             @if ($row->is_microbiological_chemicals)
@@ -212,6 +230,12 @@
                         </tbody>
                     </table>
                 </div>
+
+                @include('pages.shared.paginator', [
+                    'pgItems' => $datas,
+                    'pgTab' => 'book',
+                    'pgUnit' => 'phiếu nhập',
+                ])
                 </div>
 
                 {{-- ============ BÁO CÁO NHẬP HOÁ CHẤT ============ --}}
@@ -272,7 +296,14 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td><span class="imp-code">{{ $row->category_code }}</span></td>
                                         <td>
-                                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
+                                            <div class="font-weight-bold">
+                                                {{ $row->chem_name ?: '—' }}
+                                                @if ($impIsSpecial($row->category_id))
+                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
+                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
+                                                    </span>
+                                                @endif
+                                            </div>
                                             <div class="md-sub">
                                                 {{ $row->supplier_count }} nhà cung cấp · đơn vị {{ $row->unit }}
                                                 @if ($row->density !== null)

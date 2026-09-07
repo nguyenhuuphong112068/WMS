@@ -23,9 +23,13 @@
                             placeholder="Ví dụ: Vật tư còn tồn đủ dùng, chưa cần cấp thêm" required>{{ old('reject_reason') }}</textarea>
                         @if ($bag->has('reject_reason')) <div class="md-error text-danger small">{{ $bag->first('reject_reason') }}</div> @endif
                     </div>
-                    <div class="md-hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Đề nghị bị từ chối quay về <b>Bị từ chối</b>, Tổ sửa lại rồi trình ký lại từ đầu.
+                    {{-- Thành phần thứ 2 của chữ ký điện tử - 21 CFR Part 11 §11.200 --}}
+                    <div class="form-group mb-0">
+                        <label>Mật Khẩu Xác Nhận <span class="text-danger">*</span></label>
+                        <input type="password" name="sign_password" autocomplete="current-password"
+                            class="form-control {{ $bag->has('sign_password') ? 'is-invalid' : '' }}"
+                            placeholder="Nhập lại mật khẩu đăng nhập để ký xác nhận" required>
+                        @if ($bag->has('sign_password')) <div class="md-error text-danger small">{{ $bag->first('sign_password') }}</div> @endif
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -47,6 +51,21 @@
     });
 </script>
 
-@if ($bag->any())
-    <script>document.addEventListener('DOMContentLoaded', function () { $('#reqRejectModal').modal('show'); });</script>
+{{-- Mở lại modal khi lý do không hợp lệ, hoặc khi mật khẩu ký xác nhận sai (guardSignature) --}}
+@if ($bag->any() || session('signatureError') === 'Từ chối đề nghị cấp phát vật tư')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var oldId = @json(old('request_list_id'));
+
+            // Bấm lại đúng nút Từ chối của phiếu vừa thao tác để lấy lại mã đề nghị
+            var $btn = $('.btn-req-reject').filter(function () {
+                return String($(this).data('id')) === String(oldId);
+            }).first();
+
+            if ($btn.length) $btn.trigger('click');
+            else $('#reqRejectModal').modal('show');
+
+            $('#reqRejectModal [name="reject_reason"]').val(@json(old('reject_reason')));
+        });
+    </script>
 @endif

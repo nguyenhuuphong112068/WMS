@@ -2,6 +2,36 @@
     $bag = $errors->getBag('createErrors');
 @endphp
 
+<style>
+    /* ---------- Bảng dòng hoá chất trong modal Sử Dụng ----------
+       Ô nhập cao bằng đúng nội dung của dòng: dòng nào tên hoá chất dài / mục đích nhiều
+       chữ thì ô nhập giãn theo, không còn ô nhỏ lọt thỏm giữa ô cao. */
+    #expRowsTable td {
+        vertical-align: top;
+    }
+
+    #expRowsTable td.exp-cell-fill {
+        padding: 6px;
+    }
+
+    #expRowsTable td.exp-cell-fill>.form-control {
+        height: 100%;
+        min-height: 34px;
+        resize: none;
+        overflow: hidden;
+    }
+
+    #expRowsTable .exp-required-note {
+        margin-top: 4px;
+        font-size: 0.72rem;
+        color: #B91C1C;
+    }
+
+    #expRowsTable tr.is-banned {
+        background: #FEF7E6;
+    }
+</style>
+
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 90vw;" role="document">
         <div class="modal-content">
@@ -30,7 +60,7 @@
                     @endif
 
                     <div class="form-row">
-                        <div class="form-group col-md-7">
+                        <div class="form-group col-md-5">
                             <label>Loại Phiếu <span class="text-danger">*</span></label>
                             <div class="exp-types">
                                 @foreach ($types as $value => $label)
@@ -43,31 +73,35 @@
                             </div>
                         </div>
 
-                        {{-- Căn cứ loại bỏ, chỉ hỏi khi chọn Loại bỏ; dùng chung cho cả đợt.
-                             JS bật/tắt qua class exp-cancel-only (đã có sẵn ở shared/assets.blade.php) --}}
-                        <div class="form-group col-md-5 exp-cancel-only" style="display: none">
+                        {{-- Quét mã vạch trên nhãn lô (máy đọc mã rời, camera, hoặc gõ tay mã) để thêm nhanh 1 dòng --}}
+                        <div class="form-group col-md-7">
+                            <div class="exp-scan scan-box mb-0">
+                                <label><i class="fas fa-barcode mr-1"></i> Quét Mã Xuất Nhập</label>
+                                <div class="exp-scan-row">
+                                    <input type="text" class="form-control exp-scan-input" autocomplete="off"
+                                        data-url="{{ route($expRoute . 'lookup') }}"
+                                        placeholder="Đưa máy quét vào mã vạch trên nhãn, hoặc gõ mã rồi nhấn Enter">
+                                    <button type="button" class="btn btn-outline-primary btn-camera-scan" title="Quét bằng camera">
+                                        <i class="fas fa-camera"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-primary btn-exp-scan">
+                                        <i class="fas fa-search mr-1"></i> Tra mã
+                                    </button>
+                                </div>
+                                <div class="exp-scan-result"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Căn cứ loại bỏ, chỉ hỏi khi chọn Loại bỏ; dùng chung cho cả đợt.
+                         JS bật/tắt qua class exp-cancel-only (đã có sẵn ở shared/assets.blade.php) --}}
+                    <div class="form-row">
+                        <div class="form-group col-md-12 exp-cancel-only" style="display: none">
                             <label>Số PKN, OOS, BCSL...</label>
                             <input type="text" name="test_report_no" maxlength="100" class="form-control"
                                 placeholder="Ví dụ: PKN-2026-0145 / OOS-08">
                             <small class="md-sub">Căn cứ loại bỏ, áp dụng chung cho các hoá chất chọn bên dưới.</small>
                         </div>
-                    </div>
-
-                    {{-- Quét mã vạch trên nhãn lô (máy đọc mã rời, camera, hoặc gõ tay mã) để thêm nhanh 1 dòng --}}
-                    <div class="exp-scan scan-box">
-                        <label><i class="fas fa-barcode mr-1"></i> Quét Mã Xuất Nhập</label>
-                        <div class="exp-scan-row">
-                            <input type="text" class="form-control exp-scan-input" autocomplete="off"
-                                data-url="{{ route($expRoute . 'lookup') }}"
-                                placeholder="Đưa máy quét vào mã vạch trên nhãn, hoặc gõ mã rồi nhấn Enter">
-                            <button type="button" class="btn btn-outline-primary btn-camera-scan" title="Quét bằng camera">
-                                <i class="fas fa-camera"></i>
-                            </button>
-                            <button type="button" class="btn btn-primary btn-exp-scan">
-                                <i class="fas fa-search mr-1"></i> Tra mã
-                            </button>
-                        </div>
-                        <div class="exp-scan-result"></div>
                     </div>
 
                     <div class="md-toolbar">
@@ -81,12 +115,18 @@
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-bordered table-sm md-table mb-0" id="expRowsTable" style="display: none">
+                        {{-- data-no-datatable: dòng ở đây do JS thêm/bớt, để DataTables ôm vào thì
+                             phần đếm dòng / phân trang sai và sắp xếp lại làm mất dòng đang nhập --}}
+                        <table class="table table-bordered table-sm md-table mb-0" id="expRowsTable" data-no-datatable
+                            style="display: none">
                             <thead>
                                 <tr>
                                     <th>Hoá Chất</th>
                                     <th style="width: 130px">Số Lượng <span class="text-danger">*</span></th>
-                                    <th style="width: 180px">Người Kiểm Tra</th>
+                                    {{-- Cột chỉ hiện khi trong danh sách có hoá chất thuộc Nhóm HC Cấm --}}
+                                    <th class="exp-col-checker" style="width: 180px; display: none">Người Kiểm Tra
+                                        <span class="text-danger">*</span>
+                                    </th>
                                     <th>Mục Đích / Lý Do</th>
                                     <th style="width: 50px"></th>
                                 </tr>
@@ -182,31 +222,65 @@
                 return;
             }
 
+            // Hoá chất cấm (Luật Đầu tư 2025, số 143/2025/QH15) bắt buộc có Người Kiểm Tra,
+            // hoá chất thường thì ô này vẫn để trống được.
+            var banned = !!data.banned;
+
             var $row = $(
-                '<tr data-import-id="' + importId + '">' +
+                '<tr data-import-id="' + importId + '"' + (banned ? ' class="is-banned"' : '') + '>' +
                 '<td>' +
                 '<div class="font-weight-bold">' + esc(data.chem_name || '—') + '</div>' +
                 '<div class="md-sub"><span class="md-tag">' + esc(data.category_code || '—') + '</span>' +
+                (banned ? ' <span class="badge badge-warning text-dark">' + esc(data.banned_label || 'Nhóm HC Cấm') + '</span>' : '') +
                 (data.batch_no ? ' Lô ' + esc(data.batch_no) : '') + '</div>' +
                 '<div class="md-sub">' + esc(data.code) + ' · còn ' + trimNum(data.remaining) + ' ' + esc(data.unit || '') +
                 (data.expired_date ? ' · HSD ' + esc(data.expired_date) : '') + '</div>' +
                 '</td>' +
-                '<td><input type="text" inputmode="decimal" min="0.0001" max="' + trimNum(data.max_issue) +
+                '<td class="exp-cell-fill"><input type="text" inputmode="decimal" min="0.0001" max="' + trimNum(data.max_issue) +
                 '" name="items[' + importId + '][amount]" class="form-control form-control-sm js-decimal" placeholder="Số lượng" required></td>' +
-                '<td><select name="items[' + importId + '][checked_by]" class="form-control form-control-sm">' +
-                checkerOptionsHtml() + '</select></td>' +
-                '<td><input type="text" name="items[' + importId + '][purpose]" maxlength="500" class="form-control form-control-sm" placeholder="Mục đích / lý do"></td>' +
+                // Hoá chất thường không có ô Người Kiểm Tra, chỉ hoá chất cấm mới phải khai
+                '<td class="exp-col-checker exp-cell-fill" style="display: none">' +
+                (banned ?
+                    '<select name="items[' + importId + '][checked_by]" class="form-control form-control-sm" required>' +
+                    checkerOptionsHtml() + '</select>' :
+                    '<span class="md-empty">—</span>') + '</td>' +
+                '<td class="exp-cell-fill"><textarea name="items[' + importId + '][purpose]" maxlength="500" rows="1" ' +
+                'class="form-control form-control-sm exp-autogrow" placeholder="Mục đích / lý do"></textarea></td>' +
                 '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger exp-row-remove"><i class="fas fa-times"></i></button></td>' +
                 '</tr>'
             );
 
             $('#expRowsBody').append($row);
             syncRowsVisibility();
+            syncCheckerColumn();
+            autoGrow($row.find('.exp-autogrow'));
         };
+
+        // Cột Người Kiểm Tra chỉ có nghĩa với hoá chất thuộc Nhóm HC Cấm (Luật Đầu tư
+        // 2025, số 143/2025/QH15) - danh sách không có dòng nào như vậy thì giấu cả cột.
+        function syncCheckerColumn() {
+            $('#expRowsTable .exp-col-checker').toggle($('#expRowsBody tr.is-banned').length > 0);
+        }
+
+        // Ô Mục Đích / Lý Do cao dần theo số dòng chữ đã gõ, tối thiểu bằng chiều cao ô
+        // thông tin hoá chất của cùng dòng để cả dòng nhìn đều nhau.
+        function autoGrow($area) {
+            $area.each(function() {
+                var min = $(this).closest('tr').children('td').first().outerHeight() - 12;
+
+                this.style.height = 'auto';
+                this.style.height = Math.max(this.scrollHeight, min) + 'px';
+            });
+        }
+
+        $(document).on('input', '#expRowsBody .exp-autogrow', function() {
+            autoGrow($(this));
+        });
 
         $(document).on('click', '#expRowsBody .exp-row-remove', function() {
             $(this).closest('tr').remove();
             syncRowsVisibility();
+            syncCheckerColumn();
         });
 
         // Lưu Tạm chỉ áp dụng cho loại Sử dụng - Loại bỏ luôn trừ kho ngay
@@ -221,12 +295,14 @@
         $(document).on('click', '.btn-md-create', function() {
             $('#expRowsBody').empty();
             syncRowsVisibility();
+            syncCheckerColumn();
             $modal.find('.exp-mode-input').val('use');
             syncTypeUi();
         });
 
         syncTypeUi();
         syncRowsVisibility();
+        syncCheckerColumn();
 
         $modal.find('.exp-submit').on('click', function() {
             if (!$('#expRowsBody tr').length) {

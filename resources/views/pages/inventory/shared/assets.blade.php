@@ -1032,8 +1032,8 @@
         invTable('#invExpiringTable', [7, 'asc'],
             'Không có mã xuất nhập nào còn tồn mà sắp hết hạn.');
 
-        // Kiểm soát khối lượng
-        invTable('#invWeightTable', [6, 'desc'],
+        // Kiểm soát khối lượng: cột 8 = Độ Lệch (%), lệch nhiều nhất lên trước
+        invTable('#invWeightTable', [8, 'desc'],
             'Không có đối tượng nào có khai báo kiểm soát khối lượng.');
 
         // Theo định khu: cột 1 = Vị Trí, gom các mã cùng chỗ đứng cạnh nhau

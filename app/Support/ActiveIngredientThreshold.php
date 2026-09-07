@@ -34,6 +34,20 @@ use Illuminate\Support\Facades\DB;
  * (Bảng B, tồn thô - App\Support\MixtureHazardThreshold), nhập kho hỗn hợp không tách %
  * hoạt chất thành phần để cộng thêm vào ngưỡng Bảng A.
  *
+ * MỤC GỘP (active_ingredients.parent_id - xem migration 2026_09_07_110000):
+ * Nghị định có dòng khai theo NHÓM chất ("Thủy ngân và các hợp chất của thủy ngân" - 1 kg,
+ * "Các hợp chất xyanua" - 5.000 kg...) trong khi kho nhập chất cụ thể có số CAS riêng
+ * (HgCl₂, HgI₂...). Chất cụ thể khai thành một hoạt chất riêng rồi trỏ parent_id về mục
+ * gộp; tồn của nó KHÔNG đứng riêng mà cộng vào ngưỡng của mục gộp ("chủ ngưỡng"). Với phần
+ * cộng gộp này:
+ *   - Tính trên KHỐI LƯỢNG HỢP CHẤT THÔ - KHÔNG nhân % hàm lượng (ngưỡng 1 kg của mục gộp
+ *     là 1 kg hợp chất thuỷ ngân, không phải 1 kg Hg nguyên tố). Đây là cách hiểu chặt hơn,
+ *     giống cách Bảng B cộng tồn thô ở App\Support\MixtureHazardThreshold.
+ *   - Nhân thêm active_ingredients.equiv_factor của chất thành viên (mặc định 1). Chỉ đổi
+ *     hệ số này khi muốn quy về phần nguyên tố (ví dụ 0,738 cho Hg trong HgCl₂).
+ * Chất vừa có ngưỡng RIÊNG vừa thuộc mục gộp thì được cộng ở CẢ HAI chỗ (đúng nghị định:
+ * nó vừa bị liệt kê đích danh vừa nằm trong nhóm).
+ *
  * Đơn vị đếm (chai/thùng…) hoặc thiếu tỉ trọng => KHÔNG quy đổi được, gom vào phần
  * "cần kiểm tra thủ công" chứ không bỏ qua âm thầm.
  *
@@ -53,10 +67,11 @@ class ActiveIngredientThreshold
     }
 
     /**
-     * Hoạt chất (đã duyệt, đang hoạt động) đang được ít nhất một mã danh mục hoá chất
-     * tham chiếu, kèm các mã danh mục thuộc hoạt chất đó.
+     * Hoạt chất CHỊU NGƯỠNG (đã duyệt, đang hoạt động) đang được ít nhất một mã danh mục
+     * hoá chất tham chiếu, kèm các mã danh mục thuộc hoạt chất đó. Với mục gộp, đây là
+     * dòng mục gộp - các chất thành viên đóng góp vào nó (xem members).
      *
-     * @return array<int, object>  keyed by active_ingredient_id
+     * @return array<int, object>  keyed by active_ingredient_id của CHỦ NGƯỠNG
      */
     public static function ingredients(): array
     {
@@ -65,19 +80,31 @@ class ActiveIngredientThreshold
         $out = [];
 
         foreach ($rows as $row) {
-            if (! isset($out[$row->ai_id])) {
-                $out[$row->ai_id] = (object) [
-                    'ai_id' => (int) $row->ai_id,
-                    'ai_code' => $row->ai_code,
-                    'ai_name' => $row->ai_name,
-                    'cas_no' => $row->cas_no,
-                    'threshold_kg' => $row->threshold_kg === null ? null : (float) $row->threshold_kg,
-                    'legal_ref' => $row->legal_ref,
+            $ownerId = (int) $row->owner_ai_id;
+
+            if (! isset($out[$ownerId])) {
+                $out[$ownerId] = (object) [
+                    'ai_id' => $ownerId,
+                    'ai_code' => $row->owner_ai_code,
+                    'ai_name' => $row->owner_ai_name,
+                    'cas_no' => $row->owner_cas_no,
+                    'threshold_kg' => $row->owner_threshold_kg === null ? null : (float) $row->owner_threshold_kg,
+                    'legal_ref' => $row->owner_legal_ref,
                     'category_ids' => [],
+                    // Tên các hoạt chất thành viên cộng vào mục gộp này (rỗng nếu không phải mục gộp)
+                    'members' => [],
                 ];
             }
 
-            $out[$row->ai_id]->category_ids[] = (int) $row->category_id;
+            $out[$ownerId]->category_ids[] = (int) $row->category_id;
+
+            if ($row->is_rolled_up) {
+                $out[$ownerId]->members[(int) $row->ai_id] = $row->member_ai_name;
+            }
+        }
+
+        foreach ($out as $ing) {
+            $ing->category_ids = array_values(array_unique($ing->category_ids));
         }
 
         return $out;
@@ -91,8 +118,9 @@ class ActiveIngredientThreshold
      *                                  (phạm vi đối chiếu ngưỡng PL IV). null = toàn hệ thống.
      * @param  bool  $withDetail  true = kèm onhand_rows (chi tiết tồn hiện tại theo mã × phòng)
      *                            và timeline (diễn biến từng chứng từ tạo nên đỉnh) cho modal xem chi tiết.
-     * @return array<int, object>  keyed by active_ingredient_id, mỗi phần tử:
-     *   {ai_id, ai_code, ai_name, cas_no, threshold_kg, legal_ref,
+     * @return array<int, object>  keyed by active_ingredient_id của CHỦ NGƯỠNG (mục gộp nếu
+     *   hoạt chất là thành viên của mục gộp), mỗi phần tử:
+     *   {ai_id, ai_code, ai_name, cas_no, threshold_kg, legal_ref, members,
      *    total_kg, peak_kg, peak_date,
      *    by_department: [ {department_id, department_name, kg} ],
      *    unconvertible: [ {category_code, chem_name, reason} ],
@@ -117,6 +145,8 @@ class ActiveIngredientThreshold
                 'cas_no' => $ing->cas_no,
                 'threshold_kg' => $ing->threshold_kg,
                 'legal_ref' => $ing->legal_ref,
+                // Hoạt chất thành viên cộng vào mục gộp này (rỗng = hoạt chất đứng riêng)
+                'members' => array_values($ing->members),
                 'total_kg' => 0.0,
                 'peak_kg' => 0.0,
                 'peak_date' => null,
@@ -206,7 +236,7 @@ class ActiveIngredientThreshold
             $deptName = $deptNames[$deptId] ?? ('#' . $deptId);
 
             foreach ($catRows as $cat) {
-                $target = $result[$cat->ai_id];
+                $target = $result[$cat->owner_ai_id];
 
                 if ($reason !== null) {
                     $target->unconvertible[] = (object) [
@@ -217,8 +247,7 @@ class ActiveIngredientThreshold
                     continue;
                 }
 
-                $percent = self::resolvePercent($cat);
-                $kg = (float) $amount * $factor * $percent / 100;
+                $kg = (float) $amount * $factor * self::kgMultiplier($cat);
 
                 $target->total_kg += $kg;
 
@@ -257,20 +286,20 @@ class ActiveIngredientThreshold
                 $deptName = $deptNames[$lot->department_id] ?? ('#' . $lot->department_id);
 
                 foreach ($catRows as $cat) {
-                    $percent = self::resolvePercent($cat);
-
-                    $result[$cat->ai_id]->onhand_rows[] = (object) [
+                    $result[$cat->owner_ai_id]->onhand_rows[] = (object) [
                         'ref' => $lot->code,
                         'date' => $lot->imported_date,
                         'category_code' => $cat->category_code,
                         'chem_name' => $cat->chem_name,
+                        // Hoạt chất thành viên đóng góp (chỉ có khi cộng vào mục gộp)
+                        'member_name' => $cat->member_ai_name,
                         'department_name' => $deptName,
                         'unit_short' => $unitShort,
                         'imported' => $lot->imported,
                         'balanced' => $lot->balanced,
                         'exported' => $lot->exported,
                         'on_hand_unit' => $lot->on_hand,
-                        'on_hand_kg' => $lot->on_hand * $factor * $percent / 100,
+                        'on_hand_kg' => $lot->on_hand * $factor * self::kgMultiplier($cat),
                     ];
                 }
             }
@@ -297,9 +326,8 @@ class ActiveIngredientThreshold
             $deptName = $deptNames[$event['department_id']] ?? ('#' . $event['department_id']);
 
             foreach ($catRows as $cat) {
-                $percent = self::resolvePercent($cat);
-                $kgDelta = $event['delta'] * $factor * $percent / 100;
-                $aiId = $cat->ai_id;
+                $kgDelta = $event['delta'] * $factor * self::kgMultiplier($cat);
+                $aiId = $cat->owner_ai_id;
                 $running[$aiId] = ($running[$aiId] ?? 0.0) + $kgDelta;
 
                 if ($withDetail) {
@@ -308,6 +336,7 @@ class ActiveIngredientThreshold
                         'type' => $event['type'],
                         'ref' => $event['ref'],
                         'category_code' => $cat->category_code,
+                        'member_name' => $cat->member_ai_name,
                         'department_name' => $deptName,
                         'delta_unit' => $event['delta'],
                         'unit_short' => $unitShort,
@@ -403,6 +432,10 @@ class ActiveIngredientThreshold
      * Đánh giá gắn theo từng mã danh mục hoá chất, để bảng Danh Mục Hoá Chất hiện cột
      * cảnh báo ngưỡng.
      *
+     * Một mã danh mục có thể đứng sau nhiều chủ ngưỡng (nhiều hoạt chất Bảng A, hoặc vừa
+     * ngưỡng riêng vừa mục gộp) - giữ chủ ngưỡng CĂNG NHẤT (tỉ lệ đỉnh cao nhất) để cột
+     * cảnh báo không bị dòng nhẹ hơn ghi đè.
+     *
      * @param  int|null  $companyId  Cộng tồn trong phạm vi công ty này. null = toàn hệ thống.
      * @return array<int, object>  keyed by chemical_categories.id
      */
@@ -416,8 +449,12 @@ class ActiveIngredientThreshold
                 continue;
             }
 
+            $eval = $evaluations[$ing->ai_id];
+
             foreach ($ing->category_ids as $categoryId) {
-                $out[$categoryId] = $evaluations[$ing->ai_id];
+                if (! isset($out[$categoryId]) || $eval->peak_ratio > $out[$categoryId]->peak_ratio) {
+                    $out[$categoryId] = $eval;
+                }
             }
         }
 
@@ -449,6 +486,9 @@ class ActiveIngredientThreshold
      * Cộng các dòng số lượng (mỗi dòng {amount, unit_id}) của một mặt hàng dự trù, quy về
      * kg HOẠT CHẤT gốc (× % hàm lượng) theo tỉ trọng của mã danh mục.
      *
+     * Hoá chất là thành viên của một MỤC GỘP thì lấy khối lượng hợp chất thô (không nhân %),
+     * chỉ nhân equiv_factor - đúng cách cộng của onHandByIngredient().
+     *
      * @param  iterable  $amountRows  các object/array có khoá amount + unit_id
      * @return array{kg: float, unconvertible: bool}  unconvertible = có dòng đơn vị đếm / thiếu tỉ trọng
      */
@@ -469,9 +509,7 @@ class ActiveIngredientThreshold
         $units = $unitIds ? DB::table('units')->whereIn('id', $unitIds)->get()->keyBy('id') : collect();
 
         $density = $cat->density !== null ? (float) $cat->density : null;
-        $percent = $cat->ai_content_percent !== null
-            ? (float) $cat->ai_content_percent
-            : self::maxAppendixIvAPercent((int) $cat->chem_names_id);
+        $multiplier = self::estimateMultiplier((int) $cat->chem_names_id, $cat->ai_content_percent);
         $kgUnit = (object) ['unit_group' => 'mass', 'factor_to_base' => 1000.0];
 
         $totalKg = 0.0;
@@ -501,7 +539,7 @@ class ActiveIngredientThreshold
                 continue;
             }
 
-            $totalKg += $base * $percent / 100;
+            $totalKg += $base * $multiplier;
         }
 
         return ['kg' => $totalKg, 'unconvertible' => $unconvertible];
@@ -563,17 +601,26 @@ class ActiveIngredientThreshold
      */
     private static function categoryRows(): array
     {
-        return DB::table('chemical_categories as cc')
+        $ivAIds = self::appendixIvAIds();
+
+        if (! $ivAIds) {
+            return [];
+        }
+
+        $rows = DB::table('chemical_categories as cc')
             ->join('chem_names as cn', 'cc.chem_names_id', '=', 'cn.id')
             ->join('chem_name_active_ingredient as cnai', 'cnai.chem_names_id', '=', 'cn.id')
             ->join('active_ingredients as ai', 'cnai.active_ingredients_id', '=', 'ai.id')
-            // Hoạt chất thuộc nhóm 9 = có dòng phân loại Phụ lục IV / bảng A
-            ->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('active_ingredient_classifications as aic')
-                    ->whereColumn('aic.active_ingredients_id', 'ai.id')
-                    ->where('aic.appendix', 'IV')
-                    ->where('aic.table_ref', 'A');
+            // Mục gộp mà hoạt chất này là thành viên (nếu có) - phải đã duyệt, đang hoạt động
+            ->leftJoin('active_ingredients as pai', function ($join) {
+                $join->on('pai.id', '=', 'ai.parent_id')
+                    ->where('pai.status_id', 1)
+                    ->where('pai.app_status', 'approved');
+            })
+            // Thuộc nhóm 9 khi CHÍNH NÓ có dòng phân loại Phụ lục IV / bảng A, hoặc nó là
+            // thành viên của một mục gộp thuộc Phụ lục IV / bảng A.
+            ->where(function ($query) use ($ivAIds) {
+                $query->whereIn('ai.id', $ivAIds)->orWhereIn('pai.id', $ivAIds);
             })
             ->where('ai.status_id', 1)
             ->where('ai.app_status', 'approved')
@@ -591,10 +638,69 @@ class ActiveIngredientThreshold
                 'ai.name as ai_name',
                 'ai.cas_no',
                 'ai.threshold_kg',
-                'ai.legal_ref'
+                'ai.legal_ref',
+                'ai.equiv_factor',
+                'pai.id as parent_ai_id',
+                'pai.code as parent_ai_code',
+                'pai.name as parent_ai_name',
+                'pai.cas_no as parent_cas_no',
+                'pai.threshold_kg as parent_threshold_kg',
+                'pai.legal_ref as parent_legal_ref'
             )
-            ->get()
+            ->get();
+
+        // Chốt "chủ ngưỡng" của từng dòng. Một hoạt chất vừa có ngưỡng riêng vừa thuộc mục
+        // gộp thì sinh HAI dòng - tồn của nó được cộng ở cả hai chỗ.
+        $out = [];
+
+        foreach ($rows as $row) {
+            if (in_array((int) $row->ai_id, $ivAIds, true)) {
+                $out[] = self::ownerRow($row, false);
+            }
+
+            if ($row->parent_ai_id !== null && in_array((int) $row->parent_ai_id, $ivAIds, true)) {
+                $out[] = self::ownerRow($row, true);
+            }
+        }
+
+        return $out;
+    }
+
+    /** id các hoạt chất có dòng phân loại Phụ lục IV / Bảng A (nhóm 9). */
+    private static function appendixIvAIds(): array
+    {
+        return DB::table('active_ingredient_classifications')
+            ->where('appendix', 'IV')
+            ->where('table_ref', 'A')
+            ->pluck('active_ingredients_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
             ->all();
+    }
+
+    /**
+     * Nhân bản một dòng của categoryRows() và gắn thông tin "chủ ngưỡng":
+     *   $rollUp = false -> chính hoạt chất đó chịu ngưỡng (tính có nhân % hàm lượng).
+     *   $rollUp = true  -> cộng vào mục gộp cha (tính trên khối lượng hợp chất thô, không
+     *                      nhân %, có nhân equiv_factor của chất thành viên).
+     */
+    private static function ownerRow(object $row, bool $rollUp): object
+    {
+        $out = clone $row;
+
+        $out->is_rolled_up = $rollUp;
+        $out->owner_ai_id = $rollUp ? (int) $row->parent_ai_id : (int) $row->ai_id;
+        $out->owner_ai_code = $rollUp ? $row->parent_ai_code : $row->ai_code;
+        $out->owner_ai_name = $rollUp ? $row->parent_ai_name : $row->ai_name;
+        $out->owner_cas_no = $rollUp ? $row->parent_cas_no : $row->cas_no;
+        $out->owner_threshold_kg = $rollUp ? $row->parent_threshold_kg : $row->threshold_kg;
+        $out->owner_legal_ref = $rollUp ? $row->parent_legal_ref : $row->legal_ref;
+        // Tên hoạt chất thành viên đóng góp vào mục gộp (null khi không phải dòng cộng gộp)
+        $out->member_ai_name = $rollUp ? $row->ai_name : null;
+        $out->member_ai_code = $rollUp ? $row->ai_code : null;
+
+        return $out;
     }
 
     /**
@@ -618,29 +724,80 @@ class ActiveIngredientThreshold
     }
 
     /**
-     * Dùng cho sumEstimateKg(): mã danh mục không khai ai_content_percent tay thì lấy %
-     * nồng độ của CHÍNH hoạt chất đó (chem_name_active_ingredient.content_percent) - chỉ có
-     * ý nghĩa khi tên hoá chất là hoạt chất đơn (đúng 1 dòng pivot, cùng điều kiện với
-     * categoryRows()); hoá chất là hỗn hợp nhiều thành phần thì không thuộc diện Bảng A nên
-     * projectedForCategory() sẽ bỏ qua kg trả về ở đây. Không có hoạt chất nhóm 9 nào -> 100%.
+     * Hệ số nhân từ "kg chất như nhập kho" ra "kg tính vào ngưỡng của chủ ngưỡng".
+     *
+     *   - Dòng cộng vào MỤC GỘP: lấy khối lượng hợp chất THÔ (không nhân % hàm lượng - ngưỡng
+     *     của mục gộp là ngưỡng của hợp chất, không phải của nguyên tố), chỉ nhân
+     *     equiv_factor của chất thành viên (mặc định 1).
+     *   - Dòng hoạt chất đứng riêng: giữ nguyên cách cũ - nhân % hàm lượng (resolvePercent).
      */
-    private static function maxAppendixIvAPercent(int $chemNamesId): float
+    private static function kgMultiplier(object $cat): float
     {
-        $percent = DB::table('chem_name_active_ingredient as cnai')
-            ->join('active_ingredients as ai', 'cnai.active_ingredients_id', '=', 'ai.id')
-            ->where('cnai.chem_names_id', $chemNamesId)
-            ->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('active_ingredient_classifications as aic')
-                    ->whereColumn('aic.active_ingredients_id', 'ai.id')
-                    ->where('aic.appendix', 'IV')
-                    ->where('aic.table_ref', 'A');
-            })
-            ->where('ai.status_id', 1)
-            ->where('ai.app_status', 'approved')
-            ->whereRaw('(select count(*) from chem_name_active_ingredient as x where x.chem_names_id = cnai.chem_names_id) = 1')
-            ->max('cnai.content_percent');
+        if (! empty($cat->is_rolled_up)) {
+            return self::equivFactor($cat->equiv_factor ?? null);
+        }
 
-        return $percent !== null ? (float) $percent : 100.0;
+        return self::resolvePercent($cat) / 100;
+    }
+
+    /** equiv_factor hợp lệ (> 0); dữ liệu trống/hỏng thì coi như 1. */
+    private static function equivFactor($value): float
+    {
+        $factor = $value === null ? 1.0 : (float) $value;
+
+        return $factor > 0 ? $factor : 1.0;
+    }
+
+    /**
+     * Dùng cho sumEstimateKg(): hệ số nhân từ kg chất như dự trù ra kg tính vào ngưỡng.
+     *
+     * Chỉ có ý nghĩa khi tên hoá chất là hoạt chất ĐƠN (đúng 1 dòng pivot, cùng điều kiện
+     * với categoryRows()); hoá chất là hỗn hợp nhiều thành phần thì không thuộc diện Bảng A
+     * nên projectedForCategory() bỏ qua kg trả về ở đây.
+     *
+     *   - Hoạt chất là THÀNH VIÊN của mục gộp: khối lượng hợp chất thô × equiv_factor,
+     *     không nhân % (kể cả khi mã danh mục có khai ai_content_percent).
+     *   - Hoạt chất đứng riêng: ai_content_percent (khai tay ở mã danh mục) nếu có, không
+     *     thì content_percent lớn nhất của pivot; không có gì -> 100%.
+     */
+    private static function estimateMultiplier(int $chemNamesId, $categoryPercent): float
+    {
+        $ivAIds = self::appendixIvAIds();
+
+        $row = $ivAIds
+            ? DB::table('chem_name_active_ingredient as cnai')
+                ->join('active_ingredients as ai', 'cnai.active_ingredients_id', '=', 'ai.id')
+                ->leftJoin('active_ingredients as pai', function ($join) {
+                    $join->on('pai.id', '=', 'ai.parent_id')
+                        ->where('pai.status_id', 1)
+                        ->where('pai.app_status', 'approved');
+                })
+                ->where('cnai.chem_names_id', $chemNamesId)
+                ->where(function ($query) use ($ivAIds) {
+                    $query->whereIn('ai.id', $ivAIds)->orWhereIn('pai.id', $ivAIds);
+                })
+                ->where('ai.status_id', 1)
+                ->where('ai.app_status', 'approved')
+                ->whereRaw('(select count(*) from chem_name_active_ingredient as x where x.chem_names_id = cnai.chem_names_id) = 1')
+                // Chất thuộc mục gộp (parent_ai_id khác null) lên trước, rồi tới % cao nhất
+                ->orderByRaw('pai.id is null')
+                ->orderByDesc('cnai.content_percent')
+                ->select('cnai.content_percent', 'ai.equiv_factor', 'pai.id as parent_ai_id')
+                ->first()
+            : null;
+
+        if ($row && $row->parent_ai_id !== null && in_array((int) $row->parent_ai_id, $ivAIds, true)) {
+            return self::equivFactor($row->equiv_factor);
+        }
+
+        if ($categoryPercent !== null) {
+            return (float) $categoryPercent / 100;
+        }
+
+        if ($row && $row->content_percent !== null) {
+            return (float) $row->content_percent / 100;
+        }
+
+        return 1.0;
     }
 }

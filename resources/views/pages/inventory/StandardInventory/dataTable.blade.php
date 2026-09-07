@@ -203,17 +203,17 @@
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
                                             <div class="md-sub">
-                                                <span class="sd-group-tag">{{ $invGroupName($row->group_code) }}</span>
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
                                             </div>
-                                            <div class="md-sub">Nhập {{ $invDate($row->imported_date) }}</div>
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
                                             <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                                <span class="sgr-version ml-1">v{{ $row->category_version }}</span>
+                                                @if ($row->group_code)
+                                                    <span class="sd-group-tag">{{ $invGroupName($row->group_code) }}</span>
+                                                @endif
                                                 @if ($row->batch_no)
-                                                    <span class="ml-1">Lô {{ $row->batch_no }}</span>
+                                                    <span class="{{ $row->group_code ? 'ml-1' : '' }}">Lô {{ $row->batch_no }}</span>
                                                 @endif
                                                 @if ($row->manufacturer_short_name)
                                                     <span class="ml-1">· {{ $row->manufacturer_short_name }}</span>
@@ -396,7 +396,6 @@
                                             <div class="font-weight-bold">{{ $sum->standard_name ?: '—' }}</div>
                                             <div class="md-sub">
                                                 <span class="md-tag">{{ $sum->category_code ?: '—' }}</span>
-                                                <span class="sgr-version ml-1">v{{ $sum->version }}</span>
                                                 @if ($sum->cas_no)
                                                     <span class="ml-1">CAS: {{ $sum->cas_no }}</span>
                                                 @endif
@@ -529,16 +528,20 @@
                                         </td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
+                                            <div class="md-sub">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                            </div>
                                             @if ($row->batch_no)
                                                 <div class="md-sub">Lô {{ $row->batch_no }}</div>
                                             @endif
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                                <span class="sgr-version ml-1">v{{ $row->category_version }}</span>
-                                            </div>
+                                            @if ($row->group_code)
+                                                <div class="md-sub">
+                                                    <span class="sd-group-tag">{{ $invGroupName($row->group_code) }}</span>
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="text-right" data-order="{{ $row->gap }}">
                                             <span
@@ -586,6 +589,9 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
+                                            <div class="md-sub">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                            </div>
                                             @if ($row->batch_no)
                                                 <div class="md-sub">Lô {{ $row->batch_no }}</div>
                                             @endif
@@ -593,10 +599,11 @@
                                         <td>
                                             <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
                                             <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                                <span class="sgr-version ml-1">v{{ $row->category_version }}</span>
+                                                @if ($row->group_code)
+                                                    <span class="sd-group-tag">{{ $invGroupName($row->group_code) }}</span>
+                                                @endif
                                                 @if ($row->supplier_name)
-                                                    <span class="ml-1">· {{ $row->supplier_name }}</span>
+                                                    <span class="{{ $row->group_code ? 'ml-1' : '' }}">· {{ $row->supplier_name }}</span>
                                                 @endif
                                             </div>
                                         </td>
@@ -670,16 +677,20 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
+                                            <div class="md-sub">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                            </div>
                                             @if ($row->batch_no)
                                                 <div class="md-sub">Lô {{ $row->batch_no }}</div>
                                             @endif
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                                <span class="sgr-version ml-1">v{{ $row->category_version }}</span>
-                                            </div>
+                                            @if ($row->group_code)
+                                                <div class="md-sub">
+                                                    <span class="sd-group-tag">{{ $invGroupName($row->group_code) }}</span>
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="text-right" data-order="{{ $row->gap }}">
                                             <span
@@ -735,6 +746,8 @@
                                     <th style="width: 130px">Dạng Chuẩn</th>
                                     <th class="text-right" style="width: 130px">Qui Cách (Thực)</th>
                                     <th class="text-right" style="width: 120px">Tổng Xuất</th>
+                                    <th class="text-right" style="width: 150px">Khối Lượng Bì + Chuẩn Trước Khi Dùng</th>
+                                    <th class="text-right" style="width: 160px">Khối Lượng Bì Sau Khi Sử Dụng</th>
                                     <th class="text-center" style="width: 110px">Độ Lệch (%)</th>
                                     <th class="text-center" style="width: 110px">Giới Hạn (%)</th>
                                     <th class="text-center" style="width: 100px">Kết Quả</th>
@@ -746,16 +759,20 @@
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td>
                                             <span class="inv-code">{{ $row->code }}</span>
+                                            <div class="md-sub">
+                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                            </div>
                                             @if ($row->batch_no)
                                                 <div class="md-sub">Lô {{ $row->batch_no }}</div>
                                             @endif
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                                <span class="sgr-version ml-1">v{{ $row->category_version }}</span>
-                                            </div>
+                                            @if ($row->group_code)
+                                                <div class="md-sub">
+                                                    <span class="sd-group-tag">{{ $invGroupName($row->group_code) }}</span>
+                                                </div>
+                                            @endif
                                         </td>
                                         <td>
                                             {{ $row->standard_form ?: '—' }}
@@ -767,6 +784,37 @@
                                         <td class="text-right" data-order="{{ $row->used }}">
                                             <span class="inv-amount">{{ $invNum($row->used) }}</span>
                                             <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $row->gross_weight_before ?? -1 }}">
+                                            @if ($row->gross_weight_before !== null)
+                                                <span class="inv-amount">{{ $invNum($row->gross_weight_before) }}</span>
+                                                <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                            @else
+                                                <span class="md-empty">Chưa cân</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-right" data-order="{{ $row->tare_weight_after ?? -1 }}">
+                                            @if ($row->tare_weight_after !== null)
+                                                <span class="inv-amount">{{ $invNum($row->tare_weight_after) }}</span>
+                                                <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                            @else
+                                                <span class="md-empty">Chưa cân</span>
+                                            @endif
+                                            @perm('inventory_standard_weight')
+                                                <div class="mt-1">
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-outline-primary btn-tare-weight"
+                                                        data-id="{{ $row->id }}"
+                                                        data-code="{{ $row->code }}"
+                                                        data-gross="{{ $row->gross_weight_before !== null ? $invNum($row->gross_weight_before) : '' }}"
+                                                        data-tare="{{ $row->tare_weight_after !== null ? $invNum($row->tare_weight_after) : '' }}"
+                                                        data-unit="{{ $row->unit_short_name ?: $row->unit_name }}"
+                                                        title="{{ $row->gross_weight_before === null ? 'Chưa có Khối lượng Bì + Chuẩn, nhập ở lần sử dụng đầu tiên của ống' : 'Nhập khối lượng bì sau khi sử dụng' }}"
+                                                        {{ $row->gross_weight_before === null ? 'disabled' : '' }}>
+                                                        <i class="fas fa-balance-scale mr-1"></i> Nhập
+                                                    </button>
+                                                </div>
+                                            @endperm
                                         </td>
                                         <td class="text-center font-weight-bold {{ $row->used > 0 && $row->deviation > $row->ghkl ? 'text-danger' : 'text-success' }}" data-order="{{ $row->deviation }}">
                                             {{ $row->used > 0 ? $row->deviation . '%' : '—' }}
