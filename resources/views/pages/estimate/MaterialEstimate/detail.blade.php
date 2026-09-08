@@ -59,12 +59,24 @@
                     </div>
                 </div>
 
-                @foreach ($signSteps as $stepKey => $step)
+                @foreach ($signs as $step)
+                    @php
+                        $stepWho = $step->signer_full_name ?: ($step->user_name ?: ($step->role_names ?: '—'));
+                        $stepIsBod = (int) $step->step_no === (int) $signs->count();
+                    @endphp
                     <div class="box">
-                        <label>Bước {{ $step['no'] }} - {{ $step['label'] }}</label>
-                        <div class="val">{{ $list->{$step['signed_by']} ?: '—' }}</div>
+                        <label>Bước {{ $step->step_no }}{{ $stepIsBod ? ' - Ban Giám Đốc' : '' }}</label>
+                        <div class="val">{{ $stepWho }}</div>
                         <div class="md-sub">
-                            {{ $list->{$step['signed_at']} ? \Carbon\Carbon::parse($list->{$step['signed_at']})->format('d/m/Y H:i') : 'Chưa ký' }}
+                            @if ($step->status === 'signed')
+                                Đã ký &middot; {{ $step->signed_at ? \Carbon\Carbon::parse($step->signed_at)->format('d/m/Y H:i') : '' }}
+                            @elseif ($step->status === 'rejected')
+                                <span class="text-danger">Đã từ chối</span>
+                            @elseif ($list->app_status === 'pending_sign' && (int) $list->current_step === (int) $step->step_no)
+                                <span class="text-primary">Đang chờ ký</span>
+                            @else
+                                Chưa ký
+                            @endif
                         </div>
                     </div>
                 @endforeach
@@ -89,7 +101,7 @@
             @if ($list->app_status === 'rejected' && $list->reject_reason)
                 <div class="est-reject-note">
                     <i class="fas fa-triangle-exclamation mr-1"></i>
-                    <b>Bị từ chối ở bước {{ $signSteps[$list->reject_step]['label'] ?? '—' }}</b>
+                    <b>Bị từ chối ở bước {{ $list->reject_step }}</b>
                     bởi {{ $list->rejected_by ?: 'NA' }}
                     {{ $list->rejected_at ? '(' . \Carbon\Carbon::parse($list->rejected_at)->format('d/m/Y H:i') . ')' : '' }}:
                     {{ $list->reject_reason }}
@@ -138,7 +150,6 @@
                                     <th>Mục Đích Sử Dụng</th>
                                     <th style="width: 200px">Số Lượng Dự Trù</th>
                                     <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
-                                    <th style="width: 280px">Trao Đổi</th>
                                     <th style="width: 110px">Người Tạo</th>
                                     @if ($canEditItems && user_can('estimate_material_update'))
                                         <th class="text-center" style="width: 90px">Thao Tác</th>
@@ -263,26 +274,6 @@
                                                 </div>
                                                 <div class="text-center">{!! $daysLeftText !!}</div>
                                             @endif
-                                        </td>
-                                        <td>
-                                            <div class="chat-container d-flex flex-column" style="height: 200px; max-height: 200px;">
-                                                <div class="chat-messages flex-grow-1 overflow-auto bg-light border p-2 mb-1" style="font-size: 0.85rem;" id="chat-messages-{{ $item->id }}">
-                                                    @foreach ($item->chats as $chat)
-                                                        <div class="chat-message mb-2 {{ $chat->type === 'system' ? 'text-muted font-italic' : '' }}">
-                                                            <div class="d-flex justify-content-between align-items-center">
-                                                                <strong class="text-primary">{{ $chat->user_name }}</strong>
-                                                                <small style="font-size: 0.7rem;">{{ $chat->created_at_formatted }}</small>
-                                                            </div>
-                                                            <div>{{ $chat->content }}</div>
-                                                        </div>
-                                                    @endforeach
-                                                </div>
-                                                <div class="chat-input mt-auto">
-                                                    <div class="input-group input-group-sm">
-                                                        <input type="text" class="form-control chat-input-field" placeholder="Nhập tin nhắn và nhấn Enter..." data-item-id="{{ $item->id }}" data-route="{{ route($estRoute . 'storeItemChat') }}">
-                                                    </div>
-                                                </div>
-                                            </div>
                                         </td>
                                         <td class="md-sub">
                                             {{ $item->updated_by ?: $item->created_by ?: '—' }}

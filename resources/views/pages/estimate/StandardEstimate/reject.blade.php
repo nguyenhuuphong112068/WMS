@@ -16,6 +16,8 @@
             <form action="{{ route($estRoute . 'reject') }}" method="POST">
                 @csrf
                 <input type="hidden" name="id" value="{{ old('id') }}">
+                {{-- 'inbox' khi từ chối từ tab "Ký duyệt (mọi phòng ban)" - Controller tìm phiếu theo công ty --}}
+                <input type="hidden" name="scope" value="{{ old('scope') }}">
 
                 <div class="modal-body">
                     <div class="form-group">

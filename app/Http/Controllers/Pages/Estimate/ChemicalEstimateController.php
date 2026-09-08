@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers\Pages\Estimate;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
+use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\ActiveIngredientThreshold;
 use App\Support\CompanyContext;
@@ -32,6 +33,7 @@ use Illuminate\Support\Facades\Validator;
  */
 class ChemicalEstimateController extends Controller
 {
+    use EstimateSignFlow;
     use VerifiesSignature;
 
     private const TABLE = 'chemical_estimates';
@@ -41,6 +43,15 @@ class ChemicalEstimateController extends Controller
     private const AMOUNT_TABLE = 'chemical_estimate_item_amounts';
 
     private const HISTORY_TABLE = 'chemical_estimate_histories';
+
+    /** Quy trình ký duyệt động - xem App\Http\Controllers\Concerns\EstimateSignFlow. */
+    private const SIGN_TABLE = 'chemical_estimate_signs';
+
+    private const ESTIMATE_FK = 'chemical_estimate_id';
+
+    private const EST_ROUTE = 'pages.estimate.chemicalEstimate.';
+
+    private const SIGN_PERMISSION = 'estimate_chemical_sign';
 
     private const LABEL = 'phiếu dự trù hoá chất';
 
@@ -58,7 +69,7 @@ class ChemicalEstimateController extends Controller
      |  DANH SÁCH PHIẾU DỰ TRÙ CỦA PHÒNG BAN
      ========================================================== */
 
-    public function index()
+    public function index(Request $request)
     {
         $departmentId = $this->departmentId();
 
@@ -71,7 +82,22 @@ class ChemicalEstimateController extends Controller
             ->orderBy(self::TABLE.'.id', 'desc')
             ->get();
 
+        $signRows = $this->signRows($datas->pluck('id'));
+
+        $datas->each(function ($row) use ($signRows) {
+            $signs = $signRows->get($row->id, collect());
+            $row->pending_sign = $this->pendingSign($row, $signs);
+            $row->can_sign = $row->pending_sign ? $this->canSignRow($row->pending_sign) : false;
+        });
+
         $trackedItems = self::trackedItems($departmentId);
+
+        $inbox = $this->approvalInboxData();
+
+        $tabs = ['list', 'tracking', 'inbox'];
+        $activeTab = in_array($request->query('tab'), $tabs, true)
+            ? $request->query('tab')
+            : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'list');
 
         session()->put(['title' => 'DỰ TRÙ - DỰ TRÙ HOÁ CHẤT']);
 
@@ -79,12 +105,19 @@ class ChemicalEstimateController extends Controller
             'datas' => $datas,
             'itemCounts' => $this->itemCounts($datas->pluck('id')->all()),
             'appStatuses' => config('estimate.app_statuses'),
-            'signSteps' => config('estimate.sign_steps'),
+            'signStatuses' => config('estimate.sign_statuses'),
             'receptionStatuses' => config('estimate.reception_statuses'),
-            'canSignManager' => $this->canSign('manager'),
-            'canSignDirector' => $this->canSign('director'),
+            'signRows' => $signRows,
+            'signerOptions' => $this->signerOptions(),
+            'signPermission' => self::SIGN_PERMISSION,
             'nextCode' => $this->nextCode($departmentId),
             'trackedItems' => $trackedItems,
+            'activeTab' => $activeTab,
+            'showApprovalInbox' => $inbox['show'],
+            'inboxRequests' => $inbox['requests'],
+            'inboxItems' => $inbox['items'],
+            'inboxSigns' => $inbox['signs'],
+            'inboxBadgeCount' => $inbox['badge'],
         ]);
     }
 
@@ -108,6 +141,9 @@ class ChemicalEstimateController extends Controller
 
         session()->put(['title' => 'DỰ TRÙ - CHI TIẾT PHIẾU '.$list->code]);
 
+        $signs = $this->signRows([$list->id])->get($list->id, collect());
+        $pendingSign = $this->pendingSign($list, $signs);
+
         return view('pages.estimate.shared.detail', [
             'list' => $list,
             'items' => self::itemsOf($list->id),
@@ -119,8 +155,12 @@ class ChemicalEstimateController extends Controller
             'classificationLabels' => \App\Support\ChemicalClassification::labels(),
             'units' => $this->unitOptions(),
             'appStatuses' => config('estimate.app_statuses'),
-            'signSteps' => config('estimate.sign_steps'),
+            'signStatuses' => config('estimate.sign_statuses'),
             'receptionStatuses' => config('estimate.reception_statuses'),
+            'signs' => $signs,
+            'pendingSign' => $pendingSign,
+            'canSignCurrent' => $pendingSign ? $this->canSignRow($pendingSign) : false,
+            'signPermission' => self::SIGN_PERMISSION,
             'canEditItems' => $this->editable($list),
             'backRoute' => route('pages.estimate.chemicalEstimate.list'),
             'estRoute' => 'pages.estimate.chemicalEstimate.',
@@ -191,8 +231,6 @@ class ChemicalEstimateController extends Controller
         }
 
         $payload = $this->payload($request);
-
-
 
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
             'updated_by' => $this->actor(),
@@ -537,7 +575,11 @@ class ChemicalEstimateController extends Controller
      |  TRÌNH KÝ
      ========================================================== */
 
-    /** Nháp / Bị từ chối -> Chờ Phó/Trưởng Phòng ký. */
+    /**
+     * TRÌNH KÝ: người lập khai quy trình ký duyệt (số bước + người ký từng bước) ngay trên
+     * modal Trình ký, tối thiểu 2 bước và bước cuối là Ban Giám Đốc. Quy trình được ghi lại
+     * mỗi lần trình ký (kể cả trình ký lại sau khi bị từ chối).
+     */
     public function submit(Request $request)
     {
         $current = $this->findOwn($request->id);
@@ -558,63 +600,163 @@ class ChemicalEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$current->code.' chưa có mặt hàng nào, chưa trình ký được!');
         }
 
+        $validator = Validator::make($request->all(), [
+            'signers' => ['required', 'array', 'min:2'],
+            'signers.*' => ['required', 'integer', 'exists:user_management,id'],
+        ], [
+            'signers.required' => 'Vui lòng khai quy trình ký duyệt (tối thiểu 2 bước).',
+            'signers.min' => 'Quy trình ký duyệt phải có tối thiểu 2 bước.',
+            'signers.*.required' => 'Vui lòng chọn người ký cho mỗi bước.',
+            'signers.*.exists' => 'Người ký được chọn không hợp lệ.',
+        ]);
+
+        $signerIds = $this->signerIds($request);
+
+        if ($flowError = $this->validateSignerFlow($signerIds)) {
+            $validator->after(fn ($v) => $v->errors()->add('signers', $flowError));
+        }
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'submitErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput();
+        }
+
         if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Trình ký')) {
             return $stop;
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update([
-            'app_status' => 'pending_manager',
-            'submitted_by' => $this->actor(),
-            'submitted_at' => now(),
-            // Trình ký lại sau khi bị từ chối thì xoá dấu vết ký cũ để bắt đầu lại từ bước 1
-            'manager_signed_by' => null,
-            'manager_signed_at' => null,
-            'director_signed_by' => null,
-            'director_signed_at' => null,
-            'rejected_by' => null,
-            'rejected_at' => null,
-            'reject_step' => null,
-            'reject_reason' => null,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
+        $now = now();
+        $stepCount = count($signerIds);
 
-        self::writeHistory($current->id, 'Trình ký', 'manager', $current->app_status, 'pending_manager', $this->nullIfBlank($request->note));
+        DB::transaction(function () use ($current, $request, $stepCount, $now) {
+            DB::table(self::TABLE)->where('id', $current->id)->update([
+                'app_status' => 'pending_sign',
+                'current_step' => 1,
+                'sign_step_count' => $stepCount,
+                'submitted_by' => $this->actor(),
+                'submitted_at' => $now,
+                'rejected_by' => null,
+                'rejected_at' => null,
+                'reject_step' => null,
+                'reject_reason' => null,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ]);
 
-        AuditTrialController::log('Trình ký', self::TABLE, $current->id, 'app_status: '.$current->app_status, 'app_status: pending_manager');
+            // Ghi lại quy trình ký: bỏ hiệu lực bước cũ (nếu trình ký lại) rồi ghi bước mới
+            $this->deactivateSigns($current->id);
+            $this->insertSigns($current->id, $request);
+        });
 
-        return redirect()->back()->with('success', 'Đã trình ký phiếu '.$current->code.' lên Phó/Trưởng Phòng!');
+        self::writeHistory($current->id, 'Trình ký', '1', $current->app_status, 'pending_sign', $this->nullIfBlank($request->note));
+
+        AuditTrialController::log('Trình ký', self::TABLE, $current->id, 'app_status: '.$current->app_status, 'app_status: pending_sign, '.$stepCount.' bước ký');
+
+        // Bắt đầu quy trình: báo cho người ký bước 1 (các bước sau được báo lần lượt khi ký xong bước trước).
+        $this->notifyPendingSigner($current->id, $current->code, 1);
+
+        return redirect()->back()->with('success', 'Đã trình ký phiếu '.$current->code.' qua '.$stepCount.' bước duyệt!');
     }
 
-    /** Bước 1: Phó/Trưởng Phòng ký. */
-    public function signManager(Request $request)
+    /**
+     * KÝ MỘT BƯỚC của phiếu dự trù. Chỉ đúng người được chỉ định ở bước đang chờ mới ký được,
+     * và phải nhập lại mật khẩu (21 CFR Part 11). Ký xong bước cuối thì phiếu được duyệt và
+     * tự đánh dấu đã tiếp nhận.
+     */
+    public function signStep(Request $request)
     {
-        return $this->sign($request, 'manager');
-    }
-
-    /** Bước 2: Ban Giám Đốc ký, ký xong phiếu chuyển sang chờ Cung Ứng tiếp nhận. */
-    public function signDirector(Request $request)
-    {
-        return $this->sign($request, 'director');
-    }
-
-    /** Từ chối ở bất kỳ bước nào đang chờ ký, phiếu quay về "Bị từ chối" để sửa lại. */
-    public function reject(Request $request)
-    {
-        $current = $this->findOwn($request->id);
+        $tab = $this->approvalActiveTab($request);
+        $current = $this->resolveEstimateForApproval($request);
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần từ chối!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần ký duyệt!')->with('activeTab', $tab);
         }
 
-        $step = $this->pendingStep($current->app_status);
+        $sign = $this->currentSign($current);
 
-        if (! $step) {
-            return redirect()->back()->with('error', 'Phiếu '.$current->code.' không ở bước chờ ký nên không từ chối được!');
+        if (! $sign) {
+            return redirect()->back()->with('error', 'Phiếu '.$current->code.' không ở bước chờ ký nên không ký được!')->with('activeTab', $tab);
         }
 
-        if (! $this->canSign($step)) {
-            return redirect()->back()->with('error', 'Bạn không có quyền ký duyệt bước "'.config('estimate.sign_steps')[$step]['label'].'"!');
+        if (! $this->canSignRow($sign)) {
+            return redirect()->back()
+                ->with('error', 'Bước '.$sign->step_no.' của phiếu '.$current->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không ký thay được!')
+                ->with('activeTab', $tab);
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Ký duyệt '.self::LABEL)) {
+            return $stop->with('activeTab', $tab);
+        }
+
+        $stepCount = (int) $current->sign_step_count;
+        $stepNo = (int) $sign->step_no;
+        $isLast = $stepNo >= $stepCount;
+        $now = now();
+
+        DB::transaction(function () use ($current, $sign, $stepNo, $isLast, $now) {
+            DB::table(self::SIGN_TABLE)->where('id', $sign->id)->update([
+                'status' => 'signed',
+                'signed_by' => $this->actor(),
+                'signed_at' => $now,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ]);
+
+            $payload = [
+                'app_status' => $isLast ? 'approved' : 'pending_sign',
+                'current_step' => $isLast ? null : $stepNo + 1,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ];
+
+            if ($isLast) {
+                $payload['reception_status'] = 'received';
+                $payload['received_by'] = 'Hệ thống';
+                $payload['received_at'] = $now;
+            }
+
+            DB::table(self::TABLE)->where('id', $current->id)->update($payload);
+        });
+
+        self::writeHistory($current->id, 'Ký duyệt', (string) $stepNo, $current->app_status, $isLast ? 'approved' : 'pending_sign', $this->nullIfBlank($request->note));
+
+        AuditTrialController::log('Ký duyệt', self::TABLE, $current->id, 'Bước '.$stepNo.'/'.$stepCount, 'app_status: '.($isLast ? 'approved' : 'pending_sign'));
+
+        // Ký xong: chuyển lượt cho người ký bước kế tiếp (bước cuối thì không còn ai để báo).
+        if (! $isLast) {
+            $this->notifyPendingSigner($current->id, $current->code, $stepNo + 1);
+        }
+
+        return redirect()->back()->with(
+            'success',
+            $isLast
+                ? 'Đã ký bước '.$stepNo.'/'.$stepCount.' - phiếu '.$current->code.' được phê duyệt và ghi nhận tiếp nhận.'
+                : 'Đã ký bước '.$stepNo.'/'.$stepCount.' cho phiếu '.$current->code.'! Đã chuyển tới người ký bước '.($stepNo + 1).'.'
+        )->with('activeTab', $tab);
+    }
+
+    /** Từ chối ở bước đang chờ ký, phiếu quay về "Bị từ chối" để sửa lại rồi trình ký lại. */
+    public function reject(Request $request)
+    {
+        $tab = $this->approvalActiveTab($request);
+        $current = $this->resolveEstimateForApproval($request);
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần từ chối!')->with('activeTab', $tab);
+        }
+
+        $sign = $this->currentSign($current);
+
+        if (! $sign) {
+            return redirect()->back()->with('error', 'Phiếu '.$current->code.' không ở bước chờ ký nên không từ chối được!')->with('activeTab', $tab);
+        }
+
+        if (! $this->canSignRow($sign)) {
+            return redirect()->back()
+                ->with('error', 'Bước '.$sign->step_no.' của phiếu '.$current->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không từ chối thay được!')
+                ->with('activeTab', $tab);
         }
 
         $validator = Validator::make($request->all(), [
@@ -625,80 +767,40 @@ class ChemicalEstimateController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'rejectErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'rejectErrors')->withInput()->with('activeTab', $tab);
         }
 
         if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Từ chối duyệt')) {
-            return $stop;
+            return $stop->with('activeTab', $tab);
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update([
-            'app_status' => 'rejected',
-            'rejected_by' => $this->actor(),
-            'rejected_at' => now(),
-            'reject_step' => $step,
-            'reject_reason' => $request->reject_reason,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
+        $now = now();
 
-        self::writeHistory($current->id, 'Từ chối', $step, $current->app_status, 'rejected', $request->reject_reason);
+        DB::transaction(function () use ($current, $sign, $request, $now) {
+            DB::table(self::SIGN_TABLE)->where('id', $sign->id)->update([
+                'status' => 'rejected',
+                'reject_reason' => $request->reject_reason,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ]);
 
-        AuditTrialController::log('Từ chối duyệt', self::TABLE, $current->id, 'app_status: '.$current->app_status, 'app_status: rejected');
+            DB::table(self::TABLE)->where('id', $current->id)->update([
+                'app_status' => 'rejected',
+                'current_step' => null,
+                'rejected_by' => $this->actor(),
+                'rejected_at' => $now,
+                'reject_step' => (string) $sign->step_no,
+                'reject_reason' => $request->reject_reason,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ]);
+        });
 
-        return redirect()->back()->with('success', 'Đã từ chối phiếu '.$current->code.'. Phòng ban cần sửa lại rồi trình ký lại.');
-    }
+        self::writeHistory($current->id, 'Từ chối', (string) $sign->step_no, $current->app_status, 'rejected', $request->reject_reason);
 
-    /** Ghi nhận một bước ký: kiểm tra đúng bước, đúng quyền rồi chuyển trạng thái. */
-    private function sign(Request $request, string $step)
-    {
-        $config = config('estimate.sign_steps')[$step];
+        AuditTrialController::log('Từ chối duyệt', self::TABLE, $current->id, 'Bước '.$sign->step_no, 'app_status: rejected');
 
-        $current = $this->findOwn($request->id);
-
-        if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần ký duyệt!');
-        }
-
-        if ($current->app_status !== $config['from']) {
-            return redirect()->back()->with('error', 'Phiếu '.$current->code.' đang ở bước "'.$this->statusLabel($current->app_status).'", không ký bước "'.$config['label'].'" được!');
-        }
-
-        if (! $this->canSign($step)) {
-            return redirect()->back()->with('error', 'Bạn không có quyền ký duyệt bước "'.$config['label'].'"!');
-        }
-
-        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Ký duyệt '.$config['label'])) {
-            return $stop;
-        }
-
-        $payload = [
-            'app_status' => $config['to'],
-            $config['signed_by'] => $this->actor(),
-            $config['signed_at'] => now(),
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ];
-
-        // Ký xong bước cuối thì xem như đã tiếp nhận
-        if ($config['to'] === 'approved') {
-            $payload['reception_status'] = 'received';
-            $payload['received_by'] = 'Hệ thống';
-            $payload['received_at'] = now();
-        }
-
-        DB::table(self::TABLE)->where('id', $current->id)->update($payload);
-
-        self::writeHistory($current->id, 'Ký duyệt', $step, $current->app_status, $config['to'], $this->nullIfBlank($request->note));
-
-        AuditTrialController::log('Ký duyệt', self::TABLE, $current->id, 'app_status: '.$current->app_status, 'app_status: '.$config['to']);
-
-        return redirect()->back()->with(
-            'success',
-            $config['to'] === 'approved'
-                ? 'Ban Giám Đốc đã phê duyệt phiếu '.$current->code.'! Phiếu đã chuyển sang bộ phận Cung Ứng tiếp nhận.'
-                : 'Đã ký duyệt bước '.$config['label'].' cho phiếu '.$current->code.'! Phiếu chuyển lên Ban Giám Đốc.'
-        );
+        return redirect()->back()->with('success', 'Đã từ chối phiếu '.$current->code.'. Phòng ban cần sửa lại rồi trình ký lại.')->with('activeTab', $tab);
     }
 
     /* ==========================================================
@@ -859,6 +961,16 @@ class ChemicalEstimateController extends Controller
         // Nhật ký ghi cả bước trình ký (app_status) lẫn bước tiếp nhận (reception_status)
         $labels = config('estimate.app_statuses') + config('estimate.reception_statuses');
         $steps = config('estimate.sign_steps');
+        $stepLabel = function ($step) use ($steps) {
+            if (! $step) {
+                return '';
+            }
+            if (is_numeric($step)) {
+                return 'Bước '.$step;
+            }
+
+            return $steps[$step]['label'] ?? ($step === 'reception' ? 'Cung Ứng' : $step);
+        };
 
         return DB::table(self::HISTORY_TABLE)
             ->where('estimate_list_id', $listId)
@@ -866,7 +978,7 @@ class ChemicalEstimateController extends Controller
             ->get()
             ->map(fn ($row) => [
                 'action' => $row->action,
-                'step' => $row->step ? ($steps[$row->step]['label'] ?? ($row->step === 'reception' ? 'Cung Ứng' : $row->step)) : '',
+                'step' => $stepLabel($row->step),
                 'from_status' => $labels[$row->from_status] ?? ($row->from_status ?: ''),
                 'to_status' => $labels[$row->to_status] ?? ($row->to_status ?: ''),
                 'note' => $row->note ?: '',
@@ -1171,24 +1283,6 @@ class ChemicalEstimateController extends Controller
     private function editable($list): bool
     {
         return in_array($list->app_status, self::EDITABLE_STATUSES, true) && $list->status_id == 1;
-    }
-
-    /** Trạng thái chờ ký hiện tại ứng với bước nào: manager | director | null. */
-    private function pendingStep(?string $appStatus): ?string
-    {
-        foreach (config('estimate.sign_steps') as $step => $config) {
-            if ($config['from'] === $appStatus) {
-                return $step;
-            }
-        }
-
-        return null;
-    }
-
-    /** Người đang đăng nhập có quyền ký bước này không (Admin luôn ký được). */
-    private function canSign(string $step): bool
-    {
-        return user_has_any_role(session('user')['userId'] ?? 0, config('estimate.sign_steps')[$step]['roles']);
     }
 
     private function statusLabel(?string $appStatus): string

@@ -1019,7 +1019,6 @@
                 $(this).prop('checked', i === 0);
             });
             paintTypes($form);
-            toggleTransfer($form);
             toggleCancel($form);
         });
 
@@ -1037,7 +1036,6 @@
                 $(this).prop('checked', String(row.type) === $(this).val());
             });
             paintTypes($form);
-            toggleTransfer($form);
             toggleCancel($form);
 
             // Căn cứ loại bỏ & các trường bổ sung
@@ -1184,7 +1182,6 @@
         /* ---------- Trạng thái ban đầu khi form mở lại kèm lỗi validate ---------- */
         $('.md-modal form').each(function() {
             paintTypes($(this));
-            toggleTransfer($(this));
             toggleCancel($(this));
             $(this).find('[name="import_id"]').each(function() {
                 if ($(this).val()) syncImport($(this));

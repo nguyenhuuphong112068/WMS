@@ -36,6 +36,7 @@
                             <option value="">-- Chọn đơn vị tính --</option>
                             @foreach ($units as $unit)
                                 <option value="{{ $unit->id }}" data-short="{{ $unit->short_name }}"
+                                    data-group="{{ $unit->unit_group }}"
                                     {{ $old('unit_id') == $unit->id ? 'selected' : '' }}>
                                     {{ $unit->short_name }} - {{ $unit->name }}
                                 </option>
@@ -46,6 +47,28 @@
                         @endif
                         <small class="md-sub">Đổi đơn vị chỉ đổi cách khai từ nay về sau, số liệu các phiếu đã
                             lưu giữ nguyên.</small>
+                    </div>
+
+                    {{-- Chỉ hiện khi đơn vị của phòng thuộc nhóm đếm / bao bì: cần con số này để
+                         quy tồn ra kg lúc đối chiếu Ngưỡng Tồn Trữ PL IV. --}}
+                    <div class="form-group dc-packweight" style="display: none">
+                        <label>Khối Lượng Quy Đổi</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">1 <b class="dc-unit-hint mx-1">đơn vị</b> =</span>
+                            </div>
+                            <input type="text" inputmode="decimal" name="pack_weight_kg" min="0"
+                                class="form-control js-decimal {{ $bag->has('pack_weight_kg') ? 'is-invalid' : '' }}"
+                                value="{{ $old('pack_weight_kg') }}" placeholder="Ví dụ: 25">
+                            <div class="input-group-append">
+                                <span class="input-group-text">kg</span>
+                            </div>
+                        </div>
+                        @if ($bag->has('pack_weight_kg'))
+                            <span class="md-error">{{ $bag->first('pack_weight_kg') }}</span>
+                        @endif
+                        <small class="md-sub">Khối lượng hoá chất (kg) chứa trong 1 đơn vị đếm. Để trống nếu chưa
+                            cần đối chiếu Ngưỡng Tồn Trữ PL IV.</small>
                     </div>
 
                     @include('pages.category.shared.unitConversion', [
@@ -165,6 +188,9 @@
                 'Để trống thì lấy mặc định của danh mục: ' + row.category_shelf_life_months + ' tháng.' :
                 'Danh mục cũng chưa khai hạn dùng, để trống thì mã nhập sẽ không xác định được hạn nội bộ.');
 
+            $form.find('[name="pack_weight_kg"]').val(
+                row.pack_weight_kg === undefined || row.pack_weight_kg === null ? '' : row.pack_weight_kg);
+
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('.cat-select').each(function() {
                 var field = $(this).attr('name');
@@ -174,6 +200,18 @@
             // Lý do điều chỉnh phải nhập lại mỗi lần sửa
             $form.find('[name="change_reason"]').val('');
         });
+
+        /* ---------- Ô "Khối lượng quy đổi" chỉ dùng cho đơn vị nhóm đếm / bao bì ---------- */
+        function dcTogglePackWeight($unitSelect) {
+            var isCount = $unitSelect.find('option:selected').data('group') === 'count';
+            var $box = $unitSelect.closest('form').find('.dc-packweight');
+
+            $box.toggle(isCount);
+
+            if (!isCount) {
+                $box.find('[name="pack_weight_kg"]').val('');
+            }
+        }
 
         /* ---------- Modal Thêm mới: nhắc mặc định theo hoá chất đang chọn ---------- */
         $(document).on('change', '.dc-category', function() {
@@ -192,6 +230,12 @@
             var short = $(this).find('option:selected').data('short');
 
             $(this).closest('form').find('.dc-unit-hint').text(short || 'đơn vị');
+            dcTogglePackWeight($(this));
+        });
+
+        // Form mở sẵn sau khi báo lỗi validate: dựng lại đúng trạng thái ẩn / hiện
+        $('.dc-unit').each(function() {
+            dcTogglePackWeight($(this));
         });
     });
 </script>

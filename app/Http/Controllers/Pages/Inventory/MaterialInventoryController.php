@@ -155,7 +155,7 @@ class MaterialInventoryController extends Controller
 
         $gap = $this->gapOf($import);
         $balanced = $this->balancedOf($import);
-        $limit = abs((float) $import->amount) * self::BALANCING_MAX_RATIO;
+        $limit = max(1, abs((float) $import->amount) * self::BALANCING_MAX_RATIO);
 
         $validator->after(function ($validator) use ($request, $gap, $balanced, $limit) {
             if (! is_numeric($request->balancing_amount)) {
@@ -570,7 +570,7 @@ class MaterialInventoryController extends Controller
                 $row->effective = $row->imported + $row->balanced;
 
                 $row->balanced_all = (float) ($bal->balanced_all ?? 0);
-                $row->balancing_limit = abs($row->imported) * self::BALANCING_MAX_RATIO;
+                $row->balancing_limit = max(1, abs($row->imported) * self::BALANCING_MAX_RATIO);
                 $row->balancing_min_input = -$row->balancing_limit - $row->balanced_all;
                 $row->balancing_max_input = $row->balancing_limit - $row->balanced_all;
 

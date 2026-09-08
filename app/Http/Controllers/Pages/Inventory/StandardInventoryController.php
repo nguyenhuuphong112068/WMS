@@ -206,7 +206,7 @@ class StandardInventoryController extends Controller
 
         // Tổng đã cân đối trước đó và hạn mức 5% tính trên số lượng nhập ban đầu
         $balanced = $this->balancedOf($import);
-        $limit = abs((float) $import->amount) * self::BALANCING_MAX_RATIO;
+        $limit = max(1, abs((float) $import->amount) * self::BALANCING_MAX_RATIO);
 
         $validator->after(function ($validator) use ($request, $gap, $balanced, $limit) {
             if (! is_numeric($request->balancing_amount)) {
@@ -1216,7 +1216,7 @@ class StandardInventoryController extends Controller
                 | tổng mọi lần cân đối không quá 5% lượng nhập ban đầu.
                 */
                 $row->balanced_all = (float) ($bal->balanced_all ?? 0);
-                $row->balancing_limit = abs($row->imported) * self::BALANCING_MAX_RATIO;
+                $row->balancing_limit = max(1, abs($row->imported) * self::BALANCING_MAX_RATIO);
                 $row->balancing_min_input = -$row->balancing_limit - $row->balanced_all;
                 $row->balancing_max_input = $row->balancing_limit - $row->balanced_all;
 

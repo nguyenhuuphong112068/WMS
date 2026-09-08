@@ -22,6 +22,14 @@
                             <span class="exp-tab-count">{{ $transferBadgeCount }}</span>
                         @endif
                     </button>
+                    @if ($showApprovalInbox)
+                        <button type="button" class="exp-tab {{ $activeTab === 'inbox' ? 'is-active' : '' }}" data-pane="mePaneInbox">
+                            <i class="fas fa-inbox mr-1"></i> Ký duyệt (mọi phòng ban)
+                            @if ($inboxBadgeCount)
+                                <span class="exp-tab-count">{{ $inboxBadgeCount }}</span>
+                            @endif
+                        </button>
+                    @endif
                 </div>
 
                 {{-- ============ SỔ SỬ DỤNG ============ --}}
@@ -42,7 +50,7 @@
                         'rfPerPage' => $bookPerPage,
                         'rfKeyword' => $bookKeyword,
                         'rfDateLabel' => 'Ngày sử dụng',
-                        'rfPlaceholder' => 'Mã xuất nhập, tên vật tư, người dùng, mục đích...',
+                        'rfPlaceholder' => 'Mã xuất nhập, mã phiếu đề nghị, tên vật tư, người dùng, mục đích...',
                     ])
 
                     <div class="table-responsive">
@@ -51,6 +59,7 @@
                                 <tr>
                                     <th class="text-center" style="width:45px">STT</th>
                                     <th style="width:150px">Mã Xuất Nhập</th>
+                                    <th style="width:150px">Mã Phiếu Đề Nghị</th>
                                     <th>Vật Tư</th>
                                     <th class="text-right" style="width:100px">Số Lượng</th>
                                     <th class="text-center" style="width:90px">Loại</th>
@@ -58,7 +67,7 @@
                                     <th style="width:160px">Thiết Bị Liên Quan</th>
                                     <th>Mục Đích</th>
                                     <th style="width:130px">Người Thực Hiện</th>
-                                    <th class="text-center" style="width:120px">Thao Tác</th>
+                                    <th class="text-center" style="width:80px">Thao Tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -69,6 +78,13 @@
                                             <span class="exp-code font-weight-bold">{{ $row->code }}</span>
                                             @if ($row->category_code)
                                                 <div class="md-sub"><span class="md-tag">{{ $row->category_code }}</span></div>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($row->request_code)
+                                                <span class="exp-code font-weight-bold">{{ $row->request_code }}</span>
+                                            @else
+                                                <span class="text-muted">—</span>
                                             @endif
                                         </td>
                                         <td>
@@ -116,6 +132,7 @@
                                                             data-row="{{ json_encode([
                                                                 'id' => $row->id,
                                                                 'code' => $row->code,
+                                                                'request_code' => $row->request_code,
                                                                 'amount' => $row->amount,
                                                                 'type' => $row->type,
                                                                 'type_label' => \App\Http\Controllers\Pages\Export\MaterialExportController::TYPES[$row->type] ?? $row->type,
@@ -140,18 +157,6 @@
                                                             data-title="{{ $row->code }}">{{ $c }}</button>
                                                     @endif
                                                 </span>
-                                                @perm('export_material_issue')
-                                                    <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'deActive') }}" method="POST"
-                                                        data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} phiếu?"
-                                                        data-text="Phiếu &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không trừ tồn nữa.' : 'sẽ trừ tồn trở lại.' }}"
-                                                        data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                        @csrf
-                                                        <input type="hidden" name="id" value="{{ $row->id }}">
-                                                        <button type="submit" class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}">
-                                                            <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                        </button>
-                                                    </form>
-                                                @endperm
                                             </div>
                                             @endif
                                         </td>
@@ -175,6 +180,13 @@
 
                 {{-- ============ ĐỀ NGHỊ CHUYỂN LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.MaterialExport.transferPane')
+
+                {{-- ============ KÝ DUYỆT (MỌI PHÒNG BAN) ============ --}}
+                @if ($showApprovalInbox)
+                    <div class="exp-pane {{ $activeTab === 'inbox' ? 'is-active' : '' }}" id="mePaneInbox">
+                        @include('pages.export.MaterialExport.inboxPane')
+                    </div>
+                @endif
 
             </div>
         </div>

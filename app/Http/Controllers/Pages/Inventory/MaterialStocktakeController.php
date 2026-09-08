@@ -683,7 +683,7 @@ class MaterialStocktakeController extends Controller
             return 'Không tìm thấy mã xuất nhập, không ghi được cân đối.';
         }
 
-        $limit = abs((float) $import->amount) * self::BALANCING_MAX_RATIO;
+        $limit = max(1, abs((float) $import->amount) * self::BALANCING_MAX_RATIO);
 
         if (abs($balancedAll + $diff) > $limit + self::EPSILON) {
             return 'Lệch '.($diff > 0 ? '+' : '').$this->number($diff).' vượt hạn mức cân đối ±'

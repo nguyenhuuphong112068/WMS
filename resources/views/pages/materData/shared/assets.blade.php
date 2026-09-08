@@ -379,6 +379,85 @@
          | dữ liệu gốc và danh mục. Lý do được gắn vào form dưới tên "change_reason".
          | Hai cờ này không dùng chung trên một nút (duyệt cần mật khẩu, khoá cần lý do).
         */
+        /*
+         | Gửi form KHÔNG phụ thuộc vị trí của nó trong DOM.
+         |
+         | Nút Ký / Duyệt / Khoá nằm trong ô của bảng DataTables (responsive: true).
+         | DataTables có thể tách <td> ra khỏi tài liệu khi co bảng, lúc đó form.submit()
+         | của node đã rời DOM bị trình duyệt bỏ qua LẶNG LẼ - không lỗi, không gửi đi.
+         | Nên dựng lại một form ẩn trên <body> từ action + toàn bộ ô có name của form gốc
+         | (đã gồm _token, request_list_id...) rồi mới submit.
+        */
+        function mdConfirmSubmit(form, extras) {
+            var proxy = document.createElement('form');
+            proxy.method = (form.getAttribute('method') || 'POST');
+            proxy.action = form.getAttribute('action') || window.location.href;
+            proxy.style.display = 'none';
+
+            $(form).find('input[name], select[name], textarea[name]').each(function() {
+                if ((this.type === 'checkbox' || this.type === 'radio') && !this.checked) return;
+
+                var field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = this.name;
+                field.value = this.value;
+                proxy.appendChild(field);
+            });
+
+            Object.keys(extras || {}).forEach(function(name) {
+                var field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = name;
+                field.value = extras[name];
+                proxy.appendChild(field);
+            });
+
+            document.body.appendChild(proxy);
+            proxy.submit();
+        }
+
+        /*
+         | Icon con mắt bật / tắt xem mật khẩu.
+         |
+         | KHÔNG bọc / di chuyển ô nhập: SweetAlert2 chỉ đọc được giá trị khi ô còn là
+         | con TRỰC TIẾP của .swal2-popup (selector ".swal2-popup > .swal2-input").
+         | Bọc vào <div> sẽ làm getInput() trả null -> preConfirm tưởng bỏ trống.
+         | Nên chèn nút mắt cạnh ô (vẫn là con trực tiếp của popup) và canh tuyệt đối
+         | theo đúng vị trí thực của ô nhập.
+        */
+        function mdAddPasswordEye() {
+            var input = Swal.getInput();
+            var popup = Swal.getPopup();
+            if (!input || !popup || input.dataset.eyeReady) return;
+            input.dataset.eyeReady = '1';
+
+            popup.style.position = 'relative';
+            input.style.paddingRight = '42px';
+
+            var eye = document.createElement('button');
+            eye.type = 'button';
+            eye.tabIndex = -1;
+            eye.title = 'Hiện / ẩn mật khẩu';
+            eye.innerHTML = '<i class="fas fa-eye"></i>';
+            eye.style.cssText = 'position:absolute;border:0;background:transparent;color:#64748b;' +
+                'cursor:pointer;font-size:15px;line-height:1;padding:6px;z-index:5;';
+            eye.addEventListener('click', function() {
+                var toText = input.type === 'password';
+                input.type = toText ? 'text' : 'password';
+                eye.innerHTML = toText ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+                input.focus();
+            });
+
+            input.insertAdjacentElement('afterend', eye);
+
+            var place = function() {
+                eye.style.top = (input.offsetTop + (input.offsetHeight - eye.offsetHeight) / 2) + 'px';
+                eye.style.left = (input.offsetLeft + input.offsetWidth - eye.offsetWidth - 6) + 'px';
+            };
+            place();
+            setTimeout(place, 0);
+        }
+
         $(document).on('submit', '.form-md-confirm', function(e) {
             e.preventDefault();
             var form = this;
@@ -401,6 +480,7 @@
                 } : (needReason ? {
                     maxlength: '500'
                 } : undefined),
+                didOpen: needPassword ? mdAddPasswordEye : undefined,
                 confirmButtonColor: $(form).data('danger') ? '#DC2626' : '#2E7BC4',
                 cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Đồng ý',
@@ -419,25 +499,17 @@
             }).then(function(result) {
                 if (!result.isConfirmed) return;
 
+                var extras = {};
+
                 if (needPassword) {
-                    $(form).find('input[name="sign_password"]').remove();
-                    var pw = document.createElement('input');
-                    pw.type = 'hidden';
-                    pw.name = 'sign_password';
-                    pw.value = result.value || '';
-                    form.appendChild(pw);
+                    extras.sign_password = result.value || '';
                 }
 
                 if (needReason) {
-                    $(form).find('input[name="change_reason"]').remove();
-                    var rs = document.createElement('input');
-                    rs.type = 'hidden';
-                    rs.name = 'change_reason';
-                    rs.value = result.value || '';
-                    form.appendChild(rs);
+                    extras.change_reason = result.value || '';
                 }
 
-                form.submit();
+                mdConfirmSubmit(form, extras);
             });
         });
 
@@ -465,12 +537,9 @@
                 }
             }).then(function(result) {
                 if (result.isConfirmed) {
-                    var input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'cancel_reason';
-                    input.value = result.value;
-                    form.appendChild(input);
-                    form.submit();
+                    mdConfirmSubmit(form, {
+                        cancel_reason: result.value || ''
+                    });
                 }
             });
         });

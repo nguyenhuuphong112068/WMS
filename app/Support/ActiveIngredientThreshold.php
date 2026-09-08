@@ -48,8 +48,10 @@ use Illuminate\Support\Facades\DB;
  * Chất vừa có ngưỡng RIÊNG vừa thuộc mục gộp thì được cộng ở CẢ HAI chỗ (đúng nghị định:
  * nó vừa bị liệt kê đích danh vừa nằm trong nhóm).
  *
- * Đơn vị đếm (chai/thùng…) hoặc thiếu tỉ trọng => KHÔNG quy đổi được, gom vào phần
- * "cần kiểm tra thủ công" chứ không bỏ qua âm thầm.
+ * Đơn vị đếm (chai/thùng…): quy ra kg theo "Khối lượng quy đổi" phòng khai ở tab Hoá Chất
+ * Của Phòng (chemical_department_categories.pack_weight_kg). Chưa khai con số này, hoặc đơn
+ * vị thể tích mà thiếu tỉ trọng => KHÔNG quy đổi được, gom vào phần "cần kiểm tra thủ công"
+ * chứ không bỏ qua âm thầm.
  *
  * Query Builder thuần, không Eloquent.
  */
@@ -207,7 +209,18 @@ class ActiveIngredientThreshold
             if (! $unit) {
                 $reason = 'Phòng "' . ($deptNames[$deptId] ?? ('#' . $deptId)) . '" chưa khai đơn vị tính cho mã này';
             } elseif ($unit->unit_group === 'count') {
-                $reason = 'Đơn vị đếm (' . $unit->short_name . ') - cần khai quy cách đóng gói để ra khối lượng';
+                // Đơn vị đếm / bao bì: quy ra kg theo "Khối lượng quy đổi" phòng khai cho
+                // mã này (chemical_department_categories.pack_weight_kg = kg hoá chất trong
+                // 1 đơn vị đếm). Chưa khai thì vẫn gom vào phần "chưa quy đổi được".
+                $packKg = isset($unit->pack_weight_kg) && $unit->pack_weight_kg !== null
+                    ? (float) $unit->pack_weight_kg
+                    : null;
+
+                if ($packKg !== null && $packKg > 0) {
+                    $factor = $packKg;
+                } else {
+                    $reason = 'Đơn vị đếm (' . $unit->short_name . ') - khai "Khối lượng quy đổi" ở tab Hoá Chất Của Phòng để quy ra kg';
+                }
             } elseif ($unit->unit_group === 'volume' && ($density === null || $density <= 0)) {
                 $reason = 'Đơn vị thể tích (' . $unit->short_name . ') nhưng mã danh mục chưa khai tỉ trọng';
             } else {

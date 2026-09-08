@@ -114,7 +114,7 @@
                 <div class="tr-total-caveat">
 
                     @if ($cbExceededItems > 0)
-                        <b class="text-danger">Hiện đã có {{ $cbExceededItems }} đối tượng vượt ngưỡng.</b>
+                        <b class="text-danger">Hiện đã có {{ $cbExceededItems }} hoá chất vượt ngưỡng.</b>
                     @endif
                 </div>
 

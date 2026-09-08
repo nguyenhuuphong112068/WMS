@@ -122,6 +122,9 @@ class MaterialExportController extends Controller
             ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
             ->leftJoin(self::REQ_ITEM, self::TABLE.'.request_item_id', '=', self::REQ_ITEM.'.id')
+            ->leftJoin(self::REQ_LIST, self::REQ_ITEM.'.request_list_id', '=', self::REQ_LIST.'.id')
+            ->leftJoin(self::TRANSFER_ITEM_TABLE, self::TABLE.'.transfer_item_id', '=', self::TRANSFER_ITEM_TABLE.'.id')
+            ->leftJoin(self::TRANSFER_REQUEST_TABLE, self::TRANSFER_ITEM_TABLE.'.transfer_request_id', '=', self::TRANSFER_REQUEST_TABLE.'.id')
             ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
             // Phòng ban nhận, chỉ có ở phiếu cấp phát liên phòng ban (type = transfer_out)
             ->leftJoin('deparments', self::TABLE.'.to_department_id', '=', 'deparments.id')
@@ -133,12 +136,15 @@ class MaterialExportController extends Controller
                 'units.short_name as unit_short_name',
                 'deparments.name as to_department_name',
                 'deparments.shortName as to_department_short',
-                self::REQ_ITEM.'.purpose'
+                self::REQ_ITEM.'.purpose',
+                DB::raw('COALESCE('.self::REQ_LIST.'.code, '.self::TRANSFER_REQUEST_TABLE.'.code) as request_code')
             )
             ->where(self::TABLE.'.department_id', $departmentId)
             ->tap(ListRange::dateFilter(self::TABLE.'.created_at', $bookRange))
             ->tap(ListRange::search([
                 self::TABLE.'.code',
+                self::REQ_LIST.'.code',
+                self::TRANSFER_REQUEST_TABLE.'.code',
                 'material_imports.code',
                 'material_categories.code',
                 'material_names.name',
@@ -155,17 +161,32 @@ class MaterialExportController extends Controller
         // (chưa ký duyệt xong hoặc kho chưa cấp đủ) dù đã ngoài khoảng lọc.
         $reqRange = ListRange::of($request, 'req_');
         $reqPerPage = ListRange::perPage($request, 'req_');
+        $reqUnissued = $request->boolean('req_unissued');
 
-        $requestLists = DB::table(self::REQ_LIST)
+        $reqUnissuedCount = DB::table(self::REQ_LIST)
+            ->where('department_id', $departmentId)
+            ->where('app_status', 'approved')
+            ->whereIn('issue_status', self::REQ_PENDING_ISSUE_STATUSES)
+            ->count();
+
+        $requestListsQuery = DB::table(self::REQ_LIST)
             ->select(self::REQ_LIST.'.*')
-            ->where(self::REQ_LIST.'.department_id', $departmentId)
-            ->tap(ListRange::dateFilterKeep(
+            ->where(self::REQ_LIST.'.department_id', $departmentId);
+
+        if ($reqUnissued) {
+            $requestListsQuery->where(self::REQ_LIST.'.app_status', 'approved')
+                ->whereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES);
+        } else {
+            $requestListsQuery->tap(ListRange::dateFilterKeep(
                 self::REQ_LIST.'.created_at',
                 $reqRange,
                 fn ($query) => $query
                     ->orWhereIn(self::REQ_LIST.'.app_status', self::REQ_PENDING_APP_STATUSES)
                     ->orWhereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES)
-            ))
+            ));
+        }
+
+        $requestLists = $requestListsQuery
             ->orderBy(self::REQ_LIST.'.id', 'desc')
             ->paginate($reqPerPage, ['*'], ListRange::pageName('req_'))
             ->withQueryString();
@@ -243,11 +264,15 @@ class MaterialExportController extends Controller
             ->pluck('category_id')
             ->all();
 
+        // Hộp ký duyệt liên phòng ban: gom các đề nghị của mọi phòng đang chờ CHÍNH
+        // người đang đăng nhập ký (chỉ bật cho phòng ban chung + có quyền is_BOD).
+        $inbox = $this->approvalInboxData();
+
         /*
         | Tab nào đang mở: ?tab= trên URL là chính; các action liên phòng ban dùng
         | redirect()->back() (không đổi URL) nên tự flash activeTab qua session.
         */
-        $tabs = ['book', 'request', 'transfer'];
+        $tabs = ['book', 'request', 'transfer', 'inbox'];
         $activeTab = in_array($request->query('tab'), $tabs, true)
             ? $request->query('tab')
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'book');
@@ -285,12 +310,20 @@ class MaterialExportController extends Controller
             'bookPerPage' => $bookPerPage,
             'reqRange' => $reqRange,
             'reqPerPage' => $reqPerPage,
+            'reqUnissued' => $reqUnissued,
+            'reqUnissuedCount' => $reqUnissuedCount,
             'transferCategories' => $this->transferCategoryOptions($departmentId),
             'transferDepartments' => $this->departmentOptions($departmentId),
             'transferOwnLocations' => DepartmentMaterial::locationOptions($departmentId),
             'declaredCategoryIds' => $declaredCategoryIds,
             'currentDepartmentId' => $departmentId,
             'activeTab' => $activeTab,
+            // ---- Tab "Ký duyệt (mọi phòng ban)" - hộp ký duyệt liên phòng ban ----
+            'showApprovalInbox' => $inbox['show'],
+            'inboxRequests' => $inbox['requests'],
+            'inboxItems' => $inbox['items'],
+            'inboxSigns' => $inbox['signs'],
+            'inboxBadgeCount' => $inbox['badge'],
         ]);
     }
 
@@ -415,7 +448,6 @@ class MaterialExportController extends Controller
             // Không xoá cứng: bỏ hiệu lực các mục cũ (active = 0), dữ liệu vẫn lưu lại.
             DB::table(self::REQ_ITEM)->where('request_list_id', $req->id)->update([
                 'active' => 0,
-                'updated_by' => $this->actor(),
                 'updated_at' => now(),
             ]);
             $this->insertRequestItems($req->id, $request);
@@ -510,26 +542,27 @@ class MaterialExportController extends Controller
      */
     public function requestSign(Request $request)
     {
-        $req = $this->findRequest($request->request_list_id);
+        $tab = $this->approvalActiveTab($request);
+        $req = $this->resolveRequestForApproval($request);
 
         if (! $req) {
-            return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần ký duyệt!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần ký duyệt!')->with('activeTab', $tab);
         }
 
         $sign = $this->currentSign($req);
 
         if (! $sign) {
-            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước chờ ký nên không ký được!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước chờ ký nên không ký được!')->with('activeTab', $tab);
         }
 
         if (! $this->canSignRow($sign)) {
             return redirect()->back()
                 ->with('error', 'Bước '.$sign->step_no.' của đề nghị '.$req->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không ký thay được!')
-                ->with('activeTab', 'request');
+                ->with('activeTab', $tab);
         }
 
         if ($guard = $this->guardSignature($request, self::REQ_LIST, $req->id, 'Ký duyệt đề nghị cấp phát vật tư')) {
-            return $guard->with('activeTab', 'request');
+            return $guard->with('activeTab', $tab);
         }
 
         $stepCount = (int) $req->sign_step_count;
@@ -563,7 +596,7 @@ class MaterialExportController extends Controller
             'app_status: '.($isLast ? 'approved' : 'pending_sign')
         );
 
-        $fresh = $this->findRequest($req->id);
+        $fresh = DB::table(self::REQ_LIST)->where('id', $req->id)->first();
 
         if ($isLast) {
             $this->notifyIssuers($fresh);
@@ -577,28 +610,29 @@ class MaterialExportController extends Controller
             $isLast
                 ? 'Đã ký bước '.$stepNo.'/'.$stepCount.' - đề nghị '.$req->code.' được phê duyệt, kho có thể cấp phát.'
                 : 'Đã ký bước '.$stepNo.'/'.$stepCount.' cho đề nghị '.$req->code.'! Đã chuyển tới người ký bước '.($stepNo + 1).'.'
-        )->with('activeTab', 'request');
+        )->with('activeTab', $tab);
     }
 
     /** TỪ CHỐI tại bước đang chờ ký: phiếu quay về "Bị từ chối", Tổ sửa rồi trình ký lại. */
     public function requestReject(Request $request)
     {
-        $req = $this->findRequest($request->request_list_id);
+        $tab = $this->approvalActiveTab($request);
+        $req = $this->resolveRequestForApproval($request);
 
         if (! $req) {
-            return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần từ chối!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần từ chối!')->with('activeTab', $tab);
         }
 
         $sign = $this->currentSign($req);
 
         if (! $sign) {
-            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước chờ ký nên không từ chối được!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước chờ ký nên không từ chối được!')->with('activeTab', $tab);
         }
 
         if (! $this->canSignRow($sign)) {
             return redirect()->back()
                 ->with('error', 'Bước '.$sign->step_no.' của đề nghị '.$req->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không từ chối thay được!')
-                ->with('activeTab', 'request');
+                ->with('activeTab', $tab);
         }
 
         $validator = Validator::make($request->all(), [
@@ -609,11 +643,11 @@ class MaterialExportController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'requestRejectErrors')->withInput()->with('activeTab', 'request');
+            return redirect()->back()->withErrors($validator, 'requestRejectErrors')->withInput()->with('activeTab', $tab);
         }
 
         if ($guard = $this->guardSignature($request, self::REQ_LIST, $req->id, 'Từ chối đề nghị cấp phát vật tư')) {
-            return $guard->with('activeTab', 'request');
+            return $guard->with('activeTab', $tab);
         }
 
         $rejectedAt = now();
@@ -652,7 +686,7 @@ class MaterialExportController extends Controller
             'Bị từ chối'
         );
 
-        return redirect()->back()->with('success', 'Đã từ chối đề nghị '.$req->code.'. Tổ cần sửa lại rồi trình ký lại.')->with('activeTab', 'request');
+        return redirect()->back()->with('success', 'Đã từ chối đề nghị '.$req->code.'. Tổ cần sửa lại rồi trình ký lại.')->with('activeTab', $tab);
     }
 
     public function requestDestroy(Request $request)
@@ -816,6 +850,131 @@ class MaterialExportController extends Controller
         $roles = array_values(array_filter(array_map('trim', explode(',', (string) $sign->role_names))));
 
         return $roles ? user_has_any_role($userId, $roles) : false;
+    }
+
+    /* ==========================================================
+     |  HỘP KÝ DUYỆT LIÊN PHÒNG BAN (tab "Ký duyệt (mọi phòng ban)")
+     |
+     |  Người ký thuộc phòng ban CHUNG (deparments.is_general = 0: Ban Giám Đốc, Cung
+     |  Ứng...) không có kho riêng, phải chuyển bộ phận từng lần mới thấy phiếu chờ ký.
+     |  Tab này gom mọi đề nghị của các phòng trong cùng công ty đang chờ CHÍNH người
+     |  đang đăng nhập ký. Ký / từ chối vẫn đi qua requestSign / requestReject, chỉ khác
+     |  cách tìm phiếu: theo công ty thay vì theo phòng ban đang chọn.
+     ========================================================== */
+
+    /** Phòng ban NHÀ của người đang đăng nhập (user_management.deparment_id). */
+    private function homeDepartmentId(): int
+    {
+        return (int) DB::table('user_management')
+            ->where('id', session('user')['userId'] ?? 0)
+            ->value('deparment_id');
+    }
+
+    /** Được dùng hộp ký duyệt liên phòng ban không: có quyền is_BOD và phòng nhà là phòng chung. */
+    private function canUseApprovalInbox(): bool
+    {
+        if (! user_can('is_BOD')) {
+            return false;
+        }
+
+        $homeDeptId = $this->homeDepartmentId();
+
+        return $homeDeptId
+            ? (int) DB::table('deparments')->where('id', $homeDeptId)->value('is_general') === 0
+            : false;
+    }
+
+    /** Tab cần mở lại sau khi ký / từ chối: 'inbox' khi thao tác từ hộp ký duyệt, còn lại 'request'. */
+    private function approvalActiveTab(Request $request): string
+    {
+        return $request->input('scope') === 'inbox' && $this->canUseApprovalInbox() ? 'inbox' : 'request';
+    }
+
+    /**
+     * Tìm đề nghị để ký / từ chối.
+     *
+     * Bình thường lấy theo phòng ban đang chọn. Khi thao tác từ hộp ký duyệt liên phòng
+     * ban (scope = inbox) thì lấy theo CÔNG TY đang làm việc - currentSign() + canSignRow()
+     * vẫn chặn đúng người ký nên không lỏng quyền.
+     */
+    private function resolveRequestForApproval(Request $request)
+    {
+        if ($request->input('scope') === 'inbox' && $this->canUseApprovalInbox()) {
+            $companyDeptIds = CompanyContext::departmentIds(CompanyContext::currentId());
+
+            return DB::table(self::REQ_LIST)
+                ->where('id', $request->request_list_id)
+                ->when($companyDeptIds !== null, fn ($query) => $query->whereIn('department_id', $companyDeptIds))
+                ->first();
+        }
+
+        return $this->findRequest($request->request_list_id);
+    }
+
+    /**
+     * Dữ liệu tab "Ký duyệt (mọi phòng ban)": các đề nghị pending_sign của mọi phòng
+     * trong cùng công ty mà BƯỚC ĐANG CHỜ được giao đích danh cho người đang đăng nhập.
+     */
+    private function approvalInboxData(): array
+    {
+        $empty = ['show' => false, 'requests' => collect(), 'items' => collect(), 'signs' => collect(), 'badge' => 0];
+
+        if (! $this->canUseApprovalInbox()) {
+            return $empty;
+        }
+
+        $myUserId = (int) (session('user')['userId'] ?? 0);
+        $companyDeptIds = CompanyContext::departmentIds(CompanyContext::currentId());
+
+        $requests = DB::table(self::REQ_LIST)
+            ->join(self::REQ_SIGN, function ($join) {
+                $join->on(self::REQ_SIGN.'.request_list_id', '=', self::REQ_LIST.'.id')
+                    ->on(self::REQ_SIGN.'.step_no', '=', self::REQ_LIST.'.current_step')
+                    ->where(self::REQ_SIGN.'.active', 1);
+            })
+            ->leftJoin('deparments', self::REQ_LIST.'.department_id', '=', 'deparments.id')
+            ->where(self::REQ_LIST.'.app_status', 'pending_sign')
+            ->where(self::REQ_SIGN.'.user_id', $myUserId)
+            ->where(self::REQ_SIGN.'.status', 'pending')
+            ->when($companyDeptIds !== null, fn ($query) => $query->whereIn(self::REQ_LIST.'.department_id', $companyDeptIds))
+            ->select(
+                self::REQ_LIST.'.*',
+                'deparments.name as department_name',
+                'deparments.shortName as department_short',
+                self::REQ_SIGN.'.step_no as my_step_no'
+            )
+            ->orderBy(self::REQ_LIST.'.submitted_at', 'asc')
+            ->orderBy(self::REQ_LIST.'.id', 'asc')
+            ->get();
+
+        $ids = $requests->pluck('id');
+
+        $items = DB::table(self::REQ_ITEM)
+            ->leftJoin('material_categories', self::REQ_ITEM.'.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->select(
+                self::REQ_ITEM.'.*',
+                'material_names.name as category_material_name',
+                'material_categories.code as category_code'
+            )
+            ->where(self::REQ_ITEM.'.active', 1)
+            ->whereIn(self::REQ_ITEM.'.request_list_id', $ids)
+            ->orderBy(self::REQ_ITEM.'.id', 'asc')
+            ->get()
+            ->map(function ($item) {
+                $item->display_name = $item->category_id ? $item->category_material_name : $item->material_name;
+
+                return $item;
+            })
+            ->groupBy('request_list_id');
+
+        return [
+            'show' => true,
+            'requests' => $requests,
+            'items' => $items,
+            'signs' => $this->signRows($ids),
+            'badge' => $requests->count(),
+        ];
     }
 
     /**

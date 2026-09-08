@@ -23,5 +23,17 @@
     @include('pages.estimate.MaterialEstimate.create')
     @include('pages.estimate.MaterialEstimate.update')
     @include('pages.estimate.MaterialEstimate.reject')
+    @include('pages.estimate.shared.submitModal')
     @include('pages.estimate.shared.historyModal')
+
+    {{-- Tab "Ký duyệt (mọi phòng ban)" - xem nhanh nội dung phiếu chờ ký --}}
+    @if ($showApprovalInbox)
+        @foreach ($inboxRequests as $req)
+            @include('pages.estimate.shared.inboxDetailModal', [
+                'req' => $req,
+                'items' => $inboxItems->get($req->id, collect()),
+                'signs' => $inboxSigns->get($req->id, collect()),
+            ])
+        @endforeach
+    @endif
 @endsection

@@ -84,6 +84,10 @@
                             <small>Mã xuất nhập</small>
                             <b class="exp-code me-up-code">—</b>
                         </div>
+                        <div class="cell me-up-req-cell">
+                            <small>Mã đề nghị</small>
+                            <b class="exp-code me-up-req">—</b>
+                        </div>
                         <div class="cell">
                             <small>Vật tư</small>
                             <b class="me-up-material">—</b>
@@ -169,6 +173,8 @@
             $m.find('[name="reason"]').val(r.reason || '');
 
             $m.find('.me-up-code').text(r.code || '—');
+            $m.find('.me-up-req').text(r.request_code || '—');
+            $m.find('.me-up-req-cell').toggle(!isCancel && !!r.request_code);
             $m.find('.me-up-material').text(r.material_name || '—');
             $m.find('.me-up-catcode').text(r.category_code || '');
             $m.find('.me-up-spec').text(r.technical_specification || '');

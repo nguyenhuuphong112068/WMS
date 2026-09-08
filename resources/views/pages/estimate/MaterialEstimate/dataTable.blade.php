@@ -16,15 +16,23 @@
 
                 <ul class="nav nav-tabs mb-3" id="estimateTabs" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link active" id="list-tab" data-toggle="tab" href="#list" role="tab">Danh sách phiếu</a>
+                        <a class="nav-link {{ $activeTab === 'list' ? 'active' : '' }}" id="list-tab" data-toggle="tab" href="#list" role="tab">Danh sách phiếu</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
+                        <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
                     </li>
+                    @if ($showApprovalInbox)
+                        <li class="nav-item">
+                            <a class="nav-link {{ $activeTab === 'inbox' ? 'active' : '' }}" id="inbox-tab" data-toggle="tab" href="#inbox" role="tab">
+                                Ký duyệt (mọi phòng ban)
+                                @if ($inboxBadgeCount)<span class="badge badge-danger">{{ $inboxBadgeCount }}</span>@endif
+                            </a>
+                        </li>
+                    @endif
                 </ul>
 
                 <div class="tab-content" id="estimateTabsContent">
-                    <div class="tab-pane fade show active" id="list" role="tabpanel">
+                    <div class="tab-pane fade {{ $activeTab === 'list' ? 'show active' : '' }}" id="list" role="tabpanel">
                         <div class="table-responsive">
                             <table id="mdTable" class="table table-bordered table-hover w-100">
                         <thead>
@@ -94,7 +102,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @include('pages.estimate.shared.signFlow', ['row' => $row, 'signSteps' => $signSteps])
+                                        @include('pages.estimate.shared.signFlow', ['row' => $row, 'signs' => $signRows->get($row->id, collect())])
                                     </td>
                                     <td class="md-sub">
                                         {{ $row->updated_by ?: $row->created_by ?: '—' }}
@@ -125,46 +133,28 @@
                                                     <i class="fas fa-edit"></i>
                                                 </button>
 
-                                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'submit') }}"
-                                                    method="POST" data-title="Trình ký phiếu {{ $row->code }}?"
-                                                    data-text="Phiếu sẽ chuyển sang bước chờ Phó/Trưởng Phòng ký và không sửa được nữa cho tới khi bị từ chối.">
-                                                    @csrf
-                                                    <input type="hidden" name="id" value="{{ $row->id }}">
-                                                    <button type="submit" class="btn btn-sm btn-success" title="Trình ký">
-                                                        <i class="fas fa-paper-plane"></i>
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="btn btn-sm btn-success btn-est-submit" title="Trình ký"
+                                                    data-id="{{ $row->id }}" data-code="{{ $row->code }}"
+                                                    data-signers="{{ $signRows->get($row->id, collect())->pluck('user_id')->filter()->values()->toJson() }}">
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
                                             @endif
 
-                                            @if ($row->app_status === 'pending_manager' && $canSignManager && user_can('estimate_material_sign'))
-                                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'signManager') }}"
-                                                    method="POST" data-title="Ký duyệt bước Phó/Trưởng Phòng?"
-                                                    data-text="Phiếu {{ $row->code }} sẽ được chuyển tiếp lên Ban Giám Đốc ký.">
+                                            @if ($row->app_status === 'pending_sign' && $row->can_sign && user_can('estimate_material_sign'))
+                                                @php $estIsLast = (int) $row->pending_sign->step_no >= (int) $row->sign_step_count; @endphp
+                                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'signStep') }}"
+                                                    method="POST" data-title="Ký duyệt bước {{ $row->pending_sign->step_no }}/{{ $row->sign_step_count }} phiếu {{ $row->code }}?"
+                                                    data-text="{{ $estIsLast ? 'Phiếu sẽ được phê duyệt và ghi nhận tiếp nhận.' : 'Phiếu sẽ chuyển tới người ký bước ' . ($row->pending_sign->step_no + 1) . '.' }}">
                                                     @csrf
                                                     <input type="hidden" name="id" value="{{ $row->id }}">
-                                                    <button type="submit" class="btn btn-sm btn-success" title="Ký duyệt (Phó/Trưởng Phòng)">
-                                                        <i class="fas fa-signature"></i>
+                                                    <input type="hidden" name="scope" value="">
+                                                    <button type="submit" class="btn btn-sm btn-success" title="Ký duyệt bước {{ $row->pending_sign->step_no }}">
+                                                        <i class="fas fa-{{ $estIsLast ? 'stamp' : 'signature' }}"></i>
                                                     </button>
                                                 </form>
-                                            @endif
 
-                                            @if ($row->app_status === 'pending_director' && $canSignDirector && user_can('estimate_material_sign'))
-                                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'signDirector') }}"
-                                                    method="POST" data-title="Ban Giám Đốc phê duyệt phiếu {{ $row->code }}?"
-                                                    data-text="Sau khi phê duyệt, phiếu chuyển sang bộ phận Cung Ứng tiếp nhận giải quyết.">
-                                                    @csrf
-                                                    <input type="hidden" name="id" value="{{ $row->id }}">
-                                                    <button type="submit" class="btn btn-sm btn-success" title="Ký duyệt (Ban Giám Đốc)">
-                                                        <i class="fas fa-stamp"></i>
-                                                    </button>
-                                                </form>
-                                            @endif
-
-                                            @if (
-                                                ($row->app_status === 'pending_manager' && $canSignManager) ||
-                                                    ($row->app_status === 'pending_director' && $canSignDirector)) && user_can('estimate_material_sign')
                                                 <button type="button" class="btn btn-sm btn-outline-danger btn-est-reject"
-                                                    title="Từ chối" data-id="{{ $row->id }}" data-code="{{ $row->code }}">
+                                                    title="Từ chối" data-id="{{ $row->id }}" data-code="{{ $row->code }}" data-scope="">
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             @endif
@@ -190,9 +180,14 @@
                     </table>
                         </div>
                     </div>
-                    <div class="tab-pane fade" id="tracking" role="tabpanel">
+                    <div class="tab-pane fade {{ $activeTab === 'tracking' ? 'show active' : '' }}" id="tracking" role="tabpanel">
                         @include('pages.estimate.shared.trackingTable', ['items' => $trackedItems])
                     </div>
+                    @if ($showApprovalInbox)
+                        <div class="tab-pane fade {{ $activeTab === 'inbox' ? 'show active' : '' }}" id="inbox" role="tabpanel">
+                            @include('pages.estimate.shared.inboxPane')
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

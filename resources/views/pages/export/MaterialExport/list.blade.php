@@ -53,4 +53,13 @@
     @include('pages.export.MaterialExport.transferDetailModal')
     @include('pages.export.MaterialExport.transferStockPickerModal')
     @include('pages.export.MaterialExport.transferImportPickerModal')
+
+    {{-- Tab "Ký duyệt (mọi phòng ban)" - xem nhanh nội dung phiếu chờ ký --}}
+    @foreach ($inboxRequests as $req)
+        @include('pages.export.MaterialExport.inboxDetailModal', [
+            'req' => $req,
+            'items' => $inboxItems->get($req->id, collect()),
+            'signs' => $inboxSigns->get($req->id, collect()),
+        ])
+    @endforeach
 @endsection

@@ -115,9 +115,11 @@ class DepartmentChemicalController extends Controller
             self::TABLE,
             $current->id,
             'đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
+                .' | kg/đơn vị: '.($current->pack_weight_kg ?? 'không khai')
                 .' | hạn: '.($current->shelf_life_months ?? 'mặc định')
                 .' | ngưỡng: '.($current->min_stock ?? 'mặc định'),
             'đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
+                .' | kg/đơn vị: '.($this->packWeightKg($request) ?? 'không khai')
                 .' | hạn: '.($request->shelf_life_months ?: 'mặc định')
                 .' | ngưỡng: '.($request->min_stock ?: 'mặc định')
                 .' | Lý do: '.$this->changeReason($request)
@@ -167,6 +169,9 @@ class DepartmentChemicalController extends Controller
     {
         $rules = [
             'unit_id' => ['required', 'integer', 'exists:units,id'],
+            // Khối lượng hoá chất (kg) trong 1 đơn vị đếm/bao bì - chỉ giữ khi đơn vị của
+            // phòng thuộc nhóm count (xem payload()); đơn vị khối lượng/thể tích tự quy đổi.
+            'pack_weight_kg' => ['nullable', 'numeric', 'gt:0'],
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
             'storage_condition_id' => ['nullable', 'exists:storage_conditions,id'],
@@ -239,6 +244,7 @@ class DepartmentChemicalController extends Controller
     {
         return [
             'unit_id' => (int) $request->unit_id,
+            'pack_weight_kg' => $this->packWeightKg($request),
             'shelf_life_months' => $this->nullIfBlank($request->shelf_life_months),
             'min_stock' => $this->nullIfBlank($request->min_stock),
             'storage_condition_id' => $request->storage_condition_id ? (int) $request->storage_condition_id : null,
@@ -254,6 +260,24 @@ class DepartmentChemicalController extends Controller
         return $value === '' ? null : $value;
     }
 
+    /**
+     * "Khối lượng quy đổi" chỉ có nghĩa khi đơn vị của phòng thuộc nhóm đếm / bao bì:
+     * đơn vị khối lượng / thể tích đã tự quy đổi ra kg được. Chọn đơn vị nhóm khác thì
+     * bỏ con số này đi để không còn dữ liệu thừa treo lại.
+     */
+    private function packWeightKg(Request $request): ?float
+    {
+        $value = $this->nullIfBlank($request->pack_weight_kg);
+
+        if ($value === null) {
+            return null;
+        }
+
+        $group = DB::table('units')->where('id', (int) $request->unit_id)->value('unit_group');
+
+        return $group === 'count' ? (float) $value : null;
+    }
+
     private function messages(): array
     {
         return [
@@ -262,6 +286,8 @@ class DepartmentChemicalController extends Controller
             'category_id.unique' => 'Phòng ban đã khai hoá chất này rồi, hãy sửa dòng đang có.',
             'unit_id.required' => 'Vui lòng chọn đơn vị tính của phòng cho hoá chất này.',
             'unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'pack_weight_kg.numeric' => 'Khối lượng quy đổi phải là số.',
+            'pack_weight_kg.gt' => 'Khối lượng quy đổi phải lớn hơn 0.',
             'shelf_life_months.integer' => 'Hạn dùng nội bộ phải là số tháng nguyên.',
             'shelf_life_months.min' => 'Hạn dùng nội bộ tối thiểu 1 tháng.',
             'shelf_life_months.max' => 'Hạn dùng nội bộ tối đa 1200 tháng (100 năm).',

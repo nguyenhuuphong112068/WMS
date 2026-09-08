@@ -11,6 +11,8 @@
             <form action="{{ route($expRoute . 'requestReject') }}" method="POST">
                 @csrf
                 <input type="hidden" name="request_list_id" value="{{ old('request_list_id') }}">
+                {{-- 'inbox' khi từ chối từ tab "Ký duyệt (mọi phòng ban)" - Controller tìm phiếu theo công ty --}}
+                <input type="hidden" name="scope" value="{{ old('scope') }}">
                 <div class="modal-body">
                     <div class="form-group">
                         <label>Mã Đề Nghị</label>
@@ -45,6 +47,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         $(document).on('click', '.btn-req-reject', function () {
             $('#reqRejectModal [name="request_list_id"]').val($(this).data('id'));
+            $('#reqRejectModal [name="scope"]').val($(this).data('scope') || '');
             $('#reqRejectModal .req-reject-code').val($(this).data('code'));
             $('#reqRejectModal').modal('show');
         });

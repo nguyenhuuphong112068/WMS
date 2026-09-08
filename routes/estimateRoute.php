@@ -9,8 +9,9 @@
 | Tên route  : pages.estimate.<chứcNăng>.<action>
 |
 | chemicalEstimate / standardEstimate / materialEstimate: phòng ban lập phiếu dự trù,
-| khai mặt hàng + số lượng theo tháng, rồi trình ký 2 bước (Phó/Trưởng Phòng -> Ban
-| Giám Đốc). Duyệt xong phiếu tự đánh dấu đã tiếp nhận - không còn màn "Tiếp Nhận Dự Trù".
+| khai mặt hàng + số lượng theo tháng, rồi trình ký theo quy trình động do người lập tự
+| khai (tối thiểu 2 bước, bước cuối là Ban Giám Đốc). Duyệt xong phiếu tự đánh dấu đã
+| tiếp nhận - không còn màn "Tiếp Nhận Dự Trù".
 */
 
 use App\Http\Controllers\Pages\Estimate\ChemicalEstimateController;
@@ -42,10 +43,11 @@ Route::prefix('/estimate')
             // Cảnh báo ngưỡng PL IV tức thời khi chọn hoá chất / nhập số lượng trong modal
             Route::get('checkThreshold', 'checkThreshold')->name('checkThreshold');
 
-            // Trình ký 2 bước
+            // Trình ký động: người lập khai số bước ký + người ký từng bước (tối thiểu 2,
+            // bước cuối là Ban Giám Đốc). signStep ký bước đang chờ, dùng chung cho cả tab
+            // "Ký duyệt (mọi phòng ban)" qua tham số scope=inbox.
             Route::post('submit', 'submit')->name('submit');
-            Route::post('signManager', 'signManager')->name('signManager');
-            Route::post('signDirector', 'signDirector')->name('signDirector');
+            Route::post('signStep', 'signStep')->name('signStep');
             Route::post('reject', 'reject')->name('reject');
 
             // Cập nhật ngày mong muốn giao khi đã duyệt
@@ -72,10 +74,11 @@ Route::prefix('/estimate')
             Route::post('updateItem', 'updateItem')->name('updateItem');
             Route::post('deleteItem', 'deleteItem')->name('deleteItem');
 
-            // Trình ký 2 bước
+            // Trình ký động: người lập khai số bước ký + người ký từng bước (tối thiểu 2,
+            // bước cuối là Ban Giám Đốc). signStep ký bước đang chờ, dùng chung cho cả tab
+            // "Ký duyệt (mọi phòng ban)" qua tham số scope=inbox.
             Route::post('submit', 'submit')->name('submit');
-            Route::post('signManager', 'signManager')->name('signManager');
-            Route::post('signDirector', 'signDirector')->name('signDirector');
+            Route::post('signStep', 'signStep')->name('signStep');
             Route::post('reject', 'reject')->name('reject');
 
             // Cập nhật ngày mong muốn giao khi đã duyệt
@@ -101,10 +104,11 @@ Route::prefix('/estimate')
             Route::post('updateItem', 'updateItem')->name('updateItem');
             Route::post('deleteItem', 'deleteItem')->name('deleteItem');
 
-            // Trình ký 2 bước
+            // Trình ký động: người lập khai số bước ký + người ký từng bước (tối thiểu 2,
+            // bước cuối là Ban Giám Đốc). signStep ký bước đang chờ, dùng chung cho cả tab
+            // "Ký duyệt (mọi phòng ban)" qua tham số scope=inbox.
             Route::post('submit', 'submit')->name('submit');
-            Route::post('signManager', 'signManager')->name('signManager');
-            Route::post('signDirector', 'signDirector')->name('signDirector');
+            Route::post('signStep', 'signStep')->name('signStep');
             Route::post('reject', 'reject')->name('reject');
 
             // Cập nhật ngày mong muốn giao khi đã duyệt

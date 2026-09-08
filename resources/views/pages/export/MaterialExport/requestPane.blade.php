@@ -16,6 +16,22 @@
             <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát vật tư
         </button>
     @endperm
+
+    @if (!empty($reqUnissued))
+        <a href="{{ route($expRoute . 'list', array_merge(request()->except(['req_unissued', 'req_page']), ['tab' => 'request'])) }}"
+            class="btn btn-warning" title="Bấm để xem lại tất cả đề nghị">
+            <i class="fas fa-filter mr-1"></i> Đang lọc: Chưa cấp phát đủ ({{ $reqUnissuedCount }}) <i class="fas fa-times ml-1"></i>
+        </a>
+    @else
+        <a href="{{ route($expRoute . 'list', array_merge(request()->except(['req_page']), ['tab' => 'request', 'req_unissued' => 1])) }}"
+            class="btn btn-outline-warning text-dark" style="border-color: #d97706; background-color: #fffbeb;"
+            title="Lọc các đề nghị đã duyệt nhưng kho chưa cấp phát đủ">
+            <i class="fas fa-hourglass-half mr-1 text-warning"></i> Chưa cấp phát đủ
+            @if ($reqUnissuedCount > 0)
+                <span class="badge badge-warning ml-1" style="font-size: 0.8rem;">{{ $reqUnissuedCount }}</span>
+            @endif
+        </a>
+    @endif
 </div>
 
 @include('pages.shared.rangeFilter', [
@@ -143,7 +159,9 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="text-center text-muted">Chưa có đề nghị cấp phát vật tư nào.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted">
+                    {{ !empty($reqUnissued) ? 'Không có đề nghị nào chưa cấp phát đủ.' : 'Chưa có đề nghị cấp phát vật tư nào.' }}
+                </td></tr>
             @endforelse
         </tbody>
     </table>
@@ -152,5 +170,5 @@
 @include('pages.shared.paginator', [
     'pgItems' => $requestLists,
     'pgTab' => 'request',
-    'pgUnit' => 'đề nghị',
+    'pgUnit' => !empty($reqUnissued) ? 'đề nghị chưa cấp phát đủ' : 'đề nghị',
 ])

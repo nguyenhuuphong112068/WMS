@@ -8,7 +8,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-list-ul mr-2"></i>Đề Nghị {{ $req->code }}@if ($req->name) <span class="text-muted font-weight-normal">— {{ $req->name }}</span>@endif
+                    <i class="fas fa-list-ul mr-2"></i>Đề Nghị {{ $req->code }}@if ($req->name)
+                        <span class="text-muted font-weight-normal">— {{ $req->name }}</span>
+                    @endif
                     <span class="md-badge {{ $b['class'] }} ml-2">{{ $b['label'] }}</span>
                 </h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
@@ -16,7 +18,9 @@
             <div class="modal-body">
 
                 <div class="row mb-3">
-                    <div class="col-md-4"><small class="text-muted">Người lập</small><div class="font-weight-bold">{{ $req->created_by }}</div></div>
+                    <div class="col-md-4"><small class="text-muted">Người lập</small>
+                        <div class="font-weight-bold">{{ $req->created_by }}</div>
+                    </div>
                     <div class="col-md-4">
                         <small class="text-muted">Quy trình ký duyệt</small>
                         @php $signs = $requestSigns->get($req->id, collect()); @endphp
@@ -34,17 +38,20 @@
                                         @elseif ($s->status === 'rejected')
                                             <span class="text-danger">Từ chối: {{ $s->reject_reason }}</span>
                                         @else
-                                            <span class="text-muted">{{ $reqSignStatuses[$s->status] ?? $s->status }}</span>
+                                            <span
+                                                class="text-muted">{{ $reqSignStatuses[$s->status] ?? $s->status }}</span>
                                         @endif
                                     </div>
                                 @endforeach
                             </div>
                         @endif
                     </div>
-                    <div class="col-md-4"><small class="text-muted">Ghi chú</small><div>{{ $req->note ?: '—' }}</div></div>
+                    <div class="col-md-4"><small class="text-muted">Ghi chú</small>
+                        <div>{{ $req->note ?: '—' }}</div>
+                    </div>
                 </div>
 
-                @if (! $canIssue)
+                @if (!$canIssue)
                     <div class="md-hint mb-3">
                         <i class="fas fa-info-circle mr-1"></i>
                         Đề nghị chưa được phê duyệt xong nên kho chưa cấp phát được.
@@ -92,18 +99,26 @@
                                     $isPartial = $it->status === 'partial' || ($it->status === 'issued' && $isOwing);
                                     $isDone = in_array($it->status, ['issued', 'used', 'returned']);
                                     $hasLots = $isDone || $it->status === 'partial';
-                                    $canTopUp = $canIssue && $isOwing && in_array($it->status, ['pending', 'partial', 'issued']);
+                                    $canTopUp =
+                                        $canIssue &&
+                                        $isOwing &&
+                                        in_array($it->status, ['pending', 'partial', 'issued']);
                                 @endphp
                                 <tr>
                                     <td>
                                         <div class="font-weight-bold">{{ $it->display_name ?: '—' }}</div>
                                         @if ($it->category_code)
-                                            <div class="md-sub"><span class="md-tag">{{ $it->category_code }}</span></div>
+                                            <div class="md-sub"><span class="md-tag">{{ $it->category_code }}</span>
+                                            </div>
                                         @endif
-                                        @unless ($it->category_id) <span class="badge badge-secondary">Ngoài danh mục</span> @endunless
+                                        @unless ($it->category_id)
+                                            <span class="badge badge-secondary">Ngoài danh mục</span>
+                                        @endunless
                                     </td>
                                     <td class="md-sub">{{ $it->technical_specification ?: '—' }}</td>
-                                    <td class="text-right">{{ rtrim(rtrim(number_format((float) $it->requested_amount, 4, '.', ''), '0'), '.') }} {{ $it->requested_unit }}</td>
+                                    <td class="text-right">
+                                        {{ rtrim(rtrim(number_format((float) $it->requested_amount, 4, '.', ''), '0'), '.') }}
+                                        {{ $it->requested_unit }}</td>
                                     <td class="md-sub">{{ $it->product_name ?: '—' }}</td>
                                     <td class="md-sub">{{ $it->purpose ?: '—' }}</td>
                                     <td>
@@ -117,19 +132,24 @@
                                                 };
                                                 $itemStatusLabel = $isPartial
                                                     ? $reqItemStatuses['partial']
-                                                    : ($reqItemStatuses[$it->status] ?? $it->status);
+                                                    : $reqItemStatuses[$it->status] ?? $it->status;
                                             @endphp
                                             <span class="badge {{ $itemBadge }}">{{ $itemStatusLabel }}</span>
                                             @if ($isPartial)
                                                 <div class="md-sub small">
-                                                    Đã cấp <b>{{ $issuedNum }}</b>/{{ $expNum($requestedAmount) }} {{ $unitLabel }}
+                                                    Đã cấp <b>{{ $issuedNum }}</b>/{{ $expNum($requestedAmount) }}
+                                                    {{ $unitLabel }}
                                                     · còn thiếu <b class="text-danger">{{ $expNum($shortAmount) }}</b>
                                                 </div>
                                             @endif
-                                            <div class="md-sub small">{{ $it->issued_by }} · {{ $it->issued_at ? \Carbon\Carbon::parse($it->issued_at)->format('d/m/Y H:i') : '' }}</div>
+                                            <div class="md-sub small">{{ $it->issued_by }} ·
+                                                {{ $it->issued_at ? \Carbon\Carbon::parse($it->issued_at)->format('d/m/Y H:i') : '' }}
+                                            </div>
                                         @elseif ($it->status === 'rejected')
                                             <span class="badge badge-danger">Từ chối</span>
-                                            @if ($it->note) <div class="md-sub small text-danger">{{ $it->note }}</div> @endif
+                                            @if ($it->note)
+                                                <div class="md-sub small text-danger">{{ $it->note }}</div>
+                                            @endif
                                         @else
                                             <span class="badge badge-light border">Chờ cấp phát</span>
                                         @endif
@@ -139,50 +159,63 @@
                                             {{-- Một mục có thể đã cấp từ nhiều mã xuất nhập: liệt kê đủ từng lô --}}
                                             @forelse ($lots as $lot)
                                                 <div class="mb-1">
-                                                    Mã xuất nhập: <b>{{ $lot->code }}</b> — {{ $expNum($lot->amount) }} {{ $it->issued_unit }}
+                                                    Mã xuất nhập: <b>{{ $lot->code }}</b> —
+                                                    {{ $expNum($lot->amount) }} {{ $it->issued_unit }}
                                                     @if ($lot->status_id)
-                                                        <span class="badge badge-warning ml-1" title="Cấp phát trừ tồn ngay">đã trừ kho</span>
+                                                        <span class="badge badge-warning ml-1"
+                                                            title="Cấp phát trừ tồn ngay">đã trừ kho</span>
                                                     @else
                                                         <span class="badge badge-secondary ml-1">đã trả về kho</span>
                                                     @endif
                                                     @if ($lot->expired_date)
-                                                        <span class="md-sub small">· hạn {{ \Carbon\Carbon::parse($lot->expired_date)->format('d/m/Y') }}</span>
+                                                        <span class="md-sub small">· hạn
+                                                            {{ \Carbon\Carbon::parse($lot->expired_date)->format('d/m/Y') }}</span>
                                                     @elseif ($lot->imported_date)
-                                                        <span class="md-sub small">· nhập {{ \Carbon\Carbon::parse($lot->imported_date)->format('d/m/Y') }}</span>
+                                                        <span class="md-sub small">· nhập
+                                                            {{ \Carbon\Carbon::parse($lot->imported_date)->format('d/m/Y') }}</span>
                                                     @endif
                                                 </div>
                                             @empty
-                                                <div>Mã xuất nhập: <b>{{ $it->issued_import_code ?: ($it->import_code ?: '—') }}</b> — {{ $issuedNum }} {{ $it->issued_unit }}
-                                                    <span class="badge badge-warning ml-1" title="Cấp phát trừ tồn ngay">đã trừ kho</span>
+                                                <div>Mã xuất nhập:
+                                                    <b>{{ $it->issued_import_code ?: ($it->import_code ?: '—') }}</b> —
+                                                    {{ $issuedNum }} {{ $it->issued_unit }}
+                                                    <span class="badge badge-warning ml-1"
+                                                        title="Cấp phát trừ tồn ngay">đã trừ kho</span>
                                                 </div>
                                             @endforelse
 
                                             @if ($lots->count() > 1)
                                                 <div class="md-sub small" style="color: var(--primary-dark);">
                                                     <i class="fas fa-layer-group mr-1"></i>
-                                                    Tổng đã cấp <b>{{ $issuedNum }} {{ $unitLabel }}</b> từ {{ $lots->count() }} mã xuất nhập.
+                                                    Tổng đã cấp <b>{{ $issuedNum }} {{ $unitLabel }}</b> từ
+                                                    {{ $lots->count() }} mã xuất nhập.
                                                 </div>
                                             @endif
 
                                             @if ($isPartial)
                                                 <div class="md-sub small text-danger">
                                                     <i class="fas fa-exclamation-triangle mr-1"></i>
-                                                    Mới cấp <b>{{ $issuedNum }}/{{ $expNum($requestedAmount) }} {{ $unitLabel }}</b>,
-                                                    còn thiếu <b>{{ $expNum($shortAmount) }}</b> — có hàng về thì cấp thêm ở dưới.
+                                                    Mới cấp <b>{{ $issuedNum }}/{{ $expNum($requestedAmount) }}
+                                                        {{ $unitLabel }}</b>,
+                                                    còn thiếu <b>{{ $expNum($shortAmount) }}</b> — có hàng về thì cấp
+                                                    thêm ở dưới.
                                                 </div>
                                             @endif
 
                                             @if ($it->status === 'returned')
-                                                <span class="badge badge-secondary mt-1"><i class="fas fa-rotate-left mr-1"></i>Đã trả về kho</span>
+                                                <span class="badge badge-secondary mt-1"><i
+                                                        class="fas fa-rotate-left mr-1"></i>Đã trả về kho</span>
                                             @endif
                                         @endif
 
                                         @if ($canTopUp && user_can('export_material_issue'))
                                             @if ($hasLots)
                                                 <hr class="my-2">
-                                                <div class="font-weight-bold small mb-1" style="color: var(--primary-dark);">
+                                                <div class="font-weight-bold small mb-1"
+                                                    style="color: var(--primary-dark);">
                                                     <i class="fas fa-plus-circle mr-1"></i>Cấp phát thêm
-                                                    <span class="md-sub">(còn thiếu {{ $expNum($shortAmount) }} {{ $unitLabel }})</span>
+                                                    <span class="md-sub">(còn thiếu {{ $expNum($shortAmount) }}
+                                                        {{ $unitLabel }})</span>
                                                 </div>
                                             @endif
                                             @php
@@ -192,16 +225,18 @@
                                                 | không hạn dùng theo ngày nhập). Lô đầu không đủ thì kế hoạch tự có thêm
                                                 | dòng của lô kế tiếp - JS dựng các dòng cấp phát từ đúng mảng này.
                                                 */
-                                                $plan = ($issuePlans ?? collect())->get($it->id, ['lines' => [], 'shortage' => $shortAmount]);
+                                                $plan = ($issuePlans ?? collect())->get($it->id, [
+                                                    'lines' => [],
+                                                    'shortage' => $shortAmount,
+                                                ]);
                                                 $planLines = $plan['lines'] ?? [];
                                                 $shortage = (float) ($plan['shortage'] ?? 0);
                                             @endphp
-                                            <form action="{{ route($expRoute . 'issueStore') }}" method="POST" class="me-issue-form"
-                                                data-item-id="{{ $it->id }}"
+                                            <form action="{{ route($expRoute . 'issueStore') }}" method="POST"
+                                                class="me-issue-form" data-item-id="{{ $it->id }}"
                                                 data-category-id="{{ $it->category_id }}"
                                                 data-material="{{ $it->display_name }}"
-                                                data-needed="{{ $shortAmount }}"
-                                                data-unit="{{ $unitLabel }}"
+                                                data-needed="{{ $shortAmount }}" data-unit="{{ $unitLabel }}"
                                                 data-need-label="{{ $isPartial ? 'Cần cấp thêm' : 'Đề nghị' }}"
                                                 data-plan="{{ json_encode($planLines) }}">
                                                 @csrf
@@ -210,10 +245,12 @@
                                                 <div class="me-issue-lines"></div>
 
                                                 <div class="me-issue-foot">
-                                                    <button type="button" class="btn btn-xs btn-outline-primary me-issue-add">
+                                                    <button type="button"
+                                                        class="btn btn-xs btn-outline-primary me-issue-add">
                                                         <i class="fas fa-plus mr-1"></i>Thêm mã xuất nhập
                                                     </button>
-                                                    <input type="text" name="issued_unit" class="form-control form-control-sm me-issue-unit"
+                                                    <input type="text" name="issued_unit"
+                                                        class="form-control form-control-sm me-issue-unit"
                                                         value="{{ $unitLabel }}" title="Đơn vị tính">
                                                     <button type="submit" class="btn btn-sm btn-success">
                                                         <i class="fas fa-check mr-1"></i>Cấp phát
@@ -222,12 +259,12 @@
                                                 </div>
                                             </form>
 
-                                            @if (! $it->category_id)
+                                            @if (!$it->category_id)
                                                 <div class="md-sub small text-danger mt-1">
                                                     <i class="fas fa-exclamation-circle mr-1"></i>
                                                     Vật tư ngoài danh mục nên kho không có mã xuất nhập nào để chọn.
                                                 </div>
-                                            @elseif (! count($planLines))
+                                            @elseif (!count($planLines))
                                                 <div class="md-sub small text-danger mt-1">
                                                     <i class="fas fa-exclamation-circle mr-1"></i>
                                                     Không còn lô nào của vật tư này còn hạn và còn hứa được.
@@ -235,17 +272,19 @@
                                             @elseif ($shortage > 0.00005)
                                                 <div class="md-sub small text-danger mt-1">
                                                     <i class="fas fa-exclamation-triangle mr-1"></i>
-                                                    Gom cả {{ count($planLines) }} mã xuất nhập còn hứa được vẫn thiếu
-                                                    <b>{{ $expNum($shortage) }} {{ $unitLabel }}</b> so với phần cần cấp — cấp một phần rồi chờ hàng về,
+                                                    Gom cả {{ count($planLines) }} mã xuất nhập còn cấp được vẫn thiếu
+                                                    <b>{{ $expNum($shortage) }} {{ $unitLabel }}</b> so với phần
+                                                    cần cấp — cấp một phần rồi chờ hàng về,
                                                     mục này giữ trạng thái <b>Cấp phát một phần</b> để cấp tiếp.
                                                 </div>
                                             @elseif (count($planLines) > 1)
                                                 <div class="md-sub small mt-1" style="color: var(--primary-dark);">
                                                     <i class="fas fa-star mr-1"></i>
-                                                    Lô đề xuất không đủ nên hệ thống chia sang {{ count($planLines) }} mã xuất nhập theo thứ tự nên xuất.
+                                                    Lô đề xuất không đủ nên hệ thống chia sang {{ count($planLines) }}
+                                                    mã xuất nhập theo thứ tự nên xuất.
                                                 </div>
                                             @endif
-                                        @elseif (! $hasLots)
+                                        @elseif (!$hasLots)
                                             <span class="text-muted">—</span>
                                         @endif
                                     </td>

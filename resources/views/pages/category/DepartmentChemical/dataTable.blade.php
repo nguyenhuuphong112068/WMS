@@ -115,6 +115,10 @@
                                 @if ($row->unit_short_name || $row->unit_name)
                                     <span class="md-tag"
                                         title="{{ $row->unit_name }}">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                    @if ($row->pack_weight_kg !== null)
+                                        <div class="md-sub">1 {{ $row->unit_short_name ?: $row->unit_name }} =
+                                            {{ rtrim(rtrim(number_format((float) $row->pack_weight_kg, 8, '.', ''), '0'), '.') }} kg</div>
+                                    @endif
                                 @else
                                     <span class="md-empty" title="Phòng chưa khai đơn vị tính">—</span>
                                 @endif
@@ -207,6 +211,7 @@
                                                 'id' => $row->id,
                                                 'category_id' => $row->category_id,
                                                 'unit_id' => $row->unit_id,
+                                                'pack_weight_kg' => $row->pack_weight_kg,
                                                 'shelf_life_months' => $row->shelf_life_months,
                                                 'min_stock' => $row->min_stock,
                                                 'storage_condition_id' => $row->storage_condition_id,

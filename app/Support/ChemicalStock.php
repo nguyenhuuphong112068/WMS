@@ -217,7 +217,7 @@ class ChemicalStock
             ->join('units as u', 'dc.unit_id', '=', 'u.id')
             ->whereIn('dc.category_id', $categoryIds)
             ->where('dc.status_id', 1)
-            ->select('dc.department_id', 'dc.category_id', 'u.unit_group', 'u.factor_to_base', 'u.short_name')
+            ->select('dc.department_id', 'dc.category_id', 'dc.pack_weight_kg', 'u.unit_group', 'u.factor_to_base', 'u.short_name')
             ->get()
             ->keyBy(fn ($r) => $r->department_id . '-' . $r->category_id)
             ->all();

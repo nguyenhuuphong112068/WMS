@@ -305,7 +305,7 @@ class DepartmentChemical
         $usedIds = array_values(array_filter($usedIds));
 
         return DB::table('units')
-            ->select('id', 'name', 'short_name')
+            ->select('id', 'name', 'short_name', 'unit_group')
             ->where(function ($query) use ($usedIds) {
                 $query->where(function ($sub) {
                     $sub->where('status_id', 1)->where('app_status', 'approved');

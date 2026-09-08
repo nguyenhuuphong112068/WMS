@@ -53,6 +53,7 @@
                             <option value="">-- Chọn đơn vị tính --</option>
                             @foreach ($units as $unit)
                                 <option value="{{ $unit->id }}" data-short="{{ $unit->short_name }}"
+                                    data-group="{{ $unit->unit_group }}"
                                     {{ $old('unit_id') == $unit->id ? 'selected' : '' }}>
                                     {{ $unit->short_name }} - {{ $unit->name }}
                                 </option>
@@ -63,6 +64,28 @@
                         @endif
                         <small class="md-sub">Đơn vị phòng dùng để nhập / xuất và ghi tồn cho hoá chất này.
                             Phòng khác có thể khai đơn vị khác.</small>
+                    </div>
+
+                    {{-- Chỉ hiện khi đơn vị của phòng thuộc nhóm đếm / bao bì: cần con số này để
+                         quy tồn ra kg lúc đối chiếu Ngưỡng Tồn Trữ PL IV. --}}
+                    <div class="form-group dc-packweight" style="display: none">
+                        <label>Khối Lượng Quy Đổi</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">1 <b class="dc-unit-hint mx-1">đơn vị</b> =</span>
+                            </div>
+                            <input type="text" inputmode="decimal" name="pack_weight_kg" min="0"
+                                class="form-control js-decimal {{ $bag->has('pack_weight_kg') ? 'is-invalid' : '' }}"
+                                value="{{ $old('pack_weight_kg') }}" placeholder="Ví dụ: 25">
+                            <div class="input-group-append">
+                                <span class="input-group-text">kg</span>
+                            </div>
+                        </div>
+                        @if ($bag->has('pack_weight_kg'))
+                            <span class="md-error">{{ $bag->first('pack_weight_kg') }}</span>
+                        @endif
+                        <small class="md-sub">Khối lượng hoá chất (kg) chứa trong 1 đơn vị đếm. Để trống nếu chưa
+                            cần đối chiếu Ngưỡng Tồn Trữ PL IV.</small>
                     </div>
 
                     @include('pages.category.shared.unitConversion', [

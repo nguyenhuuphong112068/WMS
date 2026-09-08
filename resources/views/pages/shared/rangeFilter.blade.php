@@ -32,8 +32,9 @@
 
     // Giữ nguyên tham số của các bảng khác trên cùng trang: form GET chỉ gửi ô của
     // chính nó, không kèm lại thì lọc bảng này sẽ xoá mất lọc của bảng kia.
+    $rfBuiltIn = [$rfPrefix . 'from', $rfPrefix . 'to', $rfPrefix . 'q', $rfPrefix . 'per', $rfPrefix . 'page'];
     $rfKeep = collect(request()->query())
-        ->reject(fn($value, $key) => is_array($value) || $key === 'tab' || str_starts_with($key, $rfPrefix))
+        ->reject(fn($value, $key) => is_array($value) || $key === 'tab' || in_array($key, $rfBuiltIn, true) || (str_starts_with($key, $rfPrefix) && $key !== $rfPrefix . 'unissued'))
         ->all();
 @endphp
 
