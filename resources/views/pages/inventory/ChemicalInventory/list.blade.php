@@ -16,6 +16,23 @@
     $invDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
 
     /*
+    | Class cho badge .inv-mv (bấm mở modal "Chi tiết con số"): 0 -> mờ, cột trừ tồn
+    | (Sử Dụng / Huỷ) ép đỏ, còn lại tô theo dấu.
+    */
+    $mvCls = function ($value, $tone = null) {
+        if ((float) $value == 0.0) {
+            return 'inv-mv is-muted';
+        }
+        if ($tone === 'out') {
+            return 'inv-mv is-out';
+        }
+        if ($tone === 'in') {
+            return 'inv-mv is-in';
+        }
+        return 'inv-mv ' . ($value > 0 ? 'is-in' : 'is-out');
+    };
+
+    /*
     |--------------------------------------------------------------------------
     | KỲ BÁO CÁO
     |--------------------------------------------------------------------------
@@ -122,5 +139,9 @@
     @include('pages.inventory.ChemicalInventory.balancingHistory')
     @include('pages.inventory.ChemicalInventory.internalExpiry')
     @include('pages.inventory.ChemicalInventory.chart')
+    @include('pages.inventory.shared.movementDetail', [
+        'movementUrl' => route('pages.inventory.chemicalInventory.movements'),
+        'period' => $period,
+    ])
     @include('pages.shared.attachmentListModal')
 @endsection

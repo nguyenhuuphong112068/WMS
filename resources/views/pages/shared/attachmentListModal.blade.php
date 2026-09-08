@@ -27,6 +27,16 @@
                     </div>
                 </div>
 
+                <div class="att-upload-section mb-3" style="display: none;">
+                    <form class="att-upload-form d-flex align-items-center">
+                        <input type="file" name="attachments[]" class="form-control-file mr-2" multiple required>
+                        <button type="submit" class="btn btn-sm btn-primary text-nowrap">
+                            <i class="fas fa-upload mr-1"></i> Tải lên
+                        </button>
+                    </form>
+                </div>
+
+
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover att-modal-table w-100">
                         <thead>

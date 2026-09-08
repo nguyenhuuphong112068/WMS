@@ -11,7 +11,6 @@ use App\Support\CategoryUnitConversion;
 use App\Support\CompanyContext;
 use App\Support\DepartmentChemical;
 use App\Support\MixtureHazardThreshold;
-use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -116,8 +115,6 @@ class ChemicalCategoryController extends Controller
             'datas' => $datas,
             'chemNames' => $this->chemNameOptions($datas->pluck('chem_names_id')->all()),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
-            // Danh mục không còn cột đơn vị; danh sách này chỉ để đổ vào modal Quy Đổi Đơn Vị
-            'units' => $this->options('units', []),
             'storageConditions' => $this->options('storage_conditions', $datas->pluck('storage_condition_id')->all()),
             // Nhóm NĐ 24/2026 suy tự động theo từng mã danh mục (không còn tick tay)
             'classificationCodes' => $categoryGroups,
@@ -266,12 +263,7 @@ class ChemicalCategoryController extends Controller
 
     public function approve(Request $request)
     {
-        return $this->setApproval($request, 'approved');
-    }
-
-    public function reject(Request $request)
-    {
-        return $this->setApproval($request, 'rejected');
+        return $this->setApproval($request);
     }
 
     /** Trả về lịch sử thay đổi của một dòng danh mục cho modal xem lịch sử. */
@@ -461,63 +453,8 @@ class ChemicalCategoryController extends Controller
         ];
     }
 
-    /**
-     * Quy đổi số lượng giữa hai đơn vị cho một hoá chất trong danh mục.
-     *
-     * Dùng chung App\Support\UnitConverter với các màn nhập/xuất sau này để chỉ có
-     * một chỗ duy nhất định nghĩa cách quy đổi.
-     */
-    public function convert(Request $request)
-    {
-        $row = DB::table(self::TABLE)->where('id', $request->id)->first();
-
-        if (! $row) {
-            return response()->json(['ok' => false, 'reason' => 'Không tìm thấy danh mục hoá chất.']);
-        }
-
-        $from = DB::table('units')->where('id', $request->from)->first();
-        $to = DB::table('units')->where('id', $request->to)->first();
-
-        if (! $from || ! $to) {
-            return response()->json(['ok' => false, 'reason' => 'Đơn vị tính không hợp lệ.']);
-        }
-
-        $quantity = (float) $request->quantity;
-
-        if ($quantity <= 0) {
-            return response()->json(['ok' => false, 'reason' => 'Số lượng phải lớn hơn 0.']);
-        }
-
-        $density = $row->density !== null ? (float) $row->density : null;
-        $check = UnitConverter::check($from, $to, $density);
-
-        if (! $check['ok']) {
-            return response()->json(['ok' => false, 'reason' => $check['reason']]);
-        }
-
-        $result = UnitConverter::convert($quantity, $from, $to, $density);
-
-        if ($result === null) {
-            return response()->json(['ok' => false, 'reason' => 'Không quy đổi được giữa hai đơn vị này.']);
-        }
-
-        return response()->json([
-            'ok' => true,
-            'result' => round($result, 6),
-            'text' => $this->trimNumber($quantity) . ' ' . $from->short_name
-                . ' = ' . $this->trimNumber(round($result, 6)) . ' ' . $to->short_name,
-            'note' => $check['reason'],
-        ]);
-    }
-
-    /** Bỏ số 0 thừa khi hiển thị số lượng. */
-    private function trimNumber(float $value): string
-    {
-        return rtrim(rtrim(number_format($value, 6, '.', ''), '0'), '.');
-    }
-
     /** Ghi nhận kết quả duyệt: ai duyệt, duyệt lúc nào. */
-    private function setApproval(Request $request, string $appStatus)
+    private function setApproval(Request $request)
     {
         $current = DB::table(self::TABLE)->where('id', $request->id)->first();
 
@@ -525,27 +462,25 @@ class ChemicalCategoryController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần duyệt!');
         }
 
-        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt')) {
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Phê duyệt')) {
             return $stop;
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
-            'app_status' => $appStatus,
+            'app_status' => 'approved',
             'approved_by' => $this->actor(),
             'approved_at' => now(),
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
 
-        $action = $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt';
+        $this->writeHistory($current->id, 'Phê duyệt', 'Trạng thái duyệt: ' . $current->app_status . ' -> approved');
 
-        $this->writeHistory($current->id, $action, 'Trạng thái duyệt: ' . $current->app_status . ' -> ' . $appStatus);
-
-        AuditTrialController::log($action, self::TABLE, $current->id, 'app_status: ' . $current->app_status, 'app_status: ' . $appStatus);
+        AuditTrialController::log('Phê duyệt', self::TABLE, $current->id, 'app_status: ' . $current->app_status, 'app_status: approved');
 
         return redirect()->back()->with(
             'success',
-            ($appStatus === 'approved' ? 'Đã duyệt ' : 'Đã từ chối ') . self::LABEL . ' ' . $current->code . '!'
+            'Đã duyệt ' . self::LABEL . ' ' . $current->code . '!'
         );
     }
 

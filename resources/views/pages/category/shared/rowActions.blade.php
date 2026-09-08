@@ -1,5 +1,5 @@
 {{--
-| Cụm nút thao tác của nhóm Danh Mục: Sửa - Lịch sử - Duyệt - Từ chối - Khoá/Mở khoá.
+| Cụm nút thao tác của nhóm Danh Mục: Sửa - Lịch sử - Duyệt - Khoá/Mở khoá.
 | Giống nhóm Dữ Liệu Gốc nhưng có thêm badge xem lịch sử thay đổi.
 |
 | Biến vào:
@@ -29,14 +29,6 @@
         @endif
     </span>
 
-    {{-- Chỉ màn hoá chất truyền $showConvert, vì quy đổi cần tỉ trọng --}}
-    @isset($showConvert)
-        <button type="button" class="btn btn-sm btn-outline-info btn-cat-convert" title="Quy đổi đơn vị"
-            data-id="{{ $row->id }}" data-title="{{ $title }}">
-            <i class="fas fa-balance-scale"></i>
-        </button>
-    @endisset
-
     @if (($row->app_status ?? 'pending') !== 'approved' && user_can($permPrefix . 'approve'))
         <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($prefix . 'approve') }}" method="POST"
             data-title="Duyệt {{ $label }}?"
@@ -45,19 +37,6 @@
             <input type="hidden" name="id" value="{{ $row->id }}">
             <button type="submit" class="btn btn-sm btn-success" title="Duyệt">
                 <i class="fas fa-check"></i>
-            </button>
-        </form>
-    @endif
-
-    @if (($row->app_status ?? 'pending') !== 'rejected' && user_can($permPrefix . 'reject'))
-        <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($prefix . 'reject') }}" method="POST"
-            data-title="Từ chối {{ $label }}?"
-            data-text="{{ ucfirst($label) }} &quot;{{ $title }}&quot; sẽ bị đánh dấu từ chối và không được dùng."
-            data-danger="1">
-            @csrf
-            <input type="hidden" name="id" value="{{ $row->id }}">
-            <button type="submit" class="btn btn-sm btn-outline-danger" title="Từ chối">
-                <i class="fas fa-times"></i>
             </button>
         </form>
     @endif

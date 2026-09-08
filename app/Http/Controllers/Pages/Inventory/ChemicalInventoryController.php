@@ -447,6 +447,201 @@ class ChemicalInventoryController extends Controller
     }
 
     /**
+     * CHI TIẾT PHÁT SINH CỦA MỘT CON SỐ TRÊN BẢNG TỒN (trả JSON cho modal).
+     *
+     * Mỗi cột theo kỳ (Tồn Đầu Kỳ / Nhập / Cân Đối / Sử Dụng / Huỷ / Tồn Cuối Kỳ) và
+     * hai cột Tổng Tồn chỉ là con số tổng. Endpoint liệt kê đúng các bản ghi cộng lại
+     * thành con số đó, cắt kỳ y hệt stockByCode():
+     *
+     *      - Nhập  : chemical_imports.imported_date  (date)
+     *      - Cân đối: chemical_balancings.balancing_at (datetime)
+     *      - Sử dụng / Huỷ: chemical_exports.exported_date (date), type export / cancel
+     *
+     *      scope = import  : một mã xuất nhập  (id = chemical_imports.id)
+     *      scope = category: gộp mọi lô cùng hoá chất (id = chemical_categories.id),
+     *                        có batch = <batch_no> để xem "Tổng tồn theo lô".
+     */
+    public function movements(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $period = $this->period($request);
+        $from = $period['from'];
+        $to = $period['to'];
+
+        $scope = $request->query('scope') === 'category' ? 'category' : 'import';
+        $id = (int) $request->query('id');
+        $batchNo = $request->has('batch') ? (string) $request->query('batch') : null;
+
+        $query = DB::table('chemical_imports')
+            ->leftJoin('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id');
+
+        $imports = DepartmentChemical::join($query, $departmentId, 'chemical_imports.category_id')
+            ->leftJoin('units', DepartmentChemical::TABLE.'.unit_id', '=', 'units.id')
+            ->leftJoin('suppliers', 'chemical_imports.supplier_id', '=', 'suppliers.id')
+            ->where('chemical_imports.department_id', $departmentId)
+            ->where('chemical_imports.status_id', 1)
+            ->whereDate('chemical_imports.imported_date', '<=', $to)
+            ->when($scope === 'category',
+                fn ($q) => $q->where('chemical_imports.category_id', $id),
+                fn ($q) => $q->where('chemical_imports.id', $id))
+            ->orderBy('chemical_imports.code')
+            ->get([
+                'chemical_imports.id',
+                'chemical_imports.code',
+                'chemical_imports.category_id',
+                'chemical_imports.amount',
+                'chemical_imports.imported_date',
+                'chemical_imports.imported_by',
+                'chemical_imports.expired_date',
+                'chemical_imports.batch_no',
+                'chemical_categories.code as category_code',
+                'chem_names.name as chem_name',
+                'suppliers.name as supplier_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+            ]);
+
+        if ($imports->isEmpty()) {
+            return response()->json(['message' => 'Không tìm thấy dữ liệu phát sinh cho mục đã chọn.'], 404);
+        }
+
+        $first = $imports->first();
+        $unit = $first->unit_short_name ?: $first->unit_name;
+        $ids = $imports->pluck('id')->all();
+        $codeById = $imports->pluck('code', 'id');
+
+        // Thông tin kỹ thuật của lô hoá chất: số lô · nhà cung cấp
+        $specOf = fn ($import) => trim(implode(' · ', array_filter([
+            $import->batch_no ? 'Lô '.$import->batch_no : null,
+            $import->supplier_name ?: null,
+        ]))) ?: '';
+
+        $balancings = DB::table('chemical_balancings')
+            ->whereIn('import_id', $ids)
+            ->where('status_id', 1)
+            ->orderBy('balancing_at')
+            ->get(['import_id', 'balancing_amount', 'balancing_at', 'balancing_by']);
+
+        $exports = DB::table('chemical_exports')
+            ->whereIn('import_id', $ids)
+            ->where('status_id', 1)
+            ->whereIn('type', ['export', 'cancel'])
+            ->orderBy('exported_date')
+            ->get(['import_id', 'amount', 'type', 'exported_date', 'purpose', 'test_report_no', 'exported_by']);
+
+        $dayLabel = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '';
+        $timeLabel = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y H:i') : '';
+        $stamp = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('Y-m-d H:i:s') : '';
+
+        $events = [];
+
+        foreach ($imports as $import) {
+            $day = substr((string) $import->imported_date, 0, 10);
+            $spec = $specOf($import);
+            $events[] = [
+                'lot_id' => $import->id, 'metric' => 'in',
+                'datetime' => false, 'at' => $day.' 00:00:00',
+                'signed' => (float) $import->amount,
+                'fields' => [
+                    'kind' => 'Nhập kho',
+                    'at_label' => $dayLabel($import->imported_date),
+                    'code' => $import->code,
+                    'spec' => $spec,
+                    'by' => $import->imported_by ?: '',
+                    'detail' => $spec,
+                ],
+            ];
+        }
+
+        foreach ($balancings as $balancing) {
+            $amount = (float) $balancing->balancing_amount;
+            $events[] = [
+                'lot_id' => $balancing->import_id, 'metric' => 'balanced',
+                'datetime' => true, 'at' => $stamp($balancing->balancing_at),
+                'signed' => $amount,
+                'fields' => [
+                    'kind' => 'Cân đối',
+                    'at_label' => $timeLabel($balancing->balancing_at),
+                    'code' => $codeById[$balancing->import_id] ?? '',
+                    'by' => trim((string) $balancing->balancing_by),
+                    'detail' => 'Điều chỉnh '.($amount > 0 ? '+' : '').$this->number($amount),
+                ],
+            ];
+        }
+
+        foreach ($exports as $export) {
+            $isCancel = $export->type === 'cancel';
+            $day = substr((string) $export->exported_date, 0, 10);
+            $events[] = [
+                'lot_id' => $export->import_id,
+                'metric' => $isCancel ? 'cancelled' : 'used',
+                'datetime' => false, 'at' => $day.' 00:00:00',
+                'signed' => -abs((float) $export->amount),
+                'fields' => [
+                    'kind' => $isCancel ? 'Huỷ bỏ' : 'Sử dụng',
+                    'at_label' => $dayLabel($export->exported_date),
+                    'code' => $codeById[$export->import_id] ?? '',
+                    'by' => $export->exported_by ?: '',
+                    'purpose' => $export->purpose ?: '',
+                    'reason' => $export->purpose ?: '',
+                    'coa' => $export->test_report_no ?: '',
+                    'detail' => trim(implode(' · ', array_filter([
+                        $export->purpose ?: null,
+                        $export->test_report_no ? 'KN '.$export->test_report_no : null,
+                    ]))),
+                ],
+            ];
+        }
+
+        $lots = [];
+        foreach ($imports as $import) {
+            $lots[$import->id] = [
+                'batch_no' => (string) ($import->batch_no ?? ''),
+                'fields' => [
+                    'code' => $import->code,
+                    'spec' => $specOf($import) ?: 'Chưa có số lô',
+                    'imported_at' => $dayLabel($import->imported_date),
+                    'expired_at' => $dayLabel($import->expired_date),
+                ],
+            ];
+        }
+
+        $want = ['opening', 'period_in', 'period_balanced', 'period_used', 'period_cancelled', 'closing'];
+        if ($scope === 'category') {
+            $want[] = 'stock_category';
+        }
+        if ($batchNo !== null) {
+            $want[] = 'stock_batch';
+        }
+
+        $metrics = \App\Support\InventoryMovements::metrics($events, $from, $to, [
+            'unit' => $unit,
+            'want' => $want,
+            'lots' => $lots,
+            'batch_no' => $batchNo,
+            'columns' => \App\Support\InventoryMovements::columns('chemical'),
+            // Cột "Nhập Trong Kỳ" của màn hoá chất chỉ là số nhập, cân đối có cột riêng
+            'period_in_groups' => ['in'],
+        ]);
+
+        return response()->json([
+            'meta' => [
+                'scope' => $scope,
+                'name' => $first->chem_name ?: '—',
+                'code' => $scope === 'category' ? null : $first->code,
+                'category_code' => $first->category_code,
+                'unit' => $unit,
+                'lots' => count($ids),
+                'period' => $period + [
+                    'label' => \Carbon\Carbon::parse($from)->format('d/m/Y').' - '.\Carbon\Carbon::parse($to)->format('d/m/Y'),
+                ],
+            ],
+            'metrics' => $metrics,
+        ]);
+    }
+
+    /**
      * Tồn theo từng mã xuất nhập của phòng ban đang chọn.
      *
      * Lấy phiếu nhập và số lượng đã xuất bằng hai câu truy vấn rồi ghép trong PHP:
@@ -1052,5 +1247,76 @@ class ChemicalInventoryController extends Controller
     private function number(float $value): string
     {
         return rtrim(rtrim(number_format($value, 4, '.', ','), '0'), '.');
+    }
+
+    public function uploadAttachment(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer',
+            'attachments' => 'required|array',
+            'attachments.*' => 'file|max:20480',
+        ]);
+
+        $departmentId = $this->departmentId();
+        $import = \Illuminate\Support\Facades\DB::table('chemical_imports')
+            ->where('id', $request->id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $import) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy phiếu nhập.']);
+        }
+
+        $newFiles = [];
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file->isValid()) {
+                    $originalName = $file->getClientOriginalName();
+                    $fileSize = $file->getSize();
+                    $fileType = $file->getClientMimeType() ?: $file->getClientOriginalExtension();
+                    $path = $file->store('public/chemical_imports');
+                    \App\Support\AttachmentBackup::copy($path, 'chemical_imports');
+
+                    $attachmentId = \Illuminate\Support\Facades\DB::table('chemical_import_attachments')->insertGetId([
+                        'chemical_import_id' => $import->id,
+                        'file_name' => $originalName,
+                        'file_path' => $path,
+                        'file_size' => $fileSize,
+                        'file_type' => $fileType,
+                        'created_by' => $this->actor(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $newFiles[] = [
+                        'id' => $attachmentId,
+                        'file_name' => $originalName,
+                        'created_by' => $this->actor(),
+                        'created_at' => now()->format('d/m/Y H:i'),
+                        'is_active' => 1,
+                        'url' => route('pages.inventory.chemicalInventory.downloadAttachment', ['id' => $attachmentId]),
+                    ];
+                }
+            }
+        }
+
+        if (empty($newFiles)) {
+            return response()->json(['success' => false, 'message' => 'Không có file nào được tải lên.']);
+        }
+
+        if (method_exists($this, 'writeHistory')) {
+            $this->writeHistory((int) $import->id, 'Điều chỉnh', 'Đã đính kèm thêm ' . count($newFiles) . ' file.');
+        }
+
+        \App\Http\Controllers\Pages\AuditTrail\AuditTrialController::log(
+            'Điều chỉnh',
+            'chemical_imports',
+            $import->id,
+            $import->code,
+            'Đính kèm thêm ' . count($newFiles) . ' file'
+        );
+
+        return response()->json(['success' => true, 'files' => $newFiles]);
     }
 }

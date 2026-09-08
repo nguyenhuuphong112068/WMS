@@ -173,15 +173,69 @@
             var $btn = $(this);
             var files = $btn.data('files') || [];
             var type = $btn.data('type-label') || '';
+            var uploadUrl = $btn.data('upload-url') || '';
 
             $attModal.data('toggle-url', $btn.data('toggle-url') || '');
+            $attModal.data('source-btn', $btn);
             $attModal.find('.att-modal-type').text(type ? '· ' + type : '');
             $attModal.find('.att-modal-code').text($btn.data('code') || '—');
             $attModal.find('.att-modal-name').text($btn.data('name') || '—');
+            
+            var $uploadSection = $attModal.find('.att-upload-section');
+            if (uploadUrl) {
+                $uploadSection.show();
+                $attModal.find('.att-upload-form').data('url', uploadUrl)[0].reset();
+            } else {
+                $uploadSection.hide();
+            }
 
             attRenderRows(files, $btn.data('toggle-url') || '');
             $attModal.modal('show');
         });
+
+        $(document).on('submit', '.att-upload-form', function(e) {
+            e.preventDefault();
+            var $form = $(this);
+            var uploadUrl = $form.data('url');
+            var $btnSubmit = $form.find('button[type="submit"]');
+
+            if (!uploadUrl || $btnSubmit.prop('disabled')) return;
+
+            var formData = new FormData(this);
+            formData.append('_token', ATT_CSRF);
+
+            $btnSubmit.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Đang tải...');
+
+            $.ajax({
+                url: uploadUrl,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(res) {
+                    if (res && res.success) {
+                        var $sourceBtn = $attModal.data('source-btn');
+                        if ($sourceBtn) {
+                            var currentFiles = $sourceBtn.data('files') || [];
+                            var newFiles = currentFiles.concat(res.files);
+                            $sourceBtn.data('files', newFiles);
+                            $sourceBtn.html('<i class="fas fa-paperclip"></i> (' + newFiles.length + ')');
+                            attRenderRows(newFiles, $attModal.data('toggle-url'));
+                        }
+                        $form[0].reset();
+                    } else {
+                        alert((res && res.message) || 'Không tải lên được, vui lòng thử lại.');
+                    }
+                },
+                error: function(xhr) {
+                    alert((xhr.responseJSON && xhr.responseJSON.message) || 'Lỗi kết nối hoặc file quá lớn.');
+                },
+                complete: function() {
+                    $btnSubmit.prop('disabled', false).html('<i class="fas fa-upload mr-1"></i> Tải lên');
+                }
+            });
+        });
+
 
         $(document).on('click', '.att-modal-toggle', function() {
             var $btn = $(this);

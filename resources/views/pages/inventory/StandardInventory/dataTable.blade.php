@@ -235,8 +235,8 @@
                                         </td>
                                         {{-- Tồn đầu kỳ: phát sinh trước ngày bắt đầu kỳ --}}
                                         <td class="text-right" data-order="{{ $row->opening }}">
-                                            <span
-                                                class="inv-amount {{ abs($row->opening) > 0 ? '' : 'inv-muted' }}">{{ $invNum($row->opening) }}</span>
+                                            <button type="button" class="{{ $mvCls($row->opening) }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="opening">{{ $invNum($row->opening) }}</button>
                                             <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
                                             @if ($row->is_new_in_period)
                                                 <div class="md-sub"><span class="inv-period-tag">Mới nhập trong
@@ -245,8 +245,8 @@
                                         </td>
                                         {{-- Nhập trong kỳ: phiếu nhập + số cân đối ghi trong kỳ --}}
                                         <td class="text-right" data-order="{{ $row->period_in }}">
-                                            <span
-                                                class="inv-amount {{ $row->period_in != 0 ? 'is-in' : 'inv-muted' }}">{{ $invNum($row->period_in) }}</span>
+                                            <button type="button" class="{{ $mvCls($row->period_in) }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="period_in">{{ $invNum($row->period_in) }}</button>
                                             <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
                                             @if ($row->period_imported > 0)
                                                 <div class="md-sub">Nhập {{ $invDate($row->imported_date) }}</div>
@@ -259,9 +259,8 @@
                                         </td>
                                         {{-- Sử dụng trong kỳ: standard_exports type = 'export' --}}
                                         <td class="text-right" data-order="{{ $row->period_used }}">
-                                            <span class="inv-amount {{ $row->period_used > 0 ? 'is-out' : 'inv-muted' }}">
-                                                {{ $invNum($row->period_used) }}
-                                            </span>
+                                            <button type="button" class="{{ $mvCls($row->period_used, 'out') }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="period_used">{{ $invNum($row->period_used) }}</button>
                                             <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
                                             @if ($row->period_export_times > 0)
                                                 <div class="md-sub">{{ $row->period_export_times }} lần xuất</div>
@@ -269,17 +268,21 @@
                                         </td>
                                         {{-- Huỷ trong kỳ: standard_exports type = 'cancel' --}}
                                         <td class="text-right" data-order="{{ $row->period_cancelled }}">
-                                            <span
-                                                class="inv-amount {{ $row->period_cancelled > 0 ? 'is-out' : 'inv-muted' }}">{{ $invNum($row->period_cancelled) }}</span>
+                                            <button type="button" class="{{ $mvCls($row->period_cancelled, 'out') }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="period_cancelled">{{ $invNum($row->period_cancelled) }}</button>
                                             <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
                                             @if ($row->period_transferred > 0)
-                                                <div class="md-sub text-info">Chuyển LPB: {{ $invNum($row->period_transferred) }}</div>
+                                                <div class="md-sub">Chuyển LPB:
+                                                    <button type="button" class="{{ $mvCls($row->period_transferred, 'out') }}" data-scope="import"
+                                                        data-id="{{ $row->id }}" data-metric="period_transferred">{{ $invNum($row->period_transferred) }}</button>
+                                                </div>
                                             @endif
                                         </td>
                                         <td class="text-right" data-order="{{ $row->gap }}">
                                             {{-- Tồn âm (đã xuất vượt) hiện đúng số âm để thấy phần phải cân đối --}}
-                                            <span
-                                                class="inv-remaining {{ $row->state === 'over' ? 'is-over' : ($row->remaining > 0 ? '' : 'is-zero') }}">{{ $invNum($row->gap) }}</span>
+                                            <button type="button"
+                                                class="{{ $mvCls($row->gap) }} {{ $row->state === 'over' ? 'is-out' : '' }}"
+                                                data-scope="import" data-id="{{ $row->id }}" data-metric="closing">{{ $invNum($row->gap) }}</button>
                                             <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
                                             <div
                                                 class="inv-bar {{ $row->state === 'out' ? 'is-out' : ($row->state === 'low' ? 'is-low' : '') }}">
@@ -291,8 +294,9 @@
                                         </td>
                                         {{-- Cùng chất chuẩn + cùng số lô --}}
                                         <td class="text-right" data-order="{{ $row->batch_remaining }}">
-                                            <span
-                                                class="inv-group-total {{ $row->batch_remaining > 0 ? '' : 'is-zero' }}">{{ $invNum($row->batch_remaining) }}</span>
+                                            <button type="button" class="{{ $mvCls($row->batch_remaining, 'in') }}" data-scope="category"
+                                                data-id="{{ $row->category_id }}" data-metric="stock_batch"
+                                                data-batch="{{ $row->batch_no }}">{{ $invNum($row->batch_remaining) }}</button>
                                             <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
                                             <div class="md-sub">
                                                 @if ($row->batch_no)
@@ -305,8 +309,8 @@
                                         </td>
                                         {{-- Cùng chất chuẩn, gộp mọi số lô --}}
                                         <td class="text-right" data-order="{{ $row->category_remaining }}">
-                                            <span
-                                                class="inv-group-total {{ $row->category_remaining > 0 ? '' : 'is-zero' }}">{{ $invNum($row->category_remaining) }}</span>
+                                            <button type="button" class="{{ $mvCls($row->category_remaining, 'in') }}" data-scope="category"
+                                                data-id="{{ $row->category_id }}" data-metric="stock_category">{{ $invNum($row->category_remaining) }}</button>
                                             <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
                                             <div class="md-sub">
                                                 {{ $row->category_batches }} lô · {{ $row->category_codes }} ống
@@ -335,6 +339,8 @@
                                             @include('pages.shared.attachmentList', [
                                                 'attachments' => $attachments->get($row->id) ?? collect(),
                                                 'routePrefix' => 'pages.inventory.standardInventory.',
+                                                'uploadPerm' => 'import_standard_attachment_upload',
+                                                'parentId' => $row->id,
                                                 'statusPerm' => 'import_standard_attachment_status',
                                                 'code' => $row->code,
                                                 'name' => $row->standard_name,
@@ -405,25 +411,25 @@
                                             {{ $sum->in_stock_count }}/{{ $sum->code_count }} còn tồn
                                         </td>
                                         <td class="text-right" data-order="{{ $sum->opening }}">
-                                            <span
-                                                class="inv-amount {{ abs($sum->opening) > 0 ? '' : 'inv-muted' }}">{{ $invNum($sum->opening) }}</span>
+                                            <button type="button" class="{{ $mvCls($sum->opening) }}" data-scope="category"
+                                                data-id="{{ $sum->category_id }}" data-metric="opening">{{ $invNum($sum->opening) }}</button>
                                             <div class="md-sub">{{ $sum->unit }}</div>
                                         </td>
                                         <td class="text-right" data-order="{{ $sum->period_in }}">
-                                            <span
-                                                class="inv-amount {{ $sum->period_in != 0 ? 'is-in' : 'inv-muted' }}">{{ $invNum($sum->period_in) }}</span>
+                                            <button type="button" class="{{ $mvCls($sum->period_in) }}" data-scope="category"
+                                                data-id="{{ $sum->category_id }}" data-metric="period_in">{{ $invNum($sum->period_in) }}</button>
                                         </td>
                                         <td class="text-right" data-order="{{ $sum->period_used }}">
-                                            <span
-                                                class="inv-amount {{ $sum->period_used > 0 ? 'is-out' : 'inv-muted' }}">{{ $invNum($sum->period_used) }}</span>
+                                            <button type="button" class="{{ $mvCls($sum->period_used, 'out') }}" data-scope="category"
+                                                data-id="{{ $sum->category_id }}" data-metric="period_used">{{ $invNum($sum->period_used) }}</button>
                                         </td>
                                         <td class="text-right" data-order="{{ $sum->period_cancelled }}">
-                                            <span
-                                                class="inv-amount {{ $sum->period_cancelled > 0 ? 'is-out' : 'inv-muted' }}">{{ $invNum($sum->period_cancelled) }}</span>
+                                            <button type="button" class="{{ $mvCls($sum->period_cancelled, 'out') }}" data-scope="category"
+                                                data-id="{{ $sum->category_id }}" data-metric="period_cancelled">{{ $invNum($sum->period_cancelled) }}</button>
                                         </td>
                                         <td class="text-right" data-order="{{ $sum->closing }}">
-                                            <span
-                                                class="inv-remaining {{ $sum->closing > 0 ? '' : ($sum->closing < 0 ? 'is-over' : 'is-zero') }}">{{ $invNum($sum->closing) }}</span>
+                                            <button type="button" class="{{ $mvCls($sum->closing) }}" data-scope="category"
+                                                data-id="{{ $sum->category_id }}" data-metric="closing">{{ $invNum($sum->closing) }}</button>
                                             <span class="md-sub">{{ $sum->unit }}</span>
                                         </td>
                                         <td class="text-center md-sub"

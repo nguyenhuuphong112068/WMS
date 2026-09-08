@@ -222,7 +222,6 @@
                                     'row' => $row,
                                     'label' => $mdLabel,
                                     'title' => $row->code,
-                                    'showConvert' => true,
                                     'historyCount' => (int) ($historyCounts[$row->id] ?? 0),
                                     'editData' => [
                                         'id' => $row->id,
@@ -252,7 +251,7 @@
      |  của cột Ngưỡng Tồn Trữ PL IV. Dữ liệu lấy qua AJAX từ thresholdDetail().
      ========================================================================= --}}
     <div class="modal fade md-modal" id="thrDetailModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+        <div class="modal-dialog thr-detail-dialog modal-dialog-scrollable" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
@@ -274,6 +273,16 @@
     </div>
 
     <style>
+        .thr-detail-dialog {
+            max-width: 80vw;
+        }
+
+        @media (max-width: 992px) {
+            .thr-detail-dialog {
+                max-width: 95vw;
+            }
+        }
+
         .thr-chip {
             display: block;
             width: 100%;
@@ -410,12 +419,35 @@
             color: #94a3b8;
             padding: 8px 0;
         }
+
+        .thr-peak-chart-wrap {
+            margin-top: 14px;
+        }
+
+        .thr-peak-chart-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 6px;
+        }
+
+        .thr-peak-chart-canvas {
+            position: relative;
+            height: 320px;
+            background: var(--bg-neutral, #F5F9FD);
+            border: 1px solid var(--primary-lighter);
+            border-radius: var(--border-radius-md, 8px);
+            padding: 10px 12px;
+        }
     </style>
 
     <script>
         // Bọc trong DOMContentLoaded: script này nằm giữa body, jQuery nạp ở cuối body
         document.addEventListener('DOMContentLoaded', function() {
             var THR_URL = @json(route('pages.category.chemicalCategory.thresholdDetail'));
+
+            var thrChartSeq = 0; // sinh id canvas duy nhất cho mỗi biểu đồ
+            var thrChartInstances = []; // giữ instance Chart.js để huỷ khi mở lại modal
+            var pendingThrCharts = []; // hàm khởi tạo biểu đồ, chạy sau khi canvas đã vào DOM
 
             // Đưa modal ra thẳng body để không bị kẹt z-index trong tab-pane
             $('#thrDetailModal').appendTo('body');
@@ -485,6 +517,157 @@
                 $s.append($('<div>').addClass('hd').text(title));
                 $s.append($content);
                 return $s;
+            }
+
+            // Chuyển chuỗi có dấu phẩy ngăn cách nghìn / đơn vị ("+5,000 kg") về số
+            function thrToNumber(v) {
+                if (v == null) return 0;
+                var n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+                return isNaN(n) ? 0 : n;
+            }
+
+            // Biểu đồ đường cho "Tồn cao nhất": 3 đường Nhập / Sử dụng / Tồn + đường ngưỡng đỏ.
+            // Nút bật/tắt đường ngưỡng để phóng to phần dữ liệu khi ngưỡng quá cao.
+            function buildPeakChart(row) {
+                if (!row.timeline || !row.timeline.length) return null;
+
+                var labels = [],
+                    impData = [],
+                    useData = [],
+                    stockData = [];
+                row.timeline.forEach(function(t, i) {
+                    labels.push((i + 1) + '. ' + (t.date || ''));
+                    var d = Math.abs(thrToNumber(t.delta_kg));
+                    var isImport = /nhập/i.test(t.type_label || '');
+                    impData.push(isImport ? d : 0);
+                    useData.push(isImport ? 0 : d);
+                    stockData.push(thrToNumber(t.running_kg));
+                });
+
+                var threshold = thrToNumber(row.threshold_kg);
+                var hasThreshold = threshold > 0;
+
+                var id = 'thrPeakChart' + (++thrChartSeq);
+                var $wrap = $('<div>').addClass('thr-peak-chart-wrap');
+                var $btn = null;
+                if (hasThreshold) {
+                    $btn = $('<button>').attr('type', 'button')
+                        .addClass('btn btn-sm btn-outline-primary thr-peak-toggle')
+                        .html('<i class="fas fa-search-minus mr-1"></i>Ẩn đường ngưỡng');
+                    $wrap.append($('<div>').addClass('thr-peak-chart-bar').append($btn));
+                }
+                $wrap.append($('<div>').addClass('thr-peak-chart-canvas')
+                    .append($('<canvas>').attr('id', id)));
+
+                pendingThrCharts.push(function() {
+                    var el = document.getElementById(id);
+                    if (!el || typeof Chart === 'undefined') return;
+
+                    var datasets = [{
+                        label: 'Nhập (kg)',
+                        data: impData,
+                        borderColor: '#16A34A',
+                        backgroundColor: 'rgba(22,163,74,0.08)',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        fill: false,
+                        lineTension: 0.15
+                    }, {
+                        label: 'Sử dụng (kg)',
+                        data: useData,
+                        borderColor: '#F59E0B',
+                        backgroundColor: 'rgba(245,158,11,0.08)',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        fill: false,
+                        lineTension: 0.15
+                    }, {
+                        label: 'Tồn (kg)',
+                        data: stockData,
+                        borderColor: '#2E7BC4',
+                        backgroundColor: 'rgba(46,123,196,0.12)',
+                        borderWidth: 2.5,
+                        pointRadius: 3,
+                        fill: true,
+                        lineTension: 0.15
+                    }];
+                    if (hasThreshold) {
+                        datasets.push({
+                            label: 'Ngưỡng (kg)',
+                            data: labels.map(function() {
+                                return threshold;
+                            }),
+                            borderColor: '#DC2626',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            fill: false
+                        });
+                    }
+
+                    var chart = new Chart(el.getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            legend: {
+                                position: 'bottom'
+                            },
+                            hover: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            tooltips: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    afterTitle: function(items) {
+                                        var t = row.timeline[items[0].index] || {};
+                                        return (t.type_label || '') + ' · ' + (t.ref || '');
+                                    }
+                                }
+                            },
+                            scales: {
+                                xAxes: [{
+                                    ticks: {
+                                        maxRotation: 40,
+                                        autoSkip: true,
+                                        maxTicksLimit: 12
+                                    }
+                                }],
+                                yAxes: [{
+                                    ticks: {
+                                        beginAtZero: true,
+                                        callback: function(v) {
+                                            return Number(v).toLocaleString('vi-VN');
+                                        }
+                                    }
+                                }]
+                            }
+                        }
+                    });
+                    thrChartInstances.push(chart);
+
+                    if ($btn) {
+                        var showThr = true;
+                        $btn.on('click', function() {
+                            showThr = !showThr;
+                            chart.data.datasets[datasets.length - 1].hidden = !showThr;
+                            chart.update();
+                            $btn.html(showThr ?
+                                '<i class="fas fa-search-minus mr-1"></i>Ẩn đường ngưỡng' :
+                                '<i class="fas fa-search-plus mr-1"></i>Hiện đường ngưỡng');
+                            $btn.toggleClass('btn-outline-primary', showThr)
+                                .toggleClass('btn-outline-danger', !showThr);
+                        });
+                    }
+                });
+
+                return $wrap;
             }
 
             function renderCard(row, wantFocus) {
@@ -564,6 +747,8 @@
                         ' lần nhập, còn lại là xuất / cân đối), cộng dồn theo ngày. Dòng tô vàng là lúc tồn chạm mức cao nhất. ' +
                         'Chứng từ bị khoá về sau không còn trong chuỗi; cùng một ngày thì cộng (nhập) trước, trừ (xuất) sau.'
                     ));
+                    var $peakChart = buildPeakChart(row);
+                    if ($peakChart) $peakWrap.append($peakChart);
                 } else {
                     $peakWrap.append($('<div>').addClass('thr-detail-empty').text('Chưa có chứng từ nào để dựng diễn biến.'));
                 }
@@ -574,6 +759,15 @@
             }
 
             function renderThrDetail(data, wantFocus) {
+                // Huỷ biểu đồ của lần mở trước để không rò rỉ instance / sự kiện
+                thrChartInstances.forEach(function(c) {
+                    try {
+                        c.destroy();
+                    } catch (e) {}
+                });
+                thrChartInstances = [];
+                pendingThrCharts = [];
+
                 var $body = $('#thrDetailModal').find('.thr-detail-body').empty();
                 $('#thrDetailModal').find('.thr-detail-subtitle')
                     .text('Mã ' + data.category_code + ' · ' + data.chem_name + ' · cảnh báo vàng từ ' + data.warn_percent + '% ngưỡng');
@@ -593,6 +787,14 @@
                 cards.forEach(function(r) {
                     $body.append(renderCard(r, wantFocus));
                 });
+
+                // Canvas đã vào DOM và modal đang hiển thị -> khởi tạo biểu đồ
+                pendingThrCharts.forEach(function(fn) {
+                    try {
+                        fn();
+                    } catch (e) {}
+                });
+                pendingThrCharts = [];
 
                 // Cuộn tới đúng phần người dùng bấm vào
                 var $focus = $body.find('.thr-detail-section.is-focus').first();

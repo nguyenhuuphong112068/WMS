@@ -19,6 +19,9 @@
     $attStatusPerm = $statusPerm ?? null;
     $attCanToggle = $attStatusPerm && user_can($attStatusPerm);
 
+    $attUploadPerm = $uploadPerm ?? null;
+    $attCanUpload = $attUploadPerm && user_can($attUploadPerm);
+
     $attFiles = $attachments
         ->map(function ($a) use ($routePrefix) {
             $on = ! isset($a->is_active) || $a->is_active;
@@ -37,10 +40,11 @@
         ->values();
 @endphp
 
-@if ($attachments->isNotEmpty())
-    <button type="button" class="btn btn-xs btn-outline-primary att-open-modal" title="Xem danh sách file đính kèm"
+@if ($attachments->isNotEmpty() || $attCanUpload)
+    <button type="button" class="btn btn-xs btn-outline-primary att-open-modal" title="Xem/thêm file đính kèm"
         data-code="{{ $code ?? '' }}" data-name="{{ $name ?? '' }}" data-type-label="{{ $typeLabel ?? '' }}"
         data-toggle-url="{{ $attCanToggle ? route($routePrefix . 'toggleAttachmentStatus') : '' }}"
+        data-upload-url="{{ $attCanUpload && isset($parentId) ? route($routePrefix . 'uploadAttachment', ['id' => $parentId]) : '' }}"
         data-files="{{ json_encode($attFiles) }}">
         <i class="fas fa-paperclip"></i> ({{ $attachments->count() }})
     </button>

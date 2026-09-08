@@ -170,20 +170,39 @@
                                                 <div>{{ $row->warehouse_name }} / {{ $row->shelf_name }} / {{ $row->column_name }} / {{ $row->tier_name }}</div>
                                             @else <span class="text-muted">—</span> @endif
                                         </td>
-                                        <td class="text-right">{{ $invNum($row->opening) }}</td>
-                                        <td class="text-right">{{ $invNum($row->period_in) }}</td>
-                                        <td class="text-right">{{ $invNum($row->period_used) }}</td>
-                                        <td class="text-right">{{ $invNum($row->period_cancelled) }}</td>
-                                        <td class="text-right font-weight-bold {{ $row->gap < 0 ? 'text-danger' : '' }}">
-                                            {{ $invNum($row->gap) }} <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                        <td class="text-right" data-order="{{ $row->opening }}">
+                                            <button type="button" class="{{ $mvCls($row->opening) }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="opening">{{ $invNum($row->opening) }}</button>
                                         </td>
-                                        <td class="text-right">{{ $invNum($row->category_remaining) }}</td>
+                                        <td class="text-right" data-order="{{ $row->period_in }}">
+                                            <button type="button" class="{{ $mvCls($row->period_in) }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="period_in">{{ $invNum($row->period_in) }}</button>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $row->period_used }}">
+                                            <button type="button" class="{{ $mvCls($row->period_used, 'out') }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="period_used">{{ $invNum($row->period_used) }}</button>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $row->period_cancelled }}">
+                                            <button type="button" class="{{ $mvCls($row->period_cancelled, 'out') }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="period_cancelled">{{ $invNum($row->period_cancelled) }}</button>
+                                        </td>
+                                        <td class="text-right font-weight-bold {{ $row->gap < 0 ? 'text-danger' : '' }}" data-order="{{ $row->gap }}">
+                                            <button type="button" class="{{ $mvCls($row->gap) }}" data-scope="import"
+                                                data-id="{{ $row->id }}" data-metric="closing">{{ $invNum($row->gap) }}</button>
+                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $row->category_remaining }}">
+                                            <button type="button" class="{{ $mvCls($row->category_remaining, 'in') }}" data-scope="category"
+                                                data-id="{{ $row->category_id }}" data-metric="stock_category">{{ $invNum($row->category_remaining) }}</button>
+                                        </td>
                                         <td class="text-center md-sub" data-order="{{ $row->expired_date ?: '9999-12-31' }}">{{ $invDate($row->expired_date) }}</td>
                                         <td class="text-center"><span class="mi-badge {{ $row->state }}">{{ $row->state_label }}</span></td>
                                         <td class="text-center">
                                             @include('pages.shared.attachmentList', [
                                                 'attachments' => $attachments->get($row->id) ?? collect(),
                                                 'routePrefix' => 'pages.inventory.materialInventory.',
+                                                'uploadPerm' => 'import_material_attachment_upload',
+                                                'parentId' => $row->id,
                                                 'statusPerm' => 'import_material_attachment_status',
                                                 'code' => $row->code,
                                                 'name' => $row->material_name,
@@ -253,11 +272,27 @@
                                             </div>
                                         </td>
                                         <td class="text-center">{{ $s->in_stock_count }}/{{ $s->code_count }}</td>
-                                        <td class="text-right">{{ $invNum($s->opening) }}</td>
-                                        <td class="text-right">{{ $invNum($s->period_in) }}</td>
-                                        <td class="text-right">{{ $invNum($s->period_used) }}</td>
-                                        <td class="text-right">{{ $invNum($s->period_cancelled) }}</td>
-                                        <td class="text-right font-weight-bold">{{ $invNum($s->closing) }} <span class="md-sub">{{ $s->unit }}</span></td>
+                                        <td class="text-right" data-order="{{ $s->opening }}">
+                                            <button type="button" class="{{ $mvCls($s->opening) }}" data-scope="category"
+                                                data-id="{{ $s->category_id }}" data-metric="opening">{{ $invNum($s->opening) }}</button>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $s->period_in }}">
+                                            <button type="button" class="{{ $mvCls($s->period_in) }}" data-scope="category"
+                                                data-id="{{ $s->category_id }}" data-metric="period_in">{{ $invNum($s->period_in) }}</button>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $s->period_used }}">
+                                            <button type="button" class="{{ $mvCls($s->period_used, 'out') }}" data-scope="category"
+                                                data-id="{{ $s->category_id }}" data-metric="period_used">{{ $invNum($s->period_used) }}</button>
+                                        </td>
+                                        <td class="text-right" data-order="{{ $s->period_cancelled }}">
+                                            <button type="button" class="{{ $mvCls($s->period_cancelled, 'out') }}" data-scope="category"
+                                                data-id="{{ $s->category_id }}" data-metric="period_cancelled">{{ $invNum($s->period_cancelled) }}</button>
+                                        </td>
+                                        <td class="text-right font-weight-bold" data-order="{{ $s->closing }}">
+                                            <button type="button" class="{{ $mvCls($s->closing) }}" data-scope="category"
+                                                data-id="{{ $s->category_id }}" data-metric="closing">{{ $invNum($s->closing) }}</button>
+                                            <span class="md-sub">{{ $s->unit }}</span>
+                                        </td>
                                         <td class="text-center md-sub">{{ $invDate($s->nearest_expiry) }}</td>
                                         <td class="text-center">
                                             @if ($s->alert_count > 0)

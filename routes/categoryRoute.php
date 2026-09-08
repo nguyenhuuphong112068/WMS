@@ -31,7 +31,6 @@ Route::prefix('/category')
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
-            Route::post('reject', 'reject')->name('reject');
         });
 
         // Cấu hình riêng của từng phòng ban cho vật tư dùng chung - không có bước duyệt,
@@ -52,12 +51,10 @@ Route::prefix('/category')
             // JSON cho modal "xem chi tiết" cột Ngưỡng Tồn Trữ PL IV: các dòng dữ liệu
             // (tồn hiện tại theo mã × phòng, diễn biến chứng từ tạo nên đỉnh)
             Route::get('thresholdDetail', 'thresholdDetail')->name('thresholdDetail');
-            Route::get('convert', 'convert')->name('convert');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
-            Route::post('reject', 'reject')->name('reject');
         });
 
         // Cấu hình riêng của từng phòng ban cho hoá chất dùng chung - không có bước duyệt,
@@ -79,7 +76,6 @@ Route::prefix('/category')
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
-            Route::post('reject', 'reject')->name('reject');
         });
 
         // Cấu hình riêng của từng phòng ban cho chất chuẩn dùng chung - không có bước duyệt.

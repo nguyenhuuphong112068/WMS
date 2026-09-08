@@ -35,15 +35,20 @@ Route::prefix('/inventory')
             Route::get('', 'index')->name('list');
             // Dữ liệu JSON cho modal Biểu Đồ Nhập - Xuất - Tồn của một hoá chất
             Route::get('chart', 'chart')->name('chart');
+            // Dữ liệu JSON cho modal "Chi Tiết Con Số" (bấm badge trên bảng tồn)
+            Route::get('movements', 'movements')->name('movements');
             Route::post('balancing', 'balancing')->name('balancing');
             Route::post('internalExpiry', 'internalExpiry')->name('internalExpiry');
             // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
+            Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
         });
 
         Route::prefix('/standardInventory')->name('standardInventory.')->controller(StandardInventoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            // Dữ liệu JSON cho modal "Chi Tiết Con Số" (bấm badge trên bảng tồn)
+            Route::get('movements', 'movements')->name('movements');
             Route::post('balancing', 'balancing')->name('balancing');
             Route::post('internalExpiry', 'internalExpiry')->name('internalExpiry');
             Route::post('weightRemark', 'weightRemark')->name('weightRemark');
@@ -54,16 +59,20 @@ Route::prefix('/inventory')
             // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
+            Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
         });
 
         Route::prefix('/materialInventory')->name('materialInventory.')->controller(MaterialInventoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
             // Dữ liệu JSON cho modal Biểu Đồ Nhập - Xuất - Tồn của một vật tư
             Route::get('chart', 'chart')->name('chart');
+            // Dữ liệu JSON cho modal "Chi Tiết Con Số" (bấm badge trên bảng tồn)
+            Route::get('movements', 'movements')->name('movements');
             Route::post('balancing', 'balancing')->name('balancing');
             // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
+            Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
         });
 
         // Đối chiếu ngưỡng tồn trữ Phụ lục IV NĐ 24/2026/NĐ-CP - màn hình chỉ đọc, số liệu

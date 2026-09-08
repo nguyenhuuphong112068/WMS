@@ -36,6 +36,7 @@ Route::prefix('/import')
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
             // Đổi trạng thái Đang sử dụng / Ngưng sử dụng của một file đính kèm
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
+            Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
         });
 
         Route::prefix('/standardImport')->name('standardImport.')->controller(StandardImportController::class)->group(function () {
@@ -50,6 +51,7 @@ Route::prefix('/import')
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
             // Đổi trạng thái Đang sử dụng / Ngưng sử dụng của một file đính kèm
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
+            Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
         });
 
         Route::prefix('/materialImport')->name('materialImport.')->controller(MaterialImportController::class)->group(function () {
@@ -66,5 +68,6 @@ Route::prefix('/import')
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
             // Đổi trạng thái Đang sử dụng / Ngưng sử dụng của một file đính kèm
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
+            Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
         });
     });

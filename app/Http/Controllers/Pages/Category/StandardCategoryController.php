@@ -241,12 +241,7 @@ class StandardCategoryController extends Controller
 
     public function approve(Request $request)
     {
-        return $this->setApproval($request, 'approved');
-    }
-
-    public function reject(Request $request)
-    {
-        return $this->setApproval($request, 'rejected');
+        return $this->setApproval($request);
     }
 
     /** Trả về lịch sử thay đổi của một dòng danh mục cho modal xem lịch sử. */
@@ -307,7 +302,7 @@ class StandardCategoryController extends Controller
     }
 
     /** Ghi nhận kết quả duyệt: ai duyệt, duyệt lúc nào. */
-    private function setApproval(Request $request, string $appStatus)
+    private function setApproval(Request $request)
     {
         $current = DB::table(self::TABLE)->where('id', $request->id)->first();
 
@@ -315,27 +310,25 @@ class StandardCategoryController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần duyệt!');
         }
 
-        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt')) {
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Phê duyệt')) {
             return $stop;
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
-            'app_status' => $appStatus,
+            'app_status' => 'approved',
             'approved_by' => $this->actor(),
             'approved_at' => now(),
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
 
-        $action = $appStatus === 'approved' ? 'Phê duyệt' : 'Từ chối duyệt';
+        $this->writeHistory($current->id, 'Phê duyệt', 'Trạng thái duyệt: '.$current->app_status.' -> approved');
 
-        $this->writeHistory($current->id, $action, 'Trạng thái duyệt: '.$current->app_status.' -> '.$appStatus);
-
-        AuditTrialController::log($action, self::TABLE, $current->id, 'app_status: '.$current->app_status, 'app_status: '.$appStatus);
+        AuditTrialController::log('Phê duyệt', self::TABLE, $current->id, 'app_status: '.$current->app_status, 'app_status: approved');
 
         return redirect()->back()->with(
             'success',
-            ($appStatus === 'approved' ? 'Đã duyệt ' : 'Đã từ chối ').self::LABEL.' '.$current->code.'!'
+            'Đã duyệt '.self::LABEL.' '.$current->code.'!'
         );
     }
 

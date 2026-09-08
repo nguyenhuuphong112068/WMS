@@ -227,6 +227,8 @@
                                             @include('pages.shared.attachmentList', [
                                                 'attachments' => $rowAttachments,
                                                 'routePrefix' => $impRoute,
+                                                'uploadPerm' => 'import_standard_attachment_upload',
+                                                'parentId' => $row->id,
                                                 'statusPerm' => 'import_standard_attachment_status',
                                                 'code' => $row->code,
                                                 'name' => $row->standard_name,

@@ -1781,6 +1781,163 @@
             });
         }
 
+        /* ---------- Modal "Chi Tiết Con Số" (badge .inv-mv trên bảng Tồn) ----------
+        | Mỗi con số theo kỳ và cột Tổng Tồn là một <button class="inv-mv"> mang
+        | data-scope / data-id / data-metric (+ data-batch cho "Tổng tồn theo lô").
+        | Bấm -> gọi endpoint movements() theo đúng kỳ đang xem, đổ danh sách bản ghi
+        | cộng lại thành con số đó. Payload chứa mọi metric nên đổi pill không gọi lại.
+        */
+        var $mvModal = $('#invMovementModal');
+
+        if ($mvModal.length) {
+            var mvPayload = null;
+            var $mvTable = $mvModal.find('.imv-table');
+            var $mvState = $mvModal.find('.imv-state');
+            var $mvTableWrap = $mvTable.closest('.table-responsive');
+
+            function mvShowState(text, bad) {
+                $mvTableWrap.hide();
+                $mvState.text(text).toggleClass('is-bad', !!bad).prop('hidden', false);
+            }
+
+            function mvHideState() {
+                $mvState.prop('hidden', true);
+                $mvTableWrap.show();
+            }
+
+            // Một ô theo mô tả cột: 'amount'/'number' -> số có màu, còn lại -> chữ
+            function mvCell(row, colDef) {
+                var value = row[colDef.key];
+                var align = 'text-' + (colDef.align || 'left');
+
+                if (colDef.type === 'amount' || colDef.type === 'number') {
+                    if (value === null || value === undefined || value === '') {
+                        return '<td class="' + align + ' md-sub">—</td>';
+                    }
+                    var number = Number(value);
+                    var cls = '';
+                    var text = trimNum(number);
+
+                    if (colDef.tone === 'in') {
+                        cls = number ? 'imv-amount-in' : '';
+                    } else if (colDef.tone === 'out') {
+                        cls = number ? 'imv-amount-out' : '';
+                    } else if (colDef.tone === 'auto') {
+                        cls = number > 0 ? 'imv-amount-in' : (number < 0 ? 'imv-amount-out' : '');
+                        text = (number > 0 ? '+' : '') + text;
+                    }
+                    return '<td class="' + align + ' ' + cls + '">' + esc(text) + '</td>';
+                }
+
+                return '<td class="' + align + '">' + esc(value == null || value === '' ? '—' : value) + '</td>';
+            }
+
+            function mvRenderMetric(key) {
+                if (!mvPayload || !mvPayload.metrics[key]) return;
+
+                var metric = mvPayload.metrics[key];
+                var unit = metric.unit || '';
+                var cols = metric.columns || [];
+
+                $mvModal.find('.imv-pill').removeClass('is-active')
+                    .filter('[data-key="' + key + '"]').addClass('is-active');
+
+                // Tiêu đề bảng dựng động theo cột riêng của metric
+                $mvTable.find('thead').html('<tr><th class="text-center" style="width:44px">STT</th>' +
+                    cols.map(function(c) {
+                        return '<th class="text-' + (c.align || 'left') + '">' + esc(c.label) + '</th>';
+                    }).join('') + '</tr>');
+
+                $mvTable.find('tfoot').html('<tr>' +
+                    '<th colspan="' + cols.length + '" class="text-right">' +
+                    (metric.kind === 'stock' ? 'Tổng tồn' : 'Tổng') + '</th>' +
+                    '<th class="text-right">' + esc(trimNum(metric.total) + (unit ? ' ' + unit : '')) + '</th>' +
+                    '</tr>');
+
+                var rows = metric.rows || [];
+
+                if (!rows.length) {
+                    mvShowState(metric.kind === 'stock'
+                        ? 'Không còn lô nào có tồn trong phạm vi này.'
+                        : 'Không có phát sinh nào trong kỳ báo cáo đang xem.');
+                    return;
+                }
+
+                mvHideState();
+
+                $mvTable.find('tbody').html(rows.map(function(row, index) {
+                    var opening = row.kind === 'Tồn đầu kỳ';
+                    return '<tr class="' + (opening ? 'imv-row-opening' : '') + '">' +
+                        '<td class="text-center">' + (index + 1) + '</td>' +
+                        cols.map(function(c) { return mvCell(row, c); }).join('') +
+                        '</tr>';
+                }).join(''));
+            }
+
+            function mvBuildPills(focusKey) {
+                var order = ['opening', 'period_in', 'period_balanced', 'period_used',
+                    'period_cancelled', 'period_transferred', 'closing', 'stock_category', 'stock_batch'];
+                var keys = order.filter(function(k) { return mvPayload.metrics[k]; });
+
+                $mvModal.find('.imv-pills').html(keys.map(function(k) {
+                    var m = mvPayload.metrics[k];
+                    return '<button type="button" class="imv-pill" data-key="' + k + '">' +
+                        esc(m.label) +
+                        '<span class="imv-pill-total">' + esc(trimNum(m.total)) + '</span>' +
+                        '</button>';
+                }).join(''));
+
+                mvRenderMetric(mvPayload.metrics[focusKey] ? focusKey : keys[0]);
+            }
+
+            $(document).on('click', '.imv-pill', function() {
+                mvRenderMetric($(this).data('key'));
+            });
+
+            $(document).on('click', '.inv-mv', function() {
+                var $btn = $(this);
+                var metric = $btn.data('metric');
+
+                mvPayload = null;
+                $mvModal.find('.imv-name, .imv-code, .imv-period, .imv-unit').text('—');
+                $mvModal.find('.imv-pills').empty();
+                $mvTable.find('thead, tbody, tfoot').empty();
+                mvShowState('Đang tải số liệu...');
+                $mvModal.find('.imv-state').removeClass('is-bad');
+                $mvModal.modal('show');
+
+                var params = {
+                    scope: $btn.attr('data-scope'),
+                    id: $btn.attr('data-id'),
+                    metric: metric,
+                    from_date: $mvModal.data('from'),
+                    to_date: $mvModal.data('to')
+                };
+                // Chỉ gửi "batch" khi badge là "Tổng tồn theo lô" (kể cả lô rỗng)
+                if ($btn.is('[data-batch]')) {
+                    params.batch = $btn.attr('data-batch');
+                }
+
+                $.getJSON($mvModal.data('url'), params).done(function(data) {
+                    mvPayload = data;
+
+                    var meta = data.meta || {};
+                    $mvModal.find('.imv-name').text(meta.name || '—');
+                    $mvModal.find('.imv-code').text(meta.code || meta.category_code || '—');
+                    $mvModal.find('.imv-period').text((meta.period && meta.period.label) || '—');
+                    $mvModal.find('.imv-unit').text(meta.unit || '—');
+
+                    mvBuildPills(metric);
+                }).fail(function(xhr) {
+                    mvShowState(
+                        (xhr.responseJSON && xhr.responseJSON.message) ||
+                        'Không tải được số liệu, vui lòng thử lại.',
+                        true
+                    );
+                });
+            });
+        }
+
         /* ---------- Chuyển tab ---------- */
         $(document).on('click', '.inv-tab', function() {
             var target = $(this).data('pane');

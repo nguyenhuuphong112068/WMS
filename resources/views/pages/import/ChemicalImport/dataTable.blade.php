@@ -158,6 +158,8 @@
                                         @include('pages.shared.attachmentList', [
                                             'attachments' => $rowAttachments,
                                             'routePrefix' => $impRoute,
+                                            'uploadPerm' => 'import_chemical_attachment_upload',
+                                            'parentId' => $row->id,
                                             'statusPerm' => 'import_chemical_attachment_status',
                                             'code' => $row->code,
                                             'name' => $row->chem_name,

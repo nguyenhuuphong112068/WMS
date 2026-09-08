@@ -121,6 +121,8 @@
                                         @include('pages.shared.attachmentList', [
                                             'attachments' => $rowAttachments,
                                             'routePrefix' => $impRoute,
+                                            'uploadPerm' => 'import_material_attachment_upload',
+                                            'parentId' => $row->id,
                                             'statusPerm' => 'import_material_attachment_status',
                                             'code' => $row->code,
                                             'name' => $row->material_name,

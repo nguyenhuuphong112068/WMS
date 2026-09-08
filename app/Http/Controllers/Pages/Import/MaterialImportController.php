@@ -737,4 +737,75 @@ class MaterialImportController extends Controller
             'attachments.*.max' => 'Mỗi file đính kèm không được vượt quá 10MB.',
         ];
     }
+
+    public function uploadAttachment(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer',
+            'attachments' => 'required|array',
+            'attachments.*' => 'file|max:20480',
+        ]);
+
+        $departmentId = $this->departmentId();
+        $import = \Illuminate\Support\Facades\DB::table('material_imports')
+            ->where('id', $request->id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $import) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy phiếu nhập.']);
+        }
+
+        $newFiles = [];
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file->isValid()) {
+                    $originalName = $file->getClientOriginalName();
+                    $fileSize = $file->getSize();
+                    $fileType = $file->getClientMimeType() ?: $file->getClientOriginalExtension();
+                    $path = $file->store('public/material_imports');
+                    \App\Support\AttachmentBackup::copy($path, 'material_imports');
+
+                    $attachmentId = \Illuminate\Support\Facades\DB::table('material_import_attachments')->insertGetId([
+                        'material_import_id' => $import->id,
+                        'file_name' => $originalName,
+                        'file_path' => $path,
+                        'file_size' => $fileSize,
+                        'file_type' => $fileType,
+                        'created_by' => $this->actor(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $newFiles[] = [
+                        'id' => $attachmentId,
+                        'file_name' => $originalName,
+                        'created_by' => $this->actor(),
+                        'created_at' => now()->format('d/m/Y H:i'),
+                        'is_active' => 1,
+                        'url' => route('pages.import.materialImport.downloadAttachment', ['id' => $attachmentId]),
+                    ];
+                }
+            }
+        }
+
+        if (empty($newFiles)) {
+            return response()->json(['success' => false, 'message' => 'Không có file nào được tải lên.']);
+        }
+
+        if (method_exists($this, 'writeHistory')) {
+            $this->writeHistory((int) $import->id, 'Điều chỉnh', 'Đã đính kèm thêm ' . count($newFiles) . ' file.');
+        }
+
+        \App\Http\Controllers\Pages\AuditTrail\AuditTrialController::log(
+            'Điều chỉnh',
+            'material_imports',
+            $import->id,
+            $import->code,
+            'Đính kèm thêm ' . count($newFiles) . ' file'
+        );
+
+        return response()->json(['success' => true, 'files' => $newFiles]);
+    }
 }

@@ -287,6 +287,203 @@ class MaterialInventoryController extends Controller
         ]);
     }
 
+    /**
+     * CHI TIẾT PHÁT SINH CỦA MỘT CON SỐ TRÊN BẢNG TỒN (trả JSON cho modal).
+     *
+     * Mỗi cột theo kỳ (Tồn Đầu Kỳ / Nhập / Sử Dụng / Loại Bỏ / Tồn Cuối Kỳ) và cột
+     * Tổng Tồn Vật Tư chỉ là một con số tổng. Endpoint này liệt kê đúng những bản ghi
+     * nghiệp vụ cộng lại thành con số đó, cắt kỳ y hệt stockByCode().
+     *
+     *      scope = import  : một mã xuất nhập  (id = material_imports.id)
+     *      scope = category: gộp mọi lô cùng vật tư (id = material_categories.id)
+     *
+     * Số liệu chia theo App\Support\InventoryMovements để 3 màn Tồn cùng một cách tính.
+     */
+    public function movements(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $period = $this->period($request);
+        $from = $period['from'];
+        $to = $period['to'];
+
+        $scope = $request->query('scope') === 'category' ? 'category' : 'import';
+        $id = (int) $request->query('id');
+
+        $base = DB::table('material_imports')
+            ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
+            ->where('material_imports.department_id', $departmentId)
+            ->where('material_imports.status_id', 1)
+            ->whereDate('material_imports.imported_date', '<=', $to);
+
+        $base = $scope === 'category'
+            ? $base->where('material_imports.category_id', $id)
+            : $base->where('material_imports.id', $id);
+
+        $imports = $base
+            ->orderBy('material_imports.code')
+            ->get([
+                'material_imports.id',
+                'material_imports.code',
+                'material_imports.category_id',
+                'material_imports.amount',
+                'material_imports.imported_date',
+                'material_imports.imported_by',
+                'material_imports.expired_date',
+                'material_categories.code as category_code',
+                'material_categories.technical_specification as spec',
+                'material_names.name as material_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+            ]);
+
+        if ($imports->isEmpty()) {
+            return response()->json(['message' => 'Không tìm thấy dữ liệu phát sinh cho mục đã chọn.'], 404);
+        }
+
+        $first = $imports->first();
+        $unit = $first->unit_short_name ?: $first->unit_name;
+        $ids = $imports->pluck('id')->all();
+        $codeById = $imports->pluck('code', 'id');
+
+        $balancings = DB::table('material_balancings')
+            ->whereIn('import_id', $ids)
+            ->where('status_id', 1)
+            ->orderBy('balancing_at')
+            ->get(['import_id', 'balancing_amount', 'balancing_at', 'balancing_by']);
+
+        // Phiếu sử dụng: kèm mã phiếu đề nghị và mục đích (từ dòng đề nghị được cấp phát)
+        $exports = DB::table('material_exports')
+            ->leftJoin('material_request_items', 'material_exports.request_item_id', '=', 'material_request_items.id')
+            ->leftJoin('material_request_lists', 'material_request_items.request_list_id', '=', 'material_request_lists.id')
+            ->whereIn('material_exports.import_id', $ids)
+            ->where('material_exports.status_id', 1)
+            ->orderBy('material_exports.created_at')
+            ->get([
+                'material_exports.import_id',
+                'material_exports.amount',
+                'material_exports.type',
+                'material_exports.created_at',
+                'material_exports.reason',
+                'material_exports.product_name',
+                'material_exports.used_by',
+                'material_exports.test_report_no',
+                'material_request_lists.code as request_code',
+                'material_request_items.purpose as request_purpose',
+            ]);
+
+        $stamp = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('Y-m-d H:i:s') : '';
+        $dayLabel = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '';
+        $timeLabel = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y H:i') : '';
+
+        $events = [];
+
+        foreach ($imports as $import) {
+            $day = substr((string) $import->imported_date, 0, 10);
+            $events[] = [
+                'lot_id' => $import->id, 'metric' => 'in',
+                'datetime' => false, 'at' => $day.' 00:00:00',
+                'signed' => (float) $import->amount,
+                'fields' => [
+                    'kind' => 'Nhập kho',
+                    'at_label' => $dayLabel($import->imported_date),
+                    'code' => $import->code,
+                    'spec' => $import->spec ?: '',
+                    'by' => $import->imported_by ?: '',
+                    'detail' => $import->spec ?: '',
+                ],
+            ];
+        }
+
+        foreach ($balancings as $balancing) {
+            $amount = (float) $balancing->balancing_amount;
+            $events[] = [
+                'lot_id' => $balancing->import_id, 'metric' => 'balanced',
+                'datetime' => true, 'at' => $stamp($balancing->balancing_at),
+                'signed' => $amount,
+                'fields' => [
+                    'kind' => 'Cân đối',
+                    'at_label' => $timeLabel($balancing->balancing_at),
+                    'code' => $codeById[$balancing->import_id] ?? '',
+                    'by' => trim((string) $balancing->balancing_by),
+                    'detail' => 'Điều chỉnh '.($amount > 0 ? '+' : '').$this->number($amount),
+                ],
+            ];
+        }
+
+        foreach ($exports as $export) {
+            $isCancel = $export->type === 'cancel';
+            $isTransfer = $export->type === 'transfer_out';
+            $purpose = $export->request_purpose ?: $export->product_name;
+            $events[] = [
+                'lot_id' => $export->import_id,
+                'metric' => $isCancel ? 'cancelled' : 'used',
+                'datetime' => true, 'at' => $stamp($export->created_at),
+                'signed' => -abs((float) $export->amount),
+                'fields' => [
+                    'kind' => $isCancel ? 'Loại bỏ' : ($isTransfer ? 'Cấp phát liên phòng ban' : 'Sử dụng'),
+                    'at_label' => $timeLabel($export->created_at),
+                    'code' => $codeById[$export->import_id] ?? '',
+                    'by' => $export->used_by ?: '',
+                    'request' => $export->request_code ?: '',
+                    'purpose' => $purpose ?: '',
+                    'reason' => $export->reason ?: ($isCancel ? ($export->product_name ?: '') : ''),
+                    'coa' => $export->test_report_no ?: '',
+                    'detail' => trim(implode(' · ', array_filter([
+                        $export->request_code ? 'ĐN '.$export->request_code : null,
+                        $purpose ?: null,
+                        $export->reason ?: null,
+                        $export->test_report_no ? 'KN '.$export->test_report_no : null,
+                    ]))),
+                ],
+            ];
+        }
+
+        $lots = [];
+        foreach ($imports as $import) {
+            $lots[$import->id] = [
+                'batch_no' => null,
+                'fields' => [
+                    'code' => $import->code,
+                    'spec' => $import->spec ?: '',
+                    'imported_at' => $dayLabel($import->imported_date),
+                    'expired_at' => $dayLabel($import->expired_date),
+                ],
+            ];
+        }
+
+        $want = $scope === 'category'
+            ? ['opening', 'period_in', 'period_used', 'period_cancelled', 'closing', 'stock_category']
+            : ['opening', 'period_in', 'period_used', 'period_cancelled', 'closing'];
+
+        $metrics = \App\Support\InventoryMovements::metrics($events, $from, $to, [
+            'unit' => $unit,
+            'want' => $want,
+            'lots' => $lots,
+            'columns' => \App\Support\InventoryMovements::columns('material'),
+            'labels' => [
+                'period_cancelled' => 'Loại bỏ trong kỳ',
+                'stock_category' => 'Tổng tồn vật tư',
+            ],
+        ]);
+
+        return response()->json([
+            'meta' => [
+                'scope' => $scope,
+                'name' => $first->material_name ?: '—',
+                'code' => $scope === 'category' ? null : $first->code,
+                'category_code' => $first->category_code,
+                'unit' => $unit,
+                'lots' => count($ids),
+                'period' => $period + [
+                    'label' => \Carbon\Carbon::parse($from)->format('d/m/Y').' - '.\Carbon\Carbon::parse($to)->format('d/m/Y'),
+                ],
+            ],
+            'metrics' => $metrics,
+        ]);
+    }
+
     /* ==========================================================
      |  TÍNH TỒN
      ========================================================== */
@@ -1058,5 +1255,76 @@ class MaterialInventoryController extends Controller
     private function number(float $value): string
     {
         return rtrim(rtrim(number_format($value, 4, '.', ','), '0'), '.');
+    }
+
+    public function uploadAttachment(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer',
+            'attachments' => 'required|array',
+            'attachments.*' => 'file|max:20480',
+        ]);
+
+        $departmentId = $this->departmentId();
+        $import = \Illuminate\Support\Facades\DB::table('material_imports')
+            ->where('id', $request->id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $import) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy phiếu nhập.']);
+        }
+
+        $newFiles = [];
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file->isValid()) {
+                    $originalName = $file->getClientOriginalName();
+                    $fileSize = $file->getSize();
+                    $fileType = $file->getClientMimeType() ?: $file->getClientOriginalExtension();
+                    $path = $file->store('public/material_imports');
+                    \App\Support\AttachmentBackup::copy($path, 'material_imports');
+
+                    $attachmentId = \Illuminate\Support\Facades\DB::table('material_import_attachments')->insertGetId([
+                        'material_import_id' => $import->id,
+                        'file_name' => $originalName,
+                        'file_path' => $path,
+                        'file_size' => $fileSize,
+                        'file_type' => $fileType,
+                        'created_by' => $this->actor(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $newFiles[] = [
+                        'id' => $attachmentId,
+                        'file_name' => $originalName,
+                        'created_by' => $this->actor(),
+                        'created_at' => now()->format('d/m/Y H:i'),
+                        'is_active' => 1,
+                        'url' => route('pages.inventory.materialInventory.downloadAttachment', ['id' => $attachmentId]),
+                    ];
+                }
+            }
+        }
+
+        if (empty($newFiles)) {
+            return response()->json(['success' => false, 'message' => 'Không có file nào được tải lên.']);
+        }
+
+        if (method_exists($this, 'writeHistory')) {
+            $this->writeHistory((int) $import->id, 'Điều chỉnh', 'Đã đính kèm thêm ' . count($newFiles) . ' file.');
+        }
+
+        \App\Http\Controllers\Pages\AuditTrail\AuditTrialController::log(
+            'Điều chỉnh',
+            'material_imports',
+            $import->id,
+            $import->code,
+            'Đính kèm thêm ' . count($newFiles) . ' file'
+        );
+
+        return response()->json(['success' => true, 'files' => $newFiles]);
     }
 }

@@ -4,6 +4,23 @@
     $invNum = fn($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
     $invDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
 
+    /*
+    | Class cho badge .inv-mv (bấm mở modal "Chi tiết con số"): 0 -> mờ, cột trừ tồn
+    | (Sử Dụng / Loại Bỏ) ép đỏ, còn lại tô theo dấu.
+    */
+    $mvCls = function ($value, $tone = null) {
+        if ((float) $value == 0.0) {
+            return 'inv-mv is-muted';
+        }
+        if ($tone === 'out') {
+            return 'inv-mv is-out';
+        }
+        if ($tone === 'in') {
+            return 'inv-mv is-in';
+        }
+        return 'inv-mv ' . ($value > 0 ? 'is-in' : 'is-out');
+    };
+
     $invToday = \Carbon\Carbon::today();
     $invPeriodLabel = \Carbon\Carbon::parse($period['from'])->format('d/m/Y') . ' - ' . \Carbon\Carbon::parse($period['to'])->format('d/m/Y');
 
@@ -65,6 +82,10 @@
     @include('pages.inventory.MaterialInventory.balancingHistory')
     @include('pages.inventory.MaterialInventory.zoneDetail')
     @include('pages.inventory.MaterialInventory.chart')
+    @include('pages.inventory.shared.movementDetail', [
+        'movementUrl' => route('pages.inventory.materialInventory.movements'),
+        'period' => $period,
+    ])
     @include('pages.inventory.MaterialInventory.stocktakeDetail')
     {{-- Modal camera cho ô quét QR của tab Kiểm Kê Định Kỳ --}}
     @include('pages.shared.cameraScan')
