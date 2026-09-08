@@ -8,7 +8,7 @@
 --}}
 <div class="form-group">
     <div class="d-flex align-items-center justify-content-between flex-wrap mb-1" style="gap: 8px">
-        <label class="mb-0">Hoạt Chất Thành Phần (Nghị định 24/2026/NĐ-CP)</label>
+        <label class="mb-0">Hoạt Chất Thành Phần </label>
         <button type="button" class="btn btn-sm btn-outline-primary chem-ai-picker-open">
             <i class="fas fa-table mr-1"></i> Chọn từ dữ liệu gốc
         </button>
@@ -21,7 +21,7 @@
                 if ($ai->cas_no) {
                     $aiLabel .= ' — CAS ' . $ai->cas_no;
                 }
-                if (! empty($ai->groups)) {
+                if (!empty($ai->groups)) {
                     $aiLabel .= ' — Nhóm ' . implode(', ', $ai->groups);
                 }
             @endphp
@@ -31,7 +31,8 @@
         @endforeach
     </select>
     @if ($bag->has('active_ingredients_ids') || $bag->has('active_ingredients_ids.*'))
-        <span class="md-error">{{ $bag->first('active_ingredients_ids') ?: $bag->first('active_ingredients_ids.*') }}</span>
+        <span
+            class="md-error">{{ $bag->first('active_ingredients_ids') ?: $bag->first('active_ingredients_ids.*') }}</span>
     @endif
     <div class="md-hint mt-2">
         <i class="fas fa-atom mr-1"></i>
@@ -39,10 +40,9 @@
     </div>
 </div>
 
-<div class="form-group" data-percent-section style="{{ $oldAiIds ? '' : 'display: none;' }}">
+<div class="form-group" data-percent-section style="{{ count($oldAiIds) >= 2 ? '' : 'display: none;' }}">
     <label>Tỉ Lệ % Khối Lượng Từng Thành Phần</label>
-    <div class="chem-percent-box" data-percent-rows
-        data-seed='@json((object) $oldPercents)'></div>
+    <div class="chem-percent-box" data-percent-rows data-seed='@json((object) $oldPercents)'></div>
     @if ($bag->has('content_percent.*'))
         <span class="md-error">{{ $bag->first('content_percent.*') }}</span>
     @endif
@@ -60,7 +60,8 @@
 
     <div class="chem-hazard-lock" data-hazard-lock>
         <i class="fas fa-lock mr-1"></i>
-        Chỉ tick được khi hỗn hợp có <b>từ 2 hoạt chất trở lên</b> ở ô trên, trong đó có ít nhất một thành phần <b>thuộc nhóm 9</b> (Phụ lục IV Bảng A).
+        Chỉ tick được khi hỗn hợp có <b>từ 2 hoạt chất trở lên</b> ở ô trên, trong đó có ít nhất một thành phần <b>thuộc
+            nhóm 9</b> (Phụ lục IV Bảng A).
     </div>
 
     <div class="chem-hazard-box" data-hazard-box>
@@ -77,7 +78,9 @@
                             <span class="chem-hazard-code">{{ $h->hazard_group }}.{{ $h->ordinal }}</span>
                             <span class="chem-hazard-text">
                                 {{ \Illuminate\Support\Str::of($h->name)->replace("\n", ' ')->limit(140) }}
-                                <span class="chem-hazard-thr">— ngưỡng {{ rtrim(rtrim(number_format((float) $h->threshold_kg, 3, '.', ','), '0'), '.') }} kg{{ $h->threshold_basis === 'net' ? ' (net)' : '' }}</span>
+                                <span class="chem-hazard-thr">— ngưỡng
+                                    {{ rtrim(rtrim(number_format((float) $h->threshold_kg, 3, '.', ','), '0'), '.') }}
+                                    kg{{ $h->threshold_basis === 'net' ? ' (net)' : '' }}</span>
                             </span>
                         </label>
                     @endforeach
@@ -124,7 +127,7 @@
             display: none;
         }
 
-        .chem-hazard-group + .chem-hazard-group {
+        .chem-hazard-group+.chem-hazard-group {
             margin-top: 6px;
             border-top: 1px solid var(--primary-soft);
             padding-top: 6px;
@@ -192,7 +195,7 @@
             padding: 5px 6px;
         }
 
-        .chem-percent-row + .chem-percent-row {
+        .chem-percent-row+.chem-percent-row {
             border-top: 1px solid var(--primary-soft);
         }
 
@@ -206,12 +209,6 @@
             width: 110px;
             flex: 0 0 auto;
         }
-
-        .chem-percent-empty {
-            color: #94a3b8;
-            font-size: 0.83rem;
-            padding: 6px;
-        }
     </style>
 @endonce
 
@@ -224,16 +221,31 @@
 @once
     @php
         // H₂SO₄ -> H2SO4 để gõ không dấu chỉ số vẫn tìm ra
-        $fxPlain = fn ($v) => strtr((string) $v, [
-            '₀' => '0', '₁' => '1', '₂' => '2', '₃' => '3', '₄' => '4',
-            '₅' => '5', '₆' => '6', '₇' => '7', '₈' => '8', '₉' => '9',
-            '⁰' => '0', '¹' => '1', '²' => '2', '³' => '3', '⁴' => '4',
-            '⁵' => '5', '⁶' => '6', '⁷' => '7', '⁸' => '8', '⁹' => '9', '·' => '.',
+        $fxPlain = fn($v) => strtr((string) $v, [
+            '₀' => '0',
+            '₁' => '1',
+            '₂' => '2',
+            '₃' => '3',
+            '₄' => '4',
+            '₅' => '5',
+            '₆' => '6',
+            '₇' => '7',
+            '₈' => '8',
+            '₉' => '9',
+            '⁰' => '0',
+            '¹' => '1',
+            '²' => '2',
+            '³' => '3',
+            '⁴' => '4',
+            '⁵' => '5',
+            '⁶' => '6',
+            '⁷' => '7',
+            '⁸' => '8',
+            '⁹' => '9',
+            '·' => '.',
         ]);
 
-        $pickerGroups = collect($activeIngredients)
-            ->flatMap(fn ($ai) => $ai->groups ?? [])
-            ->unique()->sort()->values();
+        $pickerGroups = collect($activeIngredients)->flatMap(fn($ai) => $ai->groups ?? [])->unique()->sort()->values();
     @endphp
 
     <div class="modal fade md-modal" id="chemAiPickerModal" tabindex="-1" role="dialog" aria-hidden="true"
@@ -262,7 +274,8 @@
                         <select id="chemAiPickerGroup" class="custom-select custom-select-sm chem-aip-group">
                             <option value="">Tất cả phân loại NĐ 24/2026</option>
                             @foreach ($pickerGroups as $g)
-                                <option value="{{ $g }}" title="{{ $groupLabels[$g] ?? \App\Support\ChemicalClassification::shortLabel($g) }}">
+                                <option value="{{ $g }}"
+                                    title="{{ $groupLabels[$g] ?? \App\Support\ChemicalClassification::shortLabel($g) }}">
                                     {{ \App\Support\ChemicalClassification::shortLabel($g) }}
                                 </option>
                             @endforeach
@@ -296,14 +309,26 @@
                                 @forelse ($activeIngredients as $ai)
                                     @php
                                         $aiGroups = $ai->groups ?? [];
-                                        $search = trim($ai->name . ' ' . $ai->cas_no . ' ' . $ai->chemical_formula
-                                            . ' ' . $fxPlain($ai->chemical_formula)
-                                            . ' ' . collect($aiGroups)->map(fn ($g) => \App\Support\ChemicalClassification::shortLabel($g))->implode(' '));
+                                        $search = trim(
+                                            $ai->name .
+                                                ' ' .
+                                                $ai->cas_no .
+                                                ' ' .
+                                                $ai->chemical_formula .
+                                                ' ' .
+                                                $fxPlain($ai->chemical_formula) .
+                                                ' ' .
+                                                collect($aiGroups)
+                                                    ->map(fn($g) => \App\Support\ChemicalClassification::shortLabel($g))
+                                                    ->implode(' '),
+                                        );
                                     @endphp
-                                    <tr class="chem-ai-pick-row" data-id="{{ $ai->id }}" data-name="{{ $ai->name }}"
-                                        data-groups="{{ implode(',', $aiGroups) }}" data-search="{{ $search }}">
+                                    <tr class="chem-ai-pick-row" data-id="{{ $ai->id }}"
+                                        data-name="{{ $ai->name }}" data-groups="{{ implode(',', $aiGroups) }}"
+                                        data-search="{{ $search }}">
                                         <td class="text-center align-middle">
-                                            <input type="checkbox" class="chem-ai-pick-check" value="{{ $ai->id }}">
+                                            <input type="checkbox" class="chem-ai-pick-check"
+                                                value="{{ $ai->id }}">
                                         </td>
                                         <td class="text-center align-middle md-sub">{{ $loop->iteration }}</td>
                                         <td class="align-middle">
@@ -328,7 +353,8 @@
                                         </td>
                                         <td class="align-middle" data-groups="{{ implode(',', $aiGroups) }}">
                                             @forelse ($aiGroups as $g)
-                                                <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }} mr-1 mb-1"
+                                                <span
+                                                    class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }} mr-1 mb-1"
                                                     title="{{ $groupLabels[$g] ?? \App\Support\ChemicalClassification::shortLabel($g) }}">{{ \App\Support\ChemicalClassification::shortLabel($g) }}</span>
                                             @empty
                                                 <span class="md-empty">Không thuộc</span>

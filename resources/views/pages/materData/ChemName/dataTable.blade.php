@@ -287,8 +287,8 @@
                 var $opts = $modal.find('.chem-ai-select option:selected');
                 $box.empty();
 
-                if (!$opts.length) {
-                    $box.append($('<div class="chem-percent-empty">Chọn hoạt chất ở ô trên để khai tỉ lệ %.</div>'));
+                // Chỉ khai tỉ lệ % khi là HỖN HỢP: từ 2 hoạt chất trở lên.
+                if ($opts.length < 2) {
                     $modal.find('[data-percent-section]').hide();
                     return;
                 }
