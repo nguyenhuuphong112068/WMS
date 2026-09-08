@@ -234,7 +234,7 @@
 
                 <!-- Droplist Menu Chuyển Bộ Phận  -->
                 @php
-                    $currentDept = session('user')['selected_department'] ?? session('user')['department'] ?? null;
+                    $currentDept = session('user')['selected_department'] ?? (session('user')['department'] ?? null);
 
                     // Phòng ban user được phép làm việc (Admin -> tất cả; user thường -> phòng được gán role).
                     // Phòng ban chung (is_general = 0, VD: BOD, Cung Ứng) chỉ để tạo user, không có kho riêng.
@@ -242,7 +242,7 @@
                     $switchableDepts = DB::table('deparments')
                         ->where('isActive', 1)
                         ->where('is_general', 1)
-                        ->when($allowedDeptIds !== ['*'], fn ($q) => $q->whereIn('id', $allowedDeptIds ?: [0]))
+                        ->when($allowedDeptIds !== ['*'], fn($q) => $q->whereIn('id', $allowedDeptIds ?: [0]))
                         ->orderBy('shortName', 'asc')
                         ->get();
                 @endphp
@@ -278,7 +278,12 @@
                 @endif
 
                 <!-- Droplist Menu Dữ Liệu Gốc  -->
-                @permAny(['materData_material_view', 'materData_chemical_view', 'materData_standard_view', 'materData_common_view'])
+                @permAny([
+                    'materData_material_view',
+                    'materData_chemical_view',
+                    'materData_standard_view',
+                    'materData_common_view'
+                ])
                     <li class="nav-item has-treeview {{ str_contains(url()->current(), 'materData') ? 'menu-open' : '' }}">
                         <a href="#"
                             class="nav-link {{ str_contains(url()->current(), 'materData') ? 'active' : '' }}">
@@ -314,14 +319,14 @@
                                 <li class="nav-item"><a href="{{ route('pages.materData.activeIngredient.list') }}"
                                         class="nav-link {{ request()->is('materData/activeIngredient') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-danger"></i>
-                                        <p>Tên Hoạt Chất</p>
+                                        <p>Hoạt Chất</p>
                                     </a></li>
                             @endperm
                             @perm('materData_chemical_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.chemName.list') }}"
                                         class="nav-link {{ request()->is('materData/chemName') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-success"></i>
-                                        <p>Tên Hoá Chất</p>
+                                        <p>Hoá Chất</p>
                                     </a></li>
                             @endperm
                             @perm('materData_standard_view')
