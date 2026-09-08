@@ -24,25 +24,15 @@
 
         <div class="tr-intro">
             <i class="fas fa-scale-balanced mr-1"></i>
-            Đối chiếu <b>tổng tồn trữ của các phòng ban thuộc công ty
+            <b>Tổng tồn trữ của các phòng ban thuộc công ty
                 @if (!empty($companyName))
                     <b>"{{ $companyName }}"</b>
                 @else
                     đang chọn
                 @endif
             </b>
-            theo từng hoạt chất với
-            <b>"Ngưỡng khối lượng hoá chất tồn trữ lớn nhất tại một thời điểm (kg)"</b>
-            - Phụ lục IV Nghị định 24/2026/NĐ-CP. Chỉ xét mã danh mục hoá chất đã phân loại
-            <b>Nhóm 9 (PL IV Bảng A)</b>, <b>Nhóm 10 (PL IV Bảng B)</b> hoặc <b>hoá chất cấm</b>.
-            Cột <b>Tồn Thực Tế Cao Nhất</b> là mức tồn quy ra kg lớn nhất đã từng đạt, dựng lại
-            từ chứng từ nhập - xuất - cân đối theo ngày.
-            <b>Trạng Thái</b> lấy theo <b>Tỉ Lệ Đỉnh</b> (Tồn cao nhất / ngưỡng) - đúng nghĩa "lớn nhất
-            tại một thời điểm": đã từng chạm/vượt ngưỡng thì cơ sở phải xây dựng Kế hoạch phòng ngừa,
-            ứng phó sự cố hoá chất, dù nay đã xuất bớt. Cảnh báo vàng khi đạt từ
-            {{ $warnPercent }}% ngưỡng trở lên.
-            <span class="tr-intro-tip"><i class="fas fa-hand-pointer mr-1"></i>Bấm vào một ô tồn để xem chi
-                tiết chứng từ tạo nên con số; bấm vào thẻ thống kê để lọc nhanh theo trạng thái.</span>
+
+
         </div>
 
         {{-- ================= CARD TỔNG TỈ LỆ NHÓM 9 + NHÓM 10 (Điều 33) ================= --}}
@@ -55,7 +45,7 @@
         <div class="card md-card tr-card" id="trCardTotal">
             <div class="card-header tr-card-header">
                 <h5 class="tr-card-title">
-                    <i class="fas fa-calculator mr-2"></i>
+
                     Tổng tỉ lệ hoá chất nguy cơ tồn trữ — nhóm 9 và nhóm 10 (Điều 33)
                 </h5>
                 <button type="button" class="btn btn-tool tr-card-toggle" data-target="trCardTotal"
@@ -65,7 +55,7 @@
             </div>
             <div class="card-body">
 
-                <div class="tr-total-formula">
+                {{-- <div class="tr-total-formula">
                     <b>qx₁ / QUX₁ + qx₂ / QUX₂ + … + qxᵢ / QUXᵢ</b>
                     — với <i>qxᵢ</i> = khối lượng tồn trữ lớn nhất tại một thời điểm của hoá chất
                     nguy hiểm <i>i</i> thuộc nhóm 9 (Bảng A) hoặc nhóm 10 (Bảng B), <i>QUXᵢ</i> =
@@ -76,7 +66,7 @@
                         công ty đang chọn
                     @endif
                     - theo khoản 2 Điều 33 NĐ 24/2026/NĐ-CP.
-                </div>
+                </div> --}}
 
                 <div class="tr-total-grid">
                     <div class="tr-total-fig lv-{{ $cb['level'] }}">
@@ -186,7 +176,7 @@
         <div class="card md-card tr-card" id="trCardA">
             <div class="card-header tr-card-header">
                 <h5 class="tr-card-title">
-                    <i class="fas fa-flask-vial mr-2"></i> Nhóm 9 — đối chiếu theo từng hoạt chất
+                    </i> Nhóm 9 — đối chiếu theo từng hoạt chất
                 </h5>
                 <button type="button" class="btn btn-tool tr-card-toggle" data-target="trCardA"
                     title="Ẩn / hiện nội dung">
@@ -326,7 +316,7 @@
         <div class="card md-card tr-card" id="trCardB">
             <div class="card-header tr-card-header">
                 <h5 class="tr-card-title">
-                    <i class="fas fa-layer-group mr-2"></i> Nhóm 10 — đối chiếu theo hỗn hợp
+                    Nhóm 10 — đối chiếu theo hỗn hợp
                 </h5>
                 <button type="button" class="btn btn-tool tr-card-toggle" data-target="trCardB"
                     title="Ẩn / hiện nội dung">
