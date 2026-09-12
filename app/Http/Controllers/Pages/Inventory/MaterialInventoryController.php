@@ -315,6 +315,8 @@ class MaterialInventoryController extends Controller
             ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
             ->where('material_imports.department_id', $departmentId)
             ->where('material_imports.status_id', 1)
+            // Lô đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn kho
+            ->where('material_imports.is_checked', 1)
             ->whereDate('material_imports.imported_date', '<=', $to);
 
         $base = $scope === 'category'
@@ -500,7 +502,6 @@ class MaterialInventoryController extends Controller
             ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
             ->tap(fn ($query) => DepartmentMaterial::join($query, $departmentId, 'material_imports.category_id'))
-            ->leftJoin('material_classifications', DepartmentMaterial::TABLE.'.classification_id', '=', 'material_classifications.id')
             ->leftJoin('locations', 'material_imports.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
@@ -518,13 +519,15 @@ class MaterialInventoryController extends Controller
                 'material_categories.code as category_code',
                 'material_categories.technical_specification',
                 DepartmentMaterial::minStockColumn(),
-                'material_classifications.name as classification_name',
+                'material_categories.classification',
                 'material_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'material_imports.location_id',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
+                'locations.color as location_color',
                 'locations.warehouse_id',
                 'locations.shelf_id',
                 'locations.column_id',
@@ -536,6 +539,8 @@ class MaterialInventoryController extends Controller
             )
             ->where('material_imports.department_id', $departmentId)
             ->where('material_imports.status_id', 1)
+            // Lô đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn kho
+            ->where('material_imports.is_checked', 1)
             ->whereDate('material_imports.imported_date', '<=', $to)
             ->orderBy('material_imports.code', 'asc')
             ->get()
@@ -747,7 +752,7 @@ class MaterialInventoryController extends Controller
     private function locationOptions(int $departmentId)
     {
         return DB::table('locations')
-            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type'])
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type', 'zone_type', 'color'])
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
@@ -770,7 +775,7 @@ class MaterialInventoryController extends Controller
                     'material_name' => $first->material_name,
                     'manufacturer_short_name' => $first->manufacturer_short_name,
                     'technical_specification' => $first->technical_specification,
-                    'classification_name' => $first->classification_name,
+                    'classification_name' => \App\Support\MaterialClassification::summary($first->classification),
                     'unit' => $first->unit_short_name ?: $first->unit_name,
                     'imported' => (float) $rows->sum('imported'),
                     'balanced' => (float) $rows->sum('balanced'),
@@ -858,6 +863,8 @@ class MaterialInventoryController extends Controller
                     'shelf_id' => $first->shelf_id,
                     'column_id' => $first->column_id,
                     'tier_id' => $first->tier_id,
+                    'zone_type' => $first->location_zone_type ?? null,
+                    'color' => $first->location_color ?? null,
                 ];
             }
             if ($first->warehouse_id && ! $warehouses->has($first->warehouse_id)) {
@@ -1049,6 +1056,9 @@ class MaterialInventoryController extends Controller
             'code' => $loc->code,
             'path' => '',
             'state' => $state,
+            // Màu nền của thẻ theo định khu (App\Support\ZoneType::badge()) - độc lập với
+            // $state ở trên, vốn chỉ nói về tình trạng hàng đang đứng ở vị trí này.
+            'zoneBadge' => \App\Support\ZoneType::badge($loc->id, $loc->zone_type ?? null, $loc->color ?? null),
             'stat' => [
                 'locations' => 1,
                 'filled' => $inStock->count() > 0 ? 1 : 0,
@@ -1102,7 +1112,7 @@ class MaterialInventoryController extends Controller
             'sub' => trim(implode(' · ', array_filter([
                 $row->manufacturer_short_name,
                 $row->technical_specification,
-                $row->classification_name,
+                \App\Support\MaterialClassification::summary($row->classification),
             ]))),
             'remaining' => $this->number($row->remaining),
             'unit' => $row->unit_short_name ?: $row->unit_name,
@@ -1120,6 +1130,7 @@ class MaterialInventoryController extends Controller
             ->where('department_id', $departmentId)
             ->where('category_id', $categoryId)
             ->where('status_id', 1)
+            ->where('is_checked', 1)
             ->whereDate('imported_date', '<=', $to)
             ->get();
     }
@@ -1147,6 +1158,7 @@ class MaterialInventoryController extends Controller
             ->where('material_exports.status_id', 1)
             ->where('material_imports.category_id', $categoryId)
             ->where('material_imports.status_id', 1)
+            ->where('material_imports.is_checked', 1)
             ->where('material_exports.created_at', '<=', $to.' 23:59:59')
             ->get();
     }
@@ -1164,6 +1176,7 @@ class MaterialInventoryController extends Controller
             ->where('material_balancings.status_id', 1)
             ->where('material_imports.category_id', $categoryId)
             ->where('material_imports.status_id', 1)
+            ->where('material_imports.is_checked', 1)
             ->where('material_balancings.balancing_at', '<=', $to.' 23:59:59')
             ->get();
     }

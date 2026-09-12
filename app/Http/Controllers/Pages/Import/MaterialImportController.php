@@ -25,8 +25,11 @@ use Illuminate\Validation\Rule;
  * khoảng trống trên giao diện. Công thức nằm ở App\Support\MaterialCode.
  *
  * Phiếu nhập chỉ khoá (deActive) chứ không xoá cứng, để mã lô không bị cấp lại.
- * Vật tư là hàng tiêu hao nên phiếu nhập gọn: không có nhóm chuẩn, số lô, nhà cung cấp,
- * số hoá đơn, hàm lượng / độ ẩm, hạn dùng nội bộ. Hạn sử dụng có thể để trống.
+ * Vật tư là hàng tiêu hao nên phiếu nhập gọn: không có nhóm chuẩn, nhà cung cấp,
+ * hàm lượng / độ ẩm, hạn dùng nội bộ. Hạn sử dụng có thể để trống.
+ *
+ * Số lô, số hoá đơn, ngày ký hoá đơn, mục đích sử dụng đều là thuộc tính KHÔNG bắt
+ * buộc của phiếu nhập (batch_no, invoice_number, invoice_date, purpose).
  *
  * NGÀY NHẬP luôn là ngày bấm Lưu (now()), không có ô cho người dùng chọn và cũng không
  * sửa được khi điều chỉnh phiếu. Chỉ Hạn sử dụng mới do người dùng nhập.
@@ -51,8 +54,12 @@ class MaterialImportController extends Controller
     private const FIELDS = [
         'category_id' => 'Vật tư',
         'amount' => 'Số lượng',
+        'batch_no' => 'Số lô',
+        'invoice_number' => 'Số hoá đơn',
+        'invoice_date' => 'Ngày ký hoá đơn',
         'expired_date' => 'Hạn sử dụng',
         'location_id' => 'Vị trí lưu trữ',
+        'purpose' => 'Mục đích sử dụng',
         'note' => 'Ghi chú',
     ];
 
@@ -71,7 +78,6 @@ class MaterialImportController extends Controller
             ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
             ->tap(fn ($query) => DepartmentMaterial::join($query, $departmentId, self::TABLE.'.category_id'))
-            ->leftJoin('material_classifications', DepartmentMaterial::TABLE.'.classification_id', '=', 'material_classifications.id')
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
@@ -84,11 +90,13 @@ class MaterialImportController extends Controller
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
-                'material_classifications.name as classification_name',
+                'material_categories.classification',
                 DepartmentMaterial::minStockColumn(),
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
+                'locations.color as location_color',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',
@@ -98,6 +106,8 @@ class MaterialImportController extends Controller
             ->tap(ListRange::dateFilter(self::TABLE.'.imported_date', $bookRange))
             ->tap(ListRange::search([
                 self::TABLE.'.code',
+                self::TABLE.'.batch_no',
+                self::TABLE.'.invoice_number',
                 'material_names.name',
                 'material_categories.technical_specification',
                 'locations.code',
@@ -112,14 +122,18 @@ class MaterialImportController extends Controller
 
         $categories = DepartmentMaterial::importCategoryOptions($departmentId);
 
-        $categoryDefaults = $categories->mapWithKeys(function ($category) {
+        // Tồn hiện tại + ngưỡng tối đa của phòng, để modal cảnh báo khi nhập quá nhiều
+        $maxStock = \App\Support\MaxStockWarning::forMaterial($departmentId);
+
+        $categoryDefaults = $categories->mapWithKeys(function ($category) use ($maxStock) {
             $info = [
                 'Tên: <strong>'.htmlspecialchars($category->material_name ?: '—').'</strong>',
                 'NSX: <strong>'.htmlspecialchars($category->manufacturer_short_name ?: $category->manufacturer_name ?: '—').'</strong>',
                 'Đơn vị phòng: <strong>'.htmlspecialchars($category->unit_short_name ?: 'Chưa thiết lập').'</strong>',
             ];
-            if ($category->classification_name) {
-                $info[] = 'Phân loại: <strong>'.htmlspecialchars($category->classification_name).'</strong>';
+            $classification = \App\Support\MaterialClassification::summary($category->classification);
+            if ($classification !== '') {
+                $info[] = 'Phân loại: <strong>'.htmlspecialchars($classification).'</strong>';
             }
             if ($category->technical_specification) {
                 $info[] = 'Quy cách: <strong>'.htmlspecialchars($category->technical_specification).'</strong>';
@@ -128,9 +142,21 @@ class MaterialImportController extends Controller
                 $info[] = 'Ngưỡng tồn: <strong>'.$this->number((float) $category->min_stock).' '.htmlspecialchars($category->unit_short_name ?: '').'</strong>';
             }
 
+            $stock = $maxStock[$category->id] ?? ['max_stock' => null, 'on_hand' => 0, 'unit' => $category->unit_short_name ?: ''];
+
+            $info[] = 'Tồn hiện tại: <strong>'.$this->number((float) $stock['on_hand']).' '.htmlspecialchars($stock['unit']).'</strong>';
+
+            if ($stock['max_stock'] !== null) {
+                $info[] = 'Ngưỡng tối đa: <strong>'.$this->number((float) $stock['max_stock']).' '.htmlspecialchars($stock['unit']).'</strong>';
+            }
+
             return [$category->id => [
                 'unit_short_name' => $category->unit_short_name,
                 'min_stock' => $category->min_stock,
+                // Ba khoá dưới đây để JS dựng cảnh báo vượt ngưỡng tồn tối đa
+                'max_stock' => $stock['max_stock'],
+                'on_hand' => $stock['on_hand'],
+                'unit' => $stock['unit'],
                 // Định khu phòng đã khai ở tab "Vật Tư Của Phòng" - điền sẵn ô vị trí lưu trữ
                 'location_id' => $category->default_location_id,
                 'info_html' => implode(' | ', $info),
@@ -143,17 +169,62 @@ class MaterialImportController extends Controller
             ->get()
             ->groupBy('material_import_id');
 
+        $pendingRows = $this->pendingRows($departmentId);
+
         return view('pages.import.MaterialImport.list', [
             'datas' => $datas,
             'categories' => $categories,
             'categoryDefaults' => $categoryDefaults,
             'attachments' => $attachments,
             'locations' => DepartmentMaterial::locationOptions($departmentId),
+            // Modal Nhập vật tư chỉ cho chọn vị trí Biệt Trữ/Chờ kiểm tra
+            'quarantineLocations' => DepartmentMaterial::locationOptions($departmentId, true),
             'historyCounts' => $this->historyCounts($departmentId),
             'bookRange' => $bookRange,
             'bookKeyword' => $bookKeyword,
             'bookPerPage' => ListRange::perPage($request, 'book_'),
+            // Tab "Chờ kiểm tra": lô vừa nhập, chưa cộng tồn, chờ bước Xác nhận kiểm tra
+            'pendingRows' => $pendingRows,
+            'pendingCount' => $pendingRows->count(),
         ]);
+    }
+
+    /**
+     * Các lô đang CHỜ KIỂM TRA của phòng ban (is_checked = 0, còn hiệu lực).
+     *
+     * Không cắt theo khoảng ngày như sổ nhập: hàng chờ kiểm tra phải hiện hết cho tới
+     * khi được xác nhận, dù nhập từ bao lâu trước.
+     */
+    private function pendingRows(int $departmentId)
+    {
+        return DB::table(self::TABLE)
+            ->leftJoin('material_categories', self::TABLE.'.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
+            ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->select(
+                self::TABLE.'.*',
+                'material_categories.code as category_code',
+                'material_categories.technical_specification',
+                'material_names.name as material_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                'manufacturers.name as manufacturer_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
+                'locations.color as location_color',
+                'warehouses.name as warehouse_name'
+            )
+            ->where(self::TABLE.'.department_id', $departmentId)
+            ->where(self::TABLE.'.status_id', 1)
+            // Chỉ lô CHƯA có kết luận; lô Không đạt đã trả hàng nên không chờ nữa
+            ->where(self::TABLE.'.check_result', \App\Support\CheckStatus::PENDING)
+            ->orderBy(self::TABLE.'.imported_date', 'asc')
+            ->orderBy(self::TABLE.'.id', 'asc')
+            ->get();
     }
 
     /**
@@ -288,6 +359,11 @@ class MaterialImportController extends Controller
                     'imported_date' => now()->format('Y-m-d'),
                     'imported_by' => $this->actor(),
                     'status_id' => 1,
+                    // Nhập lần đầu luôn ở trạng thái "Chờ kiểm tra" - chỉ cộng vào tồn
+                    // kho, được đề nghị/sử dụng sau khi xác nhận ở tab "Chờ kiểm tra"
+                    'is_checked' => 0,
+                    'checked_by' => null,
+                    'checked_at' => null,
                     'created_by' => $this->actor(),
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -313,6 +389,8 @@ class MaterialImportController extends Controller
             ? 'Đã tạo '.self::LABEL.' mã xuất nhập '.$createdCodes[0].'!'
             : 'Đã tạo thành công '.count($createdCodes).' lô vật tư: '.implode(', ', $createdCodes).'!';
 
+        $msg .= ' Lô đang ở trạng thái CHỜ KIỂM TRA, chưa cộng vào tồn kho - vào tab "Chờ kiểm tra" để xác nhận.';
+
         return redirect()->back()->with('success', $msg);
     }
 
@@ -329,7 +407,8 @@ class MaterialImportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần điều chỉnh!');
         }
 
-        $rules = $this->rules($departmentId, false) + ['reason' => ['required', 'max:500']];
+        // Phiếu chưa kiểm tra thì định khu vẫn bị giới hạn trong khu Biệt Trữ/Chờ kiểm tra
+        $rules = $this->rules($departmentId, false, (bool) $current->is_checked) + ['reason' => ['required', 'max:500']];
         $messages = $this->messages() + [
             'reason.required' => 'Vui lòng nhập lý do điều chỉnh.',
             'reason.max' => 'Lý do điều chỉnh tối đa 500 ký tự.',
@@ -391,6 +470,125 @@ class MaterialImportController extends Controller
         return redirect()->back()->with('success', 'Đã ghi nhận điều chỉnh '.self::LABEL.' '.$current->code.'!');
     }
 
+    /**
+     * XÁC NHẬN KIỂM TRA một lô đang "Chờ kiểm tra" (check_result = 'pending').
+     *
+     * Hai kết quả, chọn ở modal Xác nhận kiểm tra - xem App\Support\CheckStatus:
+     *
+     *   ĐẠT (passed)      - bổ sung thông tin lần nhập đầu còn thiếu (số lô, hoá đơn,
+     *                       hạn dùng, mục đích sử dụng) + ĐỊNH KHU LẠI vị trí lưu trữ
+     *                       thật (bắt buộc), ghi is_checked = 1. Từ đây lô mới được
+     *                       cộng vào tồn kho và mới được đề nghị / sử dụng.
+     *
+     *   KHÔNG ĐẠT (failed)- tương ứng TRẢ HÀNG: is_checked giữ 0 nên lô KHÔNG BAO GIỜ
+     *                       vào tồn kho, không chọn để xuất được, cũng rời khỏi tab
+     *                       Chờ kiểm tra. Bắt buộc ghi lý do, không hồi lại được.
+     *
+     * Cả hai trường hợp đều ghi người kiểm tra + thời điểm kiểm tra.
+     */
+    public function confirmCheck(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $current = DB::table(self::TABLE)
+            ->where('id', $request->id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần xác nhận kiểm tra!');
+        }
+
+        if (\App\Support\CheckStatus::isFinal($current->check_result)) {
+            return redirect()->back()->with(
+                'error',
+                'Mã xuất nhập '.$current->code.' đã kiểm tra trước đó rồi (tình trạng: '
+                .\App\Support\CheckStatus::label($current->check_result).'), không kiểm tra lại được.'
+            );
+        }
+
+        if (! $current->status_id) {
+            return redirect()->back()->with('error', 'Mã xuất nhập '.$current->code.' đang bị khoá nên chưa xác nhận kiểm tra được.');
+        }
+
+        $passed = $request->input('check_result') === \App\Support\CheckStatus::PASSED;
+
+        $validator = Validator::make(
+            $request->all(),
+            $this->confirmCheckRules($departmentId, $passed),
+            $this->messages()
+        );
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator, 'checkErrors')->withInput();
+        }
+
+        $checkNote = $this->nullIfBlank($request->check_note);
+
+        if ($passed) {
+            // Đạt: nhận thông tin bổ sung + định khu vị trí lưu trữ thật
+            $payload = [
+                'batch_no' => $this->nullIfBlank($request->batch_no),
+                'invoice_number' => $this->nullIfBlank($request->invoice_number),
+                'invoice_date' => $this->nullIfBlank($request->invoice_date),
+                'expired_date' => $this->nullIfBlank($request->expired_date),
+                'location_id' => (int) $request->location_id,
+                'purpose' => $this->nullIfBlank($request->purpose),
+            ];
+        } else {
+            // Không đạt = trả hàng: giữ nguyên mọi thông tin của lô, chỉ ghi kết luận
+            $payload = [];
+        }
+
+        // Phần thông tin được bổ sung / sửa lại ngay trong lúc kiểm tra, ghi vào lịch sử
+        $changes = $payload ? $this->changeNote($current, $payload) : '';
+
+        $note = $passed
+            ? 'Kiểm tra ĐẠT, lô được nhập kho và cộng vào tồn.'
+                .($changes !== '' ? ' Bổ sung: '.$changes : '')
+            : 'Kiểm tra KHÔNG ĐẠT - trả hàng, lô không được nhập kho.';
+
+        if ($checkNote !== null) {
+            $note .= ' Kết luận: '.$checkNote;
+        }
+
+        DB::transaction(function () use ($current, $payload, $note, $passed, $checkNote) {
+            DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
+                // is_checked chỉ bật khi ĐẠT - lô không đạt không bao giờ vào tồn kho
+                'is_checked' => $passed ? 1 : 0,
+                'check_result' => $passed
+                    ? \App\Support\CheckStatus::PASSED
+                    : \App\Support\CheckStatus::FAILED,
+                'check_note' => $checkNote,
+                'checked_by' => $this->actor(),
+                'checked_at' => now(),
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            $this->writeHistory(
+                (int) $current->id,
+                $passed ? 'Kiểm tra Đạt' : 'Kiểm tra Không đạt',
+                $note
+            );
+        });
+
+        AuditTrialController::log(
+            $passed ? 'Kiểm tra Đạt' : 'Kiểm tra Không đạt',
+            self::TABLE,
+            $current->id,
+            $current->code,
+            $note
+        );
+
+        return redirect()->back()->with(
+            'success',
+            $passed
+                ? 'Mã xuất nhập '.$current->code.' đã KIỂM TRA ĐẠT! Lô đã được cộng vào tồn kho và sẵn sàng để đề nghị / sử dụng.'
+                : 'Mã xuất nhập '.$current->code.' KHÔNG ĐẠT - lô được trả hàng và không nhập kho.'
+        );
+    }
+
     /** Lịch sử điều chỉnh của một phiếu nhập, trả JSON cho modal trên bảng. */
     public function history(Request $request)
     {
@@ -437,6 +635,13 @@ class MaterialImportController extends Controller
                     'Ngày nhập' => $date($row->imported_date),
                     'Hạn sử dụng' => $date($row->expired_date),
                     'Vị trí lưu trữ' => $row->location_code ?: '—',
+                    'Số lô' => $row->batch_no ?: '—',
+                    'Hoá đơn' => $row->invoice_number ? $row->invoice_number.' ('.$date($row->invoice_date).')' : '—',
+                    'Mục đích sử dụng' => $row->purpose ?: '—',
+                    'Tình trạng' => \App\Support\CheckStatus::label($row->check_result)
+                        .($row->checked_by ? ' - '.$row->checked_by : '')
+                        .($row->checked_at ? ' ('.\Carbon\Carbon::parse($row->checked_at)->format('d/m/Y H:i').')' : '')
+                        .($row->check_note ? ' | Kết luận: '.$row->check_note : ''),
                     'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
                     'Ghi chú' => $row->note ?: '—',
                 ],
@@ -591,12 +796,21 @@ class MaterialImportController extends Controller
             'code' => $row->code,
             'category_id' => $row->category_id,
             'amount' => $row->amount,
+            'batch_no' => $row->batch_no,
+            'invoice_number' => $row->invoice_number,
+            'invoice_date' => $row->invoice_date,
             'imported_date' => $row->imported_date,
             'imported_by' => $row->imported_by,
             'expired_date' => $row->expired_date,
             'location_id' => $row->location_id,
+            'purpose' => $row->purpose,
             'note' => $row->note,
             'status_id' => $row->status_id,
+            'is_checked' => $row->is_checked,
+            'check_result' => $row->check_result,
+            'check_note' => $row->check_note,
+            'checked_by' => $row->checked_by,
+            'checked_at' => $row->checked_at,
             'change_note' => $note,
             'reason' => $reason,
             'created_by' => $this->actor(),
@@ -610,6 +824,12 @@ class MaterialImportController extends Controller
         $parts = [];
 
         foreach (self::FIELDS as $field => $title) {
+            // Bước Xác nhận kiểm tra chỉ gửi một phần cột (không có vật tư / số lượng),
+            // cột không nằm trong payload nghĩa là không đụng tới - đừng báo đổi thành "—"
+            if (! array_key_exists($field, $payload)) {
+                continue;
+            }
+
             $old = $current->$field ?? null;
             $new = $payload[$field] ?? null;
 
@@ -676,8 +896,20 @@ class MaterialImportController extends Controller
         return \App\Support\Signer::actor();
     }
 
-    private function rules(int $departmentId, bool $isCreate = true): array
+    /**
+     * $isChecked: trạng thái ĐANG LƯU của phiếu (false khi tạo mới - luôn "Chờ kiểm tra").
+     * Phiếu CHƯA kiểm tra chỉ được định khu vào vị trí zone_type = 'quarantine' (Biệt
+     * Trữ/Chờ kiểm tra); định khu vị trí thật chỉ thực hiện ở bước Xác nhận kiểm tra
+     * (xem confirmCheckRules()).
+     */
+    private function rules(int $departmentId, bool $isCreate = true, bool $isChecked = false): array
     {
+        $locationRule = Rule::exists('locations', 'id')->where('department_id', $departmentId)->where('status_id', 1);
+
+        if (! $isChecked) {
+            $locationRule->where('zone_type', 'quarantine');
+        }
+
         $rules = [
             'category_id' => [
                 'required',
@@ -686,11 +918,12 @@ class MaterialImportController extends Controller
                     ->where('status_id', 1),
             ],
             'amount' => ['required', 'numeric', 'min:0.0001'],
+            'batch_no' => ['nullable', 'max:100'],
+            'invoice_number' => ['nullable', 'max:100'],
+            'invoice_date' => ['nullable', 'date'],
             'expired_date' => ['nullable', 'date'],
-            'location_id' => [
-                'nullable',
-                Rule::exists('locations', 'id')->where('department_id', $departmentId)->where('status_id', 1),
-            ],
+            'location_id' => ['nullable', $locationRule],
+            'purpose' => ['nullable', 'max:500'],
             'note' => ['nullable', 'max:500'],
             'attachments.*' => ['nullable', 'file', 'max:10240'],
         ];
@@ -702,13 +935,40 @@ class MaterialImportController extends Controller
         return $rules;
     }
 
+    /**
+     * Validate bước "Xác nhận kiểm tra".
+     *
+     * ĐẠT      : bắt buộc định khu vị trí lưu trữ thật (không còn giới hạn quarantine).
+     * KHÔNG ĐẠT: hàng trả lại nên không cần định khu, nhưng BẮT BUỘC ghi lý do.
+     */
+    private function confirmCheckRules(int $departmentId, bool $passed): array
+    {
+        return [
+            'check_result' => ['required', Rule::in(\App\Support\CheckStatus::RESULTS)],
+            'location_id' => [
+                $passed ? 'required' : 'nullable',
+                Rule::exists('locations', 'id')->where('department_id', $departmentId)->where('status_id', 1),
+            ],
+            'check_note' => [$passed ? 'nullable' : 'required', 'max:500'],
+            'batch_no' => ['nullable', 'max:100'],
+            'invoice_number' => ['nullable', 'max:100'],
+            'invoice_date' => ['nullable', 'date'],
+            'expired_date' => ['nullable', 'date'],
+            'purpose' => ['nullable', 'max:500'],
+        ];
+    }
+
     private function payload(Request $request): array
     {
         return [
             'category_id' => (int) $request->category_id,
             'amount' => (float) $request->amount,
+            'batch_no' => $this->nullIfBlank($request->batch_no),
+            'invoice_number' => $this->nullIfBlank($request->invoice_number),
+            'invoice_date' => $this->nullIfBlank($request->invoice_date),
             'expired_date' => $this->nullIfBlank($request->expired_date),
             'location_id' => $request->location_id ? (int) $request->location_id : null,
+            'purpose' => $this->nullIfBlank($request->purpose),
             'note' => $this->nullIfBlank($request->note),
         ];
     }
@@ -731,8 +991,17 @@ class MaterialImportController extends Controller
             'quantity.integer' => 'Số lô cần nhập phải là số nguyên.',
             'quantity.min' => 'Số lô cần nhập tối thiểu là 1.',
             'quantity.max' => 'Số lô cần nhập tối đa là 50 trong một lần.',
+            'batch_no.max' => 'Số lô tối đa 100 ký tự.',
+            'invoice_number.max' => 'Số hoá đơn tối đa 100 ký tự.',
+            'invoice_date.date' => 'Ngày ký hoá đơn không hợp lệ.',
             'expired_date.date' => 'Hạn sử dụng không hợp lệ.',
-            'location_id.exists' => 'Vị trí lưu trữ không thuộc phòng ban đang chọn.',
+            'check_result.required' => 'Vui lòng chọn kết quả kiểm tra: Đạt hoặc Không đạt.',
+            'check_result.in' => 'Kết quả kiểm tra không hợp lệ.',
+            'check_note.required' => 'Kiểm tra Không đạt thì bắt buộc ghi lý do / kết luận.',
+            'check_note.max' => 'Kết luận kiểm tra tối đa 500 ký tự.',
+            'location_id.required' => 'Vui lòng định khu vị trí lưu trữ thật trước khi xác nhận kiểm tra Đạt.',
+            'location_id.exists' => 'Vị trí lưu trữ không hợp lệ: phải thuộc phòng ban đang chọn, và khi CHƯA kiểm tra thì chỉ chọn được vị trí Biệt Trữ/Chờ kiểm tra.',
+            'purpose.max' => 'Mục đích sử dụng tối đa 500 ký tự.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
             'attachments.*.max' => 'Mỗi file đính kèm không được vượt quá 10MB.',
         ];

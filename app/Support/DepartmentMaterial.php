@@ -8,8 +8,9 @@ use Illuminate\Support\Facades\DB;
  * CẤU HÌNH VẬT TƯ THEO TỪNG PHÒNG BAN
  *
  * Danh mục vật tư (material_categories) dùng chung toàn công ty vì nó mô tả bản chất của
- * vật tư. Cách dùng vật tư thì riêng từng phòng, nằm ở bảng material_department_categories: phân
- * loại theo bộ nhóm của phòng, đơn vị tính, ngưỡng tồn tối thiểu.
+ * vật tư (kể cả phân loại, bộ phận mua hàng, thời gian đặt hàng). Cách dùng vật tư thì
+ * riêng từng phòng, nằm ở bảng material_department_categories: đơn vị tính, ngưỡng tồn
+ * tối thiểu, định khu.
  *
  * Lớp này gom lại phần join để tab "Vật Tư Của Phòng" (do MaterialCategoryController dựng)
  * và các thao tác thêm / sửa / khoá (do DepartmentMaterialController xử lý) đọc chung một
@@ -29,7 +30,7 @@ class DepartmentMaterial
 
     /**
      * Nối bảng cấu hình của ĐÚNG một phòng ban vào câu truy vấn đang có (để lấy min_stock,
-     * classification_id...). Điều kiện phòng ban đặt trong mệnh đề JOIN, không đặt ở WHERE:
+     * default_location_id...). Điều kiện phòng ban đặt trong mệnh đề JOIN, không đặt ở WHERE:
      * đây là leftJoin, để ở WHERE sẽ loại mất vật tư phòng chưa khai cấu hình.
      *
      * @param  \Illuminate\Database\Query\Builder  $query
@@ -87,6 +88,12 @@ class DepartmentMaterial
         return self::TABLE.'.min_stock';
     }
 
+    /** Ngưỡng tồn tối đa của phòng, dùng trong select() sau khi đã gọi join(). */
+    public static function maxStockColumn(): string
+    {
+        return self::TABLE.'.max_stock';
+    }
+
     /**
      * Vật tư phòng ĐƯỢC PHÉP nhập / dùng: có dòng khai trong material_department_categories (còn hoạt
      * động) và danh mục chung đã duyệt. Kèm đơn vị của phòng.
@@ -99,17 +106,19 @@ class DepartmentMaterial
             ->join('material_categories', self::TABLE.'.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
             ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('material_classifications', self::TABLE.'.classification_id', '=', 'material_classifications.id')
             ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
             ->select(
                 'material_categories.id',
                 'material_categories.code',
                 'material_categories.technical_specification',
+                'material_categories.classification',
+                'material_categories.purchasing_department',
+                'material_categories.lead_time_days',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
-                'material_classifications.name as classification_name',
                 self::TABLE.'.min_stock',
+                self::TABLE.'.max_stock',
                 // Định khu phòng đã khai cho vật tư này - màn hình Nhập điền sẵn vào ô vị trí
                 self::TABLE.'.default_location_id',
                 'units.short_name as unit_short_name',
@@ -134,8 +143,12 @@ class DepartmentMaterial
      *
      * Lọc theo locations.item_type để không xếp nhầm hàng vào ô của loại khác;
      * ô chưa khai loại được coi là dùng chung nên vẫn chọn được.
+     *
+     * $quarantineOnly = true: chỉ lấy vị trí zone_type = 'quarantine' (Biệt Trữ/Chờ
+     * kiểm tra) - dùng cho modal Nhập vật tư, vì lô mới nhập chỉ được định khu tạm vào
+     * đây, chờ "Xác nhận kiểm tra" mới định khu lại vị trí thật.
      */
-    public static function locationOptions(int $departmentId)
+    public static function locationOptions(int $departmentId, bool $quarantineOnly = false)
     {
         return DB::table('locations')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
@@ -145,6 +158,7 @@ class DepartmentMaterial
             ->select(
                 'locations.id',
                 'locations.code',
+                'locations.zone_type',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',
@@ -155,6 +169,7 @@ class DepartmentMaterial
             // Chỉ những ô khai loại vật tư, cộng thêm ô chưa khai loại (dùng chung)
             ->where(fn ($query) => $query->whereNull('locations.item_type')
                 ->orWhere('locations.item_type', 'material'))
+            ->when($quarantineOnly, fn ($query) => $query->where('locations.zone_type', 'quarantine'))
             ->orderBy('warehouses.name', 'asc')
             ->orderBy('shelves.name', 'asc')
             ->orderBy('columns.name', 'asc')
@@ -172,7 +187,6 @@ class DepartmentMaterial
             ->leftJoin('material_categories', self::TABLE.'.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
             ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->leftJoin('material_classifications', self::TABLE.'.classification_id', '=', 'material_classifications.id')
             ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
             // Định khu phòng đã khai cho vật tư, kèm đường dẫn Kho / Kệ-Tủ / Cột / Tầng
             ->leftJoin('locations', self::TABLE.'.default_location_id', '=', 'locations.id')
@@ -184,10 +198,10 @@ class DepartmentMaterial
                 self::TABLE.'.*',
                 'material_categories.code as category_code',
                 'material_categories.technical_specification as category_technical_specification',
+                'material_categories.classification as category_classification',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
-                'material_classifications.name as classification_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'locations.code as location_code',
@@ -215,6 +229,7 @@ class DepartmentMaterial
             ->select(
                 'material_categories.id',
                 'material_categories.technical_specification',
+                'material_categories.classification',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name'
@@ -230,30 +245,6 @@ class DepartmentMaterial
         }
 
         return $query->get();
-    }
-
-    /**
-     * Bộ phân loại của đúng phòng ban đang chọn.
-     *
-     * Giữ lại những phân loại phòng đang gán dù đã bị khoá, nếu không màn hình cập nhật
-     * sẽ làm mất phân loại cũ của dòng đang sửa.
-     */
-    public static function classificationOptions(int $departmentId, array $usedIds = [])
-    {
-        $usedIds = array_values(array_filter($usedIds));
-
-        return DB::table('material_classifications')
-            ->select('id', 'name')
-            ->where('department_id', $departmentId)
-            ->where(function ($query) use ($usedIds) {
-                $query->where('status_id', 1);
-
-                if ($usedIds) {
-                    $query->orWhereIn('id', $usedIds);
-                }
-            })
-            ->orderBy('name', 'asc')
-            ->get();
     }
 
     /**

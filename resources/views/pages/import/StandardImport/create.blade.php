@@ -1,3 +1,5 @@
+@include('pages.shared.maxStockWarn')
+
 @php
     $bag = $errors->getBag('createErrors');
     $oldExpiryType = old('expiry_type', 'defined');
@@ -96,12 +98,16 @@
                             @endif
                         </div>
 
+                        <div class="form-group col-md-12 order-last">
+                            <div class="js-max-stock-warn"></div>
+                        </div>
+
                         <div class="form-group col-md-3">
-                            <label>Định Khu</label>
+                            <label>Định Khu Tạm (Biệt Trữ)</label>
                             <select name="location_id"
                                 class="form-control imp-select sd-location-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chọn --</option>
-                                @foreach ($locations as $location)
+                                @foreach ($quarantineLocations as $location)
                                     <option value="{{ $location->id }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
@@ -115,6 +121,15 @@
                             @if ($bag->has('location_id'))
                                 <span class="md-error">{{ $bag->first('location_id') }}</span>
                             @endif
+                            @if ($quarantineLocations->isEmpty())
+                                <div class="text-danger small mt-1">
+                                    <i class="fas fa-triangle-exclamation mr-1"></i>
+                                    Phòng chưa khai vị trí nào thuộc phân loại <b>Biệt Trữ</b>. Vào Dữ Liệu Gốc →
+                                    Định Khu, đặt phân loại "Biệt Trữ" cho khu chờ kiểm tra rồi quay lại.
+                                </div>
+                            @endif
+                            <small class="md-sub">Ống mới nhập ở trạng thái <b>Chờ kiểm tra</b> nên chỉ xếp vào khu
+                                Biệt Trữ; vị trí thật định khu lại ở bước Xác nhận kiểm tra.</small>
                         </div>
 
                         <div class="form-group col-md-3">
@@ -402,6 +417,20 @@
             }
         });
 
+        /* Cảnh báo trữ quá nhiều: tồn hiện tại + (lượng/ống x số lần nhập) so với ngưỡng tối đa */
+        function checkStdMaxStock($form) {
+            var $cat = $form.find('.sd-category');
+            var item = ($cat.data('defaults') || {})[$cat.val()] || null;
+            var amount = parseFloat(($form.find('[name="amount"]').val() || '').replace(/,/g, ''));
+            var times = parseInt($form.find('[name="quantity"]').val(), 10);
+
+            wmsMaxStockWarn($form.find('.js-max-stock-warn'), item, (amount || 0) * (times > 0 ? times : 1));
+        }
+
+        $(document).on('input change', '#createModal [name="amount"], #createModal [name="quantity"]', function() {
+            checkStdMaxStock($(this).closest('form'));
+        });
+
         // Tự động đồng bộ khi chọn chất chuẩn
         function syncCategoryDetails($form) {
             var $cat = $form.find('.sd-category');
@@ -418,6 +447,8 @@
                 }
 
                 $form.find('.sd-unit').text(item.unit_short_name || '—');
+
+                checkStdMaxStock($form);
 
                 // Nhóm chuẩn & Code preview
                 $form.find('.sd-group-input').val(item.group_key || '');

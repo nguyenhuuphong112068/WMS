@@ -175,6 +175,33 @@
         border-color: #86EFAC;
     }
 
+    /* ---------- Mã danh mục: tô theo tình trạng phê duyệt (đồng bộ màu với .md-badge) ---------- */
+    .cat-code {
+        display: inline-block;
+        font-weight: 700;
+        border-radius: 6px;
+        padding: 2px 9px;
+        letter-spacing: 0.3px;
+    }
+
+    .cat-code.pending {
+        background: #FEF3C7;
+        color: #B45309;
+        border: 1px solid #FCD34D;
+    }
+
+    .cat-code.approved {
+        background: #DCFCE7;
+        color: #15803D;
+        border: 1px solid #86EFAC;
+    }
+
+    .cat-code.locked {
+        background: #FEE2E2;
+        color: #B91C1C;
+        border: 1px solid #FCA5A5;
+    }
+
     /* ---------- Badge số lần thay đổi, gắn ở góc trên bên phải nút Sửa ---------- */
     .cat-btn-wrap {
         position: relative;

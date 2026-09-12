@@ -12,7 +12,7 @@
     // Suy phạm vi dữ liệu gốc từ tiền tố route để check quyền materData_<scope>_<action>
     $mdEntity = last(explode('.', rtrim($prefix, '.')));
     $mdScope = match ($mdEntity) {
-        'materialName', 'materialClassification' => 'material',
+        'materialName' => 'material',
         'chemName', 'activeIngredient', 'mixtureHazardCategory' => 'chemical',
         'standardName', 'purpose' => 'standard',
         default => 'common',

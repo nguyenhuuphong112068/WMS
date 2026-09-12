@@ -22,6 +22,7 @@
 --}}
 
 @include('pages.materData.shared.assets')
+@include('pages.shared.maxStockWarn')
 
 <style>
     /* ---------- Ô chọn Select2 trong modal ---------- */
@@ -617,6 +618,73 @@
             // Chưa có dòng nào (form thêm mới) thì mở sẵn các tháng mặc định
             if (!$(this).find('.est-amount-row').length) fillDefaults($(this));
             reindex($(this));
+        });
+
+        /* ---------- Cảnh báo dự trù vượt NGƯỠNG TỒN TỐI ĐA của phòng ----------
+           Ngưỡng khai ở tab "<Loại hàng> Của Phòng", dùng chung cho cả ba loại hàng.
+           Số lượng dự trù cho khai theo đơn vị bất kỳ, nhưng ngưỡng thì theo ĐƠN VỊ CỦA
+           PHÒNG - nên chỉ cộng những dòng khai đúng đơn vị đó, dòng khai đơn vị khác được
+           nói rõ là chưa tính thay vì quy đổi ẩu. */
+        function checkEstMaxStock($box) {
+            var $warn = $box.find('.js-max-stock-warn');
+
+            if (!$warn.length || typeof wmsMaxStockWarn !== 'function') return;
+
+            var map = $warn.data('max-stock') || {};
+            var info = map[$box.closest('form').find('[name="category_id"]').val()] || null;
+
+            if (!info) {
+                wmsMaxStockWarn($warn, null, 0);
+                return;
+            }
+
+            var total = 0;
+            var skipped = 0;
+
+            $box.find('.est-amount-row').each(function() {
+                var amount = parseFloat(($(this).find('[data-field="amount"]').val() || '').replace(/,/g, ''));
+                var unitId = $(this).find('[data-field="unit_id"]').val();
+
+                if (!amount || amount <= 0) return;
+
+                if (info.unit_id && String(unitId) !== String(info.unit_id)) {
+                    skipped++;
+                    return;
+                }
+
+                total += amount;
+            });
+
+            if (wmsMaxStockWarn($warn, info, total) && skipped > 0) {
+                $warn.append(' <i>(chưa tính ' + skipped + ' dòng khai đơn vị khác)</i>');
+            }
+        }
+
+        $(document).on('input change', '.est-amounts [data-field="amount"], .est-amounts [data-field="unit_id"]',
+            function() {
+                checkEstMaxStock($(this).closest('.est-amounts'));
+            });
+
+        $(document).on('change', '[name="category_id"]', function() {
+            $(this).closest('form').find('.est-amounts').each(function() {
+                checkEstMaxStock($(this));
+            });
+        });
+
+        $(document).on('click', '.btn-est-amount-remove', function() {
+            var $box = $(this).closest('.est-amounts');
+            setTimeout(function() {
+                checkEstMaxStock($box);
+            }, 0);
+        });
+
+        // Mở modal sửa mặt hàng: số lượng do JS đổ vào nên phải tự tính lại cảnh báo
+        $(document).on('click', '.btn-est-item-edit', function() {
+            setTimeout(function() {
+                $('#itemUpdateModal .est-amounts').each(function() {
+                    checkEstMaxStock($(this));
+                });
+            }, 80);
         });
 
         /* ---------- Cảnh báo ngưỡng PL IV khi chọn hoá chất / đổi số lượng ---------- */

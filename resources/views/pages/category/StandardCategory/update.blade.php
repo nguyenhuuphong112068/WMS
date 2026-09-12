@@ -121,6 +121,26 @@
                                 </div>
                             </div>
 
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Thời Gian Đặt Hàng</label>
+                                        <div class="input-group">
+                                            <input type="text" inputmode="numeric" name="lead_time_days"
+                                                class="form-control {{ $bag->has('lead_time_days') ? 'is-invalid' : '' }}"
+                                                value="{{ $old('lead_time_days') }}" placeholder="Ví dụ: 30">
+                                            <div class="input-group-append">
+                                                <span class="input-group-text">ngày</span>
+                                            </div>
+                                        </div>
+                                        @if ($bag->has('lead_time_days'))
+                                            <span class="md-error">{{ $bag->first('lead_time_days') }}</span>
+                                        @endif
+                                        <small class="md-sub">Số ngày từ lúc đặt hàng tới lúc hàng về công ty.</small>
+                                    </div>
+                                </div>
+                            </div>
+
 
 
                             <div class="form-group">

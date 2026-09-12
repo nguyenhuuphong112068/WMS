@@ -24,6 +24,7 @@
                         <th style="width: 160px">Nguồn Gốc / NSX</th>
                         <th class="text-center" style="width: 100px">Tỷ Trọng</th>
                         <th style="width: 165px">Điều Kiện Bảo Quản</th>
+                        <th class="text-center" style="width: 95px">Thời Gian Đặt Hàng</th>
                         <th style="width: 200px" title="Nhóm chuẩn quyết định mã ống chuẩn khi nhập kho">
                             Phân Nhóm Chuẩn</th>
                         <th style="width: 170px"
@@ -40,11 +41,13 @@
                         @php
                             $sdCodes = $sdGroupsOf($row->groups);
                             $sdDepartments = $departmentsByCategory[$row->id] ?? collect();
+                            // Màu nền mã theo tình trạng: khoá thắng duyệt, chưa duyệt thì vẫn vàng chờ
+                            $catCodeStatus = $row->status_id == 0 ? 'locked' : ($row->app_status === 'approved' ? 'approved' : 'pending');
                         @endphp
                         {{-- data-groups để bộ lọc Phân nhóm chuẩn nhận ra dòng này --}}
                         <tr data-groups="{{ implode(',', $sdCodes) }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
-                            <td><span class="font-weight-bold">{{ $row->code }}</span></td>
+                            <td><span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span></td>
                             <td>
                                 <span class="font-weight-bold">{{ $row->standard_name ?: '—' }}</span>
                                 @if ($row->doc_no)
@@ -73,6 +76,14 @@
                                 @if ($row->storage_condition_name)
                                     <span class="md-note"
                                         title="{{ $row->storage_condition_name }}">{{ $row->storage_condition_name }}</span>
+                                @else
+                                    <span class="md-empty">—</span>
+                                @endif
+                            </td>
+                            <td class="text-center" data-order="{{ $row->lead_time_days ?? -1 }}">
+                                @if ($row->lead_time_days !== null)
+                                    <span class="font-weight-bold">{{ $row->lead_time_days }}</span>
+                                    <span class="md-sub">ngày</span>
                                 @else
                                     <span class="md-empty">—</span>
                                 @endif
@@ -137,6 +148,7 @@
                                         'storage_condition_id' => $row->storage_condition_id,
                                         'groups' => $sdCodes,
                                         'doc_no' => $row->doc_no,
+                                        'lead_time_days' => $row->lead_time_days,
                                         'note' => $row->note,
                                     ],
                                 ])

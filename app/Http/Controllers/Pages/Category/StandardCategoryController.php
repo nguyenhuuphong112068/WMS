@@ -64,6 +64,7 @@ class StandardCategoryController extends Controller
         'shelf_life_months' => 'Hạn dùng mặc định (tháng)',
         'doc_no' => 'Số tài liệu',
         'note' => 'Ghi chú',
+        'lead_time_days' => 'Thời gian đặt hàng (ngày)',
     ];
 
     public function index()
@@ -280,6 +281,7 @@ class StandardCategoryController extends Controller
                         : '—',
                     'Hạn dùng (tháng)' => $row->shelf_life_months ?: '—',
                     'Số tài liệu' => $row->doc_no ?: '—',
+                    'Thời gian đặt hàng' => $row->lead_time_days === null ? '—' : $row->lead_time_days . ' ngày',
                     'Ghi chú' => $row->note ?: '—',
                 ];
 
@@ -355,6 +357,7 @@ class StandardCategoryController extends Controller
             'shelf_life_months' => $row->shelf_life_months,
             'doc_no' => $row->doc_no,
             'note' => $row->note,
+            'lead_time_days' => $row->lead_time_days,
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
             'change_note' => $note,
@@ -560,7 +563,7 @@ class StandardCategoryController extends Controller
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'doc_no' => ['nullable', 'max:20'],
             'note' => ['nullable', 'max:500'],
-        ];
+        ] + \App\Support\MaterialClassification::leadTimeRules();
     }
 
     private function payload(Request $request): array
@@ -582,6 +585,7 @@ class StandardCategoryController extends Controller
                 : (int) $request->shelf_life_months,
             'doc_no' => $this->nullIfBlank($request->doc_no),
             'note' => $this->nullIfBlank($request->note),
+            'lead_time_days' => \App\Support\MaterialClassification::leadTimeValue($request->lead_time_days),
         ];
     }
 
@@ -611,6 +615,6 @@ class StandardCategoryController extends Controller
             'shelf_life_months.max' => 'Hạn dùng tối đa 1200 tháng (100 năm).',
             'doc_no.max' => 'Số tài liệu tối đa 20 ký tự.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
-        ];
+        ] + \App\Support\MaterialClassification::leadTimeMessages();
     }
 }

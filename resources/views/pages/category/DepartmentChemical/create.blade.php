@@ -119,6 +119,18 @@
                             <small class="md-sub">Tồn xuống dưới mức này thì màn hình Tồn Kho báo "Sắp hết".
                                 Theo <b class="dc-unit-hint">đơn vị</b> đã chọn ở trên.</small>
                         </div>
+
+                        <div class="form-group col-md-6">
+                            <label>Ngưỡng Tồn Tối Đa</label>
+                            <input type="text" inputmode="decimal" name="max_stock" min="0"
+                                class="form-control js-decimal {{ $bag->has('max_stock') ? 'is-invalid' : '' }}"
+                                value="{{ $old('max_stock') }}" placeholder="Để trống nếu không đặt trần tồn">
+                            @if ($bag->has('max_stock'))
+                                <span class="md-error">{{ $bag->first('max_stock') }}</span>
+                            @endif
+                            <small class="md-sub">Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.
+                                Theo <b class="dc-unit-hint">đơn vị</b> đã chọn ở trên.</small>
+                        </div>
                     </div>
 
                     <div class="form-group">

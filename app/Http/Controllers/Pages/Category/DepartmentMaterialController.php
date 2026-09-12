@@ -18,9 +18,9 @@ use Illuminate\Validation\Rule;
  * Controller này chỉ nhận các thao tác thêm / sửa / khoá rồi quay lại đúng tab đó.
  *
  * Danh mục vật tư (material_categories) dùng chung toàn công ty vì nó mô tả BẢN CHẤT của
- * vật tư: tên, nhà sản xuất, thông tin kỹ thuật. Màn hình này khai phần CÁCH DÙNG của
- * riêng phòng ban đang chọn: phân loại theo bộ nhóm của phòng, đơn vị tính, ngưỡng tồn
- * tối thiểu, định khu.
+ * vật tư: tên, nhà sản xuất, thông tin kỹ thuật, phân loại, bộ phận mua hàng. Màn hình
+ * này khai phần CÁCH DÙNG của riêng phòng ban đang chọn: đơn vị tính, ngưỡng tồn tối
+ * thiểu, định khu.
  *
  * ĐỊNH KHU (default_location_id) là chỗ DỰ KIẾN để vật tư, chỉ dùng để điền sẵn ô vị trí
  * lúc nhập. Vị trí THỰC TẾ của từng lô nằm ở material_imports.location_id, hai cái này
@@ -45,6 +45,7 @@ class DepartmentMaterialController extends Controller
 
         $validator = Validator::make($request->all(), $this->rules($departmentId), $this->messages());
         $this->checkConversions($validator, $request, (int) $request->category_id, $departmentId);
+        $this->checkStockRange($validator, $request);
 
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dmCreateErrors')->withInput();
@@ -95,6 +96,8 @@ class DepartmentMaterialController extends Controller
 
         $this->checkConversions($validator, $request, (int) $current->category_id, $departmentId);
 
+        $this->checkStockRange($validator, $request);
+
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dmUpdateErrors')->withInput();
         }
@@ -107,20 +110,19 @@ class DepartmentMaterialController extends Controller
         $this->saveConversions($request, (int) $current->category_id, $departmentId);
 
         $units = DB::table('units')->pluck('name', 'id');
-        $classifications = DB::table('material_classifications')->pluck('name', 'id');
         $locations = DB::table('locations')->pluck('code', 'id');
 
         AuditTrialController::log(
             'Cập nhật',
             self::TABLE,
             $current->id,
-            'phân loại: '.($classifications[$current->classification_id] ?? 'chưa khai')
-                .' | đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
+            'đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
                 .' | ngưỡng: '.($current->min_stock ?? 'chưa khai')
+                .' | ngưỡng tối đa: '.($current->max_stock ?? 'chưa khai')
                 .' | định khu: '.($locations[$current->default_location_id] ?? 'chưa khai'),
-            'phân loại: '.($classifications[(int) $request->classification_id] ?? 'chưa khai')
-                .' | đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
+            'đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
                 .' | ngưỡng: '.($request->min_stock ?: 'chưa khai')
+                .' | ngưỡng tối đa: '.($request->max_stock ?: 'chưa khai')
                 .' | định khu: '.($locations[(int) $request->default_location_id] ?? 'chưa khai')
                 .' | Lý do: '.$this->changeReason($request)
         );
@@ -168,14 +170,9 @@ class DepartmentMaterialController extends Controller
     private function rules(int $departmentId, bool $isUpdate = false): array
     {
         $rules = [
-            'classification_id' => [
-                'nullable',
-                Rule::exists('material_classifications', 'id')
-                    ->where('department_id', $departmentId)
-                    ->where('status_id', 1),
-            ],
             'unit_id' => ['required', 'integer', 'exists:units,id'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
+            'max_stock' => ['nullable', 'numeric', 'min:0'],
             // Định khu phải thuộc ĐÚNG phòng ban đang chọn, không mượn được của phòng khác
             'default_location_id' => [
                 'nullable',
@@ -200,6 +197,28 @@ class DepartmentMaterialController extends Controller
         ];
 
         return $rules;
+    }
+
+    /**
+     * Ngưỡng tối đa phải lớn hơn ngưỡng tối thiểu.
+     *
+     * Không dùng rule gte:min_stock vì ô tối thiểu thường để trống, lúc đó gte so sánh
+     * chuỗi rỗng và cho kết quả vô nghĩa. Chỉ so khi cả hai ô đều có số.
+     */
+    private function checkStockRange($validator, Request $request): void
+    {
+        $validator->after(function ($validator) use ($request) {
+            $min = trim((string) $request->min_stock);
+            $max = trim((string) $request->max_stock);
+
+            if ($min === '' || $max === '' || ! is_numeric($min) || ! is_numeric($max)) {
+                return;
+            }
+
+            if ((float) $max < (float) $min) {
+                $validator->errors()->add('max_stock', 'Ngưỡng tồn tối đa phải lớn hơn hoặc bằng ngưỡng tồn tối thiểu.');
+            }
+        });
     }
 
     /**
@@ -244,9 +263,9 @@ class DepartmentMaterialController extends Controller
     private function payload(Request $request): array
     {
         return [
-            'classification_id' => $request->classification_id ? (int) $request->classification_id : null,
             'unit_id' => (int) $request->unit_id,
             'min_stock' => $this->nullIfBlank($request->min_stock),
+            'max_stock' => $this->nullIfBlank($request->max_stock),
             'default_location_id' => $request->default_location_id ? (int) $request->default_location_id : null,
             'note' => $this->nullIfBlank($request->note),
         ];
@@ -265,11 +284,12 @@ class DepartmentMaterialController extends Controller
             'category_id.required' => 'Vui lòng chọn vật tư cần khai.',
             'category_id.exists' => 'Vật tư được chọn không tồn tại.',
             'category_id.unique' => 'Phòng ban đã khai vật tư này rồi, hãy sửa dòng đang có.',
-            'classification_id.exists' => 'Phân loại không thuộc phòng ban đang chọn hoặc đã bị khoá.',
             'unit_id.required' => 'Vui lòng chọn đơn vị tính của phòng cho vật tư này.',
             'unit_id.exists' => 'Đơn vị tính không hợp lệ.',
             'min_stock.numeric' => 'Ngưỡng tồn tối thiểu phải là số.',
             'min_stock.min' => 'Ngưỡng tồn tối thiểu không được âm.',
+            'max_stock.numeric' => 'Ngưỡng tồn tối đa phải là số.',
+            'max_stock.min' => 'Ngưỡng tồn tối đa không được âm.',
             'default_location_id.exists' => 'Định khu không thuộc phòng ban đang chọn.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
         ];

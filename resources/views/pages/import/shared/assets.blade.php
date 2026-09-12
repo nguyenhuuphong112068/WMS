@@ -115,11 +115,18 @@
     }
 
     /* ---------- Thông tin phụ trên bảng ---------- */
+    /* Nền tô theo màu của định khu đang giữ lô này (App\Support\ZoneType::badge());
+       chưa định khu hoặc định khu chưa có màu thì --chip/--chip-text rơi về mặc định trắng. */
     .imp-code {
+        display: inline-block;
         font-weight: 700;
-        color: var(--primary-dark);
         letter-spacing: 0.6px;
         white-space: nowrap;
+        background: var(--chip, #fff);
+        color: var(--chip-text, var(--primary-dark));
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 6px;
+        padding: 2px 9px;
     }
 
     .imp-amount {
@@ -226,6 +233,47 @@
         background: #FEF3C7;
         color: #B45309;
         border: 1px solid #FCD34D;
+    }
+
+    /* ---------- Chọn kết quả kiểm tra trong modal Xác nhận kiểm tra ---------- */
+    .imp-check-result {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .imp-check-opt {
+        display: inline-flex;
+        align-items: center;
+        margin: 0;
+        padding: 9px 18px;
+        border: 1px solid #dbe6f2;
+        border-radius: var(--border-radius-md);
+        background: #fff;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .imp-check-opt input {
+        margin-right: 8px;
+    }
+
+    .imp-check-opt:hover {
+        border-color: var(--primary-lighter);
+    }
+
+    .imp-check-opt.is-passed.is-active {
+        border-color: #16A34A;
+        background: #DCFCE7;
+        color: #15803D;
+    }
+
+    .imp-check-opt.is-failed.is-active {
+        border-color: #DC2626;
+        background: #FEE2E2;
+        color: #B91C1C;
     }
 
     /* ---------- Thông tin lô trong modal Nhận hàng ---------- */

@@ -1904,7 +1904,7 @@ class MaterialExportController extends Controller
                 'material_name' => $category->material_name,
                 'technical_specification' => $category->technical_specification,
                 'manufacturer_name' => $category->manufacturer_name ?: $category->manufacturer_short_name,
-                'classification_name' => $category->classification_name,
+                'classification_name' => \App\Support\MaterialClassification::summary($category->classification),
                 'unit' => $category->unit_short_name ?: $category->unit_name,
                 'remaining' => (float) $group->sum('remaining'),
                 'lots' => (int) $group->where('remaining', '>', self::EPSILON)->count(),
@@ -2280,6 +2280,11 @@ class MaterialExportController extends Controller
                 'location_id' => $destLocationId,
                 'note' => $note,
                 'status_id' => 1,
+                // Hàng nhận chuyển liên phòng ban đã được kiểm tra ở lô gốc bên phòng
+                // gửi nên vào tồn ngay, không phải qua lại bước Chờ kiểm tra
+                'is_checked' => 1,
+                'checked_by' => $this->actor(),
+                'checked_at' => $receivedAt,
                 'created_by' => $this->actor(),
                 'created_at' => $receivedAt,
                 'updated_at' => $receivedAt,

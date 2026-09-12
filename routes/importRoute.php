@@ -31,6 +31,9 @@ Route::prefix('/import')
             Route::post('labelPrinted', 'labelPrinted')->name('labelPrinted');
             Route::get('history', 'history')->name('history');
             Route::post('update', 'update')->name('update');
+            // Xác nhận kiểm tra lô đang "Chờ kiểm tra": bổ sung thông tin còn thiếu,
+            // định khu lại vị trí thật, từ đó lô mới được cộng vào tồn kho
+            Route::post('confirmCheck', 'confirmCheck')->name('confirmCheck');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
@@ -46,6 +49,9 @@ Route::prefix('/import')
             Route::get('label', 'label')->name('label');
             Route::get('history', 'history')->name('history');
             Route::post('update', 'update')->name('update');
+            // Xác nhận kiểm tra lô đang "Chờ kiểm tra": bổ sung thông tin còn thiếu,
+            // định khu lại vị trí thật, từ đó lô mới được cộng vào tồn kho
+            Route::post('confirmCheck', 'confirmCheck')->name('confirmCheck');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
@@ -63,6 +69,9 @@ Route::prefix('/import')
             Route::post('labelPrinted', 'labelPrinted')->name('labelPrinted');
             Route::get('history', 'history')->name('history');
             Route::post('update', 'update')->name('update');
+            // Xác nhận kiểm tra lô đang "Chờ kiểm tra": bổ sung thông tin còn thiếu,
+            // định khu lại vị trí thật, từ đó lô mới được cộng vào tồn kho
+            Route::post('confirmCheck', 'confirmCheck')->name('confirmCheck');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');

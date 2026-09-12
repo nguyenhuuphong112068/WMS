@@ -1,39 +1,71 @@
 @include('pages.category.shared.assets')
 
+@php
+    use App\Support\MaterialClassification;
+@endphp
+
 <div class="card md-card">
     <div class="card-body">
 
         <div class="md-toolbar">
-            @perm('category_material_create')
-                <button type="button" class="btn btn-primary btn-md-create">
-                    <i class="fas fa-plus mr-1"></i> Thêm mới
-                </button>
-            @endperm
+            <div class="d-flex align-items-center flex-wrap" style="gap: 10px">
+                @perm('category_material_create')
+                    <button type="button" class="btn btn-primary btn-md-create">
+                        <i class="fas fa-plus mr-1"></i> Thêm mới
+                    </button>
+                @endperm
+
+                <div class="md-filter">
+                    <label for="mdClassFilter"><i class="fas fa-filter mr-1"></i> Phân loại</label>
+                    <select id="mdClassFilter" class="form-control form-control-sm">
+                        <option value="all">Tất cả</option>
+                        <option value="none">Chưa phân loại</option>
+                        @foreach (MaterialClassification::CRITERIA as $key => $criterion)
+                            <optgroup label="{{ $criterion['label'] }}">
+                                @foreach ($criterion['options'] as $value => $name)
+                                    <option value="{{ $key }}:{{ $value }}">{{ $name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
         </div>
 
         <div class="table-responsive">
             <table id="mdTable" class="table table-bordered table-hover w-100">
                 <thead>
                     <tr>
-                        <th class="text-center" style="width: 60px">STT</th>
-                        <th style="width: 110px">Mã Vật Tư</th>
+                        <th class="text-center" style="width: 55px">STT</th>
+                        <th style="width: 100px">Mã Vật Tư</th>
                         <th>Tên Vật Tư</th>
                         <th>Nhà Sản Xuất</th>
                         <th>Thông Tin Kỹ Thuật</th>
-                        <th style="width: 200px">Phòng Ban Đang Dùng</th>
-                        <th style="width: 130px">Người Tạo</th>
-                        <th class="text-center" style="width: 105px">Ngày Tạo</th>
-                        <th class="text-center" style="width: 130px">Duyệt</th>
-                        <th class="text-center" style="width: 105px">Sử Dụng</th>
+                        <th style="width: 190px">Phân Loại</th>
+                        <th style="width: 110px">Bộ Phận Mua Hàng</th>
+                        <th class="text-center" style="width: 95px">Thời Gian Đặt Hàng</th>
+                        <th style="width: 170px">Phòng Ban Đang Dùng</th>
+                        <th style="width: 120px">Người Tạo</th>
+                        <th class="text-center" style="width: 100px">Ngày Tạo</th>
+                        <th class="text-center" style="width: 125px">Duyệt</th>
+                        <th class="text-center" style="width: 100px">Sử Dụng</th>
                         <th class="text-center" style="width: 215px">Thao Tác</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($datas as $row)
-                        @php $usingDepts = $departmentsByCategory[$row->id] ?? collect(); @endphp
-                        <tr>
+                        @php
+                            $usingDepts = $departmentsByCategory[$row->id] ?? collect();
+                            $classification = MaterialClassification::decode($row->classification);
+                            $chips = MaterialClassification::chips($row->classification);
+                            // Chuỗi "tiêu chí:giá trị" để bộ lọc phía trên đọc được mà không phải dò chữ
+                            $classKeys = collect($classification)->map(fn($value, $key) => $key . ':' . $value)->implode(' ');
+                            // Màu nền mã theo tình trạng: khoá thắng duyệt, chưa duyệt thì vẫn vàng chờ
+                            $catCodeStatus = $row->status_id == 0 ? 'locked' : ($row->app_status === 'approved' ? 'approved' : 'pending');
+                        @endphp
+                        <tr data-classification="{{ $classKeys }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
-                            <td class="font-weight-bold">{{ $row->code }}</td>
+                            <td><span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span></td>
                             <td class="font-weight-bold">{{ $row->material_name ?: '—' }}</td>
                             <td class="md-sub">
                                 @if ($row->manufacturer_name)
@@ -46,6 +78,29 @@
                                 @endif
                             </td>
                             <td class="md-sub">{{ $row->technical_specification ?: '—' }}</td>
+                            <td>
+                                @if ($chips)
+                                    <div class="cat-chips">
+                                        @foreach ($chips as $chip)
+                                            <span class="cat-chip {{ $chip['class'] }}"
+                                                title="{{ $chip['label'] }}">{{ $chip['short'] }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="md-empty">Chưa phân loại</span>
+                                @endif
+                            </td>
+                            <td class="md-sub">
+                                {{ MaterialClassification::purchasingLabel($row->purchasing_department) ?: '—' }}
+                            </td>
+                            <td class="text-center" data-order="{{ $row->lead_time_days ?? -1 }}">
+                                @if ($row->lead_time_days !== null)
+                                    <span class="font-weight-bold">{{ $row->lead_time_days }}</span>
+                                    <span class="md-sub">ngày</span>
+                                @else
+                                    <span class="md-empty">—</span>
+                                @endif
+                            </td>
                             <td>
                                 @if ($usingDepts->count())
                                     <div class="cat-chips">
@@ -86,6 +141,9 @@
                                         'material_names_id' => $row->material_names_id,
                                         'manufacturers_id' => $row->manufacturers_id,
                                         'technical_specification' => $row->technical_specification,
+                                        'classification' => (object) $classification,
+                                        'purchasing_department' => $row->purchasing_department,
+                                        'lead_time_days' => $row->lead_time_days,
                                     ],
                                 ])
                             </td>
@@ -96,3 +154,48 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* Ô lọc nhanh trên thanh công cụ của bảng */
+    .md-filter {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .md-filter label {
+        margin: 0;
+        font-size: 0.83rem;
+        font-weight: 700;
+        color: var(--primary-dark);
+        white-space: nowrap;
+    }
+
+    .md-filter .form-control {
+        width: auto;
+        min-width: 200px;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var mdClassWant = 'all';
+
+        /* ---------- Lọc bảng danh mục công ty theo một lựa chọn phân loại ---------- */
+        $.fn.dataTable.ext.search.push(function(settings, data, index) {
+            if (settings.nTable.id !== 'mdTable') return true;
+            if (mdClassWant === 'all') return true;
+
+            var keys = ($(settings.aoData[index].nTr).attr('data-classification') || '').trim();
+
+            if (mdClassWant === 'none') return keys === '';
+
+            return (' ' + keys + ' ').indexOf(' ' + mdClassWant + ' ') !== -1;
+        });
+
+        $(document).on('change', '#mdClassFilter', function() {
+            mdClassWant = this.value;
+            $('#mdTable').DataTable().draw();
+        });
+    });
+</script>

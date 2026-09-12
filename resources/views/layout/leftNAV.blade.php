@@ -343,13 +343,6 @@
                                         <p>Tên Vật Tư</p>
                                     </a></li>
                             @endperm
-                            @perm('materData_material_view')
-                                <li class="nav-item"><a href="{{ route('pages.materData.materialClassification.list') }}"
-                                        class="nav-link {{ request()->is('materData/materialClassification') ? 'active' : '' }}"><i
-                                            class="far fa-circle nav-icon text-success"></i>
-                                        <p>Phân Loại Vật Tư</p>
-                                    </a></li>
-                            @endperm
                             @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.productName.list') }}"
                                         class="nav-link {{ request()->is('materData/productName') ? 'active' : '' }}"><i

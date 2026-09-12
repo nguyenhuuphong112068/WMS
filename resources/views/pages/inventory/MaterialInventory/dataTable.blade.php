@@ -103,7 +103,7 @@
 
                 <div class="mi-tabs">
                     <button type="button" class="mi-tab is-active" data-pane="miPaneCode"><i class="fas fa-boxes mr-1"></i>Theo mã xuất nhập</button>
-                    <button type="button" class="mi-tab" data-pane="miPaneMat"><i class="fas fa-layer-group mr-1"></i>Tồn kho theo tên</button>
+                    <button type="button" class="mi-tab" data-pane="miPaneMat"><i class="fas fa-layer-group mr-1"></i>Tồn Theo mã vật tư</button>
                     <button type="button" class="mi-tab" data-pane="miPaneZone"><i class="fas fa-map-marked-alt mr-1"></i>Tồn kho theo vị trí</button>
                     <button type="button" class="mi-tab" data-pane="miPaneCheck">
                         <i class="fas fa-clipboard-check mr-1"></i>Kiểm kê định kỳ
@@ -161,7 +161,8 @@
                                             <div class="md-sub small text-muted">
                                                 {{ $row->manufacturer_short_name ?: '' }}
                                                 @if ($row->technical_specification) · {{ $row->technical_specification }} @endif
-                                                @if ($row->classification_name) · {{ $row->classification_name }} @endif
+                                                @php $rowClassification = \App\Support\MaterialClassification::summary($row->classification); @endphp
+                                                @if ($rowClassification !== '') · {{ $rowClassification }} @endif
                                             </div>
                                         </td>
                                         <td class="md-sub">

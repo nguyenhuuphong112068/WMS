@@ -1,3 +1,5 @@
+@include('pages.shared.maxStockWarn')
+
 @php $bag = $errors->getBag('createErrors'); @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog" aria-hidden="true">
@@ -66,6 +68,10 @@
                                 value="{{ old('quantity', 1) }}">
                             <small class="text-muted">Nhập nhiều lô cùng thông tin, mỗi lô một mã.</small>
                         </div>
+                        <div class="form-group col-md-12 order-last">
+                            <div class="js-max-stock-warn"></div>
+                        </div>
+
                         <div class="form-group col-md-4">
                             <label>Hạn sử dụng</label>
                             <input type="date" name="expired_date"
@@ -76,12 +82,42 @@
                     </div>
 
                     <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label>Số lô</label>
+                            <input type="text" name="batch_no" maxlength="100"
+                                class="form-control {{ $bag->has('batch_no') ? 'is-invalid' : '' }}"
+                                value="{{ old('batch_no') }}" placeholder="Ví dụ: LOT-2026-018">
+                            @if ($bag->has('batch_no'))
+                                <div class="md-error text-danger small">{{ $bag->first('batch_no') }}</div>
+                            @endif
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label>Số hoá đơn</label>
+                            <input type="text" name="invoice_number" maxlength="100"
+                                class="form-control {{ $bag->has('invoice_number') ? 'is-invalid' : '' }}"
+                                value="{{ old('invoice_number') }}" placeholder="Ví dụ: HD-000125">
+                            @if ($bag->has('invoice_number'))
+                                <div class="md-error text-danger small">{{ $bag->first('invoice_number') }}</div>
+                            @endif
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label>Ngày ký hoá đơn</label>
+                            <input type="date" name="invoice_date"
+                                class="form-control {{ $bag->has('invoice_date') ? 'is-invalid' : '' }}"
+                                value="{{ old('invoice_date') }}">
+                            @if ($bag->has('invoice_date'))
+                                <div class="md-error text-danger small">{{ $bag->first('invoice_date') }}</div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="form-row">
                         <div class="form-group col-md-12">
-                            <label>Định Khu</label>
+                            <label>Định Khu Tạm (Biệt Trữ / Chờ Kiểm Tra)</label>
                             <select name="location_id"
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
-                                @foreach ($locations as $loc)
+                                @foreach ($quarantineLocations as $loc)
                                     <option value="{{ $loc->id }}"
                                         {{ old('location_id') == $loc->id ? 'selected' : '' }}>
                                         {{ $loc->code }} — {{ $loc->warehouse_name }} /
@@ -89,6 +125,18 @@
                                     </option>
                                 @endforeach
                             </select>
+                            @if ($bag->has('location_id'))
+                                <div class="md-error text-danger small">{{ $bag->first('location_id') }}</div>
+                            @endif
+                            @if ($quarantineLocations->isEmpty())
+                                <div class="text-danger small mt-1">
+                                    <i class="fas fa-triangle-exclamation mr-1"></i>
+                                    Phòng chưa khai vị trí nào thuộc phân loại <b>Biệt Trữ</b>. Vào Dữ Liệu Gốc →
+                                    Định Khu, đặt phân loại "Biệt Trữ" cho khu chờ kiểm tra rồi quay lại.
+                                </div>
+                            @endif
+                            <small class="text-muted">Lô mới nhập ở trạng thái <b>Chờ kiểm tra</b> nên chỉ xếp vào khu
+                                Biệt Trữ; vị trí lưu trữ thật được định khu lại ở bước Xác nhận kiểm tra.</small>
                         </div>
                     </div>
 
@@ -96,6 +144,16 @@
                         <label>Tài liệu đính kèm</label>
                         <input type="file" name="attachments[]" class="form-control-file" multiple>
                         <small class="text-muted">Tối đa 10MB / file.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Mục đích sử dụng</label>
+                        <textarea name="purpose" rows="2" maxlength="500"
+                            class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}"
+                            placeholder="Mục đích sử dụng...">{{ old('purpose') }}</textarea>
+                        @if ($bag->has('purpose'))
+                            <div class="md-error text-danger small">{{ $bag->first('purpose') }}</div>
+                        @endif
                     </div>
 
                     <div class="form-group">
@@ -132,7 +190,23 @@
             if (fillLocation && $location.length) {
                 $location.val(d.location_id ? String(d.location_id) : '').trigger('change');
             }
+
+            checkMaxStock($modal);
         }
+
+        /* Cảnh báo trữ quá nhiều: tồn hiện tại + (số lượng x số lần nhập) so với ngưỡng tối đa */
+        function checkMaxStock($modal) {
+            var defaults = $modal.find('.mi-category').data('defaults') || {};
+            var d = defaults[$modal.find('.mi-category').val()] || null;
+            var amount = parseFloat(($modal.find('[name="amount"]').val() || '').replace(/,/g, ''));
+            var times = parseInt($modal.find('[name="quantity"]').val(), 10);
+
+            wmsMaxStockWarn($modal.find('.js-max-stock-warn'), d, (amount || 0) * (times > 0 ? times : 1));
+        }
+
+        $(document).on('input change', '#createModal [name="amount"], #createModal [name="quantity"]', function() {
+            checkMaxStock($(this).closest('.modal'));
+        });
         $(document).on('change', '#createModal .mi-category', function() {
             syncCat($(this), true);
         });
@@ -187,8 +261,9 @@
                                     </td>
                                     <td>{{ $c->technical_specification ?: '—' }}</td>
                                     <td>
-                                        @if ($c->classification_name)
-                                            <span class="badge badge-secondary">{{ $c->classification_name }}</span>
+                                        @php $cClassification = \App\Support\MaterialClassification::summary($c->classification); @endphp
+                                        @if ($cClassification !== '')
+                                            <span class="badge badge-secondary">{{ $cClassification }}</span>
                                         @else
                                             —
                                         @endif

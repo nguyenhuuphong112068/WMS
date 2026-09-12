@@ -876,6 +876,7 @@ class StandardInventoryController extends Controller
         $imports = $query
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
+            ->where('standard_imports.is_checked', 1)
             ->whereDate('standard_imports.imported_date', '<=', $to)
             ->when($scope === 'category',
                 fn ($q) => $q->where('standard_imports.category_id', $id),
@@ -1148,6 +1149,8 @@ class StandardInventoryController extends Controller
             )
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
+            // Ống đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn kho
+            ->where('standard_imports.is_checked', 1)
             // Ống nhập sau ngày cuối kỳ thì trong kỳ này chưa tồn tại -> không đưa vào bảng
             ->whereDate('standard_imports.imported_date', '<=', $to)
             ->orderBy('standard_imports.code', 'asc')

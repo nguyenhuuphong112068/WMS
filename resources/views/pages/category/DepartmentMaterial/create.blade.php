@@ -52,24 +52,6 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label>Phân Loại</label>
-                            <select name="classification_id"
-                                class="form-control cat-select {{ $bag->has('classification_id') ? 'is-invalid' : '' }}">
-                                <option value="">-- Chưa phân loại --</option>
-                                @foreach ($classifications as $classification)
-                                    <option value="{{ $classification->id }}"
-                                        {{ $old('classification_id') == $classification->id ? 'selected' : '' }}>
-                                        {{ $classification->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @if ($bag->has('classification_id'))
-                                <span class="md-error">{{ $bag->first('classification_id') }}</span>
-                            @endif
-                            <small class="md-sub">Bộ phân loại khai ở <b>Dữ Liệu Gốc → Phân Loại Vật Tư</b>.</small>
-                        </div>
-
-                        <div class="form-group col-md-6">
                             <label>Đơn Vị Tính <span class="text-danger">*</span></label>
                             <select name="unit_id"
                                 class="form-control cat-select dm-unit {{ $bag->has('unit_id') ? 'is-invalid' : '' }}" required>
@@ -110,6 +92,18 @@
                         </div>
 
                         <div class="form-group col-md-6">
+                            <label>Ngưỡng Tồn Tối Đa</label>
+                            <input type="text" inputmode="decimal" name="max_stock" min="0"
+                                class="form-control js-decimal {{ $bag->has('max_stock') ? 'is-invalid' : '' }}"
+                                value="{{ $old('max_stock') }}" placeholder="Để trống nếu không đặt trần tồn">
+                            @if ($bag->has('max_stock'))
+                                <span class="md-error">{{ $bag->first('max_stock') }}</span>
+                            @endif
+                            <small class="md-sub">Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.
+                                Theo <b class="dm-unit-hint">đơn vị</b> đã chọn ở trên.</small>
+                        </div>
+
+                        <div class="form-group col-md-6">
                             <label>Định Khu</label>
                             <select name="default_location_id"
                                 class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
@@ -144,8 +138,8 @@
 
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Bản chất vật tư (tên, nhà sản xuất, thông tin kỹ thuật) khai ở
-                        <b>Danh Mục Vật Tư Công Ty</b> và dùng chung toàn công ty. Ở đây chỉ khai phần
+                        Bản chất vật tư (tên, nhà sản xuất, thông tin kỹ thuật, phân loại, bộ phận mua hàng)
+                        khai ở <b>Danh Mục Vật Tư Công Ty</b> và dùng chung toàn công ty. Ở đây chỉ khai phần
                         <b>riêng của phòng</b>.
                     </div>
                 </div>

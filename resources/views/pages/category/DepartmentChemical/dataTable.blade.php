@@ -71,6 +71,7 @@
                         <th class="text-center" style="width: 135px">Hạn Dùng Nội Bộ<br><small>(tháng)</small>
                         </th>
                         <th class="text-right" style="width: 130px">Ngưỡng Tồn Tối Thiểu</th>
+                        <th class="text-right" style="width: 130px">Ngưỡng Tồn Tối Đa</th>
                         <th style="width: 200px">Định Khu</th>
                         <th style="width: 170px">Điều Kiện Bảo Quản</th>
                         <th style="width: 160px">Ghi Chú</th>
@@ -168,6 +169,14 @@
                                     <span class="dc-value is-none">Theo tỉ lệ 20%</span>
                                 @endif
                             </td>
+                            <td class="text-right" data-order="{{ $row->max_stock ?? -1 }}">
+                                @if ($row->max_stock !== null)
+                                    <span class="dc-value">{{ $dcNum($row->max_stock) }}</span>
+                                    <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                @else
+                                    <span class="md-empty">Chưa khai</span>
+                                @endif
+                            </td>
                             <td class="md-sub">
                                 @if ($row->location_code)
                                     <div class="font-weight-bold">
@@ -214,6 +223,7 @@
                                                 'pack_weight_kg' => $row->pack_weight_kg,
                                                 'shelf_life_months' => $row->shelf_life_months,
                                                 'min_stock' => $row->min_stock,
+                                                'max_stock' => $row->max_stock,
                                                 'storage_condition_id' => $row->storage_condition_id,
                                                 'default_location_id' => $row->default_location_id,
                                                 'note' => $row->note,

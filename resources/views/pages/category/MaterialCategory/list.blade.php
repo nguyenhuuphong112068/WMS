@@ -6,10 +6,11 @@
     | DANH MỤC - VẬT TƯ (1 TRANG, 2 TAB)
     |--------------------------------------------------------------------------
     | Tab 1 "Danh Mục Vật Tư Công Ty" : bản chất của vật tư (tên, nhà sản xuất, thông tin
-    |                                   kỹ thuật), dùng chung toàn công ty, có bước duyệt
+    |                                   kỹ thuật, phân loại, bộ phận mua hàng, thời gian đặt
+    |                                   hàng), dùng chung toàn công ty, có bước duyệt
     |                                   (MaterialCategoryController).
-    | Tab 2 "Vật Tư Của Phòng"        : cách dùng riêng của phòng ban đang chọn (phân loại,
-    |                                   đơn vị tính, ngưỡng tồn), không duyệt
+    | Tab 2 "Vật Tư Của Phòng"        : cách dùng riêng của phòng ban đang chọn (đơn vị tính,
+    |                                   ngưỡng tồn, định khu), không duyệt
     |                                   (DepartmentMaterialController).
     |
     | Hai tab dùng chung một trang nên phải tách nhau ở 3 chỗ:
@@ -210,7 +211,6 @@
         'mdTitle' => $dmTitle,
         'mdIcon' => $dmIcon,
         'categories' => $dmCategories,
-        'classifications' => $dmClassifications,
         'units' => $dmUnits,
         'locations' => $dmLocations,
         'unitsInUse' => $dmUnitsInUse,
@@ -223,7 +223,6 @@
         'mdRoute' => $dmRoute,
         'mdTitle' => $dmTitle,
         'mdIcon' => $dmIcon,
-        'classifications' => $dmClassifications,
         'units' => $dmUnits,
         'locations' => $dmLocations,
         'unitsInUse' => $dmUnitsInUse,

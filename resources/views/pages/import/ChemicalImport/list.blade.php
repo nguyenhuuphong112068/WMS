@@ -43,6 +43,7 @@
 @section('model')
     @include('pages.import.ChemicalImport.create')
     @include('pages.import.ChemicalImport.update')
+    @include('pages.import.ChemicalImport.checkModal')
     @include('pages.import.ChemicalImport.historyModal')
     @include('pages.shared.attachmentListModal')
 @endsection

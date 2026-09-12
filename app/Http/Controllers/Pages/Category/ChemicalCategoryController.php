@@ -58,6 +58,7 @@ class ChemicalCategoryController extends Controller
         'storage_condition_id' => 'Điều kiện bảo quản',
         'doc_no' => 'Số tài liệu',
         'safety_warning' => 'Cảnh báo an toàn',
+        'lead_time_days' => 'Thời gian đặt hàng (ngày)',
     ];
 
     public function index()
@@ -303,6 +304,7 @@ class ChemicalCategoryController extends Controller
                     'Hạn dùng (tháng)' => $row->shelf_life_months ?: '—',
                     'Điều kiện bảo quản' => $row->storage_condition_name ?: '—',
                     'Số tài liệu' => $row->doc_no ?: '—',
+                    'Thời gian đặt hàng' => $row->lead_time_days === null ? '—' : $row->lead_time_days . ' ngày',
                     'Phân loại' => $codes ? implode(', ', $codes) : '—',
                     'Cảnh báo an toàn' => $warningCodes
                         ? implode(', ', array_map(fn ($code) => $safetyWarnings[$code] ?? $code, $warningCodes))
@@ -510,6 +512,7 @@ class ChemicalCategoryController extends Controller
             // Cột giữ lại cho ảnh chụp cũ; bản ghi mới không còn phân loại thủ công
             'classification' => null,
             'safety_warning' => $row->safety_warning,
+            'lead_time_days' => $row->lead_time_days,
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
             'change_note' => $note,
@@ -751,7 +754,7 @@ class ChemicalCategoryController extends Controller
             'doc_no' => ['nullable', 'max:20'],
             'safety_warning' => ['nullable', 'array'],
             'safety_warning.*' => [Rule::in(array_keys(config('chemical.safety_warnings')))],
-        ];
+        ] + \App\Support\MaterialClassification::leadTimeRules();
     }
 
     private function payload(Request $request): array
@@ -776,6 +779,7 @@ class ChemicalCategoryController extends Controller
             'storage_condition_id' => $storageConditionId === '' ? null : (int) $storageConditionId,
             'doc_no' => $docNo === '' ? null : $docNo,
             'safety_warning' => $warningCodes ? json_encode($warningCodes, JSON_UNESCAPED_UNICODE) : null,
+            'lead_time_days' => \App\Support\MaterialClassification::leadTimeValue($request->lead_time_days),
         ];
     }
 
@@ -798,6 +802,6 @@ class ChemicalCategoryController extends Controller
             'storage_condition_id.exists' => 'Điều kiện bảo quản không hợp lệ.',
             'doc_no.max' => 'Số tài liệu tối đa 20 ký tự.',
             'safety_warning.*.in' => 'Cảnh báo an toàn không hợp lệ.',
-        ];
+        ] + \App\Support\MaterialClassification::leadTimeMessages();
     }
 }

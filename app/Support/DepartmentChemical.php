@@ -113,6 +113,12 @@ class DepartmentChemical
         return self::TABLE.'.min_stock';
     }
 
+    /** Ngưỡng tồn tối đa của phòng, dùng trong select() sau khi đã gọi join(). */
+    public static function maxStockColumn(): string
+    {
+        return self::TABLE.'.max_stock';
+    }
+
     /** Định khu của phòng, dùng để điền sẵn khi nhập. */
     public static function defaultLocationColumn()
     {
@@ -265,8 +271,11 @@ class DepartmentChemical
      *
      * Lọc theo locations.item_type để không xếp nhầm hàng vào ô của loại khác;
      * ô chưa khai loại được coi là dùng chung nên vẫn chọn được.
+     *
+     * $quarantineOnly = true: chỉ lấy vị trí zone_type = 'quarantine' (Biệt Trữ/Chờ
+     * kiểm tra), dùng cho modal Nhập hoá chất - lô mới nhập chỉ định khu tạm vào đây.
      */
-    public static function locationOptions(int $departmentId)
+    public static function locationOptions(int $departmentId, bool $quarantineOnly = false)
     {
         return DB::table('locations')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
@@ -276,6 +285,7 @@ class DepartmentChemical
             ->select(
                 'locations.id',
                 'locations.code',
+                'locations.zone_type',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',
@@ -286,6 +296,7 @@ class DepartmentChemical
             // Chỉ những ô khai loại hoá chất, cộng thêm ô chưa khai loại (dùng chung)
             ->where(fn ($query) => $query->whereNull('locations.item_type')
                 ->orWhere('locations.item_type', 'chemical'))
+            ->when($quarantineOnly, fn ($query) => $query->where('locations.zone_type', 'quarantine'))
             ->orderBy('warehouses.name', 'asc')
             ->orderBy('shelves.name', 'asc')
             ->orderBy('columns.name', 'asc')
@@ -366,6 +377,7 @@ class DepartmentChemical
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 self::TABLE.'.min_stock',
+                self::TABLE.'.max_stock',
                 self::TABLE.'.default_location_id'
             )
             ->selectSub(self::casNoSubquery('chemical_categories.chem_names_id'), 'cas_no')

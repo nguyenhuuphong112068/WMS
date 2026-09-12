@@ -145,6 +145,8 @@ class ChemicalEstimateController extends Controller
         $pendingSign = $this->pendingSign($list, $signs);
 
         return view('pages.estimate.shared.detail', [
+            // Ngưỡng tồn tối đa + tồn hiện tại của phòng, để khối số lượng cảnh báo dự trù quá nhiều
+            'maxStock' => \App\Support\MaxStockWarning::forChemical((int) $list->department_id),
             'list' => $list,
             'items' => self::itemsOf($list->id),
             'histories' => self::historiesOf($list->id),

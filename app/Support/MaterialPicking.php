@@ -93,6 +93,8 @@ class MaterialPicking
             )
             ->where('material_imports.department_id', $departmentId)
             ->where('material_imports.status_id', 1)
+            // Lô đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn, không đề xuất lấy
+            ->where('material_imports.is_checked', 1)
             ->when($categoryId, fn ($query) => $query->where('material_imports.category_id', $categoryId))
             // 1. Lô có hạn dùng trước lô không hạn - phải đứng trước hai mệnh đề dưới
             ->orderByRaw('material_imports.expired_date IS NULL')

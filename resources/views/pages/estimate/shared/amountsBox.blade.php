@@ -10,6 +10,9 @@
 |
 | Dòng mẫu nằm trong <template>, JS nhân bản ra khi bấm "Thêm tháng" và đánh số lại
 | tên ô thành amounts[0][...], amounts[1][...] - xem pages/estimate/shared/assets.blade.php.
+|
+| $maxStock (tuỳ chọn, lấy thẳng từ dữ liệu của màn hình cha - App\Support\MaxStockWarning)
+| là ngưỡng tồn tối đa + tồn hiện tại của từng mã danh mục, để cảnh báo dự trù quá nhiều.
 --}}
 @php
     $oldRows = $oldRows ?? [];
@@ -49,4 +52,7 @@
     <button type="button" class="btn btn-sm btn-outline-primary btn-est-amount-add mb-2">
         <i class="fas fa-plus mr-1"></i> Thêm tháng
     </button>
+
+    {{-- Cảnh báo dự trù vượt ngưỡng tồn tối đa của phòng; trống thì JS tự ẩn --}}
+    <div class="js-max-stock-warn" data-max-stock="{{ json_encode($maxStock ?? [], JSON_UNESCAPED_UNICODE) }}"></div>
 </div>

@@ -48,6 +48,8 @@ class DepartmentChemicalController extends Controller
 
         $this->checkConversions($validator, $request, (int) $request->category_id, $departmentId);
 
+        $this->checkStockRange($validator, $request);
+
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dcCreateErrors')->withInput();
         }
@@ -97,6 +99,8 @@ class DepartmentChemicalController extends Controller
 
         $this->checkConversions($validator, $request, (int) $current->category_id, $departmentId);
 
+        $this->checkStockRange($validator, $request);
+
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dcUpdateErrors')->withInput();
         }
@@ -117,11 +121,13 @@ class DepartmentChemicalController extends Controller
             'đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
                 .' | kg/đơn vị: '.($current->pack_weight_kg ?? 'không khai')
                 .' | hạn: '.($current->shelf_life_months ?? 'mặc định')
-                .' | ngưỡng: '.($current->min_stock ?? 'mặc định'),
+                .' | ngưỡng: '.($current->min_stock ?? 'mặc định')
+                .' | ngưỡng tối đa: '.($current->max_stock ?? 'chưa khai'),
             'đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
                 .' | kg/đơn vị: '.($this->packWeightKg($request) ?? 'không khai')
                 .' | hạn: '.($request->shelf_life_months ?: 'mặc định')
                 .' | ngưỡng: '.($request->min_stock ?: 'mặc định')
+                .' | ngưỡng tối đa: '.($request->max_stock ?: 'chưa khai')
                 .' | Lý do: '.$this->changeReason($request)
         );
 
@@ -174,6 +180,7 @@ class DepartmentChemicalController extends Controller
             'pack_weight_kg' => ['nullable', 'numeric', 'gt:0'],
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
+            'max_stock' => ['nullable', 'numeric', 'min:0'],
             'storage_condition_id' => ['nullable', 'exists:storage_conditions,id'],
             // Định khu phải thuộc ĐÚNG phòng ban đang chọn, không mượn được của phòng khác
             'default_location_id' => [
@@ -199,6 +206,28 @@ class DepartmentChemicalController extends Controller
         ];
 
         return $rules;
+    }
+
+    /**
+     * Ngưỡng tối đa phải lớn hơn ngưỡng tối thiểu.
+     *
+     * Không dùng rule gte:min_stock vì ô tối thiểu thường để trống, lúc đó gte so sánh
+     * chuỗi rỗng và cho kết quả vô nghĩa. Chỉ so khi cả hai ô đều có số.
+     */
+    private function checkStockRange($validator, Request $request): void
+    {
+        $validator->after(function ($validator) use ($request) {
+            $min = trim((string) $request->min_stock);
+            $max = trim((string) $request->max_stock);
+
+            if ($min === '' || $max === '' || ! is_numeric($min) || ! is_numeric($max)) {
+                return;
+            }
+
+            if ((float) $max < (float) $min) {
+                $validator->errors()->add('max_stock', 'Ngưỡng tồn tối đa phải lớn hơn hoặc bằng ngưỡng tồn tối thiểu.');
+            }
+        });
     }
 
     /**
@@ -247,6 +276,7 @@ class DepartmentChemicalController extends Controller
             'pack_weight_kg' => $this->packWeightKg($request),
             'shelf_life_months' => $this->nullIfBlank($request->shelf_life_months),
             'min_stock' => $this->nullIfBlank($request->min_stock),
+            'max_stock' => $this->nullIfBlank($request->max_stock),
             'storage_condition_id' => $request->storage_condition_id ? (int) $request->storage_condition_id : null,
             'default_location_id' => $request->default_location_id ? (int) $request->default_location_id : null,
             'note' => $this->nullIfBlank($request->note),
@@ -293,6 +323,8 @@ class DepartmentChemicalController extends Controller
             'shelf_life_months.max' => 'Hạn dùng nội bộ tối đa 1200 tháng (100 năm).',
             'min_stock.numeric' => 'Ngưỡng tồn tối thiểu phải là số.',
             'min_stock.min' => 'Ngưỡng tồn tối thiểu không được âm.',
+            'max_stock.numeric' => 'Ngưỡng tồn tối đa phải là số.',
+            'max_stock.min' => 'Ngưỡng tồn tối đa không được âm.',
             'default_location_id.exists' => 'Định khu không thuộc phòng ban đang chọn.',
             'storage_condition_id.exists' => 'Điều kiện bảo quản được chọn không tồn tại.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',

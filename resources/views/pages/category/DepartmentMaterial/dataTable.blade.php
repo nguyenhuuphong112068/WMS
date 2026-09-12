@@ -1,37 +1,14 @@
 @include('pages.category.shared.assets')
 
-@php
-    // Danh sách nhóm để lọc bảng: chỉ lấy các nhóm THỰC SỰ đang xuất hiện trong bảng này.
-    $dmFilterGroups = $datas
-        ->filter(fn($row) => $row->classification_id && $row->classification_name)
-        ->unique('classification_id')
-        ->pluck('classification_name', 'classification_id')
-        ->sort();
-@endphp
-
 <div class="card md-card">
     <div class="card-body">
 
         <div class="md-toolbar">
-            <div class="d-flex align-items-center flex-wrap" style="gap: 10px">
-                @perm('category_material_dept_manage')
-                    <button type="button" class="btn btn-primary btn-md-create" data-modal="#dmCreateModal">
-                        <i class="fas fa-plus mr-1"></i> Thêm mới vật tư phòng
-                    </button>
-                @endperm
-
-                <div class="dm-filter">
-                    <label for="dmGroupFilter"><i class="fas fa-filter mr-1"></i> Nhóm</label>
-                    <select id="dmGroupFilter" class="form-control form-control-sm">
-                        <option value="all">Tất cả</option>
-                        <option value="none">Chưa phân loại</option>
-                        @foreach ($dmFilterGroups as $groupId => $groupName)
-                            <option value="{{ $groupId }}">{{ $groupName }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
+            @perm('category_material_dept_manage')
+                <button type="button" class="btn btn-primary btn-md-create" data-modal="#dmCreateModal">
+                    <i class="fas fa-plus mr-1"></i> Thêm mới vật tư phòng
+                </button>
+            @endperm
         </div>
 
         <div class="table-responsive">
@@ -43,9 +20,9 @@
                         <th style="width: 170px">Tên Vật Tư</th>
                         <th style="width: 150px">Nhà Sản Xuất</th>
                         <th>Thông Tin Kỹ Thuật</th>
-                        <th style="width: 110px">Phân Loại</th>
                         <th class="text-center" style="width: 65px">Đơn Vị</th>
                         <th class="text-right" style="width: 120px">Ngưỡng Tồn Tối Thiểu</th>
+                        <th class="text-right" style="width: 120px">Ngưỡng Tồn Tối Đa</th>
                         <th style="width: 190px">Định Khu</th>
                         <th style="width: 130px">Ghi Chú</th>
                         <th class="text-center" style="width: 90px">Sử Dụng</th>
@@ -54,7 +31,7 @@
                 </thead>
                 <tbody>
                     @foreach ($datas as $row)
-                        <tr data-classification="{{ $row->classification_id }}">
+                        <tr>
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td class="font-weight-bold">{{ $row->category_code ?: '—' }}</td>
                             <td class="font-weight-bold">{{ $row->material_name ?: '—' }}</td>
@@ -69,15 +46,6 @@
                                 @endif
                             </td>
                             <td class="md-sub">{{ $row->category_technical_specification ?: '—' }}</td>
-                            <td>
-                                @if ($row->classification_name)
-                                    <span class="cat-chip" title="{{ $row->classification_name }}">
-                                        {{ $row->classification_name }}
-                                    </span>
-                                @else
-                                    <span class="md-empty">Chưa phân loại</span>
-                                @endif
-                            </td>
                             <td class="text-center">
                                 @if ($row->unit_short_name || $row->unit_name)
                                     <span class="md-tag"
@@ -89,6 +57,14 @@
                             <td class="text-right" data-order="{{ $row->min_stock ?? -1 }}">
                                 @if ($row->min_stock !== null)
                                     <span class="font-weight-bold">{{ $dmNum($row->min_stock) }}</span>
+                                    <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                @else
+                                    <span class="md-empty">Chưa khai</span>
+                                @endif
+                            </td>
+                            <td class="text-right" data-order="{{ $row->max_stock ?? -1 }}">
+                                @if ($row->max_stock !== null)
+                                    <span class="font-weight-bold">{{ $dmNum($row->max_stock) }}</span>
                                     <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
                                 @else
                                     <span class="md-empty">Chưa khai</span>
@@ -126,9 +102,9 @@
                                             data-row="{{ json_encode([
                                                 'id' => $row->id,
                                                 'category_id' => $row->category_id,
-                                                'classification_id' => $row->classification_id,
                                                 'unit_id' => $row->unit_id,
                                                 'min_stock' => $row->min_stock,
+                                                'max_stock' => $row->max_stock,
                                                 'default_location_id' => $row->default_location_id,
                                                 'note' => $row->note,
                                                 'material_name' => $row->material_name,
@@ -163,47 +139,3 @@
     </div>
 </div>
 
-@once
-    <style>
-        .dm-filter {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .dm-filter label {
-            margin: 0;
-            font-size: 0.83rem;
-            font-weight: 700;
-            color: var(--primary-dark);
-            white-space: nowrap;
-        }
-
-        .dm-filter .form-control {
-            width: auto;
-            min-width: 170px;
-        }
-    </style>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var dmGroupWant = 'all';
-
-            /* ---------- Lọc bảng Vật Tư Của Phòng theo nhóm phân loại ---------- */
-            $.fn.dataTable.ext.search.push(function(settings, data, index) {
-                if (settings.nTable.id !== 'dmTable') return true;
-                if (dmGroupWant === 'all') return true;
-
-                var classificationId = ($(settings.aoData[index].nTr).attr('data-classification') || '')
-                    .trim();
-
-                return dmGroupWant === 'none' ? classificationId === '' : classificationId === dmGroupWant;
-            });
-
-            $(document).on('change', '#dmGroupFilter', function() {
-                dmGroupWant = this.value;
-                $('#dmTable').DataTable().draw();
-            });
-        });
-    </script>
-@endonce

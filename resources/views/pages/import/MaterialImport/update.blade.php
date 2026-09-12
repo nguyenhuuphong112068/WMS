@@ -50,6 +50,27 @@
                         </div>
                     </div>
 
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label>Số lô</label>
+                            <input type="text" name="batch_no" maxlength="100"
+                                class="form-control {{ $bag->has('batch_no') ? 'is-invalid' : '' }}">
+                            @if ($bag->has('batch_no')) <div class="md-error text-danger small">{{ $bag->first('batch_no') }}</div> @endif
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label>Số hoá đơn</label>
+                            <input type="text" name="invoice_number" maxlength="100"
+                                class="form-control {{ $bag->has('invoice_number') ? 'is-invalid' : '' }}">
+                            @if ($bag->has('invoice_number')) <div class="md-error text-danger small">{{ $bag->first('invoice_number') }}</div> @endif
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label>Ngày ký hoá đơn</label>
+                            <input type="date" name="invoice_date"
+                                class="form-control {{ $bag->has('invoice_date') ? 'is-invalid' : '' }}">
+                            @if ($bag->has('invoice_date')) <div class="md-error text-danger small">{{ $bag->first('invoice_date') }}</div> @endif
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label>Định Khu</label>
                         <select name="location_id" class="form-control imp-select">
@@ -67,6 +88,13 @@
                         <div class="mi-existing-files mb-2 small"></div>
                         <input type="file" name="attachments[]" class="form-control-file" multiple>
                         <small class="text-muted">Thêm file mới (tối đa 10MB / file).</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Mục đích sử dụng</label>
+                        <textarea name="purpose" rows="2" maxlength="500"
+                            class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}"></textarea>
+                        @if ($bag->has('purpose')) <div class="md-error text-danger small">{{ $bag->first('purpose') }}</div> @endif
                     </div>
 
                     <div class="form-group">
@@ -113,7 +141,7 @@
         $(document).on('click', '.btn-md-edit', function () {
             var row = $(this).data('row') || {};
             var $form = $('#updateModal form');
-            ['id', 'code', 'amount', 'expired_date', 'note'].forEach(function (k) {
+            ['id', 'code', 'amount', 'batch_no', 'invoice_number', 'invoice_date', 'expired_date', 'purpose', 'note'].forEach(function (k) {
                 $form.find('[name="' + k + '"]').val(row[k] == null ? '' : row[k]);
             });
             // Ngày nhập chỉ để xem: hiển thị d/m/Y, không gửi lên server

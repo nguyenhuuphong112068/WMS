@@ -1,3 +1,5 @@
+@include('pages.shared.maxStockWarn')
+
 @php $bag = $errors->getBag('createErrors'); @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
@@ -68,6 +70,10 @@
                             <small class="md-sub">Tách thành nhiều lô cùng thông tin, mỗi lô một mã xuất nhập.</small>
                         </div>
 
+                        <div class="form-group col-md-12 order-last">
+                            <div class="js-max-stock-warn"></div>
+                        </div>
+
                         <div class="form-group col-md-3">
                             <label>Số Lô</label>
                             <input type="text" name="batch_no" maxlength="100"
@@ -99,11 +105,11 @@
                     <div class="form-row">
                         {{-- Vị trí lưu trữ: chọn cấp sâu nhất, ba cấp Kho/Phòng/Kệ suy ra từ đó --}}
                         <div class="form-group col-md-12">
-                            <label>Định Khu</label>
+                            <label>Định Khu Tạm (Biệt Trữ / Chờ Kiểm Tra)</label>
                             <select name="location_id"
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
-                                @foreach ($locations as $location)
+                                @foreach ($quarantineLocations as $location)
                                     <option value="{{ $location->id }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
@@ -117,8 +123,15 @@
                             @if ($bag->has('location_id'))
                                 <span class="md-error">{{ $bag->first('location_id') }}</span>
                             @endif
-                            <small class="md-sub">Dạng Kho / Kệ/Tủ / Cột / Tầng / Mã định khu. Để trống thì mã này hiện
-                                "Chưa định khu" ở màn hình Tồn Kho.</small>
+                            @if ($quarantineLocations->isEmpty())
+                                <div class="text-danger small mt-1">
+                                    <i class="fas fa-triangle-exclamation mr-1"></i>
+                                    Phòng chưa khai vị trí nào thuộc phân loại <b>Biệt Trữ</b>. Vào Dữ Liệu Gốc →
+                                    Định Khu, đặt phân loại "Biệt Trữ" cho khu chờ kiểm tra rồi quay lại.
+                                </div>
+                            @endif
+                            <small class="md-sub">Lô mới nhập ở trạng thái <b>Chờ kiểm tra</b> nên chỉ xếp vào khu
+                                Biệt Trữ; vị trí lưu trữ thật được định khu lại ở bước Xác nhận kiểm tra.</small>
                         </div>
                     </div>
 
@@ -230,6 +243,19 @@
         | định khu phòng đã khai cho hoá chất này. Mở lại modal sau lỗi validate thì
         | giữ nguyên định khu đang chọn, không đè lên thứ người dùng đã nhập.
         */
+        /* Cảnh báo trữ quá nhiều: tồn hiện tại + (số lượng x số lần nhập) so với ngưỡng tối đa */
+        function checkChemMaxStock($form) {
+            var item = chemDefaults[$form.find('select[name="category_id"]').val()] || null;
+            var amount = parseFloat(($form.find('[name="amount"]').val() || '').replace(/,/g, ''));
+            var times = parseInt($form.find('[name="quantity"]').val(), 10);
+
+            wmsMaxStockWarn($form.find('.js-max-stock-warn'), item, (amount || 0) * (times > 0 ? times : 1));
+        }
+
+        $(document).on('input change', '#createModal [name="amount"], #createModal [name="quantity"]', function() {
+            checkChemMaxStock($(this).closest('form'));
+        });
+
         function syncChemCategory($sel, fillLocation) {
             var item = chemDefaults[$sel.val()] || null;
             var $form = $sel.closest('form');
@@ -248,6 +274,8 @@
                     .val(item && item.location_id ? String(item.location_id) : '')
                     .trigger('change');
             }
+
+            checkChemMaxStock($form);
         }
 
         $(document).on('change', '#createModal select[name="category_id"]', function() {

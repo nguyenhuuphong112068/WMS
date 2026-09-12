@@ -481,6 +481,7 @@ class ChemicalInventoryController extends Controller
             ->leftJoin('suppliers', 'chemical_imports.supplier_id', '=', 'suppliers.id')
             ->where('chemical_imports.department_id', $departmentId)
             ->where('chemical_imports.status_id', 1)
+            ->where('chemical_imports.is_checked', 1)
             ->whereDate('chemical_imports.imported_date', '<=', $to)
             ->when($scope === 'category',
                 fn ($q) => $q->where('chemical_imports.category_id', $id),
@@ -702,6 +703,8 @@ class ChemicalInventoryController extends Controller
             )
             ->where('chemical_imports.department_id', $departmentId)
             ->where('chemical_imports.status_id', 1)
+            // Lô đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn kho
+            ->where('chemical_imports.is_checked', 1)
             // Lô nhập sau ngày cuối kỳ thì trong kỳ này chưa tồn tại -> không đưa vào bảng
             ->whereDate('chemical_imports.imported_date', '<=', $to)
             ->orderBy('chemical_imports.code', 'asc')
@@ -1115,6 +1118,7 @@ class ChemicalInventoryController extends Controller
             ->where('department_id', $departmentId)
             ->where('category_id', $categoryId)
             ->where('status_id', 1)
+            ->where('is_checked', 1)
             ->whereDate('imported_date', '<=', $to)
             ->get();
     }
@@ -1139,6 +1143,7 @@ class ChemicalInventoryController extends Controller
             ->where('chemical_exports.status_id', 1)
             ->where('chemical_imports.category_id', $categoryId)
             ->where('chemical_imports.status_id', 1)
+            ->where('chemical_imports.is_checked', 1)
             ->whereDate('chemical_exports.exported_date', '<=', $to)
             ->get();
     }
@@ -1156,6 +1161,7 @@ class ChemicalInventoryController extends Controller
             ->where('chemical_balancings.status_id', 1)
             ->where('chemical_imports.category_id', $categoryId)
             ->where('chemical_imports.status_id', 1)
+            ->where('chemical_imports.is_checked', 1)
             ->whereDate('chemical_balancings.balancing_at', '<=', $to)
             ->get();
     }

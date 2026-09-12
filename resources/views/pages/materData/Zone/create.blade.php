@@ -58,7 +58,7 @@
                             </div>
                         @endif
 
-                        <div class="form-group {{ ($meta['hasName'] ?? true) ? '' : 'mb-0' }}">
+                        <div class="form-group">
                             <label>Mã {{ $meta['label'] }} <span class="text-danger">*</span></label>
                             <input type="text" name="code" maxlength="50"
                                 class="form-control inp-code {{ $bag->has('code') ? 'is-invalid' : '' }}"
@@ -74,7 +74,7 @@
                         </div>
 
                         @if ($meta['hasName'] ?? true)
-                            <div class="form-group mb-0">
+                            <div class="form-group">
                                 <label>Tên {{ $meta['label'] }} <span class="text-danger">*</span></label>
                                 <input type="text" name="name" maxlength="255"
                                     class="form-control inp-name {{ $bag->has('name') ? 'is-invalid' : '' }}"
@@ -84,6 +84,8 @@
                                 @endif
                             </div>
                         @endif
+
+                        @include('pages.materData.Zone.typeColorFields', ['bag' => $bag])
                     </div>
 
                     <div class="modal-footer">

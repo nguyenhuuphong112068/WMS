@@ -19,6 +19,12 @@
                         data-pane="impPaneReport">
                         <i class="fas fa-chart-column mr-1"></i> Báo cáo nhập hoá chất
                     </button>
+                    <button type="button" class="imp-tab" data-pane="impPaneCheck">
+                        <i class="fas fa-clipboard-check mr-1"></i> Chờ kiểm tra
+                        @if ($pendingCount > 0)
+                            <span class="imp-tab-count">{{ $pendingCount }}</span>
+                        @endif
+                    </button>
                 </div>
 
                 {{-- ============ SỔ NHẬP HOÁ CHẤT ============ --}}
@@ -69,6 +75,7 @@
                                 <th style="width: 150px">Nhà Cung Cấp</th>
                                 <th style="width: 140px">Hoá Đơn</th>
                                 <th style="width: 130px">Người Nhập</th>
+                                <th style="width: 150px">Tình Trạng</th>
                                 <th class="text-center" style="width: 60px" title="File hồ sơ đính kèm"><i
                                         class="fas fa-paperclip"></i></th>
                                 <th class="text-center" style="width: 150px">Thao Tác</th>
@@ -87,11 +94,15 @@
                                                 : '');
                                     }
                                     $rowAttachments = $attachments->get($row->id) ?? collect();
+                                    $rowCodeBadge = \App\Support\ZoneType::badge($row->location_id, $row->location_zone_type ?? null, $row->location_color ?? null);
                                 @endphp
                                 {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
                                 <tr data-classification="{{ $impCls($row->category_id) }}">
                                     <td class="text-center">{{ $datas->firstItem() + $loop->index }}</td>
-                                    <td><span class="imp-code">{{ $row->code }}</span></td>
+                                    <td>
+                                        <span class="imp-code"
+                                            style="--chip: {{ $rowCodeBadge['bg'] }}; --chip-text: {{ $rowCodeBadge['text'] }}">{{ $row->code }}</span>
+                                    </td>
                                     <td>
                                         <div class="font-weight-bold">
                                             {{ $row->chem_name ?: '—' }}
@@ -154,6 +165,21 @@
                                         @endif
                                     </td>
                                     <td class="md-sub">{{ $row->imported_by ?: '—' }}</td>
+                                    <td class="md-sub">
+                                        @php $rowCheck = $row->check_result; @endphp
+                                        <span class="badge {{ \App\Support\CheckStatus::badge($rowCheck) }}">
+                                            <i class="{{ \App\Support\CheckStatus::icon($rowCheck) }} mr-1"></i>
+                                            {{ \App\Support\CheckStatus::label($rowCheck) }}
+                                        </span>
+                                        @if ($row->checked_at)
+                                            <div class="mt-1" title="Ngày kiểm tra">{{ $impDate($row->checked_at) }}</div>
+                                            <div title="Người kiểm tra">{{ $row->checked_by ?: '—' }}</div>
+                                        @endif
+                                        @if ($row->check_note)
+                                            <div class="text-danger" title="{{ $row->check_note }}">
+                                                {{ \Illuminate\Support\Str::limit($row->check_note, 40) }}</div>
+                                        @endif
+                                    </td>
                                     <td class="text-center">
                                         @include('pages.shared.attachmentList', [
                                             'attachments' => $rowAttachments,
@@ -238,6 +264,95 @@
                     'pgTab' => 'book',
                     'pgUnit' => 'phiếu nhập',
                 ])
+                </div>
+
+                {{-- ============ CHỜ KIỂM TRA ============ --}}
+                <div class="imp-pane" id="impPaneCheck">
+                    <div class="table-responsive">
+                        <table id="mdTableCheck" class="table table-bordered table-hover w-100 md-table">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 45px">STT</th>
+                                    <th style="width: 150px">Mã Xuất Nhập</th>
+                                    <th>Hoá Chất</th>
+                                    <th class="text-right" style="width: 110px">Số Lượng</th>
+                                    <th style="width: 110px">Số Lô</th>
+                                    <th style="width: 150px">Nhà Cung Cấp</th>
+                                    <th class="text-center" style="width: 95px">Ngày Nhập</th>
+                                    <th class="text-center" style="width: 105px">Hạn Dùng</th>
+                                    <th style="width: 160px">Vị Trí Biệt Trữ</th>
+                                    <th class="text-center" style="width: 150px">Thao Tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($pendingRows as $row)
+                                    @php
+                                        $pendingAmount =
+                                            $impNum($row->amount) . ' ' . ($row->unit_short_name ?: $row->unit_name);
+                                        $pendingLocation = $row->location_code
+                                            ? $row->location_code .
+                                                ($row->warehouse_name ? ' — ' . $row->warehouse_name : '')
+                                            : 'Chưa định khu';
+                                        $pendingCodeBadge = \App\Support\ZoneType::badge($row->location_id, $row->location_zone_type ?? null, $row->location_color ?? null);
+                                    @endphp
+                                    <tr>
+                                        <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td>
+                                            <span class="imp-code"
+                                                style="--chip: {{ $pendingCodeBadge['bg'] }}; --chip-text: {{ $pendingCodeBadge['text'] }}">{{ $row->code }}</span>
+                                            <div><span class="badge badge-warning mt-1">Chờ kiểm tra</span></div>
+                                        </td>
+                                        <td>
+                                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
+                                            <div class="md-sub"><span
+                                                    class="md-tag">{{ $row->category_code ?: '—' }}</span></div>
+                                        </td>
+                                        <td class="text-right">
+                                            <span class="imp-amount">{{ $impNum($row->amount) }}</span>
+                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                        </td>
+                                        <td class="md-sub">{{ $row->batch_no ?: '—' }}</td>
+                                        <td class="md-sub">{{ $row->supplier_name ?: '—' }}</td>
+                                        <td class="text-center md-sub" data-order="{{ $row->imported_date }}">
+                                            {{ $impDate($row->imported_date) }}</td>
+                                        <td class="text-center md-sub"
+                                            data-order="{{ $row->expired_date ?: '9999-12-31' }}">
+                                            {{ $impDate($row->expired_date) }}</td>
+                                        <td class="md-sub">
+                                            @if ($row->location_code)
+                                                <span class="md-tag">{{ $row->location_code }}</span>
+                                                <div>{{ $row->warehouse_name ?: '—' }}</div>
+                                            @else
+                                                <span class="imp-no-location">Chưa định khu</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            @perm('import_chemical_update')
+                                                <button type="button" class="btn btn-sm btn-success btn-imp-check"
+                                                    title="Xác nhận kiểm tra - bổ sung thông tin, định khu vị trí thật"
+                                                    data-row="{{ json_encode([
+                                                        'id' => $row->id,
+                                                        'code' => $row->code,
+                                                        'chem_name' => $row->chem_name,
+                                                        'amount_label' => $pendingAmount,
+                                                        'imported_date_label' => $impDate($row->imported_date),
+                                                        'location_label' => $pendingLocation,
+                                                        'batch_no' => $row->batch_no,
+                                                        'invoice_number' => $row->invoice_number,
+                                                        'invoice_date' => $row->invoice_date,
+                                                        'expired_date' => $row->expired_date,
+                                                        'supplier_id' => $row->supplier_id,
+                                                        'location_id' => $row->location_id,
+                                                    ]) }}">
+                                                    <i class="fas fa-clipboard-check mr-1"></i> Kiểm tra
+                                                </button>
+                                            @endperm
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {{-- ============ BÁO CÁO NHẬP HOÁ CHẤT ============ --}}

@@ -62,6 +62,7 @@
                         <th style="width: 180px">Phân Nhóm Chuẩn</th>
                         <th class="text-center" style="width: 135px">Hạn Dùng Nội Bộ<br><small>(tháng)</small></th>
                         <th class="text-right" style="width: 130px">Ngưỡng Tồn Tối Thiểu</th>
+                        <th class="text-right" style="width: 130px">Ngưỡng Tồn Tối Đa</th>
                         <th style="width: 200px">Định Khu</th>
                         <th style="width: 170px">Điều Kiện Bảo Quản</th>
                         <th style="width: 150px">Ghi Chú</th>
@@ -132,6 +133,14 @@
                                     <span class="ds-value is-none">Theo tỉ lệ 20%</span>
                                 @endif
                             </td>
+                            <td class="text-right" data-order="{{ $row->max_stock ?? -1 }}">
+                                @if ($row->max_stock !== null)
+                                    <span class="ds-value">{{ $dsNum($row->max_stock) }}</span>
+                                    <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                @else
+                                    <span class="md-empty">Chưa khai</span>
+                                @endif
+                            </td>
                             <td class="md-sub">
                                 @if ($row->location_code)
                                     <div class="font-weight-bold">
@@ -175,6 +184,7 @@
                                                 'unit_id' => $row->unit_id,
                                                 'shelf_life_months' => $row->shelf_life_months,
                                                 'min_stock' => $row->min_stock,
+                                                'max_stock' => $row->max_stock,
                                                 'default_location_id' => $row->default_location_id,
                                                 'note' => $row->note,
                                                 'category_code' => $row->category_code,

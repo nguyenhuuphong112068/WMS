@@ -37,6 +37,11 @@
 
     $invPeriodPresets = collect([
         [
+            'label' => 'Hôm Nay',
+            'from' => $invToday->copy()->format('Y-m-d'),
+            'to' => $invToday->copy()->format('Y-m-d'),
+        ],
+        [
             'label' => 'Tháng này',
             'from' => $invToday->copy()->startOfMonth()->format('Y-m-d'),
             'to' => $invToday->copy()->endOfMonth()->format('Y-m-d'),

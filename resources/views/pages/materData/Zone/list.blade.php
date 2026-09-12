@@ -86,6 +86,16 @@
     // Vị trí không chọn loại nghĩa là dùng chung, hiện ở cả ba màn hình Tồn Kho.
     $zoneTypeLabel = fn($value) => $locationTypes[$value] ?? 'Dùng chung';
 
+    /*
+    | PHÂN LOẠI & MÀU - dùng chung cho cả 5 cấp.
+    | Màu hiển thị của một dòng: màu người dùng tự chọn, thiếu thì lấy màu mặc định
+    | của phân loại, chưa phân loại nữa thì dùng màu chủ đạo (App\Support\ZoneType).
+    */
+    $zoneClassLabel = fn($row) => \App\Support\ZoneType::label($row->zone_type ?? null);
+    $zoneClassIcon = fn($row) => \App\Support\ZoneType::icon($row->zone_type ?? null);
+    $zoneColor = fn($row) => \App\Support\ZoneType::color($row->zone_type ?? null, $row->color ?? null);
+    $zoneTextOn = fn($hex) => \App\Support\ZoneType::textOn($hex);
+
     // Mô tả các ô chọn cấp cha dùng trong modal (đổ dữ liệu động bằng JS theo cấp trên).
     $zoneParents = [
         'warehouse' => ['field' => 'warehouse_id', 'label' => 'Kho/Phòng', 'class' => 'sel-warehouse', 'placeholder' => '-- Chọn kho/phòng (tuỳ chọn) --'],

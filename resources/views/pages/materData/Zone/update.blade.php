@@ -58,7 +58,7 @@
                             </div>
                         @endif
 
-                        <div class="form-group {{ ($meta['hasName'] ?? true) ? '' : 'mb-0' }}">
+                        <div class="form-group">
                             <label>Mã {{ $meta['label'] }} <span class="text-danger">*</span></label>
                             <input type="text" name="code" maxlength="50"
                                 class="form-control inp-code {{ $bag->has('code') ? 'is-invalid' : '' }}" required>
@@ -82,6 +82,8 @@
                                 @endif
                             </div>
                         @endif
+
+                        @include('pages.materData.Zone.typeColorFields', ['bag' => $bag])
 
                         <div class="form-group mb-0">
                             <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>

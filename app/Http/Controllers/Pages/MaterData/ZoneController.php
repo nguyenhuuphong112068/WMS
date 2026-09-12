@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DataMasterHistory;
+use App\Support\ZoneType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -165,6 +166,11 @@ class ZoneController extends Controller
             'tiers' => $tiers,
             'locations' => $locations,
             'locationTypes' => self::LOCATION_TYPES,
+            // Phân loại định khu + bảng màu cho modal khai báo và chip trên bảng
+            'zoneClassifications' => ZoneType::TYPES,
+            'zoneTypeColors' => ZoneType::DEFAULT_COLORS,
+            'zoneTypeIcons' => ZoneType::ICONS,
+            'zonePalette' => ZoneType::PALETTE,
             /*
             | Số lần thay đổi của từng mục, khoá là '<bảng>-<id>' vì năm cấp nằm chung
             | một trang. Badge trên nút Sửa đọc từ đây, nội dung lịch sử tải sau qua
@@ -218,6 +224,7 @@ class ZoneController extends Controller
             'NA',
             'Thêm ' . $zone['label'] . ': ' . $this->caption($zone, $request->code, $request->name)
                 . $this->itemTypeNote($zone, $request->input('item_type'))
+                . $this->zoneTypeNote($request->input('zone_type'))
         );
 
         return $this->backToTab($type)->with('success', 'Đã thêm ' . $zone['label'] . ' thành công!');
@@ -269,8 +276,12 @@ class ZoneController extends Controller
             'Cập nhật',
             $zone['table'],
             $current->id,
-            $this->caption($zone, $current->code, $current->name ?? null) . $this->itemTypeNote($zone, $current->item_type ?? null),
-            $this->caption($zone, $request->code, $request->name) . $this->itemTypeNote($zone, $request->input('item_type'))
+            $this->caption($zone, $current->code, $current->name ?? null)
+                . $this->itemTypeNote($zone, $current->item_type ?? null)
+                . $this->zoneTypeNote($current->zone_type ?? null),
+            $this->caption($zone, $request->code, $request->name)
+                . $this->itemTypeNote($zone, $request->input('item_type'))
+                . $this->zoneTypeNote($request->input('zone_type'))
         );
 
         return $this->backToTab($type)->with('success', 'Cập nhật ' . $zone['label'] . ' thành công!');
@@ -423,6 +434,10 @@ class ZoneController extends Controller
             $fields['item_type'] = 'Loại lưu trữ';
         }
 
+        // Hai thuộc tính này có ở cả 5 cấp nên khai sau cùng, không phụ thuộc cấu hình cấp
+        $fields['zone_type'] = 'Phân loại định khu';
+        $fields['color'] = 'Màu hiển thị';
+
         return $fields;
     }
 
@@ -444,6 +459,9 @@ class ZoneController extends Controller
             $maps['item_type'] = ['' => 'Dùng chung'] + self::LOCATION_TYPES;
         }
 
+        // Lịch sử hiện "Dự Phòng" thay vì "reserve"
+        $maps['zone_type'] = ZoneType::historyMap();
+
         return $maps;
     }
 
@@ -455,6 +473,12 @@ class ZoneController extends Controller
         }
 
         return ' · Loại: ' . (self::LOCATION_TYPES[$value] ?? 'Dùng chung');
+    }
+
+    /** Phần " · Phân loại: ..." ghép vào log của mọi cấp, cấp nào cũng phân loại được. */
+    private function zoneTypeNote($value): string
+    {
+        return ' · Phân loại: ' . ZoneType::label($value ?: null);
     }
 
     private function rules(array $zone, $ignoreId = null): array
@@ -475,6 +499,9 @@ class ZoneController extends Controller
             $rules['item_type'] = ['nullable', Rule::in(array_keys(self::LOCATION_TYPES))];
         }
 
+        $rules['zone_type'] = ['nullable', Rule::in(array_keys(ZoneType::TYPES))];
+        $rules['color'] = ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'];
+
         return $rules;
     }
 
@@ -493,6 +520,10 @@ class ZoneController extends Controller
         if (! empty($zone['itemType'])) {
             $data['item_type'] = $request->input('item_type') ?: null;
         }
+
+        $data['zone_type'] = $request->input('zone_type') ?: null;
+        // Màu rỗng/sai định dạng lưu null để mục bám theo màu mặc định của phân loại
+        $data['color'] = ZoneType::normalize($request->input('color'));
 
         return $data;
     }
@@ -514,6 +545,8 @@ class ZoneController extends Controller
             'tier_id.required' => 'Vui lòng chọn tầng.',
             'tier_id.exists' => 'Tầng được chọn không hợp lệ.',
             'item_type.in' => 'Loại lưu trữ được chọn không hợp lệ.',
+            'zone_type.in' => 'Phân loại định khu được chọn không hợp lệ.',
+            'color.regex' => 'Màu không hợp lệ, vui lòng chọn lại màu trên bảng màu.',
         ];
     }
 

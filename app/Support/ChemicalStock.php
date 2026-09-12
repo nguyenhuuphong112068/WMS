@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\DB;
  *   tồn 1 mã xuất nhập = chemical_imports.amount
  *                      + SUM(chemical_balancings.balancing_amount)   -- status_id = 1
  *                      - SUM(chemical_exports.amount)                 -- status_id = 1
- *   (chỉ tính chemical_imports.status_id = 1)
+ *   (chỉ tính chemical_imports.status_id = 1 VÀ is_checked = 1 - lô đang "Chờ kiểm
+ *   tra" chưa được cộng vào tồn, xem App\Http\Controllers\Pages\Import\ChemicalImportController::confirmCheck())
  *
  * Query Builder thuần, không Eloquent.
  */
@@ -58,6 +59,8 @@ class ChemicalStock
         $imports = DB::table('chemical_imports')
             ->whereIn('category_id', $categoryIds)
             ->where('status_id', 1)
+            // Lô đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn
+            ->where('is_checked', 1)
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->when($scopeDepartmentIds !== null, fn ($q) => $q->whereIn('department_id', $scopeDepartmentIds))
             ->select('id', 'code', 'imported_date', 'category_id', 'department_id', 'amount')
@@ -128,6 +131,8 @@ class ChemicalStock
         $imports = DB::table('chemical_imports')
             ->whereIn('category_id', $categoryIds)
             ->where('status_id', 1)
+            // Lô đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn
+            ->where('is_checked', 1)
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->when($scopeDepartmentIds !== null, fn ($q) => $q->whereIn('department_id', $scopeDepartmentIds))
             ->select('id', 'code', 'category_id', 'department_id', 'amount', 'imported_date')

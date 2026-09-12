@@ -127,6 +127,19 @@
     .mz-cell-foot .alert { color: #C2410C; }
     .mz-cell-empty-note { font-size: .73rem; color: #94A3B8; font-style: italic; }
 
+    /* Nền thẻ tô theo màu định khu của vị trí (App\Support\ZoneType::badge()) - tách biệt
+       với is-ok/is-warn/is-danger/is-empty ở trên, vốn chỉ nói tình trạng hàng đang đứng ở
+       đó; viền trên (border-top) vẫn giữ nguyên màu trạng thái để không mất tín hiệu đó. */
+    .mz-cell.is-zoned { background: var(--chip); }
+    .mz-cell.is-zoned .mz-cell-code,
+    .mz-cell.is-zoned .mz-cell-name,
+    .mz-cell.is-zoned .mz-cell-items,
+    .mz-cell.is-zoned .mz-cell-items .qty,
+    .mz-cell.is-zoned .mz-cell-items .qty .u,
+    .mz-cell.is-zoned .mz-cell-foot { color: var(--chip-text); }
+    .mz-cell.is-zoned .mz-cell-lots { background: rgba(255, 255, 255, .3); color: var(--chip-text); }
+    .mz-cell.is-zoned .mz-cell-foot { border-top-color: rgba(255, 255, 255, .35); }
+
     /* ---------- Khối chưa xếp vị trí + trạng thái rỗng ---------- */
     .mz-unzoned { border: 1px dashed #F59E0B; background: #FFFBEB; border-radius: var(--border-radius-lg); padding: 14px 18px; margin-bottom: 16px; }
     .mz-unzoned-head { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #B45309; margin-bottom: 8px; }
@@ -277,10 +290,13 @@
                                                             implode(' ', array_column($loc['preview'], 'name')),
                                                     ),
                                                 );
+                                                $mzZoned = $loc['zoneBadge']['bg'] !== '#FFFFFF';
                                             @endphp
-                                            <button type="button" class="mz-cell is-{{ $loc['state'] }}"
+                                            <button type="button"
+                                                class="mz-cell is-{{ $loc['state'] }} {{ $mzZoned ? 'is-zoned' : '' }}"
                                                 data-key="{{ $loc['key'] }}" data-state="{{ $loc['state'] }}"
                                                 data-search="{{ $mzSearch }}"
+                                                style="--chip: {{ $loc['zoneBadge']['bg'] }}; --chip-text: {{ $loc['zoneBadge']['text'] }}"
                                                 {{ $loc['state'] === 'empty' ? 'disabled' : '' }}>
                                                 <div class="mz-cell-top">
                                                     <span class="mz-cell-code">{{ $loc['code'] }}</span>

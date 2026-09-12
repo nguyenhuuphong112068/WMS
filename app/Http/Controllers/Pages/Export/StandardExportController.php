@@ -1616,6 +1616,11 @@ class StandardExportController extends Controller
                 'location_id' => $request->filled('dest_location_id') ? (int) $request->dest_location_id : null,
                 'note' => 'Nhận chuyển liên phòng ban từ ' . $bDeptName . ', mã gốc ' . $sourceImport->code . '.',
                 'status_id' => 1,
+                // Hàng nhận chuyển liên phòng ban đã được kiểm tra ở lô gốc bên phòng
+                // gửi nên vào tồn ngay, không phải qua lại bước Chờ kiểm tra
+                'is_checked' => 1,
+                'checked_by' => $this->actor(),
+                'checked_at' => $receivedAt,
                 'created_by' => $this->actor(),
                 'created_at' => $receivedAt,
                 'updated_at' => $receivedAt,
@@ -2149,6 +2154,8 @@ class StandardExportController extends Controller
             )
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
+            // Ống đang "Chờ kiểm tra" (is_checked = 0) chưa được phép sử dụng/xuất
+            ->where('standard_imports.is_checked', 1)
             ->orderBy('standard_imports.imported_date', 'desc')
             ->orderBy('standard_imports.id', 'desc')
             ->get();

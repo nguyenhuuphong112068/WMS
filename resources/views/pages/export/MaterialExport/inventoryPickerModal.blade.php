@@ -74,7 +74,9 @@
                                     <td class="align-middle font-weight-bold text-dark">{{ $mat->material_name }}</td>
                                     <td class="align-middle">{{ $mat->technical_specification ?: '—' }}</td>
                                     <td class="align-middle">{{ $mat->manufacturer_name ?: '—' }}</td>
-                                    <td class="align-middle">{{ $mat->classification_name ?: '—' }}</td>
+                                    <td class="align-middle">
+                                        {{ \App\Support\MaterialClassification::summary($mat->classification) ?: '—' }}
+                                    </td>
                                     <td class="text-right align-middle">
                                         @if ($hasStock)
                                             <span class="badge badge-success font-weight-bold px-2 py-1" style="font-size: 0.85rem;">
