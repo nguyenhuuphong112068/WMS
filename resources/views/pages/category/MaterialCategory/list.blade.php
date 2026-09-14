@@ -51,7 +51,25 @@
     | DepartmentMaterialController luôn kèm activeTab = 'department' lúc quay lại.
     */
     $dmHasErrors = $errors->getBag('dmCreateErrors')->any() || $errors->getBag('dmUpdateErrors')->any();
-    $activeTab = session('activeTab') === 'department' || $dmHasErrors ? 'department' : 'company';
+
+    // ----- Tab 3, 4: Danh sách vật tư đề nghị theo chu kỳ (PeriodicRequestController) -----
+    $prHasErrors = fn ($type) => $errors->getBag(\App\Support\MaterialPeriodicRequest::errorBag($type, 'Create'))->any()
+        || $errors->getBag(\App\Support\MaterialPeriodicRequest::errorBag($type, 'Update'))->any();
+
+    $activeTab = match (true) {
+        $dmHasErrors => 'department',
+        $prHasErrors('internal') => 'internal',
+        $prHasErrors('external') => 'external',
+        in_array(session('activeTab'), ['department', 'internal', 'external'], true) => session('activeTab'),
+        default => 'company',
+    };
+
+    $tabHashes = [
+        'company' => '#tabCompany',
+        'department' => '#tabDepartment',
+        'internal' => '#tabPeriodicInternal',
+        'external' => '#tabPeriodicExternal',
+    ];
 @endphp
 
 @section('mainContent')
@@ -75,6 +93,22 @@
                         <span class="cat-tab-count">{{ $dmDatas->count() }}</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ $activeTab === 'internal' ? 'active' : '' }}" id="tabPeriodicInternalLink"
+                        data-toggle="pill" href="#tabPeriodicInternal" role="tab">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Danh sách vật tư đề nghị nội bộ theo chu kỳ</span>
+                        <span class="cat-tab-count">{{ $periodicInternalLists->count() }}</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ $activeTab === 'external' ? 'active' : '' }}" id="tabPeriodicExternalLink"
+                        data-toggle="pill" href="#tabPeriodicExternal" role="tab">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Danh sách vật tư đề nghị liên phòng ban theo chu kỳ</span>
+                        <span class="cat-tab-count">{{ $periodicExternalLists->count() }}</span>
+                    </a>
+                </li>
             </ul>
 
             <div class="tab-content">
@@ -91,6 +125,22 @@
                         'mdLabel' => $dmLabel,
                         'mdTitle' => $dmTitle,
                         'mdIcon' => $dmIcon,
+                    ])
+                </div>
+
+                <div class="tab-pane fade {{ $activeTab === 'internal' ? 'show active' : '' }}" id="tabPeriodicInternal"
+                    role="tabpanel">
+                    @include('pages.category.PeriodicRequest.dataTable', [
+                        'type' => 'internal',
+                        'lists' => $periodicInternalLists,
+                    ])
+                </div>
+
+                <div class="tab-pane fade {{ $activeTab === 'external' ? 'show active' : '' }}" id="tabPeriodicExternal"
+                    role="tabpanel">
+                    @include('pages.category.PeriodicRequest.dataTable', [
+                        'type' => 'external',
+                        'lists' => $periodicExternalLists,
                     ])
                 </div>
             </div>
@@ -194,8 +244,10 @@
             /* ---------- Mở đúng tab theo địa chỉ #tab... nếu server không chỉ định ---------- */
             var wanted = window.location.hash;
 
-            if (!@json($activeTab === 'department') && (wanted === '#tabCompany' || wanted === '#tabDepartment')) {
+            if (@json($activeTab === 'company') && @json(array_values($tabHashes)).indexOf(wanted) !== -1) {
                 $('.cat-tabs a[href="' + wanted + '"]').tab('show');
+            } else if (@json($activeTab !== 'company')) {
+                history.replaceState(null, '', @json($tabHashes[$activeTab]));
             }
         });
     </script>
@@ -228,4 +280,25 @@
         'unitsInUse' => $dmUnitsInUse,
         'conversions' => $dmConversions,
     ])
+
+    @foreach (['internal' => $periodicInternalCategories, 'external' => $periodicExternalCategories] as $prType => $prCategories)
+        @include('pages.category.PeriodicRequest.create', [
+            'type' => $prType,
+            'categories' => $prCategories,
+            'units' => $periodicUnits,
+            'departments' => $periodicDepartments,
+            'objects' => $periodicObjects,
+        ])
+        @include('pages.category.PeriodicRequest.update', [
+            'type' => $prType,
+            'categories' => $prCategories,
+            'units' => $periodicUnits,
+            'departments' => $periodicDepartments,
+            'objects' => $periodicObjects,
+        ])
+        @include('pages.category.PeriodicRequest.picker', [
+            'type' => $prType,
+            'categories' => $prCategories,
+        ])
+    @endforeach
 @endsection

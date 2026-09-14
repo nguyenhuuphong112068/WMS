@@ -14,6 +14,7 @@ use App\Http\Controllers\Pages\MaterData\ChemManufacturerController;
 use App\Http\Controllers\Pages\MaterData\ChemNameController;
 use App\Http\Controllers\Pages\MaterData\ChemSupplierController;
 use App\Http\Controllers\Pages\MaterData\CompanyController;
+use App\Http\Controllers\Pages\MaterData\ConsumptionObjectController;
 use App\Http\Controllers\Pages\MaterData\DepartmentController;
 use App\Http\Controllers\Pages\MaterData\GroupController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
@@ -188,6 +189,16 @@ Route::prefix('/materData')
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
             Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Đối Tượng: đối tượng tiêu thụ vật tư; loại thiết bị đồng bộ từ phần mềm CAL (cal1/cal2)
+        Route::prefix('/consumptionObject')->name('consumptionObject.')->controller(ConsumptionObjectController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::post('sync', 'sync')->name('sync');
         });
 
         Route::prefix('/storageCondition')->name('storageCondition.')->controller(StorageConditionController::class)->group(function () {

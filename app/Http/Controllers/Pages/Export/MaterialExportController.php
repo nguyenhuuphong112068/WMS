@@ -11,6 +11,7 @@ use App\Support\CompanyContext;
 use App\Support\DepartmentMaterial;
 use App\Support\ListRange;
 use App\Support\MaterialCode;
+use App\Support\MaterialPeriodicRequest;
 use App\Support\MaterialPicking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -110,6 +111,10 @@ class MaterialExportController extends Controller
     public function index(Request $request)
     {
         $departmentId = $this->departmentId();
+
+        // Danh sách đề nghị theo chu kỳ đã tới hạn thì tạo đề nghị Lưu tạm ngay, để phiếu
+        // hiện ra trong tab Đề nghị dù máy chủ không chạy scheduler.
+        MaterialPeriodicRequest::generateDue($departmentId);
 
         // Sổ sử dụng chỉ lấy đúng một trang trong khoảng ngày đang lọc (mặc định 30 ngày
         // gần nhất), không nạp toàn bộ phiếu sử dụng của phòng như trước.

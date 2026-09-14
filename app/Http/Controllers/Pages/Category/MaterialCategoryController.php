@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
 use App\Support\MaterialClassification;
+use App\Support\MaterialPeriodicRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -78,6 +79,11 @@ class MaterialCategoryController extends Controller
         // về DepartmentMaterialController, ở đây chỉ dựng dữ liệu để hiển thị.
         $dmDatas = DepartmentMaterial::rowsOfDepartment($departmentId);
 
+        // Tab 3, 4 - Danh sách đề nghị theo chu kỳ: bù các danh sách đã tới hạn trước khi
+        // hiển thị (phòng khi máy chủ không chạy scheduler), thao tác gửi về PeriodicRequestController.
+        MaterialPeriodicRequest::generateDue($departmentId);
+        $periodicLists = MaterialPeriodicRequest::listsOfDepartment($departmentId);
+
         return view('pages.category.MaterialCategory.list', [
             'datas' => $datas,
             'materialNames' => $this->options('material_names', $datas->pluck('material_names_id')->all()),
@@ -107,6 +113,18 @@ class MaterialCategoryController extends Controller
             ),
             'dmConversions' => \App\Support\CategoryUnitConversion::declaredByCategory(
                 \App\Support\CategoryUnitConversion::TYPE_MATERIAL
+            ),
+
+            // Dữ liệu của 2 tab đề nghị theo chu kỳ, tiền tố periodic
+            'periodicInternalLists' => $periodicLists[MaterialPeriodicRequest::TYPE_INTERNAL],
+            'periodicExternalLists' => $periodicLists[MaterialPeriodicRequest::TYPE_EXTERNAL],
+            'periodicInternalCategories' => MaterialPeriodicRequest::categoryOptions(MaterialPeriodicRequest::TYPE_INTERNAL, $departmentId),
+            'periodicExternalCategories' => MaterialPeriodicRequest::categoryOptions(MaterialPeriodicRequest::TYPE_EXTERNAL, $departmentId),
+            'periodicUnits' => DepartmentMaterial::unitOptions(),
+            'periodicDepartments' => MaterialPeriodicRequest::departmentOptions($departmentId),
+            // Đối tượng (dữ liệu gốc) cho danh sách nội bộ - giữ cả đối tượng đã khoá mà danh sách đang gắn
+            'periodicObjects' => MaterialPeriodicRequest::objectOptions(
+                $periodicLists[MaterialPeriodicRequest::TYPE_INTERNAL]->pluck('consumption_object_id')->all()
             ),
         ]);
     }

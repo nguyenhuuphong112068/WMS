@@ -371,6 +371,13 @@
                                         <p>Định Khu</p>
                                     </a></li>
                             @endperm
+                            @perm('materData_common_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.consumptionObject.list') }}"
+                                        class="nav-link {{ request()->is('materData/consumptionObject') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-success"></i>
+                                        <p>Đối Tượng</p>
+                                    </a></li>
+                            @endperm
                             @perm('materData_chemical_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.mixtureHazardCategory.list') }}"
                                         class="nav-link {{ request()->is('materData/mixtureHazardCategory') ? 'active' : '' }}"><i

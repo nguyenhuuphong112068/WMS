@@ -14,6 +14,7 @@ use App\Http\Controllers\Pages\Category\DepartmentChemicalController;
 use App\Http\Controllers\Pages\Category\DepartmentMaterialController;
 use App\Http\Controllers\Pages\Category\DepartmentStandardController;
 use App\Http\Controllers\Pages\Category\MaterialCategoryController;
+use App\Http\Controllers\Pages\Category\PeriodicRequestController;
 use App\Http\Controllers\Pages\Category\StandardCategoryController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -42,6 +43,16 @@ Route::prefix('/category')
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
+        });
+
+        // Danh sách vật tư đề nghị theo chu kỳ (nội bộ / liên phòng ban) - đến chu kỳ tự tạo
+        // đề nghị Lưu tạm. Không có route hiển thị: nằm ở 2 tab của /category/materialCategory.
+        Route::prefix('/periodicRequest')->name('periodicRequest.')->controller(PeriodicRequestController::class)->group(function () {
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::post('generateNow', 'generateNow')->name('generateNow');
         });
 
         // Trang 2 tab: "Danh Mục Hoá Chất Công Ty" + "Hoá Chất Của Phòng"
