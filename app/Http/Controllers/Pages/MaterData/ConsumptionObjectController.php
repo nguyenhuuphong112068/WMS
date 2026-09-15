@@ -17,26 +17,25 @@ use Illuminate\Validation\Rule;
  * Đối tượng tiêu thụ vật tư - dùng để khảo sát lượng vật tư mà một đối tượng tiêu thụ. Đối tượng
  * không nhất thiết là thiết bị; loại đối tượng khai báo trong TYPES.
  *
+ * Mỗi dòng là một (đối tượng, tần suất): cùng một mã có nhiều tần suất thì là nhiều đối tượng riêng,
+ * khoá không trùng (type, code, frequency).
+ *
  * Nguồn dữ liệu (source):
  * - cal    : đồng bộ từ phần mềm CAL - DB Bảo trì của PMS (cal1 = khối B1, cal2 = khối B2;
- *            config/database.php, biến DB_CAL1_* / DB_CAL2_* trong .env). Loại + mã là khoá nhận diện
- *            nên người dùng không sửa được; tên / vị trí / tần suất lần đồng bộ sau ghi lại theo CAL.
+ *            config/database.php, biến DB_CAL1_* / DB_CAL2_* trong .env). Loại + mã + tần suất là khoá
+ *            nhận diện nên người dùng không sửa được; tên / vị trí lần đồng bộ sau ghi lại theo CAL.
  * - manual : người dùng tự thêm trên màn hình.
  *
  * Liên kết WMS <-> CAL (chỉ có ở source = cal):
  * - cal_connection + cal_table_suffix : DB và cặp bảng Inst_Master_{x} / Schedule_Master_{x}
- * - cal_record_id                     : Inst_Master_{x}.ID của thiết bị lớn - khoá liên kết chính
+ * - cal_record_id                     : Inst_Master_{x}.ID của thiết bị lớn
  * - cal_inst_id                       : Inst_Master_{x}.Inst_id của thiết bị lớn
- * - cal_synced_at                     : lần đồng bộ gần nhất còn thấy đối tượng trên CAL
+ * - cal_synced_at                     : lần đồng bộ gần nhất còn thấy (thiết bị, tần suất) trên CAL
  *
- * Tạo đề nghị cấp phát theo lịch CAL (về sau): trên kết nối cal_connection, lấy lịch
- * Schedule_Master_{cal_table_suffix} có Sch_Result_Status = 'Pending' và Inst_ID thuộc
- * (cal_inst_id + Inst_id các thiết bị con có Parent_Equip_id = cal_inst_id). Mỗi (Inst_ID, Sch_Type)
- * có tối đa một lịch Pending; SCH_ID là IDENTITY nên (cal_connection, cal_table_suffix, SCH_ID)
- * dùng làm khoá chống tạo đề nghị trùng.
- *
- * Tần suất lưu mã gốc của CAL (Monthly, Quaterly...) để đồng bộ khớp 1-1, nhiều tần suất ghép
- * bằng dấu phẩy theo thứ tự FREQUENCIES.
+ * Tạo đề nghị cấp phát theo lịch CAL (về sau): với mỗi dòng, trên kết nối cal_connection lấy lịch
+ * Schedule_Master_{cal_table_suffix} có Sch_Result_Status = 'Pending', Sch_Type = frequency và Inst_ID
+ * thuộc (cal_inst_id + Inst_id các thiết bị con có Parent_Equip_id = cal_inst_id). SCH_ID là IDENTITY
+ * nên (cal_connection, cal_table_suffix, SCH_ID) dùng làm khoá chống tạo đề nghị trùng.
  */
 class ConsumptionObjectController extends Controller
 {
@@ -60,6 +59,8 @@ class ConsumptionObjectController extends Controller
      */
     public const TYPES = [
         'production_equipment' => ['label' => 'Thiết bị sản xuất', 'cal_suffix' => 2],
+        // Nhóm "Tiện ích" (TI) bên PMS: AHU, xử lý nước thải, máy giặt...
+        'utility_equipment' => ['label' => 'Thiết bị tiện ích', 'cal_suffix' => 3],
         'testing_equipment' => ['label' => 'Thiết bị kiểm nghiệm', 'cal_suffix' => 4],
     ];
 
@@ -98,9 +99,13 @@ class ConsumptionObjectController extends Controller
 
     public function index()
     {
+        $frequencyCodes = array_keys(self::FREQUENCIES);
+
         $datas = DB::table(self::TABLE)
             ->orderBy('type', 'asc')
             ->orderBy('code', 'asc')
+            // Tần suất xếp từ ngắn đến dài theo FREQUENCIES
+            ->orderByRaw('FIELD(frequency, ' . implode(', ', array_fill(0, count($frequencyCodes), '?')) . ')', $frequencyCodes)
             ->get();
 
         session()->put(['title' => 'DỮ LIỆU GỐC - ĐỐI TƯỢNG']);
@@ -138,12 +143,13 @@ class ConsumptionObjectController extends Controller
             self::TABLE,
             $id,
             'Thêm mới',
-            'Khai báo mới ' . self::LABEL . ': ' . $payload['code'] . ' - ' . $payload['name'] . '.',
+            'Khai báo mới ' . self::LABEL . ': ' . $payload['code'] . ' - ' . $payload['name']
+                . ' (' . self::FREQUENCIES[$payload['frequency']] . ').',
             self::FIELDS,
-            $this->maps($payload['frequency'])
+            $this->maps()
         );
 
-        AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm ' . self::LABEL . ': ' . $payload['code']);
+        AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm ' . self::LABEL . ': ' . $payload['code'] . ' - ' . $payload['frequency']);
 
         return redirect()->back()->with('success', 'Đã thêm ' . self::LABEL . ' thành công!');
     }
@@ -156,9 +162,9 @@ class ConsumptionObjectController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần cập nhật!');
         }
 
-        // Đối tượng đồng bộ từ CAL: loại + mã là khoá nhận diện, luôn giữ nguyên giá trị đang có
+        // Đối tượng đồng bộ từ CAL: loại + mã + tần suất là khoá nhận diện, luôn giữ nguyên giá trị đang có
         if ($current->source === self::SOURCE_CAL) {
-            $request->merge(['type' => $current->type, 'code' => $current->code]);
+            $request->merge(['type' => $current->type, 'code' => $current->code, 'frequency' => $current->frequency]);
         }
 
         $validator = Validator::make(
@@ -172,8 +178,7 @@ class ConsumptionObjectController extends Controller
         }
 
         $payload = $this->payload($request);
-        $maps = $this->maps($current->frequency, $payload['frequency']);
-        $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $maps);
+        $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $this->maps());
 
         if ($note === '') {
             return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
@@ -184,7 +189,7 @@ class ConsumptionObjectController extends Controller
             'updated_at' => now(),
         ]);
 
-        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, $maps, $this->changeReason($request));
+        DataMasterHistory::record(self::TABLE, $current->id, 'Cập nhật', $note, self::FIELDS, $this->maps(), $this->changeReason($request));
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $note, $payload['code']);
 
@@ -217,7 +222,7 @@ class ConsumptionObjectController extends Controller
             $newStatus == 1 ? 'Mở khoá' : 'Khoá',
             DataMasterHistory::statusNote($current->status_id, $newStatus),
             self::FIELDS,
-            $this->maps($current->frequency),
+            $this->maps(),
             $this->changeReason($request)
         );
 
@@ -231,7 +236,8 @@ class ConsumptionObjectController extends Controller
 
         return redirect()->back()->with(
             'success',
-            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ') . self::LABEL . ' ' . $current->code . '!'
+            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ') . self::LABEL . ' ' . $current->code
+                . ' (' . (self::FREQUENCIES[$current->frequency] ?? $current->frequency) . ')!'
         );
     }
 
@@ -247,14 +253,16 @@ class ConsumptionObjectController extends Controller
      * Đồng bộ đối tượng thẳng từ phần mềm CAL, lần lượt từng loại có 'cal_suffix' và từng khối (cal1, cal2):
      *
      * - Chỉ lấy instrument đang Active (Inst_Status).
-     * - Thiết bị lớn = dòng có Parent_Equip_id rỗng hoặc trùng chính Inst_id => một đối tượng.
+     * - Thiết bị lớn = dòng có Parent_Equip_id rỗng hoặc trùng chính Inst_id.
      * - Tần suất = các loại lịch (Sch_Type) đang có lịch Pending của thiết bị lớn và toàn bộ thiết bị
      *   con (PMS gom thiết bị con cùng thiết bị lớn thành một khối khi sắp lịch). Chưa có lịch Pending
      *   nào thì lấy tần suất khai ở Inst_Master (Inst_sch_type).
-     * - Nhận diện đối tượng đã có theo liên kết (cal_connection, cal_table_suffix, cal_record_id);
-     *   chưa có liên kết thì theo (loại, mã) - dòng người dùng thêm trùng mã được nhận làm dòng CAL.
-     * - Mã chưa có: thêm mới. Đã có: chỉ cập nhật khi khác; giá trị rỗng không ghi đè.
-     * - Dòng không đổi gì vẫn được ghi cal_synced_at để biết còn thấy trên CAL.
+     * - Mỗi (thiết bị lớn, tần suất) là một dòng đối tượng.
+     * - Nhận diện dòng đã có theo liên kết (cal_connection, cal_table_suffix, cal_record_id, frequency);
+     *   chưa có liên kết thì theo (loại, mã, tần suất) - dòng người dùng thêm trùng được nhận làm dòng CAL.
+     * - Chưa có: thêm mới. Đã có: chỉ cập nhật khi khác; giá trị rỗng không ghi đè.
+     * - Dòng không đổi gì vẫn được ghi cal_synced_at; tần suất không còn trên CAL thì dòng giữ nguyên
+     *   (cal_synced_at đứng lại ở lần cuối còn thấy).
      * - Kết nối nào lỗi thì bỏ qua, dữ liệu đã có của phần đó giữ nguyên.
      */
     public function sync()
@@ -364,103 +372,113 @@ class ConsumptionObjectController extends Controller
         }
 
         $now = now();
+        $maps = $this->maps();
         $byLink = [];
         $byCode = [];
 
         foreach (DB::table(self::TABLE)->get() as $row) {
             if ($row->source === self::SOURCE_CAL && $row->cal_record_id !== null) {
-                $byLink[$this->linkKey($row->cal_connection, $row->cal_table_suffix, $row->cal_record_id)] = $row;
+                $byLink[$this->linkKey($row->cal_connection, $row->cal_table_suffix, $row->cal_record_id, $row->frequency)] = $row;
             }
 
-            $byCode[$row->type . '|' . mb_strtoupper($row->code)] = $row;
+            $byCode[$this->codeKey($row->type, $row->code, $row->frequency)] = $row;
         }
 
         $inserted = 0;
         $updated = 0;
         $linked = 0;
+        $noFrequency = 0;
         $keptCodes = [];
         $untouched = [];
 
-        foreach ($groups as $key => $group) {
-            $link = [
-                'source' => self::SOURCE_CAL,
-                'cal_connection' => $group['connection'],
-                'cal_table_suffix' => $group['suffix'],
-                'cal_record_id' => $group['record_id'],
-                'cal_inst_id' => mb_substr($group['code'], 0, 50),
-            ];
-            $data = [
-                'code' => mb_substr($group['code'], 0, 50),
-                'name' => mb_substr($group['name'], 0, 255),
-                'location' => $group['location'] !== '' ? mb_substr($group['location'], 0, 255) : null,
-                'frequency' => $this->joinFrequencies(array_keys($group['frequencies'])),
-            ];
+        foreach ($groups as $group) {
+            $frequencies = array_values(array_intersect(array_keys(self::FREQUENCIES), array_keys($group['frequencies'])));
+
+            if (! $frequencies) {
+                $noFrequency++;
+                continue;
+            }
+
             $reason = 'Đồng bộ từ phần mềm CAL (khối ' . $group['block'] . ')';
 
-            $current = $byLink[$this->linkKey($group['connection'], $group['suffix'], $group['record_id'])] ?? null;
+            foreach ($frequencies as $frequency) {
+                $link = [
+                    'source' => self::SOURCE_CAL,
+                    'cal_connection' => $group['connection'],
+                    'cal_table_suffix' => $group['suffix'],
+                    'cal_record_id' => $group['record_id'],
+                    'cal_inst_id' => mb_substr($group['code'], 0, 50),
+                ];
+                $data = [
+                    'code' => mb_substr($group['code'], 0, 50),
+                    'name' => mb_substr($group['name'], 0, 255),
+                    'location' => $group['location'] !== '' ? mb_substr($group['location'], 0, 255) : null,
+                ];
 
-            if (! $current) {
-                $sameCode = $byCode[$key] ?? null;
+                $current = $byLink[$this->linkKey($group['connection'], $group['suffix'], $group['record_id'], $frequency)] ?? null;
 
-                // Mã đã gắn với một thiết bị CAL khác (VD lần này khối B1 lỗi, khối B2 có cùng mã) - không gắn lại
-                if ($sameCode && $sameCode->source === self::SOURCE_CAL) {
+                if (! $current) {
+                    $sameCode = $byCode[$this->codeKey($group['type'], $data['code'], $frequency)] ?? null;
+
+                    // (loại, mã, tần suất) đã gắn với thiết bị CAL khác (VD khối B1 lỗi, khối B2 có cùng mã) - không gắn lại
+                    if ($sameCode && $sameCode->source === self::SOURCE_CAL) {
+                        continue;
+                    }
+
+                    // null => thêm mới; dòng người dùng thêm trùng => nhận làm dòng CAL
+                    $current = $sameCode;
+                }
+
+                if (! $current) {
+                    $id = DB::table(self::TABLE)->insertGetId(['type' => $group['type'], 'frequency' => $frequency] + $data + $link + [
+                        'cal_synced_at' => $now,
+                        'status_id' => 1,
+                        'created_by' => $this->actor(),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+
+                    DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', $reason . '.', self::FIELDS, $maps);
+                    $inserted++;
+
                     continue;
                 }
 
-                // null => thêm mới; dòng người dùng thêm trùng (loại, mã) => nhận làm dòng CAL
-                $current = $sameCode;
-            }
+                // CAL đổi Inst_id của thiết bị (cùng ID) sang mã đã có dòng khác cùng loại + tần suất dùng - giữ mã cũ
+                if (strcasecmp($current->code, $data['code']) !== 0) {
+                    $holder = $byCode[$this->codeKey($current->type, $data['code'], $frequency)] ?? null;
 
-            if (! $current) {
-                $id = DB::table(self::TABLE)->insertGetId(['type' => $group['type']] + $data + $link + [
+                    if ($holder && $holder->id !== $current->id) {
+                        $keptCodes[] = $current->code;
+                        $data['code'] = $current->code;
+                    }
+                }
+
+                // Không để giá trị rỗng bên CAL xoá dữ liệu đang có
+                $payload = array_filter($data, fn ($value) => $value !== null) + $link;
+                $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $maps);
+                $linkChanged = collect($link)->contains(fn ($value, $column) => (string) ($current->$column ?? '') !== (string) $value);
+
+                if ($note === '' && ! $linkChanged) {
+                    $untouched[] = $current->id;
+
+                    continue;
+                }
+
+                DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
                     'cal_synced_at' => $now,
-                    'status_id' => 1,
-                    'created_by' => $this->actor(),
-                    'created_at' => $now,
+                    'updated_by' => $this->actor(),
                     'updated_at' => $now,
                 ]);
 
-                DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', $reason . '.', self::FIELDS, $this->maps($data['frequency']));
-                $inserted++;
+                $wasManual = $current->source !== self::SOURCE_CAL;
 
-                continue;
-            }
-
-            // CAL đổi Inst_id của thiết bị (cùng ID) sang mã đã có đối tượng khác cùng loại dùng - giữ mã cũ
-            if (strcasecmp($current->code, $data['code']) !== 0) {
-                $holder = $byCode[$current->type . '|' . mb_strtoupper($data['code'])] ?? null;
-
-                if ($holder && $holder->id !== $current->id) {
-                    $keptCodes[] = $current->code;
-                    $data['code'] = $current->code;
+                if ($note !== '') {
+                    DataMasterHistory::record(self::TABLE, $current->id, $wasManual ? 'Liên kết CAL' : 'Đồng bộ', $note, self::FIELDS, $maps, $reason);
                 }
+
+                $wasManual ? $linked++ : $updated++;
             }
-
-            // Không để giá trị rỗng bên CAL xoá dữ liệu đang có
-            $payload = array_filter($data, fn ($value) => $value !== null) + $link;
-            $maps = $this->maps($current->frequency, $payload['frequency'] ?? null);
-            $note = DataMasterHistory::note(self::FIELDS, $current, $payload, $maps);
-            $linkChanged = collect($link)->contains(fn ($value, $column) => (string) ($current->$column ?? '') !== (string) $value);
-
-            if ($note === '' && ! $linkChanged) {
-                $untouched[] = $current->id;
-
-                continue;
-            }
-
-            DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
-                'cal_synced_at' => $now,
-                'updated_by' => $this->actor(),
-                'updated_at' => $now,
-            ]);
-
-            $wasManual = $current->source !== self::SOURCE_CAL;
-
-            if ($note !== '') {
-                DataMasterHistory::record(self::TABLE, $current->id, $wasManual ? 'Liên kết CAL' : 'Đồng bộ', $note, self::FIELDS, $maps, $reason);
-            }
-
-            $wasManual ? $linked++ : $updated++;
         }
 
         // Dòng không đổi gì: chỉ ghi nhận vẫn còn thấy trên CAL
@@ -469,8 +487,9 @@ class ConsumptionObjectController extends Controller
         }
 
         $message = $readNote . ' Đối tượng: thêm mới ' . $inserted . ', cập nhật ' . $updated
-            . ($linked ? ', liên kết CAL ' . $linked . ' đối tượng người dùng thêm' : '') . '.'
-            . ($keptCodes ? ' Giữ mã cũ vì mã mới trên CAL đã có đối tượng khác dùng: ' . implode(', ', array_slice($keptCodes, 0, 10)) . '.' : '');
+            . ($linked ? ', liên kết CAL ' . $linked . ' dòng người dùng thêm' : '') . '.'
+            . ($noFrequency ? ' Bỏ qua ' . $noFrequency . ' thiết bị chưa có tần suất trên CAL.' : '')
+            . ($keptCodes ? ' Giữ mã cũ vì mã mới trên CAL đã có dòng khác dùng: ' . implode(', ', array_slice(array_unique($keptCodes), 0, 10)) . '.' : '');
 
         AuditTrialController::log('Đồng bộ', self::TABLE, 0, 'NA', $message);
 
@@ -492,10 +511,16 @@ class ConsumptionObjectController extends Controller
         return array_map(fn ($meta) => $meta['label'], self::TYPES);
     }
 
-    /** Khoá liên kết một thiết bị lớn bên CAL: "cal1|2|1234". */
-    private function linkKey(?string $connection, $suffix, $recordId): string
+    /** Khoá liên kết một (thiết bị lớn CAL, tần suất): "cal1|2|1234|Monthly". */
+    private function linkKey(?string $connection, $suffix, $recordId, string $frequency): string
     {
-        return $connection . '|' . (int) $suffix . '|' . (int) $recordId;
+        return $connection . '|' . (int) $suffix . '|' . (int) $recordId . '|' . $frequency;
+    }
+
+    /** Khoá (loại, mã, tần suất) không phân biệt hoa thường - khớp unique index của MySQL. */
+    private function codeKey(string $type, string $code, string $frequency): string
+    {
+        return $type . '|' . mb_strtoupper($code) . '|' . $frequency;
     }
 
     /** Đưa cách viết lệch của CAL về mã chuẩn: "Half-Yearly" => "Half Yearly", "quaterly" => "Quaterly". */
@@ -512,15 +537,10 @@ class ConsumptionObjectController extends Controller
         return null;
     }
 
-    /** Ghép các mã tần suất theo đúng thứ tự FREQUENCIES để so sánh thay đổi ổn định. */
-    private function joinFrequencies(array $codes): ?string
-    {
-        $codes = array_values(array_intersect(array_keys(self::FREQUENCIES), $codes));
-
-        return $codes ? implode(',', $codes) : null;
-    }
-
-    /** Nhãn đọc được của một chuỗi tần suất đã lưu: "Monthly,Quaterly" => "Hằng tháng, Hằng quý". */
+    /**
+     * Nhãn tiếng Việt của tần suất: mỗi dòng đối tượng chỉ có một mã nên trả về đúng một nhãn.
+     * Dùng App\Support\MaterialPeriodicRequest (màn Đề Nghị Theo Chu Kỳ) để hiện "Hằng quý"...
+     */
     public static function frequencyLabel(?string $value): string
     {
         return collect(explode(',', (string) $value))
@@ -530,17 +550,9 @@ class ConsumptionObjectController extends Controller
     }
 
     /** Bảng nhãn cho DataMasterHistory để lịch sử hiện tiếng Việt thay vì mã lưu trong DB. */
-    private function maps(?string ...$frequencies): array
+    private function maps(): array
     {
-        $map = [];
-
-        foreach ($frequencies as $value) {
-            if ($value !== null && $value !== '') {
-                $map[$value] = self::frequencyLabel($value);
-            }
-        }
-
-        return ['source' => self::SOURCES, 'type' => self::typeLabels(), 'frequency' => $map];
+        return ['source' => self::SOURCES, 'type' => self::typeLabels(), 'frequency' => self::FREQUENCIES];
     }
 
     /** Lỗi kết nối rút gọn - bỏ phần câu SQL dài mà Laravel nối vào. */
@@ -555,15 +567,17 @@ class ConsumptionObjectController extends Controller
     {
         return [
             'type' => ['required', Rule::in(array_keys(self::TYPES))],
+            'frequency' => ['required', Rule::in(array_keys(self::FREQUENCIES))],
             'code' => [
                 'required',
                 'max:50',
-                Rule::unique(self::TABLE, 'code')->where('type', (string) $request->type)->ignore($ignoreId),
+                Rule::unique(self::TABLE, 'code')
+                    ->where('type', (string) $request->type)
+                    ->where('frequency', (string) $request->frequency)
+                    ->ignore($ignoreId),
             ],
             'name' => ['required', 'max:255'],
             'location' => ['nullable', 'max:255'],
-            'frequency' => ['required', 'array', 'min:1'],
-            'frequency.*' => [Rule::in(array_keys(self::FREQUENCIES))],
         ];
     }
 
@@ -576,7 +590,7 @@ class ConsumptionObjectController extends Controller
             'code' => trim((string) $request->code),
             'name' => trim((string) $request->name),
             'location' => $location !== '' ? $location : null,
-            'frequency' => $this->joinFrequencies((array) $request->frequency),
+            'frequency' => (string) $request->frequency,
         ];
     }
 
@@ -585,15 +599,14 @@ class ConsumptionObjectController extends Controller
         return [
             'type.required' => 'Vui lòng chọn loại đối tượng.',
             'type.in' => 'Loại đối tượng không hợp lệ.',
+            'frequency.required' => 'Vui lòng chọn tần suất.',
+            'frequency.in' => 'Tần suất không hợp lệ.',
             'code.required' => 'Vui lòng nhập mã đối tượng.',
             'code.max' => 'Mã đối tượng tối đa 50 ký tự.',
-            'code.unique' => 'Mã đối tượng này đã tồn tại trong loại đối tượng đã chọn.',
+            'code.unique' => 'Đối tượng có mã và tần suất này đã tồn tại trong loại đã chọn.',
             'name.required' => 'Vui lòng nhập tên đối tượng.',
             'name.max' => 'Tên đối tượng tối đa 255 ký tự.',
             'location.max' => 'Vị trí tối đa 255 ký tự.',
-            'frequency.required' => 'Vui lòng chọn ít nhất một tần suất.',
-            'frequency.min' => 'Vui lòng chọn ít nhất một tần suất.',
-            'frequency.*.in' => 'Tần suất không hợp lệ.',
         ];
     }
 }

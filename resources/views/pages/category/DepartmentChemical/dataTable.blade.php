@@ -226,6 +226,7 @@
                                                 'max_stock' => $row->max_stock,
                                                 'storage_condition_id' => $row->storage_condition_id,
                                                 'default_location_id' => $row->default_location_id,
+                                                'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
                                                 'note' => $row->note,
                                                 'category_code' => $row->category_code,
                                                 'chem_name' => $row->chem_name,

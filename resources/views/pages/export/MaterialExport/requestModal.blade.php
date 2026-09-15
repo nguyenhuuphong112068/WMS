@@ -277,12 +277,14 @@
     <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 92vw;">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-file-signature mr-2"></i>Tạo Đề Nghị Cấp Phát Vật Tư</h5>
+                <h5 class="modal-title"><i class="fas fa-file-signature mr-2"></i>Tạo Đề Nghị Cấp Phát Vật Tư<span id="reqCreateTypeLabel">{{ old('type') === 'risk_assessment' ? ' - Theo ĐG Rủi Ro' : ' - Thường Quy' }}</span></h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <form action="{{ route($expRoute . 'requestStore') }}" method="POST" id="reqCreateForm">
                 @csrf
                 <input type="hidden" name="action_type" id="reqCreateAction" value="send">
+                {{-- Loại đề nghị: nút "Tạo đề nghị" của tab nào thì điền type của tab đó --}}
+                <input type="hidden" name="type" id="reqCreateType" value="{{ old('type') === 'risk_assessment' ? 'risk_assessment' : 'regular' }}">
                 <div class="modal-body">
 
                     {{-- Thông tin chung + hai nút thao tác nằm gọn trên một hàng --}}
@@ -291,8 +293,12 @@
                             <label>Tiêu đề đề nghị</label>
                             <input type="text" name="name" maxlength="255" class="form-control" value="{{ old('name') }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
                         </div>
+                        <div class="me-field">
+                            <label>Ngày mong muốn</label>
+                            <input type="date" name="needed_date" class="form-control" value="{{ old('needed_date') }}">
+                        </div>
 
-                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqCreateModal .me-rows">
+                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqCreateModal .me-rows"
                             <i class="fas fa-boxes-stacked mr-1"></i>Danh mục tồn của phòng
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-primary shadow-sm me-add-row">
@@ -366,7 +372,6 @@
                 @endforeach
             </select>
         </td>
-        <td><textarea name="items[__i__][product_name]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize" placeholder="Thiết bị liên quan..."></textarea></td>
         <td><textarea name="items[__i__][purpose]" maxlength="500" rows="1" class="form-control form-control-sm me-autosize" placeholder="Mục đích sử dụng..."></textarea></td>
         <td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button></td>
     </tr>
@@ -485,6 +490,12 @@
             window.meSyncSignFlow($box);
         });
         $('.me-flow-box').each(function () { window.meSyncSignFlow(this); });
+
+        // Cùng một modal cho tab Thường Quy và Theo ĐG Rủi Ro: nút bấm ở tab nào thì đề nghị thuộc loại đó
+        $(document).on('click', '.btn-req-create', function () {
+            $('#reqCreateType').val($(this).data('req-type'));
+            $('#reqCreateTypeLabel').text($(this).data('req-label'));
+        });
 
         // Textarea trong modal ẩn có scrollHeight = 0, phải đo lại lúc modal hiện ra
         $(document).on('shown.bs.modal', '#reqCreateModal, [id^="reqEditModal_"]', function () {

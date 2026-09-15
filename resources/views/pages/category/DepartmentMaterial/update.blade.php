@@ -83,6 +83,7 @@
                         <div class="form-group col-md-6">
                             <label>Định Khu</label>
                             <select name="default_location_id"
+                                data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'material']) }}"
                                 class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
                                 @foreach ($locations as $location)
@@ -150,8 +151,7 @@
 
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('.cat-select').each(function() {
-                var field = $(this).attr('name');
-                $(this).val(row[field] === undefined || row[field] === null ? '' : row[field]).trigger('change');
+                catSetSelectValue($(this), row);
             });
 
             var short = $form.find('.cat-select[name="unit_id"] option:selected').data('short');

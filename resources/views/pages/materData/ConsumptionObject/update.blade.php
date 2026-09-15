@@ -26,7 +26,7 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <div class="form-group col-md-8">
+                        <div class="form-group col-md-4">
                             <label for="update_code">Mã Đối Tượng <span class="text-danger">*</span></label>
                             <input type="text" name="code" id="update_code" maxlength="50"
                                 class="form-control @error('code', 'updateErrors') is-invalid @enderror"
@@ -35,9 +35,23 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                        <div class="form-group col-md-4">
+                            <label for="update_frequency">Tần Suất <span class="text-danger">*</span></label>
+                            <select name="frequency" id="update_frequency" required
+                                class="form-control @error('frequency', 'updateErrors') is-invalid @enderror">
+                                <option value="">-- Chọn tần suất --</option>
+                                @foreach ($frequencies as $frequencyCode => $frequencyLabel)
+                                    <option value="{{ $frequencyCode }}"
+                                        {{ old('frequency') === $frequencyCode ? 'selected' : '' }}>{{ $frequencyLabel }}</option>
+                                @endforeach
+                            </select>
+                            @error('frequency', 'updateErrors')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                         <div class="col-12 d-none" id="update_cal_lock">
                             <small class="form-text text-muted mt-n2 mb-2">
-                                <i class="fas fa-link mr-1"></i>Đối tượng đồng bộ từ CAL: không sửa được loại và mã.
+                                <i class="fas fa-link mr-1"></i>Đối tượng đồng bộ từ CAL: không sửa được loại, mã và tần suất.
                             </small>
                         </div>
                     </div>
@@ -58,27 +72,6 @@
                         @error('location', 'updateErrors')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
-                    </div>
-                    <div class="form-group">
-                        <label>Tần Suất <span class="text-danger">*</span></label>
-                        <div class="row obj-freq-grid">
-                            @foreach ($frequencies as $code => $label)
-                                <div class="col-6 col-md-4">
-                                    <div class="custom-control custom-checkbox">
-                                        <input type="checkbox" class="custom-control-input" name="frequency[]"
-                                            id="update_freq_{{ $loop->index }}" value="{{ $code }}"
-                                            {{ in_array($code, (array) old('frequency', [])) ? 'checked' : '' }}>
-                                        <label class="custom-control-label" for="update_freq_{{ $loop->index }}"
-                                            title="{{ $code }}">{{ $label }}</label>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                        @if ($errors->updateErrors->has('frequency') || $errors->updateErrors->has('frequency.*'))
-                            <div class="text-danger small mt-1">
-                                {{ $errors->updateErrors->first('frequency') ?: $errors->updateErrors->first('frequency.*') }}
-                            </div>
-                        @endif
                     </div>
                     <div class="form-group mb-0">
                         <label for="update_change_reason">Lý Do Điều Chỉnh <span class="text-danger">*</span></label>

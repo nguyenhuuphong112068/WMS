@@ -21,6 +21,20 @@
                 <div class="modal-body p-3">
                     <input type="hidden" name="action_type" id="matTransferActionType" value="send">
 
+                    <div class="d-flex flex-wrap mb-3" style="gap: 12px;">
+                        <div class="form-group mb-0 flex-grow-1" style="min-width: 280px;">
+                            <label class="font-weight-bold" style="font-size: 0.9rem;">
+                                Tiêu Đề Đề Nghị <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
+                                placeholder="VD: Xin vật tư văn phòng phẩm quý 3..." value="{{ old('title') }}" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="font-weight-bold" style="font-size: 0.9rem;">Ngày Mong Muốn</label>
+                            <input type="date" name="needed_date" class="form-control" value="{{ old('needed_date') }}">
+                        </div>
+                    </div>
+
                     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 8px;">
                         <div class="d-flex align-items-center">
                             <label class="font-weight-bold mb-0 mr-2 text-nowrap" style="font-size: 0.95rem;">

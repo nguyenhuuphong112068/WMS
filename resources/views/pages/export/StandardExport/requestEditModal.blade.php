@@ -20,21 +20,27 @@
                     <input type="hidden" name="action_type" class="edit-action-type" value="draft">
 
                     <div class="modal-body p-3">
-                        {{-- Row 1: Tổ Đề Nghị + Buttons --}}
-                        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap">
-                            <div class="d-flex align-items-center">
-                                <label class="font-weight-bold mb-0 mr-2 text-nowrap" style="font-size: 0.95rem;">
-                                    <i class="fas fa-users mr-1 text-primary"></i> Tổ Đề Nghị <span class="text-danger">*</span>:
-                                </label>
-                                <div style="min-width: 260px;">
-                                    <select name="group_id" class="form-control font-weight-bold" style="height: 38px !important;" required>
-                                        <option value="">-- Chọn tổ đề nghị --</option>
-                                        @foreach ($groups as $group)
-                                            <option value="{{ $group->id }}" {{ $req->group_id == $group->id ? 'selected' : '' }}>
-                                                {{ $group->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
+                        {{-- Row 1: Tổ Đề Nghị + Ngày Mong Muốn + Buttons --}}
+                        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 10px;">
+                            <div class="d-flex align-items-center flex-wrap" style="gap: 20px;">
+                                <div class="d-flex align-items-center">
+                                    <label class="font-weight-bold mb-0 mr-2 text-nowrap" style="font-size: 0.95rem;">
+                                        <i class="fas fa-users mr-1 text-primary"></i> Tổ Đề Nghị <span class="text-danger">*</span>:
+                                    </label>
+                                    <div style="min-width: 260px;">
+                                        <select name="group_id" class="form-control font-weight-bold" style="height: 38px !important;" required>
+                                            <option value="">-- Chọn tổ đề nghị --</option>
+                                            @foreach ($groups as $group)
+                                                <option value="{{ $group->id }}" {{ $req->group_id == $group->id ? 'selected' : '' }}>
+                                                    {{ $group->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <label class="font-weight-bold mb-0 mr-2 text-nowrap" style="font-size: 0.95rem;">Ngày Mong Muốn:</label>
+                                    <input type="date" name="needed_date" class="form-control" style="height: 38px !important; width: 170px;" value="{{ $req->needed_date ? \Carbon\Carbon::parse($req->needed_date)->format('Y-m-d') : '' }}">
                                 </div>
                             </div>
                             <div class="d-flex align-items-center">

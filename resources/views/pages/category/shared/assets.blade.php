@@ -375,22 +375,73 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
 
-        /* ---------- Bật tìm kiếm cho các ô chọn trong modal ---------- */
+        /* ---------- Bật tìm kiếm cho các ô chọn trong modal ----------
+           Ô có data-lookup-url (tên dữ liệu gốc, định khu) không nhúng cả danh mục vào trang: gõ tìm
+           thì gọi CategoryLookupController, mỗi lần 30 dòng, cuộn xuống cuối thì tải tiếp. */
         $('.md-modal').each(function() {
             var $modal = $(this);
 
-            $modal.find('.cat-select').select2({
-                theme: 'bootstrap4',
-                dropdownParent: $modal,
-                width: '100%',
-                placeholder: '-- Chọn --',
-                language: {
-                    noResults: function() {
-                        return 'Không tìm thấy dữ liệu phù hợp';
+            $modal.find('.cat-select').each(function() {
+                var $select = $(this);
+                var lookupUrl = $select.data('lookup-url');
+                var options = {
+                    theme: 'bootstrap4',
+                    dropdownParent: $modal,
+                    width: '100%',
+                    placeholder: '-- Chọn --',
+                    language: {
+                        noResults: function() {
+                            return 'Không tìm thấy dữ liệu phù hợp';
+                        },
+                        searching: function() {
+                            return 'Đang tìm...';
+                        },
+                        loadingMore: function() {
+                            return 'Đang tải thêm...';
+                        },
+                        errorLoading: function() {
+                            return 'Không tải được dữ liệu, vui lòng thử lại';
+                        }
                     }
+                };
+
+                if (lookupUrl) {
+                    options.placeholder = $select.find('option[value=""]').first().text().trim() || options.placeholder;
+                    // Option trống không nằm trong kết quả tìm: ô không bắt buộc (Định khu) phải xoá được lựa chọn
+                    options.allowClear = !$select.prop('required');
+                    options.ajax = {
+                        url: lookupUrl,
+                        dataType: 'json',
+                        delay: 250,
+                        cache: true,
+                        data: function(params) {
+                            return {
+                                q: params.term || '',
+                                page: params.page || 1
+                            };
+                        }
+                    };
                 }
+
+                $select.select2(options);
             });
         });
+
+        /* ---------- Đổ giá trị của dòng đang sửa vào một ô chọn ----------
+           Ô AJAX chỉ có sẵn option của giá trị old(), nên giá trị chưa có option thì dựng từ nhãn
+           row['<name>_text'] mà nút Sửa gửi kèm. */
+        window.catSetSelectValue = function($select, row) {
+            var field = $select.attr('name');
+            var value = row[field] === undefined || row[field] === null ? '' : String(row[field]);
+
+            if (value !== '' && !$select.find('option').filter(function() {
+                    return this.value === value;
+                }).length) {
+                $select.append(new Option(row[field + '_text'] || value, value, false, false));
+            }
+
+            $select.val(value).trigger('change');
+        };
 
         /* ---------- Tô nền dòng đang tick trong nhóm Phân Loại ---------- */
         $(document).on('change', '.cat-check-input', function() {
@@ -420,8 +471,7 @@
 
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('.cat-select').each(function() {
-                var field = $(this).attr('name');
-                $(this).val(row[field] === undefined || row[field] === null ? '' : row[field]).trigger('change');
+                catSetSelectValue($(this), row);
             });
 
             $form.find('.cat-check-input').each(function() {

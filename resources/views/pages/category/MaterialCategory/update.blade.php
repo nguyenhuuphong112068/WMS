@@ -28,6 +28,7 @@
                             <div class="form-group">
                                 <label>Tên Vật Tư <span class="text-danger">*</span></label>
                                 <select name="material_names_id"
+                                    data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'material']) }}"
                                     class="form-control cat-select {{ $bag->has('material_names_id') ? 'is-invalid' : '' }}"
                                     required>
                                     <option value="">-- Chọn tên vật tư --</option>

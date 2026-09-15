@@ -6,7 +6,6 @@
         <th style="min-width: 200px">Thông tin kỹ thuật</th>
         <th style="min-width: 110px" class="text-right">SL đề nghị</th>
         <th style="min-width: 110px">Đơn vị</th>
-        <th style="min-width: 190px">Thiết bị liên quan</th>
         <th style="min-width: 240px">Mục đích</th>
         <th style="width: 44px"></th>
     </tr>

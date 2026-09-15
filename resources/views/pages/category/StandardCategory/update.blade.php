@@ -32,6 +32,7 @@
                             <div class="form-group">
                                 <label>Tên Chất Chuẩn <span class="text-danger">*</span></label>
                                 <select name="chem_names_id"
+                                    data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'standard']) }}"
                                     class="form-control cat-select {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
                                     required>
                                     <option value="">-- Chọn tên chuẩn --</option>

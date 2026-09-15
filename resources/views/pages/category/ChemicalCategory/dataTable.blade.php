@@ -240,6 +240,7 @@
                                         'code' => $row->code,
                                         'type' => $row->type,
                                         'chem_names_id' => $row->chem_names_id,
+                                        'chem_names_id_text' => \App\Support\CategoryLookup::nameLabel((object) ['name' => $row->chem_name, 'cas_no' => $row->cas_no]),
                                         'manufacturers_id' => $row->manufacturers_id,
                                         'density' => $row->density !== null ? rtrim(rtrim($row->density, '0'), '.') : null,
                                         'ai_content_percent' => $row->ai_content_percent !== null ? rtrim(rtrim($row->ai_content_percent, '0'), '.') : null,

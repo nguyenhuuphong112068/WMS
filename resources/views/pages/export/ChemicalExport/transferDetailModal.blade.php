@@ -31,7 +31,8 @@
             <div class="modal-content shadow-lg border-0">
                 <div class="modal-header bg-light py-2">
                     <h5 class="modal-title font-weight-bold text-primary" style="font-size: 1.05rem;">
-                        <i class="fas fa-people-arrows mr-2"></i> Đề Nghị Liên Phòng Ban: {{ $req->code }}
+                        <i class="fas fa-people-arrows mr-2"></i> {{ $req->title ?: 'Đề Nghị Liên Phòng Ban' }}
+                        <span class="text-muted font-weight-normal" style="font-size: 0.85rem;">({{ $req->code }})</span>
                     </h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
@@ -46,19 +47,23 @@
                                     <span class="text-muted">{{ $iAmSource ? 'Phòng đề nghị:' : 'Gửi đến phòng:' }}</span>
                                     <b class="text-primary ml-1 font-weight-bold">{{ $req->partner_name ?: '—' }}</b>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <span class="text-muted">Trạng thái:</span>
                                     <span class="exp-req-badge {{ $expReqBadge($req->status)['class'] }} ml-1">
                                         {{ $expReqBadge($req->status)['label'] }}
                                     </span>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <span class="text-muted">Người lập:</span>
                                     <b class="ml-1">{{ $req->updated_by ?: $req->created_by ?: '—' }}</b>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <span class="text-muted">Ngày lập:</span>
                                     <b class="ml-1">{{ $expDate($req->created_at) }}</b>
+                                </div>
+                                <div class="col-md-3">
+                                    <span class="text-muted">Ngày mong muốn:</span>
+                                    <b class="ml-1">{{ $req->needed_date ? $expDate($req->needed_date) : '—' }}</b>
                                 </div>
                             </div>
                             @if ($req->note)

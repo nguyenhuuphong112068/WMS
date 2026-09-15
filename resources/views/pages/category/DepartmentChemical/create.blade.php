@@ -136,6 +136,7 @@
                     <div class="form-group">
                         <label>Định Khu</label>
                         <select name="default_location_id"
+                            data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'chemical']) }}"
                             class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
                             <option value="">-- Chưa định khu --</option>
                             @foreach ($locations as $location)

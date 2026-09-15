@@ -34,7 +34,14 @@
         @endperm
     </div>
 
-    <h6 class="font-weight-bold text-primary mt-3 mb-2"><i class="fas fa-paper-plane mr-1"></i> Đề nghị phòng mình đã gửi đi</h6>
+    <div class="exp-req-card is-sent">
+        <div class="exp-req-card-header">
+            <i class="fas fa-paper-plane"></i>
+            <span class="exp-req-card-title">Đề nghị phòng mình đã gửi đi</span>
+            <span class="exp-req-card-count">{{ $transferSent->total() }}</span>
+            <i class="fas fa-chevron-down exp-req-card-toggle"></i>
+        </div>
+        <div class="exp-req-card-body">
 
     @include('pages.shared.rangeFilter', [
         'rfRoute' => $expRoute . 'list',
@@ -51,12 +58,14 @@
             <thead>
                 <tr class="text-center">
                     <th style="width: 50px">STT</th>
-                    <th style="width: 190px">Mã Đề Nghị</th>
+                    <th style="width: 130px">Mã Đề Nghị</th>
+                    <th>Tiêu Đề</th>
                     <th style="width: 170px">Gửi Đến Phòng</th>
                     <th style="width: 120px">Số Lượng Mục</th>
                     <th style="width: 140px">Trạng Thái</th>
                     <th style="width: 140px">Người Lập</th>
                     <th style="width: 120px">Ngày Lập</th>
+                    <th style="width: 120px">Ngày Mong Muốn</th>
                     <th style="width: 110px">Thao Tác</th>
                 </tr>
             </thead>
@@ -70,6 +79,9 @@
                         <td class="text-center align-middle">{{ $transferSent->firstItem() + $loop->index }}</td>
                         <td class="align-middle">
                             <span class="exp-code font-weight-bold">{{ $req->code }}</span>
+                        </td>
+                        <td class="align-middle">
+                            <span class="font-weight-bold">{{ $req->title ?: '—' }}</span>
                             @if ($req->note)
                                 <div class="md-sub mt-1 text-muted" title="{{ $req->note }}">
                                     <i class="fas fa-comment-dots mr-1"></i>{{ Str::limit($req->note, 25) }}
@@ -91,6 +103,7 @@
                         </td>
                         <td class="align-middle">{{ $req->updated_by ?: $req->created_by ?: '—' }}</td>
                         <td class="text-center align-middle">{{ $expDate($req->created_at) }}</td>
+                        <td class="text-center align-middle">{{ $req->needed_date ? $expDate($req->needed_date) : '—' }}</td>
                         <td class="text-center align-middle" style="white-space: nowrap;">
                             @if ($req->status === 'draft' && user_can('export_chemical_request'))
                                 <button type="button" class="btn btn-sm btn-warning px-2 py-1 shadow-sm mr-1"
@@ -125,7 +138,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">Phòng mình chưa gửi đề nghị liên phòng ban nào.</td>
+                        <td colspan="10" class="text-center text-muted py-4">Phòng mình chưa gửi đề nghị liên phòng ban nào.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -138,9 +151,17 @@
         'pgUnit' => 'đề nghị',
     ])
 
-    <div class="mb-4"></div>
+        </div>
+    </div>
 
-    <h6 class="font-weight-bold text-success mb-2"><i class="fas fa-inbox mr-1"></i> Đề nghị phòng ban khác gửi đến - cần cấp phát</h6>
+    <div class="exp-req-card is-received">
+        <div class="exp-req-card-header">
+            <i class="fas fa-inbox"></i>
+            <span class="exp-req-card-title">Đề nghị phòng ban khác gửi đến - cần cấp phát</span>
+            <span class="exp-req-card-count">{{ $transferReceived->total() }}</span>
+            <i class="fas fa-chevron-down exp-req-card-toggle"></i>
+        </div>
+        <div class="exp-req-card-body">
 
     @include('pages.shared.rangeFilter', [
         'rfRoute' => $expRoute . 'list',
@@ -157,12 +178,14 @@
             <thead>
                 <tr class="text-center">
                     <th style="width: 50px">STT</th>
-                    <th style="width: 190px">Mã Đề Nghị</th>
+                    <th style="width: 130px">Mã Đề Nghị</th>
+                    <th>Tiêu Đề</th>
                     <th style="width: 170px">Phòng Đề Nghị</th>
                     <th style="width: 120px">Số Lượng Mục</th>
                     <th style="width: 140px">Trạng Thái</th>
                     <th style="width: 140px">Người Lập</th>
                     <th style="width: 120px">Ngày Lập</th>
+                    <th style="width: 120px">Ngày Mong Muốn</th>
                     <th style="width: 110px">Thao Tác</th>
                 </tr>
             </thead>
@@ -173,6 +196,9 @@
                         <td class="text-center align-middle">{{ $transferReceived->firstItem() + $loop->index }}</td>
                         <td class="align-middle">
                             <span class="exp-code font-weight-bold">{{ $req->code }}</span>
+                        </td>
+                        <td class="align-middle">
+                            <span class="font-weight-bold">{{ $req->title ?: '—' }}</span>
                             @if ($req->note)
                                 <div class="md-sub mt-1 text-muted" title="{{ $req->note }}">
                                     <i class="fas fa-comment-dots mr-1"></i>{{ Str::limit($req->note, 25) }}
@@ -194,6 +220,7 @@
                         </td>
                         <td class="align-middle">{{ $req->updated_by ?: $req->created_by ?: '—' }}</td>
                         <td class="text-center align-middle">{{ $expDate($req->created_at) }}</td>
+                        <td class="text-center align-middle">{{ $req->needed_date ? $expDate($req->needed_date) : '—' }}</td>
                         <td class="text-center align-middle" style="white-space: nowrap;">
                             @if (in_array($req->status, ['pending', 'partial']) && user_can('export_chemical_transfer'))
                                 <button type="button" class="btn btn-sm btn-success px-2 py-1 shadow-sm mr-1"
@@ -214,7 +241,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">Chưa có phòng ban nào gửi đề nghị đến phòng mình.</td>
+                        <td colspan="10" class="text-center text-muted py-4">Chưa có phòng ban nào gửi đề nghị đến phòng mình.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -226,4 +253,7 @@
         'pgTab' => 'request',
         'pgUnit' => 'đề nghị',
     ])
+
+        </div>
+    </div>
 </div>

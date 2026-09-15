@@ -1,5 +1,14 @@
 @include('pages.export.shared.assets')
 
+@php
+    // 3 tab đề nghị cấp phát: key = material_request_lists.type (cũng là tên tab)
+    $reqTabMeta = [
+        'periodic' => ['pane' => 'mePanePeriodic', 'icon' => 'fas fa-sync-alt', 'label' => 'Đề Nghị Theo Định Kỳ', 'prefix' => 'reqp_', 'create' => false, 'empty' => 'Chưa có đề nghị định kỳ nào.'],
+        'risk_assessment' => ['pane' => 'mePaneRisk', 'icon' => 'fas fa-shield-alt', 'label' => 'Đề Nghị Theo ĐG Rủi Ro', 'prefix' => 'reqk_', 'create' => true, 'empty' => 'Chưa có đề nghị theo đánh giá rủi ro nào.'],
+        'regular' => ['pane' => 'mePaneRegular', 'icon' => 'fas fa-file-signature', 'label' => 'Đề Nghị Thường Quy', 'prefix' => 'reqt_', 'create' => true, 'empty' => 'Chưa có đề nghị cấp phát vật tư nào.'],
+    ];
+@endphp
+
 <div class="content-wrapper">
     <div class="md-page">
         <div class="card md-card">
@@ -9,12 +18,14 @@
                     <button type="button" class="exp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}" data-pane="mePaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ sử dụng vật tư
                     </button>
-                    <button type="button" class="exp-tab {{ $activeTab === 'request' ? 'is-active' : '' }}" data-pane="mePaneRequest">
-                        <i class="fas fa-file-signature mr-1"></i> Đề nghị cấp phát vật tư
-                        @if ($requestLists->total())
-                            <span class="exp-tab-count">{{ $requestLists->total() }}</span>
-                        @endif
-                    </button>
+                    @foreach ($reqTabMeta as $reqType => $meta)
+                        <button type="button" class="exp-tab {{ $activeTab === $reqType ? 'is-active' : '' }}" data-pane="{{ $meta['pane'] }}">
+                            <i class="{{ $meta['icon'] }} mr-1"></i> {{ $meta['label'] }}
+                            @if ($reqTabs[$reqType]['list']->total())
+                                <span class="exp-tab-count">{{ $reqTabs[$reqType]['list']->total() }}</span>
+                            @endif
+                        </button>
+                    @endforeach
                     <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}" data-pane="mePaneTransfer">
                         <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
                         {{-- Do Controller đếm trên toàn bộ dữ liệu, không chỉ trang đang xem --}}
@@ -173,10 +184,22 @@
                     ])
                 </div>
 
-                {{-- ============ ĐỀ NGHỊ CẤP PHÁT ============ --}}
-                <div class="exp-pane {{ $activeTab === 'request' ? 'is-active' : '' }}" id="mePaneRequest">
-                    @include('pages.export.MaterialExport.requestPane')
-                </div>
+                {{-- ============ ĐỀ NGHỊ CẤP PHÁT: ĐỊNH KỲ / THEO ĐÁNH GIÁ RỦI RO / THƯỜNG QUY ============ --}}
+                @foreach ($reqTabMeta as $reqType => $meta)
+                    <div class="exp-pane {{ $activeTab === $reqType ? 'is-active' : '' }}" id="{{ $meta['pane'] }}">
+                        @include('pages.export.MaterialExport.requestPane', [
+                            'reqType' => $reqType,
+                            'reqPrefix' => $meta['prefix'],
+                            'reqList' => $reqTabs[$reqType]['list'],
+                            'reqRange' => $reqTabs[$reqType]['range'],
+                            'reqPerPage' => $reqTabs[$reqType]['perPage'],
+                            'reqUnissued' => $reqTabs[$reqType]['unissued'],
+                            'reqUnissuedCount' => $reqTabs[$reqType]['unissuedCount'],
+                            'reqShowCreate' => $meta['create'],
+                            'reqEmptyText' => $meta['empty'],
+                        ])
+                    </div>
+                @endforeach
 
                 {{-- ============ ĐỀ NGHỊ CHUYỂN LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.MaterialExport.transferPane')

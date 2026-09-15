@@ -25,12 +25,26 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <div class="form-group col-md-8">
+                        <div class="form-group col-md-4">
                             <label for="create_code">Mã Đối Tượng <span class="text-danger">*</span></label>
                             <input type="text" name="code" id="create_code" maxlength="50"
                                 class="form-control @error('code', 'createErrors') is-invalid @enderror"
                                 value="{{ old('code') }}" required>
                             @error('code', 'createErrors')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="create_frequency">Tần Suất <span class="text-danger">*</span></label>
+                            <select name="frequency" id="create_frequency" required
+                                class="form-control @error('frequency', 'createErrors') is-invalid @enderror">
+                                <option value="">-- Chọn tần suất --</option>
+                                @foreach ($frequencies as $frequencyCode => $frequencyLabel)
+                                    <option value="{{ $frequencyCode }}"
+                                        {{ old('frequency') === $frequencyCode ? 'selected' : '' }}>{{ $frequencyLabel }}</option>
+                                @endforeach
+                            </select>
+                            @error('frequency', 'createErrors')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
@@ -44,7 +58,7 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
-                    <div class="form-group">
+                    <div class="form-group mb-0">
                         <label for="create_location">Vị Trí</label>
                         <input type="text" name="location" id="create_location" maxlength="255"
                             class="form-control @error('location', 'createErrors') is-invalid @enderror"
@@ -52,27 +66,6 @@
                         @error('location', 'createErrors')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
-                    </div>
-                    <div class="form-group mb-0">
-                        <label>Tần Suất <span class="text-danger">*</span></label>
-                        <div class="row obj-freq-grid">
-                            @foreach ($frequencies as $code => $label)
-                                <div class="col-6 col-md-4">
-                                    <div class="custom-control custom-checkbox">
-                                        <input type="checkbox" class="custom-control-input" name="frequency[]"
-                                            id="create_freq_{{ $loop->index }}" value="{{ $code }}"
-                                            {{ in_array($code, (array) old('frequency', [])) ? 'checked' : '' }}>
-                                        <label class="custom-control-label" for="create_freq_{{ $loop->index }}"
-                                            title="{{ $code }}">{{ $label }}</label>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                        @if ($errors->createErrors->has('frequency') || $errors->createErrors->has('frequency.*'))
-                            <div class="text-danger small mt-1">
-                                {{ $errors->createErrors->first('frequency') ?: $errors->createErrors->first('frequency.*') }}
-                            </div>
-                        @endif
                     </div>
                 </div>
                 <div class="modal-footer">

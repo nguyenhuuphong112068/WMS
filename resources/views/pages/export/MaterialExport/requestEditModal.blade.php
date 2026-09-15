@@ -18,8 +18,12 @@
                             <label>Tiêu đề đề nghị</label>
                             <input type="text" name="name" maxlength="255" class="form-control" value="{{ $req->name }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
                         </div>
+                        <div class="me-field">
+                            <label>Ngày mong muốn</label>
+                            <input type="date" name="needed_date" class="form-control" value="{{ $req->needed_date ? \Carbon\Carbon::parse($req->needed_date)->format('Y-m-d') : '' }}">
+                        </div>
 
-                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqEditModal_{{ $req->id }} .me-edit-rows">
+                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqEditModal_{{ $req->id }} .me-edit-rows"
                             <i class="fas fa-boxes-stacked mr-1"></i>Danh mục tồn của phòng
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-primary shadow-sm me-edit-add">
@@ -54,7 +58,6 @@
                                                 @endforeach
                                             </select>
                                         </td>
-                                        <td><textarea name="items[{{ $i }}][product_name]" maxlength="255" rows="1" class="form-control form-control-sm me-autosize" placeholder="Thiết bị liên quan...">{{ $it->product_name }}</textarea></td>
                                         <td><textarea name="items[{{ $i }}][purpose]" maxlength="500" rows="1" class="form-control form-control-sm me-autosize" placeholder="Mục đích sử dụng...">{{ $it->purpose }}</textarea></td>
                                         <td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button></td>
                                     </tr>

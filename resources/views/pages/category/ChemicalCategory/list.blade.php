@@ -233,7 +233,6 @@
 
     {{-- Bảng chọn "Tên Hoá Chất" từ dữ liệu gốc (dùng chung modal Thêm + Cập nhật) --}}
     @include('pages.category.ChemicalCategory.chemNamePicker', [
-        'chemNames' => $chemNames,
         'chemNameGroups' => $chemNameGroups,
     ])
 

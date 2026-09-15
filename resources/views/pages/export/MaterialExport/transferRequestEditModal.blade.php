@@ -11,7 +11,7 @@
         <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 85%; width: 85%;">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-edit mr-2 text-warning"></i> Điều Chỉnh Đề Nghị Liên Phòng Ban: {{ $req->code }}</h5>
+                    <h5 class="modal-title"><i class="fas fa-edit mr-2 text-warning"></i> Điều Chỉnh Đề Nghị: {{ $req->code }}</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -23,6 +23,20 @@
                     <input type="hidden" name="action_type" class="edit-mat-transfer-action-type" value="draft">
 
                     <div class="modal-body p-3">
+                        <div class="d-flex flex-wrap mb-3" style="gap: 12px;">
+                            <div class="form-group mb-0 flex-grow-1" style="min-width: 280px;">
+                                <label class="font-weight-bold" style="font-size: 0.9rem;">
+                                    Tiêu Đề Đề Nghị <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
+                                    value="{{ $req->title }}" required>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="font-weight-bold" style="font-size: 0.9rem;">Ngày Mong Muốn</label>
+                                <input type="date" name="needed_date" class="form-control" value="{{ $req->needed_date ? \Carbon\Carbon::parse($req->needed_date)->format('Y-m-d') : '' }}">
+                            </div>
+                        </div>
+
                         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 8px;">
                             <div class="d-flex align-items-center">
                                 <label class="font-weight-bold mb-0 mr-2 text-nowrap" style="font-size: 0.95rem;">

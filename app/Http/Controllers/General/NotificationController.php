@@ -97,7 +97,8 @@ class NotificationController extends Controller
             ->where('nr.user_id', $userId)
             ->select(
                 'n.*',
-                'u.fullName as sender_name',
+                // Thông báo hệ thống tự sinh (sender_id = null) không có người gửi
+                DB::raw("COALESCE(u.fullName, 'Hệ thống') as sender_name"),
                 'nr.is_read',
                 'nr.read_at'
             )

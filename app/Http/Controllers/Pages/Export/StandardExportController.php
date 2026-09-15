@@ -588,6 +588,7 @@ class StandardExportController extends Controller
             'items.*.test_criteria' => ['nullable'],
             'items.*.analyst_id' => ['nullable'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
+            'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
             'group_id.required' => 'Vui lòng chọn Tổ đề nghị.',
@@ -635,6 +636,7 @@ class StandardExportController extends Controller
             'group_id' => (int) $request->group_id,
             'status' => $status,
             'note' => $this->nullIfBlank($request->note),
+            'needed_date' => $this->nullIfBlank($request->needed_date),
             'created_by' => $this->actor(),
             'created_at' => now(),
             'updated_at' => now(),
@@ -711,6 +713,7 @@ class StandardExportController extends Controller
             'items.*.test_criteria' => ['nullable'],
             'items.*.analyst_id' => ['nullable'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
+            'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
             'group_id.required' => 'Vui lòng chọn Tổ đề nghị.',
@@ -738,6 +741,7 @@ class StandardExportController extends Controller
             'group_id' => (int) $request->group_id,
             'status' => $status,
             'note' => $this->nullIfBlank($request->note),
+            'needed_date' => $this->nullIfBlank($request->needed_date),
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
@@ -1064,6 +1068,7 @@ class StandardExportController extends Controller
         $departmentId = $this->departmentId();
 
         $validator = Validator::make($request->all(), [
+            'title' => ['required', 'string', 'max:255'],
             'to_department_id' => ['required', 'exists:deparments,id', Rule::notIn([$departmentId])],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:standard_categories,id'],
@@ -1071,8 +1076,10 @@ class StandardExportController extends Controller
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
             'items.*.purpose_id' => ['nullable', 'exists:purposes,id'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
+            'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
+            'title.required' => 'Vui lòng nhập tiêu đề đề nghị.',
             'to_department_id.required' => 'Vui lòng chọn phòng ban nguồn (đang giữ chuẩn).',
             'to_department_id.exists' => 'Phòng ban được chọn không tồn tại.',
             'to_department_id.not_in' => 'Không thể tạo đề nghị liên phòng ban gửi đến chính phòng mình.',
@@ -1100,10 +1107,12 @@ class StandardExportController extends Controller
 
         $listId = DB::table(self::TRANSFER_REQUEST_TABLE)->insertGetId([
             'code' => $code,
+            'title' => $this->nullIfBlank($request->title),
             'department_id' => $departmentId,
             'to_department_id' => $toDepartmentId,
             'status' => $status,
             'note' => $this->nullIfBlank($request->note),
+            'needed_date' => $this->nullIfBlank($request->needed_date),
             'created_by' => $this->actor(),
             'created_at' => now(),
             'updated_at' => now(),
@@ -1160,6 +1169,7 @@ class StandardExportController extends Controller
 
         $validator = Validator::make($request->all(), [
             'transfer_request_id' => ['required', 'exists:standard_transfer_requests,id'],
+            'title' => ['required', 'string', 'max:255'],
             'to_department_id' => ['required', 'exists:deparments,id', Rule::notIn([$departmentId])],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:standard_categories,id'],
@@ -1167,8 +1177,10 @@ class StandardExportController extends Controller
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
             'items.*.purpose_id' => ['nullable', 'exists:purposes,id'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
+            'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
+            'title.required' => 'Vui lòng nhập tiêu đề đề nghị.',
             'to_department_id.required' => 'Vui lòng chọn phòng ban nguồn (đang giữ chuẩn).',
             'to_department_id.not_in' => 'Không thể tạo đề nghị liên phòng ban gửi đến chính phòng mình.',
             'items.required' => 'Vui lòng thêm ít nhất một chất chuẩn đề nghị.',
@@ -1192,9 +1204,11 @@ class StandardExportController extends Controller
         $toDepartmentId = (int) $request->to_department_id;
 
         DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $req->id)->update([
+            'title' => $this->nullIfBlank($request->title),
             'to_department_id' => $toDepartmentId,
             'status' => $status,
             'note' => $this->nullIfBlank($request->note),
+            'needed_date' => $this->nullIfBlank($request->needed_date),
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
@@ -2574,12 +2588,13 @@ class StandardExportController extends Controller
             ->get();
     }
 
-    /** Mã đề nghị liên phòng ban: LPB-<shortName A>-<shortName B>-ddMMyy-<số thứ tự trong ngày>. */
+    /**
+     * Mã đề nghị liên phòng ban: LPB-<id phòng gửi>-<id phòng nhận>-ddMMyy-<số thứ tự
+     * trong ngày>. Dùng id số thay vì shortName (có thể dài như "KTBT-NM2") cho gọn.
+     */
     private function nextTransferCode(int $fromDepartmentId, int $toDepartmentId): string
     {
-        $fromShort = DB::table('deparments')->where('id', $fromDepartmentId)->value('shortName') ?: 'NA';
-        $toShort = DB::table('deparments')->where('id', $toDepartmentId)->value('shortName') ?: 'NA';
-        $prefix = 'LPB-'.$fromShort.'-'.$toShort.'-'.date('dmy').'-';
+        $prefix = 'LPB-'.$fromDepartmentId.'-'.$toDepartmentId.'-'.date('dmy').'-';
 
         $latestCode = DB::table(self::TRANSFER_REQUEST_TABLE)
             ->where('code', 'LIKE', $prefix.'%')

@@ -9,6 +9,7 @@
 | Tên route  : pages.category.<chứcNăng>.<action>
 */
 
+use App\Http\Controllers\Pages\Category\CategoryLookupController;
 use App\Http\Controllers\Pages\Category\ChemicalCategoryController;
 use App\Http\Controllers\Pages\Category\DepartmentChemicalController;
 use App\Http\Controllers\Pages\Category\DepartmentMaterialController;
@@ -23,6 +24,14 @@ Route::prefix('/category')
     ->name('pages.category.')
     ->middleware(CheckLogin::class)
     ->group(function () {
+
+        // Tra cứu dữ liệu gốc qua AJAX cho ô chọn Select2 của 3 trang Danh Mục (tên vật tư / hoá chất /
+        // chất chuẩn, định khu) - không nhúng cả danh mục vào trang, xem App\Support\CategoryLookup.
+        Route::prefix('/lookup')->name('lookup.')->controller(CategoryLookupController::class)->group(function () {
+            Route::get('names', 'names')->name('names');
+            Route::get('locations', 'locations')->name('locations');
+            Route::get('chemicalNames', 'chemicalNames')->name('chemicalNames');
+        });
 
         // Trang 2 tab: "Danh Mục Vật Tư Công Ty" + "Vật Tư Của Phòng"
         Route::prefix('/materialCategory')->name('materialCategory.')->controller(MaterialCategoryController::class)->group(function () {
@@ -49,6 +58,12 @@ Route::prefix('/category')
         // đề nghị Lưu tạm. Không có route hiển thị: nằm ở 2 tab của /category/materialCategory.
         Route::prefix('/periodicRequest')->name('periodicRequest.')->controller(PeriodicRequestController::class)->group(function () {
             Route::get('history', 'history')->name('history');
+            // Tìm đối tượng (dữ liệu gốc) qua AJAX cho modal "Dữ Liệu Gốc - Đối Tượng" - không
+            // nhúng cả danh mục vào trang, xem MaterialPeriodicRequest::objectSearch()
+            Route::get('objects', 'objects')->name('objects');
+            // Lịch Pending bên CAL của đối tượng + ngày tạo sẽ theo - cho tuỳ chọn "Theo ngày đến hạn
+            // lịch CAL" ở modal thêm / sửa danh sách nội bộ, xem MaterialPeriodicRequest::calSchedulePreview()
+            Route::get('calSchedule', 'calSchedule')->name('calSchedule');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');

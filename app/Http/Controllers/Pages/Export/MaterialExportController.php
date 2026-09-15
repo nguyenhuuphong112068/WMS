@@ -77,6 +77,19 @@ class MaterialExportController extends Controller
     /** Đề nghị cấp phát đã duyệt nhưng kho chưa cấp đủ. */
     private const REQ_PENDING_ISSUE_STATUSES = ['waiting', 'partial'];
 
+    /**
+     * 3 loại đề nghị cấp phát, mỗi loại một tab riêng: material_request_lists.type =>
+     * ['tab' => tên tab dùng cho activeTab/route, 'param' => tiền tố tham số lọc riêng].
+     *   periodic        : hệ thống tự sinh từ danh sách vật tư đề nghị theo chu kỳ của phòng
+     *   risk_assessment : theo Đánh Giá Rủi Ro (chưa có nghiệp vụ tạo tự động)
+     *   regular         : đề nghị tự lập như trước giờ - tab duy nhất có nút "Tạo đề nghị"
+     */
+    private const REQ_TYPE_TABS = [
+        'periodic' => 'reqp_',
+        'risk_assessment' => 'reqk_',
+        'regular' => 'reqt_',
+    ];
+
     private const LABEL = 'phiếu sử dụng vật tư';
 
     private const EPSILON = 0.00005;
@@ -162,51 +175,34 @@ class MaterialExportController extends Controller
             ->paginate($bookPerPage, ['*'], ListRange::pageName('book_'))
             ->withQueryString();
 
-        // Đề nghị cấp phát: lọc theo ngày lập nhưng LUÔN giữ các đề nghị còn dở dang
-        // (chưa ký duyệt xong hoặc kho chưa cấp đủ) dù đã ngoài khoảng lọc.
-        $reqRange = ListRange::of($request, 'req_');
-        $reqPerPage = ListRange::perPage($request, 'req_');
-        $reqUnissued = $request->boolean('req_unissued');
-
-        $reqUnissuedCount = DB::table(self::REQ_LIST)
-            ->where('department_id', $departmentId)
-            ->where('app_status', 'approved')
-            ->whereIn('issue_status', self::REQ_PENDING_ISSUE_STATUSES)
-            ->count();
-
-        $requestListsQuery = DB::table(self::REQ_LIST)
-            ->select(self::REQ_LIST.'.*')
-            ->where(self::REQ_LIST.'.department_id', $departmentId);
-
-        if ($reqUnissued) {
-            $requestListsQuery->where(self::REQ_LIST.'.app_status', 'approved')
-                ->whereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES);
-        } else {
-            $requestListsQuery->tap(ListRange::dateFilterKeep(
-                self::REQ_LIST.'.created_at',
-                $reqRange,
-                fn ($query) => $query
-                    ->orWhereIn(self::REQ_LIST.'.app_status', self::REQ_PENDING_APP_STATUSES)
-                    ->orWhereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES)
-            ));
+        // Đề nghị cấp phát: chia 3 loại (periodic / risk_assessment / regular), mỗi loại một
+        // tab với bộ lọc + phân trang RIÊNG (tiền tố xem self::REQ_TYPE_TABS), nhưng vẫn lọc
+        // theo ngày lập và LUÔN giữ các đề nghị còn dở dang dù đã ngoài khoảng lọc.
+        $reqTabs = [];
+        foreach (self::REQ_TYPE_TABS as $reqType => $reqPrefix) {
+            $reqTabs[$reqType] = $this->requestListsOfType($departmentId, $request, $reqType, $reqPrefix);
         }
 
-        $requestLists = $requestListsQuery
-            ->orderBy(self::REQ_LIST.'.id', 'desc')
-            ->paginate($reqPerPage, ['*'], ListRange::pageName('req_'))
-            ->withQueryString();
+        // Gộp lại để tính chung: bước ký, dòng đề nghị, kế hoạch chia lô - vẫn chỉ những
+        // đề nghị đang HIỂN THỊ trên 3 trang hiện tại, không nạp toàn bộ dữ liệu của phòng.
+        $requestLists = collect($reqTabs)->reduce(
+            fn ($carry, $tab) => $carry->concat($tab['list']->items()),
+            collect()
+        );
 
         // Bước ký của các đề nghị đang hiện: request_list_id => danh sách bước theo step_no
         $requestSigns = $this->signRows($requestLists->pluck('id'));
 
-        $requestLists->through(function ($req) use ($requestSigns) {
-            $pending = $this->pendingSign($req, $requestSigns->get($req->id, collect()));
+        foreach ($reqTabs as $reqType => $reqTab) {
+            $reqTab['list']->through(function ($req) use ($requestSigns) {
+                $pending = $this->pendingSign($req, $requestSigns->get($req->id, collect()));
 
-            $req->pending_sign = $pending;
-            $req->can_sign = $pending ? $this->canSignRow($pending) : false;
+                $req->pending_sign = $pending;
+                $req->can_sign = $pending ? $this->canSignRow($pending) : false;
 
-            return $req;
-        });
+                return $req;
+            });
+        }
 
         $requestItems = DB::table(self::REQ_ITEM)
             ->leftJoin('material_categories', self::REQ_ITEM.'.category_id', '=', 'material_categories.id')
@@ -275,16 +271,20 @@ class MaterialExportController extends Controller
 
         /*
         | Tab nào đang mở: ?tab= trên URL là chính; các action liên phòng ban dùng
-        | redirect()->back() (không đổi URL) nên tự flash activeTab qua session.
+        | redirect()->back() (không đổi URL) nên tự flash activeTab qua session. 3 tab đề
+        | nghị cấp phát dùng đúng tên type (periodic / risk_assessment / regular).
         */
-        $tabs = ['book', 'request', 'transfer', 'inbox'];
-        $activeTab = in_array($request->query('tab'), $tabs, true)
-            ? $request->query('tab')
+        $tabs = array_merge(['book', 'transfer', 'inbox'], array_keys(self::REQ_TYPE_TABS));
+        // Link trong thông báo cũ còn trỏ tab 'request' (trước khi tách 3 tab)
+        $queryTab = $request->query('tab') === 'request' ? 'regular' : $request->query('tab');
+        $activeTab = in_array($queryTab, $tabs, true)
+            ? $queryTab
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'book');
 
         return view('pages.export.MaterialExport.list', [
             'exports' => $exports,
             'requestLists' => $requestLists,
+            'reqTabs' => $reqTabs,
             'requestItems' => $requestItems,
             'categories' => $categories,
             'units' => $this->unitOptions(),
@@ -313,10 +313,6 @@ class MaterialExportController extends Controller
             'bookRange' => $bookRange,
             'bookKeyword' => $bookKeyword,
             'bookPerPage' => $bookPerPage,
-            'reqRange' => $reqRange,
-            'reqPerPage' => $reqPerPage,
-            'reqUnissued' => $reqUnissued,
-            'reqUnissuedCount' => $reqUnissuedCount,
             'transferCategories' => $this->transferCategoryOptions($departmentId),
             'transferDepartments' => $this->departmentOptions($departmentId),
             'transferOwnLocations' => DepartmentMaterial::locationOptions($departmentId),
@@ -340,6 +336,9 @@ class MaterialExportController extends Controller
     {
         $departmentId = $this->departmentId();
 
+        // Lập tay chỉ có Thường Quy / Theo ĐG Rủi Ro; 'periodic' chỉ do MaterialPeriodicRequest tự sinh
+        $type = $request->input('type') === 'risk_assessment' ? 'risk_assessment' : 'regular';
+
         $validator = Validator::make($request->all(), $this->requestRules(), $this->requestMessages());
 
         if ($validator->fails()) {
@@ -347,7 +346,7 @@ class MaterialExportController extends Controller
                 ->withErrors($validator, 'requestCreateErrors')
                 ->with('error', $validator->errors()->first())
                 ->withInput()
-                ->with('activeTab', 'request');
+                ->with('activeTab', $type);
         }
 
         $isDraft = $request->input('action_type', 'send') === 'draft';
@@ -368,12 +367,14 @@ class MaterialExportController extends Controller
             ? ['app_status' => 'draft', 'current_step' => null, 'issue_status' => null]
             : $this->submitPayload($stepCount);
 
-        $listId = DB::transaction(function () use ($request, $departmentId, $code, $isDraft, $flow, $stepCount) {
+        $listId = DB::transaction(function () use ($request, $departmentId, $code, $isDraft, $flow, $stepCount, $type) {
             $listId = DB::table(self::REQ_LIST)->insertGetId($flow + [
                 'code' => $code,
                 'department_id' => $departmentId,
+                'type' => $type,
                 'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
+                'needed_date' => $this->nullIfBlank($request->needed_date),
                 'sign_step_count' => $stepCount,
                 'submitted_by' => $isDraft ? null : $this->actor(),
                 'submitted_at' => $isDraft ? null : now(),
@@ -401,7 +402,7 @@ class MaterialExportController extends Controller
             $this->notifySubmitted($this->findRequest($listId), $stepCount);
         }
 
-        return redirect()->route('pages.export.materialExport.list', ['tab' => 'request'])->with(
+        return redirect()->route('pages.export.materialExport.list', ['tab' => $type])->with(
             'success',
             $isDraft ? 'Đã lưu tạm đề nghị '.$code.'!' : $this->submitMessage($code, $stepCount)
         );
@@ -417,7 +418,7 @@ class MaterialExportController extends Controller
             ->first();
 
         if (! $req || ! in_array($req->app_status, ['draft', 'rejected'])) {
-            return redirect()->back()->with('error', 'Chỉ sửa được đề nghị đang ở trạng thái Nháp hoặc Bị từ chối!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Chỉ sửa được đề nghị đang ở trạng thái Nháp hoặc Bị từ chối!')->with('activeTab', $req->type ?? 'regular');
         }
 
         $validator = Validator::make($request->all(), $this->requestRules() + [
@@ -429,7 +430,7 @@ class MaterialExportController extends Controller
                 ->withErrors($validator, 'requestCreateErrors')
                 ->with('error', $validator->errors()->first())
                 ->withInput()
-                ->with('activeTab', 'request');
+                ->with('activeTab', $req->type);
         }
 
         $isDraft = $request->input('action_type', 'draft') === 'draft';
@@ -442,6 +443,7 @@ class MaterialExportController extends Controller
             DB::table(self::REQ_LIST)->where('id', $req->id)->update($flow + [
                 'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
+                'needed_date' => $this->nullIfBlank($request->needed_date),
                 'sign_step_count' => $stepCount,
                 'submitted_by' => $isDraft ? $req->submitted_by : $this->actor(),
                 'submitted_at' => $isDraft ? $req->submitted_at : now(),
@@ -474,7 +476,7 @@ class MaterialExportController extends Controller
             $this->notifySubmitted($this->findRequest($req->id), $stepCount);
         }
 
-        return redirect()->route('pages.export.materialExport.list', ['tab' => 'request'])->with(
+        return redirect()->route('pages.export.materialExport.list', ['tab' => $req->type])->with(
             'success',
             $isDraft ? 'Đã lưu đề nghị '.$req->code.'!' : $this->submitMessage($req->code, $stepCount, true)
         );
@@ -485,15 +487,15 @@ class MaterialExportController extends Controller
         $req = $this->findRequest($request->request_list_id);
 
         if (! $req) {
-            return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần trình ký!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần trình ký!')->with('activeTab', 'regular');
         }
 
         if (! in_array($req->app_status, ['draft', 'rejected'])) {
-            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở trạng thái sửa được nên không trình ký lại!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở trạng thái sửa được nên không trình ký lại!')->with('activeTab', $req->type);
         }
 
         if (! DB::table(self::REQ_ITEM)->where('request_list_id', $req->id)->where('active', 1)->exists()) {
-            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' chưa có mục nào, chưa trình ký được!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' chưa có mục nào, chưa trình ký được!')->with('activeTab', $req->type);
         }
 
         // Quy trình ký đã khai sẵn lúc lập / sửa phiếu, chỉ cần đưa các bước về chờ ký lại
@@ -536,7 +538,7 @@ class MaterialExportController extends Controller
 
         return redirect()->back()
             ->with('success', $this->submitMessage($req->code, $stepCount))
-            ->with('activeTab', 'request');
+            ->with('activeTab', $req->type);
     }
 
     /**
@@ -547,8 +549,8 @@ class MaterialExportController extends Controller
      */
     public function requestSign(Request $request)
     {
-        $tab = $this->approvalActiveTab($request);
         $req = $this->resolveRequestForApproval($request);
+        $tab = $this->approvalActiveTab($request, $req->type ?? null);
 
         if (! $req) {
             return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần ký duyệt!')->with('activeTab', $tab);
@@ -621,8 +623,8 @@ class MaterialExportController extends Controller
     /** TỪ CHỐI tại bước đang chờ ký: phiếu quay về "Bị từ chối", Tổ sửa rồi trình ký lại. */
     public function requestReject(Request $request)
     {
-        $tab = $this->approvalActiveTab($request);
         $req = $this->resolveRequestForApproval($request);
+        $tab = $this->approvalActiveTab($request, $req->type ?? null);
 
         if (! $req) {
             return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần từ chối!')->with('activeTab', $tab);
@@ -699,18 +701,18 @@ class MaterialExportController extends Controller
         $req = $this->findRequest($request->request_list_id);
 
         if (! $req) {
-            return redirect()->back()->with('error', 'Không tìm thấy đề nghị này.')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Không tìm thấy đề nghị này.')->with('activeTab', 'regular');
         }
 
         if (! in_array($req->app_status, ['draft', 'rejected'])) {
-            return redirect()->back()->with('error', 'Chỉ huỷ được đề nghị đang Nháp hoặc Bị từ chối.')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Chỉ huỷ được đề nghị đang Nháp hoặc Bị từ chối.')->with('activeTab', $req->type);
         }
 
         DB::table(self::REQ_LIST)->where('id', $req->id)->update(['app_status' => 'canceled', 'updated_at' => now()]);
 
         AuditTrialController::log('Huỷ đề nghị cấp phát vật tư', self::REQ_LIST, $req->id, $req->code, 'Đã huỷ');
 
-        return redirect()->back()->with('success', 'Đã huỷ đề nghị '.$req->code.'.')->with('activeTab', 'request');
+        return redirect()->back()->with('success', 'Đã huỷ đề nghị '.$req->code.'.')->with('activeTab', $req->type);
     }
 
     /* ==========================================================
@@ -787,6 +789,57 @@ class MaterialExportController extends Controller
         }
 
         return $ids;
+    }
+
+    /**
+     * Một trang đề nghị cấp phát ĐÚNG MỘT LOẠI (periodic / risk_assessment / regular), lọc
+     * theo ngày lập nhưng LUÔN giữ các đề nghị còn dở dang (chưa ký duyệt xong hoặc kho
+     * chưa cấp đủ) dù đã ngoài khoảng lọc - cùng tiêu chí với tab "Đề nghị" trước khi tách
+     * thành 3 tab, chỉ khác là tự lọc thêm theo type và mỗi loại có bộ lọc + phân trang
+     * riêng (tiền tố $prefix, xem self::REQ_TYPE_TABS).
+     */
+    private function requestListsOfType(int $departmentId, Request $request, string $type, string $prefix): array
+    {
+        $range = ListRange::of($request, $prefix);
+        $perPage = ListRange::perPage($request, $prefix);
+        $unissued = $request->boolean($prefix.'unissued');
+
+        $unissuedCount = DB::table(self::REQ_LIST)
+            ->where('department_id', $departmentId)
+            ->where('type', $type)
+            ->where('app_status', 'approved')
+            ->whereIn('issue_status', self::REQ_PENDING_ISSUE_STATUSES)
+            ->count();
+
+        $query = DB::table(self::REQ_LIST)
+            ->select(self::REQ_LIST.'.*')
+            ->where(self::REQ_LIST.'.department_id', $departmentId)
+            ->where(self::REQ_LIST.'.type', $type);
+
+        if ($unissued) {
+            $query->where(self::REQ_LIST.'.app_status', 'approved')
+                ->whereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES);
+        } else {
+            $query->tap(ListRange::dateFilterKeep(
+                self::REQ_LIST.'.created_at',
+                $range,
+                fn ($q) => $q
+                    ->orWhereIn(self::REQ_LIST.'.app_status', self::REQ_PENDING_APP_STATUSES)
+                    ->orWhereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES)
+            ));
+        }
+
+        $list = $query->orderBy(self::REQ_LIST.'.id', 'desc')
+            ->paginate($perPage, ['*'], ListRange::pageName($prefix))
+            ->withQueryString();
+
+        return [
+            'list' => $list,
+            'range' => $range,
+            'perPage' => $perPage,
+            'unissued' => $unissued,
+            'unissuedCount' => $unissuedCount,
+        ];
     }
 
     /** Các bước ký còn hiệu lực của một loạt phiếu: request_list_id => bước theo step_no. */
@@ -889,10 +942,18 @@ class MaterialExportController extends Controller
             : false;
     }
 
-    /** Tab cần mở lại sau khi ký / từ chối: 'inbox' khi thao tác từ hộp ký duyệt, còn lại 'request'. */
-    private function approvalActiveTab(Request $request): string
+    /**
+     * Tab cần mở lại sau khi ký / từ chối: 'inbox' khi thao tác từ hộp ký duyệt, còn lại
+     * đúng tab loại của đề nghị ($type = material_request_lists.type). $type chỉ có sau
+     * khi resolveRequestForApproval() tìm ra phiếu nên gọi hàm này SAU, truyền vào nếu có.
+     */
+    private function approvalActiveTab(Request $request, ?string $type = null): string
     {
-        return $request->input('scope') === 'inbox' && $this->canUseApprovalInbox() ? 'inbox' : 'request';
+        if ($request->input('scope') === 'inbox' && $this->canUseApprovalInbox()) {
+            return 'inbox';
+        }
+
+        return $type ?? 'regular';
     }
 
     /**
@@ -1075,7 +1136,7 @@ class MaterialExportController extends Controller
         $this->notify(
             'Đề nghị cấp phát vật tư '.$req->code.' đang chờ bạn ký duyệt (bước '.$stepNo.'/'.$stepCount.').',
             'Chờ ký duyệt',
-            (int) $req->id,
+            $req,
             [(int) $sign->user_id]
         );
     }
@@ -1086,21 +1147,21 @@ class MaterialExportController extends Controller
         $this->notify(
             'Đề nghị cấp phát vật tư '.$req->code.' đã được duyệt, chờ kho cấp phát.',
             'Chờ cấp phát',
-            (int) $req->id,
+            $req,
             users_with_permission('export_material_issue', (int) $req->department_id)
         );
     }
 
     private function notifyCreator($req, string $message, string $activityType): void
     {
-        $this->notify($message, $activityType, (int) $req->id, [(int) ($req->created_user_id ?? 0)]);
+        $this->notify($message, $activityType, $req, [(int) ($req->created_user_id ?? 0)]);
     }
 
     /**
-     * Gửi thông báo vào chuông, kèm đường dẫn mở đúng tab Đề nghị.
+     * Gửi thông báo vào chuông, kèm đường dẫn mở đúng tab loại của đề nghị.
      * NotificationController tự bỏ người gửi ra khỏi danh sách nhận.
      */
-    private function notify(string $message, string $activityType, int $referenceId, array $userIds): void
+    private function notify(string $message, string $activityType, $req, array $userIds): void
     {
         $userIds = array_values(array_unique(array_filter($userIds)));
 
@@ -1111,10 +1172,10 @@ class MaterialExportController extends Controller
         NotificationController::sendNotification(
             $message,
             $activityType,
-            $referenceId,
+            (int) $req->id,
             $userIds,
             [],
-            route('pages.export.materialExport.list', ['tab' => 'request'])
+            route('pages.export.materialExport.list', ['tab' => $req->type ?? 'regular'])
         );
     }
 
@@ -1150,12 +1211,12 @@ class MaterialExportController extends Controller
             'lots.*.amount.min' => 'Số lượng cấp phát không được âm.',
         ]);
 
-        $fail = function ($message) use ($request) {
+        $fail = function ($message) use ($request, &$req) {
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => $message]);
             }
 
-            return redirect()->back()->with('error', $message)->with('activeTab', 'request');
+            return redirect()->back()->with('error', $message)->with('activeTab', $req->type ?? 'regular');
         };
 
         if ($validator->fails()) {
@@ -1342,7 +1403,7 @@ class MaterialExportController extends Controller
             ]);
         }
 
-        return redirect()->route('pages.export.materialExport.list', ['tab' => 'request'])
+        return redirect()->route('pages.export.materialExport.list', ['tab' => $req->type])
             ->with('success', $message);
     }
 
@@ -1354,7 +1415,7 @@ class MaterialExportController extends Controller
         $req = $item ? DB::table(self::REQ_LIST)->where('id', $item->request_list_id)->where('department_id', $departmentId)->first() : null;
 
         if (! $item || ! $req) {
-            return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!')->with('activeTab', 'request');
+            return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!')->with('activeTab', 'regular');
         }
 
         DB::table(self::REQ_ITEM)->where('id', $item->id)->update([
@@ -1367,7 +1428,7 @@ class MaterialExportController extends Controller
 
         AuditTrialController::log('Từ chối cấp phát vật tư', self::REQ_ITEM, $item->id, $item->status, 'rejected');
 
-        return redirect()->back()->with('success', 'Đã từ chối cấp phát mục đề nghị.')->with('activeTab', 'request');
+        return redirect()->back()->with('success', 'Đã từ chối cấp phát mục đề nghị.')->with('activeTab', $req->type);
     }
 
     /* ==========================================================
@@ -1699,10 +1760,12 @@ class MaterialExportController extends Controller
         $listId = DB::transaction(function () use ($request, $departmentId, $toDepartmentId, $code, $status) {
             $listId = DB::table(self::TRANSFER_REQUEST_TABLE)->insertGetId([
                 'code' => $code,
+                'title' => $this->nullIfBlank($request->title),
                 'department_id' => $departmentId,
                 'to_department_id' => $toDepartmentId,
                 'status' => $status,
                 'note' => $this->nullIfBlank($request->note),
+                'needed_date' => $this->nullIfBlank($request->needed_date),
                 'created_by' => $this->actor(),
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -1766,9 +1829,11 @@ class MaterialExportController extends Controller
 
         DB::transaction(function () use ($request, $req, $toDepartmentId, $status) {
             DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $req->id)->update([
+                'title' => $this->nullIfBlank($request->title),
                 'to_department_id' => $toDepartmentId,
                 'status' => $status,
                 'note' => $this->nullIfBlank($request->note),
+                'needed_date' => $this->nullIfBlank($request->needed_date),
                 'updated_by' => $this->actor(),
                 'updated_at' => now(),
             ]);
@@ -2573,12 +2638,13 @@ class MaterialExportController extends Controller
         ];
     }
 
-    /** Mã đề nghị liên phòng ban: LPB-<shortName A>-<shortName B>-ddMMyy-<số thứ tự trong ngày>. */
+    /**
+     * Mã đề nghị liên phòng ban: LPB-<id phòng gửi>-<id phòng nhận>-ddMMyy-<số thứ tự
+     * trong ngày>. Dùng id số thay vì shortName (có thể dài như "KTBT-NM2") cho gọn.
+     */
     private function nextMaterialTransferCode(int $fromDepartmentId, int $toDepartmentId): string
     {
-        $fromShort = DB::table('deparments')->where('id', $fromDepartmentId)->value('shortName') ?: 'NA';
-        $toShort = DB::table('deparments')->where('id', $toDepartmentId)->value('shortName') ?: 'NA';
-        $prefix = 'LPB-'.$fromShort.'-'.$toShort.'-'.date('dmy').'-';
+        $prefix = 'LPB-'.$fromDepartmentId.'-'.$toDepartmentId.'-'.date('dmy').'-';
 
         $latestCode = DB::table(self::TRANSFER_REQUEST_TABLE)
             ->where('code', 'LIKE', $prefix.'%')
@@ -2637,7 +2703,9 @@ class MaterialExportController extends Controller
     private function transferRules(int $departmentId): array
     {
         return [
+            'title' => ['required', 'string', 'max:255'],
             'to_department_id' => ['required', 'exists:deparments,id', Rule::notIn([$departmentId])],
+            'needed_date' => ['nullable', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:material_categories,id'],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
@@ -2650,6 +2718,7 @@ class MaterialExportController extends Controller
     private function transferMessages(): array
     {
         return [
+            'title.required' => 'Vui lòng nhập tiêu đề đề nghị.',
             'to_department_id.required' => 'Vui lòng chọn phòng ban nguồn (đang giữ vật tư).',
             'to_department_id.exists' => 'Phòng ban được chọn không tồn tại.',
             'to_department_id.not_in' => 'Không thể tạo đề nghị liên phòng ban gửi đến chính phòng mình.',
@@ -2983,6 +3052,7 @@ class MaterialExportController extends Controller
         return [
             'name' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],
+            'needed_date' => ['nullable', 'date'],
             // Quy trình ký: mảng rỗng = 0 bước, phiếu đi thẳng đến người cấp phát
             'signers' => ['nullable', 'array', 'max:20'],
             'signers.*' => ['required', 'integer', 'distinct', Rule::in($this->signerOptions()->pluck('id')->all())],

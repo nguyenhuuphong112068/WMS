@@ -142,6 +142,7 @@
                                         'id' => $row->id,
                                         'code' => $row->code,
                                         'chem_names_id' => $row->chem_names_id,
+                                        'chem_names_id_text' => \App\Support\CategoryLookup::nameLabel((object) ['name' => $row->standard_name, 'cas_no' => $row->name_cas_no]),
                                         'cas_no' => $row->cas_no,
                                         'manufacturers_id' => $row->manufacturers_id,
                                         'density' => $row->density !== null ? rtrim(rtrim((string) $row->density, '0'), '.') : null,

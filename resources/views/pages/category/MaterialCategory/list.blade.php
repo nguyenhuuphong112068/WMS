@@ -300,5 +300,9 @@
             'type' => $prType,
             'categories' => $prCategories,
         ])
+        @include('pages.category.PeriodicRequest.objectPicker', [
+            'type' => $prType,
+            'objects' => $periodicObjects,
+        ])
     @endforeach
 @endsection

@@ -396,23 +396,22 @@ class MaterialPeriodicRequest
     }
 
     /**
-     * Đối tượng chọn được cho danh sách nội bộ: đối tượng đang hoạt động, giữ lại cả những
-     * đối tượng danh sách đang gắn dù đã bị khoá để modal Sửa không mất giá trị cũ.
+     * Đối tượng theo đúng các id truyền vào (giữ nguyên dù đã khoá) - dựng lại ô chọn "Đối tượng"
+     * của danh sách đang có trên trang mà KHÔNG nhúng cả danh mục (2000+ dòng) vào HTML. Toàn bộ
+     * danh mục tìm qua AJAX ở objectSearch() - xem PeriodicRequestController::objects().
      * Mỗi dòng kèm frequency_label (tần suất tiếng Việt) để hiện ngay khi chọn.
      */
-    public static function objectOptions(array $keepIds = [])
+    public static function objectsByIds(array $ids)
     {
-        $keepIds = array_values(array_filter($keepIds));
+        $ids = array_values(array_unique(array_filter($ids)));
+
+        if (! $ids) {
+            return collect();
+        }
 
         return DB::table('consumption_objects')
             ->select('id', 'type', 'code', 'name', 'location', 'frequency', 'status_id')
-            ->where(function ($query) use ($keepIds) {
-                $query->where('status_id', 1);
-
-                if ($keepIds) {
-                    $query->orWhereIn('id', $keepIds);
-                }
-            })
+            ->whereIn('id', $ids)
             ->orderBy('type', 'asc')
             ->orderBy('code', 'asc')
             ->get()
@@ -421,12 +420,333 @@ class MaterialPeriodicRequest
             });
     }
 
+    /**
+     * Đối tượng khớp bộ lọc cho modal tìm kiếm AJAX "Dữ Liệu Gốc - Đối Tượng" - trả từng trang
+     * $limit dòng (từ vị trí $offset) thay vì cả danh mục; modal cuộn tới cuối thì gọi trang kế.
+     * $keepIds (đối tượng đang chọn trong ô, kể cả đã khoá) luôn đứng đầu trang đầu dù không khớp
+     * bộ lọc, để không mất lựa chọn hiện tại khi gõ tìm tiếp.
+     *
+     * @return array{items: \Illuminate\Support\Collection, total: int, more: bool, next_offset: int}
+     */
+    public static function objectSearch(string $q, ?string $type, ?string $frequency, array $keepIds = [], int $limit = 50, int $offset = 0): array
+    {
+        $keepIds = array_values(array_unique(array_filter($keepIds)));
+        $q = trim($q);
+        $offset = max(0, $offset);
+
+        $columns = ['id', 'type', 'code', 'name', 'location', 'frequency', 'status_id'];
+
+        $kept = $keepIds
+            ? DB::table('consumption_objects')->select($columns)->whereIn('id', $keepIds)->get()
+            : collect();
+
+        $query = DB::table('consumption_objects')
+            ->where('status_id', 1)
+            ->when($keepIds, fn ($query) => $query->whereNotIn('id', $keepIds))
+            ->when($type, fn ($query) => $query->where('type', $type))
+            ->when($frequency, fn ($query) => $query->where('frequency', $frequency))
+            ->when($q !== '', fn ($query) => $query->where(function ($sub) use ($q) {
+                $sub->where('code', 'like', '%'.$q.'%')
+                    ->orWhere('name', 'like', '%'.$q.'%')
+                    ->orWhere('location', 'like', '%'.$q.'%');
+            }));
+
+        $total = (clone $query)->count();
+
+        $matches = $query
+            ->select($columns)
+            ->orderBy('type', 'asc')
+            ->orderBy('code', 'asc')
+            ->orderBy('frequency', 'asc')
+            ->orderBy('id', 'asc')
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
+
+        // Dòng đang chọn chỉ chèn ở trang đầu; tổng số vẫn tính cả dòng đó
+        $items = ($offset === 0 ? $kept : collect())->concat($matches)->each(function ($object) {
+            $object->type_label = ConsumptionObjectController::typeLabels()[$object->type] ?? $object->type;
+            $object->frequency_label = ConsumptionObjectController::frequencyLabel($object->frequency);
+        })->values();
+
+        $nextOffset = $offset + $matches->count();
+
+        return [
+            'items' => $items,
+            'total' => $total + $kept->count(),
+            'more' => $nextOffset < $total,
+            'next_offset' => $nextOffset,
+        ];
+    }
+
     /** "PDP-108 - MÁY ĐÓNG HỘP UHLMANN", không có đối tượng thì null. */
     public static function objectLabel($objectId): ?string
     {
         $object = $objectId ? DB::table('consumption_objects')->where('id', $objectId)->first() : null;
 
         return $object ? $object->code.' - '.$object->name : null;
+    }
+
+    /* ==========================================================
+     |  NGÀY TẠO THEO LỊCH CAL (Sch_DueDate)
+     ========================================================== */
+
+    /** Cách chọn ngày tạo đề nghị trong chu kỳ: ngày cố định (cycle_day) / theo hạn lịch CAL. */
+    public const DAY_MODE_FIXED = 'fixed';
+
+    public const DAY_MODE_CAL_DUE = 'cal_due';
+
+    /** Trạng thái lịch đang chờ thực hiện bên CAL (Schedule_Master_x.Sch_Result_Status). */
+    private const CAL_PENDING = 'Pending';
+
+    /** Trang Danh Mục Vật Tư mở liên tục: cách tối thiểu giữa hai lần đọc CAL cho một danh sách (phút). */
+    private const CAL_REFRESH_MINUTES = 15;
+
+    /**
+     * "Theo ngày đến hạn lịch CAL": tạo đề nghị trước hạn CAL mấy ngày để có thời gian chuẩn bị
+     * vật tư, thay vì đúng ngày hạn. Không lùi trước Ngày bắt đầu chu kỳ đầu tiên.
+     */
+    public const CAL_LEAD_DAYS_DEFAULT = 3;
+
+    public const CAL_LEAD_DAYS_MAX = 30;
+
+    public static function dayModeOf($value): string
+    {
+        return $value === self::DAY_MODE_CAL_DUE ? self::DAY_MODE_CAL_DUE : self::DAY_MODE_FIXED;
+    }
+
+    /** "Theo ngày đến hạn lịch CAL" / "Ngày 5 hằng tháng" - cột Chu Kỳ và lịch sử. */
+    public static function dayLabel($list): string
+    {
+        if (self::dayModeOf($list->cycle_day_mode ?? null) !== self::DAY_MODE_CAL_DUE) {
+            return self::cycleDayLabel($list->periodic, $list->cycle_day, $list->cycle_length);
+        }
+
+        $lead = self::calLeadDays($list);
+
+        return 'Theo ngày đến hạn lịch CAL'.($lead > 0 ? ' (tạo trước '.$lead.' ngày)' : '');
+    }
+
+    /** Số ngày tạo đề nghị trước hạn CAL của một danh sách - chưa khai thì lấy mặc định. */
+    public static function calLeadDays($list): int
+    {
+        return $list && $list->cal_lead_days !== null ? (int) $list->cal_lead_days : self::CAL_LEAD_DAYS_DEFAULT;
+    }
+
+    /**
+     * Lịch Pending bên CAL của một Đối tượng theo một tần suất, hạn sớm nhất trước.
+     *
+     * Liên kết qua Inst_ID: thiết bị lớn (consumption_objects.cal_inst_id) và các thiết bị con có
+     * Parent_Equip_id = cal_inst_id trong Inst_Master_{cal_table_suffix}; lịch lấy ở
+     * Schedule_Master_{cal_table_suffix} với Sch_Type = tần suất, Sch_Result_Status = Pending.
+     *
+     * Trả null khi đối tượng không đồng bộ từ CAL. Lỗi kết nối CAL ném exception cho nơi gọi xử lý.
+     *
+     * @return array<int, array{sch_id: int, inst_id: string, due_date: string}>|null
+     */
+    public static function calPendingSchedules($object, ?string $frequency): ?array
+    {
+        if (! $object
+            || ($object->source ?? null) !== ConsumptionObjectController::SOURCE_CAL
+            || ! $object->cal_connection
+            || ! $object->cal_table_suffix
+            || ! $object->cal_inst_id
+            || ! $frequency) {
+            return null;
+        }
+
+        $db = DB::connection($object->cal_connection);
+        $suffix = (int) $object->cal_table_suffix;
+
+        $instIds = $db->table('Inst_Master_'.$suffix)
+            ->whereRaw('LTRIM(RTRIM(Parent_Equip_id)) = ?', [$object->cal_inst_id])
+            ->pluck('Inst_id')
+            ->map(fn ($id) => trim((string) $id))
+            ->push((string) $object->cal_inst_id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return $db->table('Schedule_Master_'.$suffix)
+            ->select('SCH_ID as sch_id', 'Inst_ID as inst_id', 'Sch_DueDate as due_date')
+            ->whereIn(DB::raw('LTRIM(RTRIM(Inst_ID))'), $instIds)
+            ->whereRaw('LTRIM(RTRIM(Sch_Type)) = ?', [$frequency])
+            ->where('Sch_Result_Status', self::CAL_PENDING)
+            ->whereNotNull('Sch_DueDate')
+            ->orderBy('Sch_DueDate', 'asc')
+            ->orderBy('SCH_ID', 'asc')
+            ->get()
+            ->map(fn ($row) => [
+                'sch_id' => (int) $row->sch_id,
+                'inst_id' => trim((string) $row->inst_id),
+                'due_date' => Carbon::parse($row->due_date)->toDateString(),
+            ])
+            ->all();
+    }
+
+    /**
+     * Chọn lịch CAL mà danh sách sẽ theo, trong các lịch Pending đã xếp hạn sớm nhất trước:
+     * - Chỉ nhận lịch có hạn thuộc chu kỳ đang xét trở về sau - bỏ lịch Pending treo từ các
+     *   chu kỳ trước mà CAL chưa đóng.
+     * - Mỗi chu kỳ chỉ tự tạo một đề nghị: đã tạo theo lịch có hạn $lastDueDate thì chỉ nhận lịch
+     *   thuộc các chu kỳ SAU chu kỳ đó (thiết bị lớn + con cùng chu kỳ không sinh thêm phiếu).
+     * - Ngày tạo = hạn CAL trừ $leadDays ngày (chuẩn bị vật tư trước), nhưng không sớm hơn ngày
+     *   bắt đầu chu kỳ đầu tiên. $leadDays không ảnh hưởng việc chọn lịch nào (vẫn theo hạn gốc),
+     *   chỉ dời lùi ngày thật sự tạo đề nghị.
+     *
+     * @return array{sch_id: int, inst_id: string, due_date: string, run_date: string}|null
+     */
+    public static function calNextSchedule(array $schedules, string $periodic, ?int $cycleLength, string $startDate, ?string $lastDueDate = null, $today = null, int $leadDays = 0): ?array
+    {
+        if ($periodic === '' || ! $schedules) {
+            return null;
+        }
+
+        $start = Carbon::parse($startDate)->startOfDay();
+        $today = Carbon::parse($today ?? now())->startOfDay();
+        $length = max(1, (int) $cycleLength);
+        $windowStart = self::periodStart($periodic, $today->lt($start) ? $start->copy() : $today, $start, $length);
+
+        if ($lastDueDate) {
+            $last = Carbon::parse($lastDueDate)->startOfDay();
+            $afterLast = self::periodEnd($periodic, self::periodStart($periodic, $last->lt($start) ? $start->copy() : $last, $start, $length), $length)
+                ->addDay();
+
+            if ($afterLast->gt($windowStart)) {
+                $windowStart = $afterLast;
+            }
+        }
+
+        foreach ($schedules as $schedule) {
+            $due = Carbon::parse($schedule['due_date'])->startOfDay();
+
+            if ($due->lt($windowStart)) {
+                continue;
+            }
+
+            $run = $due->copy()->subDays(max(0, $leadDays));
+
+            return $schedule + ['run_date' => ($run->lt($start) ? $start : $run)->toDateString()];
+        }
+
+        return null;
+    }
+
+    /**
+     * Xem trước cho modal thêm / sửa: các lịch Pending CAL của đối tượng + lịch danh sách sẽ theo.
+     * available = đối tượng thuộc CAL và có ít nhất một lịch Pending của tần suất đang chọn - chỉ khi
+     * đó mới được chọn "Theo ngày đến hạn lịch CAL".
+     *
+     * @return array{available: bool, message: ?string, schedules: array, next: ?array, lead_days: int}
+     */
+    public static function calSchedulePreview($object, ?string $frequency, ?string $startDate, $list = null, ?int $leadDays = null): array
+    {
+        $leadDays = $leadDays !== null ? max(0, min(self::CAL_LEAD_DAYS_MAX, $leadDays)) : self::CAL_LEAD_DAYS_DEFAULT;
+        $fail = fn (string $message) => ['available' => false, 'message' => $message, 'schedules' => [], 'next' => null, 'lead_days' => $leadDays];
+
+        if (! $object) {
+            return $fail('Chọn đối tượng thuộc phần mềm CAL để dùng hạn lịch CAL.');
+        }
+
+        if (($object->source ?? null) !== ConsumptionObjectController::SOURCE_CAL || ! $object->cal_inst_id) {
+            return $fail('Đối tượng không đồng bộ từ phần mềm CAL nên không có hạn lịch CAL.');
+        }
+
+        if (! $frequency || ! isset(self::FREQUENCY_SCHEDULES[$frequency])) {
+            return $fail('Chọn tần suất đề nghị trước.');
+        }
+
+        try {
+            $schedules = self::calPendingSchedules($object, $frequency) ?? [];
+        } catch (\Throwable $e) {
+            return $fail('Không đọc được lịch từ phần mềm CAL, vui lòng thử lại sau.');
+        }
+
+        if (! $schedules) {
+            return $fail('Đối tượng chưa có lịch Pending tần suất này trên CAL.');
+        }
+
+        [$periodic, $length] = self::FREQUENCY_SCHEDULES[$frequency];
+
+        // Sửa danh sách giữ nguyên đối tượng + tần suất: tính tiếp từ mốc chu kỳ đã tự tạo đề nghị
+        $lastDueDate = $list
+            && (int) $list->consumption_object_id === (int) $object->id
+            && (string) $list->frequency === (string) $frequency
+                ? $list->last_cal_due_date
+                : null;
+
+        $next = self::calNextSchedule($schedules, $periodic, $length, $startDate ?: now()->toDateString(), $lastDueDate, null, $leadDays);
+
+        return [
+            'available' => true,
+            'message' => $next ? null : 'Chưa có lịch Pending thuộc chu kỳ đang xét - hệ thống chờ CAL sinh lịch mới.',
+            'schedules' => $schedules,
+            'next' => $next,
+            'lead_days' => $leadDays,
+        ];
+    }
+
+    /**
+     * Đọc lại lịch CAL cho một danh sách "theo hạn lịch CAL", ghi cal_sch_id / cal_due_date /
+     * next_run_date. Không có lịch hợp lệ thì next_run_date = null (chờ CAL sinh lịch Pending mới).
+     * Lỗi kết nối CAL: giữ nguyên lịch đang có, trả false.
+     */
+    public static function refreshCalSchedule($list, $today = null): bool
+    {
+        if (! $list || self::dayModeOf($list->cycle_day_mode ?? null) !== self::DAY_MODE_CAL_DUE) {
+            return false;
+        }
+
+        $object = $list->consumption_object_id
+            ? DB::table('consumption_objects')->where('id', $list->consumption_object_id)->first()
+            : null;
+
+        try {
+            $schedules = self::calPendingSchedules($object, $list->frequency) ?? [];
+        } catch (\Throwable $e) {
+            DB::table(self::LIST_TABLE)->where('id', $list->id)->update(['cal_checked_at' => now()]);
+
+            return false;
+        }
+
+        $next = self::calNextSchedule(
+            $schedules,
+            (string) $list->periodic,
+            $list->cycle_length ? (int) $list->cycle_length : null,
+            (string) $list->start_date,
+            $list->last_cal_due_date,
+            $today,
+            self::calLeadDays($list)
+        );
+
+        DB::table(self::LIST_TABLE)->where('id', $list->id)->update([
+            'cal_sch_id' => $next['sch_id'] ?? null,
+            'cal_due_date' => $next['due_date'] ?? null,
+            'next_run_date' => $next['run_date'] ?? null,
+            'cal_checked_at' => now(),
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Đọc lại lịch CAL cho các danh sách "theo hạn lịch CAL" đang dùng. Mở trang thì giãn cách
+     * CAL_REFRESH_MINUTES phút mỗi danh sách; $force (lệnh chạy hằng ngày) đọc lại tất cả.
+     */
+    public static function refreshCalSchedules(?int $departmentId = null, bool $force = false): void
+    {
+        DB::table(self::LIST_TABLE)
+            ->where('status_id', 1)
+            ->where('cycle_day_mode', self::DAY_MODE_CAL_DUE)
+            ->when($departmentId !== null, fn ($query) => $query->where('department_id', $departmentId))
+            ->when(! $force, fn ($query) => $query->where(function ($sub) {
+                $sub->whereNull('cal_checked_at')
+                    ->orWhere('cal_checked_at', '<', now()->subMinutes(self::CAL_REFRESH_MINUTES));
+            }))
+            ->orderBy('id')
+            ->get()
+            ->each(fn ($list) => self::refreshCalSchedule($list));
     }
 
     /* ==========================================================
@@ -460,7 +780,12 @@ class MaterialPeriodicRequest
             'Đối tượng' => $isExternal ? null : (self::objectLabel($list->consumption_object_id) ?? '—'),
             'Phòng cấp phát' => $isExternal ? ($list->to_department_name ?: '—') : null,
             'Chu kỳ' => self::scheduleLabel($list->periodic, $list->cycle_length, $list->frequency),
-            'Ngày tạo trong chu kỳ' => self::cycleDayLabel($list->periodic, $list->cycle_day, $list->cycle_length),
+            'Ngày tạo trong chu kỳ' => self::dayLabel($list),
+            'Lịch CAL đang theo' => self::dayModeOf($list->cycle_day_mode ?? null) === self::DAY_MODE_CAL_DUE
+                ? ($list->cal_due_date
+                    ? 'Hạn '.Carbon::parse($list->cal_due_date)->format('d/m/Y').' (SCH_ID '.$list->cal_sch_id.')'
+                    : 'Chưa có lịch Pending thuộc chu kỳ đang xét')
+                : null,
             'Ngày bắt đầu chu kỳ đầu tiên' => $list->start_date ? Carbon::parse($list->start_date)->format('d/m/Y') : '—',
             'Tạo đề nghị kế tiếp' => $list->next_run_date ? Carbon::parse($list->next_run_date)->format('d/m/Y') : '—',
             'Số lần đã tạo đề nghị' => (string) (int) $list->generated_count,
@@ -538,10 +863,20 @@ class MaterialPeriodicRequest
     /**
      * Tạo đề nghị cho mọi danh sách đã tới hạn. $departmentId = null: toàn hệ thống.
      *
+     * $refreshCal = true : đọc lại lịch Pending từ phần mềm CAL trước khi xét hạn - dùng khi
+     *   người dùng mở trang Sử Dụng Vật Tư hoặc lệnh scheduler chạy hằng ngày.
+     * $refreshCal = false: bỏ qua bước đọc CAL để trang tải nhanh - dùng ở trang Danh Mục Vật
+     *   Tư (chỉ cần tạo đề nghị cho các danh sách đã có next_run_date sẵn).
+     *
      * @return array<int, array{id: int, code: string, type: string, list_id: int}>
      */
-    public static function generateDue(?int $departmentId = null): array
+    public static function generateDue(?int $departmentId = null, bool $refreshCal = true): array
     {
+        // Danh sách theo hạn lịch CAL: đọc lại lịch Pending trước khi xét hạn (lệnh hằng ngày đọc lại tất cả)
+        if ($refreshCal) {
+            self::refreshCalSchedules($departmentId, $departmentId === null);
+        }
+
         $today = now()->toDateString();
 
         $ids = DB::table(self::LIST_TABLE)
@@ -565,22 +900,36 @@ class MaterialPeriodicRequest
                     }
 
                     $result = self::createRequest($list, self::SYSTEM_ACTOR, $list->created_user_id ? (int) $list->created_user_id : null);
+                    $isCal = self::dayModeOf($list->cycle_day_mode ?? null) === self::DAY_MODE_CAL_DUE;
 
-                    DB::table(self::LIST_TABLE)->where('id', $list->id)->update([
-                        'next_run_date' => self::nextRunDate(
-                            (string) $list->periodic,
-                            (int) $list->cycle_day,
-                            $list->cycle_length ? (int) $list->cycle_length : null,
-                            (string) $list->start_date,
-                            $today
-                        ),
-                    ] + self::generatedMark($result));
+                    DB::table(self::LIST_TABLE)->where('id', $list->id)->update(($isCal
+                        // Theo hạn lịch CAL: đánh dấu lịch đã dùng, chờ lịch Pending của chu kỳ sau ở lần đọc CAL kế tiếp
+                        ? [
+                            'last_cal_sch_id' => $list->cal_sch_id,
+                            'last_cal_due_date' => $list->cal_due_date,
+                            'cal_sch_id' => null,
+                            'cal_due_date' => null,
+                            'next_run_date' => null,
+                            'cal_checked_at' => null,
+                        ]
+                        : [
+                            'next_run_date' => self::nextRunDate(
+                                (string) $list->periodic,
+                                (int) $list->cycle_day,
+                                $list->cycle_length ? (int) $list->cycle_length : null,
+                                (string) $list->start_date,
+                                $today
+                            ),
+                        ]) + self::generatedMark($result));
 
                     if ($result) {
                         self::writeHistory(
                             (int) $list->id,
                             'Tạo đề nghị',
-                            'Tự động theo chu kỳ: tạo đề nghị '.$result['code'].' (Lưu tạm).',
+                            ($isCal && $list->cal_due_date
+                                ? 'Tự động theo lịch CAL (hạn '.Carbon::parse($list->cal_due_date)->format('d/m/Y').', SCH_ID '.$list->cal_sch_id.')'
+                                : 'Tự động theo chu kỳ')
+                                .': tạo đề nghị '.$result['code'].' (Lưu tạm).',
                             null,
                             self::SYSTEM_ACTOR
                         );
@@ -675,8 +1024,13 @@ class MaterialPeriodicRequest
             'department_id' => $list->department_id,
             'group_id' => null,
             'name' => Str::limit($list->title.' - kỳ '.$now->format('d/m/Y'), 255, ''),
+            'type' => 'periodic',
+            'needed_date' => null, // Chưa biết ngày mong muốn cụ thể - người lập tự điền khi mở phiếu
             'note' => Str::limit('Tạo tự động từ danh sách đề nghị theo chu kỳ "'.$list->title.'"'
-                .($objectLabel ? ' - Đối tượng: '.$objectLabel : '').'.', 500, ''),
+                .($objectLabel ? ' - Đối tượng: '.$objectLabel : '')
+                .(self::dayModeOf($list->cycle_day_mode ?? null) === self::DAY_MODE_CAL_DUE && $list->cal_due_date
+                    ? ' - Lịch CAL hạn '.Carbon::parse($list->cal_due_date)->format('d/m/Y').' (SCH_ID '.$list->cal_sch_id.')'
+                    : '').'.', 500, ''),
             'app_status' => 'draft',
             'sign_step_count' => 0,
             'current_step' => null,
@@ -710,9 +1064,7 @@ class MaterialPeriodicRequest
     private static function createExternal($list, $items, string $actor): array
     {
         $now = now();
-        $fromShort = DB::table('deparments')->where('id', $list->department_id)->value('shortName') ?: 'NA';
-        $toShort = DB::table('deparments')->where('id', $list->to_department_id)->value('shortName') ?: 'NA';
-        $prefix = 'LPB-'.$fromShort.'-'.$toShort.'-'.$now->format('dmy').'-';
+        $prefix = 'LPB-'.$list->department_id.'-'.$list->to_department_id.'-'.$now->format('dmy').'-';
 
         $latest = DB::table('material_transfer_requests')->where('code', 'LIKE', $prefix.'%')->orderBy('id', 'desc')->value('code');
         $seq = $latest ? (int) Str::afterLast($latest, '-') + 1 : 1;
@@ -722,6 +1074,7 @@ class MaterialPeriodicRequest
             'code' => $code,
             'department_id' => $list->department_id,
             'to_department_id' => $list->to_department_id,
+            'title' => Str::limit($list->title.' - kỳ '.$now->format('d/m/Y'), 255, ''),
             'status' => 'draft',
             'note' => 'Tạo tự động từ danh sách đề nghị theo chu kỳ "'.$list->title.'".',
             'created_by' => $actor,
@@ -799,7 +1152,7 @@ class MaterialPeriodicRequest
                     .$result['code'].' (Lưu tạm) từ danh sách "'.$list->title.'". Vui lòng kiểm tra, điều chỉnh rồi '
                     .($isExternal ? 'gửi đề nghị.' : 'trình ký.'),
                 'reference_id' => $result['id'],
-                'url' => route('pages.export.materialExport.list', ['tab' => $isExternal ? 'transfer' : 'request'], false),
+                'url' => route('pages.export.materialExport.list', ['tab' => $isExternal ? 'transfer' : 'periodic'], false),
                 'created_at' => now(),
             ]);
 

@@ -59,6 +59,7 @@
                                     </button>
                                 </div>
                                 <select name="chem_names_id"
+                                    data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'chemical']) }}"
                                     class="form-control cat-select mt-1 {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
                                     required>
                                     <option value="">-- Chọn tên hoá chất --</option>

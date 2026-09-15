@@ -81,12 +81,16 @@ class MaterialCategoryController extends Controller
 
         // Tab 3, 4 - Danh sách đề nghị theo chu kỳ: bù các danh sách đã tới hạn trước khi
         // hiển thị (phòng khi máy chủ không chạy scheduler), thao tác gửi về PeriodicRequestController.
-        MaterialPeriodicRequest::generateDue($departmentId);
+        // Không đọc lại lịch CAL ở đây (refreshCal: false) để tránh treo trang khi CAL chậm
+        // - lịch CAL chỉ được cập nhật ở trang Sử Dụng Vật Tư hoặc lệnh scheduler hằng ngày.
+        MaterialPeriodicRequest::generateDue($departmentId, refreshCal: false);
         $periodicLists = MaterialPeriodicRequest::listsOfDepartment($departmentId);
 
         return view('pages.category.MaterialCategory.list', [
             'datas' => $datas,
-            'materialNames' => $this->options('material_names', $datas->pluck('material_names_id')->all()),
+            // Ô Tên vật tư tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị vừa gửi bị lỗi
+            // validate; dòng đang sửa gửi kèm nhãn qua material_names_id_text.
+            'materialNames' => \App\Support\CategoryLookup::namesByIds('material', [old('material_names_id')]),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
             'nextCode' => $this->nextCode(),
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa thay vì một nút riêng
@@ -101,7 +105,8 @@ class MaterialCategoryController extends Controller
             'dmDatas' => $dmDatas,
             'dmCategories' => DepartmentMaterial::categoryOptions($dmDatas->pluck('category_id')->all()),
             'dmUnits' => DepartmentMaterial::unitOptions($dmDatas->pluck('unit_id')->all()),
-            'dmLocations' => DepartmentMaterial::locationOptions($departmentId),
+            // Định khu tìm qua AJAX như ô Tên vật tư, chỉ dựng sẵn option của giá trị old()
+            'dmLocations' => \App\Support\CategoryLookup::locationsByIds([old('default_location_id')]),
             /*
             | Đơn vị các phòng KHÁC đang dùng cho từng mã + hệ số đã khai. Phòng khai đơn
             | vị lệch với phòng khác thì phải khai hệ số quy đổi, nếu không lúc CHUYỂN VẬT
@@ -122,9 +127,16 @@ class MaterialCategoryController extends Controller
             'periodicExternalCategories' => MaterialPeriodicRequest::categoryOptions(MaterialPeriodicRequest::TYPE_EXTERNAL, $departmentId),
             'periodicUnits' => DepartmentMaterial::unitOptions(),
             'periodicDepartments' => MaterialPeriodicRequest::departmentOptions($departmentId),
-            // Đối tượng (dữ liệu gốc) cho danh sách nội bộ - giữ cả đối tượng đã khoá mà danh sách đang gắn
-            'periodicObjects' => MaterialPeriodicRequest::objectOptions(
-                $periodicLists[MaterialPeriodicRequest::TYPE_INTERNAL]->pluck('consumption_object_id')->all()
+            /*
+            | Đối tượng (dữ liệu gốc) cho ô chọn của danh sách nội bộ - chỉ những đối tượng ĐANG
+            | GẮN vào danh sách trên trang (kể cả đã khoá) + lựa chọn vừa gửi bị lỗi validate.
+            | Toàn bộ danh mục (2000+ dòng) không nhúng tĩnh vào trang nữa - modal "Dữ Liệu Gốc
+            | - Đối Tượng" (objectPicker.blade.php) tìm qua AJAX, xem PeriodicRequestController::objects().
+            */
+            'periodicObjects' => MaterialPeriodicRequest::objectsByIds(
+                $periodicLists[MaterialPeriodicRequest::TYPE_INTERNAL]->pluck('consumption_object_id')
+                    ->push(old('consumption_object_id'))
+                    ->all()
             ),
         ]);
     }

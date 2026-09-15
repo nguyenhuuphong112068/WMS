@@ -21,6 +21,12 @@ use Illuminate\Validation\Rule;
  * một đề nghị Lưu tạm (xem App\Support\MaterialPeriodicRequest), người đề nghị điều chỉnh
  * rồi trình ký / gửi đi ở màn Sử Dụng Vật Tư.
  *
+ * Ngày tạo trong chu kỳ (cycle_day_mode):
+ * - fixed   : ngày cố định (cycle_day) - mọi danh sách.
+ * - cal_due : chỉ danh sách nội bộ gắn Đối tượng đồng bộ từ phần mềm CAL có lịch Pending của tần
+ *             suất đã chọn - ngày tạo = Sch_DueDate của lịch đó (tìm qua Inst_ID của thiết bị lớn
+ *             + thiết bị con), next_run_date do MaterialPeriodicRequest::refreshCalSchedule() tính.
+ *
  * Trang hiển thị do MaterialCategoryController::index() dựng; controller này nhận các thao
  * tác thêm / sửa / khoá / tạo đề nghị ngay và trả lịch sử thay đổi. Sửa / Khoá / Mở khoá
  * bắt buộc nhập lý do điều chỉnh như mọi màn Danh Mục.
@@ -53,12 +59,14 @@ class PeriodicRequestController extends Controller
         }
 
         $payload = $this->payload($request, $type);
+        $isCal = $payload['cycle_day_mode'] === MaterialPeriodicRequest::DAY_MODE_CAL_DUE;
 
-        $id = DB::transaction(function () use ($request, $type, $departmentId, $payload) {
+        $id = DB::transaction(function () use ($request, $type, $departmentId, $payload, $isCal) {
             $id = DB::table(self::LIST_TABLE)->insertGetId($payload + [
                 'type' => $type,
                 'department_id' => $departmentId,
-                'next_run_date' => MaterialPeriodicRequest::scheduleRunDate($payload),
+                // Theo hạn lịch CAL: ngày tạo đọc từ CAL ngay bên dưới
+                'next_run_date' => $isCal ? null : MaterialPeriodicRequest::scheduleRunDate($payload),
                 'generated_count' => 0,
                 'status_id' => 1,
                 'created_by' => $this->actor(),
@@ -68,6 +76,10 @@ class PeriodicRequestController extends Controller
             ]);
 
             $this->insertItems($id, $request);
+
+            if ($isCal) {
+                MaterialPeriodicRequest::refreshCalSchedule(DB::table(self::LIST_TABLE)->where('id', $id)->first());
+            }
 
             MaterialPeriodicRequest::writeHistory($id, 'Thêm mới', 'Khai báo mới '.self::LABEL.'.');
 
@@ -103,19 +115,36 @@ class PeriodicRequestController extends Controller
 
         $before = MaterialPeriodicRequest::snapshot($current->id);
         $payload = $this->payload($request, $type);
+        $isCal = $payload['cycle_day_mode'] === MaterialPeriodicRequest::DAY_MODE_CAL_DUE;
 
-        // Đổi lịch (chu kỳ / số ngày / ngày trong chu kỳ / ngày bắt đầu) thì tính lại ngày tạo
+        // Đổi đối tượng / tần suất = gắn với lịch CAL khác: bỏ mốc "đã tự tạo đề nghị theo lịch CAL"
+        $linkChanged = $payload['consumption_object_id'] !== ($current->consumption_object_id === null ? null : (int) $current->consumption_object_id)
+            || $payload['frequency'] !== $current->frequency;
+
+        // Đổi lịch (cách chọn ngày / chu kỳ / số ngày / ngày trong chu kỳ / ngày bắt đầu) thì tính lại ngày tạo
         // kế tiếp, không đổi thì giữ nguyên lịch cũ
-        $scheduleChanged = $payload['frequency'] !== $current->frequency
+        $scheduleChanged = $linkChanged
+            || $payload['cycle_day_mode'] !== MaterialPeriodicRequest::dayModeOf($current->cycle_day_mode)
+            || $payload['cal_lead_days'] !== MaterialPeriodicRequest::calLeadDays($current)
             || $payload['periodic'] !== $current->periodic
             || $payload['cycle_day'] !== (int) $current->cycle_day
             || $payload['cycle_length'] !== ($current->cycle_length === null ? null : (int) $current->cycle_length)
             || $payload['start_date'] !== (string) $current->start_date
             || ! $current->next_run_date;
 
-        $payload['next_run_date'] = $scheduleChanged
-            ? MaterialPeriodicRequest::scheduleRunDate($payload, $current->last_generated_at)
-            : $current->next_run_date;
+        if ($linkChanged) {
+            $payload += ['last_cal_sch_id' => null, 'last_cal_due_date' => null];
+        }
+
+        if ($isCal) {
+            // next_run_date đọc lại từ CAL ngay sau khi lưu (refreshCalSchedule)
+            $payload['next_run_date'] = $current->next_run_date;
+        } else {
+            $payload += ['cal_sch_id' => null, 'cal_due_date' => null, 'cal_checked_at' => null];
+            $payload['next_run_date'] = $scheduleChanged
+                ? MaterialPeriodicRequest::scheduleRunDate($payload, $current->last_generated_at)
+                : $current->next_run_date;
+        }
 
         DB::beginTransaction();
 
@@ -124,6 +153,10 @@ class PeriodicRequestController extends Controller
                 'updated_by' => $this->actor(),
                 'updated_at' => now(),
             ]);
+
+            if ($isCal && $scheduleChanged) {
+                MaterialPeriodicRequest::refreshCalSchedule(DB::table(self::LIST_TABLE)->where('id', $current->id)->first());
+            }
 
             // Không xoá cứng: bỏ hiệu lực các dòng cũ rồi ghi lại từ đầu
             DB::table(self::ITEM_TABLE)
@@ -177,6 +210,8 @@ class PeriodicRequestController extends Controller
         DB::transaction(function () use ($current, $newStatus, $action, $request) {
             DB::table(self::LIST_TABLE)->where('id', $current->id)->update([
                 'status_id' => $newStatus,
+                // Mở khoá danh sách theo hạn lịch CAL: đọc lại lịch ở lần mở trang kế tiếp
+                'cal_checked_at' => null,
                 'updated_by' => $this->actor(),
                 'updated_at' => now(),
             ]);
@@ -246,12 +281,58 @@ class PeriodicRequestController extends Controller
         ]);
     }
 
+    /**
+     * Tìm đối tượng (dữ liệu gốc) cho modal "Dữ Liệu Gốc - Đối Tượng" - AJAX, tối đa 50 dòng mỗi
+     * lần thay vì nhúng cả danh mục (2000+ dòng) vào trang. Gọi lại mỗi khi gõ tìm / đổi bộ lọc.
+     */
+    public function objects(Request $request)
+    {
+        if (! user_can(self::PERMISSION)) {
+            return response()->json(['items' => [], 'total' => 0, 'more' => false], 403);
+        }
+
+        return response()->json(MaterialPeriodicRequest::objectSearch(
+            (string) $request->q,
+            $request->type ?: null,
+            $request->frequency ?: null,
+            [(int) $request->keep_id],
+            50,
+            (int) $request->offset
+        ));
+    }
+
+    /**
+     * Lịch Pending bên CAL của đối tượng + tần suất đang chọn và ngày tạo đề nghị sẽ theo - AJAX cho
+     * tuỳ chọn "Theo ngày đến hạn lịch CAL" ở modal thêm / sửa danh sách nội bộ. Sửa danh sách thì
+     * gửi kèm list_id để tính tiếp từ mốc chu kỳ đã tự tạo đề nghị.
+     */
+    public function calSchedule(Request $request)
+    {
+        if (! user_can(self::PERMISSION)) {
+            return response()->json(['available' => false, 'message' => 'Không có quyền.', 'schedules' => [], 'next' => null], 403);
+        }
+
+        $object = $request->filled('object_id')
+            ? DB::table('consumption_objects')->where('id', (int) $request->object_id)->first()
+            : null;
+
+        return response()->json(MaterialPeriodicRequest::calSchedulePreview(
+            $object,
+            $request->frequency ?: null,
+            $request->start_date ?: null,
+            $request->filled('list_id') ? $this->findOwn((int) $request->list_id) : null,
+            $request->filled('cal_lead_days') ? (int) $request->cal_lead_days : null
+        ));
+    }
+
     private function validator(Request $request, string $type, int $departmentId, $current = null)
     {
         $allowedCategoryIds = MaterialPeriodicRequest::categoryOptions($type, $departmentId)->pluck('id')->all();
         $object = null;
+        $isInternal = $type === MaterialPeriodicRequest::TYPE_INTERNAL;
+        $isCal = $isInternal && MaterialPeriodicRequest::dayModeOf($request->cycle_day_mode) === MaterialPeriodicRequest::DAY_MODE_CAL_DUE;
 
-        if ($type === MaterialPeriodicRequest::TYPE_INTERNAL) {
+        if ($isInternal) {
             $object = $request->filled('consumption_object_id')
                 ? DB::table('consumption_objects')->where('id', (int) $request->consumption_object_id)->first()
                 : null;
@@ -273,7 +354,7 @@ class PeriodicRequestController extends Controller
         $rules = [
             'title' => ['required', 'string', 'max:255'],
             // Nội bộ: thiếu / sai tần suất thì chỉ báo lỗi ở ô tần suất, không báo trùng ở chu kỳ
-            'periodic' => $type === MaterialPeriodicRequest::TYPE_INTERNAL
+            'periodic' => $isInternal
                 ? ['nullable']
                 : ['required', Rule::in(array_keys(MaterialPeriodicRequest::CYCLES))],
             'cycle_length' => [
@@ -282,12 +363,18 @@ class PeriodicRequestController extends Controller
                 'min:1',
                 'max:'.$lengthLimit,
             ],
-            'cycle_day' => [
-                'required',
-                'integer',
-                'min:1',
-                'max:'.($periodic === '' ? 9999 : MaterialPeriodicRequest::maxCycleDay($periodic, $request->cycle_length)),
-            ],
+            // Theo hạn lịch CAL: không dùng ngày cố định (ô cycle_day bị disabled nên không gửi lên)
+            'cycle_day' => $isCal
+                ? ['nullable']
+                : [
+                    'required',
+                    'integer',
+                    'min:1',
+                    'max:'.($periodic === '' ? 9999 : MaterialPeriodicRequest::maxCycleDay($periodic, $request->cycle_length)),
+                ],
+            'cycle_day_mode' => ['nullable', Rule::in([MaterialPeriodicRequest::DAY_MODE_FIXED, MaterialPeriodicRequest::DAY_MODE_CAL_DUE])],
+            // Theo hạn lịch CAL: tạo đề nghị trước hạn mấy ngày để chuẩn bị vật tư
+            'cal_lead_days' => ['nullable', 'integer', 'min:0', 'max:'.MaterialPeriodicRequest::CAL_LEAD_DAYS_MAX],
             'start_date' => $startDateRules,
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'integer', 'distinct', Rule::in($allowedCategoryIds)],
@@ -297,19 +384,19 @@ class PeriodicRequestController extends Controller
             'items.*.purpose' => ['nullable', 'string', 'max:500'],
         ];
 
-        if ($type === MaterialPeriodicRequest::TYPE_EXTERNAL) {
+        if (! $isInternal) {
             $rules['to_department_id'] = [
                 'required',
                 'integer',
                 Rule::in(MaterialPeriodicRequest::departmentOptions($departmentId)->pluck('id')->all()),
             ];
         } else {
-            // Danh sách nội bộ gắn với một Đối tượng đang hoạt động; giữ nguyên đối tượng cũ (dù đã khoá) thì cho qua
+            // Danh sách nội bộ có thể không gắn với Đối tượng nào; giữ nguyên đối tượng cũ (dù đã khoá) thì cho qua
             $keepObject = $current && (int) $request->consumption_object_id === (int) $current->consumption_object_id;
 
             $rules['consumption_object_id'] = $keepObject
-                ? ['required', 'integer']
-                : ['required', 'integer', Rule::exists('consumption_objects', 'id')->where('status_id', 1)];
+                ? ['nullable', 'integer']
+                : ['nullable', 'integer', Rule::exists('consumption_objects', 'id')->where('status_id', 1)];
 
             // Tần suất phải là một tần suất của đối tượng; giữ nguyên đối tượng thì tần suất đang dùng vẫn hợp lệ
             // dù đồng bộ CAL sau này đã bỏ tần suất đó khỏi đối tượng
@@ -329,7 +416,40 @@ class PeriodicRequestController extends Controller
             $messages += $this->changeReasonMessages();
         }
 
-        return Validator::make($request->all(), $rules, $messages);
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ($isCal) {
+            $validator->after(function ($validator) use ($request, $object, $current) {
+                if ($validator->errors()->hasAny(['consumption_object_id', 'frequency'])) {
+                    return;
+                }
+
+                // Sửa danh sách đã theo hạn lịch CAL, giữ nguyên đối tượng + tần suất: cho lưu dù CAL đang
+                // chưa có lịch Pending (đã tự tạo đề nghị chu kỳ này, chờ lịch chu kỳ sau)
+                $unchangedCal = $current
+                    && MaterialPeriodicRequest::dayModeOf($current->cycle_day_mode) === MaterialPeriodicRequest::DAY_MODE_CAL_DUE
+                    && (int) $request->consumption_object_id === (int) $current->consumption_object_id
+                    && (string) $request->frequency === (string) $current->frequency;
+
+                if ($unchangedCal) {
+                    return;
+                }
+
+                $preview = MaterialPeriodicRequest::calSchedulePreview(
+                    $object,
+                    (string) $request->frequency,
+                    (string) $request->start_date,
+                    $current,
+                    $request->filled('cal_lead_days') ? (int) $request->cal_lead_days : null
+                );
+
+                if (! $preview['available']) {
+                    $validator->errors()->add('cycle_day_mode', 'Không dùng được "Theo ngày đến hạn lịch CAL": '.$preview['message']);
+                }
+            });
+        }
+
+        return $validator;
     }
 
     private function messages(string $type): array
@@ -350,6 +470,10 @@ class PeriodicRequestController extends Controller
             'cycle_day.integer' => 'Ngày tạo đề nghị trong chu kỳ phải là số nguyên.',
             'cycle_day.min' => 'Ngày tạo đề nghị không nằm trong chu kỳ đã chọn.',
             'cycle_day.max' => 'Ngày tạo đề nghị không nằm trong chu kỳ đã chọn.',
+            'cycle_day_mode.in' => 'Cách chọn ngày tạo đề nghị không hợp lệ.',
+            'cal_lead_days.integer' => 'Số ngày tạo trước hạn phải là số nguyên.',
+            'cal_lead_days.min' => 'Số ngày tạo trước hạn không được âm.',
+            'cal_lead_days.max' => 'Số ngày tạo trước hạn tối đa '.MaterialPeriodicRequest::CAL_LEAD_DAYS_MAX.' ngày.',
             'start_date.required' => 'Vui lòng chọn ngày bắt đầu chu kỳ đầu tiên.',
             'start_date.date' => 'Ngày bắt đầu chu kỳ đầu tiên không hợp lệ.',
             'start_date.after_or_equal' => 'Ngày bắt đầu chu kỳ đầu tiên không được trước hôm nay.',
@@ -376,16 +500,28 @@ class PeriodicRequestController extends Controller
     private function payload(Request $request, string $type): array
     {
         $periodic = (string) $request->periodic;
+        $isInternal = $type === MaterialPeriodicRequest::TYPE_INTERNAL;
+        $dayMode = $isInternal
+            ? MaterialPeriodicRequest::dayModeOf($request->cycle_day_mode)
+            : MaterialPeriodicRequest::DAY_MODE_FIXED;
 
         return [
             'title' => trim((string) $request->title),
             'periodic' => $periodic,
             'cycle_length' => MaterialPeriodicRequest::hasCycleLength($periodic) ? (int) $request->cycle_length : null,
-            'cycle_day' => (int) $request->cycle_day,
+            // Theo hạn lịch CAL không dùng ngày cố định - giữ 1 cho cột NOT NULL
+            'cycle_day' => $dayMode === MaterialPeriodicRequest::DAY_MODE_CAL_DUE ? 1 : (int) $request->cycle_day,
+            'cycle_day_mode' => $dayMode,
+            // Giữ nguyên giá trị đã nhập dù đang ở chế độ ngày cố định, để chọn lại CAL sau không mất
+            'cal_lead_days' => $request->filled('cal_lead_days')
+                ? max(0, min(MaterialPeriodicRequest::CAL_LEAD_DAYS_MAX, (int) $request->cal_lead_days))
+                : MaterialPeriodicRequest::CAL_LEAD_DAYS_DEFAULT,
             'start_date' => \Carbon\Carbon::parse($request->start_date)->toDateString(),
-            'to_department_id' => $type === MaterialPeriodicRequest::TYPE_EXTERNAL ? (int) $request->to_department_id : null,
-            'consumption_object_id' => $type === MaterialPeriodicRequest::TYPE_INTERNAL ? (int) $request->consumption_object_id : null,
-            'frequency' => $type === MaterialPeriodicRequest::TYPE_INTERNAL ? (string) $request->frequency : null,
+            'to_department_id' => $isInternal ? null : (int) $request->to_department_id,
+            'consumption_object_id' => $isInternal && $request->filled('consumption_object_id')
+                ? (int) $request->consumption_object_id
+                : null,
+            'frequency' => $isInternal ? (string) $request->frequency : null,
         ];
     }
 

@@ -81,6 +81,7 @@
                     <th style="width: 140px">Trạng Thái</th>
                     <th style="width: 140px">Người Lập</th>
                     <th style="width: 120px">Ngày Lập</th>
+                    <th style="width: 120px">Ngày Mong Muốn</th>
                     <th style="width: 110px">Thao Tác</th>
                 </tr>
             </thead>
@@ -114,6 +115,7 @@
                         </td>
                         <td class="align-middle">{{ $req->updated_by ?: $req->created_by ?: '—' }}</td>
                         <td class="text-center align-middle">{{ $expDate($req->created_at) }}</td>
+                        <td class="text-center align-middle">{{ $req->needed_date ? $expDate($req->needed_date) : '—' }}</td>
                         <td class="text-center align-middle" style="white-space: nowrap;">
                             @if ($req->status === 'draft' && user_can('export_standard_request'))
                                 <button type="button" class="btn btn-sm btn-warning px-2 py-1 shadow-sm mr-1"
@@ -147,7 +149,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">Chưa có phiếu đề nghị cấp phát chuẩn nào.</td>
+                        <td colspan="9" class="text-center text-muted py-4">Chưa có phiếu đề nghị cấp phát chuẩn nào.</td>
                     </tr>
                 @endforelse
             </tbody>

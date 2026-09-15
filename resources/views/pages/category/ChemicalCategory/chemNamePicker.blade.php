@@ -10,16 +10,13 @@
 | của form tương ứng. Sau khi chọn, ô xem nhanh [data-cls-preview] trong
 | modal đó hiển thị các nhóm phân loại suy được của hoá chất.
 |
-| Danh sách hoá chất ($chemNames) và nhóm phân loại ($chemNameGroups) lấy
-| từ ChemicalCategoryController::index(). Dùng lại toàn bộ CSS md-*/cat-*.
+| Danh sách hoá chất KHÔNG nhúng vào trang: mở bảng lần đầu mới nạp JSON từ
+| CategoryLookupController::chemicalNames(). $chemNameGroups chỉ mang mã nhóm
+| (N1..N10) của các tên danh mục đang dùng, cho ô xem nhanh ở modal Cập nhật.
+| Dùng lại toàn bộ CSS md-*/cat-*.
 --}}
 
 @php
-    // Mã nhóm NĐ 24/2026 (N1..N10) theo từng tên hoá chất, để lọc bảng + vẽ chip.
-    $cnpGroupCodes = [];
-    foreach ($chemNameGroups as $chemId => $groups) {
-        $cnpGroupCodes[$chemId] = array_map(fn ($g) => 'N' . $g, $groups);
-    }
     $cnpClsList = \App\Support\ChemicalClassification::labels();
 @endphp
 
@@ -61,7 +58,8 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table id="chemNamePickerTable" class="table table-bordered table-hover w-100">
+                    <table id="chemNamePickerTable" class="table table-bordered table-hover w-100"
+                        data-url="{{ route('pages.category.lookup.chemicalNames') }}">
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 52px">STT</th>
@@ -71,48 +69,7 @@
                                 <th class="text-center" style="width: 80px">Chọn</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            @foreach ($chemNames as $cn)
-                                @php
-                                    $codes = $cnpGroupCodes[$cn->id] ?? [];
-                                @endphp
-                                <tr data-classification="{{ implode(',', $codes) }}">
-                                    <td class="text-center">{{ $loop->iteration }}</td>
-                                    <td>
-                                        <span class="font-weight-bold">{{ $cn->name }}</span>
-                                    </td>
-                                    <td class="md-sub">{{ $cn->cas_no ?: '—' }}</td>
-                                    <td data-order="{{ $codes ? (int) ltrim($codes[0], 'N') : 99 }}">
-                                        @if ($codes)
-                                            <div class="cat-chips">
-                                                @foreach ($codes as $code)
-                                                    <span
-                                                        class="cat-chip {{ \App\Support\ChemicalClassification::toneOfCode($code) }}"
-                                                        title="{{ $cnpClsList[$code] ?? $code }}">{{ $code }}</span>
-                                                @endforeach
-                                            </div>
-                                            @if (\App\Support\ChemicalClassification::isSpecialControl($codes))
-                                                <div class="mt-1">
-                                                    <span class="badge-special-control" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
-                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
-                                                    </span>
-                                                </div>
-                                            @endif
-                                        @else
-                                            <span class="md-empty">Chưa phân loại</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-primary cnp-choose"
-                                            data-id="{{ $cn->id }}"
-                                            data-name="{{ $cn->name }}{{ $cn->cas_no ? ' (CAS: ' . $cn->cas_no . ')' : '' }}"
-                                            title="Chọn hoá chất này">
-                                            <i class="fas fa-check"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
+                        <tbody></tbody>
                     </table>
                 </div>
             </div>
@@ -189,67 +146,188 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            var CNP_GROUP_CODES = @json($cnpGroupCodes);
+            // Mã nhóm theo tên hoá chất, bổ sung dần từ kết quả tìm ở ô chọn và dữ liệu bảng chọn
+            var CNP_GROUP_CODES = @json((object) $chemNameGroups);
             var CNP_CLS_LABELS = @json($cnpClsList);
             var CRITICAL = ['N9', 'N10'],
                 BANNED = ['N4', 'N6'];
 
             var pickerTargetForm = null; // form (#createModal / #updateModal) đang chờ nhận hoá chất
             var cnpTable = null;
+            var cnpLoading = false;
             var cnpGroupWant = 'all';
+
+            function cnpEscape(value) {
+                return String(value === null || value === undefined ? '' : value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function cnpCodes(row) {
+                return (row.codes || []).map(function(item) {
+                    return item.code;
+                });
+            }
+
+            function cnpMessage(html) {
+                $('#chemNamePickerTable tbody').html(
+                    '<tr><td colspan="5" class="text-center md-sub py-4">' + html + '</td></tr>');
+            }
 
             /* ---------- Lọc theo nhóm NĐ 24/2026, chỉ áp cho bảng chọn ---------- */
             $.fn.dataTable.ext.search.push(function(settings, data, index) {
                 if (settings.nTable.id !== 'chemNamePickerTable') return true;
                 if (cnpGroupWant === 'all') return true;
 
-                var raw = ($(settings.aoData[index].nTr).attr('data-classification') || '').trim();
-                var codes = raw ? raw.split(',') : [];
+                var codes = cnpCodes(settings.aoData[index]._aData || {});
 
                 return cnpGroupWant === 'none' ? codes.length === 0 : codes.indexOf(cnpGroupWant) !== -1;
             });
 
-            function initCnpTable() {
-                if (cnpTable) {
-                    cnpTable.columns.adjust();
-                    return;
-                }
+            function buildCnpTable(rows) {
+                rows.forEach(function(row) {
+                    CNP_GROUP_CODES[row.id] = cnpCodes(row);
+                });
+
+                $('#chemNamePickerTable tbody').empty();
 
                 cnpTable = $('#chemNamePickerTable').DataTable({
+                    data: rows,
+                    deferRender: true,
                     paging: true,
                     pageLength: 10,
                     lengthChange: false,
                     info: true,
                     autoWidth: false,
+                    search: {
+                        search: $('#cnpSearch').val() || ''
+                    },
                     order: [
                         [1, 'asc']
                     ],
-                    columnDefs: [{
-                        orderable: false,
-                        targets: [0, 4]
-                    }],
+                    columns: [{
+                            data: null,
+                            className: 'text-center',
+                            orderable: false,
+                            render: function(value, type, row, meta) {
+                                return meta.row + 1;
+                            }
+                        },
+                        {
+                            data: 'name',
+                            render: function(value, type) {
+                                return type === 'display' ?
+                                    '<span class="font-weight-bold">' + cnpEscape(value) + '</span>' : value;
+                            }
+                        },
+                        {
+                            data: 'cas_no',
+                            className: 'md-sub',
+                            render: function(value, type) {
+                                return type === 'display' ? (value ? cnpEscape(value) : '—') : value;
+                            }
+                        },
+                        {
+                            data: 'codes',
+                            render: function(codes, type, row) {
+                                codes = codes || [];
+
+                                if (type === 'sort' || type === 'type') {
+                                    return codes.length ? parseInt(codes[0].code.replace(/\D/g, ''), 10) : 99;
+                                }
+
+                                if (type !== 'display') {
+                                    return cnpCodes(row).join(' ');
+                                }
+
+                                if (!codes.length) {
+                                    return '<span class="md-empty">Chưa phân loại</span>';
+                                }
+
+                                var html = '<div class="cat-chips">' + codes.map(function(item) {
+                                    return '<span class="cat-chip ' + cnpEscape(item.tone) + '" title="' +
+                                        cnpEscape(CNP_CLS_LABELS[item.code] || item.code) + '">' +
+                                        cnpEscape(item.code) + '</span>';
+                                }).join('') + '</div>';
+
+                                if (row.special) {
+                                    html += '<div class="mt-1"><span class="badge-special-control" ' +
+                                        'title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">' +
+                                        '<i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt</span></div>';
+                                }
+
+                                return html;
+                            }
+                        },
+                        {
+                            data: 'id',
+                            className: 'text-center',
+                            orderable: false,
+                            searchable: false,
+                            render: function(id) {
+                                return '<button type="button" class="btn btn-sm btn-primary cnp-choose" data-id="' +
+                                    cnpEscape(id) + '" title="Chọn hoá chất này"><i class="fas fa-check"></i></button>';
+                            }
+                        }
+                    ],
                     dom: 'rt<"cnp-foot"ip>',
                     language: {
                         info: 'Hiện _START_–_END_ / _TOTAL_ hoá chất',
                         infoEmpty: 'Không có hoá chất',
                         infoFiltered: '(lọc từ _MAX_)',
                         zeroRecords: 'Không tìm thấy hoá chất phù hợp',
+                        emptyTable: 'Chưa có tên hoá chất nào đã duyệt',
                         paginate: {
                             previous: 'Trước',
                             next: 'Sau'
                         }
                     }
                 });
-
-                $('#cnpSearch').on('keyup', function() {
-                    cnpTable.search(this.value).draw();
-                });
-
-                $('#cnpGroup').on('change', function() {
-                    cnpGroupWant = this.value;
-                    cnpTable.draw();
-                });
             }
+
+            /* Nạp danh sách hoá chất khi mở bảng lần đầu, những lần sau chỉ tính lại bề rộng cột */
+            function initCnpTable() {
+                if (cnpTable) {
+                    cnpTable.columns.adjust();
+                    return;
+                }
+
+                if (cnpLoading) return;
+                cnpLoading = true;
+
+                cnpMessage('<i class="fas fa-spinner fa-spin mr-1"></i> Đang tải danh sách hoá chất...');
+
+                fetch($('#chemNamePickerTable').data('url'), {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('http');
+                        return response.json();
+                    })
+                    .then(function(json) {
+                        buildCnpTable(json.rows || []);
+                    })
+                    .catch(function() {
+                        cnpMessage('Không tải được danh sách hoá chất. Đóng bảng rồi mở lại để thử lại.');
+                    })
+                    .finally(function() {
+                        cnpLoading = false;
+                    });
+            }
+
+            $('#cnpSearch').on('keyup', function() {
+                if (cnpTable) cnpTable.search(this.value).draw();
+            });
+
+            $('#cnpGroup').on('change', function() {
+                cnpGroupWant = this.value;
+                if (cnpTable) cnpTable.draw();
+            });
 
             // Bảng nằm trong modal ẩn -> khởi tạo khi modal hiện ra để cột không bị tính sai
             $('#chemNamePickerModal').on('shown.bs.modal', function() {
@@ -264,14 +342,17 @@
 
             /* ---------- Chọn một hoá chất ---------- */
             $(document).on('click', '.cnp-choose', function() {
-                if (!pickerTargetForm || !pickerTargetForm.length) return;
+                if (!pickerTargetForm || !pickerTargetForm.length || !cnpTable) return;
 
-                var id = String($(this).data('id'));
+                var row = cnpTable.row($(this).closest('tr')).data() || {};
+                var id = String(row.id || $(this).data('id'));
                 var $sel = pickerTargetForm.find('select[name="chem_names_id"]');
                 if (!$sel.length) return;
 
-                if (!$sel.find('option[value="' + id + '"]').length) {
-                    $sel.append(new Option($(this).data('name'), id, true, true));
+                if (!$sel.find('option').filter(function() {
+                        return this.value === id;
+                    }).length) {
+                    $sel.append(new Option(row.text || id, id, true, true));
                 }
                 $sel.val(id).trigger('change');
 
@@ -313,6 +394,12 @@
             }
 
             $(document).on('change', '.md-modal select[name="chem_names_id"]', function() {
+                // Chọn qua ô tìm (AJAX): nhóm phân loại đi kèm kết quả tìm của Select2
+                var picked = $(this).data('select2') ? ($(this).select2('data') || [])[0] : null;
+                if (picked && picked.id && Array.isArray(picked.groups)) {
+                    CNP_GROUP_CODES[picked.id] = picked.groups;
+                }
+
                 renderClsPreview($(this).closest('.md-modal'));
             });
 

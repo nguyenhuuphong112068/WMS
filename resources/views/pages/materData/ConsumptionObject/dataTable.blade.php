@@ -2,7 +2,6 @@
 <style>
     .obj-freq {
         display: inline-block;
-        margin: 1px 2px;
         padding: 2px 8px;
         border-radius: 10px;
         font-size: .8rem;
@@ -27,6 +26,10 @@
         background: var(--primary);
     }
 
+    .obj-type-utility_equipment {
+        background: var(--primary-dark);
+    }
+
     .obj-type-testing_equipment {
         background: var(--accent);
     }
@@ -48,19 +51,29 @@
         gap: 8px;
     }
 
+    /* Hai bộ lọc luôn nằm cùng một hàng; màn hình hẹp mới xuống dòng */
     .obj-filters {
+        display: flex;
+        flex-wrap: nowrap;
         gap: 8px;
     }
 
     .obj-filters .obj-filter {
-        min-width: 200px;
+        width: auto;
+        min-width: 210px;
         border-radius: var(--border-radius-md, 8px);
         transition: border-color .2s, box-shadow .2s;
     }
 
-    .obj-freq-grid .custom-control {
-        padding-top: 2px;
-        padding-bottom: 2px;
+    @media (max-width: 767.98px) {
+        .obj-filters {
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .obj-filters .obj-filter {
+            flex: 1 1 200px;
+        }
     }
 </style>
 <div class="content-wrapper">
@@ -85,7 +98,7 @@
                     </form>
                 @endperm
 
-                <div class="d-flex flex-wrap ml-md-auto obj-filters">
+                <div class="ml-md-auto obj-filters">
                     <select id="filter_type" class="form-control obj-filter" title="Lọc theo loại đối tượng">
                         <option value="">Tất cả loại đối tượng</option>
                         @foreach ($types as $typeLabel)
@@ -100,6 +113,8 @@
                     </select>
                 </div>
             </div>
+
+            @php($frequencyOrder = array_flip(array_keys($frequencies)))
 
             <table id="data_table_consumption_object" class="table table-bordered table-striped">
                 <thead style="position: sticky; top: 60px; background-color: white; z-index: 1020">
@@ -139,12 +154,8 @@
                             <td>{{ $data->code }}</td>
                             <td>{{ $data->name }}</td>
                             <td>{{ $data->location ?? '-' }}</td>
-                            <td>
-                                @forelse (array_filter(explode(',', (string) $data->frequency)) as $freq)
-                                    <span class="obj-freq">{{ $frequencies[$freq] ?? $freq }}</span>
-                                @empty
-                                    -
-                                @endforelse
+                            <td data-order="{{ $frequencyOrder[$data->frequency] ?? 99 }}">
+                                <span class="obj-freq" title="{{ $data->frequency }}">{{ $frequencies[$data->frequency] ?? $data->frequency }}</span>
                             </td>
                             <td class="text-center">
                                 @if ($data->status_id == 1)
@@ -175,7 +186,7 @@
                                         'url' => route('pages.materData.consumptionObject.history', [
                                             'id' => $data->id,
                                         ]),
-                                        'title' => $data->code . ' - ' . $data->name,
+                                        'title' => $data->code . ' - ' . $data->name . ' (' . ($frequencies[$data->frequency] ?? $data->frequency) . ')',
                                     ])
                                 </span>
 
@@ -187,7 +198,7 @@
                                         <input type="hidden" name="id" value="{{ $data->id }}">
                                         <button type="submit"
                                             class="btn btn-{{ $data->status_id == 1 ? 'danger' : 'success' }} btn-deactive-confirm"
-                                            data-name="{{ $data->code }} - {{ $data->name }}"
+                                            data-name="{{ $data->code }} - {{ $data->name }} ({{ $frequencies[$data->frequency] ?? $data->frequency }})"
                                             data-active="{{ $data->status_id }}">
                                             <i class="fas fa-{{ $data->status_id == 1 ? 'lock' : 'unlock' }}"></i>
                                         </button>
@@ -236,19 +247,16 @@
         $('.btn-edit').click(function() {
             const button = $(this);
             const modal = $('#updateModal');
-            const selected = String(button.data('frequency') || '').split(',');
-            // Đối tượng đồng bộ từ CAL: loại + mã là khoá nhận diện, không cho sửa
+            // Đối tượng đồng bộ từ CAL: loại + mã + tần suất là khoá nhận diện, không cho sửa
             const fromCal = button.data('source') === 'cal';
 
             modal.find('#update_id').val(button.data('id'));
             modal.find('#update_type').val(button.data('type')).prop('disabled', fromCal);
             modal.find('#update_code').val(button.data('code')).prop('readonly', fromCal);
+            modal.find('#update_frequency').val(button.data('frequency')).prop('disabled', fromCal);
             modal.find('#update_cal_lock').toggleClass('d-none', !fromCal);
             modal.find('#update_name').val(button.data('name'));
             modal.find('#update_location').val(button.data('location'));
-            modal.find('input[name="frequency[]"]').each(function() {
-                this.checked = selected.indexOf(this.value) !== -1;
-            });
             modal.find('[name="change_reason"]').val('');
         });
 
@@ -258,7 +266,7 @@
 
             Swal.fire({
                 title: 'Đồng bộ từ phần mềm CAL?',
-                text: 'Lấy thiết bị sản xuất và thiết bị kiểm nghiệm từ cal1, cal2: thêm mã mới, cập nhật mã đã có nếu thông tin khác.',
+                text: 'Lấy thiết bị sản xuất và thiết bị kiểm nghiệm từ cal1, cal2: mỗi tần suất một dòng, thêm dòng mới, cập nhật dòng đã có nếu thông tin khác.',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#28a745',
@@ -334,6 +342,7 @@
                 search: "Tìm kiếm:",
                 lengthMenu: "Hiển thị _MENU_ dòng",
                 info: "Hiển thị _START_ đến _END_ của _TOTAL_ dòng",
+                infoFiltered: "(lọc từ _MAX_ dòng)",
                 zeroRecords: "Không tìm thấy dữ liệu phù hợp",
                 emptyTable: "Chưa có đối tượng nào",
                 paginate: {

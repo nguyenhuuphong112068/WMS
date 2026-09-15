@@ -1,3 +1,14 @@
+{{--
+| SỬ DỤNG VẬT TƯ - MỘT TRONG 3 TAB "ĐỀ NGHỊ CẤP PHÁT" (Định Kỳ / Theo Đánh Giá Rủi Ro /
+| Thường Quy), cùng dùng chung một khuôn bảng - chỉ khác nhau ở:
+|   - $reqType         : material_request_lists.type đang lọc ('periodic' | 'risk_assessment' | 'regular')
+|   - $reqList/$reqRange/$reqPerPage/$reqUnissued/$reqUnissuedCount : dữ liệu riêng của loại này (self::REQ_TYPE_TABS)
+|   - $reqShowCreate   : chỉ tab "Thường Quy" có nút "Tạo đề nghị cấp phát vật tư"
+|   - $reqEmptyText    : câu hiện khi bảng rỗng
+| Truyền vào qua @include('...requestPane', [...]) ở dataTable.blade.php.
+--}}
+
+@once
 <style>
     .me-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
     .me-flow .step {
@@ -9,21 +20,25 @@
     .me-flow .step.rejected { background: #FEE2E2; color: #991B1B; border-color: #FCA5A5; }
     .me-flow .step.skip { opacity: .45; }
 </style>
+@endonce
 
 <div class="md-toolbar">
-    @perm('export_material_request')
-        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#reqCreateModal">
-            <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát vật tư
-        </button>
-    @endperm
+    @if ($reqShowCreate)
+        @perm('export_material_request')
+            <button type="button" class="btn btn-primary btn-req-create" data-toggle="modal" data-target="#reqCreateModal"
+                data-req-type="{{ $reqType }}" data-req-label="{{ $reqType === 'risk_assessment' ? ' - Theo ĐG Rủi Ro' : ' - Thường Quy' }}">
+                <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát vật tư
+            </button>
+        @endperm
+    @endif
 
     @if (!empty($reqUnissued))
-        <a href="{{ route($expRoute . 'list', array_merge(request()->except(['req_unissued', 'req_page']), ['tab' => 'request'])) }}"
+        <a href="{{ route($expRoute . 'list', array_merge(request()->except([$reqPrefix.'unissued', $reqPrefix.'page']), ['tab' => $reqType])) }}"
             class="btn btn-warning" title="Bấm để xem lại tất cả đề nghị">
             <i class="fas fa-filter mr-1"></i> Đang lọc: Chưa cấp phát đủ ({{ $reqUnissuedCount }}) <i class="fas fa-times ml-1"></i>
         </a>
     @else
-        <a href="{{ route($expRoute . 'list', array_merge(request()->except(['req_page']), ['tab' => 'request', 'req_unissued' => 1])) }}"
+        <a href="{{ route($expRoute . 'list', array_merge(request()->except([$reqPrefix.'page']), ['tab' => $reqType, $reqPrefix.'unissued' => 1])) }}"
             class="btn btn-outline-warning text-dark" style="border-color: #d97706; background-color: #fffbeb;"
             title="Lọc các đề nghị đã duyệt nhưng kho chưa cấp phát đủ">
             <i class="fas fa-hourglass-half mr-1 text-warning"></i> Chưa cấp phát đủ
@@ -36,8 +51,8 @@
 
 @include('pages.shared.rangeFilter', [
     'rfRoute' => $expRoute . 'list',
-    'rfTab' => 'request',
-    'rfPrefix' => 'req_',
+    'rfTab' => $reqType,
+    'rfPrefix' => $reqPrefix,
     'rfRange' => $reqRange,
     'rfPerPage' => $reqPerPage,
     'rfSearch' => false,
@@ -45,12 +60,13 @@
 ])
 
 <div class="table-responsive">
-    <table id="meReqTable" class="table table-bordered table-hover w-100 md-table" data-server-paged>
+    <table id="meReqTable_{{ $reqType }}" class="table table-bordered table-hover w-100 md-table" data-server-paged>
         <thead>
             <tr>
                 <th class="text-center" style="width:45px">STT</th>
                 <th style="width:150px">Mã Đề Nghị</th>
                 <th class="text-center" style="width:70px">Số Mục</th>
+                <th class="text-center" style="width:110px">Ngày Mong Muốn</th>
                 <th style="width:130px">Trạng Thái</th>
                 <th style="width:320px">Trình Ký</th>
                 <th class="text-center" style="width:110px">Cấp Phát</th>
@@ -59,19 +75,24 @@
             </tr>
         </thead>
         <tbody>
-            @forelse ($requestLists as $req)
+            @forelse ($reqList as $req)
                 @php
                     $b = $expReqBadge($req->app_status);
                     $items = $requestItems->get($req->id, collect());
                     $editable = in_array($req->app_status, ['draft', 'rejected']) && user_can('export_material_request');
                 @endphp
                 <tr>
-                    <td class="text-center">{{ $requestLists->firstItem() + $loop->index }}</td>
+                    <td class="text-center">{{ $reqList->firstItem() + $loop->index }}</td>
                     <td><span class="exp-code font-weight-bold">{{ $req->code }}</span>
                         @if ($req->name) <div class="md-sub small font-weight-bold" style="color: var(--primary-dark);">{{ $req->name }}</div> @endif
-                        @if ($req->note) <div class="md-sub small text-muted">{{ $req->note }}</div> @endif
+                        @if ($req->type === 'periodic')
+                            <span class="badge badge-info mt-1" title="{{ $req->note }}"><i class="fas fa-sync-alt mr-1"></i>Tạo tự động</span>
+                        @elseif ($req->note)
+                            <div class="md-sub small text-muted">{{ $req->note }}</div>
+                        @endif
                     </td>
                     <td class="text-center"><span class="md-tag">{{ $items->count() }}</span></td>
+                    <td class="text-center md-sub">{{ $req->needed_date ? \Carbon\Carbon::parse($req->needed_date)->format('d/m/Y') : '—' }}</td>
                     <td>
                         <span class="md-badge {{ $b['class'] }}">{{ $b['label'] }}</span>
                         @if ($req->app_status === 'rejected' && $req->reject_reason)
@@ -159,8 +180,8 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="text-center text-muted">
-                    {{ !empty($reqUnissued) ? 'Không có đề nghị nào chưa cấp phát đủ.' : 'Chưa có đề nghị cấp phát vật tư nào.' }}
+                <tr><td colspan="9" class="text-center text-muted">
+                    {{ !empty($reqUnissued) ? 'Không có đề nghị nào chưa cấp phát đủ.' : $reqEmptyText }}
                 </td></tr>
             @endforelse
         </tbody>
@@ -168,7 +189,7 @@
 </div>
 
 @include('pages.shared.paginator', [
-    'pgItems' => $requestLists,
-    'pgTab' => 'request',
+    'pgItems' => $reqList,
+    'pgTab' => $reqType,
     'pgUnit' => !empty($reqUnissued) ? 'đề nghị chưa cấp phát đủ' : 'đề nghị',
 ])

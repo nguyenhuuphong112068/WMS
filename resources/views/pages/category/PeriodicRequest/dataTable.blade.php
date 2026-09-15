@@ -35,7 +35,6 @@
                         @else
                             <th style="width: 210px">Đối Tượng</th>
                         @endif
-                        <th>Vật Tư Đề Nghị</th>
                         <th style="width: 160px">Chu Kỳ</th>
                         <th class="text-center" style="width: 110px">Tạo Đề Nghị Kế Tiếp</th>
                         <th style="width: 160px">Đề Nghị Đã Tạo</th>
@@ -68,35 +67,17 @@
                                     @endif
                                 </td>
                             @endif
-                            <td>
-                                <div class="pr-items">
-                                    @foreach ($row->items as $item)
-                                        <div class="pr-item">
-                                            <span class="md-tag">{{ $item->category_code ?: '—' }}</span>
-                                            <span class="pr-item-name">{{ $item->material_name ?: '—' }}</span>
-                                            <span class="pr-item-amount">{{ $prNum($item->requested_amount) }} {{ $item->requested_unit }}</span>
-                                            @if ($item->technical_specification)
-                                                <div class="pr-item-purpose" title="Thông tin kỹ thuật: {{ $item->technical_specification }}">
-                                                    <i class="fas fa-info-circle mr-1"></i>{{ $item->technical_specification }}
-                                                </div>
-                                            @endif
-                                            @if ($item->product_name)
-                                                <div class="pr-item-purpose" title="Thiết bị liên quan: {{ $item->product_name }}">
-                                                    <i class="fas fa-cogs mr-1"></i>{{ $item->product_name }}
-                                                </div>
-                                            @endif
-                                            @if ($item->purpose)
-                                                <div class="pr-item-purpose" title="Mục đích sử dụng: {{ $item->purpose }}">
-                                                    <i class="fas fa-bullseye mr-1"></i>{{ $item->purpose }}
-                                                </div>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </td>
                             <td data-order="{{ (int) array_search($row->periodic, array_keys($prSupport::CYCLES)) }}-{{ str_pad((string) $row->cycle_length, 3, '0', STR_PAD_LEFT) }}-{{ str_pad((string) $row->cycle_day, 3, '0', STR_PAD_LEFT) }}">
+                                @php $prCalMode = $prSupport::dayModeOf($row->cycle_day_mode ?? null) === $prSupport::DAY_MODE_CAL_DUE; @endphp
                                 <div class="font-weight-bold">{{ $prSupport::scheduleLabel($row->periodic, $row->cycle_length, $row->frequency) }}</div>
-                                <div>{{ $prSupport::cycleDayLabel($row->periodic, $row->cycle_day, $row->cycle_length) }}</div>
+                                <div>{{ $prSupport::dayLabel($row) }}</div>
+                                @if ($prCalMode)
+                                    <div class="md-sub" title="{{ $row->cal_sch_id ? 'SCH_ID ' . $row->cal_sch_id : '' }}">
+                                        <i class="fas fa-link mr-1"></i>{{ $row->cal_due_date
+                                            ? 'Hạn CAL ' . \Carbon\Carbon::parse($row->cal_due_date)->format('d/m/Y')
+                                            : 'Chờ lịch Pending mới từ CAL' }}
+                                    </div>
+                                @endif
                                 <div class="md-sub">Bắt đầu {{ \Carbon\Carbon::parse($row->start_date)->format('d/m/Y') }}</div>
                             </td>
                             <td class="text-center" data-order="{{ $row->status_id == 1 && $row->next_run_date ? $row->next_run_date : '9999-12-31' }}">
@@ -104,6 +85,8 @@
                                     @php $prNext = \Carbon\Carbon::parse($row->next_run_date); @endphp
                                     <div class="font-weight-bold">{{ $prNext->format('d/m/Y') }}</div>
                                     <div class="md-sub">{{ $prSupport::WEEKDAYS[$prNext->dayOfWeekIso] }}</div>
+                                @elseif ($row->status_id == 1 && $prCalMode)
+                                    <span class="md-sub">Chờ lịch CAL</span>
                                 @else
                                     <span class="md-empty">—</span>
                                 @endif
@@ -124,28 +107,34 @@
                             </td>
                             <td>
                                 <div class="md-actions">
-                                    <span class="cat-btn-wrap">
-                                        <button type="button" class="btn btn-sm btn-outline-primary btn-cat-history" title="Lịch sử thay đổi"
-                                            data-url="{{ route($prRoute . 'history', ['id' => $row->id]) }}"
-                                            data-title="{{ $row->title }}">
-                                            <i class="fas fa-history"></i>
-                                        </button>
-                                        @if ($row->history_count > 0)
-                                            <span class="cat-count-badge btn-cat-history" title="Đã thay đổi {{ $row->history_count }} lần"
-                                                data-url="{{ route($prRoute . 'history', ['id' => $row->id]) }}"
-                                                data-title="{{ $row->title }}">{{ $row->history_count }}</span>
-                                        @endif
-                                    </span>
+                                    <button type="button" class="btn btn-sm btn-outline-info btn-pr-items" title="Xem vật tư đề nghị"
+                                        data-title="{{ $row->title }}"
+                                        data-items="{{ json_encode($row->items->map(fn ($item) => [
+                                            'category_code' => $item->category_code,
+                                            'material_name' => $item->material_name,
+                                            'requested_amount' => $prNum($item->requested_amount),
+                                            'requested_unit' => $item->requested_unit,
+                                            'technical_specification' => $item->technical_specification,
+                                            'product_name' => $item->product_name,
+                                            'purpose' => $item->purpose,
+                                        ])->values()) }}">
+                                        <i class="fas fa-list-ul"></i>
+                                    </button>
 
-                                    @perm('category_material_periodic_manage')
-                                        <button type="button" class="btn btn-sm btn-warning btn-pr-edit" title="Sửa"
-                                            data-modal="#periodic{{ $prKey }}UpdateModal"
-                                            data-row="{{ json_encode([
+                                    {{-- Nút Sửa + badge số lần thay đổi (nếu có) ở góc trên bên phải - giống cụm Danh Mục --}}
+                                    <span class="cat-btn-wrap">
+                                        @perm('category_material_periodic_manage')
+                                            <button type="button" class="btn btn-sm btn-warning btn-pr-edit" title="Sửa"
+                                                data-modal="#periodic{{ $prKey }}UpdateModal"
+                                                data-row="{{ json_encode([
                                                 'id' => $row->id,
                                                 'title' => $row->title,
                                                 'periodic' => $row->periodic,
                                                 'cycle_length' => $row->cycle_length === null ? null : (int) $row->cycle_length,
                                                 'cycle_day' => (int) $row->cycle_day,
+                                                'cycle_day_mode' => $prSupport::dayModeOf($row->cycle_day_mode ?? null),
+                                                'cal_lead_days' => $prSupport::calLeadDays($row),
+                                                'cal_due_date' => $row->cal_due_date ?? null,
                                                 'start_date' => $row->start_date,
                                                 'next_run_date' => $row->next_run_date,
                                                 'to_department_id' => $row->to_department_id,
@@ -159,9 +148,19 @@
                                                     'purpose' => $item->purpose,
                                                 ])->values(),
                                             ]) }}">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        @endperm
 
+                                        @if ($row->history_count > 0)
+                                            <button type="button" class="cat-count-badge btn-cat-history"
+                                                title="Xem {{ $row->history_count }} lần thay đổi"
+                                                data-url="{{ route($prRoute . 'history', ['id' => $row->id]) }}"
+                                                data-title="{{ $row->title }}">{{ $row->history_count }}</button>
+                                        @endif
+                                    </span>
+
+                                    @perm('category_material_periodic_manage')
                                         @if ($row->status_id == 1)
                                             <form class="form-md-confirm d-inline" action="{{ route($prRoute . 'generateNow') }}" method="POST"
                                                 data-title="Tạo đề nghị ngay?"

@@ -18,8 +18,11 @@
             <div class="modal-body">
 
                 <div class="row mb-3">
-                    <div class="col-md-4"><small class="text-muted">Người lập</small>
+                    <div class="col-md-3"><small class="text-muted">Người lập</small>
                         <div class="font-weight-bold">{{ $req->created_by }}</div>
+                    </div>
+                    <div class="col-md-2"><small class="text-muted">Ngày mong muốn</small>
+                        <div class="font-weight-bold">{{ $req->needed_date ? \Carbon\Carbon::parse($req->needed_date)->format('d/m/Y') : '—' }}</div>
                     </div>
                     <div class="col-md-4">
                         <small class="text-muted">Quy trình ký duyệt</small>
@@ -46,7 +49,7 @@
                             </div>
                         @endif
                     </div>
-                    <div class="col-md-4"><small class="text-muted">Ghi chú</small>
+                    <div class="col-md-3"><small class="text-muted">Ghi chú</small>
                         <div>{{ $req->note ?: '—' }}</div>
                     </div>
                 </div>

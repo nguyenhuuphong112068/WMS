@@ -94,7 +94,9 @@ class StandardCategoryController extends Controller
 
         return view('pages.category.StandardCategory.list', [
             'datas' => $datas,
-            'chemNames' => $this->options('standard_names', $datas->pluck('chem_names_id')->all()),
+            // Ô Tên chất chuẩn tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị vừa gửi bị
+            // lỗi validate; dòng đang sửa gửi kèm nhãn qua chem_names_id_text.
+            'chemNames' => \App\Support\CategoryLookup::namesByIds('standard', [old('chem_names_id')]),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
             'storageConditions' => $this->options('storage_conditions', $datas->pluck('storage_condition_id')->all()),
             'groups' => config('standard.groups'),
@@ -111,7 +113,8 @@ class StandardCategoryController extends Controller
             // Dữ liệu của tab Chất Chuẩn Của Phòng, đặt tiền tố ds để không đụng biến của tab 1
             'dsDatas' => $dsDatas,
             'dsCategories' => DepartmentStandard::categoryOptions($dsDatas->pluck('category_id')->all()),
-            'dsLocations' => DepartmentStandard::locationOptions($departmentId),
+            // Định khu tìm qua AJAX, chỉ dựng sẵn option của giá trị old()
+            'dsLocations' => \App\Support\CategoryLookup::locationsByIds([old('default_location_id')]),
             'dsUnits' => DepartmentStandard::unitOptions($dsDatas->pluck('unit_id')->all()),
             /*
             | Đơn vị các phòng KHÁC đang dùng cho từng chất chuẩn. Phòng đang khai chọn

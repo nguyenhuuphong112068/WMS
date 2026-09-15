@@ -114,15 +114,19 @@ class ChemicalCategoryController extends Controller
 
         return view('pages.category.ChemicalCategory.list', [
             'datas' => $datas,
-            'chemNames' => $this->chemNameOptions($datas->pluck('chem_names_id')->all()),
+            // Ô Tên hoá chất tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị vừa gửi bị
+            // lỗi validate; dòng đang sửa gửi kèm nhãn qua chem_names_id_text.
+            'chemNames' => \App\Support\CategoryLookup::namesByIds('chemical', [old('chem_names_id')]),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
             'storageConditions' => $this->options('storage_conditions', $datas->pluck('storage_condition_id')->all()),
             // Nhóm NĐ 24/2026 suy tự động theo từng mã danh mục (không còn tick tay)
             'classificationCodes' => $categoryGroups,
             'classificationLabels' => \App\Support\ChemicalClassification::labels(),
-            // Nhóm NĐ 24/2026 theo từng tên hoá chất - dùng cho bảng chọn "dữ liệu gốc" và
-            // ô xem nhanh nhóm phân loại trong modal Thêm / Cập nhật danh mục.
-            'chemNameGroups' => \App\Support\ChemicalClassification::groupsByChemName(),
+            // Mã nhóm NĐ 24/2026 (N1..N10) của các tên hoá chất danh mục đang mang - cho ô xem nhanh
+            // nhóm phân loại ở modal Cập nhật. Tên chọn mới lấy nhóm từ kết quả tìm / bảng chọn (AJAX).
+            'chemNameGroups' => \App\Support\CategoryLookup::chemicalGroupCodes(
+                $datas->pluck('chem_names_id')->push(old('chem_names_id'))->all()
+            ),
             'types' => config('chemical.types'),
             'safetyWarnings' => config('chemical.safety_warnings'),
             'nextCode' => $this->previewNextCode(),
@@ -141,7 +145,8 @@ class ChemicalCategoryController extends Controller
             // Dữ liệu của tab Hoá Chất Của Phòng, đặt tiền tố dc để không đụng biến của tab 1
             'dcDatas' => $dcDatas,
             'dcCategories' => DepartmentChemical::categoryOptions($dcDatas->pluck('category_id')->all()),
-            'dcLocations' => DepartmentChemical::locationOptions($departmentId),
+            // Định khu tìm qua AJAX, chỉ dựng sẵn option của giá trị old()
+            'dcLocations' => \App\Support\CategoryLookup::locationsByIds([old('default_location_id')]),
             'dcStorageConditions' => DepartmentChemical::storageConditionOptions(),
             'dcUnits' => DepartmentChemical::unitOptions($dcDatas->pluck('unit_id')->all()),
             /*
@@ -711,33 +716,6 @@ class ChemicalCategoryController extends Controller
     private function actor(): string
     {
         return \App\Support\Signer::actor();
-    }
-
-    /**
-     * Danh sách hoá chất cho ô chọn "Tên Hoá Chất", kèm số CAS.
-     *
-     * chem_names không còn cột cas_no: mỗi tên hoá chất gắn nhiều hoạt chất qua pivot
-     * chem_name_active_ingredient, số CAS nằm ở active_ingredients. Vì vậy phải gộp CAS
-     * qua subquery giống index(), nếu không view create/update sẽ lỗi Undefined property $cas_no.
-     */
-    private function chemNameOptions(array $usedIds)
-    {
-        $usedIds = array_values(array_filter($usedIds));
-
-        return DB::table('chem_names')
-            ->where(function ($query) use ($usedIds) {
-                $query->where(function ($sub) {
-                    $sub->where('status_id', 1)->where('app_status', 'approved');
-                });
-
-                if ($usedIds) {
-                    $query->orWhereIn('id', $usedIds);
-                }
-            })
-            ->select('chem_names.*')
-            ->selectSub(DepartmentChemical::casNoSubquery('chem_names.id'), 'cas_no')
-            ->orderBy('name', 'asc')
-            ->get();
     }
 
     /** Mã danh mục sinh tự động nên không nằm trong danh sách kiểm tra. */

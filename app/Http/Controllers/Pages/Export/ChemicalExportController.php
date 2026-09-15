@@ -1607,14 +1607,17 @@ class ChemicalExportController extends Controller
         $departmentId = $this->departmentId();
 
         $validator = Validator::make($request->all(), [
+            'title' => ['required', 'string', 'max:255'],
             'to_department_id' => ['required', 'exists:deparments,id', Rule::notIn([$departmentId])],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:chemical_categories,id'],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
+            'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
+            'title.required' => 'Vui lòng nhập tiêu đề đề nghị.',
             'to_department_id.required' => 'Vui lòng chọn phòng ban nguồn (đang giữ hoá chất).',
             'to_department_id.exists' => 'Phòng ban được chọn không tồn tại.',
             'to_department_id.not_in' => 'Không thể tạo đề nghị liên phòng ban gửi đến chính phòng mình.',
@@ -1642,10 +1645,12 @@ class ChemicalExportController extends Controller
 
         $listId = DB::table(self::TRANSFER_REQUEST_TABLE)->insertGetId([
             'code' => $code,
+            'title' => $this->nullIfBlank($request->title),
             'department_id' => $departmentId,
             'to_department_id' => $toDepartmentId,
             'status' => $status,
             'note' => $this->nullIfBlank($request->note),
+            'needed_date' => $this->nullIfBlank($request->needed_date),
             'created_by' => $this->actor(),
             'created_at' => now(),
             'updated_at' => now(),
@@ -1701,14 +1706,17 @@ class ChemicalExportController extends Controller
 
         $validator = Validator::make($request->all(), [
             'transfer_request_id' => ['required', 'exists:chemical_transfer_requests,id'],
+            'title' => ['required', 'string', 'max:255'],
             'to_department_id' => ['required', 'exists:deparments,id', Rule::notIn([$departmentId])],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['required', 'exists:chemical_categories,id'],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
+            'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
         ], [
+            'title.required' => 'Vui lòng nhập tiêu đề đề nghị.',
             'to_department_id.required' => 'Vui lòng chọn phòng ban nguồn (đang giữ hoá chất).',
             'to_department_id.not_in' => 'Không thể tạo đề nghị liên phòng ban gửi đến chính phòng mình.',
             'items.required' => 'Vui lòng thêm ít nhất một hoá chất đề nghị.',
@@ -1732,9 +1740,11 @@ class ChemicalExportController extends Controller
         $toDepartmentId = (int) $request->to_department_id;
 
         DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $req->id)->update([
+            'title' => $this->nullIfBlank($request->title),
             'to_department_id' => $toDepartmentId,
             'status' => $status,
             'note' => $this->nullIfBlank($request->note),
+            'needed_date' => $this->nullIfBlank($request->needed_date),
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
@@ -2501,12 +2511,13 @@ class ChemicalExportController extends Controller
         ];
     }
 
-    /** Mã đề nghị liên phòng ban: LPB-<shortName A>-<shortName B>-ddMMyy-<số thứ tự trong ngày>. */
+    /**
+     * Mã đề nghị liên phòng ban: LPB-<id phòng gửi>-<id phòng nhận>-ddMMyy-<số thứ tự
+     * trong ngày>. Dùng id số thay vì shortName (có thể dài như "KTBT-NM2") cho gọn.
+     */
     private function nextChemTransferCode(int $fromDepartmentId, int $toDepartmentId): string
     {
-        $fromShort = DB::table('deparments')->where('id', $fromDepartmentId)->value('shortName') ?: 'NA';
-        $toShort = DB::table('deparments')->where('id', $toDepartmentId)->value('shortName') ?: 'NA';
-        $prefix = 'LPB-'.$fromShort.'-'.$toShort.'-'.date('dmy').'-';
+        $prefix = 'LPB-'.$fromDepartmentId.'-'.$toDepartmentId.'-'.date('dmy').'-';
 
         $latestCode = DB::table(self::TRANSFER_REQUEST_TABLE)
             ->where('code', 'LIKE', $prefix.'%')

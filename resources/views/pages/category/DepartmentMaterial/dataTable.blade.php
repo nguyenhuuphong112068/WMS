@@ -106,6 +106,7 @@
                                                 'min_stock' => $row->min_stock,
                                                 'max_stock' => $row->max_stock,
                                                 'default_location_id' => $row->default_location_id,
+                                                'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
                                                 'note' => $row->note,
                                                 'material_name' => $row->material_name,
                                                 'manufacturer_name' => $row->manufacturer_name,

@@ -48,7 +48,9 @@ class MaterialModulesSmokeTest extends TestCase
         $this->withSession($s)->get('/import/materialImport')->assertStatus(200)->assertSee('Nhập vật tư', false);
         $this->withSession($s)->get('/inventory/materialInventory')->assertStatus(200)->assertSee('TỒN KHO VẬT TƯ', false);
         $this->withSession($s)->get('/export/materialExport')->assertStatus(200)->assertSee('Đề nghị cấp phát vật tư', false);
-        $this->withSession($s)->get('/export/materialExport?tab=request')->assertStatus(200);
+        foreach (['periodic', 'risk_assessment', 'regular'] as $tab) {
+            $this->withSession($s)->get('/export/materialExport?tab='.$tab)->assertStatus(200)->assertSee('id="mePane', false);
+        }
         $this->withSession($s)->get('/estimate/materialEstimate')->assertStatus(200)->assertSee('Dự Trù Vật Tư', false);
     }
 

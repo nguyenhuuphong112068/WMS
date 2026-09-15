@@ -5,10 +5,6 @@
     // nhập khi chính form này báo lỗi, không thì để giá trị mặc định.
     $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
     $oldGroups = (array) $old('groups', []);
-
-    // Số CAS điền sẵn theo tên chất chuẩn đang chọn, nhưng vẫn sửa được:
-    // cùng một tên chất, chuẩn tạp có số CAS riêng.
-    $casByName = $chemNames->mapWithKeys(fn ($row) => [$row->id => $row->cas_no ?: ''])->toArray();
 @endphp
 
 <div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
@@ -35,10 +31,11 @@
                                 <label>Tên Chất Chuẩn <span class="text-danger">*</span></label>
                                 <select name="chem_names_id"
                                     class="form-control cat-select sd-name-select {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
-                                    data-cas="{{ json_encode($casByName) }}" required>
+                                    data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'standard']) }}" required>
                                     <option value="">-- Chọn tên chuẩn --</option>
                                     @foreach ($chemNames as $option)
                                         <option value="{{ $option->id }}"
+                                            data-cas-no="{{ $option->cas_no }}"
                                             {{ $old('chem_names_id') == $option->id ? 'selected' : '' }}>
                                             {{ $option->name }}{{ $option->cas_no ? ' (CAS: ' . $option->cas_no . ')' : '' }}
                                         </option>
@@ -223,9 +220,11 @@
 
             if (!$cas.length || $cas.val().trim() !== '') return;
 
-            var map = $(this).data('cas') || {};
+            // Chọn qua ô tìm (AJAX) thì số CAS nằm trong dữ liệu Select2; option dựng sẵn (old()) mang data-cas-no
+            var picked = $(this).data('select2') ? ($(this).select2('data') || [])[0] || {} : {};
+            var cas = picked.cas_no !== undefined ? picked.cas_no : $(this).find('option:selected').data('cas-no');
 
-            $cas.val(map[$(this).val()] || '');
+            $cas.val(cas || '');
         });
     });
 </script>

@@ -348,6 +348,66 @@
         border: 1px solid #93C5FD;
     }
 
+    /* ---------- Card thu gọn/mở rộng: đề nghị đã gửi đi / gửi đến liên phòng ban ---------- */
+    .exp-req-card {
+        border: none;
+        border-radius: var(--border-radius-lg, 14px);
+        box-shadow: 0 4px 16px rgba(var(--primary-rgb), .10);
+        overflow: hidden;
+        margin-bottom: 22px;
+        background: #fff;
+    }
+
+    .exp-req-card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 18px;
+        cursor: pointer;
+        user-select: none;
+        background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+        color: #fff;
+        transition: filter .15s ease;
+    }
+
+    .exp-req-card-header:hover {
+        filter: brightness(1.06);
+    }
+
+    .exp-req-card.is-received .exp-req-card-header {
+        background: linear-gradient(135deg, #15803D, #16A34A);
+    }
+
+    .exp-req-card-title {
+        font-size: 0.92rem;
+        font-weight: 700;
+        letter-spacing: .3px;
+    }
+
+    .exp-req-card-count {
+        min-width: 22px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .22);
+        font-size: 0.76rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .exp-req-card-toggle {
+        margin-left: auto;
+        font-size: 13px;
+        transition: transform .2s ease;
+    }
+
+    .exp-req-card.is-collapsed .exp-req-card-toggle {
+        transform: rotate(-90deg);
+    }
+
+    .exp-req-card-body {
+        padding: 18px;
+    }
+
     /* ---------- Ô tick chọn nhiều dòng trong các bảng picker ----------
        Checkbox mặc định của trình duyệt quá nhỏ so với dòng bảng, người dùng phải nhắm
        mới bấm trúng. Phóng to và tô theo màu chủ đạo cho mọi picker chọn nhiều. */
@@ -1152,6 +1212,20 @@
                 $body.append($item);
             });
         }
+
+        /* ---------- Thu gọn/mở rộng card đề nghị đã gửi đi / gửi đến ---------- */
+        $(document).on('click', '.exp-req-card-header', function() {
+            var $card = $(this).closest('.exp-req-card');
+            var collapsed = !$card.hasClass('is-collapsed');
+
+            $card.toggleClass('is-collapsed', collapsed);
+            $card.children('.exp-req-card-body').stop(true, true)[collapsed ? 'slideUp' : 'slideDown'](150, function() {
+                $.fn.dataTable.tables({
+                    visible: true,
+                    api: true
+                }).columns.adjust();
+            });
+        });
 
         /* ---------- Chuyển tab ---------- */
         $(document).on('click', '.exp-tab', function() {

@@ -1,26 +1,41 @@
 {{--
 | Modal thêm / cập nhật danh sách đề nghị theo chu kỳ.
-| Biến vào: $type (internal|external), $mode (create|update), $categories, $units, $departments
+| Biến vào: $type (internal|external), $mode (create|update), $categories, $units, $departments, $objects
 |
-| Lịch chu kỳ: Hằng tuần / Hằng tháng / Hằng quý chọn ngày bằng ô chọn (.pr-cycle-day-select);
-| "Theo số ngày" hiện ô nhập số ngày (.pr-cycle-length) và ô nhập ngày thứ mấy
-| (.pr-cycle-day-input). Hai ô cycle_day luân phiên disabled nên chỉ một ô được gửi lên.
+| LỊCH CHU KỲ
+| - Liên phòng ban: chọn Chu Kỳ tay (.pr-periodic là ô chọn); chu kỳ "Theo số ngày" / "Theo số
+|   năm" hiện thêm ô độ dài (.pr-cycle-length).
+| - Nội bộ: chọn Tần Suất Đề Nghị trong các tần suất của Đối tượng (.pr-frequency). JS điền
+|   periodic + cycle_length vào 2 ô ẩn theo tần suất; server cũng tự suy lại từ mã tần suất.
+| Ngày tạo trong chu kỳ: chu kỳ ngắn (tuần / tháng / 2 tháng / quý) chọn bằng ô chọn
+| (.pr-cycle-day-select); chu kỳ dài (theo số ngày / nửa năm / năm) nhập số (.pr-cycle-day-input).
+| Hai ô cycle_day luân phiên disabled nên chỉ một ô được gửi lên.
+| Nội bộ: .pr-day-mode = cal_due ("Theo ngày đến hạn lịch CAL") thì ẩn + disabled cả hai ô cycle_day,
+| ngày tạo theo Sch_DueDate lịch Pending CAL của đối tượng (.pr-cal-info hiện hạn đang theo) - xem
+| MaterialPeriodicRequest::calSchedulePreview().
+|
 | Dòng vật tư do JS dựng từ <template class="pr-row-template"> - xem assets.blade.php.
 --}}
 @php
+    $prSupport = \App\Support\MaterialPeriodicRequest::class;
     $prRoute = 'pages.category.periodicRequest.';
     $prKey = $type === 'external' ? 'External' : 'Internal';
     $isExternal = $type === 'external';
     $isUpdate = $mode === 'update';
     $modalId = 'periodic' . $prKey . ($isUpdate ? 'Update' : 'Create') . 'Modal';
-    $bag = $errors->getBag(\App\Support\MaterialPeriodicRequest::errorBag($type, $isUpdate ? 'Update' : 'Create'));
+    $bag = $errors->getBag($prSupport::errorBag($type, $isUpdate ? 'Update' : 'Create'));
     $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
 @endphp
 
 <div class="modal fade md-modal pr-modal" id="{{ $modalId }}" tabindex="-1" role="dialog"
     data-mode="{{ $mode }}"
     data-has-errors="{{ $bag->any() ? 1 : 0 }}"
-    data-old="{{ json_encode($bag->any() ? ['cycle_day' => old('cycle_day'), 'items' => array_values((array) old('items', []))] : null) }}">
+    data-old="{{ json_encode($bag->any() ? [
+        'cycle_day' => old('cycle_day'),
+        'cycle_day_mode' => old('cycle_day_mode'),
+        'frequency' => old('frequency'),
+        'items' => array_values((array) old('items', [])),
+    ] : null) }}">
     <div class="modal-dialog pr-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
@@ -50,14 +65,14 @@
                     @endif
 
                     <div class="form-row">
-                        <div class="form-group col-md-7">
-                            <label>Tiêu Đề <span class="text-danger">*</span></label>
-                            <input type="text" name="title" maxlength="255" required
-                                class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
-                                value="{{ $old('title') }}" placeholder="VD: Vật tư bảo trì hằng tháng">
-                        </div>
-
                         @if ($isExternal)
+                            <div class="form-group col-md-7">
+                                <label>Tiêu Đề <span class="text-danger">*</span></label>
+                                <input type="text" name="title" maxlength="255" required
+                                    class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
+                                    value="{{ $old('title') }}" placeholder="VD: Vật tư bảo trì hằng tháng">
+                            </div>
+
                             <div class="form-group col-md-5">
                                 <label>Phòng Cấp Phát <span class="text-danger">*</span></label>
                                 <select name="to_department_id" required
@@ -74,75 +89,155 @@
                         @else
                             @php $objectTypes = \App\Http\Controllers\Pages\MaterData\ConsumptionObjectController::typeLabels(); @endphp
                             <div class="form-group col-md-5">
-                                <label>Đối Tượng <span class="text-danger">*</span></label>
-                                <select name="consumption_object_id" required
-                                    class="form-control cat-select pr-object {{ $bag->has('consumption_object_id') ? 'is-invalid' : '' }}">
-                                    <option value="">-- Chọn đối tượng --</option>
-                                    @foreach ($objects->groupBy('type') as $objectType => $typeObjects)
-                                        <optgroup label="{{ $objectTypes[$objectType] ?? $objectType }}">
-                                            @foreach ($typeObjects as $object)
-                                                <option value="{{ $object->id }}"
-                                                    data-location="{{ $object->location }}"
-                                                    data-frequency="{{ $object->frequency_label }}"
-                                                    {{ (string) $old('consumption_object_id') === (string) $object->id ? 'selected' : '' }}>
-                                                    {{ $object->code }} - {{ $object->name }}{{ $object->status_id != 1 ? ' (đã khoá)' : '' }}
-                                                </option>
-                                            @endforeach
-                                        </optgroup>
-                                    @endforeach
-                                </select>
+                                <label>Đối Tượng</label>
+                                <div class="input-group pr-object-group">
+                                    <select name="consumption_object_id"
+                                        class="form-control cat-select pr-object {{ $bag->has('consumption_object_id') ? 'is-invalid' : '' }}">
+                                        <option value="">-- Chọn đối tượng --</option>
+                                        @foreach ($objects->groupBy('type') as $objectType => $typeObjects)
+                                            <optgroup label="{{ $objectTypes[$objectType] ?? $objectType }}">
+                                                @foreach ($typeObjects as $object)
+                                                    <option value="{{ $object->id }}"
+                                                        data-code="{{ $object->code }}"
+                                                        data-name="{{ $object->name }}"
+                                                        data-location="{{ $object->location }}"
+                                                        data-frequency="{{ $object->frequency_label }}"
+                                                        data-frequencies="{{ $object->frequency }}"
+                                                        {{ (string) $old('consumption_object_id') === (string) $object->id ? 'selected' : '' }}>
+                                                        {{ $object->code }} - {{ $object->name }}{{ $object->status_id != 1 ? ' (đã khoá)' : '' }}
+                                                    </option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endforeach
+                                    </select>
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-outline-info pr-open-object-picker"
+                                            data-picker="#periodicInternalObjectPickerModal" title="Mở dữ liệu gốc đối tượng">
+                                            <i class="fas fa-crosshairs"></i>
+                                        </button>
+                                    </div>
+                                </div>
                                 <small class="pr-object-info"></small>
+                            </div>
+
+                            <div class="form-group col-md-7">
+                                <label>Tiêu Đề <span class="text-danger">*</span></label>
+                                <input type="text" name="title" maxlength="255" required
+                                    class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
+                                    value="{{ $old('title') }}" placeholder="VD: Vật tư bảo trì hằng tháng">
                             </div>
                         @endif
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group col-md-3">
-                            <label>Chu Kỳ <span class="text-danger">*</span></label>
-                            <select name="periodic" required
-                                class="form-control pr-periodic {{ $bag->has('periodic') ? 'is-invalid' : '' }}">
-                                @foreach (\App\Support\MaterialPeriodicRequest::CYCLES as $cycleKey => $cycleLabel)
-                                    <option value="{{ $cycleKey }}" {{ $old('periodic', 'month') === $cycleKey ? 'selected' : '' }}>
-                                        {{ $cycleLabel }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="form-group col-md-2 pr-length-group">
-                            <label>Số Ngày Của Chu Kỳ <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <input type="number" name="cycle_length" min="1" max="{{ \App\Support\MaterialPeriodicRequest::CYCLE_MAX_LENGTH }}" step="1"
-                                    class="form-control pr-cycle-length {{ $bag->has('cycle_length') ? 'is-invalid' : '' }}"
-                                    value="{{ $old('cycle_length') }}" placeholder="VD: 10">
-                                <div class="input-group-append"><span class="input-group-text">ngày</span></div>
+                    <div class="form-row pr-cycle-row">
+                        @if ($isExternal)
+                            <div class="form-group col-md-3">
+                                <label>Chu Kỳ <span class="text-danger">*</span></label>
+                                <select name="periodic" required
+                                    class="form-control pr-periodic {{ $bag->has('periodic') ? 'is-invalid' : '' }}">
+                                    @foreach ($prSupport::CYCLES as $cycleKey => $cycleLabel)
+                                        <option value="{{ $cycleKey }}" {{ $old('periodic', 'month') === $cycleKey ? 'selected' : '' }}>
+                                            {{ $cycleLabel }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
-                        </div>
+
+                            <div class="form-group col-md-2 pr-length-group">
+                                <label>Số <span class="pr-length-name">Ngày</span> Của Chu Kỳ <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" name="cycle_length" min="1" max="{{ $prSupport::CYCLE_MAX_LENGTH }}" step="1"
+                                        class="form-control pr-cycle-length {{ $bag->has('cycle_length') ? 'is-invalid' : '' }}"
+                                        value="{{ $old('cycle_length') }}" placeholder="VD: 10">
+                                    <div class="input-group-append"><span class="input-group-text pr-length-unit">ngày</span></div>
+                                </div>
+                            </div>
+                        @else
+                            <div class="form-group col-md-3">
+                                <label>Tần Suất Đề Nghị <span class="text-danger">*</span></label>
+                                <select name="frequency" required
+                                    class="form-control pr-frequency {{ $bag->has('frequency') ? 'is-invalid' : '' }}">
+                                    <option value="">-- Chọn đối tượng trước --</option>
+                                </select>
+                                {{-- Lịch suy từ tần suất, JS điền để dựng ô ngày + xem trước; server tự tính lại --}}
+                                <input type="hidden" name="periodic" class="pr-periodic" value="{{ $old('periodic') }}">
+                                <input type="hidden" name="cycle_length" class="pr-cycle-length" value="{{ $old('cycle_length') }}">
+                            </div>
+                        @endif
 
                         <div class="form-group col-md-3">
                             <label>Ngày Tạo Đề Nghị Trong Chu Kỳ <span class="text-danger">*</span></label>
-                            <select name="cycle_day" required
-                                class="form-control pr-cycle-day-select {{ $bag->has('cycle_day') ? 'is-invalid' : '' }}"></select>
-                            <div class="input-group pr-cycle-day-input-group">
-                                <div class="input-group-prepend"><span class="input-group-text">Ngày thứ</span></div>
-                                <input type="number" name="cycle_day" min="1" step="1" disabled
-                                    class="form-control pr-cycle-day-input {{ $bag->has('cycle_day') ? 'is-invalid' : '' }}">
-                                <div class="input-group-append"><span class="input-group-text pr-day-max">/ —</span></div>
-                            </div>
+                            @if ($isExternal)
+                                <select name="cycle_day" required
+                                    class="form-control pr-cycle-day-select {{ $bag->has('cycle_day') ? 'is-invalid' : '' }}"></select>
+                                <div class="input-group pr-cycle-day-input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text">Ngày thứ</span></div>
+                                    <input type="number" name="cycle_day" min="1" step="1" disabled
+                                        class="form-control pr-cycle-day-input {{ $bag->has('cycle_day') ? 'is-invalid' : '' }}">
+                                    <div class="input-group-append"><span class="input-group-text pr-day-max">/ —</span></div>
+                                </div>
+                            @else
+                                {{--
+                                | Theo hạn lịch CAL: chỉ bật khi đối tượng đồng bộ từ CAL và có lịch Pending của tần suất
+                                | đang chọn (JS hỏi pages.category.periodicRequest.calSchedule). Chọn CAL thì cột "Ngày Cụ
+                                | Thể" ẩn đi, cột "Tạo Trước" hiện ra thay vào (JS prApplyCycle) - ngày tạo = Sch_DueDate
+                                | của lịch CAL trừ đi số ngày đó.
+                                --}}
+                                <select name="cycle_day_mode"
+                                    class="form-control pr-day-mode {{ $bag->has('cycle_day_mode') ? 'is-invalid' : '' }}">
+                                    <option value="{{ $prSupport::DAY_MODE_FIXED }}">Ngày cố định trong chu kỳ</option>
+                                    <option value="{{ $prSupport::DAY_MODE_CAL_DUE }}" disabled>Theo ngày đến hạn lịch CAL</option>
+                                </select>
+                                <small class="pr-cal-info"></small>
+                            @endif
                         </div>
 
-                        <div class="form-group col-md-2">
-                            <label>Ngày Bắt Đầu Chu Kỳ Đầu Tiên <span class="text-danger">*</span></label>
-                            <input type="date" name="start_date" required
-                                class="form-control pr-start-date {{ $bag->has('start_date') ? 'is-invalid' : '' }}"
-                                value="{{ $old('start_date', now()->toDateString()) }}">
-                        </div>
-
-                        <div class="form-group col-md-2 d-flex align-items-end">
-                            <div class="pr-next-box w-100">
-                                <span class="pr-next-label"><i class="far fa-calendar-alt mr-1"></i>Lần tạo kế tiếp</span>
-                                <b class="pr-next-preview">—</b>
+                        @unless ($isExternal)
+                            {{-- Chỉ hiện khi đang chọn "Ngày cố định trong chu kỳ" - JS prApplyCycle ẩn hẳn cột này ở chế độ CAL --}}
+                            <div class="form-group col-md-2 pr-day-col">
+                                <label>Ngày Cụ Thể</label>
+                                <select name="cycle_day" required
+                                    class="form-control pr-cycle-day-select {{ $bag->has('cycle_day') ? 'is-invalid' : '' }}"></select>
+                                <div class="input-group pr-cycle-day-input-group">
+                                    <div class="input-group-prepend"><span class="input-group-text">Ngày thứ</span></div>
+                                    <input type="number" name="cycle_day" min="1" step="1" disabled
+                                        class="form-control pr-cycle-day-input {{ $bag->has('cycle_day') ? 'is-invalid' : '' }}">
+                                    <div class="input-group-append"><span class="input-group-text pr-day-max">/ —</span></div>
+                                </div>
                             </div>
+
+                            {{-- Ngược lại "Ngày Cụ Thể": chỉ hiện khi đang chọn "Theo ngày đến hạn lịch CAL" --}}
+                            <div class="form-group col-md-2 pr-lead-col">
+                                <label>Tạo Trước</label>
+                                <div class="input-group">
+                                    <input type="number" name="cal_lead_days" min="0" max="{{ $prSupport::CAL_LEAD_DAYS_MAX }}" step="1"
+                                        value="{{ $old('cal_lead_days', $prSupport::CAL_LEAD_DAYS_DEFAULT) }}"
+                                        class="form-control pr-cal-lead-days {{ $bag->has('cal_lead_days') ? 'is-invalid' : '' }}">
+                                    <div class="input-group-append"><span class="input-group-text">ngày</span></div>
+                                </div>
+                            </div>
+                        @endunless
+
+                        @if ($isExternal || $isUpdate)
+                            <div class="form-group col-md-2">
+                                <label>Ngày Bắt Đầu Chu Kỳ Đầu Tiên <span class="text-danger">*</span></label>
+                                <input type="date" name="start_date" required
+                                    class="form-control pr-start-date {{ $bag->has('start_date') ? 'is-invalid' : '' }}"
+                                    value="{{ $old('start_date', now()->toDateString()) }}">
+                            </div>
+                        @else
+                            {{--
+                            | Nội bộ, lúc thêm mới: bỏ hẳn ô chọn - luôn bắt đầu từ ngày tạo danh sách, đỡ phải
+                            | chọn. Cần dời lại (VD tạo nhầm ngày) thì sửa danh sách sau khi tạo, modal Sửa vẫn
+                            | còn ô này.
+                            --}}
+                            <input type="hidden" name="start_date" class="pr-start-date" value="{{ now()->toDateString() }}">
+                        @endif
+
+                        {{-- Không đặt col-md cố định - tự giãn lấp phần còn lại của hàng, kể cả khi cột "Ngày Cụ Thể" ẩn --}}
+                        <div class="form-group pr-next-col">
+                            <label><i class="far fa-calendar-alt mr-1"></i>Lần Tạo Kế Tiếp</label>
+                            <div class="pr-next-box"><b class="pr-next-preview">—</b></div>
                         </div>
                     </div>
 
@@ -168,7 +263,6 @@
                                 <col style="width: 120px">
                                 <col style="width: 110px">
                                 <col style="width: 16%">
-                                <col style="width: 16%">
                                 <col style="width: 48px">
                             </colgroup>
                             <thead>
@@ -177,7 +271,6 @@
                                     <th>Thông Tin Kỹ Thuật</th>
                                     <th>Số Lượng</th>
                                     <th>Đơn Vị</th>
-                                    <th>Thiết Bị Liên Quan</th>
                                     <th>Mục Đích Sử Dụng</th>
                                     <th></th>
                                 </tr>
@@ -214,10 +307,6 @@
                                         <option value="{{ $unit->short_name }}">{{ $unit->short_name }}</option>
                                     @endforeach
                                 </select>
-                            </td>
-                            <td>
-                                <input type="text" data-name="product_name" maxlength="255"
-                                    class="form-control form-control-sm" placeholder="Thiết bị liên quan...">
                             </td>
                             <td>
                                 <input type="text" data-name="purpose" maxlength="500"

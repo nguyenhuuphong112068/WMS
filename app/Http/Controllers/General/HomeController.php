@@ -463,7 +463,7 @@ class HomeController extends Controller
                     ->where('s.active', 1);
             })
             ->select(
-                'r.id', 'r.code', 'r.name', 'r.app_status', 'r.current_step', 'r.sign_step_count',
+                'r.id', 'r.code', 'r.name', 'r.type', 'r.app_status', 'r.current_step', 'r.sign_step_count',
                 'r.submitted_at', 'r.created_at',
                 's.user_id as signer_user_id', 's.user_name as signer_name', 's.role_names as signer_roles'
             )
@@ -490,7 +490,7 @@ class HomeController extends Controller
                 'status_label' => 'Chờ ký bước '.$record->current_step.'/'.$record->sign_step_count
                     .($record->signer_name ? ' — '.$record->signer_name : ''),
                 'since' => $record->submitted_at ?: $record->created_at,
-                'url' => route('pages.export.materialExport.list', ['tab' => 'request']),
+                'url' => route('pages.export.materialExport.list', ['tab' => $record->type ?: 'regular']),
                 'waiting_me' => $waitingMe,
             ];
         }

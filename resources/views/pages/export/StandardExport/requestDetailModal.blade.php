@@ -37,19 +37,23 @@
                                     <span class="text-muted">Tổ đề nghị:</span>
                                     <b class="text-primary ml-1 font-weight-bold">{{ $req->group_name ?: '—' }}</b>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <span class="text-muted">Trạng thái:</span>
                                     <span class="exp-req-badge {{ $stdReqBadge($req->status)['class'] }} ml-1">
                                         {{ $stdReqBadge($req->status)['label'] }}
                                     </span>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <span class="text-muted">Người lập:</span>
                                     <b class="ml-1">{{ $req->updated_by ?: $req->created_by ?: '—' }}</b>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <span class="text-muted">Ngày lập:</span>
                                     <b class="ml-1">{{ $expDate($req->created_at) }}</b>
+                                </div>
+                                <div class="col-md-3">
+                                    <span class="text-muted">Ngày mong muốn:</span>
+                                    <b class="ml-1">{{ $req->needed_date ? $expDate($req->needed_date) : '—' }}</b>
                                 </div>
                             </div>
                             @if ($req->note)
