@@ -849,7 +849,6 @@
 
             $row.find('[data-name="requested_amount"]').val(prTrimNumber(data.requested_amount));
             prSetSpec($row);
-            $row.find('[data-name="product_name"]').val(data.product_name || '');
             $row.find('[data-name="purpose"]').val(data.purpose || '');
             prSetUnit($row, data.requested_unit || $category.find('option:selected').data('unit') || '');
 

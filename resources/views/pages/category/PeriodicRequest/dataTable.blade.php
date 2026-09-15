@@ -115,7 +115,6 @@
                                             'requested_amount' => $prNum($item->requested_amount),
                                             'requested_unit' => $item->requested_unit,
                                             'technical_specification' => $item->technical_specification,
-                                            'product_name' => $item->product_name,
                                             'purpose' => $item->purpose,
                                         ])->values()) }}">
                                         <i class="fas fa-list-ul"></i>
@@ -144,7 +143,6 @@
                                                     'category_id' => $item->category_id,
                                                     'requested_amount' => $prNum($item->requested_amount),
                                                     'requested_unit' => $item->requested_unit,
-                                                    'product_name' => $item->product_name,
                                                     'purpose' => $item->purpose,
                                                 ])->values(),
                                             ]) }}">

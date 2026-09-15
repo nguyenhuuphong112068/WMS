@@ -58,7 +58,6 @@
                                 <th style="width:200px">Vật tư</th>
                                 <th style="width:150px">Quy cách</th>
                                 <th class="text-right" style="width:110px">SL đề nghị</th>
-                                <th style="width:150px">Thiết bị liên quan</th>
                                 <th>Mục đích</th>
                             </tr>
                         </thead>
@@ -75,11 +74,10 @@
                                     </td>
                                     <td class="md-sub">{{ $it->technical_specification ?: '—' }}</td>
                                     <td class="text-right">{{ $expNum($it->requested_amount) }} {{ $it->requested_unit }}</td>
-                                    <td class="md-sub">{{ $it->product_name ?: '—' }}</td>
                                     <td class="md-sub">{{ $it->purpose ?: '—' }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="6" class="text-center text-muted">Đề nghị chưa có mục nào.</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted">Đề nghị chưa có mục nào.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

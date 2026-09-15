@@ -380,7 +380,6 @@ class PeriodicRequestController extends Controller
             'items.*.category_id' => ['required', 'integer', 'distinct', Rule::in($allowedCategoryIds)],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
-            'items.*.product_name' => ['nullable', 'string', 'max:255'],
             'items.*.purpose' => ['nullable', 'string', 'max:500'],
         ];
 
@@ -492,7 +491,6 @@ class PeriodicRequestController extends Controller
             'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',
             'items.*.requested_amount.numeric' => 'Số lượng đề nghị phải là số.',
             'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
-            'items.*.product_name.max' => 'Thiết bị liên quan tối đa 255 ký tự.',
             'items.*.purpose.max' => 'Mục đích sử dụng tối đa 500 ký tự.',
         ];
     }
@@ -531,7 +529,6 @@ class PeriodicRequestController extends Controller
             DB::table(self::ITEM_TABLE)->insert([
                 'periodic_request_list_id' => $listId,
                 'category_id' => (int) $item['category_id'],
-                'product_name' => $this->nullIfBlank($item['product_name'] ?? null),
                 'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
                 'requested_amount' => (float) ($item['requested_amount'] ?? 0),
                 'requested_unit' => $this->nullIfBlank($item['requested_unit'] ?? null),

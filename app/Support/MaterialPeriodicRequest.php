@@ -47,11 +47,11 @@ use Illuminate\Support\Str;
  */
 class MaterialPeriodicRequest
 {
-    public const LIST_TABLE = 'periodic_request_list';
+    public const LIST_TABLE = 'material_periodic_request_list';
 
-    public const ITEM_TABLE = 'periodic_request_item';
+    public const ITEM_TABLE = 'material_periodic_request_item';
 
-    public const HISTORY_TABLE = 'periodic_request_list_histories';
+    public const HISTORY_TABLE = 'material_periodic_request_list_histories';
 
     public const TYPE_INTERNAL = 'internal';
 
@@ -771,7 +771,6 @@ class MaterialPeriodicRequest
 
         $items = self::activeItems([$id])->map(fn ($item) => ($item->category_code ?: '—').' '.($item->material_name ?: '')
             .' x '.$number($item->requested_amount).($item->requested_unit ? ' '.$item->requested_unit : '')
-            .($item->product_name ? ' - thiết bị: '.$item->product_name : '')
             .($item->purpose ? ' ('.$item->purpose.')' : ''));
 
         return array_filter([
@@ -1011,7 +1010,7 @@ class MaterialPeriodicRequest
     {
         $now = now();
 
-        // Đối tượng của danh sách: ghi vào ghi chú phiếu, và làm "Thiết bị liên quan" cho dòng để trống
+        // Đối tượng của danh sách: ghi vào ghi chú phiếu
         $objectLabel = self::objectLabel($list->consumption_object_id ?? null);
         $prefix = str_pad((string) $list->department_id, 2, '0', STR_PAD_LEFT).$now->format('dmy').'_';
 
@@ -1049,7 +1048,6 @@ class MaterialPeriodicRequest
             'technical_specification' => $item->technical_specification,
             'requested_amount' => $item->requested_amount,
             'requested_unit' => $item->requested_unit,
-            'product_name' => $item->product_name ?: ($objectLabel ? Str::limit($objectLabel, 255, '') : null),
             'purpose' => $item->purpose,
             'status' => 'pending',
             'active' => 1,
@@ -1082,16 +1080,13 @@ class MaterialPeriodicRequest
             'updated_at' => $now,
         ]);
 
-        // Dòng liên phòng ban không có cột thiết bị liên quan / mục đích riêng: ghi cả hai vào ghi chú của dòng
+        // Dòng liên phòng ban không có cột mục đích riêng: ghi vào ghi chú của dòng
         DB::table('material_transfer_items')->insert($items->map(fn ($item) => [
             'transfer_request_id' => $requestId,
             'category_id' => $item->category_id,
             'requested_amount' => $item->requested_amount,
             'requested_unit' => $item->requested_unit,
-            'note' => implode(' | ', array_filter([
-                $item->product_name ? 'Thiết bị liên quan: '.$item->product_name : null,
-                $item->purpose,
-            ])) ?: null,
+            'note' => $item->purpose ?: null,
             'status' => 'draft',
             'active' => 1,
             'created_at' => $now,

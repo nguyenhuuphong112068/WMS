@@ -76,7 +76,6 @@
                                 <th style="width:170px">Vật tư</th>
                                 <th style="width:120px">Quy cách</th>
                                 <th style="width:90px">SL đề nghị</th>
-                                <th style="width:130px">Thiết bị liên quan</th>
                                 <th style="width:140px">Mục đích</th>
                                 <th style="width:115px">Trạng thái</th>
                                 <th>Cấp phát</th>
@@ -122,7 +121,6 @@
                                     <td class="text-right">
                                         {{ rtrim(rtrim(number_format((float) $it->requested_amount, 4, '.', ''), '0'), '.') }}
                                         {{ $it->requested_unit }}</td>
-                                    <td class="md-sub">{{ $it->product_name ?: '—' }}</td>
                                     <td class="md-sub">{{ $it->purpose ?: '—' }}</td>
                                     <td>
                                         @if ($hasLots)

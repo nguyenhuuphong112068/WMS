@@ -1355,7 +1355,6 @@ class MaterialExportController extends Controller
                     'request_item_id' => $item->id,
                     'amount' => $line['amount'],
                     'type' => 'export',
-                    'product_name' => $item->product_name,
                     'used_by' => $this->actor(),
                     'status_id' => 1,
                     'created_by' => $this->actor(),
@@ -2743,7 +2742,6 @@ class MaterialExportController extends Controller
                 'technical_specification' => $this->nullIfBlank($item['technical_specification'] ?? null),
                 'requested_amount' => (float) ($item['requested_amount'] ?? 0),
                 'requested_unit' => $this->nullIfBlank($item['requested_unit'] ?? null),
-                'product_name' => $this->nullIfBlank($item['product_name'] ?? null),
                 'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
                 'note' => $this->nullIfBlank($item['note'] ?? null),
                 'status' => 'pending',
@@ -3062,7 +3060,6 @@ class MaterialExportController extends Controller
             'items.*.technical_specification' => ['nullable', 'string', 'max:255'],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
-            'items.*.product_name' => ['nullable', 'string', 'max:255'],
             'items.*.purpose' => ['nullable', 'string', 'max:500'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
         ];
