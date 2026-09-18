@@ -122,17 +122,6 @@
     }
 </style>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        /* ---------- Mở modal Thêm mới: đưa mọi tiêu chí phân loại về "Chưa xác định" ----------
-           Phần JS dùng chung chỉ bỏ tick mọi ô, nhóm radio sẽ không còn ô nào được chọn. */
-        $(document).on('click', '.btn-md-create:not([data-modal])', function() {
-            $('#createModal').find('.cat-check-input[value=""]').prop('checked', true)
-                .closest('.cat-check-item').addClass('is-checked');
-        });
-    });
-</script>
-
 @if ($bag->any())
     <script>
         document.addEventListener('DOMContentLoaded', function() {

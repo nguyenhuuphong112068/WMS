@@ -52,6 +52,8 @@ Route::prefix('/category')
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
+            // "Đề nghị dự trù vật tư" từ tab Vật Tư Của Phòng - hiện ở tab Dự Trù Vật Tư
+            Route::post('watchlistRemember', 'watchlistRemember')->name('watchlistRemember');
         });
 
         // Danh sách vật tư đề nghị theo chu kỳ (nội bộ / liên phòng ban) - đến chu kỳ tự tạo

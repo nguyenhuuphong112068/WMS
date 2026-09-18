@@ -123,16 +123,19 @@
 
         /* ---------- Đổ phân loại của dòng đang sửa vào nhóm radio ----------
            Phần JS dùng chung chỉ hiểu ô tick dạng name="<tên>[]"; phân loại ở đây là
-           name="classification[<tiêu chí>]" nên phải tự đổ. Handler này gắn sau nên
-           chạy sau phần dùng chung (phần đó vừa bỏ tick toàn bộ nhóm). */
+           name="classification[<tiêu chí>]" và name="purchasing_department" nên phải tự
+           đổ. Handler này gắn sau nên chạy sau phần dùng chung (phần đó vừa bỏ tick
+           toàn bộ nhóm). */
         $(document).on('click', '.btn-md-edit:not([data-modal])', function() {
             var row = $(this).data('row') || {};
             var classification = row.classification || {};
             var $form = $('#updateModal').find('form');
 
-            $form.find('.cat-check-input[name^="classification["]').each(function() {
-                var key = ($(this).attr('name').match(/\[(.+)\]/) || [])[1];
-                var checked = (classification[key] || '') === this.value;
+            $form.find('.cat-check-input').each(function() {
+                var name = $(this).attr('name');
+                var key = (name.match(/^classification\[(.+)\]$/) || [])[1];
+                var want = key ? (classification[key] || '') : (row.purchasing_department || '');
+                var checked = want === this.value;
 
                 $(this).prop('checked', checked).closest('.cat-check-item').toggleClass('is-checked', checked);
             });

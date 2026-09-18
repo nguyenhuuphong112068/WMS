@@ -21,6 +21,11 @@
                     <li class="nav-item">
                         <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $activeTab === 'watchlist' ? 'active' : '' }}" id="watchlist-tab" data-toggle="tab" href="#watchlist" role="tab">
+                            Danh sách vật tư cần dự trù <span class="badge badge-warning">{{ $watchlistItems->count() }}</span>
+                        </a>
+                    </li>
                     @if ($showApprovalInbox)
                         <li class="nav-item">
                             <a class="nav-link {{ $activeTab === 'inbox' ? 'active' : '' }}" id="inbox-tab" data-toggle="tab" href="#inbox" role="tab">
@@ -182,6 +187,9 @@
                     </div>
                     <div class="tab-pane fade {{ $activeTab === 'tracking' ? 'show active' : '' }}" id="tracking" role="tabpanel">
                         @include('pages.estimate.shared.trackingTable', ['items' => $trackedItems])
+                    </div>
+                    <div class="tab-pane fade {{ $activeTab === 'watchlist' ? 'show active' : '' }}" id="watchlist" role="tabpanel">
+                        @include('pages.estimate.MaterialEstimate.watchlistTable', ['items' => $watchlistItems])
                     </div>
                     @if ($showApprovalInbox)
                         <div class="tab-pane fade {{ $activeTab === 'inbox' ? 'show active' : '' }}" id="inbox" role="tabpanel">

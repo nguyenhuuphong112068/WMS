@@ -105,6 +105,14 @@
                     <button type="button" class="mi-tab is-active" data-pane="miPaneCode"><i class="fas fa-boxes mr-1"></i>Theo mã xuất nhập</button>
                     <button type="button" class="mi-tab" data-pane="miPaneMat"><i class="fas fa-layer-group mr-1"></i>Tồn Theo mã vật tư</button>
                     <button type="button" class="mi-tab" data-pane="miPaneZone"><i class="fas fa-map-marked-alt mr-1"></i>Tồn kho theo vị trí</button>
+                    <button type="button" class="mi-tab" data-pane="miPaneNext">
+                        <i class="fas fa-calendar-check mr-1"></i>Khả dụng {{ $forecast['month']['label'] }}
+                        @if ($forecast['summary']['short'] > 0)
+                            <span class="badge badge-danger ml-1">{{ $forecast['summary']['short'] }} mã không đáp ứng</span>
+                        @elseif ($forecast['summary']['tight'] > 0)
+                            <span class="badge badge-warning ml-1">{{ $forecast['summary']['tight'] }} mã vừa đủ</span>
+                        @endif
+                    </button>
                     <button type="button" class="mi-tab" data-pane="miPaneCheck">
                         <i class="fas fa-clipboard-check mr-1"></i>Kiểm kê định kỳ
                         @if ($stocktake['canOpen'])
@@ -321,6 +329,11 @@
                     @include('pages.inventory.MaterialInventory.zoneMap')
                 </div>
 
+                {{-- ============ KHẢ DỤNG THÁNG TỚI ============ --}}
+                <div class="mi-pane" id="miPaneNext">
+                    @include('pages.inventory.MaterialInventory.nextMonth')
+                </div>
+
                 {{-- ============ KIỂM KÊ ĐỊNH KỲ (1 THÁNG 1 LẦN) ============ --}}
                 <div class="mi-pane" id="miPaneCheck">
                     @include('pages.inventory.MaterialInventory.stocktake')
@@ -349,8 +362,9 @@
             var tr = settings.aoData[dataIndex].nTr;
             return tr && tr.getAttribute('data-state') === miState;
         });
-        $('.mi-chip').on('click', function () {
-            $('.mi-chip').removeClass('is-active');
+        // Chỉ bộ lọc của tab "Theo mã xuất nhập" - tab "Khả dụng tháng tới" có bộ lọc riêng
+        $('#miPaneCode').on('click', '.mi-chip', function () {
+            $('#miPaneCode .mi-chip').removeClass('is-active');
             $(this).addClass('is-active');
             miState = $(this).data('state') || '';
             if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().draw();
@@ -488,5 +502,10 @@
         });
 
         if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([1, 'asc']).draw();
+
+        // Đổi tháng ở tab "Khả dụng tháng tới" nạp lại trang - mở lại đúng tab đó
+        if (location.search.indexOf('tab=forecast') >= 0) {
+            $('.mi-tab[data-pane="miPaneNext"]').trigger('click');
+        }
     });
 </script>

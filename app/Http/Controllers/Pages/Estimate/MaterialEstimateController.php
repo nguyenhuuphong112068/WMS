@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
+use App\Support\MaterialWatchlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -86,10 +87,13 @@ class MaterialEstimateController extends Controller
 
         $trackedItems = self::trackedItems($departmentId);
 
+        // Vật tư tồn dưới ngưỡng tối thiểu + vật tư người dùng bấm "Ghi nhớ" bên Sử Dụng Vật Tư
+        $watchlistItems = MaterialWatchlist::forTab($departmentId);
+
         // Hộp ký duyệt liên phòng ban (chỉ bật cho phòng ban chung + có quyền is_BOD)
         $inbox = $this->approvalInboxData();
 
-        $tabs = ['list', 'tracking', 'inbox'];
+        $tabs = ['list', 'tracking', 'watchlist', 'inbox'];
         $activeTab = in_array($request->query('tab'), $tabs, true)
             ? $request->query('tab')
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'list');
@@ -107,6 +111,7 @@ class MaterialEstimateController extends Controller
             'signPermission' => self::SIGN_PERMISSION,
             'nextCode' => $this->nextCode($departmentId),
             'trackedItems' => $trackedItems,
+            'watchlistItems' => $watchlistItems,
             'activeTab' => $activeTab,
             'showApprovalInbox' => $inbox['show'],
             'inboxRequests' => $inbox['requests'],
@@ -159,6 +164,25 @@ class MaterialEstimateController extends Controller
     public function history(Request $request)
     {
         return response()->json(['rows' => self::historiesOf((int) $request->id)]);
+    }
+
+    /**
+     * Bỏ ghi nhớ một vật tư khỏi tab "Danh sách vật tư cần dự trù". Vật tư vẫn hiện lại ở
+     * đây nếu tồn hiện tại đang dưới ngưỡng tối thiểu - xem App\Support\MaterialWatchlist.
+     */
+    public function watchlistDismiss(Request $request)
+    {
+        $ok = MaterialWatchlist::dismiss((int) $request->id, $this->departmentId(), $this->actor());
+
+        if (! $ok) {
+            return redirect()->back()
+                ->with('error', 'Không tìm thấy vật tư ghi nhớ cần bỏ, hoặc đã được bỏ trước đó!')
+                ->with('activeTab', 'watchlist');
+        }
+
+        return redirect()->back()
+            ->with('success', 'Đã bỏ ghi nhớ vật tư cần dự trù!')
+            ->with('activeTab', 'watchlist');
     }
 
     /* ==========================================================
@@ -413,6 +437,7 @@ class MaterialEstimateController extends Controller
         $request->validate([
             'id' => 'required|integer',
             'promised_date' => 'nullable|date',
+            'reason' => 'nullable|string|max:500',
         ]);
 
         [$item, $list] = $this->findItem($request->id);
@@ -427,10 +452,16 @@ class MaterialEstimateController extends Controller
 
         $oldDate = $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('d/m/Y') : 'Chưa có';
         $newDate = $request->promised_date ? \Carbon\Carbon::parse($request->promised_date)->format('d/m/Y') : 'Chưa có';
+
+        if ($oldDate !== $newDate && trim((string) $request->reason) === '') {
+            return response()->json(['success' => false, 'message' => 'Vui lòng nhập lý do thay đổi ngày hẹn đáp ứng!']);
+        }
+
         $actor = $this->actor();
+        $reason = trim((string) $request->reason);
         $historyAdded = false;
 
-        DB::transaction(function () use ($item, $request, $oldDate, $newDate, $actor, &$historyAdded) {
+        DB::transaction(function () use ($item, $request, $oldDate, $newDate, $actor, $reason, &$historyAdded) {
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
                 'promised_date' => $request->promised_date,
             ]);
@@ -440,7 +471,7 @@ class MaterialEstimateController extends Controller
                     'item_id' => $item->id,
                     'item_type' => self::CHAT_TYPE,
                     'user_name' => $actor,
-                    'content' => "Cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]",
+                    'content' => "Cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]. Lý do: {$reason}",
                     'type' => 'history_promised_date',
                     'created_at' => now(),
                     'updated_at' => now(),

@@ -15,9 +15,11 @@ use App\Http\Controllers\Pages\MaterData\ChemNameController;
 use App\Http\Controllers\Pages\MaterData\ChemSupplierController;
 use App\Http\Controllers\Pages\MaterData\CompanyController;
 use App\Http\Controllers\Pages\MaterData\ConsumptionObjectController;
+use App\Http\Controllers\Pages\MaterData\DepartmentClassificationController;
 use App\Http\Controllers\Pages\MaterData\DepartmentController;
 use App\Http\Controllers\Pages\MaterData\GroupController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
+use App\Http\Controllers\Pages\MaterData\MaterialSignFlowController;
 use App\Http\Controllers\Pages\MaterData\MixtureHazardCategoryController;
 use App\Http\Controllers\Pages\MaterData\PackagingSpecificationController;
 use App\Http\Controllers\Pages\MaterData\ProductNameController;
@@ -149,6 +151,26 @@ Route::prefix('/materData')
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
             Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Phân loại của phòng: mỗi phòng ban tự khai bộ nhóm của phòng mình, dùng khi
+        // khai "Vật Tư Của Phòng". Màn hình làm việc trên phòng ban đang chọn.
+        Route::prefix('/departmentClassification')->name('departmentClassification.')->controller(DepartmentClassificationController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+        });
+
+        // Trình ký đề nghị cấp phát vật tư: phòng khai trước quy trình ký chuẩn ứng với
+        // từng tổ hợp phân loại (danh mục chung + danh mục của phòng), mỗi bước một vai trò.
+        Route::prefix('/materialSignFlow')->name('materialSignFlow.')->controller(MaterialSignFlowController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
         });
 
         Route::prefix('/chemManufacturer')->name('chemManufacturer.')->controller(ChemManufacturerController::class)->group(function () {

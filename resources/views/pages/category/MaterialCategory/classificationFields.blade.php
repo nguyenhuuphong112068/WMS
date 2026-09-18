@@ -1,9 +1,10 @@
 {{--
-| Khối khai PHÂN LOẠI + BỘ PHẬN MUA HÀNG + THỜI GIAN ĐẶT HÀNG của Danh Mục Vật Tư Công Ty.
+| Khối khai PHÂN LOẠI + THỜI GIAN ĐẶT HÀNG của Danh Mục Vật Tư Công Ty.
 | Dùng chung cho modal Thêm mới và modal Cập nhật.
 |
-| Mỗi tiêu chí chọn đúng một giá trị (radio), một vật tư mang nhiều tiêu chí cùng lúc.
-| Bộ tiêu chí khai ở App\Support\MaterialClassification, không khai rải rác trong view.
+| 6 tiêu chí, mỗi tiêu chí chọn đúng một giá trị (radio) và đều bắt buộc. Bộ Phận Mua Hàng
+| là tiêu chí thứ 4 nhưng lưu ở cột riêng purchasing_department - xem
+| App\Support\MaterialClassification::formGroups(), không khai rải rác trong view.
 |
 | Biến vào:
 | - $bag        : bag lỗi của form đang dựng
@@ -18,56 +19,35 @@
     $selected = $selected ?? [];
     $purchasing = $purchasing ?? null;
     $leadTime = $leadTime ?? null;
+    $groups = MaterialClassification::formGroups($selected, $purchasing);
 @endphp
 
 <div class="form-group">
-    <label>Phân Loại Vật Tư</label>
+    <label>Phân Loại Vật Tư <span class="text-danger">*</span></label>
     <div class="cat-check-group">
-        @foreach (MaterialClassification::CRITERIA as $key => $criterion)
+        @foreach ($groups as $group)
             <div class="cat-subgroup">
                 <span class="cat-subgroup-title">
-                    <i class="{{ $criterion['icon'] }} mr-1"></i> {{ $criterion['label'] }}
+                    <i class="{{ $group['icon'] }} mr-1"></i> {{ $group['label'] }}
                 </span>
 
-                <label class="cat-check-item {{ ($selected[$key] ?? '') === '' ? 'is-checked' : '' }}">
-                    <input type="radio" class="cat-check-input" name="classification[{{ $key }}]" value=""
-                        {{ ($selected[$key] ?? '') === '' ? 'checked' : '' }}>
-                    <span class="cat-check-name md-empty">Chưa xác định</span>
-                </label>
-
-                @foreach ($criterion['options'] as $value => $name)
-                    <label class="cat-check-item {{ ($selected[$key] ?? '') === $value ? 'is-checked' : '' }}">
-                        <input type="radio" class="cat-check-input" name="classification[{{ $key }}]"
-                            value="{{ $value }}" {{ ($selected[$key] ?? '') === $value ? 'checked' : '' }}>
+                @foreach ($group['options'] as $value => $name)
+                    <label class="cat-check-item {{ $group['value'] === $value ? 'is-checked' : '' }}">
+                        <input type="radio" class="cat-check-input" name="{{ $group['name'] }}" value="{{ $value }}"
+                            {{ $group['value'] === $value ? 'checked' : '' }} required>
                         <span class="cat-check-name">{{ $name }}</span>
                     </label>
                 @endforeach
             </div>
 
-            @if ($bag->has('classification.' . $key))
-                <span class="md-error">{{ $bag->first('classification.' . $key) }}</span>
+            @if ($bag->has($group['errorKey']))
+                <span class="md-error">{{ $bag->first($group['errorKey']) }}</span>
             @endif
         @endforeach
     </div>
 </div>
 
 <div class="row">
-    <div class="col-md-6">
-        <div class="form-group">
-            <label>Bộ Phận Mua Hàng</label>
-            <select name="purchasing_department"
-                class="form-control cat-select {{ $bag->has('purchasing_department') ? 'is-invalid' : '' }}">
-                <option value="">-- Chưa khai --</option>
-                @foreach (MaterialClassification::PURCHASING_DEPARTMENTS as $value => $name)
-                    <option value="{{ $value }}" {{ $purchasing === $value ? 'selected' : '' }}>{{ $name }}</option>
-                @endforeach
-            </select>
-            @if ($bag->has('purchasing_department'))
-                <span class="md-error">{{ $bag->first('purchasing_department') }}</span>
-            @endif
-        </div>
-    </div>
-
     <div class="col-md-6">
         <div class="form-group">
             <label>Thời Gian Đặt Hàng</label>

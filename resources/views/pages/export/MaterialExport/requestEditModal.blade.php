@@ -6,7 +6,7 @@
                 <h5 class="modal-title"><i class="fas fa-edit mr-2"></i>Sửa Đề Nghị {{ $req->code }}</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
-            <form action="{{ route($expRoute . 'requestUpdate') }}" method="POST">
+            <form action="{{ route($expRoute . 'requestUpdate') }}" method="POST" data-req-type="{{ $req->type }}">
                 @csrf
                 <input type="hidden" name="request_list_id" value="{{ $req->id }}">
                 <input type="hidden" name="action_type" class="me-edit-action" value="draft">
@@ -41,7 +41,9 @@
                                             <select name="items[{{ $i }}][category_id]" class="form-control form-control-sm me-cat">
                                                 <option value="">-- Ngoài danh mục --</option>
                                                 @foreach ($categories as $c)
-                                                    <option value="{{ $c->id }}" {{ $it->category_id == $c->id ? 'selected' : '' }}>
+                                                    <option value="{{ $c->id }}" {{ $it->category_id == $c->id ? 'selected' : '' }}
+                                                        data-unit="{{ $c->unit_short_name }}" data-spec="{{ $c->technical_specification }}"
+                                                        data-stock="{{ $c->total_remaining ?? 0 }}" data-available="{{ $c->available_stock ?? ($c->total_remaining ?? 0) }}">
                                                         {{ $c->material_name }} — {{ $c->manufacturer_short_name }}
                                                     </option>
                                                 @endforeach
@@ -58,20 +60,25 @@
                                                 @endforeach
                                             </select>
                                         </td>
+                                        <td class="text-right">
+                                            {{-- Tồn tại thời điểm dòng này được thêm/sửa danh mục lần gần nhất - giữ nguyên trừ khi đổi lại danh mục --}}
+                                            <span class="me-stock-view">{{ $it->stock_at_request !== null ? rtrim(rtrim(number_format((float) $it->stock_at_request, 4, '.', ''), '0'), '.') : '—' }}</span>
+                                            <input type="hidden" class="me-stock-hidden" name="items[{{ $i }}][stock_at_request]" value="{{ $it->stock_at_request ?? '' }}">
+                                        </td>
+                                        <td class="text-right"><span class="me-available">—</span></td>
                                         <td><textarea name="items[{{ $i }}][purpose]" maxlength="500" rows="1" class="form-control form-control-sm me-autosize" placeholder="Mục đích sử dụng...">{{ $it->purpose }}</textarea></td>
-                                        <td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button></td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-xs btn-outline-warning me-remember-row mr-1" title="Đề nghị dự trù vật tư"><i class="fas fa-bookmark"></i></button>
+                                            <button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
 
-                    {{-- Bước ký chỉ định đích danh mới nạp lại được; bước cũ khai theo chức danh
-                         (phiếu chuyển từ luồng Trưởng Phòng -> Ban Giám Đốc) phải chọn lại người ký. --}}
                     <div class="mt-3">
-                        @include('pages.export.MaterialExport.signFlowFields', [
-                            'flowSigners' => ($requestSigns->get($req->id, collect()))->pluck('user_id')->filter()->values()->all(),
-                        ])
+                        @include('pages.export.MaterialExport.signFlowFields')
                     </div>
 
                     <div class="form-group mt-3 mb-0">

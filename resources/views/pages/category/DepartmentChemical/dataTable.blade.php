@@ -213,29 +213,31 @@
                             </td>
                             <td>
                                 <div class="md-actions">
-                                    @perm('category_chemical_dept_manage')
-                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
-                                            data-modal="#dcUpdateModal"
-                                            data-row="{{ json_encode([
-                                                'id' => $row->id,
-                                                'category_id' => $row->category_id,
-                                                'unit_id' => $row->unit_id,
-                                                'pack_weight_kg' => $row->pack_weight_kg,
-                                                'shelf_life_months' => $row->shelf_life_months,
-                                                'min_stock' => $row->min_stock,
-                                                'max_stock' => $row->max_stock,
-                                                'storage_condition_id' => $row->storage_condition_id,
-                                                'default_location_id' => $row->default_location_id,
-                                                'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
-                                                'note' => $row->note,
-                                                'category_code' => $row->category_code,
-                                                'chem_name' => $row->chem_name,
-                                                'unit' => $row->unit_short_name ?: $row->unit_name,
-                                                'category_shelf_life_months' => $row->category_shelf_life_months,
-                                            ]) }}">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                    @endperm
+                                    @if ($row->status_id == 1)
+                                        @perm('category_chemical_dept_manage')
+                                            <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
+                                                data-modal="#dcUpdateModal"
+                                                data-row="{{ json_encode([
+                                                    'id' => $row->id,
+                                                    'category_id' => $row->category_id,
+                                                    'unit_id' => $row->unit_id,
+                                                    'pack_weight_kg' => $row->pack_weight_kg,
+                                                    'shelf_life_months' => $row->shelf_life_months,
+                                                    'min_stock' => $row->min_stock,
+                                                    'max_stock' => $row->max_stock,
+                                                    'storage_condition_id' => $row->storage_condition_id,
+                                                    'default_location_id' => $row->default_location_id,
+                                                    'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                    'note' => $row->note,
+                                                    'category_code' => $row->category_code,
+                                                    'chem_name' => $row->chem_name,
+                                                    'unit' => $row->unit_short_name ?: $row->unit_name,
+                                                    'category_shelf_life_months' => $row->category_shelf_life_months,
+                                                ]) }}">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        @endperm
+                                    @endif
 
                                     @perm('category_chemical_dept_manage')
                                         <form class="form-md-confirm d-inline" data-require-reason="1" action="{{ route($mdRoute . 'deActive') }}"

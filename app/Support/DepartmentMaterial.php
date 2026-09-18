@@ -112,6 +112,9 @@ class DepartmentMaterial
                 'material_categories.code',
                 'material_categories.technical_specification',
                 'material_categories.classification',
+                // Phân loại của phòng - cùng với classification ở trên quyết định quy trình
+                // trình ký của dòng đề nghị, xem App\Support\MaterialSignFlow
+                self::TABLE.'.classification_id',
                 'material_categories.purchasing_department',
                 'material_categories.lead_time_days',
                 'material_names.name as material_name',
@@ -188,6 +191,8 @@ class DepartmentMaterial
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
             ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', self::TABLE.'.unit_id', '=', 'units.id')
+            // Phân loại riêng của phòng (dữ liệu gốc department_classification)
+            ->leftJoin('department_classification', self::TABLE.'.classification_id', '=', 'department_classification.id')
             // Định khu phòng đã khai cho vật tư, kèm đường dẫn Kho / Kệ-Tủ / Cột / Tầng
             ->leftJoin('locations', self::TABLE.'.default_location_id', '=', 'locations.id')
             ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
@@ -204,6 +209,7 @@ class DepartmentMaterial
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
+                'department_classification.name as classification_name',
                 'locations.code as location_code',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
@@ -263,6 +269,30 @@ class DepartmentMaterial
                 $query->where(function ($sub) {
                     $sub->where('status_id', 1)->where('app_status', 'approved');
                 });
+
+                if ($usedIds) {
+                    $query->orWhereIn('id', $usedIds);
+                }
+            })
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Phân loại riêng của phòng cho ô chọn (dữ liệu gốc department_classification).
+     *
+     * Giữ lại những phân loại dòng đang sửa đã dùng dù chúng đã bị khoá, nếu không màn
+     * hình cập nhật sẽ làm mất giá trị cũ.
+     */
+    public static function classificationOptions(int $departmentId, array $usedIds = [])
+    {
+        $usedIds = array_values(array_filter($usedIds));
+
+        return DB::table('department_classification')
+            ->select('id', 'name')
+            ->where('department_id', $departmentId)
+            ->where(function ($query) use ($usedIds) {
+                $query->where('status_id', 1);
 
                 if ($usedIds) {
                     $query->orWhereIn('id', $usedIds);

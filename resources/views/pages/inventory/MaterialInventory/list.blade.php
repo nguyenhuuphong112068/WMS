@@ -92,6 +92,7 @@
         'period' => $period,
     ])
     @include('pages.inventory.MaterialInventory.stocktakeDetail')
+    @include('pages.inventory.MaterialInventory.nextMonthDetail')
     {{-- Modal camera cho ô quét QR của tab Kiểm Kê Định Kỳ --}}
     @include('pages.shared.cameraScan')
     @include('pages.shared.attachmentListModal')

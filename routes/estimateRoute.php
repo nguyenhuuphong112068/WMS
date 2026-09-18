@@ -94,6 +94,9 @@ Route::prefix('/estimate')
             Route::get('detail', 'detail')->name('detail');
             Route::get('history', 'history')->name('history');
 
+            // Tab "Danh sách vật tư cần dự trù": dưới ngưỡng tối thiểu + ghi nhớ thủ công
+            Route::post('watchlistDismiss', 'watchlistDismiss')->name('watchlistDismiss');
+
             // Đầu phiếu
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');

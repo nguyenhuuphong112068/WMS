@@ -90,6 +90,10 @@ class DepartmentStandardController extends Controller
             return $this->backToTab()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!');
         }
 
+        if ($current->status_id != 1) {
+            return $this->backToTab()->with('error', 'Chất chuẩn của phòng đã bị khoá, không thể chỉnh sửa!');
+        }
+
         // Không cho đổi chất chuẩn của một dòng đã khai: đó là khoá của dòng.
         // Khai nhầm thì khoá dòng cũ rồi khai dòng mới, để giữ vết.
         $validator = Validator::make(

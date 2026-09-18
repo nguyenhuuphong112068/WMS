@@ -466,7 +466,8 @@ class StandardEstimateController extends Controller
     {
         $request->validate([
             'id' => 'required|integer',
-            'promised_date' => 'nullable|date'
+            'promised_date' => 'nullable|date',
+            'reason' => 'nullable|string|max:500',
         ]);
 
         [$item, $list] = $this->findItem($request->id);
@@ -481,10 +482,16 @@ class StandardEstimateController extends Controller
 
         $oldDate = $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('d/m/Y') : 'Chưa có';
         $newDate = $request->promised_date ? \Carbon\Carbon::parse($request->promised_date)->format('d/m/Y') : 'Chưa có';
+
+        if ($oldDate !== $newDate && trim((string) $request->reason) === '') {
+            return response()->json(['success' => false, 'message' => 'Vui lòng nhập lý do thay đổi ngày hẹn đáp ứng!']);
+        }
+
         $actor = $this->actor();
+        $reason = trim((string) $request->reason);
         $historyAdded = false;
 
-        DB::transaction(function () use ($item, $request, $oldDate, $newDate, $actor, &$historyAdded) {
+        DB::transaction(function () use ($item, $request, $oldDate, $newDate, $actor, $reason, &$historyAdded) {
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
                 'promised_date' => $request->promised_date,
             ]);
@@ -494,7 +501,7 @@ class StandardEstimateController extends Controller
                     'item_id' => $item->id,
                     'item_type' => 'standard',
                     'user_name' => $actor,
-                    'content' => "Cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]",
+                    'content' => "Cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]. Lý do: {$reason}",
                     'type' => 'history_promised_date',
                     'created_at' => now(),
                     'updated_at' => now(),

@@ -67,6 +67,16 @@ class MaxStockWarning
     }
 
     /**
+     * Tồn hiện tại theo category_id của phòng - dùng ở nơi cần tồn nhưng không cần so ngưỡng
+     * TỐI ĐA (vd. tab "Vật tư cần dự trù" so ngưỡng TỐI THIỂU) - cùng công thức trên, tránh
+     * viết lại. Xem App\Support\MaterialWatchlist::belowThreshold().
+     */
+    public static function onHandMaterial(int $departmentId): array
+    {
+        return self::onHand(self::SOURCES['material'], $departmentId);
+    }
+
+    /**
      * [category_id => ['max_stock' => float|null, 'on_hand' => float, 'unit' => string]]
      * cho mọi mã danh mục phòng đang khai (kể cả mã chưa đặt ngưỡng - màn hình vẫn cần
      * con số tồn để viết câu cảnh báo khi phòng khai ngưỡng sau này).

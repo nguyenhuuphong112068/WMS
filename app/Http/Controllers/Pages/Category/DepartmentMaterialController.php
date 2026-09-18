@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
+use App\Support\MaterialWatchlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -18,9 +19,12 @@ use Illuminate\Validation\Rule;
  * Controller này chỉ nhận các thao tác thêm / sửa / khoá rồi quay lại đúng tab đó.
  *
  * Danh mục vật tư (material_categories) dùng chung toàn công ty vì nó mô tả BẢN CHẤT của
- * vật tư: tên, nhà sản xuất, thông tin kỹ thuật, phân loại, bộ phận mua hàng. Màn hình
- * này khai phần CÁCH DÙNG của riêng phòng ban đang chọn: đơn vị tính, ngưỡng tồn tối
- * thiểu, định khu.
+ * vật tư: tên, nhà sản xuất, thông tin kỹ thuật, phân loại theo bộ tiêu chí công ty, bộ
+ * phận mua hàng. Màn hình này khai phần CÁCH DÙNG của riêng phòng ban đang chọn: phân loại
+ * theo bộ nhóm của phòng, đơn vị tính, ngưỡng tồn tối thiểu, định khu.
+ *
+ * PHÂN LOẠI ở đây (classification_id) là bộ nhóm do chính phòng khai ở Dữ Liệu Gốc → Phân
+ * Loại, không liên quan tới phân loại bản chất vật tư của danh mục công ty.
  *
  * ĐỊNH KHU (default_location_id) là chỗ DỰ KIẾN để vật tư, chỉ dùng để điền sẵn ô vị trí
  * lúc nhập. Vị trí THỰC TẾ của từng lô nằm ở material_imports.location_id, hai cái này
@@ -86,6 +90,10 @@ class DepartmentMaterialController extends Controller
             return $this->backToTab()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!');
         }
 
+        if ($current->status_id != 1) {
+            return $this->backToTab()->with('error', 'Vật tư của phòng đã bị khoá, không thể chỉnh sửa!');
+        }
+
         // Không cho đổi vật tư của một dòng đã khai: đó là khoá của dòng. Khai nhầm thì
         // khoá dòng cũ rồi khai dòng mới, để giữ vết.
         $validator = Validator::make(
@@ -111,16 +119,19 @@ class DepartmentMaterialController extends Controller
 
         $units = DB::table('units')->pluck('name', 'id');
         $locations = DB::table('locations')->pluck('code', 'id');
+        $classifications = DB::table('department_classification')->pluck('name', 'id');
 
         AuditTrialController::log(
             'Cập nhật',
             self::TABLE,
             $current->id,
-            'đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
+            'phân loại: '.($classifications[$current->classification_id] ?? 'chưa khai')
+                .' | đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
                 .' | ngưỡng: '.($current->min_stock ?? 'chưa khai')
                 .' | ngưỡng tối đa: '.($current->max_stock ?? 'chưa khai')
                 .' | định khu: '.($locations[$current->default_location_id] ?? 'chưa khai'),
-            'đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
+            'phân loại: '.($classifications[(int) $request->classification_id] ?? 'chưa khai')
+                .' | đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
                 .' | ngưỡng: '.($request->min_stock ?: 'chưa khai')
                 .' | ngưỡng tối đa: '.($request->max_stock ?: 'chưa khai')
                 .' | định khu: '.($locations[(int) $request->default_location_id] ?? 'chưa khai')
@@ -167,9 +178,62 @@ class DepartmentMaterialController extends Controller
         );
     }
 
+    /**
+     * "Đề nghị dự trù vật tư" bấm ngay trên một dòng của tab "Vật Tư Của Phòng" - bắt buộc
+     * nêu lý do dự trù. Hiện lại ở tab "Danh sách vật tư cần dự trù" bên Dự Trù Vật Tư -
+     * xem App\Support\MaterialWatchlist.
+     */
+    public function watchlistRemember(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'category_id' => ['required', 'integer', 'exists:material_categories,id'],
+            'note' => ['required', 'max:500'],
+        ], [
+            'category_id.required' => 'Không xác định được vật tư cần đề nghị dự trù!',
+            'category_id.exists' => 'Vật tư được chọn không tồn tại.',
+            'note.required' => 'Vui lòng nhập lý do dự trù.',
+            'note.max' => 'Lý do dự trù tối đa 500 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()]);
+        }
+
+        $deptMaterial = DB::table(self::TABLE)
+            ->where('department_id', $this->departmentId())
+            ->where('category_id', (int) $request->category_id)
+            ->first();
+
+        if ($deptMaterial && $deptMaterial->status_id != 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vật tư của phòng đã bị khoá, không thể đề nghị dự trù!',
+            ]);
+        }
+
+        $result = MaterialWatchlist::remember(
+            $this->departmentId(),
+            (int) $request->category_id,
+            null,
+            null,
+            $request->note,
+            'category',
+            $this->actor()
+        );
+
+        return response()->json($result);
+    }
+
     private function rules(int $departmentId, bool $isUpdate = false): array
     {
         $rules = [
+            // Phân loại riêng của phòng, phải thuộc ĐÚNG phòng ban đang chọn
+            'classification_id' => [
+                'nullable',
+                Rule::exists('department_classification', 'id')
+                    ->where('department_id', $departmentId)
+                    ->where('status_id', 1),
+            ],
             'unit_id' => ['required', 'integer', 'exists:units,id'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
             'max_stock' => ['nullable', 'numeric', 'min:0'],
@@ -263,6 +327,7 @@ class DepartmentMaterialController extends Controller
     private function payload(Request $request): array
     {
         return [
+            'classification_id' => $request->classification_id ? (int) $request->classification_id : null,
             'unit_id' => (int) $request->unit_id,
             'min_stock' => $this->nullIfBlank($request->min_stock),
             'max_stock' => $this->nullIfBlank($request->max_stock),

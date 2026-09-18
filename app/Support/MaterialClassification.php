@@ -8,14 +8,18 @@ use Illuminate\Validation\Rule;
  * PHÂN LOẠI VẬT TƯ CỦA DANH MỤC VẬT TƯ CÔNG TY
  *
  * Nguồn sự thật duy nhất cho cột material_categories.classification. Cột này lưu JSON
- * dạng {"price":"high","importance":"a",...} để MỘT vật tư mang nhiều cách phân loại
+ * dạng {"price":"high","importance":"low",...} để MỘT vật tư mang nhiều cách phân loại
  * cùng lúc, mỗi tiêu chí chọn đúng một giá trị:
  *
- *   - price          : theo giá
+ *   - price          : theo giá trị
  *   - importance     : theo mức độ quan trọng
- *   - supply         : Hành Chánh cấp phát hay Khác
  *   - dangerous      : có thuộc danh mục hàng hoá nguy hiểm hay không
+ *   - supply         : Hành Chánh cấp phát hay Khác
  *   - qa_calibration : có cần QA hiệu chuẩn trước khi sử dụng hay không
+ *
+ * Bộ tiêu chí do Phòng Tổng Hợp chốt: 6 tiêu chí, mỗi tiêu chí BẮT BUỘC chọn - không còn
+ * mục "Chưa xác định". Bộ Phận Mua Hàng là tiêu chí thứ 4 trên form nhưng vẫn lưu ở cột
+ * riêng purchasing_department, xem formGroups().
  *
  * Trước đây phân loại là dữ liệu gốc của từng phòng (bảng material_classifications, cột
  * material_department_categories.classification_id). Nhưng "vật tư đắt hay rẻ, có nguy
@@ -34,44 +38,42 @@ class MaterialClassification
      */
     public const CRITERIA = [
         'price' => [
-            'label' => 'Theo Giá',
+            'label' => 'Theo Giá Trị',
             'icon' => 'fas fa-tags',
             'options' => [
-                'high' => 'Giá trị cao',
-                'medium' => 'Giá trị trung bình',
-                'low' => 'Giá trị thấp',
+                'low' => 'Thấp',
+                'high' => 'Cao',
             ],
         ],
         'importance' => [
             'label' => 'Theo Mức Độ Quan Trọng',
             'icon' => 'fas fa-star',
             'options' => [
-                'a' => 'A - Rất quan trọng',
-                'b' => 'B - Quan trọng',
-                'c' => 'C - Bình thường',
-            ],
-        ],
-        'supply' => [
-            'label' => 'Nguồn Cấp Phát',
-            'icon' => 'fas fa-hand-holding',
-            'options' => [
-                'admin' => 'Hành Chánh Cấp Phát',
-                'other' => 'Khác',
+                'low' => 'Thấp',
+                'high' => 'Cao',
             ],
         ],
         'dangerous' => [
-            'label' => 'Hàng Hoá Nguy Hiểm',
+            'label' => 'Theo Hàng Hoá Nguy Hiểm',
             'icon' => 'fas fa-triangle-exclamation',
             'options' => [
-                'yes' => 'Thuộc danh mục hàng hoá nguy hiểm',
+                'yes' => 'Có',
                 'no' => 'Không',
             ],
         ],
+        'supply' => [
+            'label' => 'Theo Cấp Phát Bởi Hành Chánh',
+            'icon' => 'fas fa-hand-holding',
+            'options' => [
+                'admin' => 'Hành Chánh',
+                'other' => 'Khác',
+            ],
+        ],
         'qa_calibration' => [
-            'label' => 'Hiệu Chuẩn Trước Khi Sử Dụng',
+            'label' => 'Theo Cần Hiệu Chuẩn Trước Khi Dùng',
             'icon' => 'fas fa-ruler-combined',
             'options' => [
-                'yes' => 'Cần QA hiệu chuẩn trước khi sử dụng',
+                'yes' => 'Có',
                 'no' => 'Không',
             ],
         ],
@@ -82,10 +84,10 @@ class MaterialClassification
      * Cột trên bảng hẹp, để nguyên tên dài sẽ vỡ bố cục.
      */
     public const SHORT_LABELS = [
-        'price' => ['high' => 'Giá cao', 'medium' => 'Giá TB', 'low' => 'Giá thấp'],
-        'importance' => ['a' => 'Quan trọng A', 'b' => 'Quan trọng B', 'c' => 'Quan trọng C'],
-        'supply' => ['admin' => 'HC cấp phát', 'other' => 'Nguồn khác'],
+        'price' => ['low' => 'Giá thấp', 'high' => 'Giá cao'],
+        'importance' => ['low' => 'Ít quan trọng', 'high' => 'Rất quan trọng'],
         'dangerous' => ['yes' => 'Hàng nguy hiểm', 'no' => 'Không nguy hiểm'],
+        'supply' => ['admin' => 'HC cấp phát', 'other' => 'Nguồn khác'],
         'qa_calibration' => ['yes' => 'Cần hiệu chuẩn', 'no' => 'Không hiệu chuẩn'],
     ];
 
@@ -100,10 +102,14 @@ class MaterialClassification
 
     /** Bộ phận chịu trách nhiệm mua vật tư này. */
     public const PURCHASING_DEPARTMENTS = [
-        'admin' => 'Hành Chánh',
         'supply' => 'Cung Ứng',
+        'admin' => 'Hành Chánh',
         'it' => 'IT',
     ];
+
+    /** Nhãn + icon của tiêu chí Bộ Phận Mua Hàng khi dựng form chung với 5 tiêu chí kia. */
+    public const PURCHASING_LABEL = 'Theo Bộ Phận Mua Hàng';
+    public const PURCHASING_ICON = 'fas fa-cart-shopping';
 
     /** Số ngày đặt hàng tối đa cho phép khai - chặn gõ nhầm 3650 thành 36500. */
     public const MAX_LEAD_TIME_DAYS = 3650;
@@ -201,17 +207,52 @@ class MaterialClassification
         return self::PURCHASING_DEPARTMENTS[(string) $key] ?? '';
     }
 
+    /**
+     * 6 nhóm tiêu chí theo đúng thứ tự trên form khai báo.
+     *
+     * Bộ Phận Mua Hàng đứng thứ 4 cùng dạng radio với 5 tiêu chí kia nhưng lưu ở cột riêng
+     * purchasing_department, nên gom ở đây để view dựng một mạch thay vì tách hai khối.
+     */
+    public static function formGroups(array $selected = [], ?string $purchasing = null): array
+    {
+        $groups = [];
+
+        foreach (self::CRITERIA as $key => $criterion) {
+            $groups[] = [
+                'label' => $criterion['label'],
+                'icon' => $criterion['icon'],
+                'name' => 'classification['.$key.']',
+                'errorKey' => 'classification.'.$key,
+                'options' => $criterion['options'],
+                'value' => (string) ($selected[$key] ?? ''),
+            ];
+
+            if ($key === 'dangerous') {
+                $groups[] = [
+                    'label' => self::PURCHASING_LABEL,
+                    'icon' => self::PURCHASING_ICON,
+                    'name' => 'purchasing_department',
+                    'errorKey' => 'purchasing_department',
+                    'options' => self::PURCHASING_DEPARTMENTS,
+                    'value' => (string) $purchasing,
+                ];
+            }
+        }
+
+        return $groups;
+    }
+
     /** Quy tắc validate cho phần phân loại + bộ phận mua hàng + thời gian đặt hàng. */
     public static function rules(): array
     {
         $rules = [
-            'classification' => ['nullable', 'array'],
-            'purchasing_department' => ['nullable', Rule::in(array_keys(self::PURCHASING_DEPARTMENTS))],
+            'classification' => ['required', 'array'],
+            'purchasing_department' => ['required', Rule::in(array_keys(self::PURCHASING_DEPARTMENTS))],
             'lead_time_days' => ['nullable', 'integer', 'min:0', 'max:'.self::MAX_LEAD_TIME_DAYS],
         ];
 
         foreach (self::CRITERIA as $key => $criterion) {
-            $rules['classification.'.$key] = ['nullable', Rule::in(array_keys($criterion['options']))];
+            $rules['classification.'.$key] = ['required', Rule::in(array_keys($criterion['options']))];
         }
 
         return $rules;
@@ -220,6 +261,8 @@ class MaterialClassification
     public static function messages(): array
     {
         $messages = [
+            'classification.required' => 'Vui lòng chọn đủ các tiêu chí phân loại.',
+            'purchasing_department.required' => 'Vui lòng chọn bộ phận mua hàng.',
             'purchasing_department.in' => 'Bộ phận mua hàng không hợp lệ.',
             'lead_time_days.integer' => 'Thời gian đặt hàng phải là số ngày nguyên.',
             'lead_time_days.min' => 'Thời gian đặt hàng không được âm.',
@@ -227,6 +270,7 @@ class MaterialClassification
         ];
 
         foreach (self::CRITERIA as $key => $criterion) {
+            $messages['classification.'.$key.'.required'] = 'Vui lòng chọn tiêu chí "'.$criterion['label'].'".';
             $messages['classification.'.$key.'.in'] = 'Lựa chọn của tiêu chí "'.$criterion['label'].'" không hợp lệ.';
         }
 

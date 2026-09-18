@@ -115,6 +115,9 @@ Route::prefix('/export')
             Route::get('history', 'history')->name('history');
             Route::get('lookup', 'lookup')->name('lookup');
             Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
+            Route::get('requestStockMap', 'requestStockMap')->name('requestStockMap');
+            // "Ghi nhớ vật tư cần dự trù" từ dòng đề nghị - hiện ở tab Dự Trù Vật Tư
+            Route::post('watchlistRemember', 'watchlistRemember')->name('watchlistRemember');
 
             // Đề nghị cấp phát + trình ký
             Route::post('requestStore', 'requestStore')->name('requestStore');

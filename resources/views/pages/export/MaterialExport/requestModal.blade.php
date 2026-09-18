@@ -99,28 +99,6 @@
         color: #64748b;
         margin-left: 4px;
     }
-    .me-flow-head .me-add-signer {
-        margin-left: auto;
-        font-size: 0.8rem;
-        font-weight: 600;
-        padding: 6px 14px;
-        border-radius: 6px;
-        background: var(--primary, #2E7BC4);
-        border: 1px solid var(--primary, #2E7BC4);
-        color: #ffffff;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        transition: all 0.2s ease;
-        box-shadow: 0 1px 2px rgba(46, 123, 196, 0.2);
-    }
-    .me-flow-head .me-add-signer:hover {
-        background: var(--primary-dark, #1F5E9E);
-        border-color: var(--primary-dark, #1F5E9E);
-        color: #ffffff;
-        transform: translateY(-1px);
-        box-shadow: 0 3px 6px rgba(46, 123, 196, 0.25);
-    }
     .me-flow-steps {
         display: flex;
         flex-direction: column;
@@ -173,55 +151,37 @@
         color: #475569;
         white-space: nowrap;
     }
-    .me-step-row .me-step-user {
-        flex: 1 1 auto;
+    /* Dòng bước ký CHỈ ĐỌC: tên người ký nổi, vai trò + phòng ban ở dòng phụ */
+    .me-step-who {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
         min-width: 0;
-        height: 38px !important;
-        min-height: 38px !important;
-        max-height: none !important;
-        line-height: 1.5 !important;
-        font-size: 0.875rem !important;
-        padding: 6px 12px !important;
-        color: #1e293b !important;
-        background-color: #ffffff !important;
-        border: 1.5px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-        box-sizing: border-box !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-        cursor: pointer;
-        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        flex: 1 1 auto;
     }
-    .me-step-row .me-step-user:focus {
-        border-color: var(--primary, #2E7BC4) !important;
-        outline: 0 !important;
-        box-shadow: 0 0 0 3px rgba(46, 123, 196, 0.15) !important;
-    }
-    .me-step-row .me-step-user option {
-        padding: 6px 10px;
+    .me-step-name {
         font-size: 0.875rem;
+        font-weight: 600;
         color: #1e293b;
+        line-height: 1.35;
     }
-    .me-del-signer {
-        flex: 0 0 auto;
-        width: 34px;
-        height: 34px;
-        border: 1px solid #fee2e2 !important;
-        background: #fff5f5 !important;
-        color: #ef4444 !important;
-        border-radius: 6px !important;
-        display: inline-flex !important;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.82rem;
-        padding: 0;
-        cursor: pointer;
-        transition: all 0.2s ease;
+    .me-step-or {
+        color: #94a3b8;
+        font-weight: 400;
+        font-style: italic;
+        font-size: 0.78rem;
+        margin: 0 5px;
     }
-    .me-del-signer:hover {
-        background: #fee2e2 !important;
-        color: #b91c1c !important;
-        border-color: #fca5a5 !important;
-        transform: scale(1.05);
+    .me-step-role {
+        font-size: 0.76rem;
+        color: #64748b;
+        line-height: 1.3;
+    }
+    .me-step-warn {
+        font-size: 0.74rem;
+        font-weight: 600;
+        color: #B45309;
+        margin-top: 2px;
     }
     .me-flow-none {
         background: #ffffff;
@@ -326,9 +286,7 @@
                     @endforeach
 
                     <div class="mt-3">
-                        @include('pages.export.MaterialExport.signFlowFields', [
-                            'flowSigners' => old('signers', []),
-                        ])
+                        @include('pages.export.MaterialExport.signFlowFields')
                     </div>
                     @foreach ($bag->keys() as $k)
                         @if (str_starts_with($k, 'signers')) <div class="md-error text-danger small">{{ $bag->first($k) }}</div> @endif
@@ -355,7 +313,8 @@
             <select name="items[__i__][category_id]" class="form-control form-control-sm me-cat">
                 <option value="">-- Ngoài danh mục --</option>
                 @foreach ($categories as $c)
-                    <option value="{{ $c->id }}" data-unit="{{ $c->unit_short_name }}" data-spec="{{ $c->technical_specification }}">
+                    <option value="{{ $c->id }}" data-unit="{{ $c->unit_short_name }}" data-spec="{{ $c->technical_specification }}"
+                        data-stock="{{ $c->total_remaining ?? 0 }}" data-available="{{ $c->available_stock ?? ($c->total_remaining ?? 0) }}">
                         {{ $c->material_name }} — {{ $c->manufacturer_short_name }}
                     </option>
                 @endforeach
@@ -372,65 +331,112 @@
                 @endforeach
             </select>
         </td>
+        <td class="text-right">
+            <span class="me-stock-view">—</span>
+            <input type="hidden" class="me-stock-hidden" name="items[__i__][stock_at_request]" value="">
+        </td>
+        <td class="text-right"><span class="me-available">—</span></td>
         <td><textarea name="items[__i__][purpose]" maxlength="500" rows="1" class="form-control form-control-sm me-autosize" placeholder="Mục đích sử dụng..."></textarea></td>
-        <td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button></td>
+        <td class="text-center">
+            <button type="button" class="btn btn-xs btn-outline-warning me-remember-row mr-1" title="Đề nghị dự trù vật tư"><i class="fas fa-bookmark"></i></button>
+            <button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button>
+        </td>
     </tr>
 </template>
 
-<template id="meSignerTemplate">
-    <div class="me-step-row">
-        <div class="me-step-badge">
-            <span class="me-step-no"></span>
-            <span class="me-step-tag">Bước <span class="me-step-idx"></span>:</span>
-        </div>
-        <select name="signers[]" class="form-control me-step-user" required>
-            <option value="">-- Chọn người ký duyệt --</option>
-            @foreach ($signerOptions as $person)
-                @php
-                    $label = ($person->fullName ?: $person->userName)
-                        . ($person->role_name ? ' — ' . $person->role_name : '')
-                        . ($person->department_short ? ' · ' . $person->department_short : '');
-                @endphp
-                <option value="{{ $person->id }}" title="{{ $label }}">
-                    {{ $label }}
-                </option>
-            @endforeach
-        </select>
-        <button type="button" class="btn me-del-signer" title="Xoá bước ký"><i class="fas fa-trash-alt"></i></button>
-    </div>
-</template>
 
 <script>
-    /**
-     * Đánh lại số thứ tự bước ký + cập nhật dòng tóm tắt của một khối quy trình.
-     * Gọi sau mọi lần thêm / xoá bước, và một lần lúc dựng trang cho các bước đã lưu.
-     */
-    window.meSyncSignFlow = function (box) {
-        var $box = $(box);
-        var $rows = $box.find('.me-step-row');
+    // Quy trình ký của từng vật tư trong danh mục của phòng, gửi từ Controller
+    window.meSignFlowMap = @json($signFlowMap);
 
-        $rows.each(function (i) {
-            $(this).find('.me-step-no').text(i + 1);
-            $(this).find('.me-step-idx').text(i + 1);
+    /*
+     | QUY TRÌNH KÝ DUYỆT - CHỈ ĐỌC, suy từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật Tư".
+     |
+     | meSignFlowMap gửi từ Controller: byCategory[<category_id>] là quy trình của vật tư
+     | đó, fallback là quy trình cho dòng tên tự nhập (chỉ khớp quy trình không khai điều
+     | kiện nào). Mỗi dòng vật tư khớp một quy trình riêng; phiếu lấy quy trình NHIỀU BƯỚC
+     | NHẤT. Còn dòng chưa khớp quy trình nào thì khoá nút Trình ký - phải khai dữ liệu gốc
+     | trước, đúng như Controller chặn ở phía server.
+     */
+    window.meRenderSignFlow = function (box) {
+        var $box = $(box);
+        var map = window.meSignFlowMap || { byCategory: {}, fallback: null };
+        var best = null;
+        var missing = [];
+
+        $box.closest('form').find('.me-rows').children('tr').each(function (i) {
+            var catId = String($(this).find('.me-cat').val() || '');
+            var flow = catId ? map.byCategory[catId] : map.fallback;
+
+            if (!flow) {
+                missing.push(i + 1);
+                return;
+            }
+
+            if (!best || flow.steps.length > best.steps.length) best = flow;
         });
 
-        $box.find('.me-flow-count').text($rows.length ? $rows.length + ' bước ký' : 'Duyệt thẳng (0 bước)');
-        if ($rows.length === 0) {
-            $box.find('.me-flow-none').css('display', 'flex');
+        var $steps = $box.find('.me-flow-steps').empty();
+
+        (best ? best.steps : []).forEach(function (step) {
+            var $row = $('<div class="me-step-row me-step-readonly"></div>');
+
+            $row.append(
+                $('<div class="me-step-badge"></div>')
+                    .append($('<span class="me-step-no"></span>').text(step.no))
+                    .append($('<span class="me-step-tag"></span>').text('Bước ' + step.no + ':'))
+            );
+
+            var $who = $('<div class="me-step-who"></div>');
+            var $names = $('<span class="me-step-name"></span>');
+
+            // Bước giao cho nhiều người: liệt kê hết, chỉ cần MỘT trong số họ ký là xong bước
+            step.users.forEach(function (person, i) {
+                if (i) $names.append($('<span class="me-step-or"></span>').text('hoặc'));
+                $names.append($('<span></span>').text(person.name + (person.dept ? ' · ' + person.dept : '')));
+            });
+
+            $who.append($names);
+            $who.append($('<span class="me-step-role"></span>').text(
+                step.role + (step.users.length > 1 ? ' — chỉ cần 1 người ký' : '')
+            ));
+
+            var locked = step.users.filter(function (person) { return person.inactive; });
+
+            if (locked.length) {
+                $who.append($('<span class="me-step-warn"></span>').html(
+                    '<i class="fas fa-triangle-exclamation mr-1"></i>Tài khoản đã bị khoá: '
+                    + $('<div>').text(locked.map(function (p) { return p.name; }).join(', ')).html()
+                ));
+            }
+
+            $row.append($who);
+            $steps.append($row);
+        });
+
+        $box.find('.me-flow-count').text(best ? best.steps.length + ' bước ký · ' + best.name : 'Chưa xác định');
+
+        // Dòng chưa khớp quy trình nào -> báo ngay và khoá Trình ký, vẫn cho Lưu tạm
+        var $none = $box.find('.me-flow-none');
+
+        if (missing.length) {
+            $box.find('.me-flow-none-detail').text(
+                'Dòng ' + missing.join(', ') + ' chưa khớp quy trình nào của phòng. '
+                + 'Vào Dữ Liệu Gốc → Trình Ký Đề Nghị CP Vật Tư để khai quy trình cho phân loại tương ứng.'
+            );
+            $none.css('display', 'flex');
         } else {
-            $box.find('.me-flow-none').hide();
+            $none.hide();
         }
+
+        $box.closest('form').find('.me-btn-send').prop('disabled', missing.length > 0);
     };
 
-    /**
-     * Thêm một bước ký vào khối quy trình.
-     * Người lập tự xếp thứ tự bước: bước nào đứng trước thì ký trước.
-     */
-    window.meAddSignerRow = function (box) {
-        var $box = $(box);
-
-        $box.find('.me-flow-steps').append(document.getElementById('meSignerTemplate').innerHTML);
-        window.meSyncSignFlow($box);
+    /** Dựng lại khối quy trình ký của form chứa một phần tử bất kỳ. */
+    window.meSyncSignFlow = function (el) {
+        $(el).closest('form').find('[data-sign-flow]').each(function () {
+            window.meRenderSignFlow(this);
+        });
     };
 
     /**
@@ -447,8 +453,42 @@
 
         var $row = $tbody.children('tr').last();
         window.meAutoSize($row);
+        window.meSyncSignFlow($tbody);
 
         return $row;
+    };
+
+    /*
+     | CỘT "TỒN KHẢ DỤNG" - tính động, KHÔNG lưu DB, khác cột "Tồn" (chụp tĩnh một lần lúc
+     | thêm dòng vào ô ẩn .me-stock-hidden - xem handler .me-cat change bên dưới). Tồn khả
+     | dụng = tồn - phần các đề nghị KHÁC đang chờ ký/đã duyệt nhưng kho chưa cấp đủ đã giữ
+     | chỗ, nạp qua route requestStockMap và có thể làm mới bất cứ lúc nào bằng nút cạnh tiêu
+     | đề cột hoặc mỗi khi mở lại modal.
+     */
+    window.meStockMap = {};
+
+    window.meFmtStock = function (v) {
+        if (v === null || v === undefined || v === '') return '—';
+        var n = Number(v);
+        if (isNaN(n)) return '—';
+        return n.toLocaleString('vi-VN', { maximumFractionDigits: 4 });
+    };
+
+    window.meFetchStockMap = function (done) {
+        $.getJSON('{{ route($expRoute . "requestStockMap") }}')
+            .done(function (res) { window.meStockMap = (res && res.ok && res.stock) || {}; })
+            .always(function () { if (typeof done === 'function') done(); });
+    };
+
+    /** Vẽ lại CHỈ cột "Tồn khả dụng" của mọi dòng trong một bảng, theo window.meStockMap hiện có. */
+    window.meRefreshAvailable = function (tbody) {
+        $(tbody).children('tr').each(function () {
+            var catId = $(this).find('.me-cat').val();
+            var $cell = $(this).find('.me-available');
+            if (!catId) { $cell.text('—'); return; }
+            var s = window.meStockMap[catId];
+            $cell.text(s ? window.meFmtStock(s.available) : '—');
+        });
     };
 
     /** Kéo chiều cao các ô textarea vừa đúng nội dung đang có (dòng mới, dòng đổ từ danh mục, dòng đã lưu). */
@@ -463,7 +503,70 @@
     document.addEventListener('DOMContentLoaded', function () {
         function addRow(tbodySel) { return window.meAddRequestRow(tbodySel); }
         $(document).on('click', '.me-add-row', function () { addRow('#reqCreateModal .me-rows'); });
-        $(document).on('click', '.me-del-row', function () { $(this).closest('tr').remove(); });
+
+        /*
+         | ĐỀ NGHỊ DỰ TRÙ VẬT TƯ - nút trên từng dòng đề nghị, hỏi lý do dự trù rồi gửi AJAX
+         | ngay (không phụ thuộc đề nghị có được lưu hay không). Hiện lại ở tab "Danh sách
+         | vật tư cần dự trù" bên Dự Trù Vật Tư - xem App\Support\MaterialWatchlist.
+         */
+        window.meWatchlistToast = window.meWatchlistToast || Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 });
+
+        $(document).on('click', '.me-remember-row', function () {
+            var $btn = $(this), $tr = $btn.closest('tr'), $form = $btn.closest('form');
+            var categoryId = $tr.find('.me-cat').val();
+            var materialName = $.trim($tr.find('[name$="[material_name]"]').val() || '');
+            var spec = $tr.find('[name$="[technical_specification]"]').val() || '';
+            var srcType = $form.attr('data-req-type') || $form.find('[name="type"]').val() || 'regular';
+
+            if (!categoryId && !materialName) {
+                window.meWatchlistToast.fire({ icon: 'warning', title: 'Chưa chọn vật tư cho dòng này!' });
+                return;
+            }
+
+            Swal.fire({
+                title: 'Đề nghị dự trù vật tư này?',
+                input: 'textarea',
+                inputLabel: 'Lý do dự trù',
+                inputPlaceholder: 'Nêu rõ lý do cần dự trù vật tư này...',
+                inputAttributes: { maxlength: '500' },
+                showCancelButton: true,
+                confirmButtonColor: '#2E7BC4',
+                cancelButtonColor: '#94A3B8',
+                confirmButtonText: 'Gửi đề nghị',
+                cancelButtonText: 'Huỷ',
+                preConfirm: function (value) {
+                    if (!value || !value.trim()) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do dự trù');
+                    }
+                    return value;
+                }
+            }).then(function (result) {
+                if (!result.isConfirmed) return;
+
+                $btn.prop('disabled', true);
+
+                $.post('{{ route($expRoute . "watchlistRemember") }}', {
+                    _token: $form.find('input[name="_token"]').val(),
+                    category_id: categoryId || '',
+                    material_name: materialName,
+                    technical_specification: spec,
+                    note: result.value,
+                    source_type: srcType
+                }).done(function (res) {
+                    window.meWatchlistToast.fire({ icon: res.success ? 'success' : 'error', title: res.message || 'Có lỗi xảy ra!' });
+                    if (res.success) $btn.find('i').removeClass('fa-bookmark').addClass('fa-check');
+                }).fail(function () {
+                    window.meWatchlistToast.fire({ icon: 'error', title: 'Có lỗi xảy ra, vui lòng thử lại!' });
+                }).always(function () {
+                    $btn.prop('disabled', false);
+                });
+            });
+        });
+        $(document).on('click', '.me-del-row', function () {
+            var $form = $(this).closest('form');
+            $(this).closest('tr').remove();
+            window.meSyncSignFlow($form);
+        });
         $(document).on('input', 'textarea.me-autosize', function () { window.meAutoSize($(this)); });
         $(document).on('change', '.me-cat', function () {
             var $o = $(this).find(':selected'), $tr = $(this).closest('tr');
@@ -471,25 +574,36 @@
                 $tr.find('.me-unit').val($o.data('unit') || '');
                 $tr.find('.me-spec').val($o.data('spec') || '').prop('readonly', true);
                 $tr.find('[name$="[material_name]"]').val('').prop('disabled', true);
+
+                /*
+                 | "Tồn" chụp NGAY LÚC chọn danh mục cho dòng này - ưu tiên số vừa tải qua
+                 | AJAX (window.meStockMap, mới hơn lúc mở trang), không có thì tạm dùng số
+                 | lúc tải trang (data-stock/data-available trên option). Sau khi đã chụp,
+                 | ô ẩn giữ nguyên giá trị này - chỉ đổi lại khi người dùng CHỌN LẠI danh mục
+                 | khác cho đúng dòng đó, không tự cập nhật theo thời gian.
+                 */
+                var catId = String($o.val());
+                var live = (window.meStockMap || {})[catId];
+                var stock = live ? live.remaining : $o.data('stock');
+                var avail = live ? live.available : $o.data('available');
+                $tr.find('.me-stock-hidden').val(stock !== undefined && stock !== null ? stock : '');
+                $tr.find('.me-stock-view').text(window.meFmtStock(stock));
+                $tr.find('.me-available').text(window.meFmtStock(avail));
             } else {
                 $tr.find('[name$="[material_name]"]').prop('disabled', false);
                 $tr.find('.me-spec').prop('readonly', false);
+                $tr.find('.me-stock-hidden').val('');
+                $tr.find('.me-stock-view').text('—');
+                $tr.find('.me-available').text('—');
             }
             window.meAutoSize($tr);
         });
         $(document).on('click', '.me-btn-draft', function () { $('#reqCreateAction').val('draft'); });
         $(document).on('click', '.me-btn-send', function () { $('#reqCreateAction').val('send'); });
 
-        // ---- Quy trình ký duyệt: thêm / xoá bước, số thứ tự tự đánh lại ----
-        $(document).on('click', '.me-add-signer', function () {
-            window.meAddSignerRow($(this).closest('.me-flow-box'));
-        });
-        $(document).on('click', '.me-del-signer', function () {
-            var $box = $(this).closest('.me-flow-box');
-            $(this).closest('.me-step-row').remove();
-            window.meSyncSignFlow($box);
-        });
-        $('.me-flow-box').each(function () { window.meSyncSignFlow(this); });
+        // ---- Quy trình ký duyệt: dựng lại mỗi khi danh sách vật tư đổi ----
+        $(document).on('change', '.me-cat', function () { window.meSyncSignFlow(this); });
+        $('[data-sign-flow]').each(function () { window.meRenderSignFlow(this); });
 
         // Cùng một modal cho tab Thường Quy và Theo ĐG Rủi Ro: nút bấm ở tab nào thì đề nghị thuộc loại đó
         $(document).on('click', '.btn-req-create', function () {
@@ -503,6 +617,17 @@
                 addRow('#reqCreateModal .me-rows');
             }
             window.meAutoSize($(this));
+
+            // Mở modal thì làm mới ngay "Tồn khả dụng" của mọi dòng đang có trong đúng modal này
+            var $rows = $(this).find('.me-rows, .me-edit-rows');
+            window.meFetchStockMap(function () { window.meRefreshAvailable($rows); });
+        });
+
+        // Nút làm mới cạnh tiêu đề cột "Tồn khả dụng" - chỉ làm mới bảng chứa nút vừa bấm
+        $(document).on('click', '.me-refresh-stock', function (e) {
+            e.preventDefault();
+            var $rows = $(this).closest('table').find('.me-rows, .me-edit-rows');
+            window.meFetchStockMap(function () { window.meRefreshAvailable($rows); });
         });
         @if ($bag->any())
             $(function () {

@@ -105,6 +105,11 @@ class MaterialCategoryController extends Controller
             'dmDatas' => $dmDatas,
             'dmCategories' => DepartmentMaterial::categoryOptions($dmDatas->pluck('category_id')->all()),
             'dmUnits' => DepartmentMaterial::unitOptions($dmDatas->pluck('unit_id')->all()),
+            // Phân loại riêng của phòng, khai ở Dữ Liệu Gốc → Phân Loại
+            'dmClassifications' => DepartmentMaterial::classificationOptions(
+                $departmentId,
+                $dmDatas->pluck('classification_id')->all()
+            ),
             // Định khu tìm qua AJAX như ô Tên vật tư, chỉ dựng sẵn option của giá trị old()
             'dmLocations' => \App\Support\CategoryLookup::locationsByIds([old('default_location_id')]),
             /*

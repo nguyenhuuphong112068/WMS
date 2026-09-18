@@ -120,6 +120,9 @@ class MaterialPeriodicRequest
         7 => 'Chủ nhật',
     ];
 
+    /** Chặn vòng lặp khi đếm số lần tạo đề nghị của một khoảng ngày - xem runsBetween(). */
+    private const MAX_RUNS_PER_WINDOW = 400;
+
     /** Các hành động được tính là "thay đổi" cho badge trên nút lịch sử. */
     private const CHANGE_ACTIONS = ['Cập nhật', 'Khoá', 'Mở khoá'];
 
@@ -250,6 +253,98 @@ class MaterialPeriodicRequest
 
             $periodStart = $end->copy()->addDay();
         }
+    }
+
+    /**
+     * SỐ LẦN DANH SÁCH SẼ TẠO ĐỀ NGHỊ TRONG KHOẢNG [$from, $to]
+     *
+     * Dùng cho màn "Khả dụng tháng tới" (App\Support\MaterialAvailabilityForecast): nhân số
+     * lần này với số lượng từng dòng của danh sách ra lượng vật tư chu kỳ sẽ lấy khỏi kho.
+     *
+     * Lịch cố định: chạy lại đúng nextRunDate() đến khi vượt $to nên số đếm khớp tuyệt đối
+     * với những gì generateDue() sẽ tạo.
+     *
+     * Lịch "Theo ngày đến hạn lịch CAL" chỉ biết trước hạn của chu kỳ ĐANG chờ (next_run_date);
+     * hạn các chu kỳ sau do CAL sinh dần nên phần đó là ƯỚC TÍNH: mỗi chu kỳ sau chu kỳ đang
+     * chờ mà giao với khoảng đang xét được tính thêm một đề nghị.
+     */
+    public static function runsBetween($list, string $from, string $to): int
+    {
+        if (! $list || (int) ($list->status_id ?? 0) !== 1 || ! $list->periodic || ! $list->start_date) {
+            return 0;
+        }
+
+        $from = Carbon::parse($from)->startOfDay();
+        $to = Carbon::parse($to)->startOfDay();
+
+        if ($from->gt($to)) {
+            return 0;
+        }
+
+        if (self::dayModeOf($list->cycle_day_mode ?? null) === self::DAY_MODE_CAL_DUE) {
+            return self::calRunsBetween($list, $from, $to);
+        }
+
+        $count = 0;
+        $cursor = $from->copy();
+        $inclusive = true;
+
+        while ($count < self::MAX_RUNS_PER_WINDOW) {
+            $run = Carbon::parse(self::nextRunDate(
+                (string) $list->periodic,
+                (int) $list->cycle_day,
+                $list->cycle_length ? (int) $list->cycle_length : null,
+                (string) $list->start_date,
+                $cursor,
+                $inclusive
+            ));
+
+            if ($run->gt($to)) {
+                break;
+            }
+
+            $count++;
+            $cursor = $run;
+            $inclusive = false;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Ước tính số lần tạo đề nghị của danh sách "Theo ngày đến hạn lịch CAL" - xem runsBetween().
+     * Chu kỳ đang chờ tính theo next_run_date đã đọc được từ CAL; các chu kỳ sau mỗi chu kỳ một lần.
+     */
+    private static function calRunsBetween($list, Carbon $from, Carbon $to): int
+    {
+        $periodic = (string) $list->periodic;
+        $length = max(1, (int) $list->cycle_length);
+        $start = Carbon::parse($list->start_date)->startOfDay();
+        $next = $list->next_run_date ? Carbon::parse($list->next_run_date)->startOfDay() : null;
+
+        $count = $next && $next->gte($from) && $next->lte($to) ? 1 : 0;
+
+        // Mốc để bỏ qua chu kỳ đang chờ: hạn kế tiếp đã biết, chưa có thì lấy hôm nay
+        $anchor = $next ?: now()->startOfDay();
+
+        if ($anchor->lt($start)) {
+            $anchor = $start->copy();
+        }
+
+        $cursor = self::periodEnd($periodic, self::periodStart($periodic, $anchor, $start, $length), $length)->addDay();
+        $guard = 0;
+
+        while ($cursor->lte($to) && $guard++ < self::MAX_RUNS_PER_WINDOW) {
+            $end = self::periodEnd($periodic, $cursor, $length);
+
+            if ($end->gte($from)) {
+                $count++;
+            }
+
+            $cursor = $end->copy()->addDay();
+        }
+
+        return $count;
     }
 
     /**

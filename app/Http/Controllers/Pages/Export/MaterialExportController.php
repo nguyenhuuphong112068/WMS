@@ -13,6 +13,8 @@ use App\Support\ListRange;
 use App\Support\MaterialCode;
 use App\Support\MaterialPeriodicRequest;
 use App\Support\MaterialPicking;
+use App\Support\MaterialSignFlow;
+use App\Support\MaterialWatchlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -23,10 +25,12 @@ use Illuminate\Validation\Rule;
  *
  * Khác chất chuẩn: vật tư BẮT BUỘC phải qua ĐỀ NGHỊ được phê duyệt trước khi lấy ra dùng.
  *
- *   1. Tổ lập ĐỀ NGHỊ (material_request_lists + items) -> Trình ký. Ngay trên phiếu, người
- *      lập tự khai QUY TRÌNH KÝ DUYỆT: số bước ký và người ký của từng bước
- *      (material_request_signs). Khai 0 bước thì trình ký là duyệt luôn, phiếu đi thẳng
- *      đến người cấp phát.
+ *   1. Tổ lập ĐỀ NGHỊ (material_request_lists + items) -> Trình ký. QUY TRÌNH KÝ DUYỆT
+ *      KHÔNG do người lập khai nữa mà suy thẳng từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật
+ *      Tư": mỗi dòng vật tư khớp một quy trình theo phân loại của danh mục chung + phân
+ *      loại của phòng, phiếu lấy quy trình CHẶT NHẤT (nhiều bước nhất) trong các dòng rồi
+ *      chép các bước sang material_request_signs. Dòng nào chưa khớp quy trình nào thì
+ *      chặn không cho trình ký - xem App\Support\MaterialSignFlow.
  *   2. Ký lần lượt theo step_no, mỗi bước đúng người được chỉ định ký (nhập lại mật khẩu -
  *      21 CFR Part 11). Ký hết bước cuối -> approved, issue_status = waiting. Mỗi lần
  *      chuyển bước đều gửi thông báo cho người phải ký tiếp; từ chối thì báo người lập.
@@ -60,6 +64,9 @@ class MaterialExportController extends Controller
 
     /** Các bước ký của một đề nghị - mỗi bước một dòng, thứ tự theo step_no. */
     private const REQ_SIGN = 'material_request_signs';
+
+    /** Người được ký một bước - một bước giao cho nhiều người thì mỗi người một dòng. */
+    private const REQ_CANDIDATE = 'material_request_sign_candidates';
 
     private const TRANSFER_REQUEST_TABLE = 'material_transfer_requests';
 
@@ -104,9 +111,6 @@ class MaterialExportController extends Controller
      * xuất khác, nhưng hàng không mất đi mà thành tồn của phòng nhận.
      */
     private const TYPE_TRANSFER_OUT = 'transfer_out';
-
-    /** Danh sách người ký chọn được - nạp một lần cho cả request, xem signerOptions(). */
-    private $signerOptions = null;
 
     /** Trường theo dõi khi điều chỉnh phiếu sử dụng: cột => tên hiển thị. */
     private const FIELDS = [
@@ -234,9 +238,14 @@ class MaterialExportController extends Controller
             'total_lots' => (int) $group->where('suggestable', true)->count(),
         ]);
 
-        $departmentMaterialInventory = $categories->map(function ($cat) use ($stockByCategory) {
+        // Tồn khả dụng (thời gian thực) của từng danh mục = tồn - phần các đề nghị KHÁC đang
+        // chờ ký / đã duyệt nhưng kho chưa cấp đủ đang giữ chỗ - xem cột "Tồn khả dụng".
+        $liveStockByCategory = $this->categoryStockMap($departmentId, $availableImports);
+
+        $departmentMaterialInventory = $categories->map(function ($cat) use ($stockByCategory, $liveStockByCategory) {
             $cat->total_remaining = $stockByCategory[$cat->id]['total_remaining'] ?? 0.0;
             $cat->total_lots = $stockByCategory[$cat->id]['total_lots'] ?? 0;
+            $cat->available_stock = $liveStockByCategory[$cat->id]['available'] ?? $cat->total_remaining;
 
             return $cat;
         });
@@ -299,7 +308,8 @@ class MaterialExportController extends Controller
             'reqIssueStatuses' => config('material.request_issue_statuses'),
             'reqItemStatuses' => config('material.request_item_statuses'),
             'requestSigns' => $requestSigns,
-            'signerOptions' => $this->signerOptions(),
+            // Quy trình ký của từng vật tư - JS dựng lại khối "Quy trình ký duyệt" theo dòng đang chọn
+            'signFlowMap' => $this->signFlowMapForView($departmentId),
             'overIssuePercent' => (int) round(self::OVER_ISSUE_RATIO * 100),
             // ---- Tab "Đề nghị chuyển liên phòng ban" ----
             'transferSent' => $transfer['sent'],
@@ -351,6 +361,20 @@ class MaterialExportController extends Controller
 
         $isDraft = $request->input('action_type', 'send') === 'draft';
 
+        /*
+        | Quy trình ký lấy thẳng từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật Tư" theo phân loại
+        | của các dòng vật tư. Lưu tạm thì cho qua (phiếu nháp chưa cần ký), nhưng TRÌNH KÝ
+        | mà còn dòng chưa khớp quy trình nào là chặn - phải khai dữ liệu gốc trước.
+        */
+        $signFlow = $this->requestSignFlow($request, $departmentId);
+
+        if (! $isDraft && $signFlow['missing']) {
+            return redirect()->back()
+                ->with('error', $this->signFlowMissingMessage())
+                ->withInput()
+                ->with('activeTab', $type);
+        }
+
         $deptStr = str_pad((string) $departmentId, 2, '0', STR_PAD_LEFT);
         $prefix = $deptStr.date('dmy').'_';
 
@@ -362,12 +386,13 @@ class MaterialExportController extends Controller
         }
         $code = $prefix.str_pad((string) $seq, 2, '0', STR_PAD_LEFT);
 
-        $stepCount = count($this->signerIds($request));
+        $signSteps = $signFlow['steps'];
+        $stepCount = $signSteps->count();
         $flow = $isDraft
             ? ['app_status' => 'draft', 'current_step' => null, 'issue_status' => null]
             : $this->submitPayload($stepCount);
 
-        $listId = DB::transaction(function () use ($request, $departmentId, $code, $isDraft, $flow, $stepCount, $type) {
+        $listId = DB::transaction(function () use ($request, $departmentId, $code, $isDraft, $flow, $stepCount, $type, $signSteps) {
             $listId = DB::table(self::REQ_LIST)->insertGetId($flow + [
                 'code' => $code,
                 'department_id' => $departmentId,
@@ -385,7 +410,7 @@ class MaterialExportController extends Controller
             ]);
 
             $this->insertRequestItems($listId, $request);
-            $this->insertRequestSigns($listId, $request);
+            $this->insertRequestSigns($listId, $signSteps);
 
             return $listId;
         });
@@ -434,12 +459,24 @@ class MaterialExportController extends Controller
         }
 
         $isDraft = $request->input('action_type', 'draft') === 'draft';
-        $stepCount = count($this->signerIds($request));
+
+        // Sửa dòng vật tư có thể đổi luôn quy trình ký, nên tính lại từ dữ liệu gốc
+        $signFlow = $this->requestSignFlow($request, $departmentId);
+
+        if (! $isDraft && $signFlow['missing']) {
+            return redirect()->back()
+                ->with('error', $this->signFlowMissingMessage())
+                ->withInput()
+                ->with('activeTab', $req->type);
+        }
+
+        $signSteps = $signFlow['steps'];
+        $stepCount = $signSteps->count();
         $flow = $isDraft
             ? ['app_status' => 'draft', 'current_step' => null, 'issue_status' => null]
             : $this->submitPayload($stepCount);
 
-        DB::transaction(function () use ($request, $req, $isDraft, $flow, $stepCount) {
+        DB::transaction(function () use ($request, $req, $isDraft, $flow, $stepCount, $signSteps) {
             DB::table(self::REQ_LIST)->where('id', $req->id)->update($flow + [
                 'name' => $this->nullIfBlank($request->name),
                 'note' => $this->nullIfBlank($request->note),
@@ -459,9 +496,9 @@ class MaterialExportController extends Controller
             ]);
             $this->insertRequestItems($req->id, $request);
 
-            // Quy trình ký khai lại từ đầu: các bước cũ (kể cả bước đã bị từ chối) hết hiệu lực
+            // Quy trình ký dựng lại từ đầu: các bước cũ (kể cả bước đã bị từ chối) hết hiệu lực
             $this->deactivateSigns($req->id);
-            $this->insertRequestSigns($req->id, $request);
+            $this->insertRequestSigns($req->id, $signSteps);
         });
 
         AuditTrialController::log(
@@ -498,15 +535,23 @@ class MaterialExportController extends Controller
             return redirect()->back()->with('error', 'Đề nghị '.$req->code.' chưa có mục nào, chưa trình ký được!')->with('activeTab', $req->type);
         }
 
-        // Quy trình ký đã khai sẵn lúc lập / sửa phiếu, chỉ cần đưa các bước về chờ ký lại
-        $stepCount = (int) DB::table(self::REQ_SIGN)
-            ->where('request_list_id', $req->id)
-            ->where('active', 1)
-            ->count();
+        /*
+        | Dựng lại quy trình ký từ dữ liệu gốc ngay lúc trình ký, không dùng lại các bước đã
+        | ghi lúc lưu tạm: giữa hai lần đó phòng có thể đã sửa quy trình hoặc đổi người ký.
+        */
+        $signFlow = $this->requestSignFlowOf($req);
 
+        if ($signFlow['missing']) {
+            return redirect()->back()
+                ->with('error', $this->signFlowMissingMessage())
+                ->with('activeTab', $req->type);
+        }
+
+        $signSteps = $signFlow['steps'];
+        $stepCount = $signSteps->count();
         $flow = $this->submitPayload($stepCount);
 
-        DB::transaction(function () use ($req, $flow, $stepCount) {
+        DB::transaction(function () use ($req, $flow, $stepCount, $signSteps) {
             DB::table(self::REQ_LIST)->where('id', $req->id)->update($flow + [
                 'sign_step_count' => $stepCount,
                 'submitted_by' => $this->actor(),
@@ -516,14 +561,8 @@ class MaterialExportController extends Controller
                 'updated_at' => now(),
             ]);
 
-            DB::table(self::REQ_SIGN)->where('request_list_id', $req->id)->where('active', 1)->update([
-                'status' => 'pending',
-                'signed_by' => null,
-                'signed_at' => null,
-                'reject_reason' => null,
-                'updated_by' => $this->actor(),
-                'updated_at' => now(),
-            ]);
+            $this->deactivateSigns($req->id);
+            $this->insertRequestSigns($req->id, $signSteps);
         });
 
         AuditTrialController::log(
@@ -581,6 +620,8 @@ class MaterialExportController extends Controller
             DB::table(self::REQ_SIGN)->where('id', $sign->id)->update([
                 'status' => 'signed',
                 'signed_by' => $this->actor(),
+                // Bước giao cho nhiều người: ghi rõ AI trong danh sách đã ký
+                'signed_user_id' => (int) (session('user')['userId'] ?? 0) ?: null,
                 'signed_at' => $signedAt,
                 'updated_by' => $this->actor(),
                 'updated_at' => $signedAt,
@@ -741,54 +782,185 @@ class MaterialExportController extends Controller
     }
 
     /**
-     * Ghi QUY TRÌNH KÝ của một phiếu: mỗi phần tử signers[] là một bước, theo đúng thứ tự
-     * người dùng xếp trên form.
+     * Ghi QUY TRÌNH KÝ của một phiếu: chép các bước của quy trình đã khai ở dữ liệu gốc
+     * sang phiếu, theo đúng thứ tự ký.
+     *
+     * Một bước giao cho NHIỀU người thì mỗi người một dòng trong REQ_CANDIDATE - chỉ cần
+     * MỘT trong số họ ký là xong bước. Phải chụp lại danh sách trên phiếu chứ không đọc
+     * thẳng dữ liệu gốc: quy trình gốc đổi người sau này thì phiếu đang ký dở vẫn giữ đúng
+     * danh sách lúc trình ký (21 CFR Part 11).
      */
-    private function insertRequestSigns(int $listId, Request $request): void
+    private function insertRequestSigns(int $listId, $steps): void
     {
-        $people = $this->signerOptions()->keyBy('id');
+        foreach (collect($steps)->values() as $index => $step) {
+            $signers = collect($step->signers ?? []);
 
-        foreach ($this->signerIds($request) as $index => $userId) {
-            $person = $people->get($userId);
-
-            DB::table(self::REQ_SIGN)->insert([
+            $signId = DB::table(self::REQ_SIGN)->insertGetId([
                 'request_list_id' => $listId,
                 'step_no' => $index + 1,
-                'user_id' => $userId,
-                'user_name' => $person ? $this->personName($person) : null,
+                // Người ký đọc ở REQ_CANDIDATE; cột user_id chỉ còn dùng cho phiếu cũ
+                'user_id' => null,
+                'user_name' => MaterialSignFlow::stepSignerNames($step),
+                // Giữ cả vai trò của bước: quy trình gốc đổi người ký sau này thì phiếu cũ
+                // vẫn đọc được bước này do cấp nào duyệt
+                'role_names' => $step->role_name,
                 'status' => 'pending',
                 'active' => 1,
                 'created_by' => $this->actor(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            foreach ($signers as $signer) {
+                DB::table(self::REQ_CANDIDATE)->insert([
+                    'sign_id' => $signId,
+                    'user_id' => $signer->user_id,
+                    'user_name' => $signer->user_name,
+                    'active' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
+    }
+
+    /**
+     * Gắn danh sách NGƯỜI ĐƯỢC KÝ vào các dòng bước ký đã đọc ra.
+     *
+     * Mỗi dòng nhận thêm ->candidates (id + tên) và ->signer_full_name (tên ghép để hiện
+     * trên bảng). Phiếu cũ chỉ có user_id đích danh thì không có dòng candidate nào, lúc
+     * đó giữ nguyên cách đọc cũ.
+     */
+    private function attachCandidates($signs)
+    {
+        $signs = collect($signs);
+
+        if ($signs->isEmpty()) {
+            return $signs;
+        }
+
+        $candidates = DB::table(self::REQ_CANDIDATE)
+            ->leftJoin('user_management', 'user_management.id', '=', self::REQ_CANDIDATE.'.user_id')
+            ->select(
+                self::REQ_CANDIDATE.'.sign_id',
+                self::REQ_CANDIDATE.'.user_id',
+                self::REQ_CANDIDATE.'.user_name',
+                'user_management.fullName as full_name'
+            )
+            ->whereIn(self::REQ_CANDIDATE.'.sign_id', $signs->pluck('id'))
+            ->where(self::REQ_CANDIDATE.'.active', 1)
+            ->orderBy(self::REQ_CANDIDATE.'.id', 'asc')
+            ->get()
+            ->groupBy('sign_id');
+
+        foreach ($signs as $sign) {
+            $rows = $candidates->get($sign->id, collect());
+
+            $sign->candidates = $rows;
+            $sign->candidate_ids = $rows->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+
+            if ($rows->isNotEmpty()) {
+                $sign->signer_full_name = $rows
+                    ->map(fn ($row) => $row->full_name ?: $row->user_name ?: 'NA')
+                    ->implode(' / ');
+            }
+        }
+
+        return $signs;
+    }
+
+    /**
+     * QUY TRÌNH KÝ của một phiếu, suy từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật Tư".
+     *
+     * Mỗi dòng vật tư khớp một quy trình theo phân loại của nó; phiếu lấy quy trình nhiều
+     * bước nhất. Người lập phiếu không khai và không sửa được quy trình này.
+     *
+     * @return array{steps: \Illuminate\Support\Collection, flow: ?object, missing: bool}
+     */
+    private function requestSignFlow(Request $request, int $departmentId): array
+    {
+        $categoryIds = collect((array) $request->input('items', []))
+            ->map(fn ($item) => (int) ($item['category_id'] ?? 0))
+            ->all();
+
+        return MaterialSignFlow::resolveForItems($departmentId, $categoryIds);
+    }
+
+    /** Quy trình ký của một phiếu ĐÃ LƯU - đọc các dòng còn hiệu lực ngay trong CSDL. */
+    private function requestSignFlowOf($req): array
+    {
+        $categoryIds = DB::table(self::REQ_ITEM)
+            ->where('request_list_id', $req->id)
+            ->where('active', 1)
+            ->pluck('category_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return MaterialSignFlow::resolveForItems((int) $req->department_id, $categoryIds);
+    }
+
+    /**
+     * Quy trình ký của từng vật tư, rút gọn thành dữ liệu JSON cho JS.
+     *
+     * Khối "Quy trình ký duyệt" trên modal là CHỈ ĐỌC và phải đổi theo dòng vật tư người
+     * lập đang chọn, nên gửi sẵn cả bảng tra xuống trình duyệt thay vì gọi lại server mỗi
+     * lần đổi dòng.
+     */
+    private function signFlowMapForView(int $departmentId): array
+    {
+        $map = MaterialSignFlow::mapForDepartment($departmentId);
+
+        $shrink = fn ($matched) => $matched === null ? null : [
+            'name' => $matched['flow']->name,
+            'steps' => $matched['steps']->map(fn ($step) => [
+                'no' => (int) $step->step_no,
+                'role' => $step->role_name ?: 'NA',
+                // Một bước giao cho nhiều người: chỉ cần MỘT trong số họ ký là xong bước
+                'users' => collect($step->signers)->map(fn ($signer) => [
+                    'name' => MaterialSignFlow::signerLabel($signer),
+                    'dept' => $signer->signer_department_short ?: '',
+                    // Người ký đã nghỉ / bị khoá tài khoản thì phải khai lại quy trình gốc
+                    'inactive' => ! $signer->signer_active,
+                ])->values()->all(),
+            ])->values()->all(),
+        ];
+
+        return [
+            'byCategory' => collect($map['byCategory'])->map($shrink)->all(),
+            'fallback' => $shrink($map['fallback']),
+        ];
+    }
+
+    /**
+     * Câu báo lỗi khi phiếu có dòng vật tư chưa khớp quy trình ký nào.
+     * Phải khai dữ liệu gốc trước mới trình ký được - không cho khai tay bù vào.
+     */
+    private function signFlowMissingMessage(): string
+    {
+        return 'Có dòng vật tư chưa khớp quy trình trình ký nào của phòng nên chưa trình ký được. '
+            .'Vào Dữ Liệu Gốc → Trình Ký Đề Nghị CP Vật Tư để khai quy trình cho phân loại tương ứng '
+            .'(vật tư tự nhập ngoài danh mục cần một quy trình khai điều kiện "Tất cả").';
     }
 
     /** Sửa phiếu là khai lại quy trình: không xoá cứng, chỉ bỏ hiệu lực các bước cũ. */
     private function deactivateSigns(int $listId): void
     {
+        $signIds = DB::table(self::REQ_SIGN)->where('request_list_id', $listId)->pluck('id');
+
+        if ($signIds->isNotEmpty()) {
+            DB::table(self::REQ_CANDIDATE)->whereIn('sign_id', $signIds)->update([
+                'active' => 0,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+        }
+
         DB::table(self::REQ_SIGN)->where('request_list_id', $listId)->update([
             'active' => 0,
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
-    }
-
-    /** Id người ký trên form, giữ nguyên thứ tự và bỏ các ô để trống. */
-    private function signerIds(Request $request): array
-    {
-        $ids = [];
-
-        foreach ((array) $request->input('signers', []) as $value) {
-            $id = (int) $value;
-
-            if ($id > 0 && ! in_array($id, $ids, true)) {
-                $ids[] = $id;
-            }
-        }
-
-        return $ids;
     }
 
     /**
@@ -863,6 +1035,7 @@ class MaterialExportController extends Controller
             ->whereIn(self::REQ_SIGN.'.request_list_id', $listIds)
             ->orderBy(self::REQ_SIGN.'.step_no', 'asc')
             ->get()
+            ->pipe(fn ($rows) => $this->attachCandidates($rows))
             ->groupBy('request_list_id');
     }
 
@@ -873,11 +1046,13 @@ class MaterialExportController extends Controller
             return null;
         }
 
-        return DB::table(self::REQ_SIGN)
+        $sign = DB::table(self::REQ_SIGN)
             ->where('request_list_id', $req->id)
             ->where('active', 1)
             ->where('step_no', (int) $req->current_step)
             ->first();
+
+        return $sign ? $this->attachCandidates([$sign])->first() : null;
     }
 
     /** Bước đang chờ ký, lấy từ bộ bước đã nạp sẵn ở index() để khỏi truy vấn lại từng phiếu. */
@@ -893,13 +1068,18 @@ class MaterialExportController extends Controller
     /**
      * Người đang đăng nhập có ký được bước này không.
      *
-     * Phiếu mới chỉ định đích danh user_id. Phiếu cũ (chuyển từ luồng Trưởng Phòng ->
-     * Ban Giám Đốc) không có user_id nên vẫn cho ai thuộc role ghi ở role_names ký,
-     * đúng như trước đây.
+     * Phiếu mới giao bước cho MỘT HOẶC NHIỀU người (REQ_CANDIDATE) - ai trong danh sách
+     * đó ký cũng được, và chỉ cần một người ký là xong bước. Phiếu chỉ định đích danh một
+     * người (user_id) và phiếu cũ khai theo chức danh (role_names) vẫn đọc như trước.
      */
     private function canSignRow($sign): bool
     {
         $userId = (int) (session('user')['userId'] ?? 0);
+        $candidateIds = $sign->candidate_ids ?? null;
+
+        if ($candidateIds) {
+            return in_array($userId, $candidateIds, true);
+        }
 
         if ($sign->user_id) {
             return (int) $sign->user_id === $userId;
@@ -1000,7 +1180,11 @@ class MaterialExportController extends Controller
             })
             ->leftJoin('deparments', self::REQ_LIST.'.department_id', '=', 'deparments.id')
             ->where(self::REQ_LIST.'.app_status', 'pending_sign')
-            ->where(self::REQ_SIGN.'.user_id', $myUserId)
+            ->join(self::REQ_CANDIDATE, function ($join) use ($myUserId) {
+                $join->on(self::REQ_CANDIDATE.'.sign_id', '=', self::REQ_SIGN.'.id')
+                    ->where(self::REQ_CANDIDATE.'.active', 1)
+                    ->where(self::REQ_CANDIDATE.'.user_id', $myUserId);
+            })
             ->where(self::REQ_SIGN.'.status', 'pending')
             ->when($companyDeptIds !== null, fn ($query) => $query->whereIn(self::REQ_LIST.'.department_id', $companyDeptIds))
             ->select(
@@ -1043,64 +1227,6 @@ class MaterialExportController extends Controller
         ];
     }
 
-    /**
-     * Người có thể được chọn làm người ký: user đang hoạt động thuộc CÙNG CÔNG TY với
-     * phòng ban đang chọn, để còn trình ký lên cấp trên ngoài phòng (Ban Giám Đốc...).
-     *
-     * Một lần lưu phiếu hỏi tới danh sách này nhiều lần (dựng rule, ghi bước ký, đổ ô
-     * chọn) nên giữ lại kết quả trong suốt request.
-     */
-    private function signerOptions()
-    {
-        if ($this->signerOptions !== null) {
-            return $this->signerOptions;
-        }
-
-        $companyId = CompanyContext::currentId();
-        $departmentIds = CompanyContext::departmentIds($companyId);
-
-        return $this->signerOptions = DB::table('user_management')
-            ->leftJoin('deparments', 'deparments.id', '=', 'user_management.deparment_id')
-            ->leftJoin('roles', 'roles.id', '=', 'user_management.role_id')
-            ->select(
-                'user_management.id',
-                'user_management.fullName',
-                'user_management.userName',
-                'deparments.shortName as department_short',
-                'roles.name as role_name'
-            )
-            ->where('user_management.isActive', 1)
-            ->when($companyId, fn ($query) => $query->where(function ($sub) use ($companyId, $departmentIds) {
-                /*
-                | Công ty của một người suy từ PHÒNG BAN họ làm việc, giống cách
-                | CompanyContext suy công ty của phiên đăng nhập - cột company_id trên
-                | user_management có thể còn lệch với phòng ban đã đổi sau này.
-                */
-                if ($departmentIds) {
-                    $sub->whereIn('user_management.deparment_id', $departmentIds);
-                }
-
-                // Tài khoản chưa gắn phòng ban thì mới xét tới cột công ty của chính họ
-                $sub->orWhere(fn ($q) => $q->whereNull('user_management.deparment_id')
-                    ->where('user_management.company_id', $companyId));
-            }))
-            ->orderBy('user_management.fullName', 'asc')
-            ->get();
-    }
-
-    /** "Họ Tên (userName)" - cùng dạng với App\Support\Signer::actor() để đối chiếu chữ ký. */
-    private function personName($person): string
-    {
-        $fullName = trim((string) ($person->fullName ?? ''));
-        $userName = trim((string) ($person->userName ?? ''));
-
-        if ($userName === '') {
-            return $fullName ?: 'NA';
-        }
-
-        return $fullName !== '' ? $fullName.' ('.$userName.')' : $userName;
-    }
-
     /* ---------- Thông báo cho người phải xử lý tiếp ---------- */
 
     /** Sau khi trình ký: báo người ký bước 1, hoặc báo thẳng người cấp phát khi 0 bước. */
@@ -1128,8 +1254,24 @@ class MaterialExportController extends Controller
             ->where('step_no', $stepNo)
             ->first();
 
+        if (! $sign) {
+            return;
+        }
+
+        // Bước giao cho nhiều người thì báo cho tất cả - ai ký trước cũng được
+        $userIds = DB::table(self::REQ_CANDIDATE)
+            ->where('sign_id', $sign->id)
+            ->where('active', 1)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
         // Phiếu cũ khai theo role chứ không đích danh ai thì không có người để báo
-        if (! $sign || ! $sign->user_id) {
+        if (! $userIds && $sign->user_id) {
+            $userIds = [(int) $sign->user_id];
+        }
+
+        if (! $userIds) {
             return;
         }
 
@@ -1137,7 +1279,7 @@ class MaterialExportController extends Controller
             'Đề nghị cấp phát vật tư '.$req->code.' đang chờ bạn ký duyệt (bước '.$stepNo.'/'.$stepCount.').',
             'Chờ ký duyệt',
             $req,
-            [(int) $sign->user_id]
+            $userIds
         );
     }
 
@@ -1696,6 +1838,97 @@ class MaterialExportController extends Controller
             'unit' => $row->unit_short_name,
             'technical_specification' => $row->technical_specification,
         ]);
+    }
+
+    /**
+     * category_id -> {remaining, available} của TOÀN BỘ danh mục vật tư trong phòng, dùng để
+     * dựng lại 2 cột "Tồn" / "Tồn khả dụng" ở bảng dòng đề nghị cấp phát mỗi khi mở modal
+     * tạo/sửa - xem categoryStockMap().
+     */
+    public function requestStockMap(Request $request)
+    {
+        return response()->json([
+            'ok' => true,
+            'stock' => (object) $this->categoryStockMap($this->departmentId())->all(),
+        ]);
+    }
+
+    /**
+     * "Đề nghị dự trù vật tư" bấm ngay trên một dòng đề nghị của modal Thường Quy / Theo ĐG
+     * Rủi Ro - không phụ thuộc đề nghị đó có được lưu hay không, bắt buộc nêu lý do dự trù.
+     * Hiện lại ở tab "Danh sách vật tư cần dự trù" bên Dự Trù Vật Tư - xem
+     * App\Support\MaterialWatchlist.
+     */
+    public function watchlistRemember(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'category_id' => ['nullable', 'integer', 'exists:material_categories,id'],
+            'material_name' => ['nullable', 'max:255'],
+            'technical_specification' => ['nullable', 'max:255'],
+            'note' => ['required', 'max:500'],
+            'source_type' => ['nullable', 'in:regular,risk_assessment'],
+        ], [
+            'note.required' => 'Vui lòng nhập lý do dự trù.',
+            'note.max' => 'Lý do dự trù tối đa 500 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()]);
+        }
+
+        $result = MaterialWatchlist::remember(
+            $this->departmentId(),
+            $request->category_id ? (int) $request->category_id : null,
+            $request->material_name,
+            $request->technical_specification,
+            $request->note,
+            $request->source_type,
+            $this->actor()
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * Tồn hiện tại và "tồn khả dụng" của từng danh mục vật tư trong phòng.
+     *
+     * "Tồn khả dụng" = tồn - phần các đề nghị KHÁC (đang chờ ký, hoặc đã duyệt nhưng kho
+     * chưa cấp đủ) đã giữ chỗ, tính động mỗi lần gọi - KHÁC với cột "Tồn" lưu tĩnh trên
+     * từng dòng đề nghị (material_request_items.stock_at_request, chụp một lần lúc thêm
+     * dòng, không tính lại). Đề nghị đang sửa (draft/rejected) chưa từng giữ chỗ nên không
+     * cần loại trừ khỏi phần đang giữ chỗ.
+     */
+    private function categoryStockMap(int $departmentId, ?\Illuminate\Support\Collection $availableImports = null): \Illuminate\Support\Collection
+    {
+        $availableImports ??= $this->importOptions($departmentId);
+
+        $remaining = $availableImports->where('suggestable', true)
+            ->groupBy('category_id')
+            ->map(fn ($group) => (float) $group->sum('remaining'));
+
+        $reserved = DB::table(self::REQ_ITEM)
+            ->join(self::REQ_LIST, self::REQ_LIST.'.id', '=', self::REQ_ITEM.'.request_list_id')
+            ->where(self::REQ_LIST.'.department_id', $departmentId)
+            ->whereIn(self::REQ_ITEM.'.status', ['pending', 'partial'])
+            ->where(self::REQ_ITEM.'.active', 1)
+            ->whereNotNull(self::REQ_ITEM.'.category_id')
+            ->where(function ($q) {
+                $q->where(self::REQ_LIST.'.app_status', 'pending_sign')
+                    ->orWhere(function ($q2) {
+                        $q2->where(self::REQ_LIST.'.app_status', 'approved')
+                            ->whereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES);
+                    });
+            })
+            ->groupBy(self::REQ_ITEM.'.category_id')
+            ->selectRaw(self::REQ_ITEM.'.category_id as category_id, SUM('.self::REQ_ITEM.'.requested_amount - COALESCE('.self::REQ_ITEM.'.issued_amount, 0)) as reserved')
+            ->pluck('reserved', 'category_id');
+
+        return $remaining->keys()->merge($reserved->keys())->unique()->mapWithKeys(function ($categoryId) use ($remaining, $reserved) {
+            $rem = (float) ($remaining[$categoryId] ?? 0);
+            $res = (float) ($reserved[$categoryId] ?? 0);
+
+            return [$categoryId => ['remaining' => $rem, 'available' => $rem - $res]];
+        });
     }
 
 
@@ -2742,6 +2975,12 @@ class MaterialExportController extends Controller
                 'technical_specification' => $this->nullIfBlank($item['technical_specification'] ?? null),
                 'requested_amount' => (float) ($item['requested_amount'] ?? 0),
                 'requested_unit' => $this->nullIfBlank($item['requested_unit'] ?? null),
+                // Tồn của danh mục tại đúng lúc dòng này được thêm - chụp một lần từ trình
+                // duyệt (dòng cũ giữ nguyên giá trị cũ, dòng mới/mới đổi danh mục lấy giá trị
+                // hiện tại), không tính lại ở đây để tránh đổi ngược lịch sử khi sửa đề nghị.
+                'stock_at_request' => isset($item['stock_at_request']) && $item['stock_at_request'] !== ''
+                    ? (float) $item['stock_at_request']
+                    : null,
                 'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
                 'note' => $this->nullIfBlank($item['note'] ?? null),
                 'status' => 'pending',
@@ -3051,15 +3290,13 @@ class MaterialExportController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],
             'needed_date' => ['nullable', 'date'],
-            // Quy trình ký: mảng rỗng = 0 bước, phiếu đi thẳng đến người cấp phát
-            'signers' => ['nullable', 'array', 'max:20'],
-            'signers.*' => ['required', 'integer', 'distinct', Rule::in($this->signerOptions()->pluck('id')->all())],
             'items' => ['required', 'array', 'min:1'],
             'items.*.category_id' => ['nullable'],
             'items.*.material_name' => ['nullable', 'string', 'max:255'],
             'items.*.technical_specification' => ['nullable', 'string', 'max:255'],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
+            'items.*.stock_at_request' => ['nullable', 'numeric'],
             'items.*.purpose' => ['nullable', 'string', 'max:500'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
         ];
@@ -3068,10 +3305,6 @@ class MaterialExportController extends Controller
     private function requestMessages(): array
     {
         return [
-            'signers.max' => 'Quy trình ký duyệt tối đa 20 bước.',
-            'signers.*.required' => 'Vui lòng chọn người ký cho mỗi bước duyệt, hoặc xoá bước đó đi.',
-            'signers.*.distinct' => 'Một người chỉ được ký một bước trong cùng đề nghị.',
-            'signers.*.in' => 'Người ký được chọn không thuộc công ty của bạn.',
             'items.required' => 'Vui lòng thêm ít nhất một vật tư đề nghị.',
             'items.min' => 'Vui lòng thêm ít nhất một vật tư đề nghị.',
             'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',

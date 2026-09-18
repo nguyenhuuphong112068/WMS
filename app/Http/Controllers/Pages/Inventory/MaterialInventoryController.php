@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
 use App\Support\InventoryChart;
+use App\Support\MaterialAvailabilityForecast;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -81,6 +82,8 @@ class MaterialInventoryController extends Controller
             'zoneMap' => $this->zoneMap($datas, $zones),
             // Tab KIỂM KÊ ĐỊNH KỲ - chu kỳ 1 tháng 1 lần, xem MaterialStocktakeController
             'stocktake' => MaterialStocktakeController::panel($departmentId),
+            // Tab KHẢ DỤNG THÁNG TỚI - xem App\Support\MaterialAvailabilityForecast
+            'forecast' => MaterialAvailabilityForecast::build($departmentId, $request->query('forecast_month')),
             'states' => self::STATES,
             'period' => $period,
             'nearExpiryDays' => self::NEAR_EXPIRY_DAYS,

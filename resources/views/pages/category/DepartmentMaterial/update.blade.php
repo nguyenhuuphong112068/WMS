@@ -29,6 +29,25 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-6">
+                            <label>Phân Loại Của Phòng</label>
+                            <select name="classification_id"
+                                class="form-control cat-select {{ $bag->has('classification_id') ? 'is-invalid' : '' }}">
+                                <option value="">-- Chưa phân loại --</option>
+                                @foreach ($classifications as $classification)
+                                    <option value="{{ $classification->id }}"
+                                        {{ $old('classification_id') == $classification->id ? 'selected' : '' }}>
+                                        {{ $classification->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @if ($bag->has('classification_id'))
+                                <span class="md-error">{{ $bag->first('classification_id') }}</span>
+                            @endif
+                            <small class="md-sub">Bộ nhóm riêng của phòng, khai ở
+                                <b>Dữ Liệu Gốc → Phân Loại</b>.</small>
+                        </div>
+
+                        <div class="form-group col-md-6">
                             <label>Đơn Vị Tính <span class="text-danger">*</span></label>
                             <select name="unit_id"
                                 class="form-control cat-select dm-unit {{ $bag->has('unit_id') ? 'is-invalid' : '' }}" required>

@@ -920,18 +920,55 @@
         }
 
         /* ---------- Xử lý Ngày Hẹn Đáp Ứng ---------- */
+        $('.input-promised-date').on('focus', function() {
+            $(this).data('prev-value', $(this).val());
+        });
+
         $('.input-promised-date').on('change', function() {
             var $input = $(this);
             var dateVal = $input.val();
+            var prevValue = $input.data('prev-value') || '';
             var route = $input.data('route');
             var itemId = $input.closest('form').find('[name="id"]').val();
 
+            Swal.fire({
+                title: 'Lý do thay đổi ngày hẹn',
+                text: 'Vui lòng nhập lý do thay đổi ngày hẹn đáp ứng.',
+                icon: 'question',
+                input: 'textarea',
+                inputPlaceholder: 'Nhập lý do thay đổi ngày hẹn đáp ứng...',
+                inputAttributes: {
+                    maxlength: '500'
+                },
+                showCancelButton: true,
+                confirmButtonColor: '#2E7BC4',
+                cancelButtonColor: '#94A3B8',
+                confirmButtonText: 'Xác nhận',
+                cancelButtonText: 'Huỷ',
+                preConfirm: (reason) => {
+                    if (!reason || !reason.trim()) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do thay đổi');
+                    }
+                    return reason;
+                }
+            }).then(function(result) {
+                if (!result.isConfirmed) {
+                    $input.val(prevValue);
+                    return;
+                }
+                submitPromisedDate($input, route, itemId, dateVal, result.value);
+            });
+        });
+
+        function submitPromisedDate($input, route, itemId, dateVal, reason) {
             $.post(route, {
                 _token: $('input[name="_token"]').first().val(),
                 id: itemId,
-                promised_date: dateVal
+                promised_date: dateVal,
+                reason: reason
             }).done(function(res) {
                 if (res.success) {
+                    $input.data('prev-value', dateVal);
                     var $daysLeft = $input.closest('form').find('.promised-date-days-left');
                     if (dateVal) {
                         var promised = new Date(dateVal);
@@ -961,12 +998,14 @@
                         }
                     }
                 } else {
+                    $input.val($input.data('prev-value') || '');
                     alert(res.message || 'Lỗi');
                 }
             }).fail(function() {
+                $input.val($input.data('prev-value') || '');
                 alert('Có lỗi xảy ra!');
             });
-        });
+        }
 
         // History modal
         if ($('#promisedDateHistoryModal').length === 0) {

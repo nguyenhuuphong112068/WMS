@@ -20,6 +20,7 @@
                         <th style="width: 170px">Tên Vật Tư</th>
                         <th style="width: 150px">Nhà Sản Xuất</th>
                         <th>Thông Tin Kỹ Thuật</th>
+                        <th style="width: 130px">Phân Loại</th>
                         <th class="text-center" style="width: 65px">Đơn Vị</th>
                         <th class="text-right" style="width: 120px">Ngưỡng Tồn Tối Thiểu</th>
                         <th class="text-right" style="width: 120px">Ngưỡng Tồn Tối Đa</th>
@@ -46,6 +47,13 @@
                                 @endif
                             </td>
                             <td class="md-sub">{{ $row->category_technical_specification ?: '—' }}</td>
+                            <td>
+                                @if ($row->classification_name)
+                                    <span class="md-tag">{{ $row->classification_name }}</span>
+                                @else
+                                    <span class="md-empty">—</span>
+                                @endif
+                            </td>
                             <td class="text-center">
                                 @if ($row->unit_short_name || $row->unit_name)
                                     <span class="md-tag"
@@ -96,24 +104,32 @@
                             </td>
                             <td>
                                 <div class="md-actions">
-                                    @perm('category_material_dept_manage')
-                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
-                                            data-modal="#dmUpdateModal"
-                                            data-row="{{ json_encode([
-                                                'id' => $row->id,
-                                                'category_id' => $row->category_id,
-                                                'unit_id' => $row->unit_id,
-                                                'min_stock' => $row->min_stock,
-                                                'max_stock' => $row->max_stock,
-                                                'default_location_id' => $row->default_location_id,
-                                                'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
-                                                'note' => $row->note,
-                                                'material_name' => $row->material_name,
-                                                'manufacturer_name' => $row->manufacturer_name,
-                                            ]) }}">
-                                            <i class="fas fa-edit"></i>
+                                    @if ($row->status_id == 1)
+                                        <button type="button" class="btn btn-sm btn-outline-warning btn-dm-watchlist" title="Đề nghị dự trù vật tư"
+                                            data-category-id="{{ $row->category_id }}">
+                                            <i class="fas fa-bookmark"></i>
                                         </button>
-                                    @endperm
+
+                                        @perm('category_material_dept_manage')
+                                            <button type="button" class="btn btn-sm btn-warning btn-md-edit" title="Sửa"
+                                                data-modal="#dmUpdateModal"
+                                                data-row="{{ json_encode([
+                                                    'id' => $row->id,
+                                                    'category_id' => $row->category_id,
+                                                    'classification_id' => $row->classification_id,
+                                                    'unit_id' => $row->unit_id,
+                                                    'min_stock' => $row->min_stock,
+                                                    'max_stock' => $row->max_stock,
+                                                    'default_location_id' => $row->default_location_id,
+                                                    'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                    'note' => $row->note,
+                                                    'material_name' => $row->material_name,
+                                                    'manufacturer_name' => $row->manufacturer_name,
+                                                ]) }}">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        @endperm
+                                    @endif
 
                                     @perm('category_material_dept_manage')
                                         <form class="form-md-confirm d-inline" data-require-reason="1" action="{{ route($mdRoute . 'deActive') }}"
@@ -139,4 +155,59 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        /*
+         | ĐỀ NGHỊ DỰ TRÙ VẬT TƯ - hỏi lý do dự trù rồi gửi AJAX ngay. Dòng đã khoá
+         | sẽ không hiển thị nút này. Hiện lại ở tab "Danh sách vật tư cần dự trù" bên Dự Trù
+         | Vật Tư - xem App\Support\MaterialWatchlist.
+         */
+        $(document).on('click', '.btn-dm-watchlist', function() {
+            var $btn = $(this);
+            var categoryId = $btn.data('category-id');
+
+            Swal.fire({
+                title: 'Đề nghị dự trù vật tư này?',
+                input: 'textarea',
+                inputLabel: 'Lý do dự trù',
+                inputPlaceholder: 'Nêu rõ lý do cần dự trù vật tư này...',
+                inputAttributes: { maxlength: '500' },
+                showCancelButton: true,
+                confirmButtonColor: '#2E7BC4',
+                cancelButtonColor: '#94A3B8',
+                confirmButtonText: 'Gửi đề nghị',
+                cancelButtonText: 'Huỷ',
+                preConfirm: function(value) {
+                    if (!value || !value.trim()) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do dự trù');
+                    }
+                    return value;
+                }
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+
+                $btn.prop('disabled', true);
+
+                $.post('{{ route($mdRoute . "watchlistRemember") }}', {
+                    _token: '{{ csrf_token() }}',
+                    category_id: categoryId,
+                    note: result.value
+                }).done(function(res) {
+                    Swal.fire({
+                        icon: res.success ? 'success' : 'error',
+                        title: res.success ? 'Đã gửi đề nghị!' : 'Có lỗi xảy ra',
+                        text: res.message || '',
+                        timer: res.success ? 1800 : undefined,
+                        showConfirmButton: !res.success
+                    });
+                }).fail(function() {
+                    Swal.fire({ icon: 'error', title: 'Có lỗi xảy ra', text: 'Vui lòng thử lại.' });
+                }).always(function() {
+                    $btn.prop('disabled', false);
+                });
+            });
+        });
+    });
+</script>
 
