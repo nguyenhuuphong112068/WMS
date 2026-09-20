@@ -47,6 +47,11 @@
     {{-- Đặt sau các phiếu chi tiết: dựng dòng cấp phát + bảng chọn mã xuất nhập cho mọi mục còn chờ --}}
     @include('pages.export.MaterialExport.issueLotPickerModal')
 
+    {{-- Tab "Soạn vật tư cấp phát": một modal chi tiết cho mỗi vật tư đang chờ soạn --}}
+    @foreach ($prepGroups as $prepIndex => $g)
+        @include('pages.export.MaterialExport.prepDetailModal', ['g' => $g, 'prepIndex' => $prepIndex])
+    @endforeach
+
     {{-- Tab "Đề nghị chuyển liên phòng ban" --}}
     @include('pages.export.MaterialExport.transferRequestModal')
     @include('pages.export.MaterialExport.transferRequestEditModal')

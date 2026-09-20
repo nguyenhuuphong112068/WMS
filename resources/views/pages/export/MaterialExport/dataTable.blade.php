@@ -26,6 +26,12 @@
                             @endif
                         </button>
                     @endforeach
+                    <button type="button" class="exp-tab {{ $activeTab === 'prepare' ? 'is-active' : '' }}" data-pane="mePanePrepare">
+                        <i class="fas fa-dolly mr-1"></i> Soạn vật tư cấp phát
+                        @if ($prepBadgeCount)
+                            <span class="exp-tab-count">{{ $prepBadgeCount }}</span>
+                        @endif
+                    </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}" data-pane="mePaneTransfer">
                         <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
                         {{-- Do Controller đếm trên toàn bộ dữ liệu, không chỉ trang đang xem --}}
@@ -200,6 +206,11 @@
                         ])
                     </div>
                 @endforeach
+
+                {{-- ============ SOẠN VẬT TƯ CẤP PHÁT ============ --}}
+                <div class="exp-pane {{ $activeTab === 'prepare' ? 'is-active' : '' }}" id="mePanePrepare">
+                    @include('pages.export.MaterialExport.preparePane')
+                </div>
 
                 {{-- ============ ĐỀ NGHỊ CHUYỂN LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.MaterialExport.transferPane')

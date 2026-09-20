@@ -7,10 +7,13 @@ use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
+use App\Support\MaterialClassification;
+use App\Support\MaterialTransferRequest;
 use App\Support\MaterialWatchlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * DỰ TRÙ - DỰ TRÙ VẬT TƯ
@@ -112,6 +115,12 @@ class MaterialEstimateController extends Controller
             'nextCode' => $this->nextCode($departmentId),
             'trackedItems' => $trackedItems,
             'watchlistItems' => $watchlistItems,
+            // Tab "Danh sách vật tư cần dự trù": cột + bộ lọc Bộ Phận Mua Hàng, và hai lối đi
+            // tiếp theo của các vật tư được chọn (lập phiếu dự trù / gửi đề nghị liên phòng ban)
+            'purchasingDepartments' => MaterialClassification::PURCHASING_DEPARTMENTS,
+            'units' => $this->unitOptions(),
+            'transferDepartments' => $this->transferDepartmentOptions($departmentId),
+            'adminDepartmentId' => $this->adminDepartmentId($departmentId),
             'activeTab' => $activeTab,
             'showApprovalInbox' => $inbox['show'],
             'inboxRequests' => $inbox['requests'],
@@ -182,6 +191,189 @@ class MaterialEstimateController extends Controller
 
         return redirect()->back()
             ->with('success', 'Đã bỏ ghi nhớ vật tư cần dự trù!')
+            ->with('activeTab', 'watchlist');
+    }
+
+    /**
+     * LẬP PHIẾU DỰ TRÙ TỪ TAB "DANH SÁCH VẬT TƯ CẦN DỰ TRÙ"
+     *
+     * Người dùng tick chọn các vật tư ngay trên tab rồi khai số lượng / tháng cần dùng cho
+     * từng dòng. Phiếu tạo ra giống hệt phiếu lập tay: một material_estimates trạng thái
+     * Nháp, mỗi vật tư một material_estimate_items kèm ĐÚNG MỘT dòng số lượng. Lưu xong mở
+     * thẳng trang chi tiết để người lập bổ sung thêm tháng / mặt hàng rồi trình ký.
+     *
+     * Vật tư do bộ phận nào mua cũng lập được phiếu dự trù - riêng vật tư của Hành Chánh
+     * còn có lối đi thứ hai là watchlistTransferStore() bên dưới.
+     */
+    public function watchlistEstimateStore(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules() + $this->watchlistItemRules(),
+            $this->messages() + $this->watchlistItemMessages()
+        );
+
+        $validator->after(function ($validator) use ($request) {
+            foreach ((array) $request->input('items', []) as $index => $item) {
+                if (empty($item['category_id']) && trim((string) ($item['material_name'] ?? '')) === '') {
+                    $validator->errors()->add('items.'.$index.'.material_name', 'Vật tư dòng '.($index + 1).' thiếu cả mã danh mục lẫn tên, không lập phiếu được.');
+                }
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'watchlistEstimateErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput()
+                ->with('activeTab', 'watchlist');
+        }
+
+        $items = (array) $request->input('items', []);
+
+        $result = DB::transaction(function () use ($request, $departmentId, $items) {
+            $code = $this->nextCode($departmentId);
+
+            $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
+                'code' => $code,
+                'department_id' => $departmentId,
+                'app_status' => 'draft',
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            foreach ($items as $item) {
+                $categoryId = ! empty($item['category_id']) ? (int) $item['category_id'] : null;
+
+                $itemId = DB::table(self::ITEM_TABLE)->insertGetId([
+                    'material_estimate_id' => $id,
+                    'category_id' => $categoryId,
+                    'material_name' => $categoryId ? null : $this->nullIfBlank($item['material_name'] ?? null),
+                    'technical_information' => $this->nullIfBlank($item['technical_information'] ?? null),
+                    'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                DB::table(self::AMOUNT_TABLE)->insert([
+                    'material_estimate_item_id' => $itemId,
+                    'amount' => (float) $item['amount'],
+                    'unit_id' => (int) $item['unit_id'],
+                    'for_month_year' => $item['for_month_year'].'-01',
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return ['id' => $id, 'code' => $code];
+        });
+
+        AuditTrialController::log(
+            'Thêm mới',
+            self::TABLE,
+            $result['id'],
+            'NA',
+            'Lập '.self::LABEL.' '.$result['code'].' từ danh sách vật tư cần dự trù ('.count($items).' mục)'
+        );
+
+        return redirect()->route(self::EST_ROUTE.'detail', ['id' => $result['id']])
+            ->with('success', 'Đã lập '.self::LABEL.' mã '.$result['code'].' với '.count($items).' vật tư đã chọn!');
+    }
+
+    /**
+     * GỬI ĐỀ NGHỊ LIÊN PHÒNG BAN TỪ TAB "DANH SÁCH VẬT TƯ CẦN DỰ TRÙ"
+     *
+     * Chỉ dành cho vật tư mà danh mục công ty khai BỘ PHẬN MUA HÀNG là Hành Chánh: thay vì
+     * đi hết quy trình dự trù, phòng gửi thẳng đề nghị xin vật tư cho phòng Hành Chánh
+     * (phòng này đang giữ hàng). Phiếu ghi vào cùng bộ bảng material_transfer_requests của
+     * tab "Đề nghị chuyển liên phòng ban" bên SỬ DỤNG VẬT TƯ, các bước cấp phát / nhận hàng
+     * tiếp theo xử lý ở đó.
+     *
+     * Vật tư ngoài danh mục không gửi được (không có category_id để phòng kia tra tồn).
+     */
+    public function watchlistTransferStore(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), [
+            'title' => ['required', 'string', 'max:255'],
+            'to_department_id' => ['required', 'exists:deparments,id', Rule::notIn([$departmentId])],
+            'needed_date' => ['nullable', 'date'],
+            'note' => ['nullable', 'string', 'max:500'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.category_id' => ['required', 'exists:material_categories,id'],
+            'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
+            'items.*.note' => ['nullable', 'string', 'max:500'],
+        ], [
+            'title.required' => 'Vui lòng nhập tiêu đề đề nghị.',
+            'to_department_id.required' => 'Vui lòng chọn phòng ban nhận đề nghị.',
+            'to_department_id.exists' => 'Phòng ban được chọn không tồn tại.',
+            'to_department_id.not_in' => 'Không thể gửi đề nghị liên phòng ban đến chính phòng mình.',
+            'needed_date.date' => 'Ngày cần dùng không hợp lệ.',
+            'note.max' => 'Ghi chú tối đa 500 ký tự.',
+            'items.required' => 'Vui lòng chọn ít nhất một vật tư để đề nghị.',
+            'items.min' => 'Vui lòng chọn ít nhất một vật tư để đề nghị.',
+            'items.*.category_id.required' => 'Vật tư ngoài danh mục không gửi đề nghị liên phòng ban được.',
+            'items.*.category_id.exists' => 'Vật tư được chọn không tồn tại trong danh mục.',
+            'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',
+            'items.*.requested_amount.numeric' => 'Số lượng đề nghị phải là số.',
+            'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'watchlistTransferErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput()
+                ->with('activeTab', 'watchlist');
+        }
+
+        $toDepartmentId = (int) $request->to_department_id;
+        $items = [];
+
+        foreach ((array) $request->input('items', []) as $item) {
+            $items[] = [
+                'category_id' => (int) $item['category_id'],
+                'requested_amount' => (float) $item['requested_amount'],
+                'requested_unit' => $this->nullIfBlank($item['requested_unit'] ?? null),
+                'note' => $this->nullIfBlank($item['note'] ?? null),
+            ];
+        }
+
+        $result = MaterialTransferRequest::create(
+            $departmentId,
+            $toDepartmentId,
+            [
+                'title' => $this->nullIfBlank($request->title),
+                'note' => $this->nullIfBlank($request->note),
+                'needed_date' => $this->nullIfBlank($request->needed_date),
+            ],
+            $items,
+            'pending',
+            $this->actor()
+        );
+
+        $toDeptName = DB::table('deparments')->where('id', $toDepartmentId)->value('name') ?: 'phòng ban được chọn';
+
+        AuditTrialController::log(
+            'Tạo đề nghị chuyển vật tư liên phòng ban',
+            MaterialTransferRequest::TABLE,
+            $result['id'],
+            'NA',
+            'Tạo đề nghị '.$result['code'].' gửi đến '.$toDeptName.' ('.count($items).' mục) từ danh sách vật tư cần dự trù'
+        );
+
+        return redirect()->back()
+            ->with('success', 'Đã gửi đề nghị liên phòng ban '.$result['code'].' đến '.$toDeptName.'! Theo dõi tiếp ở Sử Dụng Vật Tư - tab "Đề nghị chuyển liên phòng ban".')
             ->with('activeTab', 'watchlist');
     }
 
@@ -1109,6 +1301,72 @@ class MaterialEstimateController extends Controller
     /* ==========================================================
      |  KIỂM TRA DỮ LIỆU NHẬP
      ========================================================== */
+
+    /**
+     * Phòng ban có thể nhận đề nghị liên phòng ban (mọi phòng còn hoạt động, trừ phòng mình).
+     */
+    private function transferDepartmentOptions(int $departmentId)
+    {
+        return DB::table('deparments')
+            ->select('id', 'name', 'shortName')
+            ->where('isActive', 1)
+            ->where('id', '!=', $departmentId)
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Phòng Hành Chánh để điền sẵn vào ô "Phòng ban nhận đề nghị" - dò theo tên vì bộ phận
+     * mua hàng khai ở danh mục là một mã (admin), không trỏ tới deparments.id. Không tìm
+     * thấy thì để người dùng tự chọn.
+     */
+    private function adminDepartmentId(int $departmentId): ?int
+    {
+        $id = DB::table('deparments')
+            ->where('isActive', 1)
+            ->where('id', '!=', $departmentId)
+            ->where(function ($q) {
+                $q->where('name', 'LIKE', '%Hành Ch%')
+                    ->orWhere('shortName', 'LIKE', 'HC%');
+            })
+            ->orderBy('id', 'asc')
+            ->value('id');
+
+        return $id ? (int) $id : null;
+    }
+
+    /** Quy tắc cho các dòng vật tư chọn từ tab "Danh sách vật tư cần dự trù". */
+    private function watchlistItemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.category_id' => ['nullable', 'exists:material_categories,id'],
+            'items.*.material_name' => ['nullable', 'max:255'],
+            'items.*.technical_information' => ['nullable', 'max:1000'],
+            'items.*.purpose' => ['nullable', 'max:1000'],
+            'items.*.amount' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.unit_id' => ['required', 'exists:units,id'],
+            'items.*.for_month_year' => ['required', 'date_format:Y-m'],
+        ];
+    }
+
+    private function watchlistItemMessages(): array
+    {
+        return [
+            'items.required' => 'Vui lòng chọn ít nhất một vật tư để lập phiếu dự trù.',
+            'items.min' => 'Vui lòng chọn ít nhất một vật tư để lập phiếu dự trù.',
+            'items.*.category_id.exists' => 'Vật tư được chọn không tồn tại trong danh mục.',
+            'items.*.material_name.max' => 'Tên vật tư tối đa 255 ký tự.',
+            'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'items.*.amount.required' => 'Vui lòng nhập số lượng dự trù cho mọi vật tư đã chọn.',
+            'items.*.amount.numeric' => 'Số lượng dự trù phải là số.',
+            'items.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính cho mọi vật tư đã chọn.',
+            'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'items.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng cho mọi vật tư đã chọn.',
+            'items.*.for_month_year.date_format' => 'Tháng cần dùng không hợp lệ.',
+        ];
+    }
 
     private function rules(): array
     {

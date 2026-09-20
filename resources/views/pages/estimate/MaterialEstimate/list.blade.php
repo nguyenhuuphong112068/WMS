@@ -23,6 +23,11 @@
     @include('pages.estimate.MaterialEstimate.create')
     @include('pages.estimate.MaterialEstimate.update')
     @include('pages.estimate.MaterialEstimate.reject')
+
+    {{-- Hai lối đi của các vật tư chọn ở tab "Danh sách vật tư cần dự trù" --}}
+    @include('pages.estimate.MaterialEstimate.watchlistEstimate')
+    @include('pages.estimate.MaterialEstimate.watchlistTransfer')
+
     @include('pages.estimate.shared.submitModal')
     @include('pages.estimate.shared.historyModal')
 

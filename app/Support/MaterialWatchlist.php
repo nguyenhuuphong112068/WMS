@@ -34,9 +34,11 @@ class MaterialWatchlist
             ->select(
                 'material_categories.id as category_id',
                 'material_categories.technical_specification',
+                'material_categories.purchasing_department',
                 'material_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 DepartmentMaterial::TABLE.'.min_stock',
+                DepartmentMaterial::TABLE.'.unit_id',
                 'units.short_name as unit_short_name'
             )
             ->where(DepartmentMaterial::TABLE.'.department_id', $departmentId)
@@ -76,8 +78,10 @@ class MaterialWatchlist
             ->select(
                 self::TABLE.'.*',
                 'material_categories.technical_specification as category_technical_specification',
+                'material_categories.purchasing_department',
                 'material_names.name as category_material_name',
                 'manufacturers.short_name as manufacturer_short_name',
+                DepartmentMaterial::UNIT_ALIAS.'.unit_id',
                 'units.short_name as unit_short_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
@@ -103,6 +107,8 @@ class MaterialWatchlist
                 'technical_specification' => $t->technical_specification,
                 'manufacturer_name' => $t->manufacturer_short_name,
                 'unit' => $t->unit_short_name,
+                'unit_id' => $t->unit_id,
+                'purchasing_department' => $t->purchasing_department,
                 'on_hand' => $t->on_hand,
                 'min_stock' => $t->min_stock,
                 'below_threshold' => true,
@@ -133,6 +139,8 @@ class MaterialWatchlist
                 'technical_specification' => $r->category_id ? $r->category_technical_specification : $r->technical_specification,
                 'manufacturer_name' => $r->manufacturer_short_name,
                 'unit' => $r->unit_short_name,
+                'unit_id' => $r->unit_id,
+                'purchasing_department' => $r->purchasing_department,
                 'on_hand' => null,
                 'min_stock' => null,
                 'below_threshold' => false,

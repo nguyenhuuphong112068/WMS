@@ -260,6 +260,14 @@ class MaterialExportController extends Controller
         $lotsByCategory = $availableImports->groupBy('category_id');
         $issuePlans = $this->issuePlans($requestLists, $requestItems, $lotsByCategory);
 
+        /*
+        | Tab "Soạn vật tư cấp phát": gom phần CÒN PHẢI CẤP của mọi đề nghị đã duyệt theo
+        | từng vật tư (không theo phiếu) để kho soạn hàng một lượt trước khi bấm cấp phát.
+        | Đọc thẳng từ DB chứ không dựa vào 3 trang đề nghị đang hiện - phiếu nằm ở trang
+        | sau vẫn phải được soạn.
+        */
+        $prep = $this->preparationData($departmentId, $lotsByCategory);
+
         session()->put(['title' => 'SỬ DỤNG - SỬ DỤNG VẬT TƯ']);
 
         // Đề nghị chuyển vật tư LIÊN PHÒNG BAN: đã gửi đi (mình là A) / cần cấp phát (mình là B)
@@ -283,7 +291,7 @@ class MaterialExportController extends Controller
         | redirect()->back() (không đổi URL) nên tự flash activeTab qua session. 3 tab đề
         | nghị cấp phát dùng đúng tên type (periodic / risk_assessment / regular).
         */
-        $tabs = array_merge(['book', 'transfer', 'inbox'], array_keys(self::REQ_TYPE_TABS));
+        $tabs = array_merge(['book', 'prepare', 'transfer', 'inbox'], array_keys(self::REQ_TYPE_TABS));
         // Link trong thông báo cũ còn trỏ tab 'request' (trước khi tách 3 tab)
         $queryTab = $request->query('tab') === 'request' ? 'regular' : $request->query('tab');
         $activeTab = in_array($queryTab, $tabs, true)
@@ -301,6 +309,10 @@ class MaterialExportController extends Controller
             'lotsByCategory' => $lotsByCategory,
             'issuedLots' => $issuedLots,
             'issuePlans' => $issuePlans,
+            // ---- Tab "Soạn vật tư cấp phát" ----
+            'prepGroups' => $prep['groups'],
+            'prepBadgeCount' => $prep['count'],
+            'prepShortageCount' => $prep['shortageCount'],
             'departmentMaterialInventory' => $departmentMaterialInventory,
             'adjustCounts' => $this->adjustCounts($departmentId),
             'reqAppStatuses' => config('material.request_app_statuses'),
@@ -2876,21 +2888,8 @@ class MaterialExportController extends Controller
      */
     private function nextMaterialTransferCode(int $fromDepartmentId, int $toDepartmentId): string
     {
-        $prefix = 'LPB-'.$fromDepartmentId.'-'.$toDepartmentId.'-'.date('dmy').'-';
-
-        $latestCode = DB::table(self::TRANSFER_REQUEST_TABLE)
-            ->where('code', 'LIKE', $prefix.'%')
-            ->orderBy('id', 'desc')
-            ->value('code');
-
-        $seq = 1;
-
-        if ($latestCode) {
-            $parts = explode('-', $latestCode);
-            $seq = (int) end($parts) + 1;
-        }
-
-        return $prefix.str_pad((string) $seq, 2, '0', STR_PAD_LEFT);
+        // Dùng chung với tab "Danh sách vật tư cần dự trù" của màn Dự Trù Vật Tư
+        return \App\Support\MaterialTransferRequest::nextCode($fromDepartmentId, $toDepartmentId);
     }
 
     /**
@@ -3179,6 +3178,242 @@ class MaterialExportController extends Controller
         }
 
         return $plans;
+    }
+
+    /* ==========================================================
+     |  SOẠN VẬT TƯ CẤP PHÁT
+     ========================================================== */
+
+    /**
+     * Gom mọi dòng đề nghị ĐÃ DUYỆT mà kho chưa cấp đủ, cộng theo TỪNG VẬT TƯ chứ không
+     * theo phiếu - người giữ kho đi lấy hàng theo vật tư và vị trí, không đi theo phiếu.
+     *
+     * Mỗi vật tư kèm sẵn: tổng còn phải cấp, tồn còn hứa được, kế hoạch chia lô (đúng
+     * thứ tự nên xuất của App\Support\MaterialPicking) và danh sách phiếu đang chờ.
+     *
+     * @param  \Illuminate\Support\Collection  $lotsByCategory  Lô đã nạp ở index(): category_id => lô
+     * @return array{groups: \Illuminate\Support\Collection, count: int, shortageCount: int}
+     */
+    private function preparationData(int $departmentId, $lotsByCategory): array
+    {
+        $rows = DB::table(self::REQ_ITEM)
+            ->join(self::REQ_LIST, self::REQ_ITEM.'.request_list_id', '=', self::REQ_LIST.'.id')
+            ->leftJoin('material_categories', self::REQ_ITEM.'.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->select(
+                self::REQ_ITEM.'.id',
+                self::REQ_ITEM.'.category_id',
+                self::REQ_ITEM.'.material_name',
+                self::REQ_ITEM.'.technical_specification as item_specification',
+                self::REQ_ITEM.'.requested_amount',
+                self::REQ_ITEM.'.requested_unit',
+                self::REQ_ITEM.'.issued_amount',
+                self::REQ_ITEM.'.issued_unit',
+                self::REQ_ITEM.'.purpose',
+                self::REQ_ITEM.'.note as item_note',
+                self::REQ_ITEM.'.status as item_status',
+                self::REQ_ITEM.'.issued_by',
+                self::REQ_ITEM.'.issued_at',
+                self::REQ_LIST.'.id as request_list_id',
+                self::REQ_LIST.'.code as request_code',
+                self::REQ_LIST.'.name as request_name',
+                self::REQ_LIST.'.note as request_note',
+                self::REQ_LIST.'.type as request_type',
+                self::REQ_LIST.'.needed_date',
+                self::REQ_LIST.'.created_by as request_created_by',
+                self::REQ_LIST.'.created_at as request_created_at',
+                self::REQ_LIST.'.submitted_at as request_submitted_at',
+                self::REQ_LIST.'.issue_status as request_issue_status',
+                'material_names.name as category_material_name',
+                'material_categories.code as category_code',
+                'material_categories.technical_specification'
+            )
+            ->where(self::REQ_LIST.'.department_id', $departmentId)
+            ->where(self::REQ_LIST.'.app_status', 'approved')
+            ->whereIn(self::REQ_LIST.'.issue_status', self::REQ_PENDING_ISSUE_STATUSES)
+            ->where(self::REQ_ITEM.'.active', 1)
+            ->whereIn(self::REQ_ITEM.'.status', ['pending', 'partial', 'issued'])
+            ->orderBy(self::REQ_LIST.'.needed_date', 'asc')
+            ->orderBy(self::REQ_LIST.'.id', 'asc')
+            ->get();
+
+        $listIds = $rows->pluck('request_list_id')->unique()->values();
+
+        // Ngày phiếu được ký xong = lần ký cuối cùng; phiếu không khai bước ký nào thì không có
+        $approvedAt = DB::table(self::REQ_SIGN)
+            ->select('request_list_id', DB::raw('MAX(signed_at) as signed_at'))
+            ->whereIn('request_list_id', $listIds)
+            ->where('active', 1)
+            ->where('status', 'signed')
+            ->groupBy('request_list_id')
+            ->pluck('signed_at', 'request_list_id');
+
+        // Tổng số mục của cả phiếu - để kho biết mục đang soạn nằm trong phiếu mấy mục
+        $itemTotals = DB::table(self::REQ_ITEM)
+            ->select('request_list_id', DB::raw('COUNT(*) as items'))
+            ->whereIn('request_list_id', $listIds)
+            ->where('active', 1)
+            ->groupBy('request_list_id')
+            ->pluck('items', 'request_list_id');
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            // Dòng đã cấp đủ thì không còn gì để soạn
+            $left = round((float) $row->requested_amount - (float) $row->issued_amount, 4);
+
+            if ($left <= self::EPSILON) {
+                continue;
+            }
+
+            // Vật tư ngoài danh mục không có category_id nên gom theo tên người lập tự khai
+            $key = $row->category_id
+                ? 'c'.$row->category_id
+                : 'n'.mb_strtolower(trim((string) $row->material_name));
+
+            $unit = $row->issued_unit ?: $row->requested_unit;
+
+            if (! isset($groups[$key])) {
+                $groups[$key] = [
+                    'key' => $key,
+                    'category_id' => $row->category_id ? (int) $row->category_id : null,
+                    'name' => $row->category_id ? $row->category_material_name : $row->material_name,
+                    'category_code' => $row->category_code,
+                    'specification' => $row->technical_specification ?: $row->item_specification,
+                    'unit' => $unit,
+                    'units' => [],
+                    'needed' => 0.0,
+                    'issued' => 0.0,
+                    'demands' => [],
+                    'earliest_needed' => null,
+                ];
+            }
+
+            $groups[$key]['needed'] += $left;
+            $groups[$key]['issued'] += (float) $row->issued_amount;
+
+            if ($unit) {
+                $groups[$key]['units'][$unit] = true;
+            }
+
+            if ($row->needed_date && (! $groups[$key]['earliest_needed'] || $row->needed_date < $groups[$key]['earliest_needed'])) {
+                $groups[$key]['earliest_needed'] = $row->needed_date;
+            }
+
+            $groups[$key]['demands'][] = [
+                'item_id' => (int) $row->id,
+                'request_list_id' => (int) $row->request_list_id,
+                'request_code' => $row->request_code,
+                'request_name' => $row->request_name,
+                'request_note' => $row->request_note,
+                'request_type' => $row->request_type,
+                'needed_date' => $row->needed_date,
+                'created_by' => $row->request_created_by,
+                'created_at' => $row->request_created_at,
+                'submitted_at' => $row->request_submitted_at,
+                'approved_at' => $approvedAt[$row->request_list_id] ?? null,
+                'issue_status' => $row->request_issue_status,
+                'item_total' => (int) ($itemTotals[$row->request_list_id] ?? 0),
+                'purpose' => $row->purpose,
+                'item_note' => $row->item_note,
+                'status' => $row->item_status,
+                'issued_by' => $row->issued_by,
+                'issued_at' => $row->issued_at,
+                'requested' => (float) $row->requested_amount,
+                'issued' => (float) $row->issued_amount,
+                'left' => $left,
+                'unit' => $unit,
+            ];
+        }
+
+        $shortageCount = 0;
+
+        foreach ($groups as $key => $group) {
+            $lots = $group['category_id']
+                ? collect($lotsByCategory->get($group['category_id'], collect()))
+                : collect();
+
+            // Kế hoạch chia lô cho TỔNG số còn phải cấp của cả nhóm - soạn một lần cho mọi phiếu
+            $plan = MaterialPicking::planFrom($lots, $group['needed']);
+
+            $groups[$key]['plan'] = $plan['lines'];
+            $groups[$key]['shortage'] = (float) $plan['shortage'];
+            $groups[$key]['available'] = (float) $lots->where('suggestable', true)->sum('available');
+            $groups[$key]['remaining'] = (float) $lots->sum('remaining');
+            $groups[$key]['lot_count'] = count($plan['lines']);
+            $groups[$key]['unit'] = $group['unit'] ?: ($lots->first()->unit_short_name ?? '');
+            $groups[$key]['unit_mixed'] = count($group['units']) > 1;
+
+            if ($plan['shortage'] > self::EPSILON) {
+                $shortageCount++;
+            }
+        }
+
+        // Cần trước xếp trước; phiếu không khai ngày mong muốn xuống cuối, rồi theo tên vật tư
+        $groups = collect($groups)
+            ->sortBy(fn ($group) => [$group['earliest_needed'] ?: '9999-12-31', mb_strtolower((string) $group['name'])])
+            ->values();
+
+        return [
+            'groups' => $groups,
+            'count' => $groups->count(),
+            'shortageCount' => $shortageCount,
+        ];
+    }
+
+    /**
+     * PHIẾU SOẠN VẬT TƯ - trang A4 để in, mỗi dòng là MỘT LÔ ở MỘT vị trí.
+     *
+     * Thứ tự dòng do App\Support\MaterialPicking::sequence() quyết định (kho -> kệ ->
+     * cột -> tầng) để nhân viên đi một vòng là lấy đủ, không phải quay lại kệ cũ.
+     */
+    public function prepPrint()
+    {
+        $departmentId = $this->departmentId();
+        $prep = $this->preparationData($departmentId, $this->importOptions($departmentId)->groupBy('category_id'));
+
+        $lines = [];
+
+        // Nhu cầu của từng phiếu đề nghị, để tờ in nói rõ lô đang lấy là lấy cho phiếu nào
+        $requests = [];
+
+        foreach ($prep['groups'] as $group) {
+            foreach ($group['plan'] as $line) {
+                $lines[] = $line + [
+                    'material_name' => $group['name'],
+                    'category_code' => $group['category_code'],
+                    'specification' => $group['specification'],
+                    'requests' => collect($group['demands'])->map(fn ($demand) => [
+                        'code' => $demand['request_code'],
+                        'left' => $demand['left'],
+                        'unit' => $demand['unit'] ?: $group['unit'],
+                    ])->values()->all(),
+                ];
+            }
+
+            foreach ($group['demands'] as $demand) {
+                $requests[$demand['request_code']]['info'] ??= $demand;
+                $requests[$demand['request_code']]['items'][] = $demand + [
+                    'material_name' => $group['name'],
+                    'category_code' => $group['category_code'],
+                    'display_unit' => $demand['unit'] ?: $group['unit'],
+                ];
+            }
+        }
+
+        $lines = MaterialPicking::sequence($lines);
+
+        // Phiếu cần trước xếp trước, phiếu không khai ngày mong muốn xuống cuối
+        $requests = collect($requests)
+            ->sortBy(fn ($request) => [$request['info']['needed_date'] ?: '9999-12-31', $request['info']['request_code']])
+            ->values();
+
+        return view('pages.export.MaterialExport.prepPrint', [
+            'prepGroups' => $prep['groups'],
+            'prepLines' => $lines,
+            'prepRequests' => $requests,
+            'department' => DB::table('deparments')->where('id', $departmentId)->first(),
+        ]);
     }
 
     /**

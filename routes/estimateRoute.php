@@ -94,8 +94,12 @@ Route::prefix('/estimate')
             Route::get('detail', 'detail')->name('detail');
             Route::get('history', 'history')->name('history');
 
-            // Tab "Danh sách vật tư cần dự trù": dưới ngưỡng tối thiểu + ghi nhớ thủ công
+            // Tab "Danh sách vật tư cần dự trù": dưới ngưỡng tối thiểu + ghi nhớ thủ công.
+            // Chọn nhiều vật tư rồi đi tiếp một trong hai đường: lập phiếu dự trù, hoặc (vật
+            // tư do Hành Chánh mua) gửi thẳng đề nghị liên phòng ban cho phòng Hành Chánh.
             Route::post('watchlistDismiss', 'watchlistDismiss')->name('watchlistDismiss');
+            Route::post('watchlistEstimateStore', 'watchlistEstimateStore')->name('watchlistEstimateStore');
+            Route::post('watchlistTransferStore', 'watchlistTransferStore')->name('watchlistTransferStore');
 
             // Đầu phiếu
             Route::post('store', 'store')->name('store');
