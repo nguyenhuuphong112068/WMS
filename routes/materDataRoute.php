@@ -28,6 +28,7 @@ use App\Http\Controllers\Pages\MaterData\StatusController;
 use App\Http\Controllers\Pages\MaterData\StorageConditionController;
 use App\Http\Controllers\Pages\MaterData\UnitController;
 use App\Http\Controllers\Pages\MaterData\ZoneController;
+use App\Http\Controllers\Pages\MaterData\ZoneStructureController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
 
@@ -85,6 +86,18 @@ Route::prefix('/materData')
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
         });
+
+        // Định Khu - Cấu trúc kho: khai Kệ/Tủ -> Cột -> Tầng -> Vị Trí trên một lưới (API cho màn Định Khu)
+        Route::prefix('/zone/structure')->name('zone.structure.')
+            ->controller(ZoneStructureController::class)
+            ->group(function () {
+                Route::get('warehouses', 'warehouses')->name('warehouses');
+                Route::post('warehouse', 'saveWarehouse')->name('saveWarehouse');
+                Route::get('shelves', 'shelves')->name('shelves');
+                Route::get('detail', 'detail')->name('detail');
+                Route::get('checkCode', 'checkCode')->name('checkCode');
+                Route::post('apply', 'apply')->name('apply');
+            });
 
         // Định Khu: Kho/Phòng - Kệ/Tủ - Cột - Tầng - Vị Trí gộp chung một màn hình, {type} là cấp đang thao tác
         Route::prefix('/zone')->name('zone.')

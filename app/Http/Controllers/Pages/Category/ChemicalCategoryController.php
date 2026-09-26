@@ -33,6 +33,9 @@ use Illuminate\Validation\Rule;
  *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về "Chờ duyệt".
  * Mọi thay đổi đều được chụp lại ở bảng chemical_category_histories.
+ *
+ * "Đã khai báo trên Cổng thông tin quốc gia" không sửa qua update(): chỉ xác nhận được
+ * một lần duy nhất qua declarePortal().
  */
 class ChemicalCategoryController extends Controller
 {
@@ -272,10 +275,63 @@ class ChemicalCategoryController extends Controller
         return $this->setApproval($request);
     }
 
+    /**
+     * Xác nhận "Đã khai báo trên Cổng thông tin quốc gia".
+     *
+     * Chỉ cho cập nhật MỘT lần, một chiều Chưa -> Đã: ghi lại người + thời điểm xác nhận,
+     * sau đó không sửa / gỡ được nữa. Không nằm trong update() nên không bắt duyệt lại
+     * danh mục; bù lại phải nhập mật khẩu ký xác nhận vì thao tác không đảo ngược được.
+     */
+    public function declarePortal(Request $request)
+    {
+        if (! user_can('category_chemical_update')) {
+            return redirect()->back()->with('error', 'Bạn không có quyền cập nhật ' . self::LABEL . '!');
+        }
+
+        $current = DB::table(self::TABLE)->where('id', $request->id)->first();
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần cập nhật!');
+        }
+
+        $alreadyDeclared = 'Mã ' . $current->code . ' đã được xác nhận khai báo trên Cổng thông tin quốc gia, không cập nhật lại được.';
+
+        if ($current->national_portal_declared) {
+            return redirect()->back()->with('error', $alreadyDeclared);
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Xác nhận khai báo Cổng thông tin quốc gia')) {
+            return $stop;
+        }
+
+        // Điều kiện "chưa khai báo" nằm ngay trong câu UPDATE: hai người bấm cùng lúc thì chỉ một người ghi được
+        $affected = DB::table(self::TABLE)
+            ->where('id', $current->id)
+            ->where('national_portal_declared', 0)
+            ->update([
+                'national_portal_declared' => 1,
+                'national_portal_declared_by' => $this->actor(),
+                'national_portal_declared_at' => now(),
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+        if (! $affected) {
+            return redirect()->back()->with('error', $alreadyDeclared);
+        }
+
+        $this->writeHistory($current->id, 'Khai báo Cổng TTQG', 'Khai báo trên Cổng thông tin quốc gia: Chưa khai báo -> Đã khai báo');
+
+        AuditTrialController::log('Khai báo Cổng thông tin quốc gia', self::TABLE, $current->id, 'national_portal_declared: 0', 'national_portal_declared: 1');
+
+        return redirect()->back()->with('success', 'Đã xác nhận ' . self::LABEL . ' ' . $current->code . ' đã khai báo trên Cổng thông tin quốc gia!');
+    }
+
     /** Trả về lịch sử thay đổi của một dòng danh mục cho modal xem lịch sử. */
     public function history(Request $request)
     {
-        $safetyWarnings = config('chemical.safety_warnings');
+        // Gồm cả nhãn mã cũ (FLAMMABLE, CORROSIVE) còn nằm trong ảnh chụp lịch sử trước khi tách mã
+        $safetyWarnings = \App\Support\ChemicalCompatibility::labels();
 
         $rows = DB::table(self::HISTORY_TABLE)
             ->leftJoin('chem_names', self::HISTORY_TABLE . '.chem_names_id', '=', 'chem_names.id')
@@ -314,6 +370,10 @@ class ChemicalCategoryController extends Controller
                     'Cảnh báo an toàn' => $warningCodes
                         ? implode(', ', array_map(fn ($code) => $safetyWarnings[$code] ?? $code, $warningCodes))
                         : '—',
+                    // Ảnh chụp trước khi có cột này là NULL
+                    'Khai báo Cổng TT quốc gia' => $row->national_portal_declared === null
+                        ? '—'
+                        : ($row->national_portal_declared ? 'Đã khai báo' : 'Chưa khai báo'),
                 ];
 
                 // Đơn vị tính đã chuyển sang danh mục của phòng nên bản ghi mới không còn
@@ -518,6 +578,7 @@ class ChemicalCategoryController extends Controller
             'classification' => null,
             'safety_warning' => $row->safety_warning,
             'lead_time_days' => $row->lead_time_days,
+            'national_portal_declared' => $row->national_portal_declared,
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
             'change_note' => $note,

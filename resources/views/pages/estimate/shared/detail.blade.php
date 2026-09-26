@@ -154,7 +154,12 @@
                                             </div>
                                             @foreach ($item->threshold_warnings ?? [] as $warning)
                                                 <div class="est-threshold-alert is-compact level-{{ $warning['level'] }}">
-                                                    <i class="fas fa-triangle-exclamation mr-1"></i>{{ $warning['message'] }}
+                                                    <i class="fas fa-exclamation-triangle mr-1"></i>{{ $warning['message'] }}
+                                                    <button type="button" class="btn-est-thr-detail"
+                                                        data-params="{{ json_encode(['category_id' => $item->category_id, 'item_id' => $item->id]) }}"
+                                                        title="Xem các lượng đóng góp: tồn theo lô, dự trù chưa hoàn thành, mặt hàng này">
+                                                        <i class="fas fa-search-plus"></i> Chi tiết
+                                                    </button>
                                                 </div>
                                             @endforeach
                                         </td>
@@ -194,58 +199,7 @@
                                                 <div class="text-primary"><i class="fas fa-calendar-alt mr-1"></i> Mong muốn giao: <b>{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</b></div>
                                             @endif
                                             
-                                            @if ($list->app_status === 'approved' && user_can('estimate_chemical_tracking'))
-                                                <div class="mt-2 pt-2 border-top">
-                                                    @if ($item->status_id == 0)
-                                                        <span class="badge badge-danger mb-1">Đã huỷ không dự trù</span>
-                                                        @if ($item->cancel_reason)
-                                                            <div class="text-danger small mb-1">Lý do: {{ $item->cancel_reason }}</div>
-                                                        @endif
-                                                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline ml-2 form-md-confirm" data-title="Khôi phục lại mặt hàng?" data-text="Bạn muốn tiếp tục dự trù mặt hàng này?">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $item->id }}">
-                                                            <input type="hidden" name="action" value="undo">
-                                                            <button type="submit" class="btn btn-xs btn-outline-secondary" title="Hoàn tác"><i class="fas fa-undo"></i> Hoàn tác</button>
-                                                        </form>
-                                                    @elseif ($item->fulfilled_date)
-                                                        <div class="text-success mb-1"><i class="fas fa-check-circle mr-1"></i> Đã giao: <b>{{ \Carbon\Carbon::parse($item->fulfilled_date)->format('d/m/Y') }}</b></div>
-                                                        @if ($item->fulfilled_by)
-                                                            <div class="small text-muted mb-1"><i class="fas fa-user-check mr-1"></i> {{ $item->fulfilled_by }}</div>
-                                                        @endif
-                                                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline mt-1 form-md-confirm" data-title="Hoàn tác trạng thái?" data-text="Mặt hàng này chưa được giao?">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $item->id }}">
-                                                            <input type="hidden" name="action" value="undo">
-                                                            <button type="submit" class="btn btn-xs btn-outline-secondary" title="Hoàn tác"><i class="fas fa-undo"></i> Hoàn tác</button>
-                                                        </form>
-                                                    @else
-                                                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline mr-1 form-md-confirm" data-title="Xác nhận hoàn thành?" data-text="Mặt hàng này đã được giao đến khoa/phòng?">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $item->id }}">
-                                                            <input type="hidden" name="action" value="complete">
-                                                            <button type="submit" class="btn btn-sm btn-success" title="Xác nhận đã được giao"><i class="fas fa-check"></i> Hoàn thành</button>
-                                                        </form>
-                                                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm-cancel" data-title="Huỷ dự trù mặt hàng này?" data-text="Xác nhận khoa/phòng không cần dự trù mặt hàng này nữa?" data-danger="1">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $item->id }}">
-                                                            <input type="hidden" name="action" value="cancel">
-                                                            <button type="submit" class="btn btn-sm btn-danger" title="Không cần dự trù nữa"><i class="fas fa-times"></i> Huỷ</button>
-                                                        </form>
-                                                    @endif
-                                                </div>
-                                            @elseif ($item->status_id == 0)
-                                                <div class="mt-2 pt-2 border-top">
-                                                    <span class="badge badge-danger">Đã huỷ không dự trù</span>
-                                                    @if ($item->cancel_reason)
-                                                        <div class="text-danger small mt-1">Lý do: {{ $item->cancel_reason }}</div>
-                                                    @endif
-                                                </div>
-                                            @elseif ($item->fulfilled_date)
-                                                <div class="text-success mt-1 border-top pt-2"><i class="fas fa-check-circle mr-1"></i> Đã giao: <b>{{ \Carbon\Carbon::parse($item->fulfilled_date)->format('d/m/Y') }}</b></div>
-                                                @if ($item->fulfilled_by)
-                                                    <div class="small text-muted"><i class="fas fa-user-check mr-1"></i> {{ $item->fulfilled_by }}</div>
-                                                @endif
-                                            @endif
+                                            @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_chemical_tracking'])
                                         </td>
                                         <td>
                                             @forelse ($item->amounts as $amount)
@@ -315,6 +269,9 @@
                                                             'amounts' => $item->amounts->map(fn($amount) => [
                                                                 'amount' => rtrim(rtrim(number_format((float) $amount->amount, 4, '.', ''), '0'), '.'),
                                                                 'unit_id' => $amount->unit_id,
+                                                                'conversion_factor' => $amount->conversion_factor !== null
+                                                                    ? rtrim(rtrim(number_format((float) $amount->conversion_factor, 6, '.', ''), '0'), '.')
+                                                                    : '',
                                                                 'for_month_year' => \Carbon\Carbon::parse($amount->for_month_year)->format('Y-m'),
                                                             ]),
                                                         ]) }}">
@@ -354,6 +311,9 @@
     @endif
 
     @include('pages.estimate.shared.historyModal')
+
+    {{-- Nút "Chi tiết" của cảnh báo ngưỡng PL IV: các lượng đóng góp (tồn, dự trù chưa hoàn thành) --}}
+    @include('pages.estimate.shared.thresholdDetailModal')
 
     {{-- Chú thích 4 Phụ lục + 10 nhóm NĐ 24/2026 cho cột "Nhóm Hoá Chất" --}}
     @include('pages.shared.classifyGuideModal')

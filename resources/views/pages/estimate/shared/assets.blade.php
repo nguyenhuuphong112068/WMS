@@ -501,7 +501,83 @@
         font-size: 0.74rem;
         margin-top: 6px;
     }
+
+    /* ---------- Hệ số quy đổi về đơn vị danh mục (hoá chất nhóm 9 / 10) ---------- */
+    .est-factor {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+        padding: 3px 6px;
+        border: 1px dashed #F59E0B;
+        border-radius: var(--border-radius-md);
+        background: #FFFBEB;
+        font-size: 0.75rem;
+        color: #92400E;
+        white-space: nowrap;
+    }
+
+    .est-factor .js-factor-input {
+        flex: 1;
+        min-width: 50px;
+        height: 26px;
+        padding: 2px 6px;
+        font-size: 0.8rem;
+        text-align: right;
+    }
 </style>
+
+<script>
+    /**
+     * Ô hệ số quy đổi của một dòng số lượng dự trù hoá chất nhóm 9 / 10:
+     *   1 <đơn vị dự trù> = [hệ số] <đơn vị danh mục của phòng>
+     * Chỉ hiện khi đơn vị đang chọn khác đơn vị danh mục; hai đơn vị cùng nhóm khối lượng /
+     * thể tích thì tự điền hệ số (người dùng vẫn sửa được), khác nhóm (chai, lọ...) phải tự khai.
+     *
+     * $wrap : khối .est-factor (chứa .js-factor-input / .js-factor-from / .js-factor-to)
+     * dept  : {unit_id, unit, group, base} của mã danh mục (null = không cần khai hệ số)
+     * $unit : ô chọn đơn vị của dòng (option mang data-group / data-base / data-short)
+     */
+    window.wmsEstFactor = function($wrap, dept, $unit) {
+        if (!$wrap || !$wrap.length) return;
+
+        var $input = $wrap.find('.js-factor-input');
+        var unitId = $unit.val();
+
+        if (!dept || !unitId || String(unitId) === String(dept.unit_id)) {
+            $wrap.hide();
+            $input.val('').removeData('auto');
+            return;
+        }
+
+        var $opt = $unit.find('option:selected');
+        var group = $opt.data('group');
+        var base = parseFloat($opt.data('base'));
+
+        $wrap.find('.js-factor-from').text($opt.data('short') || $.trim($opt.text()));
+        $wrap.find('.js-factor-to').text(dept.unit);
+
+        if (!$input.val() || $input.data('auto')) {
+            var ratio = group && group !== 'count' && group === dept.group && base > 0 && dept.base > 0 ?
+                parseFloat((base / dept.base).toFixed(6)) : 0;
+
+            if (ratio > 0) {
+                $input.val(String(ratio)).data('auto', 1);
+            } else {
+                $input.val('').removeData('auto');
+            }
+        }
+
+        $wrap.css('display', 'flex');
+    };
+
+    // Người dùng tự gõ hệ số thì thôi không tự điền đè nữa (jQuery nạp cuối trang nên chờ DOM)
+    document.addEventListener('DOMContentLoaded', function() {
+        $(document).on('input', '.js-factor-input', function() {
+            $(this).removeData('auto');
+        });
+    });
+</script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -571,14 +647,40 @@
             if (data) {
                 $row.find('[data-field="amount"]').val(data.amount);
                 $row.find('[data-field="unit_id"]').val(data.unit_id);
+                $row.find('[data-field="conversion_factor"]').val(data.conversion_factor || '');
                 $row.find('[data-field="for_month_year"]').val(data.for_month_year);
             }
 
             $box.find('.est-amount-list').append($row);
             reindex($box);
+            applyFactors($box);
 
             return $row;
         }
+
+        /* Hoá chất nhóm 9 / 10: dòng khai khác đơn vị danh mục của phòng phải có hệ số quy đổi.
+           Map đơn vị danh mục nằm ở data-factor-units của khối (chỉ modal Hoá Chất có). */
+        function applyFactors($box) {
+            var map = $box.data('factor-units');
+
+            if (!map || typeof wmsEstFactor !== 'function') return;
+
+            var dept = map[$box.closest('form').find('[name="category_id"]').val()] || null;
+
+            $box.find('.est-amount-row').each(function() {
+                wmsEstFactor($(this).find('.est-factor'), dept, $(this).find('[data-field="unit_id"]'));
+            });
+        }
+
+        $(document).on('change', '.est-amounts [data-field="unit_id"]', function() {
+            applyFactors($(this).closest('.est-amounts'));
+        });
+
+        $(document).on('change', '[name="category_id"]', function() {
+            $(this).closest('form').find('.est-amounts').each(function() {
+                applyFactors($(this));
+            });
+        });
 
         // Form còn trống thì mở sẵn các tháng mặc định (3 tháng liên tiếp từ tháng dự trù)
         function fillDefaults($box) {
@@ -618,6 +720,7 @@
             // Chưa có dòng nào (form thêm mới) thì mở sẵn các tháng mặc định
             if (!$(this).find('.est-amount-row').length) fillDefaults($(this));
             reindex($(this));
+            applyFactors($(this));
         });
 
         /* ---------- Cảnh báo dự trù vượt NGƯỠNG TỒN TỐI ĐA của phòng ----------
@@ -690,19 +793,21 @@
         /* ---------- Cảnh báo ngưỡng PL IV khi chọn hoá chất / đổi số lượng ---------- */
         // Chỉ hoạt động trên modal có ô chọn mang data-threshold-url (hiện chỉ Dự Trù Hoá Chất
         // có ngưỡng PL IV để đối chiếu); modal Vật Tư / Chất Chuẩn không có thì im lặng bỏ qua.
-        function renderThresholdAlerts($box, warnings) {
+        /* params = {category_id, item_id, amounts} đang khai - nút "Chi tiết" gửi lại cho
+           thresholdDetail() để liệt kê các lượng đóng góp (pages/estimate/shared/thresholdDetailModal) */
+        function renderThresholdAlerts($box, warnings, params) {
             if (!$box.length) return;
 
-            if (!warnings || !warnings.length) {
-                $box.empty();
-                return;
-            }
+            $box.empty();
 
-            $box.html(warnings.map(function(w) {
-                return '<div class="est-threshold-alert level-' + (w.level || 'warn') + '">' +
-                    '<i class="fas fa-triangle-exclamation mr-1"></i>' + w.message +
-                    '</div>';
-            }).join(''));
+            (warnings || []).forEach(function(w) {
+                $('<div class="est-threshold-alert level-' + (w.level || 'warn') + '">' +
+                        '<i class="fas fa-exclamation-triangle mr-1"></i><span></span></div>')
+                    .find('span').text(w.message || '').end()
+                    .append($('<button type="button" class="btn-est-thr-detail">' +
+                        '<i class="fas fa-search-plus"></i> Chi tiết</button>').data('params', params))
+                    .appendTo($box);
+            });
         }
 
         function checkThreshold($form) {
@@ -722,13 +827,22 @@
             $form.find('.est-amount-row').each(function() {
                 amounts.push({
                     amount: $(this).find('[data-field="amount"]').val(),
-                    unit_id: $(this).find('[data-field="unit_id"]').val()
+                    unit_id: $(this).find('[data-field="unit_id"]').val(),
+                    conversion_factor: $(this).find('[data-field="conversion_factor"]').val() || '',
+                    for_month_year: $(this).find('[data-field="for_month_year"]').val() || ''
                 });
             });
 
-            $.get($select.data('threshold-url'), { category_id: categoryId, amounts: amounts })
+            // Modal Sửa gửi kèm id mặt hàng để không tự cộng lượng dự trù cũ của chính nó
+            var params = {
+                category_id: categoryId,
+                item_id: $form.find('[name="id"]').val() || '',
+                amounts: amounts
+            };
+
+            $.get($select.data('threshold-url'), params)
                 .done(function(res) {
-                    renderThresholdAlerts($box, res && res.warnings);
+                    renderThresholdAlerts($box, res && res.warnings, params);
                 });
         }
 
@@ -736,7 +850,7 @@
             checkThreshold($(this).closest('form'));
         });
 
-        $(document).on('change', '.est-amounts [data-field="amount"], .est-amounts [data-field="unit_id"]', function() {
+        $(document).on('change', '.est-amounts [data-field="amount"], .est-amounts [data-field="unit_id"], .est-amounts [data-field="conversion_factor"]', function() {
             checkThreshold($(this).closest('form'));
         });
 
@@ -753,6 +867,11 @@
             $form.find('[name="technical_information"]').val(row.technical_information || '');
             $form.find('[name="purpose"]').val(row.purpose || '');
             $form.find('[name="chem_name"]').val(row.chem_name || '');
+            // Chỉ màn nào gửi kèm 2 trường này trong data-row mới đổ vào (hiện là Dự Trù Vật Tư)
+            if ('part_number' in row) $form.find('[name="part_number"]').val(row.part_number || '');
+            if ('expected_delivery_date' in row) {
+                $form.find('[name="expected_delivery_date"]').val((row.expected_delivery_date || '').substring(0, 10));
+            }
 
             $form.find('[name="source"][value="' + (row.category_id ? 'category' : 'manual') + '"]')
                 .prop('checked', true);
@@ -773,6 +892,7 @@
             if (!$box.find('.est-amount-row').length) addRow($box);
 
             reindex($box);
+            applyFactors($box);
 
             $modal.modal('show');
         });

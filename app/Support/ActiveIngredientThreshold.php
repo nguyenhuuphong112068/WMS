@@ -502,60 +502,27 @@ class ActiveIngredientThreshold
      * Hoá chất là thành viên của một MỤC GỘP thì lấy khối lượng hợp chất thô (không nhân %),
      * chỉ nhân equiv_factor - đúng cách cộng của onHandByIngredient().
      *
-     * @param  iterable  $amountRows  các object/array có khoá amount + unit_id
+     * Quy ra kg chất thô theo App\Support\ChemicalEstimateThreshold::rawKg(): có $departmentId
+     * thì đi qua đơn vị danh mục của phòng + hệ số quy đổi (conversion_factor) của từng dòng.
+     *
+     * @param  iterable  $amountRows  các object/array có khoá amount + unit_id (+ conversion_factor)
      * @return array{kg: float, unconvertible: bool}  unconvertible = có dòng đơn vị đếm / thiếu tỉ trọng
      */
-    public static function sumEstimateKg(int $categoryId, $amountRows): array
+    public static function sumEstimateKg(int $categoryId, $amountRows, ?int $departmentId = null): array
     {
         $cat = DB::table('chemical_categories')
             ->where('id', $categoryId)
-            ->select('chem_names_id', 'density', 'ai_content_percent')
+            ->select('chem_names_id', 'ai_content_percent')
             ->first();
 
-        $rows = collect($amountRows);
-
         if (! $cat) {
-            return ['kg' => 0.0, 'unconvertible' => $rows->isNotEmpty()];
+            return ['kg' => 0.0, 'unconvertible' => collect($amountRows)->isNotEmpty()];
         }
 
-        $unitIds = $rows->map(fn ($r) => (int) ($r->unit_id ?? ($r['unit_id'] ?? 0)))->filter()->unique()->all();
-        $units = $unitIds ? DB::table('units')->whereIn('id', $unitIds)->get()->keyBy('id') : collect();
-
-        $density = $cat->density !== null ? (float) $cat->density : null;
+        $raw = ChemicalEstimateThreshold::rawKg($categoryId, $amountRows, $departmentId);
         $multiplier = self::estimateMultiplier((int) $cat->chem_names_id, $cat->ai_content_percent);
-        $kgUnit = (object) ['unit_group' => 'mass', 'factor_to_base' => 1000.0];
 
-        $totalKg = 0.0;
-        $unconvertible = false;
-
-        foreach ($rows as $row) {
-            $qty = (float) ($row->amount ?? ($row['amount'] ?? 0));
-            $unitId = (int) ($row->unit_id ?? ($row['unit_id'] ?? 0));
-            $unit = $unitId ? ($units[$unitId] ?? null) : null;
-
-            if ($qty <= 0) {
-                continue;
-            }
-
-            if (! $unit || $unit->unit_group === 'count'
-                || ($unit->unit_group === 'volume' && ($density === null || $density <= 0))) {
-                $unconvertible = true;
-
-                continue;
-            }
-
-            $base = UnitConverter::convert($qty, $unit, $kgUnit, $density);
-
-            if ($base === null) {
-                $unconvertible = true;
-
-                continue;
-            }
-
-            $totalKg += $base * $multiplier;
-        }
-
-        return ['kg' => $totalKg, 'unconvertible' => $unconvertible];
+        return ['kg' => $raw['kg'] * $multiplier, 'unconvertible' => $raw['unconvertible']];
     }
 
     /**
@@ -565,10 +532,14 @@ class ActiveIngredientThreshold
      * Trả null nếu mã danh mục không thuộc diện đối chiếu (không N9/N10/CAM, hoặc chưa gắn
      * hoạt chất Bảng A đã duyệt có ngưỡng).
      *
-     * @return object|null {ai_name, ai_code, threshold_kg, current_kg, add_kg, projected_kg,
-     *                       current_ratio, add_ratio, projected_ratio, level}
+     * $pendingKgByCategory (category_id => kg hoạt chất đang dự trù chưa hoàn thành - xem
+     * App\Support\ChemicalEstimateThreshold::pendingByCategory()['A']) được cộng theo mọi mã
+     * danh mục của cùng chủ ngưỡng.
+     *
+     * @return object|null {ai_name, ai_code, threshold_kg, current_kg, pending_kg, add_kg,
+     *                       projected_kg, current_ratio, add_ratio, projected_ratio, level}
      */
-    public static function projectedForCategory(int $categoryId, float $addKg, ?int $companyId = null): ?object
+    public static function projectedForCategory(int $categoryId, float $addKg, ?int $companyId = null, array $pendingKgByCategory = []): ?object
     {
         $eval = self::forCategories($companyId)[$categoryId] ?? null;
 
@@ -576,15 +547,23 @@ class ActiveIngredientThreshold
             return null;
         }
 
+        $pendingKg = 0.0;
+        if ($pendingKgByCategory) {
+            foreach (self::ingredients()[$eval->ai_id]->category_ids ?? [] as $ownerCategoryId) {
+                $pendingKg += $pendingKgByCategory[$ownerCategoryId] ?? 0.0;
+            }
+        }
+
         $threshold = (float) $eval->threshold_kg;
         $addKg = max($addKg, 0.0);
-        $projectedKg = $eval->total_kg + $addKg;
+        $projectedKg = $eval->total_kg + $pendingKg + $addKg;
 
         return (object) [
             'ai_name' => $eval->ai_name,
             'ai_code' => $eval->ai_code,
             'threshold_kg' => $threshold,
             'current_kg' => $eval->total_kg,
+            'pending_kg' => $pendingKg,
             'add_kg' => $addKg,
             'projected_kg' => $projectedKg,
             'current_ratio' => $eval->ratio,

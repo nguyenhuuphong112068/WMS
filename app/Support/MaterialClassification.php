@@ -201,6 +201,12 @@ class MaterialClassification
         return $parts ? implode('; ', $parts) : 'Chưa phân loại';
     }
 
+    /** Vật tư phải được QA hiệu chuẩn trước khi sử dụng - cấp phát xong phải báo QA. */
+    public static function needsQaCalibration(?string $json): bool
+    {
+        return (self::decode($json)['qa_calibration'] ?? null) === 'yes';
+    }
+
     /** Nhãn bộ phận mua hàng, chưa khai thì trả về chuỗi rỗng. */
     public static function purchasingLabel(?string $key): string
     {

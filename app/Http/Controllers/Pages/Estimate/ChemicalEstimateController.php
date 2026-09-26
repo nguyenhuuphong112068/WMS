@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Pages\Estimate;
 
+use App\Http\Controllers\Concerns\EstimateItemCancel;
 use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\ActiveIngredientThreshold;
+use App\Support\ChemicalEstimateThreshold;
 use App\Support\CompanyContext;
 use App\Support\DepartmentChemical;
 use App\Support\MixtureHazardThreshold;
@@ -33,6 +35,7 @@ use Illuminate\Support\Facades\Validator;
  */
 class ChemicalEstimateController extends Controller
 {
+    use EstimateItemCancel;
     use EstimateSignFlow;
     use VerifiesSignature;
 
@@ -65,6 +68,29 @@ class ChemicalEstimateController extends Controller
     /** Chỉ hai trạng thái này mới được sửa đầu phiếu và chi tiết mặt hàng. */
     private const EDITABLE_STATUSES = ['draft', 'rejected'];
 
+    /** Cache trạng thái ngưỡng PL IV trong một request - xem thresholdStatus(). */
+    private ?array $thresholdStatusCache = null;
+
+    /** Cache ký hiệu đơn vị trong một request - xem unitLabels(). */
+    private ?array $unitLabelCache = null;
+
+    /**
+     * Huỷ mục cần xác nhận 2 bên - xem App\Http\Controllers\Concerns\EstimateItemCancel.
+     * Danh mục không khai bộ phận mua hàng nên bộ phận mua hàng luôn là Cung Ứng.
+     */
+    protected function cancelConfig(): array
+    {
+        return [
+            'item_fk' => 'estimate_list_id',
+            'chat_type' => 'chemical',
+            'category_table' => 'chemical_categories',
+            'name_table' => 'chem_names',
+            'name_fk' => 'chem_names_id',
+            'manual_name' => 'chem_name',
+            'purchasing_col' => null,
+        ];
+    }
+
     /* ==========================================================
      |  DANH SÁCH PHIẾU DỰ TRÙ CỦA PHÒNG BAN
      ========================================================== */
@@ -94,7 +120,10 @@ class ChemicalEstimateController extends Controller
 
         $inbox = $this->approvalInboxData();
 
-        $tabs = ['list', 'tracking', 'inbox'];
+        // Tab "Bộ phận mua hàng" (xác nhận huỷ 2 bên) - chỉ hiện với Cung Ứng
+        $purchasingItems = $this->purchasingItems($departmentId);
+
+        $tabs = ['list', 'tracking', 'inbox', 'purchasing'];
         $activeTab = in_array($request->query('tab'), $tabs, true)
             ? $request->query('tab')
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'list');
@@ -113,6 +142,7 @@ class ChemicalEstimateController extends Controller
             'nextCode' => $this->nextCode($departmentId),
             'trackedItems' => $trackedItems,
             'activeTab' => $activeTab,
+            'purchasingItems' => $purchasingItems,
             'showApprovalInbox' => $inbox['show'],
             'inboxRequests' => $inbox['requests'],
             'inboxItems' => $inbox['items'],
@@ -151,7 +181,15 @@ class ChemicalEstimateController extends Controller
             'items' => self::itemsOf($list->id),
             'histories' => self::historiesOf($list->id),
             'categories' => $this->categoryOptions($list->department_id),
-            'categoryLevels' => $this->categoryThresholdLevels(CompanyContext::resolveForDepartment($list->department_id)),
+            // Danh mục hoá chất của phòng - khung "Chọn từ danh mục phòng" ở modal thêm mặt hàng
+            'deptCategories' => $deptCategories = $this->deptCategoryOptions((int) $list->department_id),
+            // Đơn vị danh mục của phòng cho hoá chất nhóm 9 / 10 - JS bắt khai hệ số quy đổi khi dự trù khác đơn vị
+            'factorUnits' => $this->factorUnits($deptCategories),
+            // Tồn hiện tại + đang dự trù chưa hoàn thành so với ngưỡng PL IV: mã đã vượt thì khoá ở
+            // khung chọn danh mục; hoá chất nhóm 9 / 10 khai khác đơn vị phải có hệ số quy đổi
+            'thresholdStatus' => $thresholdStatus = $this->thresholdStatus($list),
+            'categoryLevels' => array_map(fn ($status) => $status->level, $thresholdStatus),
+            'criticalCategoryIds' => ChemicalEstimateThreshold::criticalCategoryIds(),
             // Nhóm NĐ 24/2026 suy tự động theo mã danh mục, hiển thị ở cột "Nhóm Hoá Chất"
             'classificationCodes' => \App\Support\ChemicalClassification::codesByCategory(),
             'classificationLabels' => \App\Support\ChemicalClassification::labels(),
@@ -277,6 +315,11 @@ class ChemicalEstimateController extends Controller
      |  MẶT HÀNG DỰ TRÙ + SỐ LƯỢNG THEO THÁNG
      ========================================================== */
 
+    /**
+     * Thêm NHIỀU mặt hàng một lần từ modal dạng bảng: mỗi dòng items[i] là một hoá chất, các
+     * tháng cần dùng là cột chung periods[k], số lượng của dòng ở items[i][amounts][k] và
+     * dùng chung đơn vị items[i][unit_id]. Dòng bỏ trống hoàn toàn thì bỏ qua.
+     */
     public function storeItem(Request $request)
     {
         $list = $this->findOwn($request->estimate_list_id);
@@ -289,37 +332,107 @@ class ChemicalEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không thêm mặt hàng được nữa!');
         }
 
-        $this->pruneEmptyAmounts($request);
+        $this->pruneEmptyItemRows($request);
 
-        $validator = Validator::make($request->all(), $this->itemRules(), $this->itemMessages());
+        $validator = Validator::make($request->all(), $this->batchItemRules(), $this->batchItemMessages());
+
+        // Mỗi dòng phải có ít nhất một tháng có số lượng; cột nào có số thì phải chọn tháng
+        $validator->after(function ($validator) use ($request, $list) {
+            $periods = (array) $request->input('periods', []);
+
+            foreach ((array) $request->input('items', []) as $index => $line) {
+                $hasAmount = false;
+
+                foreach ((array) ($line['amounts'] ?? []) as $k => $amount) {
+                    if ($amount === '') {
+                        continue;
+                    }
+
+                    $hasAmount = true;
+
+                    if (trim((string) ($periods[$k] ?? '')) === '') {
+                        $validator->errors()->add('periods.'.$k, 'Vui lòng chọn tháng cho cột số lượng đang có dữ liệu.');
+                    }
+                }
+
+                if (! $hasAmount) {
+                    $validator->errors()->add('items.'.$index.'.amounts', 'Vui lòng nhập số lượng ít nhất một tháng.');
+                }
+            }
+
+            // Hoá chất nhóm 9 / 10: chặn mã đã vượt ngưỡng PL IV, bắt khai hệ số quy đổi đơn vị
+            foreach ((array) $request->input('items', []) as $index => $line) {
+                if (($line['source'] ?? '') !== 'category' || empty($line['category_id'])) {
+                    continue;
+                }
+
+                $categoryId = (int) $line['category_id'];
+
+                if ($blocked = $this->blockedStatus($list, $categoryId)) {
+                    $validator->errors()->add('items.'.$index.'.category_id', 'Đã vượt ngưỡng, không được dự trù thêm - '.$blocked->message);
+                }
+
+                if ($error = $this->factorError((int) $list->department_id, $categoryId, $line['unit_id'] ?? null, $line['conversion_factor'] ?? null)) {
+                    $validator->errors()->add('items.'.$index.'.conversion_factor', $error);
+                }
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'itemCreateErrors')->withInput();
         }
 
-        $itemId = DB::transaction(function () use ($request, $list) {
-            $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayload($request) + [
-                'estimate_list_id' => $list->id,
-                'status_id' => 1,
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        $periods = (array) $request->input('periods', []);
+        $lines = (array) $request->input('items', []);
 
-            $this->saveAmounts($itemId, $request);
+        $itemIds = DB::transaction(function () use ($lines, $periods, $list) {
+            $ids = [];
 
-            return $itemId;
+            foreach ($lines as $line) {
+                $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayloadFrom($line) + [
+                    'estimate_list_id' => $list->id,
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Một dòng dùng chung một đơn vị cho mọi cột tháng
+                $amountRows = [];
+
+                foreach ((array) ($line['amounts'] ?? []) as $k => $amount) {
+                    $amountRows[] = [
+                        'amount' => $amount,
+                        'unit_id' => $line['unit_id'] ?? null,
+                        'conversion_factor' => $this->factorFor($list->department_id, $line['category_id'] ?? null, $line['unit_id'] ?? null, $line['conversion_factor'] ?? null),
+                        'for_month_year' => $periods[$k] ?? '',
+                    ];
+                }
+
+                $this->saveAmountRows($itemId, $amountRows);
+                $ids[] = $itemId;
+            }
+
+            return $ids;
         });
 
         if ($list->app_status !== 'draft') {
-            AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
-            self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm mặt hàng vào phiếu.');
+            foreach ($itemIds as $itemId) {
+                AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
+            }
+
+            self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm '.count($itemIds).' mặt hàng vào phiếu.');
         }
 
-        $redirect = redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
+        $redirect = redirect()->back()->with('success', 'Đã thêm '.count($itemIds).' '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
 
-        if ($warnings = $this->thresholdWarnings($itemId)) {
-            $redirect->with('warning', implode(' — ', array_column($warnings, 'message')));
+        $warnings = [];
+        foreach ($itemIds as $itemId) {
+            array_push($warnings, ...array_column($this->thresholdWarnings($itemId), 'message'));
+        }
+
+        if ($warnings) {
+            $redirect->with('warning', implode(' — ', $warnings));
         }
 
         return $redirect;
@@ -341,11 +454,31 @@ class ChemicalEstimateController extends Controller
 
         $validator = Validator::make($request->all(), $this->itemRules(), $this->itemMessages());
 
+        // Hoá chất nhóm 9 / 10: không được đổi sang mã đã vượt ngưỡng PL IV; dòng khai khác
+        // đơn vị danh mục phải có hệ số quy đổi
+        $validator->after(function ($validator) use ($request, $item, $list) {
+            if ($request->source !== 'category' || ! $request->category_id) {
+                return;
+            }
+
+            $categoryId = (int) $request->category_id;
+
+            if ($categoryId !== (int) $item->category_id && ($blocked = $this->blockedStatus($list, $categoryId))) {
+                $validator->errors()->add('category_id', 'Đã vượt ngưỡng, không được dự trù thêm - '.$blocked->message);
+            }
+
+            foreach ((array) $request->input('amounts', []) as $k => $line) {
+                if ($error = $this->factorError((int) $list->department_id, $categoryId, $line['unit_id'] ?? null, $line['conversion_factor'] ?? null)) {
+                    $validator->errors()->add('amounts.'.$k.'.conversion_factor', 'Dòng '.($k + 1).': '.$error);
+                }
+            }
+        });
+
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'itemUpdateErrors')->withInput();
         }
 
-        DB::transaction(function () use ($request, $item) {
+        DB::transaction(function () use ($request, $item, $list) {
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->update($this->itemPayload($request) + [
                 'updated_by' => $this->actor(),
                 'updated_at' => now(),
@@ -354,7 +487,13 @@ class ChemicalEstimateController extends Controller
             // Số lượng theo tháng luôn ghi lại toàn bộ: xoá dòng cũ rồi ghi dòng mới
             DB::table(self::AMOUNT_TABLE)->where('estimate_item_id', $item->id)->update(['active' => 0]);
 
-            $this->saveAmounts($item->id, $request);
+            // Hệ số quy đổi chỉ giữ ở dòng khai khác đơn vị danh mục của phòng
+            $categoryId = $request->source === 'category' ? $request->category_id : null;
+
+            $this->saveAmountRows($item->id, array_map(
+                fn ($line) => ['conversion_factor' => $this->factorFor($list->department_id, $categoryId, $line['unit_id'] ?? null, $line['conversion_factor'] ?? null)] + (array) $line,
+                (array) $request->input('amounts', [])
+            ));
         });
 
         if ($list->app_status !== 'draft') {
@@ -407,11 +546,16 @@ class ChemicalEstimateController extends Controller
         return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu dự trù!');
     }
 
+    /**
+     * Phòng đề nghị cập nhật trạng thái mục đã duyệt: hoàn thành / hoàn tác, và phần của
+     * PHÒNG ĐỀ NGHỊ trong luồng huỷ 2 bên (cancel / cancel_reject / cancel_withdraw) -
+     * xem EstimateItemCancel. Bộ phận mua hàng thao tác phần của mình qua purchaseCancel().
+     */
     public function updateItemStatus(Request $request)
     {
         $request->validate([
             'id' => 'required|integer',
-            'action' => 'required|in:complete,cancel,undo'
+            'action' => 'required|in:complete,cancel,cancel_reject,cancel_withdraw,undo',
         ]);
 
         [$item, $list] = $this->findItem($request->id);
@@ -424,61 +568,60 @@ class ChemicalEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu chưa được duyệt nên không thể cập nhật trạng thái mục!');
         }
 
-        $updateData = [];
-        $logMessage = '';
+        if (str_starts_with($request->action, 'cancel')) {
+            return $this->applyCancel($item, 'requester', $request->action, $request->cancel_reason);
+        }
+
         if ($request->action === 'complete') {
+            if ($this->cancelPending($item)) {
+                return redirect()->back()->with('error', 'Mục đang chờ xác nhận huỷ, xử lý đề nghị huỷ trước khi xác nhận hoàn thành!');
+            }
+
             $updateData = ['fulfilled_date' => now(), 'fulfilled_by' => $this->actor(), 'status_id' => 1];
             $logMessage = 'Đã xác nhận hoàn thành (giao hàng).';
-        } elseif ($request->action === 'cancel') {
-            $updateData = ['fulfilled_date' => null, 'fulfilled_by' => null, 'status_id' => 0, 'cancel_reason' => $request->cancel_reason];
-            $logMessage = 'Đã huỷ dự trù mặt hàng. Lý do: ' . $request->cancel_reason;
         } else {
-            $updateData = ['fulfilled_date' => null, 'fulfilled_by' => null, 'status_id' => 1, 'cancel_reason' => null];
+            $updateData = ['fulfilled_date' => null, 'fulfilled_by' => null, 'status_id' => 1] + $this->clearCancel();
             $logMessage = 'Đã khôi phục lại trạng thái mặt hàng.';
         }
 
         DB::transaction(function () use ($item, $list, $updateData, $logMessage) {
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->update($updateData);
-            
-            DB::table('estimate_item_chats')->insert([
-                'item_id' => $item->id,
-                'item_type' => 'chemical',
-                'user_name' => $this->actor(),
-                'content' => $logMessage,
-                'type' => 'system',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $allItems = DB::table(self::ITEM_TABLE)->where('estimate_list_id', $list->id)->where('active', 1)->get();
-            $allCompleted = true;
-            $hasActive = false;
-            foreach ($allItems as $i) {
-                if ($i->status_id != 0) {
-                    $hasActive = true;
-                    if (empty($i->fulfilled_date)) {
-                        $allCompleted = false;
-                        break;
-                    }
-                }
-            }
-
-            if ($allCompleted && $hasActive) {
-                DB::table(self::TABLE)->where('id', $list->id)->update([
-                    'reception_status' => 'completed',
-                    'completed_at' => now(),
-                    'completed_by' => $this->actor()
-                ]);
-            } elseif ($list->reception_status === 'completed') {
-                DB::table(self::TABLE)->where('id', $list->id)->update([
-                    'reception_status' => 'received',
-                    'completed_at' => null,
-                    'completed_by' => null
-                ]);
-            }
+            $this->itemSystemChat($item->id, $logMessage);
+            $this->afterItemStatusChange($list);
         });
 
         return redirect()->back()->with('success', 'Đã cập nhật trạng thái ' . self::ITEM_LABEL . '!');
+    }
+
+    /** Mọi mục còn hiệu lực đã giao hết thì đánh dấu phiếu hoàn tất; ngược lại mở lại. */
+    protected function afterItemStatusChange($list): void
+    {
+        $allItems = DB::table(self::ITEM_TABLE)->where('estimate_list_id', $list->id)->where('active', 1)->get();
+        $allCompleted = true;
+        $hasActive = false;
+        foreach ($allItems as $i) {
+            if ($i->status_id != 0) {
+                $hasActive = true;
+                if (empty($i->fulfilled_date)) {
+                    $allCompleted = false;
+                    break;
+                }
+            }
+        }
+
+        if ($allCompleted && $hasActive) {
+            DB::table(self::TABLE)->where('id', $list->id)->update([
+                'reception_status' => 'completed',
+                'completed_at' => now(),
+                'completed_by' => $this->actor()
+            ]);
+        } elseif ($list->reception_status === 'completed') {
+            DB::table(self::TABLE)->where('id', $list->id)->update([
+                'reception_status' => 'received',
+                'completed_at' => null,
+                'completed_by' => null
+            ]);
+        }
     }
 
     public function updatePromisedDate(Request $request)
@@ -882,13 +1025,17 @@ class ChemicalEstimateController extends Controller
             ->groupBy('item_id')
             ->map->count();
 
-        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $companyId) {
+        // Mặt hàng dự trù chưa hoàn thành toàn công ty - cộng vào đối chiếu ngưỡng PL IV
+        $pendingRows = ChemicalEstimateThreshold::pendingRows($companyId, ChemicalEstimateThreshold::criticalCategoryIds());
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $companyId, $departmentId, $pendingRows) {
             $item->amounts = ($amounts[$item->id] ?? collect())->values();
             $item->chats = ($chats[$item->id] ?? collect())->values();
             $item->history_count = $historyCounts[$item->id] ?? 0;
             $item->display_name = $item->category_id ? $item->category_chem_name : $item->chem_name;
             $item->threshold_warnings = $item->category_id
-                ? self::computeThresholdWarnings((int) $item->category_id, $item->amounts, $companyId)
+                ? self::computeThresholdWarnings((int) $item->category_id, $item->amounts, $companyId, $departmentId,
+                    ChemicalEstimateThreshold::pendingByCategory($pendingRows, (int) $item->id))
                 : [];
 
             return $item;
@@ -949,7 +1096,10 @@ class ChemicalEstimateController extends Controller
             ->groupBy('item_id')
             ->map->count();
 
-        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $companyId) {
+        // Mặt hàng dự trù chưa hoàn thành toàn công ty - cộng vào đối chiếu ngưỡng PL IV
+        $pendingRows = ChemicalEstimateThreshold::pendingRows($companyId, ChemicalEstimateThreshold::criticalCategoryIds());
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $companyId, $departmentId, $pendingRows) {
             $item->amounts = ($amounts[$item->id] ?? collect())->values();
             $item->chats = ($chats[$item->id] ?? collect())->values();
             $item->history_count = $historyCounts[$item->id] ?? 0;
@@ -957,7 +1107,8 @@ class ChemicalEstimateController extends Controller
             $item->display_name = $item->category_id ? $item->category_chem_name : $item->chem_name;
             // Cảnh báo ngưỡng PL IV hiển thị thường trực cho người ký duyệt / bộ phận tiếp nhận
             $item->threshold_warnings = $item->category_id
-                ? self::computeThresholdWarnings((int) $item->category_id, $item->amounts, $companyId)
+                ? self::computeThresholdWarnings((int) $item->category_id, $item->amounts, $companyId, $departmentId,
+                    ChemicalEstimateThreshold::pendingByCategory($pendingRows, (int) $item->id))
                 : [];
 
             return $item;
@@ -1030,13 +1181,213 @@ class ChemicalEstimateController extends Controller
             ->map(fn ($line) => (object) [
                 'amount' => (float) ($line['amount'] ?? 0),
                 'unit_id' => (int) ($line['unit_id'] ?? 0),
+                'conversion_factor' => (float) ($line['conversion_factor'] ?? 0),
             ])
             ->filter(fn ($row) => $row->amount > 0 && $row->unit_id > 0)
             ->values();
 
+        $companyId = CompanyContext::currentId();
+        // Modal Sửa gửi kèm id mặt hàng để không tự cộng lượng dự trù cũ của chính nó
+        $pending = ChemicalEstimateThreshold::pendingByCategory(
+            ChemicalEstimateThreshold::pendingRows($companyId, ChemicalEstimateThreshold::criticalCategoryIds()),
+            (int) $request->input('item_id') ?: null
+        );
+
         return response()->json([
-            'warnings' => self::computeThresholdWarnings($categoryId, $amountRows, CompanyContext::currentId()),
+            'warnings' => self::computeThresholdWarnings($categoryId, $amountRows, $companyId, $this->departmentId(), $pending),
         ]);
+    }
+
+    /**
+     * Nút "Chi tiết" của cảnh báo ngưỡng PL IV: trả về các lượng ĐÓNG GÓP vào con số đối chiếu
+     * của một mã danh mục - tồn hiện tại theo lô, từng mặt hàng dự trù chưa hoàn thành, lượng
+     * đang khai - để người dùng biết cảnh báo đến từ đâu.
+     *
+     * Tham số: category_id (bắt buộc); amounts[] (dòng đang khai trên form, nếu có); item_id
+     * (mặt hàng đang sửa / đang xem - không cộng lại vào phần "đang dự trù"; không gửi amounts
+     * thì lấy chính số lượng đã lưu của mặt hàng đó); list_id (phiếu đang mở, để đánh dấu).
+     */
+    public function thresholdDetail(Request $request)
+    {
+        $categoryId = (int) $request->category_id;
+
+        $category = DB::table('chemical_categories')
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->where('chemical_categories.id', $categoryId)
+            ->select('chemical_categories.code', 'chem_names.name as chem_name')
+            ->first();
+
+        if (! $category) {
+            return response()->json(['ok' => false, 'reason' => 'Không tìm thấy mã danh mục hoá chất.']);
+        }
+
+        // Chỉ nhận mặt hàng thuộc phiếu của phòng ban đang chọn
+        [$item] = $request->filled('item_id') ? $this->findItem($request->item_id) : [null];
+
+        if ($request->has('amounts')) {
+            $addRows = collect((array) $request->input('amounts', []))
+                ->map(fn ($line) => (object) [
+                    'amount' => (float) ($line['amount'] ?? 0),
+                    'unit_id' => (int) ($line['unit_id'] ?? 0),
+                    'conversion_factor' => (float) ($line['conversion_factor'] ?? 0),
+                    'for_month_year' => $line['for_month_year'] ?? null,
+                ])
+                ->filter(fn ($row) => $row->amount > 0 && $row->unit_id > 0)
+                ->values();
+            $addLabel = $item ? 'Mặt hàng đang sửa' : 'Dự trù lần này';
+        } elseif ($item && (int) $item->category_id === $categoryId) {
+            $addRows = DB::table(self::AMOUNT_TABLE)
+                ->where('estimate_item_id', $item->id)
+                ->where('active', 1)
+                ->orderBy('for_month_year')
+                ->get(['amount', 'unit_id', 'conversion_factor', 'for_month_year']);
+            $addLabel = 'Mặt hàng này';
+        } else {
+            // Mở từ khung chọn danh mục: chỉ xem tồn + đang dự trù
+            $addRows = collect();
+            $addLabel = null;
+        }
+
+        $departmentId = $this->departmentId();
+        $owners = ChemicalEstimateThreshold::breakdown(
+            $categoryId, CompanyContext::currentId(), $addRows, $departmentId, $item ? (int) $item->id : null
+        );
+
+        return response()->json([
+            'ok' => true,
+            'category_code' => $category->code,
+            'chem_name' => $category->chem_name ?: '—',
+            'warn_percent' => (int) round(ActiveIngredientThreshold::warnRatio() * 100),
+            'add_label' => $addLabel,
+            'cards' => array_map(
+                fn ($owner) => $this->thresholdDetailPayload($owner, $addRows, $departmentId, $categoryId, $addLabel, (int) $request->list_id),
+                $owners
+            ),
+        ]);
+    }
+
+    /** Gom một chủ ngưỡng của ChemicalEstimateThreshold::breakdown() thành mảng đã định dạng cho modal. */
+    private function thresholdDetailPayload(object $owner, $addRows, int $departmentId, int $categoryId, ?string $addLabel, int $listId): array
+    {
+        $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ','), '0'), '.') ?: '0';
+        $percent = fn ($ratio) => (int) round($ratio * 100);
+        $isA = $owner->table === 'A';
+        $eval = $owner->eval;
+        $threshold = $owner->threshold_kg;
+
+        $units = $this->unitLabels();
+        $appStatuses = config('estimate.app_statuses');
+        $categoryCodes = DB::table('chemical_categories')
+            ->whereIn('id', array_unique(array_map(fn ($row) => $row->category_id, $owner->pending)) ?: [0])
+            ->pluck('code', 'id');
+        $departmentNames = DB::table('deparments')->pluck('name', 'id');
+
+        // "1 chai (= 500 g) · 09/2026" - một dòng số lượng dự trù, kèm hệ số quy đổi nếu có
+        $amountText = function ($row, int $rowDepartmentId, int $rowCategoryId) use ($num, $units) {
+            $text = $num($row->amount).' '.($units[(int) $row->unit_id] ?? '');
+            $factor = (float) ($row->conversion_factor ?? 0);
+
+            if ($factor > 0) {
+                $deptUnit = ChemicalEstimateThreshold::deptUnit($rowDepartmentId, $rowCategoryId);
+                $text .= ' (1 '.($units[(int) $row->unit_id] ?? '').' = '.$num($factor).' '.($deptUnit->short_name ?? '').')';
+            }
+
+            if (! empty($row->for_month_year)) {
+                $text .= ' · '.\Carbon\Carbon::parse($row->for_month_year)->format('m/Y');
+            }
+
+            return trim($text);
+        };
+
+        $levelLabels = [
+            'exceeded' => 'Dự kiến vượt ngưỡng',
+            'warn' => 'Dự kiến chạm ngưỡng cảnh báo',
+            'ok' => 'Trong ngưỡng',
+        ];
+        $scale = max($owner->projected_kg, $threshold) * 1.08 ?: 1.0;
+
+        return [
+            'table' => $owner->table,
+            'title' => $isA ? $eval->ai_name : $eval->chem_name,
+            'subtitle' => $isA
+                ? implode(' · ', array_filter([
+                    $eval->ai_code ?: null,
+                    $eval->members ? 'mục gộp gồm: '.implode(', ', $eval->members) : null,
+                ]))
+                : 'Nhóm nguy hại: '.implode(', ', $eval->hazard_labels).' · ngưỡng thấp nhất nhóm '.($eval->strictest_group ?? '—'),
+            'kg_label' => $isA ? 'kg hoạt chất' : 'kg hỗn hợp',
+            'threshold_kg' => $num($threshold),
+            'current_kg' => $num($owner->current_kg),
+            'pending_kg' => $num($owner->pending_kg),
+            'add_kg' => $num($owner->add_kg),
+            'base_kg' => $num($owner->base_kg),
+            'projected_kg' => $num($owner->projected_kg),
+            'base_percent' => $percent($owner->base_ratio),
+            'projected_percent' => $percent($owner->projected_ratio),
+            'has_add' => $addLabel !== null,
+            'add_unconvertible' => (bool) $owner->add_unconvertible,
+            'blocked' => (bool) $owner->blocked,
+            'level' => $owner->level,
+            'level_label' => $owner->blocked
+                ? 'Đã vượt ngưỡng (tồn + đang dự trù) - không được dự trù thêm'
+                : ($addLabel !== null ? $levelLabels[$owner->level] : ($owner->level === 'ok' ? 'Trong ngưỡng' : 'Sắp chạm ngưỡng')),
+            // Độ rộng (%) các đoạn của thanh xếp chồng + vị trí vạch ngưỡng trên cùng một thang
+            'bar' => [
+                'current' => round($owner->current_kg / $scale * 100, 2),
+                'pending' => round($owner->pending_kg / $scale * 100, 2),
+                'add' => round($owner->add_kg / $scale * 100, 2),
+                'threshold' => round($threshold / $scale * 100, 2),
+            ],
+            'onhand_rows' => array_map(fn ($o) => [
+                'ref' => $o->ref ?? '',
+                'date' => ! empty($o->date) ? \Carbon\Carbon::parse($o->date)->format('d/m/Y') : '—',
+                'category_code' => $o->category_code,
+                'member_name' => $o->member_name ?? '',
+                'department_name' => $o->department_name,
+                'on_hand' => $num($o->on_hand_unit).($o->unit_short ? ' '.$o->unit_short : ''),
+                'on_hand_kg' => $num($o->on_hand_kg),
+            ], $eval->onhand_rows),
+            'unconvertible' => array_map(fn ($u) => [
+                'category_code' => $u->category_code,
+                'chem_name' => $u->chem_name ?? '',
+                'reason' => $u->reason,
+            ], $eval->unconvertible),
+            'pending_rows' => array_map(fn ($row) => [
+                'list_code' => $row->list_code,
+                'is_current_list' => $listId > 0 && $row->list_id === $listId,
+                'status_label' => ($appStatuses[$row->app_status] ?? $row->app_status)
+                    .($row->app_status === 'approved' ? ' · chờ giao' : ''),
+                'department_name' => $departmentNames[$row->department_id] ?? '—',
+                'category_code' => $categoryCodes[$row->category_id] ?? '—',
+                'amounts' => implode('; ', array_map(
+                    fn ($amount) => $amountText($amount, $row->department_id, $row->category_id),
+                    $row->amounts
+                )),
+                'kg' => $num($isA ? $row->a_kg : $row->b_kg),
+                'unconvertible' => (bool) $row->unconvertible,
+            ], $owner->pending),
+            'add_rows' => $addLabel === null ? [] : collect($addRows)
+                ->map(fn ($row) => $amountText($row, $departmentId, $categoryId))
+                ->values()
+                ->all(),
+            'quarantine' => array_map(fn ($lot) => [
+                'code' => $lot->code,
+                'date' => $lot->imported_date ? \Carbon\Carbon::parse($lot->imported_date)->format('d/m/Y') : '—',
+                'category_code' => $lot->category_code,
+                'department_name' => $lot->department_name ?: '—',
+                'amount' => $num($lot->amount).($lot->unit_short ? ' '.$lot->unit_short : ''),
+            ], $owner->quarantine),
+        ];
+    }
+
+    /** [unit_id => ký hiệu] để in lại số lượng dự trù. */
+    private function unitLabels(): array
+    {
+        return $this->unitLabelCache ??= DB::table('units')
+            ->select('id', 'name', 'short_name')
+            ->get()
+            ->mapWithKeys(fn ($unit) => [(int) $unit->id => $unit->short_name ?: $unit->name])
+            ->all();
     }
 
     /**
@@ -1061,10 +1412,17 @@ class ChemicalEstimateController extends Controller
         $amountRows = DB::table(self::AMOUNT_TABLE)
             ->where('estimate_item_id', $itemId)
             ->where('active', 1)
-            ->select('amount', 'unit_id')
+            ->select('amount', 'unit_id', 'conversion_factor')
             ->get();
 
-        return self::computeThresholdWarnings((int) $item->category_id, $amountRows, CompanyContext::currentId());
+        $departmentId = (int) DB::table(self::TABLE)->where('id', $item->estimate_list_id)->value('department_id');
+        $companyId = CompanyContext::currentId();
+        $pending = ChemicalEstimateThreshold::pendingByCategory(
+            ChemicalEstimateThreshold::pendingRows($companyId, ChemicalEstimateThreshold::criticalCategoryIds()),
+            $itemId
+        );
+
+        return self::computeThresholdWarnings((int) $item->category_id, $amountRows, $companyId, $departmentId, $pending);
     }
 
     /**
@@ -1073,10 +1431,15 @@ class ChemicalEstimateController extends Controller
      * hiển thị thường trực trên phiếu cho người ký duyệt / bộ phận tiếp nhận xem
      * (itemsOf, trackedItems).
      *
-     * @param  iterable  $amountRows  các dòng {amount, unit_id}
-     * @return array<int, array{level: string, message: string}>
+     * Tổng đối chiếu = tồn hiện tại + lượng các mặt hàng dự trù CHƯA HOÀN THÀNH khác
+     * ($pending - App\Support\ChemicalEstimateThreshold::pendingByCategory(), đã bỏ chính
+     * mặt hàng đang xét) + lượng dự trù của mặt hàng này.
+     *
+     * @param  iterable  $amountRows  các dòng {amount, unit_id, conversion_factor}
+     * @param  int|null  $departmentId  phòng lập phiếu - quy đổi qua đơn vị danh mục của phòng
+     * @return array<int, array{level: string, percent: int, message: string}>
      */
-    private static function computeThresholdWarnings(int $categoryId, $amountRows, ?int $companyId): array
+    private static function computeThresholdWarnings(int $categoryId, $amountRows, ?int $companyId, ?int $departmentId = null, array $pending = []): array
     {
         $amountRows = collect($amountRows);
 
@@ -1088,16 +1451,19 @@ class ChemicalEstimateController extends Controller
         $warnings = [];
 
         // ----- BẢNG A: theo hoạt chất (× % hàm lượng) -----
-        $sumA = ActiveIngredientThreshold::sumEstimateKg($categoryId, $amountRows);
-        $projA = ActiveIngredientThreshold::projectedForCategory($categoryId, $sumA['kg'], $companyId);
+        $sumA = ActiveIngredientThreshold::sumEstimateKg($categoryId, $amountRows, $departmentId);
+        $projA = ActiveIngredientThreshold::projectedForCategory($categoryId, $sumA['kg'], $companyId, $pending['A'] ?? []);
 
         if ($projA && ($projA->add_ratio >= 1.0 || $projA->projected_ratio >= ActiveIngredientThreshold::warnRatio())) {
             $warnings[] = [
                 'level' => $projA->level,
+                'percent' => (int) round($projA->projected_ratio * 100),
                 'message' => 'Hoá chất "'.$projA->ai_name.'" phải xây dựng Kế hoạch phòng ngừa, ứng phó sự cố hoá chất '
                     .'(Phụ lục IV NĐ 24/2026/NĐ-CP - Bảng A). Lượng dự trù của mặt hàng ≈ '.$num($projA->add_kg).' kg hoạt chất'
                     .($sumA['unconvertible'] ? ' (chưa gồm dòng dùng đơn vị đếm / thiếu tỉ trọng)' : '')
-                    .'; cộng tồn hiện tại toàn công ty '.$num($projA->current_kg).' kg thì tổng ≈ '.$num($projA->projected_kg)
+                    .'; cộng tồn hiện tại toàn công ty '.$num($projA->current_kg).' kg'
+                    .($projA->pending_kg > 0 ? ' và đang dự trù chưa hoàn thành '.$num($projA->pending_kg).' kg' : '')
+                    .' thì tổng ≈ '.$num($projA->projected_kg)
                     .' kg / ngưỡng '.$num($projA->threshold_kg).' kg ('.(int) round($projA->projected_ratio * 100).'%). '
                     .($projA->add_ratio >= 1.0 ? 'Riêng lượng dự trù đã vượt ngưỡng "tồn trữ lớn nhất tại một thời điểm". ' : '')
                     .($projA->level === ActiveIngredientThreshold::LEVEL_EXCEEDED ? 'DỰ KIẾN VƯỢT NGƯỠNG.' : 'Dự kiến chạm ngưỡng cảnh báo.'),
@@ -1105,16 +1471,19 @@ class ChemicalEstimateController extends Controller
         }
 
         // ----- BẢNG B: theo hỗn hợp (tồn thô, không × %) -----
-        $sumB = MixtureHazardThreshold::sumEstimateKg($categoryId, $amountRows);
-        $projB = MixtureHazardThreshold::projectedForCategory($categoryId, $sumB['kg'], $companyId);
+        $sumB = MixtureHazardThreshold::sumEstimateKg($categoryId, $amountRows, $departmentId);
+        $projB = MixtureHazardThreshold::projectedForCategory($categoryId, $sumB['kg'], $companyId, $pending['B'] ?? []);
 
         if ($projB && ($projB->add_ratio >= 1.0 || $projB->projected_ratio >= MixtureHazardThreshold::warnRatio())) {
             $warnings[] = [
                 'level' => $projB->level,
+                'percent' => (int) round($projB->projected_ratio * 100),
                 'message' => 'Hỗn hợp "'.$projB->chem_name.'" thuộc nhóm nguy hại Bảng B (Phụ lục IV NĐ 24/2026/NĐ-CP). '
                     .'Lượng dự trù ≈ '.$num($projB->add_kg).' kg thô'
                     .($sumB['unconvertible'] ? ' (chưa gồm dòng chưa quy đổi được)' : '')
-                    .'; cộng tồn hiện tại '.$num($projB->current_kg).' kg thì tổng ≈ '.$num($projB->projected_kg)
+                    .'; cộng tồn hiện tại '.$num($projB->current_kg).' kg'
+                    .($projB->pending_kg > 0 ? ' và đang dự trù chưa hoàn thành '.$num($projB->pending_kg).' kg' : '')
+                    .' thì tổng ≈ '.$num($projB->projected_kg)
                     .' kg / ngưỡng thấp nhất '.$num($projB->threshold_kg).' kg (nhóm '.$projB->strictest_group.', '
                     .(int) round($projB->projected_ratio * 100).'%). '
                     .($projB->add_ratio >= 1.0 ? 'Riêng lượng dự trù đã vượt ngưỡng. ' : '')
@@ -1158,12 +1527,39 @@ class ChemicalEstimateController extends Controller
         $request->merge(['amounts' => $rows]);
     }
 
-    /** Ghi lại các dòng số lượng theo tháng của một mặt hàng. */
-    private function saveAmounts(int $itemId, Request $request): void
+    /**
+     * Modal thêm nhiều mặt hàng: bỏ các dòng trống hoàn toàn (chưa chọn/gõ hoá chất, không số
+     * lượng, không thông tin) rồi đánh số lại, để lỗi validate trỏ đúng dòng đang hiện.
+     */
+    private function pruneEmptyItemRows(Request $request): void
     {
         $rows = [];
 
-        foreach ((array) $request->input('amounts', []) as $line) {
+        foreach ((array) $request->input('items', []) as $line) {
+            $line = (array) $line;
+            $line['amounts'] = array_map(fn ($value) => trim((string) $value), (array) ($line['amounts'] ?? []));
+
+            $isBlank = ! array_filter($line['amounts'], fn ($value) => $value !== '')
+                && trim((string) ($line['category_id'] ?? '')) === ''
+                && trim((string) ($line['chem_name'] ?? '')) === ''
+                && trim((string) ($line['technical_information'] ?? '')) === ''
+                && trim((string) ($line['purpose'] ?? '')) === ''
+                && trim((string) ($line['expected_delivery_date'] ?? '')) === '';
+
+            if (! $isBlank) {
+                $rows[] = $line;
+            }
+        }
+
+        $request->merge(['items' => $rows]);
+    }
+
+    /** Ghi các dòng số lượng [amount, unit_id, for_month_year 'Y-m']; dòng thiếu số hoặc tháng thì bỏ qua. */
+    private function saveAmountRows(int $itemId, array $lines): void
+    {
+        $rows = [];
+
+        foreach ($lines as $line) {
             $amount = trim((string) ($line['amount'] ?? ''));
             $period = trim((string) ($line['for_month_year'] ?? ''));
 
@@ -1171,10 +1567,14 @@ class ChemicalEstimateController extends Controller
                 continue;
             }
 
+            $factor = trim((string) ($line['conversion_factor'] ?? ''));
+
             $rows[] = [
                 'estimate_item_id' => $itemId,
                 'amount' => (float) $amount,
                 'unit_id' => ! empty($line['unit_id']) ? (int) $line['unit_id'] : null,
+                // Số đơn vị danh mục trong 1 đơn vị dự trù (chỉ có khi khai khác đơn vị danh mục)
+                'conversion_factor' => $factor !== '' && (float) $factor > 0 ? (float) $factor : null,
                 // Ô nhập dạng "2026-09" -> lưu ngày đầu tháng
                 'for_month_year' => $period.'-01',
                 'status_id' => 1,
@@ -1231,34 +1631,127 @@ class ChemicalEstimateController extends Controller
     }
 
     /**
-     * Mức cảnh báo ngưỡng PL IV hiện tại (không tính thêm số lượng dự trù) của từng mã
-     * danh mục, để bảng "Chọn Từ Danh Mục Hoá Chất" tô badge ngay khi duyệt danh sách -
-     * gộp mức nặng nhất giữa Bảng A (theo hoạt chất) và Bảng B (theo hỗn hợp).
-     *
-     * @return array<int, string>  category_id => 'ok' | 'warn' | 'exceeded'
+     * Hoá chất phòng đã khai ở tab "Hoá Chất Của Phòng" (còn hoạt động, danh mục chung đã
+     * duyệt) - khung "Chọn từ danh mục phòng" của modal thêm mặt hàng, kèm đơn vị và ngưỡng
+     * tồn tối thiểu / tối đa của phòng.
      */
-    private function categoryThresholdLevels(?int $companyId): array
+    private function deptCategoryOptions(int $departmentId)
     {
-        $rank = ['ok' => 0, 'warn' => 1, 'exceeded' => 2];
-        $levels = [];
+        $table = DepartmentChemical::TABLE;
 
-        foreach (ActiveIngredientThreshold::forCategories($companyId) as $categoryId => $row) {
-            $levels[$categoryId] = $row->level;
+        return DB::table($table)
+            ->join('chemical_categories', $table.'.category_id', '=', 'chemical_categories.id')
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('manufacturers', 'chemical_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->leftJoin('units', $table.'.unit_id', '=', 'units.id')
+            ->select(
+                'chemical_categories.id',
+                'chemical_categories.code',
+                'chem_names.name as chem_name',
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                $table.'.unit_id',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                'units.unit_group',
+                'units.factor_to_base',
+                $table.'.min_stock',
+                $table.'.max_stock'
+            )
+            ->selectSub(DepartmentChemical::casNoSubquery('chemical_categories.chem_names_id'), 'cas_no')
+            ->where($table.'.department_id', $departmentId)
+            ->where($table.'.status_id', 1)
+            ->where('chemical_categories.status_id', 1)
+            ->where('chemical_categories.app_status', 'approved')
+            ->orderBy('chem_names.name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Trạng thái ngưỡng PL IV theo mã danh mục (tồn hiện tại + đang dự trù chưa hoàn thành),
+     * trong phạm vi công ty của phòng lập phiếu - tính một lần mỗi request.
+     *
+     * @return array<int, object>  xem App\Support\ChemicalEstimateThreshold::categoryStatus()
+     */
+    private function thresholdStatus($list): array
+    {
+        return $this->thresholdStatusCache ??= ChemicalEstimateThreshold::categoryStatus(
+            CompanyContext::resolveForDepartment((int) $list->department_id)
+        );
+    }
+
+    /** Trạng thái ngưỡng của mã nếu mã đó đã vượt ngưỡng (không được dự trù thêm), ngược lại null. */
+    private function blockedStatus($list, int $categoryId): ?object
+    {
+        $status = $this->thresholdStatus($list)[$categoryId] ?? null;
+
+        return $status && $status->blocked ? $status : null;
+    }
+
+    /**
+     * Hoá chất nhóm 9 / 10 dự trù bằng đơn vị khác đơn vị danh mục của phòng mà chưa khai hệ
+     * số quy đổi (> 0) thì trả câu báo lỗi, ngược lại null.
+     */
+    private function factorError(int $departmentId, int $categoryId, $unitId, $factor): ?string
+    {
+        if (! $unitId || ! in_array($categoryId, ChemicalEstimateThreshold::criticalCategoryIds(), true)) {
+            return null;
         }
 
-        foreach (MixtureHazardThreshold::forCategories($companyId) as $categoryId => $row) {
-            if (! isset($levels[$categoryId]) || $rank[$row->level] > $rank[$levels[$categoryId]]) {
-                $levels[$categoryId] = $row->level;
+        $deptUnit = ChemicalEstimateThreshold::deptUnit($departmentId, $categoryId);
+
+        if (! $deptUnit || (int) $unitId === (int) $deptUnit->unit_id || (float) $factor > 0) {
+            return null;
+        }
+
+        $unitLabel = $deptUnit->short_name ?: $deptUnit->name;
+
+        return 'Hoá chất nhóm 9 / 10 dự trù khác đơn vị danh mục ('.$unitLabel.') - vui lòng khai hệ số quy đổi: '
+            .'1 đơn vị dự trù = bao nhiêu '.$unitLabel.'.';
+    }
+
+    /**
+     * [category_id => {unit_id, unit, group, base}] - đơn vị danh mục của phòng cho các hoá chất
+     * nhóm 9 / 10 trong danh mục phòng. JS dựa vào đây để hiện ô "1 <đơn vị dự trù> = ? <đơn vị
+     * danh mục>" và tự điền hệ số khi hai đơn vị cùng nhóm khối lượng / thể tích.
+     */
+    private function factorUnits($deptCategories): array
+    {
+        $critical = array_flip(ChemicalEstimateThreshold::criticalCategoryIds());
+        $out = [];
+
+        foreach ($deptCategories as $category) {
+            if (isset($critical[(int) $category->id]) && $category->unit_id) {
+                $out[(int) $category->id] = [
+                    'unit_id' => (int) $category->unit_id,
+                    'unit' => $category->unit_short_name ?: $category->unit_name,
+                    'group' => $category->unit_group,
+                    'base' => (float) $category->factor_to_base,
+                ];
             }
         }
 
-        return $levels;
+        return $out;
+    }
+
+    /** Hệ số quy đổi cần lưu cho một dòng: chỉ giữ khi khai khác đơn vị danh mục của phòng. */
+    private function factorFor($departmentId, $categoryId, $unitId, $factor): ?float
+    {
+        $factor = (float) $factor;
+
+        if ($factor <= 0 || ! $categoryId || ! $unitId) {
+            return null;
+        }
+
+        $deptUnit = ChemicalEstimateThreshold::deptUnit((int) $departmentId, (int) $categoryId);
+
+        return $deptUnit && (int) $unitId !== (int) $deptUnit->unit_id ? $factor : null;
     }
 
     private function unitOptions()
     {
         return DB::table('units')
-            ->select('id', 'name', 'short_name')
+            ->select('id', 'name', 'short_name', 'unit_group', 'factor_to_base')
             ->where('status_id', 1)
             ->where('app_status', 'approved')
             ->orderBy('name', 'asc')
@@ -1370,20 +1863,74 @@ class ChemicalEstimateController extends Controller
             'amounts' => ['required', 'array', 'min:1'],
             'amounts.*.amount' => ['required', 'numeric', 'min:0.0001'],
             'amounts.*.unit_id' => ['required', 'exists:units,id'],
+            'amounts.*.conversion_factor' => ['nullable', 'numeric', 'gt:0'],
             'amounts.*.for_month_year' => ['required', 'date_format:Y-m'],
         ];
     }
 
     private function itemPayload(Request $request): array
     {
-        $fromCategory = $request->source === 'category';
+        return $this->itemPayloadFrom($request->all());
+    }
+
+    /** Payload một mặt hàng từ mảng dữ liệu (form sửa 1 dòng hoặc 1 dòng items[i] của modal thêm nhiều). */
+    private function itemPayloadFrom(array $line): array
+    {
+        $fromCategory = ($line['source'] ?? '') === 'category';
 
         return [
-            'category_id' => $fromCategory ? (int) $request->category_id : null,
-            'chem_name' => $fromCategory ? null : $this->nullIfBlank($request->chem_name),
-            'technical_information' => $this->nullIfBlank($request->technical_information),
-            'purpose' => $this->nullIfBlank($request->purpose),
-            'expected_delivery_date' => $this->nullIfBlank($request->expected_delivery_date),
+            'category_id' => $fromCategory ? (int) $line['category_id'] : null,
+            'chem_name' => $fromCategory ? null : $this->nullIfBlank($line['chem_name'] ?? null),
+            'technical_information' => $this->nullIfBlank($line['technical_information'] ?? null),
+            'purpose' => $this->nullIfBlank($line['purpose'] ?? null),
+            'expected_delivery_date' => $this->nullIfBlank($line['expected_delivery_date'] ?? null),
+        ];
+    }
+
+    /** Modal thêm nhiều mặt hàng: items[i] là một hoá chất, periods[k] là cột tháng chung. */
+    private function batchItemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.source' => ['required', 'in:category,manual'],
+            'items.*.category_id' => ['required_if:items.*.source,category', 'nullable', 'exists:chemical_categories,id'],
+            'items.*.chem_name' => ['required_if:items.*.source,manual', 'nullable', 'max:255'],
+            'items.*.technical_information' => ['nullable', 'max:1000'],
+            'items.*.purpose' => ['nullable', 'max:1000'],
+            'items.*.expected_delivery_date' => ['nullable', 'date'],
+            'items.*.unit_id' => ['required', 'exists:units,id'],
+            'items.*.conversion_factor' => ['nullable', 'numeric', 'gt:0'],
+            'items.*.amounts' => ['array'],
+            'items.*.amounts.*' => ['nullable', 'numeric', 'min:0.0001'],
+            'periods' => ['required', 'array', 'min:1'],
+            'periods.*' => ['nullable', 'date_format:Y-m', 'distinct'],
+        ];
+    }
+
+    private function batchItemMessages(): array
+    {
+        return [
+            'items.required' => 'Vui lòng khai ít nhất một hoá chất.',
+            'items.min' => 'Vui lòng khai ít nhất một hoá chất.',
+            'items.max' => 'Mỗi lần thêm tối đa 200 hoá chất.',
+            'items.*.source.required' => 'Vui lòng chọn nguồn hoá chất.',
+            'items.*.source.in' => 'Nguồn hoá chất không hợp lệ.',
+            'items.*.category_id.required_if' => 'Vui lòng chọn hoá chất trong danh mục.',
+            'items.*.category_id.exists' => 'Hoá chất được chọn không tồn tại trong danh mục.',
+            'items.*.chem_name.required_if' => 'Vui lòng nhập tên hoá chất ngoài danh mục.',
+            'items.*.chem_name.max' => 'Tên hoá chất tối đa 255 ký tự.',
+            'items.*.technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
+            'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'items.*.expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
+            'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
+            'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'items.*.conversion_factor.numeric' => 'Hệ số quy đổi phải là số.',
+            'items.*.conversion_factor.gt' => 'Hệ số quy đổi phải lớn hơn 0.',
+            'items.*.amounts.*.numeric' => 'Số lượng dự trù phải là số.',
+            'items.*.amounts.*.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'periods.required' => 'Vui lòng khai ít nhất một tháng cần dùng.',
+            'periods.*.date_format' => 'Tháng cần dùng không hợp lệ.',
+            'periods.*.distinct' => 'Các cột tháng cần dùng bị trùng nhau.',
         ];
     }
 
@@ -1405,6 +1952,8 @@ class ChemicalEstimateController extends Controller
             'amounts.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
             'amounts.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
             'amounts.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'amounts.*.conversion_factor.numeric' => 'Hệ số quy đổi phải là số.',
+            'amounts.*.conversion_factor.gt' => 'Hệ số quy đổi phải lớn hơn 0.',
             'amounts.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng.',
             'amounts.*.for_month_year.date_format' => 'Tháng cần dùng không hợp lệ.',
         ];

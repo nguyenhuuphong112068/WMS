@@ -108,6 +108,7 @@
                         @include('pages.estimate.shared.amountsBox', [
                             'units' => $units,
                             'oldRows' => (array) old('amounts', []),
+                            'factorUnits' => $factorUnits ?? [],
                         ])
                         @foreach ($bag->keys() as $estKey)
                             @if (str_starts_with($estKey, 'amounts'))

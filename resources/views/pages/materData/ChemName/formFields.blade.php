@@ -2,9 +2,11 @@
 | Phần dùng chung cho modal Thêm mới / Cập nhật Tên Hoá Chất:
 |   - chọn NHIỀU hoạt chất + khai % khối lượng từng thành phần (dùng cho quy tắc nhóm 2, 8)
 |   - tick nhóm nguy hại Bảng B (chỉ có hiệu lực khi hỗn hợp có thành phần nhóm 9) => nhóm 10
+|   - tick "Phân loại khác" (ngoài NĐ 24/2026): nhóm 11 Hoá chất cấm (Luật Đầu tư 2025), nhóm 12
+|     Hàng hoá đặc biệt - áp cho cả đơn chất lẫn hỗn hợp
 | Nhóm 2 (hỗn hợp >= 2 hoạt chất, có >= 1 thành phần nhóm 1) tự suy, không tick tay.
 | Biến vào: $bag, $activeIngredients, $hazardCategories, $hazardGroups, $groupLabels,
-|           $oldAiIds, $oldHazardIds, $oldPercents
+|           $oldAiIds, $oldHazardIds, $oldPercents, $oldOther ([cột => bool])
 --}}
 <div class="form-group">
     <div class="d-flex align-items-center justify-content-between flex-wrap mb-1" style="gap: 8px">
@@ -50,6 +52,24 @@
         Dùng để tự xét <b>nhóm 8</b> (Hỗn hợp chất cần kiểm soát đặc biệt): có thành phần nhóm 3/4/6/7
         tỉ lệ &gt; 1%, hoặc thành phần nhóm 5 tỉ lệ &gt; 5%. Bỏ trống = coi như 0% (không tự đánh nhóm 8).
     </small>
+</div>
+
+<div class="form-group">
+    <label>Phân Loại Khác (ngoài NĐ 24/2026/NĐ-CP)</label>
+    <div class="chem-other-box">
+        @foreach (\App\Support\ChemicalClassification::OTHER_GROUPS as $g => $column)
+            @php $checked = !empty($oldOther[$column]); @endphp
+            <label class="chem-other-item {{ $checked ? 'is-checked' : '' }}">
+                <input type="checkbox" class="chem-other-input" name="{{ $column }}" value="1"
+                    {{ $checked ? 'checked' : '' }}>
+                <span class="badge {{ \App\Support\ChemicalClassification::badgeClass($g) }}">{{ \App\Support\ChemicalClassification::shortLabel($g) }}</span>
+                <span class="chem-other-text">{{ $groupLabels[$g] ?? '' }}</span>
+            </label>
+            @if ($bag->has($column))
+                <span class="md-error">{{ $bag->first($column) }}</span>
+            @endif
+        @endforeach
+    </div>
 </div>
 
 <div class="form-group" data-hazard-section>
@@ -100,6 +120,39 @@
 
 @once
     <style>
+        .chem-other-box {
+            border: 1px solid #dbe6f2;
+            border-radius: var(--border-radius-md);
+            padding: 6px;
+        }
+
+        .chem-other-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            padding: 7px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 400;
+            transition: background 0.2s;
+        }
+
+        .chem-other-item + .chem-other-item,
+        .chem-other-box .md-error + .chem-other-item {
+            border-top: 1px solid var(--primary-soft);
+        }
+
+        .chem-other-item:hover,
+        .chem-other-item.is-checked {
+            background: var(--primary-soft);
+        }
+
+        .chem-other-text {
+            font-size: 0.85rem;
+            color: var(--text-main);
+        }
+
         .chem-hazard-lock {
             background: #FEF3C7;
             border: 1px dashed #FCD34D;

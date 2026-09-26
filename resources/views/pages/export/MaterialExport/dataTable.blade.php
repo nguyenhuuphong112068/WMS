@@ -32,6 +32,18 @@
                             <span class="exp-tab-count">{{ $prepBadgeCount }}</span>
                         @endif
                     </button>
+                    <button type="button" class="exp-tab {{ $activeTab === 'late' ? 'is-active' : '' }}" data-pane="mePaneLate">
+                        <i class="fas fa-hourglass-end mr-1"></i> Cấp phát trễ hạn
+                        @if ($lateRows->count())
+                            <span class="exp-tab-count">{{ $lateRows->count() }}</span>
+                        @endif
+                    </button>
+                    <button type="button" class="exp-tab {{ $activeTab === 'quarantine' ? 'is-active' : '' }}" data-pane="mePaneQuarantine">
+                        <i class="fas fa-biohazard mr-1"></i> Vật tư hỏng
+                        @if ($quarantineBadge)
+                            <span class="exp-tab-count">{{ $quarantineBadge }}</span>
+                        @endif
+                    </button>
                     <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}" data-pane="mePaneTransfer">
                         <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
                         {{-- Do Controller đếm trên toàn bộ dữ liệu, không chỉ trang đang xem --}}
@@ -51,14 +63,6 @@
 
                 {{-- ============ SỔ SỬ DỤNG ============ --}}
                 <div class="exp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="mePaneBook">
-                    <div class="md-toolbar">
-                        @perm('export_material_issue')
-                            <button type="button" class="btn btn-danger btn-md-create">
-                                <i class="fas fa-trash-alt mr-1"></i> Loại bỏ vật tư hỏng / hết hạn
-                            </button>
-                        @endperm
-                    </div>
-
                     @include('pages.shared.rangeFilter', [
                         'rfRoute' => $expRoute . 'list',
                         'rfTab' => 'book',
@@ -141,6 +145,9 @@
                                             @if ($row->type === 'transfer_out')
                                                 {{-- Phiếu cấp phát liên phòng ban chỉ đổi được qua thao tác Nhận / Từ chối nhận của phòng nhận --}}
                                                 <span class="md-sub text-muted">—</span>
+                                            @elseif ($row->quarantine_id)
+                                                {{-- Loại bỏ theo quyết định ở tab "Vật tư hỏng": không quay lại kho được --}}
+                                                <span class="md-sub text-muted" title="Loại bỏ theo quyết định, không điều chỉnh được"><i class="fas fa-lock"></i></span>
                                             @else
                                             <div class="md-actions">
                                                 <span class="exp-btn-wrap">
@@ -212,6 +219,16 @@
                     @include('pages.export.MaterialExport.preparePane')
                 </div>
 
+                {{-- ============ CẤP PHÁT TRỄ HẠN ============ --}}
+                <div class="exp-pane {{ $activeTab === 'late' ? 'is-active' : '' }}" id="mePaneLate">
+                    @include('pages.export.MaterialExport.latePane')
+                </div>
+
+                {{-- ============ VẬT TƯ HỎNG: CÁCH LY -> LOẠI BỎ -> HUỶ ============ --}}
+                <div class="exp-pane {{ $activeTab === 'quarantine' ? 'is-active' : '' }}" id="mePaneQuarantine">
+                    @include('pages.export.MaterialExport.quarantinePane')
+                </div>
+
                 {{-- ============ ĐỀ NGHỊ CHUYỂN LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.MaterialExport.transferPane')
 
@@ -230,11 +247,5 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([5, 'desc']).draw();
-
-        // Điền form loại bỏ / điều chỉnh
-        $(document).on('click', '.btn-md-create', function () {
-            $('#createModal form')[0].reset();
-            $('#createModal').modal('show');
-        });
     });
 </script>

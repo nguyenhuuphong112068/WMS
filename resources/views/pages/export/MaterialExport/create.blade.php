@@ -1,67 +1,4 @@
-@php $bag = $errors->getBag('createErrors'); $ubag = $errors->getBag('updateErrors'); @endphp
-
-{{-- ============ LẬP PHIẾU LOẠI BỎ HÀNG HỎNG / HẾT HẠN ============ --}}
-<div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="{{ $expIcon }} mr-2"></i>Loại bỏ vật tư hỏng / hết hạn</h5>
-                <button type="button" class="close" data-dismiss="modal">&times;</button>
-            </div>
-            <form action="{{ route($expRoute . 'store') }}" method="POST">
-                @csrf
-                <div class="modal-body">
-
-                    <input type="hidden" name="type" value="cancel">
-
-                    <div class="md-hint mb-3">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Phiếu này chỉ dùng để <b>loại bỏ</b> hàng hỏng / hết hạn. Vật tư đem <b>sử dụng</b> đã
-                        được trừ kho ngay lúc kho cấp phát.
-                    </div>
-
-                    {{-- Nguồn: chọn mã xuất nhập để loại bỏ --}}
-                    <div class="form-group">
-                        <label>Mã xuất nhập cần loại bỏ <span class="text-danger">*</span></label>
-                        <select name="import_id" class="form-control exp-select {{ $bag->has('import_id') ? 'is-invalid' : '' }}">
-                            <option value="">-- Chọn mã xuất nhập trong kho --</option>
-                            @foreach ($availableImports as $i)
-                                <option value="{{ $i->id }}" data-remaining="{{ $i->remaining }}" data-unit="{{ $i->unit_short_name }}"
-                                    {{ old('import_id') == $i->id ? 'selected' : '' }} {{ $i->remaining <= 0 && $i->expired ? '' : '' }}>
-                                    {{ $i->code }} — {{ $i->material_name }} (còn {{ $expNum($i->remaining) }} {{ $i->unit_short_name }}){{ $i->expired ? ' · HẾT HẠN' : '' }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @if ($bag->has('import_id')) <div class="md-error text-danger small">{{ $bag->first('import_id') }}</div> @endif
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group col-md-5">
-                            <label>Số lượng <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <input type="text" inputmode="decimal" min="0.0001" name="amount"
-                                    class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}" value="{{ old('amount') }}" required>
-                                <div class="input-group-append"><span class="input-group-text me-unit">—</span></div>
-                            </div>
-                            @if ($bag->has('amount')) <div class="md-error text-danger small">{{ $bag->first('amount') }}</div> @endif
-                            <small class="text-muted me-remaining"></small>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Lý do loại bỏ <span class="text-danger">*</span></label>
-                        <textarea name="reason" rows="2" maxlength="500" class="form-control {{ $bag->has('reason') ? 'is-invalid' : '' }}">{{ old('reason') }}</textarea>
-                        @if ($bag->has('reason')) <div class="md-error text-danger small">{{ $bag->first('reason') }}</div> @endif
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Ghi nhận</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+@php $ubag = $errors->getBag('updateErrors'); @endphp
 
 {{-- ============ ĐIỀU CHỈNH PHIẾU ============ --}}
 {{-- Các ô trong modal bám đúng theo cột của bảng "Sổ sử dụng vật tư": phần chỉ xem
@@ -151,13 +88,6 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Chọn mã xuất nhập -> đơn vị + tồn còn lại
-        $(document).on('change', '#createModal [name="import_id"]', function () {
-            var $o = $(this).find(':selected');
-            $('#createModal .me-unit').text($o.data('unit') || '—');
-            $('#createModal .me-remaining').text($o.val() ? ('Tồn còn: ' + ($o.data('remaining') || 0)) : '');
-        });
-
         // Đổ dữ liệu dòng của sổ sử dụng vào modal điều chỉnh. Phiếu sử dụng chỉ sinh
         // từ cấp phát nên form suy loại phiếu từ dữ liệu dòng.
         $(document).on('click', '.btn-me-edit', function () {
@@ -190,8 +120,6 @@
             $m.find('.me-up-cancel').toggle(isCancel);
             $m.modal('show');
         });
-
-        @if ($bag->any()) $(function () { $('#createModal').modal('show'); }); @endif
 
         {{-- Lỗi validate: mở lại đúng dòng vừa sửa để giữ nguyên phần thông tin chỉ xem --}}
         @if ($ubag->any())

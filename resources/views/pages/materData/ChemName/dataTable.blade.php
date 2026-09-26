@@ -200,6 +200,10 @@
                                                 'active_ingredient_ids' => $row->active_ingredient_ids,
                                                 'hazard_category_ids' => $row->hazard_category_ids,
                                                 'content_percents' => (object) $row->content_percents,
+                                                // Gom vào một khoá riêng, KHÔNG để trùng tên ô tick: handler chung của
+                                                // shared.assets gán .val() theo tên ô, sẽ ghi đè value="1" của checkbox
+                                                'other_groups' => collect(\App\Support\ChemicalClassification::OTHER_GROUPS)
+                                                    ->mapWithKeys(fn ($col) => [$col => (int) $row->$col])->all(),
                                             ],
                                         ])
                                     </td>
@@ -343,6 +347,18 @@
                 chemHazardCount($(this).closest('.md-modal'));
             });
 
+            /* ---------- Phân loại khác (Hoá chất cấm, Hàng hoá đặc biệt) - tick tay ---------- */
+            function chemSetOther($modal, values) {
+                $modal.find('.chem-other-input').each(function() {
+                    var on = String((values || {})[this.name]) === '1';
+                    $(this).prop('checked', on).closest('.chem-other-item').toggleClass('is-checked', on);
+                });
+            }
+
+            $(document).on('change', '.chem-other-input', function() {
+                $(this).closest('.chem-other-item').toggleClass('is-checked', this.checked);
+            });
+
             $(document).on('change', '.chem-ai-select', function() {
                 var $modal = $(this).closest('.md-modal');
                 chemRebuildPercents($modal);
@@ -363,6 +379,7 @@
                     var on = hazIds.indexOf(String(this.value)) !== -1;
                     $(this).prop('checked', on).closest('.chem-hazard-item').toggleClass('is-checked', on);
                 });
+                chemSetOther($modal, row.other_groups);
                 chemHazardLock($modal);
             });
 
@@ -373,6 +390,7 @@
                 $modal.find('.chem-ai-select').val(null).trigger('change');
                 $modal.find('.chem-hazard-input').prop('checked', false)
                     .closest('.chem-hazard-item').removeClass('is-checked');
+                chemSetOther($modal, {});
                 chemHazardLock($modal);
             });
 

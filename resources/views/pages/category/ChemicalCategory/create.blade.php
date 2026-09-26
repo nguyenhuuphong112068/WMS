@@ -161,8 +161,14 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Cảnh Báo An Toàn</label>
-                                <div class="cat-check-group {{ $bag->has('safety_warning') ? 'is-invalid' : '' }}">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <label>Cảnh Báo An Toàn</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-toggle="modal"
+                                        data-target="#storageChartModal">
+                                        <i class="fas fa-th mr-1"></i> Sơ đồ tương kỵ
+                                    </button>
+                                </div>
+                                <div class="cat-check-group is-grid {{ $bag->has('safety_warning') ? 'is-invalid' : '' }}">
                                     @foreach ($safetyWarnings as $code => $name)
                                         <label
                                             class="cat-check-item has-picto {{ in_array($code, $oldWarnings) ? 'is-checked' : '' }}">
@@ -178,7 +184,7 @@
                                     @endforeach
                                 </div>
                                 <small class="md-sub">Cho phép chọn nhiều cảnh báo. In ra dải giữa của nhãn dán lô
-                                    hàng ở màn hình Nhập Hoá Chất.</small>
+                                    hàng ở màn hình Nhập Hoá Chất và dùng để chặn xếp chung kệ/tủ với hoá chất tương kỵ.</small>
                                 @if ($bag->has('safety_warning'))
                                     <span class="md-error">{{ $bag->first('safety_warning') }}</span>
                                 @endif

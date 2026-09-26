@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Pages\Import;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
-use App\Support\Barcode128;
 use App\Support\ChemicalCode;
 use App\Support\DepartmentChemical;
 use App\Support\ListRange;
+use App\Support\QrCode;
 use App\Support\UnitConverter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -209,8 +209,9 @@ class ChemicalImportController extends Controller
      * thẳng lên chai/thùng. Số lượng nhãn nhân bản bằng JS ngay trên trang, không nạp
      * lại trang; lúc bấm In, trang gọi labelPrinted() để ghi audit log.
      *
-     * Mã vạch là Code 128 sinh thẳng thành SVG (App\Support\Barcode128), nội dung đúng
-     * bằng MÃ XUẤT NHẬP của lô, để màn hình Sử Dụng quét lại là ra đúng lô này.
+     * Mã QR (App\Support\QrCode) giống nhãn lô vật tư, nội dung đúng bằng MÃ XUẤT NHẬP
+     * của lô, để màn hình Sử Dụng quét lại là ra đúng lô này. Nhãn cũ in mã vạch Code 128
+     * vẫn quét được (cameraScan đọc cả hai kiểu).
      */
     public function label(Request $request)
     {
@@ -240,7 +241,9 @@ class ChemicalImportController extends Controller
         return view('pages.import.ChemicalImport.label', [
             'import' => $row,
             'label' => config('chemical.label'),
-            'barcode' => Barcode128::svg($row->code),
+            // ECC Q (25%): chịu được logo Stella đè giữa mã. border 1 module: vùng trắng tối
+            // thiểu để QR gọn trong góc nhãn.
+            'qr' => QrCode::render($row->code, 'Q', 1),
             'maxCopies' => self::LABEL_MAX_COPIES,
         ]);
     }

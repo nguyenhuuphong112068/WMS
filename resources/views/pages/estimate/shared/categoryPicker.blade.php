@@ -2,11 +2,14 @@
 | DỰ TRÙ - Bảng chọn "Hoá Chất Trong Danh Mục" từ Danh Mục Hoá Chất của phòng ban
 |
 | Mở từ nút ".est-pick-category" đặt trước ô select[name="category_id"] trong modal
-| Thêm / Sửa mặt hàng dự trù (nút mang data-target-modal="#itemCreateModal" hoặc
-| "#itemUpdateModal"). Bấm "Chọn" đổ giá trị vào ô select của modal đó rồi trigger
+| Sửa mặt hàng dự trù (nút mang data-target-modal="#itemUpdateModal"; modal Thêm đã chuyển
+| sang dạng bảng chọn nhiều - pages/estimate/shared/batchItemCreate.blade.php).
+| Bấm "Chọn" đổ giá trị vào ô select của modal đó rồi trigger
 | change để Select2 cập nhật và cảnh báo ngưỡng PL IV tự chạy lại (xem assets.blade.php).
 |
-| Biến vào: $categories (từ categoryOptions()), $categoryLevels (category_id => 'ok'|'warn'|'exceeded').
+| Biến vào: $categories (từ categoryOptions()), $categoryLevels (category_id => 'ok'|'warn'|'exceeded'),
+|           $thresholdStatus (App\Support\ChemicalEstimateThreshold::categoryStatus() - tồn hiện tại +
+|           đang dự trù chưa hoàn thành): mã có blocked = true không bấm Chọn được.
 --}}
 
 @php
@@ -54,24 +57,40 @@
                         </thead>
                         <tbody>
                             @foreach ($categories as $category)
-                                @php $ecpLevel = $categoryLevels[$category->id] ?? null; @endphp
+                                @php
+                                    $ecpLevel = $categoryLevels[$category->id] ?? null;
+                                    $ecpStatus = ($thresholdStatus ?? [])[$category->id] ?? null;
+                                    $ecpBlocked = $ecpStatus && $ecpStatus->blocked;
+                                @endphp
                                 <tr>
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td><span class="md-tag">{{ $category->code }}</span></td>
                                     <td class="font-weight-bold">{{ $category->chem_name }}</td>
                                     <td>{{ $category->unit_short_name ?: '—' }}</td>
                                     <td>
-                                        @if ($ecpLevel && isset($ecpLevelLabel[$ecpLevel]))
-                                            <span class="badge {{ $ecpLevelBadge[$ecpLevel] }}">{{ $ecpLevelLabel[$ecpLevel] }}</span>
+                                        @if ($ecpBlocked)
+                                            <span class="badge badge-danger" style="white-space: normal"
+                                                title="{{ $ecpStatus->message }}">Đã vượt ngưỡng, không được dự trù thêm</span>
+                                        @elseif ($ecpLevel && isset($ecpLevelLabel[$ecpLevel]))
+                                            <span class="badge {{ $ecpLevelBadge[$ecpLevel] }}"
+                                                title="{{ $ecpStatus->message ?? '' }}">{{ $ecpLevelLabel[$ecpLevel] }}</span>
                                         @else
                                             <span class="md-empty">—</span>
+                                        @endif
+                                        @if ($ecpStatus)
+                                            <button type="button" class="btn-est-thr-detail text-primary"
+                                                data-params="{{ json_encode(['category_id' => $category->id]) }}"
+                                                title="Xem các lượng đóng góp: tồn theo lô, dự trù chưa hoàn thành">
+                                                <i class="fas fa-search-plus"></i> Chi tiết
+                                            </button>
                                         @endif
                                     </td>
                                     <td class="text-center">
                                         <button type="button" class="btn btn-sm btn-primary ecp-choose"
                                             data-id="{{ $category->id }}"
                                             data-name="{{ $category->code }} - {{ $category->chem_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}"
-                                            title="Chọn hoá chất này">
+                                            title="{{ $ecpBlocked ? 'Đã vượt ngưỡng PL IV, không được dự trù thêm' : 'Chọn hoá chất này' }}"
+                                            {{ $ecpBlocked ? 'disabled' : '' }}>
                                             <i class="fas fa-check"></i>
                                         </button>
                                     </td>

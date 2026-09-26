@@ -2,16 +2,19 @@
 
 namespace App\Http\Controllers\Pages\Estimate;
 
+use App\Http\Controllers\Concerns\EstimateItemCancel;
 use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\AttachmentBackup;
 use App\Support\DepartmentMaterial;
 use App\Support\MaterialClassification;
 use App\Support\MaterialTransferRequest;
 use App\Support\MaterialWatchlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -34,6 +37,7 @@ use Illuminate\Validation\Rule;
  */
 class MaterialEstimateController extends Controller
 {
+    use EstimateItemCancel;
     use EstimateSignFlow;
     use VerifiesSignature;
 
@@ -44,6 +48,13 @@ class MaterialEstimateController extends Controller
     private const AMOUNT_TABLE = 'material_estimate_item_amounts';
 
     private const HISTORY_TABLE = 'material_estimate_histories';
+
+    /** File đính kèm của phiếu - xoá mềm bằng cột active. */
+    private const ATTACHMENT_TABLE = 'material_estimate_attachments';
+
+    private const ATTACHMENT_FOLDER = 'material_estimates';
+
+    private const ATTACHMENT_MIMES = 'pdf,doc,docx,xls,xlsx,csv,ppt,pptx,txt,jpg,jpeg,png,gif,bmp,webp,zip,rar,7z,msg,eml';
 
     /** Quy trình ký duyệt động - xem App\Http\Controllers\Concerns\EstimateSignFlow. */
     private const SIGN_TABLE = 'material_estimate_signs';
@@ -61,6 +72,20 @@ class MaterialEstimateController extends Controller
     private const ITEM_LABEL = 'vật tư dự trù';
 
     private const EDITABLE_STATUSES = ['draft', 'rejected'];
+
+    /** Huỷ mục cần xác nhận 2 bên - xem App\Http\Controllers\Concerns\EstimateItemCancel. */
+    protected function cancelConfig(): array
+    {
+        return [
+            'item_fk' => 'material_estimate_id',
+            'chat_type' => self::CHAT_TYPE,
+            'category_table' => 'material_categories',
+            'name_table' => 'material_names',
+            'name_fk' => 'material_names_id',
+            'manual_name' => 'material_name',
+            'purchasing_col' => 'purchasing_department',
+        ];
+    }
 
     /* ==========================================================
      |  DANH SÁCH PHIẾU
@@ -96,7 +121,10 @@ class MaterialEstimateController extends Controller
         // Hộp ký duyệt liên phòng ban (chỉ bật cho phòng ban chung + có quyền is_BOD)
         $inbox = $this->approvalInboxData();
 
-        $tabs = ['list', 'tracking', 'watchlist', 'inbox'];
+        // Tab "Bộ phận mua hàng" (xác nhận huỷ 2 bên) - chỉ hiện với Cung Ứng / Hành Chánh / IT
+        $purchasingItems = $this->purchasingItems($departmentId);
+
+        $tabs = ['list', 'tracking', 'watchlist', 'inbox', 'purchasing'];
         $activeTab = in_array($request->query('tab'), $tabs, true)
             ? $request->query('tab')
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'list');
@@ -122,6 +150,7 @@ class MaterialEstimateController extends Controller
             'transferDepartments' => $this->transferDepartmentOptions($departmentId),
             'adminDepartmentId' => $this->adminDepartmentId($departmentId),
             'activeTab' => $activeTab,
+            'purchasingItems' => $purchasingItems,
             'showApprovalInbox' => $inbox['show'],
             'inboxRequests' => $inbox['requests'],
             'inboxItems' => $inbox['items'],
@@ -156,12 +185,16 @@ class MaterialEstimateController extends Controller
             'items' => self::itemsOf($list->id),
             'histories' => self::historiesOf($list->id),
             'categories' => $this->categoryOptions(),
+            // Danh mục vật tư của phòng - khung "Chọn từ danh mục phòng" ở modal thêm vật tư
+            'deptCategories' => DepartmentMaterial::importCategoryOptions($this->departmentId()),
             'units' => $this->unitOptions(),
             'appStatuses' => config('estimate.app_statuses'),
             'signStatuses' => config('estimate.sign_statuses'),
             'receptionStatuses' => config('estimate.reception_statuses'),
             'signs' => $signs,
             'pendingSign' => $pendingSign,
+            // Mốc tính cảnh báo thời gian đặt hàng: ngày BGĐ duyệt (bước ký cuối), chưa duyệt thì ngày tạo phiếu
+            'approvedAt' => $list->app_status === 'approved' ? $signs->max('signed_at') : null,
             'canSignCurrent' => $pendingSign ? $this->canSignRow($pendingSign) : false,
             'signPermission' => self::SIGN_PERMISSION,
             'canEditItems' => $this->editable($list),
@@ -467,9 +500,147 @@ class MaterialEstimateController extends Controller
     }
 
     /* ==========================================================
+     |  FILE ĐÍNH KÈM - mỗi file gắn với MỘT mục dự trù.
+     |  Chỉ đính kèm / xoá khi phiếu còn Nháp / Bị từ chối. Xoá là xoá mềm.
+     ========================================================== */
+
+    public function uploadAttachment(Request $request)
+    {
+        $list = $this->findOwn($request->material_estimate_id);
+
+        if (! $list) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần đính kèm file!');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'attachments' => ['required', 'array', 'max:20'],
+            'attachments.*' => ['file', 'max:20480', 'mimes:'.self::ATTACHMENT_MIMES],
+            'note' => ['nullable', 'max:255'],
+            'material_estimate_item_id' => ['required', 'integer'],
+        ], [
+            'attachments.required' => 'Vui lòng chọn file cần đính kèm.',
+            'material_estimate_item_id.required' => 'File đính kèm phải gắn với một mục dự trù.',
+            'attachments.max' => 'Mỗi lần tải tối đa 20 file.',
+            'attachments.*.file' => 'File tải lên không hợp lệ.',
+            'attachments.*.max' => 'Mỗi file tối đa 20MB.',
+            'attachments.*.mimes' => 'Định dạng file không được hỗ trợ.',
+            'note.max' => 'Ghi chú tối đa 255 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->with('error', $validator->errors()->first());
+        }
+
+        if (! $this->editable($list)) {
+            return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không đính kèm file được nữa!');
+        }
+
+        // Mỗi file phải gắn với một mục dự trù thuộc đúng phiếu này
+        $itemId = DB::table(self::ITEM_TABLE)
+            ->where('id', $request->material_estimate_item_id)
+            ->where('material_estimate_id', $list->id)
+            ->where('active', 1)
+            ->value('id');
+
+        if (! $itemId) {
+            return redirect()->back()->with('error', 'Không tìm thấy vật tư cần đính kèm file!');
+        }
+
+        $names = DB::transaction(fn () => $this->storeFiles(
+            $list->id, $itemId, $request->file('attachments', []), $this->nullIfBlank($request->note)
+        ));
+
+        if (! $names) {
+            return redirect()->back()->with('error', 'Không có file hợp lệ nào được tải lên!');
+        }
+
+        AuditTrialController::log('Thêm mới', self::ATTACHMENT_TABLE, $list->id, $list->code, 'Đính kèm file: '.implode(', ', $names));
+
+        if ($list->app_status !== 'draft') {
+            self::writeHistory($list->id, 'Đính kèm file', null, $list->app_status, $list->app_status, 'Đính kèm '.count($names).' file: '.implode(', ', $names));
+        }
+
+        return redirect()->back()->with('success', 'Đã đính kèm '.count($names).' file vào phiếu '.$list->code.'!');
+    }
+
+    /**
+     * Xem / tải file. Người trong phòng lập phiếu, hoặc người được chỉ định ký phiếu
+     * (xem từ tab "Ký duyệt (mọi phòng ban)") đều mở được.
+     */
+    public function downloadAttachment($id)
+    {
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->join(self::TABLE, self::ATTACHMENT_TABLE.'.material_estimate_id', '=', self::TABLE.'.id')
+            ->select(self::ATTACHMENT_TABLE.'.*', self::TABLE.'.department_id')
+            ->where(self::ATTACHMENT_TABLE.'.id', $id)
+            ->where(self::ATTACHMENT_TABLE.'.active', 1)
+            ->first();
+
+        if (! $attachment) {
+            abort(404, 'Không tìm thấy file đính kèm.');
+        }
+
+        $isSigner = DB::table(self::SIGN_TABLE)
+            ->where(self::ESTIMATE_FK, $attachment->material_estimate_id)
+            ->where('user_id', session('user')['userId'] ?? 0)
+            ->where('active', 1)
+            ->exists();
+
+        if ((int) $attachment->department_id !== $this->departmentId() && ! $isSigner) {
+            abort(403, 'Bạn không có quyền xem file này.');
+        }
+
+        if (! Storage::exists($attachment->file_path)) {
+            abort(404, 'File không tồn tại trên hệ thống lưu trữ.');
+        }
+
+        return Storage::response($attachment->file_path, $attachment->file_name, [
+            'Content-Disposition' => "inline; filename*=UTF-8''".rawurlencode($attachment->file_name),
+        ]);
+    }
+
+    public function deleteAttachment(Request $request)
+    {
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->where('id', $request->id)
+            ->where('active', 1)
+            ->first();
+
+        $list = $attachment ? $this->findOwn($attachment->material_estimate_id) : null;
+
+        if (! $attachment || ! $list) {
+            return redirect()->back()->with('error', 'Không tìm thấy file đính kèm cần xoá!');
+        }
+
+        if (! $this->editable($list)) {
+            return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không xoá file đính kèm được nữa!');
+        }
+
+        DB::table(self::ATTACHMENT_TABLE)->where('id', $attachment->id)->update([
+            'active' => 0,
+            'deleted_by' => $this->actor(),
+            'deleted_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log('Xoá', self::ATTACHMENT_TABLE, $list->id, $list->code, 'Xoá file đính kèm: '.$attachment->file_name);
+
+        if ($list->app_status !== 'draft') {
+            self::writeHistory($list->id, 'Xoá file đính kèm', null, $list->app_status, $list->app_status, 'Xoá file: '.$attachment->file_name);
+        }
+
+        return redirect()->back()->with('success', 'Đã xoá file '.$attachment->file_name.'!');
+    }
+
+    /* ==========================================================
      |  MẶT HÀNG DỰ TRÙ + SỐ LƯỢNG THEO THÁNG
      ========================================================== */
 
+    /**
+     * Thêm NHIỀU vật tư một lần từ modal dạng bảng: mỗi dòng items[i] là một vật tư, các
+     * tháng cần dùng là cột chung periods[k], số lượng của dòng ở items[i][amounts][k] và
+     * dùng chung đơn vị items[i][unit_id]. Dòng bỏ trống hoàn toàn thì bỏ qua.
+     */
     public function storeItem(Request $request)
     {
         $list = $this->findOwn($request->material_estimate_id);
@@ -482,34 +653,89 @@ class MaterialEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không thêm mặt hàng được nữa!');
         }
 
-        $this->pruneEmptyAmounts($request);
+        $itemFiles = $this->pruneEmptyItemRows($request);
 
-        $validator = Validator::make($request->all(), $this->itemRules(), $this->itemMessages());
+        // File của từng dòng đi theo chỉ số MỚI sau khi bỏ dòng trống (không dùng $request->all()
+        // vì phần file vẫn giữ chỉ số cũ)
+        $data = $request->input();
+        foreach ($itemFiles as $index => $files) {
+            $data['items'][$index]['files'] = $files;
+        }
+
+        $validator = Validator::make($data, $this->batchItemRules(), $this->batchItemMessages());
+
+        // Mỗi dòng phải có ít nhất một tháng có số lượng; cột nào có số thì phải chọn tháng
+        $validator->after(function ($validator) use ($request) {
+            $periods = (array) $request->input('periods', []);
+
+            foreach ((array) $request->input('items', []) as $index => $line) {
+                $hasAmount = false;
+
+                foreach ((array) ($line['amounts'] ?? []) as $k => $amount) {
+                    if ($amount === '') {
+                        continue;
+                    }
+
+                    $hasAmount = true;
+
+                    if (trim((string) ($periods[$k] ?? '')) === '') {
+                        $validator->errors()->add('periods.'.$k, 'Vui lòng chọn tháng cho cột số lượng đang có dữ liệu.');
+                    }
+                }
+
+                if (! $hasAmount) {
+                    $validator->errors()->add('items.'.$index.'.amounts', 'Vui lòng nhập số lượng ít nhất một tháng.');
+                }
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'itemCreateErrors')->withInput();
         }
 
-        $itemId = DB::transaction(function () use ($request, $list) {
-            $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayload($request) + [
-                'material_estimate_id' => $list->id,
-                'status_id' => 1,
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        $periods = (array) $request->input('periods', []);
+        $lines = (array) $request->input('items', []);
 
-            $this->saveAmounts($itemId, $request);
+        $itemIds = DB::transaction(function () use ($lines, $periods, $list, $itemFiles) {
+            $ids = [];
 
-            return $itemId;
+            foreach ($lines as $index => $line) {
+                $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayloadFrom($line) + [
+                    'material_estimate_id' => $list->id,
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Một dòng dùng chung một đơn vị cho mọi cột tháng
+                $amountRows = [];
+
+                foreach ((array) ($line['amounts'] ?? []) as $k => $amount) {
+                    $amountRows[] = [
+                        'amount' => $amount,
+                        'unit_id' => $line['unit_id'] ?? null,
+                        'for_month_year' => $periods[$k] ?? '',
+                    ];
+                }
+
+                $this->saveAmountRows($itemId, $amountRows);
+                $this->storeFiles($list->id, $itemId, $itemFiles[$index] ?? [], null);
+                $ids[] = $itemId;
+            }
+
+            return $ids;
         });
 
         if ($list->app_status !== 'draft') {
-            AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
-            self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm mặt hàng vào phiếu.');
+            foreach ($itemIds as $itemId) {
+                AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
+            }
+
+            self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm '.count($itemIds).' mặt hàng vào phiếu.');
         }
 
-        return redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
+        return redirect()->back()->with('success', 'Đã thêm '.count($itemIds).' '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
     }
 
     public function updateItem(Request $request)
@@ -579,11 +805,16 @@ class MaterialEstimateController extends Controller
         return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu dự trù!');
     }
 
+    /**
+     * Phòng đề nghị cập nhật trạng thái mục đã duyệt: hoàn thành / hoàn tác, và phần của
+     * PHÒNG ĐỀ NGHỊ trong luồng huỷ 2 bên (cancel / cancel_reject / cancel_withdraw) -
+     * xem EstimateItemCancel. Bộ phận mua hàng thao tác phần của mình qua purchaseCancel().
+     */
     public function updateItemStatus(Request $request)
     {
         $request->validate([
             'id' => 'required|integer',
-            'action' => 'required|in:complete,cancel,undo',
+            'action' => 'required|in:complete,cancel,cancel_reject,cancel_withdraw,undo',
         ]);
 
         [$item, $list] = $this->findItem($request->id);
@@ -596,29 +827,25 @@ class MaterialEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu chưa được duyệt nên không thể cập nhật trạng thái mục!');
         }
 
+        if (str_starts_with($request->action, 'cancel')) {
+            return $this->applyCancel($item, 'requester', $request->action, $request->cancel_reason);
+        }
+
         if ($request->action === 'complete') {
+            if ($item->cancel_requester_at || $item->cancel_purchasing_at) {
+                return redirect()->back()->with('error', 'Mục đang chờ xác nhận huỷ, xử lý đề nghị huỷ trước khi xác nhận hoàn thành!');
+            }
+
             $updateData = ['fulfilled_date' => now(), 'status_id' => 1];
             $logMessage = 'Đã xác nhận hoàn thành (giao hàng).';
-        } elseif ($request->action === 'cancel') {
-            $updateData = ['fulfilled_date' => null, 'status_id' => 0, 'cancel_reason' => $request->cancel_reason];
-            $logMessage = 'Đã huỷ dự trù mặt hàng. Lý do: '.$request->cancel_reason;
         } else {
-            $updateData = ['fulfilled_date' => null, 'status_id' => 1, 'cancel_reason' => null];
+            $updateData = ['fulfilled_date' => null, 'status_id' => 1] + $this->clearCancel();
             $logMessage = 'Đã khôi phục lại trạng thái mặt hàng.';
         }
 
         DB::transaction(function () use ($item, $updateData, $logMessage) {
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->update($updateData);
-
-            DB::table('estimate_item_chats')->insert([
-                'item_id' => $item->id,
-                'item_type' => self::CHAT_TYPE,
-                'user_name' => $this->actor(),
-                'content' => $logMessage,
-                'type' => 'system',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $this->itemSystemChat($item->id, $logMessage);
         });
 
         return redirect()->back()->with('success', 'Đã cập nhật trạng thái '.self::ITEM_LABEL.'!');
@@ -976,6 +1203,7 @@ class MaterialEstimateController extends Controller
                 self::TABLE.'.id as list_id',
                 self::TABLE.'.code as list_code',
                 'material_categories.technical_specification as category_technical_specification',
+                'material_categories.lead_time_days as category_lead_time_days',
                 'material_names.name as category_material_name',
                 'units.short_name as category_unit_short_name',
                 'manufacturers.name as category_manufacturer_name'
@@ -1049,6 +1277,7 @@ class MaterialEstimateController extends Controller
             ->select(
                 self::ITEM_TABLE.'.*',
                 'material_categories.technical_specification as category_technical_specification',
+                'material_categories.lead_time_days as category_lead_time_days',
                 'material_names.name as category_material_name',
                 'units.short_name as category_unit_short_name',
                 'manufacturers.name as category_manufacturer_name',
@@ -1090,7 +1319,16 @@ class MaterialEstimateController extends Controller
             ->groupBy('item_id')
             ->map->count();
 
-        return $items->map(function ($item) use ($amounts, $chats, $historyCounts) {
+        // File đính kèm của từng vật tư
+        $files = DB::table(self::ATTACHMENT_TABLE)
+            ->whereIn('material_estimate_item_id', $items->pluck('id')->all())
+            ->where('active', 1)
+            ->orderBy('id', 'asc')
+            ->get()
+            ->groupBy('material_estimate_item_id');
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $files) {
+            $item->files = ($files[$item->id] ?? collect())->values();
             $item->amounts = ($amounts[$item->id] ?? collect())->values();
             $item->chats = ($chats[$item->id] ?? collect())->values();
             $item->history_count = $historyCounts[$item->id] ?? 0;
@@ -1172,11 +1410,90 @@ class MaterialEstimateController extends Controller
         $request->merge(['amounts' => $rows]);
     }
 
+    /**
+     * Modal thêm nhiều vật tư: bỏ các dòng trống hoàn toàn (chưa chọn/gõ vật tư, không số
+     * lượng, không thông tin) rồi đánh số lại, để lỗi validate trỏ đúng dòng đang hiện.
+     */
+    /** @return array<int, \Illuminate\Http\UploadedFile[]> file đính kèm theo chỉ số dòng MỚI */
+    private function pruneEmptyItemRows(Request $request): array
+    {
+        $rows = [];
+        $files = [];
+
+        foreach ((array) $request->input('items', []) as $origIndex => $line) {
+            $lineFiles = array_values(array_filter((array) $request->file('items.'.$origIndex.'.files', [])));
+            $line = (array) $line;
+            $line['amounts'] = array_map(fn ($value) => trim((string) $value), (array) ($line['amounts'] ?? []));
+
+            $isBlank = ! array_filter($line['amounts'], fn ($value) => $value !== '')
+                && trim((string) ($line['category_id'] ?? '')) === ''
+                && trim((string) ($line['material_name'] ?? '')) === ''
+                && trim((string) ($line['technical_information'] ?? '')) === ''
+                && trim((string) ($line['purpose'] ?? '')) === ''
+                && trim((string) ($line['expected_delivery_date'] ?? '')) === ''
+                && ! $lineFiles;
+
+            if (! $isBlank) {
+                if ($lineFiles) {
+                    $files[count($rows)] = $lineFiles;
+                }
+                $rows[] = $line;
+            }
+        }
+
+        $request->merge(['items' => $rows]);
+
+        return $files;
+    }
+
+    /**
+     * Lưu file đính kèm (của cả phiếu khi $itemId = null, hoặc của một vật tư).
+     *
+     * @return string[] tên các file đã lưu
+     */
+    private function storeFiles(int $listId, ?int $itemId, array $files, ?string $note): array
+    {
+        $names = [];
+
+        foreach ($files as $file) {
+            if (! $file || ! $file->isValid()) {
+                continue;
+            }
+
+            $path = $file->store('public/'.self::ATTACHMENT_FOLDER);
+            AttachmentBackup::copy($path, self::ATTACHMENT_FOLDER);
+
+            DB::table(self::ATTACHMENT_TABLE)->insert([
+                'material_estimate_id' => $listId,
+                'material_estimate_item_id' => $itemId,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
+                'file_size' => $file->getSize(),
+                'file_type' => $file->getClientMimeType() ?: $file->getClientOriginalExtension(),
+                'note' => $note,
+                'active' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $names[] = $file->getClientOriginalName();
+        }
+
+        return $names;
+    }
+
     private function saveAmounts(int $itemId, Request $request): void
+    {
+        $this->saveAmountRows($itemId, (array) $request->input('amounts', []));
+    }
+
+    /** Ghi các dòng số lượng [amount, unit_id, for_month_year 'Y-m']; dòng thiếu số hoặc tháng thì bỏ qua. */
+    private function saveAmountRows(int $itemId, array $lines): void
     {
         $rows = [];
 
-        foreach ((array) $request->input('amounts', []) as $line) {
+        foreach ($lines as $line) {
             $amount = trim((string) ($line['amount'] ?? ''));
             $period = trim((string) ($line['for_month_year'] ?? ''));
 
@@ -1237,9 +1554,11 @@ class MaterialEstimateController extends Controller
             ->select(
                 'material_categories.id',
                 'material_categories.technical_specification',
+                'material_categories.lead_time_days',
                 'material_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
-                'units.short_name as unit_short_name'
+                'units.short_name as unit_short_name',
+                'units.id as unit_id'
             )
             ->where('material_categories.status_id', 1)
             ->where('material_categories.app_status', 'approved')
@@ -1405,6 +1724,7 @@ class MaterialEstimateController extends Controller
             'material_name' => ['required_if:source,manual', 'nullable', 'max:255'],
             'technical_information' => ['nullable', 'max:1000'],
             'purpose' => ['nullable', 'max:1000'],
+            'part_number' => ['nullable', 'max:100'],
             'amounts' => ['required', 'array', 'min:1'],
             'amounts.*.amount' => ['required', 'numeric', 'min:0.0001'],
             'amounts.*.unit_id' => ['required', 'exists:units,id'],
@@ -1414,14 +1734,73 @@ class MaterialEstimateController extends Controller
 
     private function itemPayload(Request $request): array
     {
-        $fromCategory = $request->source === 'category';
+        return $this->itemPayloadFrom($request->all());
+    }
+
+    /** Payload một mặt hàng từ mảng dữ liệu (form sửa 1 dòng hoặc 1 dòng items[i] của modal thêm nhiều). */
+    private function itemPayloadFrom(array $line): array
+    {
+        $fromCategory = ($line['source'] ?? '') === 'category';
 
         return [
-            'category_id' => $fromCategory ? (int) $request->category_id : null,
-            'material_name' => $fromCategory ? null : $this->nullIfBlank($request->material_name),
-            'technical_information' => $this->nullIfBlank($request->technical_information),
-            'purpose' => $this->nullIfBlank($request->purpose),
-            'expected_delivery_date' => $this->nullIfBlank($request->expected_delivery_date),
+            'category_id' => $fromCategory ? (int) $line['category_id'] : null,
+            'material_name' => $fromCategory ? null : $this->nullIfBlank($line['material_name'] ?? null),
+            'part_number' => $this->nullIfBlank($line['part_number'] ?? null),
+            'technical_information' => $this->nullIfBlank($line['technical_information'] ?? null),
+            'purpose' => $this->nullIfBlank($line['purpose'] ?? null),
+            'expected_delivery_date' => $this->nullIfBlank($line['expected_delivery_date'] ?? null),
+        ];
+    }
+
+    /** Modal thêm nhiều vật tư: items[i] là một vật tư, periods[k] là cột tháng chung. */
+    private function batchItemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.source' => ['required', 'in:category,manual'],
+            'items.*.category_id' => ['required_if:items.*.source,category', 'nullable', 'exists:material_categories,id'],
+            'items.*.material_name' => ['required_if:items.*.source,manual', 'nullable', 'max:255'],
+            'items.*.part_number' => ['nullable', 'max:100'],
+            'items.*.technical_information' => ['nullable', 'max:1000'],
+            'items.*.purpose' => ['nullable', 'max:1000'],
+            'items.*.expected_delivery_date' => ['nullable', 'date'],
+            'items.*.unit_id' => ['required', 'exists:units,id'],
+            'items.*.amounts' => ['array'],
+            'items.*.amounts.*' => ['nullable', 'numeric', 'min:0.0001'],
+            'items.*.files' => ['nullable', 'array', 'max:10'],
+            'items.*.files.*' => ['file', 'max:20480', 'mimes:'.self::ATTACHMENT_MIMES],
+            'periods' => ['required', 'array', 'min:1'],
+            'periods.*' => ['nullable', 'date_format:Y-m', 'distinct'],
+        ];
+    }
+
+    private function batchItemMessages(): array
+    {
+        return [
+            'items.required' => 'Vui lòng khai ít nhất một vật tư.',
+            'items.min' => 'Vui lòng khai ít nhất một vật tư.',
+            'items.max' => 'Mỗi lần thêm tối đa 200 vật tư.',
+            'items.*.source.required' => 'Vui lòng chọn nguồn vật tư.',
+            'items.*.source.in' => 'Nguồn vật tư không hợp lệ.',
+            'items.*.category_id.required_if' => 'Vui lòng chọn vật tư trong danh mục.',
+            'items.*.category_id.exists' => 'Vật tư được chọn không tồn tại trong danh mục.',
+            'items.*.material_name.required_if' => 'Vui lòng nhập tên vật tư ngoài danh mục.',
+            'items.*.material_name.max' => 'Tên vật tư tối đa 255 ký tự.',
+            'items.*.technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
+            'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'items.*.part_number.max' => 'Part Number tối đa 100 ký tự.',
+            'items.*.expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
+            'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
+            'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'items.*.amounts.*.numeric' => 'Số lượng dự trù phải là số.',
+            'items.*.amounts.*.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.files.max' => 'Mỗi vật tư đính kèm tối đa 10 file.',
+            'items.*.files.*.file' => 'File đính kèm không hợp lệ.',
+            'items.*.files.*.max' => 'Mỗi file đính kèm tối đa 20MB.',
+            'items.*.files.*.mimes' => 'Định dạng file đính kèm không được hỗ trợ.',
+            'periods.required' => 'Vui lòng khai ít nhất một tháng cần dùng.',
+            'periods.*.date_format' => 'Tháng cần dùng không hợp lệ.',
+            'periods.*.distinct' => 'Các cột tháng cần dùng bị trùng nhau.',
         ];
     }
 
@@ -1436,6 +1815,7 @@ class MaterialEstimateController extends Controller
             'material_name.max' => 'Tên vật tư tối đa 255 ký tự.',
             'technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
             'purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'part_number.max' => 'Part Number tối đa 100 ký tự.',
             'amounts.required' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
             'amounts.min' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
             'amounts.*.amount.required' => 'Vui lòng nhập số lượng dự trù.',

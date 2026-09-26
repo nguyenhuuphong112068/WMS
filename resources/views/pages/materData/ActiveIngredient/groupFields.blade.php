@@ -1,6 +1,6 @@
 {{--
-| Phân loại hoạt chất - các nhóm ĐƠN CHẤT (1, 3, 4, 5, 6, 7, 9 theo Nghị định 24/2026/NĐ-CP,
-| 11 theo Luật Đầu tư 2025 số 143/2025/QH15). Nhóm 9 (Phụ lục IV Bảng A) bắt buộc kèm ngưỡng tồn trữ.
+| Phân loại hoạt chất - các nhóm ĐƠN CHẤT (1, 3, 4, 5, 6, 7, 9 theo Nghị định 24/2026/NĐ-CP).
+| Nhóm 9 (Phụ lục IV Bảng A) bắt buộc kèm ngưỡng tồn trữ.
 | Kèm ô "Thuộc mục gộp": chất cụ thể (HgCl₂...) trỏ về dòng khai theo nhóm chất của nghị định
 | ("Thủy ngân và các hợp chất của thủy ngân") để tồn của nó cộng vào ngưỡng của mục gộp đó.
 | Biến vào: $bag, $groupLabels, $singleSubstanceGroups, $oldGroups, $collectives

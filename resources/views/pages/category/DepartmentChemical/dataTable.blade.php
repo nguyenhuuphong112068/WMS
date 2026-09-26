@@ -63,6 +63,7 @@
                         <th class="text-center" style="width: 55px">STT</th>
                         <th style="width: 120px">Mã Danh Mục</th>
                         <th>Tên Hoá Chất</th>
+                        <th style="width: 130px">Số CAS</th>
                         <th>Nhà Sản Xuất</th>
                         <th class="text-center" style="width: 90px">Đơn Vị</th>
                         <th class="text-center" style="width: 105px">Tỉ Trọng d<br><small>(g/ml)</small></th>
@@ -98,10 +99,8 @@
                             </td>
                             <td>
                                 <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
-                                @if ($row->cas_no)
-                                    <small class="md-sub">CAS: {{ $row->cas_no }}</small>
-                                @endif
                             </td>
+                            @include('pages.category.shared.casCell', ['casNo' => $row->cas_no])
                             <td class="md-sub">
                                 @if ($row->manufacturer_name)
                                     {{ $row->manufacturer_name }}

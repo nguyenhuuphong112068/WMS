@@ -7,7 +7,7 @@
     |--------------------------------------------------------------------------
     | Vật tư bắt buộc qua đề nghị được phê duyệt rồi kho cấp phát; số bước ký và người ký
     | từng bước do người lập phiếu tự khai (0 bước = duyệt thẳng đến người cấp phát).
-    | Loại bỏ hàng hỏng thì lập thẳng, không cần đề nghị.
+    | Loại bỏ hàng hỏng đi 3 bước ở tab "Vật tư hỏng": Cách ly -> Loại bỏ -> Huỷ.
     */
 
     $expRoute = 'pages.export.materialExport.';
@@ -51,6 +51,9 @@
     @foreach ($prepGroups as $prepIndex => $g)
         @include('pages.export.MaterialExport.prepDetailModal', ['g' => $g, 'prepIndex' => $prepIndex])
     @endforeach
+
+    {{-- Tab "Vật tư hỏng" --}}
+    @include('pages.export.MaterialExport.quarantineModals')
 
     {{-- Tab "Đề nghị chuyển liên phòng ban" --}}
     @include('pages.export.MaterialExport.transferRequestModal')

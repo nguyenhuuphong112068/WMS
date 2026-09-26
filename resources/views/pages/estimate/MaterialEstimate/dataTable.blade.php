@@ -26,6 +26,19 @@
                             Danh sách vật tư cần dự trù <span class="badge badge-warning">{{ $watchlistItems->count() }}</span>
                         </a>
                     </li>
+                    @if ($purchasingItems !== null)
+                        @php
+                            $purchasingPending = $purchasingItems->filter(
+                                fn($it) => $it->cancel_requester_at && !$it->cancel_purchasing_at,
+                            )->count();
+                        @endphp
+                        <li class="nav-item">
+                            <a class="nav-link {{ $activeTab === 'purchasing' ? 'active' : '' }}" id="purchasing-tab" data-toggle="tab" href="#purchasing" role="tab">
+                                Bộ phận mua hàng
+                                @if ($purchasingPending)<span class="badge badge-danger" title="Đề nghị huỷ chờ xác nhận">{{ $purchasingPending }}</span>@endif
+                            </a>
+                        </li>
+                    @endif
                     @if ($showApprovalInbox)
                         <li class="nav-item">
                             <a class="nav-link {{ $activeTab === 'inbox' ? 'active' : '' }}" id="inbox-tab" data-toggle="tab" href="#inbox" role="tab">
@@ -191,6 +204,11 @@
                     <div class="tab-pane fade {{ $activeTab === 'watchlist' ? 'show active' : '' }}" id="watchlist" role="tabpanel">
                         @include('pages.estimate.MaterialEstimate.watchlistTable', ['items' => $watchlistItems])
                     </div>
+                    @if ($purchasingItems !== null)
+                        <div class="tab-pane fade {{ $activeTab === 'purchasing' ? 'show active' : '' }}" id="purchasing" role="tabpanel">
+                            @include('pages.estimate.shared.purchasingPane', ['items' => $purchasingItems])
+                        </div>
+                    @endif
                     @if ($showApprovalInbox)
                         <div class="tab-pane fade {{ $activeTab === 'inbox' ? 'show active' : '' }}" id="inbox" role="tabpanel">
                             @include('pages.estimate.shared.inboxPane')

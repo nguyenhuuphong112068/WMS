@@ -31,6 +31,8 @@ Route::prefix('/category')
             Route::get('names', 'names')->name('names');
             Route::get('locations', 'locations')->name('locations');
             Route::get('chemicalNames', 'chemicalNames')->name('chemicalNames');
+            // Tương kỵ khi đặt hoá chất vào định khu (Sơ đồ lưu trữ GHS) - modal Khai Hoá Chất Cho Phòng
+            Route::get('chemicalCompatibility', 'chemicalCompatibility')->name('chemicalCompatibility');
         });
 
         // Trang 2 tab: "Danh Mục Vật Tư Công Ty" + "Vật Tư Của Phòng"
@@ -83,6 +85,8 @@ Route::prefix('/category')
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
+            // Xác nhận "Đã khai báo trên Cổng thông tin quốc gia" - chỉ một lần, không gỡ lại được
+            Route::post('declarePortal', 'declarePortal')->name('declarePortal');
         });
 
         // Cấu hình riêng của từng phòng ban cho hoá chất dùng chung - không có bước duyệt,

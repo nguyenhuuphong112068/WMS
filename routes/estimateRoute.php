@@ -42,6 +42,8 @@ Route::prefix('/estimate')
 
             // Cảnh báo ngưỡng PL IV tức thời khi chọn hoá chất / nhập số lượng trong modal
             Route::get('checkThreshold', 'checkThreshold')->name('checkThreshold');
+            // Nút "Chi tiết" của cảnh báo: các lượng đóng góp (tồn theo lô, dự trù chưa hoàn thành, lần này)
+            Route::get('thresholdDetail', 'thresholdDetail')->name('thresholdDetail');
 
             // Trình ký động: người lập khai số bước ký + người ký từng bước (tối thiểu 2,
             // bước cuối là Ban Giám Đốc). signStep ký bước đang chờ, dùng chung cho cả tab
@@ -52,6 +54,8 @@ Route::prefix('/estimate')
 
             // Cập nhật ngày mong muốn giao khi đã duyệt
             Route::post('updateItemStatus', 'updateItemStatus')->name('updateItemStatus');
+            // Huỷ mục cần xác nhận của cả phòng đề nghị và bộ phận mua hàng
+            Route::post('purchaseCancel', 'purchaseCancel')->name('purchaseCancel');
             Route::post('updatePromisedDate', 'updatePromisedDate')->name('updatePromisedDate');
             Route::get('getPromisedDateHistory/{itemId}', 'getPromisedDateHistory')->name('getPromisedDateHistory');
             Route::post('storeItemChat', 'storeItemChat')->name('storeItemChat');
@@ -83,6 +87,8 @@ Route::prefix('/estimate')
 
             // Cập nhật ngày mong muốn giao khi đã duyệt
             Route::post('updateItemStatus', 'updateItemStatus')->name('updateItemStatus');
+            // Huỷ mục cần xác nhận của cả phòng đề nghị và bộ phận mua hàng
+            Route::post('purchaseCancel', 'purchaseCancel')->name('purchaseCancel');
             Route::post('updatePromisedDate', 'updatePromisedDate')->name('updatePromisedDate');
             Route::get('getPromisedDateHistory/{itemId}', 'getPromisedDateHistory')->name('getPromisedDateHistory');
             Route::post('storeItemChat', 'storeItemChat')->name('storeItemChat');
@@ -110,6 +116,14 @@ Route::prefix('/estimate')
             Route::post('storeItem', 'storeItem')->name('storeItem');
             Route::post('updateItem', 'updateItem')->name('updateItem');
             Route::post('deleteItem', 'deleteItem')->name('deleteItem');
+
+            // File đính kèm của phiếu (xoá mềm)
+            Route::post('uploadAttachment', 'uploadAttachment')->name('uploadAttachment');
+            Route::get('downloadAttachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('deleteAttachment', 'deleteAttachment')->name('deleteAttachment');
+
+            // Huỷ mục dự trù cần xác nhận của cả phòng đề nghị và bộ phận mua hàng
+            Route::post('purchaseCancel', 'purchaseCancel')->name('purchaseCancel');
 
             // Trình ký động: người lập khai số bước ký + người ký từng bước (tối thiểu 2,
             // bước cuối là Ban Giám Đốc). signStep ký bước đang chờ, dùng chung cho cả tab

@@ -227,6 +227,8 @@
 
 @section('model')
     @include('pages.shared.classifyGuideModal')
+    {{-- Sơ đồ lưu trữ hoá chất theo hình đồ cảnh báo (GHS) - mở từ ô Cảnh Báo An Toàn / Định Khu --}}
+    @include('pages.shared.storageChartModal')
     @include('pages.category.ChemicalCategory.create')
     @include('pages.category.ChemicalCategory.update')
     @include('pages.category.shared.historyModal')
@@ -257,4 +259,6 @@
         'unitsInUse' => $dcUnitsInUse,
         'conversions' => $dcConversions,
     ])
+    {{-- Cảnh báo tương kỵ ở ô Định Khu của 2 modal trên --}}
+    @include('pages.category.DepartmentChemical.compatibility')
 @endsection

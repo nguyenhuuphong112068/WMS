@@ -33,23 +33,72 @@ return [
     /*
      | Nhóm cảnh báo an toàn (kiểu GHS) cho ô "Cảnh Báo An Toàn". Một hoá chất được
      | chọn NHIỀU mã cùng lúc, lưu dạng chuỗi JSON các mã xuống
-     | chemical_categories.safety_warning, ví dụ ["TOXIC","CORROSIVE"] - cùng cách
-     | lưu với cột classification.
+     | chemical_categories.safety_warning, ví dụ ["TOXIC","CORROSIVE_ACID"].
+     |
+     | 11 mã đầu theo đúng thứ tự "Sơ đồ lưu trữ hoá chất theo hình đồ cảnh báo" (GHS)
+     | của phòng KTCL - chính là các nhóm dùng để xét tương kỵ ở storage_incompatible
+     | bên dưới. Hai mã cuối (khí nén, nổ) sơ đồ không có nên chỉ để hiển thị / in nhãn.
+     |
+     | Nhãn chỉ ghi tiếng Việt (hiện ở modal, bảng danh mục, lịch sử và nhãn in lô).
      |
      | Khoá = mã cố định, KHÔNG đổi vì đã lưu trong DB. Logo tương ứng từng mã vẽ tại
      | resources/views/pages/shared/safetyPictogram.blade.php, thêm mã mới thì thêm
      | luôn @case cho mã đó ở file logo, không thì hiện logo mặc định (dấu chấm than).
      */
     'safety_warnings' => [
-        'TOXIC' => 'Độc/Toxic',
-        'CORROSIVE' => 'Ăn mòn/Corrosive',
-        'FLAMMABLE' => 'Dễ cháy/Flammable',
-        'OXIDIZING' => 'Oxy hoá/Oxidizing',
-        'IRRITANT' => 'Kích ứng/Irritant',
-        'ENV_HAZARD' => 'Nguy hại môi trường/Environmental hazard',
-        'COMPRESSED_GAS' => 'Khí nén/Compressed gas',
-        'EXPLOSIVE' => 'Nổ/Explosive',
+        'FLAMMABLE_LIQUID' => 'Lỏng dễ cháy',
+        'FLAMMABLE_SOLID' => 'Rắn dễ cháy',
+        'WATER_REACTIVE' => 'Gặp nước sinh khí dễ cháy',
+        'PYROPHORIC' => 'Dễ tự bốc cháy',
+        'CORROSIVE_ACID' => 'Ăn mòn nhóm axit',
+        'CORROSIVE_BASE' => 'Ăn mòn nhóm bazơ',
+        'OXIDIZING' => 'Oxy hoá',
+        'TOXIC' => 'Độc',
+        'IRRITANT' => 'Có hại, kích ứng',
+        'HEALTH_HAZARD' => 'Nguy hiểm sức khoẻ',
+        'ENV_HAZARD' => 'Nguy hại môi trường',
+        'COMPRESSED_GAS' => 'Khí nén',
+        'EXPLOSIVE' => 'Nổ',
     ],
+
+    /*
+     | Mã cũ trước khi tách theo sơ đồ (migration 2026_09_23_200000 đã đổi FLAMMABLE ->
+     | FLAMMABLE_LIQUID, CORROSIVE -> CORROSIVE_ACID ở danh mục). Chỉ còn nằm trong ảnh
+     | chụp lịch sử cũ - khai nhãn ở đây để modal lịch sử vẫn hiện chữ, không cho chọn mới.
+     */
+    'safety_warnings_legacy' => [
+        'FLAMMABLE' => 'Dễ cháy',
+        'CORROSIVE' => 'Ăn mòn',
+    ],
+
+    /*
+     | TƯƠNG KỴ KHI LƯU TRỮ - chép các ô "x - không được lưu trữ cùng nhau" của sơ đồ.
+     | Mỗi dòng của sơ đồ là một khoá, giá trị là các cột bị "x". Sơ đồ đối xứng; lỡ khai
+     | thiếu một chiều thì App\Support\ChemicalCompatibility vẫn tự lấy đối xứng.
+     | Mã không có ở đây (khí nén, nổ) thì không xét tương kỵ.
+     */
+    'storage_incompatible' => [
+        'FLAMMABLE_LIQUID' => ['FLAMMABLE_SOLID', 'WATER_REACTIVE', 'PYROPHORIC', 'CORROSIVE_ACID', 'OXIDIZING'],
+        'FLAMMABLE_SOLID' => ['FLAMMABLE_LIQUID', 'WATER_REACTIVE', 'PYROPHORIC', 'CORROSIVE_ACID', 'OXIDIZING'],
+        'WATER_REACTIVE' => ['FLAMMABLE_LIQUID', 'FLAMMABLE_SOLID', 'PYROPHORIC', 'CORROSIVE_ACID', 'OXIDIZING', 'IRRITANT', 'HEALTH_HAZARD', 'ENV_HAZARD'],
+        'PYROPHORIC' => ['FLAMMABLE_LIQUID', 'FLAMMABLE_SOLID', 'WATER_REACTIVE', 'CORROSIVE_ACID', 'OXIDIZING'],
+        'CORROSIVE_ACID' => ['FLAMMABLE_LIQUID', 'FLAMMABLE_SOLID', 'WATER_REACTIVE', 'PYROPHORIC', 'CORROSIVE_BASE', 'TOXIC'],
+        'CORROSIVE_BASE' => ['CORROSIVE_ACID'],
+        'OXIDIZING' => ['FLAMMABLE_LIQUID', 'FLAMMABLE_SOLID', 'WATER_REACTIVE', 'PYROPHORIC'],
+        'TOXIC' => ['CORROSIVE_ACID'],
+        'IRRITANT' => ['WATER_REACTIVE'],
+        'HEALTH_HAZARD' => ['WATER_REACTIVE'],
+        'ENV_HAZARD' => ['WATER_REACTIVE'],
+    ],
+
+    /*
+     | Thế nào là "gần nhau" khi xét tương kỵ: hai hoá chất cùng một cấp định khu này.
+     |   location  : cùng một vị trí (ô)       tier   : cùng tầng
+     |   column    : cùng cột                  shelf  : cùng kệ/tủ (mặc định)
+     |   warehouse : cùng kho
+     | Vị trí chưa gắn cấp đó (cột null) thì chỉ xét trong chính vị trí.
+     */
+    'incompatibility_scope' => 'shelf',
 
     /*
      | NGƯỠNG TỒN TRỮ - Phụ lục IV Nghị định 24/2026/NĐ-CP.
@@ -75,10 +124,13 @@ return [
      | Đổi khổ nhãn thì sửa ở đây, trang in tự co giãn theo.
      */
     'label' => [
-        'sop_no' => 'QC-SOP-031',
+        // Nhãn chỉ in số biểu mẫu, không in số SOP
         'form_no' => 'QC/F/106-03',
         'width_mm' => 60,
         'height_mm' => 40,
+        // Cạnh phần MÃ QR (mm, chưa tính vùng trắng) ở góc dưới bên phải nhãn, giữa có logo
+        // Stella - cùng kiểu nhãn vật tư nhưng nhỏ hơn 25% (vật tư 16mm).
+        'qr_size_mm' => 12,
         // Độ phân giải đầu in Zebra (ZD421: bản 203 hoặc 300 dpi - xem tem dưới đáy máy).
         'dpi' => 300,
     ],

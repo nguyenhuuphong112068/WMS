@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\Estimate;
 
+use App\Http\Controllers\Concerns\EstimateItemCancel;
 use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Controller;
@@ -33,6 +34,7 @@ use Illuminate\Validation\Rule;
  */
 class StandardEstimateController extends Controller
 {
+    use EstimateItemCancel;
     use EstimateSignFlow;
     use VerifiesSignature;
 
@@ -65,6 +67,23 @@ class StandardEstimateController extends Controller
     /** Chỉ hai trạng thái này mới được sửa đầu phiếu và chi tiết mặt hàng. */
     private const EDITABLE_STATUSES = ['draft', 'rejected'];
 
+    /**
+     * Huỷ mục cần xác nhận 2 bên - xem App\Http\Controllers\Concerns\EstimateItemCancel.
+     * Danh mục không khai bộ phận mua hàng nên bộ phận mua hàng luôn là Cung Ứng.
+     */
+    protected function cancelConfig(): array
+    {
+        return [
+            'item_fk' => 'standard_estimate_id',
+            'chat_type' => 'standard',
+            'category_table' => 'standard_categories',
+            'name_table' => 'standard_names',
+            'name_fk' => 'chem_names_id',
+            'manual_name' => 'standard_name',
+            'purchasing_col' => null,
+        ];
+    }
+
     /* ==========================================================
      |  DANH SÁCH PHIẾU DỰ TRÙ CỦA PHÒNG BAN
      ========================================================== */
@@ -94,7 +113,10 @@ class StandardEstimateController extends Controller
 
         $inbox = $this->approvalInboxData();
 
-        $tabs = ['list', 'tracking', 'inbox'];
+        // Tab "Bộ phận mua hàng" (xác nhận huỷ 2 bên) - chỉ hiện với Cung Ứng
+        $purchasingItems = $this->purchasingItems($departmentId);
+
+        $tabs = ['list', 'tracking', 'inbox', 'purchasing'];
         $activeTab = in_array($request->query('tab'), $tabs, true)
             ? $request->query('tab')
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'list');
@@ -113,6 +135,7 @@ class StandardEstimateController extends Controller
             'nextCode' => $this->nextCode($departmentId),
             'trackedItems' => $trackedItems,
             'activeTab' => $activeTab,
+            'purchasingItems' => $purchasingItems,
             'showApprovalInbox' => $inbox['show'],
             'inboxRequests' => $inbox['requests'],
             'inboxItems' => $inbox['items'],
@@ -148,6 +171,8 @@ class StandardEstimateController extends Controller
             'items' => self::itemsOf($list->id),
             'histories' => self::historiesOf($list->id),
             'categories' => $this->categoryOptions(),
+            // Danh mục chất chuẩn của phòng - khung "Chọn từ danh mục phòng" ở modal thêm chất chuẩn
+            'deptCategories' => $this->deptCategoryOptions((int) $list->department_id),
             'units' => $this->unitOptions(),
             'groups' => config('standard.groups'),
             'appStatuses' => config('estimate.app_statuses'),
@@ -270,6 +295,11 @@ class StandardEstimateController extends Controller
      |  MẶT HÀNG DỰ TRÙ + SỐ LƯỢNG THEO THÁNG
      ========================================================== */
 
+    /**
+     * Thêm NHIỀU chất chuẩn một lần từ modal dạng bảng: mỗi dòng items[i] là một chất chuẩn,
+     * các tháng cần dùng là cột chung periods[k], số lượng của dòng ở items[i][amounts][k] và
+     * dùng chung đơn vị items[i][unit_id]. Dòng bỏ trống hoàn toàn thì bỏ qua.
+     */
     public function storeItem(Request $request)
     {
         $list = $this->findOwn($request->standard_estimate_id);
@@ -282,34 +312,81 @@ class StandardEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không thêm mặt hàng được nữa!');
         }
 
-        $this->pruneEmptyAmounts($request);
+        $this->pruneEmptyItemRows($request);
 
-        $validator = Validator::make($request->all(), $this->itemRules(), $this->itemMessages());
+        $validator = Validator::make($request->all(), $this->batchItemRules(), $this->batchItemMessages());
+
+        // Mỗi dòng phải có ít nhất một tháng có số lượng; cột nào có số thì phải chọn tháng
+        $validator->after(function ($validator) use ($request) {
+            $periods = (array) $request->input('periods', []);
+
+            foreach ((array) $request->input('items', []) as $index => $line) {
+                $hasAmount = false;
+
+                foreach ((array) ($line['amounts'] ?? []) as $k => $amount) {
+                    if ($amount === '') {
+                        continue;
+                    }
+
+                    $hasAmount = true;
+
+                    if (trim((string) ($periods[$k] ?? '')) === '') {
+                        $validator->errors()->add('periods.'.$k, 'Vui lòng chọn tháng cho cột số lượng đang có dữ liệu.');
+                    }
+                }
+
+                if (! $hasAmount) {
+                    $validator->errors()->add('items.'.$index.'.amounts', 'Vui lòng nhập số lượng ít nhất một tháng.');
+                }
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'itemCreateErrors')->withInput();
         }
 
-        $itemId = DB::transaction(function () use ($request, $list) {
-            $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayload($request) + [
-                'standard_estimate_id' => $list->id,
-                'status_id' => 1,
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        $periods = (array) $request->input('periods', []);
+        $lines = (array) $request->input('items', []);
 
-            $this->saveAmounts($itemId, $request);
+        $itemIds = DB::transaction(function () use ($lines, $periods, $list) {
+            $ids = [];
 
-            return $itemId;
+            foreach ($lines as $line) {
+                $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayloadFrom($line) + [
+                    'standard_estimate_id' => $list->id,
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Một dòng dùng chung một đơn vị cho mọi cột tháng
+                $amountRows = [];
+
+                foreach ((array) ($line['amounts'] ?? []) as $k => $amount) {
+                    $amountRows[] = [
+                        'amount' => $amount,
+                        'unit_id' => $line['unit_id'] ?? null,
+                        'for_month_year' => $periods[$k] ?? '',
+                    ];
+                }
+
+                $this->saveAmountRows($itemId, $amountRows);
+                $ids[] = $itemId;
+            }
+
+            return $ids;
         });
 
         if ($list->app_status !== 'draft') {
-            AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
-            self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm mặt hàng vào phiếu.');
+            foreach ($itemIds as $itemId) {
+                AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
+            }
+
+            self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm '.count($itemIds).' mặt hàng vào phiếu.');
         }
 
-        return redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
+        return redirect()->back()->with('success', 'Đã thêm '.count($itemIds).' '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
     }
 
     public function updateItem(Request $request)
@@ -388,11 +465,16 @@ class StandardEstimateController extends Controller
         return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu dự trù!');
     }
 
+    /**
+     * Phòng đề nghị cập nhật trạng thái mục đã duyệt: hoàn thành / hoàn tác, và phần của
+     * PHÒNG ĐỀ NGHỊ trong luồng huỷ 2 bên (cancel / cancel_reject / cancel_withdraw) -
+     * xem EstimateItemCancel. Bộ phận mua hàng thao tác phần của mình qua purchaseCancel().
+     */
     public function updateItemStatus(Request $request)
     {
         $request->validate([
             'id' => 'required|integer',
-            'action' => 'required|in:complete,cancel,undo'
+            'action' => 'required|in:complete,cancel,cancel_reject,cancel_withdraw,undo',
         ]);
 
         [$item, $list] = $this->findItem($request->id);
@@ -405,61 +487,60 @@ class StandardEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu chưa được duyệt nên không thể cập nhật trạng thái mục!');
         }
 
-        $updateData = [];
-        $logMessage = '';
+        if (str_starts_with($request->action, 'cancel')) {
+            return $this->applyCancel($item, 'requester', $request->action, $request->cancel_reason);
+        }
+
         if ($request->action === 'complete') {
+            if ($this->cancelPending($item)) {
+                return redirect()->back()->with('error', 'Mục đang chờ xác nhận huỷ, xử lý đề nghị huỷ trước khi xác nhận hoàn thành!');
+            }
+
             $updateData = ['fulfilled_date' => now(), 'fulfilled_by' => $this->actor(), 'status_id' => 1];
             $logMessage = 'Đã xác nhận hoàn thành (giao hàng).';
-        } elseif ($request->action === 'cancel') {
-            $updateData = ['fulfilled_date' => null, 'fulfilled_by' => null, 'status_id' => 0, 'cancel_reason' => $request->cancel_reason];
-            $logMessage = 'Đã huỷ dự trù mặt hàng. Lý do: ' . $request->cancel_reason;
         } else {
-            $updateData = ['fulfilled_date' => null, 'fulfilled_by' => null, 'status_id' => 1, 'cancel_reason' => null];
+            $updateData = ['fulfilled_date' => null, 'fulfilled_by' => null, 'status_id' => 1] + $this->clearCancel();
             $logMessage = 'Đã khôi phục lại trạng thái mặt hàng.';
         }
 
         DB::transaction(function () use ($item, $list, $updateData, $logMessage) {
             DB::table(self::ITEM_TABLE)->where('id', $item->id)->update($updateData);
-            
-            DB::table('estimate_item_chats')->insert([
-                'item_id' => $item->id,
-                'item_type' => 'standard',
-                'user_name' => $this->actor(),
-                'content' => $logMessage,
-                'type' => 'system',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $allItems = DB::table(self::ITEM_TABLE)->where('standard_estimate_id', $list->id)->where('active', 1)->get();
-            $allCompleted = true;
-            $hasActive = false;
-            foreach ($allItems as $i) {
-                if ($i->status_id != 0) {
-                    $hasActive = true;
-                    if (empty($i->fulfilled_date)) {
-                        $allCompleted = false;
-                        break;
-                    }
-                }
-            }
-
-            if ($allCompleted && $hasActive) {
-                DB::table(self::TABLE)->where('id', $list->id)->update([
-                    'reception_status' => 'completed',
-                    'completed_at' => now(),
-                    'completed_by' => $this->actor()
-                ]);
-            } elseif ($list->reception_status === 'completed') {
-                DB::table(self::TABLE)->where('id', $list->id)->update([
-                    'reception_status' => 'received',
-                    'completed_at' => null,
-                    'completed_by' => null
-                ]);
-            }
+            $this->itemSystemChat($item->id, $logMessage);
+            $this->afterItemStatusChange($list);
         });
 
         return redirect()->back()->with('success', 'Đã cập nhật trạng thái ' . self::ITEM_LABEL . '!');
+    }
+
+    /** Mọi mục còn hiệu lực đã giao hết thì đánh dấu phiếu hoàn tất; ngược lại mở lại. */
+    protected function afterItemStatusChange($list): void
+    {
+        $allItems = DB::table(self::ITEM_TABLE)->where('standard_estimate_id', $list->id)->where('active', 1)->get();
+        $allCompleted = true;
+        $hasActive = false;
+        foreach ($allItems as $i) {
+            if ($i->status_id != 0) {
+                $hasActive = true;
+                if (empty($i->fulfilled_date)) {
+                    $allCompleted = false;
+                    break;
+                }
+            }
+        }
+
+        if ($allCompleted && $hasActive) {
+            DB::table(self::TABLE)->where('id', $list->id)->update([
+                'reception_status' => 'completed',
+                'completed_at' => now(),
+                'completed_by' => $this->actor()
+            ]);
+        } elseif ($list->reception_status === 'completed') {
+            DB::table(self::TABLE)->where('id', $list->id)->update([
+                'reception_status' => 'received',
+                'completed_at' => null,
+                'completed_by' => null
+            ]);
+        }
     }
 
     public function updatePromisedDate(Request $request)
@@ -1022,12 +1103,45 @@ class StandardEstimateController extends Controller
         $request->merge(['amounts' => $rows]);
     }
 
-    /** Ghi lại các dòng số lượng theo tháng của một mặt hàng. */
-    private function saveAmounts(int $itemId, Request $request): void
+    /**
+     * Modal thêm nhiều chất chuẩn: bỏ các dòng trống hoàn toàn (chưa chọn/gõ chất chuẩn, không
+     * số lượng, không thông tin) rồi đánh số lại, để lỗi validate trỏ đúng dòng đang hiện.
+     */
+    private function pruneEmptyItemRows(Request $request): void
     {
         $rows = [];
 
-        foreach ((array) $request->input('amounts', []) as $line) {
+        foreach ((array) $request->input('items', []) as $line) {
+            $line = (array) $line;
+            $line['amounts'] = array_map(fn ($value) => trim((string) $value), (array) ($line['amounts'] ?? []));
+
+            $isBlank = ! array_filter($line['amounts'], fn ($value) => $value !== '')
+                && trim((string) ($line['category_id'] ?? '')) === ''
+                && trim((string) ($line['standard_name'] ?? '')) === ''
+                && trim((string) ($line['technical_information'] ?? '')) === ''
+                && trim((string) ($line['purpose'] ?? '')) === ''
+                && trim((string) ($line['expected_delivery_date'] ?? '')) === '';
+
+            if (! $isBlank) {
+                $rows[] = $line;
+            }
+        }
+
+        $request->merge(['items' => $rows]);
+    }
+
+    /** Ghi lại các dòng số lượng theo tháng của một mặt hàng (form sửa 1 mặt hàng). */
+    private function saveAmounts(int $itemId, Request $request): void
+    {
+        $this->saveAmountRows($itemId, (array) $request->input('amounts', []));
+    }
+
+    /** Ghi các dòng số lượng [amount, unit_id, for_month_year 'Y-m']; dòng thiếu số hoặc tháng thì bỏ qua. */
+    private function saveAmountRows(int $itemId, array $lines): void
+    {
+        $rows = [];
+
+        foreach ($lines as $line) {
             $amount = trim((string) ($line['amount'] ?? ''));
             $period = trim((string) ($line['for_month_year'] ?? ''));
 
@@ -1098,6 +1212,43 @@ class StandardEstimateController extends Controller
             ->where('standard_categories.status_id', 1)
             ->where('standard_categories.app_status', 'approved')
             ->orderBy('standard_categories.code', 'asc')
+            ->get();
+    }
+
+    /**
+     * Chất chuẩn phòng đã khai ở tab "Chất Chuẩn Của Phòng" (còn hoạt động, danh mục chung đã
+     * duyệt) - khung "Chọn từ danh mục phòng" của modal thêm chất chuẩn, kèm nhóm chuẩn, đơn vị
+     * và ngưỡng tồn tối thiểu / tối đa của phòng.
+     */
+    private function deptCategoryOptions(int $departmentId)
+    {
+        $table = DepartmentStandard::TABLE;
+
+        return DB::table($table)
+            ->join('standard_categories', $table.'.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->leftJoin('units', $table.'.unit_id', '=', 'units.id')
+            ->select(
+                'standard_categories.id',
+                'standard_categories.code',
+                'standard_categories.version',
+                'standard_categories.groups',
+                'standard_categories.cas_no',
+                'standard_names.name as standard_name',
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                $table.'.unit_id',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                $table.'.min_stock',
+                $table.'.max_stock'
+            )
+            ->where($table.'.department_id', $departmentId)
+            ->where($table.'.status_id', 1)
+            ->where('standard_categories.status_id', 1)
+            ->where('standard_categories.app_status', 'approved')
+            ->orderBy('standard_names.name', 'asc')
             ->get();
     }
 
@@ -1214,15 +1365,74 @@ class StandardEstimateController extends Controller
 
     private function itemPayload(Request $request): array
     {
-        $fromCategory = $request->source === 'category';
+        return $this->itemPayloadFrom($request->all());
+    }
+
+    /** Payload một mặt hàng từ mảng dữ liệu (form sửa 1 dòng hoặc 1 dòng items[i] của modal thêm nhiều). */
+    private function itemPayloadFrom(array $line): array
+    {
+        $fromCategory = ($line['source'] ?? '') === 'category';
 
         return [
-            'category_id' => $fromCategory ? (int) $request->category_id : null,
-            'standard_name' => $fromCategory ? null : $this->nullIfBlank($request->standard_name),
-            'group_key' => $this->nullIfBlank($request->group_key),
-            'technical_information' => $this->nullIfBlank($request->technical_information),
-            'purpose' => $this->nullIfBlank($request->purpose),
-            'expected_delivery_date' => $this->nullIfBlank($request->expected_delivery_date),
+            'category_id' => $fromCategory ? (int) $line['category_id'] : null,
+            'standard_name' => $fromCategory ? null : $this->nullIfBlank($line['standard_name'] ?? null),
+            'group_key' => $this->nullIfBlank($line['group_key'] ?? null),
+            'technical_information' => $this->nullIfBlank($line['technical_information'] ?? null),
+            'purpose' => $this->nullIfBlank($line['purpose'] ?? null),
+            'expected_delivery_date' => $this->nullIfBlank($line['expected_delivery_date'] ?? null),
+        ];
+    }
+
+    /** Modal thêm nhiều chất chuẩn: items[i] là một chất chuẩn, periods[k] là cột tháng chung. */
+    private function batchItemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.source' => ['required', 'in:category,manual'],
+            'items.*.category_id' => ['required_if:items.*.source,category', 'nullable', 'exists:standard_categories,id'],
+            'items.*.standard_name' => ['required_if:items.*.source,manual', 'nullable', 'max:255'],
+            // Nhóm chuẩn mong muốn: bắt buộc với chất chuẩn ngoài danh mục (Cung Ứng cần biết
+            // mua chuẩn chính hay chuẩn tạp)
+            'items.*.group_key' => [
+                'required_if:items.*.source,manual',
+                'nullable',
+                Rule::in(array_keys(config('standard.groups'))),
+            ],
+            'items.*.technical_information' => ['nullable', 'max:1000'],
+            'items.*.purpose' => ['nullable', 'max:1000'],
+            'items.*.expected_delivery_date' => ['nullable', 'date'],
+            'items.*.unit_id' => ['required', 'exists:units,id'],
+            'items.*.amounts' => ['array'],
+            'items.*.amounts.*' => ['nullable', 'numeric', 'min:0.0001'],
+            'periods' => ['required', 'array', 'min:1'],
+            'periods.*' => ['nullable', 'date_format:Y-m', 'distinct'],
+        ];
+    }
+
+    private function batchItemMessages(): array
+    {
+        return [
+            'items.required' => 'Vui lòng khai ít nhất một chất chuẩn.',
+            'items.min' => 'Vui lòng khai ít nhất một chất chuẩn.',
+            'items.max' => 'Mỗi lần thêm tối đa 200 chất chuẩn.',
+            'items.*.source.required' => 'Vui lòng chọn nguồn chất chuẩn.',
+            'items.*.source.in' => 'Nguồn chất chuẩn không hợp lệ.',
+            'items.*.category_id.required_if' => 'Vui lòng chọn chất chuẩn trong danh mục.',
+            'items.*.category_id.exists' => 'Chất chuẩn được chọn không tồn tại trong danh mục.',
+            'items.*.standard_name.required_if' => 'Vui lòng nhập tên chất chuẩn ngoài danh mục.',
+            'items.*.standard_name.max' => 'Tên chất chuẩn tối đa 255 ký tự.',
+            'items.*.group_key.required_if' => 'Vui lòng chọn nhóm chuẩn mong muốn cho chất chuẩn ngoài danh mục.',
+            'items.*.group_key.in' => 'Nhóm chuẩn không hợp lệ.',
+            'items.*.technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
+            'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'items.*.expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
+            'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
+            'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'items.*.amounts.*.numeric' => 'Số lượng dự trù phải là số.',
+            'items.*.amounts.*.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'periods.required' => 'Vui lòng khai ít nhất một tháng cần dùng.',
+            'periods.*.date_format' => 'Tháng cần dùng không hợp lệ.',
+            'periods.*.distinct' => 'Các cột tháng cần dùng bị trùng nhau.',
         ];
     }
 

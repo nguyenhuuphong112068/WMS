@@ -61,6 +61,43 @@
         font-size: 0.75rem;
     }
 
+    /* ---------- Công tắc chế độ ---------- */
+    .zone-modes {
+        display: inline-flex;
+        gap: 4px;
+        padding: 4px;
+        margin-bottom: 16px;
+        background: #fff;
+        border: 1px solid var(--primary-soft);
+        border-radius: var(--border-radius-md);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .zone-mode {
+        border: none;
+        background: transparent;
+        color: #64748b;
+        font-weight: 600;
+        font-size: 0.88rem;
+        padding: 8px 18px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .zone-mode:hover {
+        color: var(--primary);
+        background: var(--primary-soft);
+    }
+
+    .zone-mode.active {
+        background: var(--primary);
+        color: #fff;
+        box-shadow: 0 2px 6px rgba(var(--primary-rgb), 0.3);
+    }
+
     /* ---------- Thanh tab ---------- */
     .zone-tabs {
         display: flex;
@@ -371,6 +408,21 @@
             </div>
         </div>
 
+        {{-- Hai chế độ: khai cấu trúc trên lưới (mặc định) và bảng danh sách từng cấp --}}
+        <div class="zone-modes" role="tablist">
+            <button type="button" class="zone-mode" data-mode="structure">
+                <i class="fas fa-th"></i> Cấu trúc kho
+            </button>
+            <button type="button" class="zone-mode" data-mode="list">
+                <i class="fas fa-list"></i> Danh sách định khu
+            </button>
+        </div>
+
+        <div id="zoneModeStructure" class="zone-mode-pane" hidden>
+            @include('pages.materData.Zone.structure')
+        </div>
+
+        <div id="zoneModeList" class="zone-mode-pane" hidden>
         <div class="card">
             <ul class="nav zone-tabs" id="zoneTabs" role="tablist">
                 @foreach ($zoneMeta as $key => $meta)
@@ -553,6 +605,7 @@
                     @endforeach
                 </div>
             </div>
+        </div>
         </div>
     </div>
 </div>
@@ -799,6 +852,42 @@
                 .draw();
         });
 
+        /* ---------- Chế độ Cấu trúc kho / Danh sách định khu ---------- */
+        var zoneModeKey = 'wms.zone.mode';
+
+        function showMode(mode) {
+            // Vừa lưu cấu trúc thì bảng danh sách do máy chủ dựng sẵn đã cũ, tải lại trang
+            if (mode === 'list' && window.zoneStructureStale) {
+                try { localStorage.setItem(zoneModeKey, 'list'); } catch (err) {}
+                window.location.reload();
+                return;
+            }
+            if (mode === 'list' && window.zoneStructureDirty && window.zoneStructureDirty()
+                && !window.confirm('Cấu trúc kệ/tủ đang sửa chưa lưu. Vẫn chuyển sang danh sách?')) {
+                return;
+            }
+
+            $('.zone-mode').each(function() {
+                $(this).toggleClass('active', $(this).data('mode') === mode);
+            });
+            $('#zoneModeStructure').prop('hidden', mode !== 'structure');
+            $('#zoneModeList').prop('hidden', mode !== 'list');
+            try { localStorage.setItem(zoneModeKey, mode); } catch (err) {}
+
+            if (mode === 'list') {
+                $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+            }
+        }
+
+        $('.zone-mode').on('click', function() {
+            showMode($(this).data('mode'));
+        });
+
+        var savedMode = null;
+        try { savedMode = localStorage.getItem(zoneModeKey); } catch (err) {}
+        // Quay về từ một thao tác ở bảng danh sách (thêm/sửa/khoá/xoá) thì mở lại đúng danh sách
+        showMode(zoneFlash.activeTab || zoneFlash.formTab ? 'list' : (savedMode === 'list' ? 'list' : 'structure'));
+
         /* ---------- Ghi nhớ tab đang xem ---------- */
         function showTab(type) {
             var $link = $('#zoneTabs a[data-tab="' + type + '"]');
@@ -812,7 +901,9 @@
             } catch (err) {
                 /* trình duyệt chặn localStorage thì bỏ qua */
             }
-            $('#zoneTable-' + type).DataTable().columns.adjust().responsive.recalc();
+            // Layout nạp lại lõi DataTables sau plugin Responsive nên .responsive có thể không còn
+            var api = $('#zoneTable-' + type).DataTable().columns.adjust();
+            if (api.responsive && api.responsive.recalc) api.responsive.recalc();
         });
 
         var savedTab = null;

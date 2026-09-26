@@ -124,6 +124,7 @@ class DepartmentMaterial
                 self::TABLE.'.max_stock',
                 // Định khu phòng đã khai cho vật tư này - màn hình Nhập điền sẵn vào ô vị trí
                 self::TABLE.'.default_location_id',
+                self::TABLE.'.unit_id',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )

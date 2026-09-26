@@ -55,6 +55,27 @@
         border-color: #dc3545;
     }
 
+    /* Nhóm nhiều mục (Cảnh Báo An Toàn - 13 mục theo Sơ đồ lưu trữ GHS): xếp 2 cột cho gọn */
+    @media (min-width: 768px) {
+        .cat-check-group.is-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 4px;
+        }
+    }
+
+    /* Dòng kết quả Select2 bị khoá kèm lý do (định khu tương kỵ với hoá chất đang khai) */
+    .cat-opt-warn small {
+        display: block;
+        color: #DC2626;
+        font-size: 0.78rem;
+        white-space: normal;
+    }
+
+    .select2-results__option[aria-disabled="true"] .cat-opt-warn {
+        opacity: 0.85;
+    }
+
     /* Tách ô "Phân Loại" thành nhiều vùng riêng, mỗi vùng một tiêu đề nhỏ */
     .cat-subgroup + .cat-subgroup {
         margin-top: 12px;
@@ -415,11 +436,23 @@
                         delay: 250,
                         cache: true,
                         data: function(params) {
-                            return {
+                            // Trang có thể gắn thêm tham số lọc qua $select.data('lookupParams', fn)
+                            var extra = $select.data('lookupParams');
+
+                            return $.extend({
                                 q: params.term || '',
                                 page: params.page || 1
-                            };
+                            }, typeof extra === 'function' ? extra($select) : {});
                         }
+                    };
+                    // Dòng kết quả có "warning" (ví dụ định khu tương kỵ) hiện thêm lý do màu đỏ bên dưới
+                    options.templateResult = function(item) {
+                        if (!item.id || !item.warning) return item.text;
+
+                        return $('<div class="cat-opt-warn">').append(
+                            $('<div>').text(item.text),
+                            $('<small>').text(item.warning)
+                        );
                     };
                 }
 

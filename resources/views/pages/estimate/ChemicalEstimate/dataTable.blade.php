@@ -21,6 +21,19 @@
                     <li class="nav-item">
                         <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
                     </li>
+                    @if (($purchasingItems ?? null) !== null)
+                        @php
+                            $purchasingPending = $purchasingItems->filter(
+                                fn($it) => $it->cancel_requester_at && !$it->cancel_purchasing_at,
+                            )->count();
+                        @endphp
+                        <li class="nav-item">
+                            <a class="nav-link {{ $activeTab === 'purchasing' ? 'active' : '' }}" id="purchasing-tab" data-toggle="tab" href="#purchasing" role="tab">
+                                Bộ phận mua hàng
+                                @if ($purchasingPending)<span class="badge badge-danger" title="Đề nghị huỷ chờ xác nhận">{{ $purchasingPending }}</span>@endif
+                            </a>
+                        </li>
+                    @endif
                     @if ($showApprovalInbox)
                         <li class="nav-item">
                             <a class="nav-link {{ $activeTab === 'inbox' ? 'active' : '' }}" id="inbox-tab" data-toggle="tab" href="#inbox" role="tab">
@@ -200,6 +213,11 @@
                     <div class="tab-pane fade {{ $activeTab === 'tracking' ? 'show active' : '' }}" id="tracking" role="tabpanel">
                         @include('pages.estimate.shared.trackingTable', ['items' => $trackedItems])
                     </div>
+                    @if (($purchasingItems ?? null) !== null)
+                        <div class="tab-pane fade {{ $activeTab === 'purchasing' ? 'show active' : '' }}" id="purchasing" role="tabpanel">
+                            @include('pages.estimate.shared.purchasingPane', ['items' => $purchasingItems])
+                        </div>
+                    @endif
                     @if ($showApprovalInbox)
                         <div class="tab-pane fade {{ $activeTab === 'inbox' ? 'show active' : '' }}" id="inbox" role="tabpanel">
                             @include('pages.estimate.shared.inboxPane')
