@@ -76,7 +76,7 @@
                                 @perm('user_update')
                                     <button type="button" class="btn btn-warning btn-edit" data-id="{{ $data->id }}"
                                         data-username="{{ $data->userName }}" data-usergroup='@json($data->role_ids)'
-                                        data-fullname="{{ $data->fullName }}" data-deparment="{{ $data->deparment }}"
+                                        data-fullname="{{ $data->fullName }}" data-deparment_id="{{ $data->deparment_id }}"
                                         data-group_ids='@json($data->group_ids)'
                                         data-role_dept_map='@json($data->role_dept_map)'
                                         data-mail="{{ $data->mail }}"
@@ -244,7 +244,7 @@
             if (window.syncRoleDeptRows) window.syncRoleDeptRows(modal);
 
             modal.find('input[name="fullName"]').val(button.data('fullname'));
-            modal.find('select[name="deparment"]').val(button.data('deparment'));
+            modal.find('select[name="deparment"]').val(button.data('deparment_id'));
             modal.find('input[name="mail"]').val(button.data('mail'));
 
             // Tổ: dựng theo phòng ban của user rồi chọn sẵn các tổ hiện có

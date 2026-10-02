@@ -94,8 +94,8 @@
                             <option value="">-- Chọn phòng ban --</option>
 
                             @foreach ($deparments as $department)
-                                <option value="{{ $department->shortName }}" data-id="{{ $department->id }}"
-                                    {{ old('deparment') == $department->shortName ? 'selected' : '' }}>
+                                <option value="{{ $department->id }}" data-id="{{ $department->id }}"
+                                    {{ old('deparment') == $department->id ? 'selected' : '' }}>
                                     {{ $department->name }}@if (!empty($department->company_name)) — {{ $department->company_name }}@endif
                                 </option>
                             @endforeach

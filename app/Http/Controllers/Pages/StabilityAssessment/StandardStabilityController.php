@@ -255,6 +255,13 @@ class StandardStabilityController extends Controller
                 return;
             }
 
+            // Chỉ lô được tick "Lô đánh giá hạn dùng" ở phiếu nhập mới lập phiếu được
+            if (! $import->stability_batch) {
+                $validator->errors()->add('import_id', 'Ống '.$import->code.' chưa được tick "Lô đánh giá hạn dùng" ở phiếu nhập nên không lập phiếu đánh giá được!');
+
+                return;
+            }
+
             // Mỗi ống chuẩn chỉ theo dõi trên một phiếu, tránh số liệu đánh giá tách làm hai nơi
             $exists = DB::table(self::TABLE)
                 ->where('import_id', $import->id)
@@ -1031,8 +1038,12 @@ class StandardStabilityController extends Controller
     /**
      * Ống chuẩn được chọn khi lập phiếu.
      *
-     * Chỉ lấy ống CHUẨN THỨ CẤP (CTC) và còn hiệu lực của phòng ban đang chọn; ống đã
-     * có phiếu chưa huỷ bị loại hẳn khỏi danh sách vì mỗi ống chỉ theo dõi trên một phiếu.
+     * Chỉ lấy ống CHUẨN THỨ CẤP (CTC) còn hiệu lực của phòng ban đang chọn VÀ đã được
+     * tick "Lô đánh giá hạn dùng" ngay trên phiếu nhập - phòng chỉ đưa một số lô đại
+     * diện vào chương trình theo dõi, không phải ống nào cũng đánh giá.
+     *
+     * Ống đã có phiếu chưa huỷ bị loại hẳn khỏi danh sách vì mỗi ống chỉ theo dõi trên
+     * một phiếu.
      */
     private function importOptions(int $departmentId)
     {
@@ -1056,6 +1067,7 @@ class StandardStabilityController extends Controller
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
             ->where('standard_imports.group_code', $this->groupCode())
+            ->where('standard_imports.stability_batch', 1)
             ->when($taken, fn ($query) => $query->whereNotIn('standard_imports.id', $taken))
             ->orderBy('standard_imports.code', 'asc')
             ->get();

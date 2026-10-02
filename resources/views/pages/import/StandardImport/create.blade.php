@@ -285,7 +285,7 @@
 
                     {{-- Nhóm 6: Phân loại đặc thù (Checkboxes & Dạng Chuẩn) --}}
                     <div class="form-row mb-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="p-3 border rounded bg-light" style="min-height: 80px;">
                                 <div class="custom-control custom-checkbox">
                                     <input type="checkbox" class="custom-control-input sd-weight-ctrl"
@@ -320,7 +320,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="p-3 border rounded bg-light" style="min-height: 80px;">
                                 <div class="custom-control custom-checkbox">
                                     <input type="checkbox" class="custom-control-input" id="requires_aliquot"
@@ -332,6 +332,22 @@
                                         dụng
                                     </label>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded bg-light" style="min-height: 80px;">
+                                <div class="custom-control custom-checkbox">
+                                    <input type="checkbox" class="custom-control-input" id="stability_batch"
+                                        name="stability_batch" value="1"
+                                        {{ old('stability_batch') ? 'checked' : '' }}>
+                                    <label class="custom-control-label font-weight-bold text-dark cursor-pointer"
+                                        for="stability_batch">
+                                        <i class="fas fa-clipboard-list mr-1 text-success"></i> Lô đánh giá hạn dùng
+                                    </label>
+                                </div>
+                                <small class="md-sub d-block mt-2">Chỉ ống được tick mới chọn được ở màn
+                                    <b>Đánh Giá Hạn Dùng</b>.</small>
                             </div>
                         </div>
                     </div>

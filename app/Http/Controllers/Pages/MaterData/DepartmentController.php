@@ -8,6 +8,8 @@ use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 
 /**
  * DỮ LIỆU GỐC - PHÒNG BAN
@@ -57,15 +59,15 @@ class DepartmentController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'company_id' => 'required|integer|exists:companies,id',
-            'shortName' => 'required|unique:deparments,shortName',
-            'name' => 'required|unique:deparments,name',
+            'shortName' => ['required', $this->uniqueInCompany('shortName', $request)],
+            'name' => ['required', $this->uniqueInCompany('name', $request)],
         ], [
             'company_id.required' => 'Vui lòng chọn Công Ty',
             'company_id.exists' => 'Công Ty không hợp lệ.',
             'name.required' => 'Vui lòng nhập Tên Phòng Ban',
-            'name.unique' => 'Tên Phòng Ban đã tồn tại.',
+            'name.unique' => 'Tên Phòng Ban đã tồn tại trong công ty này.',
             'shortName.required' => 'Vui lòng nhập Tên Viết Tắt',
-            'shortName.unique' => 'Tên Viết Tắt đã tồn tại.',
+            'shortName.unique' => 'Tên Viết Tắt đã tồn tại trong công ty này.',
         ]);
 
         if ($validator->fails()) {
@@ -94,15 +96,15 @@ class DepartmentController extends Controller
 
         $validator = Validator::make($request->all(), [
             'company_id' => 'required|integer|exists:companies,id',
-            'shortName' => 'required|unique:deparments,shortName,' . $request->id,
-            'name' => 'required|unique:deparments,name,' . $request->id,
+            'shortName' => ['required', $this->uniqueInCompany('shortName', $request, (int) $request->id)],
+            'name' => ['required', $this->uniqueInCompany('name', $request, (int) $request->id)],
         ] + $this->changeReasonRules(), [
             'company_id.required' => 'Vui lòng chọn Công Ty',
             'company_id.exists' => 'Công Ty không hợp lệ.',
             'name.required' => 'Vui lòng nhập Tên Phòng Ban',
-            'name.unique' => 'Tên Phòng Ban đã tồn tại.',
+            'name.unique' => 'Tên Phòng Ban đã tồn tại trong công ty này.',
             'shortName.required' => 'Vui lòng nhập Tên Viết Tắt',
-            'shortName.unique' => 'Tên Viết Tắt đã tồn tại.',
+            'shortName.unique' => 'Tên Viết Tắt đã tồn tại trong công ty này.',
         ] + $this->changeReasonMessages());
 
         if ($validator->fails()) {
@@ -163,6 +165,19 @@ class DepartmentController extends Controller
         return response()->json([
             'rows' => DataMasterHistory::rows(self::TABLE, (int) $request->id),
         ]);
+    }
+
+    /**
+     * Mã phòng / tên phòng chỉ cần duy nhất TRONG MỘT CÔNG TY.
+     *
+     * Hai công ty khác nhau được phép trùng mã (VD: công ty nào cũng có phòng "QA"), nên
+     * khoá duy nhất là cặp (company_id, cột) - khớp unique index trên bảng deparments.
+     */
+    private function uniqueInCompany(string $column, Request $request, ?int $ignoreId = null): Unique
+    {
+        $rule = Rule::unique(self::TABLE, $column)->where('company_id', (int) $request->company_id);
+
+        return $ignoreId ? $rule->ignore($ignoreId) : $rule;
     }
 
     private function actor(): string

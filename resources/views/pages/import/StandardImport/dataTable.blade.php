@@ -126,7 +126,8 @@
                                             $row->potency ||
                                             $row->moisture ||
                                             $row->weight_controlled ||
-                                            $row->requires_aliquot;
+                                            $row->requires_aliquot ||
+                                            $row->stability_batch;
                                         $rowCodeBadge = \App\Support\ZoneType::badge($row->location_id, $row->location_zone_type ?? null, $row->location_color ?? null);
                                     @endphp
                                     {{-- data-groups để bộ lọc Phân nhóm chuẩn nhận ra dòng này --}}
@@ -183,6 +184,12 @@
                                                         <span class="sd-badge-tag badge-info"
                                                             title="Cần chiết ống trước khi dùng">
                                                             <i class="fas fa-vial"></i> chiết ống
+                                                        </span>
+                                                    @endif
+                                                    @if ($row->stability_batch)
+                                                        <span class="sd-badge-tag badge-success"
+                                                            title="Lô được chọn đánh giá hạn dùng">
+                                                            <i class="fas fa-clipboard-list"></i> Lô ĐG hạn dùng
                                                         </span>
                                                     @endif
                                                 </div>
@@ -284,6 +291,7 @@
                                                                 'standard_form' => $row->standard_form,
                                                                 'weight_controlled' => $row->weight_controlled,
                                                                 'requires_aliquot' => $row->requires_aliquot,
+                                                                'stability_batch' => $row->stability_batch,
                                                                 'location_id' => $row->location_id,
                                                                 'purpose_id' => $row->purpose_id,
                                                                 'note' => $row->note,

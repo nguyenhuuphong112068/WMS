@@ -61,6 +61,7 @@ class StandardImportController extends Controller
         'weight_controlled' => 'Kiểm soát khối lượng',
         'standard_form' => 'Dạng chuẩn',
         'requires_aliquot' => 'chiết ống trước khi dùng',
+        'stability_batch' => 'Lô đánh giá hạn dùng',
         'supplier_id' => 'Nhà cung cấp',
         'location_id' => 'Vị trí lưu trữ',
         'purpose_id' => 'Chỉ tiêu kiểm',
@@ -654,6 +655,7 @@ class StandardImportController extends Controller
                     'Dạng chuẩn' => $row->standard_form ?: '—',
                     'Kiểm soát khối lượng' => $row->weight_controlled ? 'Có' : 'Không',
                     'Chiết ống trước khi dùng' => $row->requires_aliquot ? 'Có' : 'Không',
+                    'Lô đánh giá hạn dùng' => $row->stability_batch ? 'Có' : 'Không',
                     'Ngày nhập' => $date($row->imported_date),
                     'Loại hạn dùng' => match ($row->expiry_type) {
                         'check online', 'undetermined', 'unlimited' => 'Chưa xác định (Check online)',
@@ -848,6 +850,7 @@ class StandardImportController extends Controller
             'weight_controlled' => $row->weight_controlled ?? 0,
             'standard_form' => $row->standard_form ?? null,
             'requires_aliquot' => $row->requires_aliquot ?? 0,
+            'stability_batch' => $row->stability_batch ?? 0,
             'supplier_id' => $row->supplier_id,
             'purpose_id' => $row->purpose_id ?? null,
             'location_id' => $row->location_id,
@@ -890,7 +893,7 @@ class StandardImportController extends Controller
                 continue;
             }
 
-            if ($field === 'weight_controlled' || $field === 'requires_aliquot') {
+            if ($field === 'weight_controlled' || $field === 'requires_aliquot' || $field === 'stability_batch') {
                 $oldBool = (int) $old;
                 $newBool = (int) $new;
                 if ($oldBool !== $newBool) {
@@ -1141,6 +1144,7 @@ class StandardImportController extends Controller
             'standard_form' => ['nullable', Rule::in(['Dạng Bột Rời', 'Dạng Bột Mịn', 'Dạng Sệt'])],
             'weight_controlled' => ['nullable', 'boolean'],
             'requires_aliquot' => ['nullable', 'boolean'],
+            'stability_batch' => ['nullable', 'boolean'],
             'supplier_id' => ['nullable', 'exists:suppliers,id'],
             'purpose_id' => ['nullable'],
             'purpose_id.*' => ['exists:purposes,id'],
@@ -1208,6 +1212,7 @@ class StandardImportController extends Controller
             'weight_controlled' => $request->has('weight_controlled') && $request->weight_controlled ? 1 : 0,
             'standard_form' => ($request->has('weight_controlled') && $request->weight_controlled) ? $this->nullIfBlank($request->standard_form) : null,
             'requires_aliquot' => $request->has('requires_aliquot') && $request->requires_aliquot ? 1 : 0,
+            'stability_batch' => $request->has('stability_batch') && $request->stability_batch ? 1 : 0,
             'supplier_id' => $request->supplier_id ? (int) $request->supplier_id : null,
             'purpose_id' => $purposeJson,
             'location_id' => $request->location_id ? (int) $request->location_id : null,

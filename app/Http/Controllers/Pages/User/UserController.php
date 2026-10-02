@@ -101,7 +101,7 @@ class UserController extends Controller
                         'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/',],
                 'fullName' => 'required|string|max:255|min:5',
                 'userGroup' => 'required|array', // Chấp nhận mảng
-                'deparment' => 'required',
+                'deparment' => 'required|integer|exists:deparments,id',
                 'group_id' => 'nullable|array',
                 'group_id.*' => 'integer|exists:groups,id',
                 'mail' => 'required',
@@ -123,6 +123,7 @@ class UserController extends Controller
                 'userGroup.required' => 'Vui lòng chọn ít nhất một phân quyền',
 
                 'deparment.required' => 'Vui chọn Phòng Ban',
+                'deparment.exists' => 'Phòng Ban không hợp lệ.',
 
                 'mail.required' => 'Nếu Không Có Mail Vui Lòng Nhập NA',
 
@@ -140,9 +141,9 @@ class UserController extends Controller
                 $userGroups = $request->userGroup; // Mảng role IDs
                 $primaryRoleId = $userGroups[0] ?? null; // Role đầu tiên làm role chính
 
-                // Phòng ban + công ty suy từ shortName gửi lên
+                // Phòng ban + công ty suy từ id gửi lên (shortName được phép trùng giữa 2 công ty)
                 $department = DB::table('deparments')
-                        ->where('shortName', $request->deparment)
+                        ->where('id', $request->deparment)
                         ->first(['id', 'company_id']);
                 $departmentId = $department->id ?? null;
                 $companyId = $department->company_id ?? null;
@@ -193,7 +194,7 @@ class UserController extends Controller
                 $rules = [
                     'fullName' => 'required|string|max:255|min:5',
                     'userGroup' => 'required|array',
-                    'deparment' => 'required',
+                    'deparment' => 'required|integer|exists:deparments,id',
                     'group_id' => 'nullable|array',
                     'group_id.*' => 'integer|exists:groups,id',
                     'mail' => 'required',
@@ -228,9 +229,9 @@ class UserController extends Controller
                 $userGroups = $request->userGroup;
                 $primaryRoleId = $userGroups[0] ?? null;
 
-                // Phòng ban + công ty suy từ shortName gửi lên
+                // Phòng ban + công ty suy từ id gửi lên (shortName được phép trùng giữa 2 công ty)
                 $department = DB::table('deparments')
-                    ->where('shortName', $request->deparment)
+                    ->where('id', $request->deparment)
                     ->first(['id', 'company_id']);
                 $departmentId = $department->id ?? null;
                 $companyId = $department->company_id ?? null;
@@ -369,7 +370,7 @@ class UserController extends Controller
                 }
 
                 $departmentId = DB::table('deparments')
-                        ->where('shortName', $request->deparment)
+                        ->where('id', $request->deparment)
                         ->value('id');
 
                 if (!$departmentId) {

@@ -221,7 +221,7 @@
 
                     {{-- Checkboxes & Dạng Chuẩn --}}
                     <div class="form-row mb-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="p-3 border rounded bg-light" style="min-height: 80px;">
                                 <div class="custom-control custom-checkbox">
                                     <input type="checkbox" class="custom-control-input sd-up-weight-ctrl"
@@ -247,7 +247,7 @@
                             </div>
                         </div>
 
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="p-3 border rounded bg-light" style="min-height: 80px;">
                                 <div class="custom-control custom-checkbox">
                                     <input type="checkbox" class="custom-control-input sd-up-req-aliquot"
@@ -258,6 +258,21 @@
                                         dụng
                                     </label>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded bg-light" style="min-height: 80px;">
+                                <div class="custom-control custom-checkbox">
+                                    <input type="checkbox" class="custom-control-input sd-up-stability-batch"
+                                        id="up_stability_batch" name="stability_batch" value="1">
+                                    <label class="custom-control-label font-weight-bold text-dark cursor-pointer"
+                                        for="up_stability_batch">
+                                        <i class="fas fa-clipboard-list mr-1 text-success"></i> Lô đánh giá hạn dùng
+                                    </label>
+                                </div>
+                                <small class="md-sub d-block mt-2">Chỉ ống được tick mới chọn được ở màn
+                                    <b>Đánh Giá Hạn Dùng</b>.</small>
                             </div>
                         </div>
                     </div>
@@ -448,6 +463,9 @@
 
             // Checkbox chiết ống
             $upModal.find('.sd-up-req-aliquot').prop('checked', !!row.requires_aliquot);
+
+            // Checkbox lô đánh giá hạn dùng
+            $upModal.find('.sd-up-stability-batch').prop('checked', !!row.stability_batch);
 
             // Expiry type: Chuẩn hoá và check đúng radio
             var rawExpType = row.expiry_type || 'Specify';
