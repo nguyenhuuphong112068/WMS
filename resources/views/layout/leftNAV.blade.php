@@ -435,6 +435,13 @@
                                         <p>Điều Kiện Bảo Quản</p>
                                     </a></li>
                             @endperm
+                            @if (user_has_any_role(session('user')['userId'] ?? 0, ['Admin']))
+                                <li class="nav-item"><a href="{{ route('pages.materData.initialData.list') }}"
+                                        class="nav-link {{ request()->is('materData/initialData') ? 'active' : '' }}"><i
+                                            class="fas fa-file-import nav-icon text-primary"></i>
+                                        <p>Khởi Tạo Dữ Liệu</p>
+                                    </a></li>
+                            @endif
 
                         </ul>
                     </li>

@@ -18,6 +18,7 @@ use App\Http\Controllers\Pages\MaterData\ConsumptionObjectController;
 use App\Http\Controllers\Pages\MaterData\DepartmentClassificationController;
 use App\Http\Controllers\Pages\MaterData\DepartmentController;
 use App\Http\Controllers\Pages\MaterData\GroupController;
+use App\Http\Controllers\Pages\MaterData\InitialDataController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
 use App\Http\Controllers\Pages\MaterData\MaterialSignFlowController;
 use App\Http\Controllers\Pages\MaterData\MixtureHazardCategoryController;
@@ -231,5 +232,12 @@ Route::prefix('/materData')
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
             Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Khởi Tạo Dữ Liệu: tải file Excel mẫu, kiểm tra và nạp dữ liệu ban đầu (chỉ Admin)
+        Route::prefix('/initialData')->name('initialData.')->controller(InitialDataController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('template', 'template')->name('template');
+            Route::post('process', 'process')->name('process');
         });
     });
