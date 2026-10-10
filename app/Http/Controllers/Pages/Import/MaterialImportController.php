@@ -175,6 +175,8 @@ class MaterialImportController extends Controller
             'datas' => $datas,
             'categories' => $categories,
             'categoryDefaults' => $categoryDefaults,
+            // Bộ lọc "Phân loại phòng" của modal Chọn Vật Tư
+            'deptClassifications' => DepartmentMaterial::classificationOptions($departmentId),
             'attachments' => $attachments,
             'locations' => DepartmentMaterial::locationOptions($departmentId),
             // Modal Nhập vật tư chỉ cho chọn vị trí Biệt Trữ/Chờ kiểm tra

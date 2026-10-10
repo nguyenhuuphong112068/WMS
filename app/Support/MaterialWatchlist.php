@@ -112,6 +112,7 @@ class MaterialWatchlist
                 'on_hand' => $t->on_hand,
                 'min_stock' => $t->min_stock,
                 'below_threshold' => true,
+                'quantity' => null,
                 'source_type' => null,
                 'note' => null,
                 'remembered_by' => null,
@@ -124,6 +125,7 @@ class MaterialWatchlist
 
             if (isset($rows[$key])) {
                 $rows[$key]->watchlist_id = $r->id;
+                $rows[$key]->quantity = $r->quantity;
                 $rows[$key]->source_type = $r->source_type;
                 $rows[$key]->note = $r->note;
                 $rows[$key]->remembered_by = $r->created_by;
@@ -144,6 +146,7 @@ class MaterialWatchlist
                 'on_hand' => null,
                 'min_stock' => null,
                 'below_threshold' => false,
+                'quantity' => $r->quantity,
                 'source_type' => $r->source_type,
                 'note' => $r->note,
                 'remembered_by' => $r->created_by,
@@ -156,12 +159,13 @@ class MaterialWatchlist
 
     /**
      * Tạo một "Đề nghị dự trù vật tư" (nút trên dòng đề nghị của modal Thường Quy / Theo ĐG
-     * Rủi Ro, hoặc trên tab "Vật Tư Của Phòng") - bắt buộc nêu lý do dự trù. Vật tư trong
-     * danh mục khoá theo (department_id, category_id) - bấm lại chỉ cập nhật lại lý do /
-     * nguồn, không tạo dòng trùng. Vật tư ngoài danh mục khoá theo tên (không phân biệt hoa
+     * Rủi Ro, hoặc trên tab "Vật Tư Của Phòng") - bắt buộc nêu số lượng (theo đơn vị tính
+     * của phòng) và lý do dự trù. Vật tư trong
+     * danh mục khoá theo (department_id, category_id) - bấm lại chỉ cập nhật lại số lượng /
+     * lý do / nguồn, không tạo dòng trùng. Vật tư ngoài danh mục khoá theo tên (không phân biệt hoa
      * thường) vì không có category_id để ràng buộc duy nhất.
      */
-    public static function remember(int $departmentId, ?int $categoryId, ?string $materialName, ?string $technicalSpecification, ?string $note, ?string $sourceType, string $actor): array
+    public static function remember(int $departmentId, ?int $categoryId, ?string $materialName, ?string $technicalSpecification, ?float $quantity, ?string $note, ?string $sourceType, string $actor): array
     {
         $materialName = trim((string) $materialName) ?: null;
         $technicalSpecification = trim((string) $technicalSpecification) ?: null;
@@ -169,6 +173,10 @@ class MaterialWatchlist
 
         if (! $categoryId && ! $materialName) {
             return ['success' => false, 'message' => 'Vui lòng chọn vật tư trong danh mục hoặc nhập tên vật tư trước khi đề nghị dự trù!'];
+        }
+
+        if (! $quantity || $quantity <= 0) {
+            return ['success' => false, 'message' => 'Vui lòng nhập số lượng cần đề nghị lớn hơn 0.'];
         }
 
         if (! $note) {
@@ -196,6 +204,7 @@ class MaterialWatchlist
 
         $payload = [
             'technical_specification' => $technicalSpecification,
+            'quantity' => $quantity,
             'note' => $note,
             'source_type' => $sourceType,
             'status_id' => 1,
@@ -206,7 +215,7 @@ class MaterialWatchlist
         if ($existing) {
             DB::table(self::TABLE)->where('id', $existing->id)->update($payload);
 
-            return ['success' => true, 'message' => 'Vật tư đã có trong danh sách cần dự trù, đã cập nhật lại lý do dự trù!'];
+            return ['success' => true, 'message' => 'Vật tư đã có trong danh sách cần dự trù, đã cập nhật lại số lượng và lý do dự trù!'];
         }
 
         DB::table(self::TABLE)->insert($payload + [

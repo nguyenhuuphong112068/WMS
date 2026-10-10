@@ -116,6 +116,8 @@ Route::prefix('/export')
             Route::get('lookup', 'lookup')->name('lookup');
             Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
             Route::get('requestStockMap', 'requestStockMap')->name('requestStockMap');
+            // Ô chọn Đối Tượng ở cột Mục đích của dòng đề nghị (select2 AJAX)
+            Route::get('requestObjects', 'requestObjects')->name('requestObjects');
             // Soạn vật tư cấp phát - phiếu soạn hàng A4 in theo đường đi trong kho
             Route::get('prepPrint', 'prepPrint')->name('prepPrint');
             // "Ghi nhớ vật tư cần dự trù" từ dòng đề nghị - hiện ở tab Dự Trù Vật Tư

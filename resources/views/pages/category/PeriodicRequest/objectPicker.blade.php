@@ -10,7 +10,7 @@
 | "Chọn đối tượng" thì gán vào ô Đối Tượng và bắn change để tự dựng lại tần suất đề nghị theo
 | đối tượng đó.
 --}}
-@if ($type !== 'external')
+@if ($type === 'internal')
     @php
         $objectTypes = \App\Http\Controllers\Pages\MaterData\ConsumptionObjectController::typeLabels();
         $objectFrequencies = \App\Http\Controllers\Pages\MaterData\ConsumptionObjectController::FREQUENCIES;

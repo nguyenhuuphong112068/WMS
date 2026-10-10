@@ -2,6 +2,24 @@
 @php
     $b = $expReqBadge($req->app_status);
     $canIssue = $req->app_status === 'approved';
+
+    /*
+    | Cột "Tồn khả dụng" = tồn thực hiện tại - phần các đề nghị chưa cấp phát đang giữ chỗ
+    | (MaterialExportController::categoryStockMap). Đề nghị đang xem nếu đang giữ chỗ (chờ ký,
+    | hoặc đã duyệt mà kho chưa cấp đủ) thì cộng trả phần của CHÍNH NÓ, để con số cho biết kho
+    | còn bao nhiêu dành được cho đề nghị này - cùng nghĩa với cột ở modal lập đề nghị.
+    */
+    $reqHolds = $req->app_status === 'pending_sign'
+        || ($req->app_status === 'approved' && in_array($req->issue_status, ['waiting', 'partial']));
+    $ownHeld = [];
+    if ($reqHolds) {
+        foreach ($items as $held) {
+            if ($held->category_id && in_array($held->status, ['pending', 'partial'])) {
+                $ownHeld[$held->category_id] = ($ownHeld[$held->category_id] ?? 0)
+                    + max((float) $held->requested_amount - (float) $held->issued_amount, 0);
+            }
+        }
+    }
 @endphp
 <div class="modal fade md-modal" id="reqDetailModal_{{ $req->id }}" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 90vw;">
@@ -76,7 +94,9 @@
                                 <th style="width:170px">Vật tư</th>
                                 <th style="width:120px">Quy cách</th>
                                 <th style="width:90px">SL đề nghị</th>
-                                <th style="width:140px">Mục đích</th>
+                                <th style="width:90px" title="Tồn kho của vật tư tại thời điểm lập đề nghị">Tồn lúc lập</th>
+                                <th style="width:100px" title="Tồn thực hiện tại - số lượng các đề nghị khác chưa được cấp phát">Tồn khả dụng</th>
+                                <th style="width:200px">Đối tượng / Mục đích</th>
                                 <th style="width:115px">Trạng thái</th>
                                 <th>Cấp phát</th>
                             </tr>
@@ -121,7 +141,33 @@
                                     <td class="text-right">
                                         {{ rtrim(rtrim(number_format((float) $it->requested_amount, 4, '.', ''), '0'), '.') }}
                                         {{ $it->requested_unit }}</td>
-                                    <td class="md-sub">{{ $it->purpose ?: '—' }}</td>
+                                    <td class="text-right">
+                                        @if ($it->category_id && $it->stock_at_request !== null)
+                                            {{ $expNum($it->stock_at_request) }}
+                                        @else
+                                            <span class="md-sub" title="{{ $it->category_id ? 'Phiếu lập trước khi hệ thống chụp tồn' : 'Vật tư ngoài danh mục' }}">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-right">
+                                        @if ($it->category_id)
+                                            @php
+                                                $available = (($liveStockByCategory ?? [])[$it->category_id]['available'] ?? 0)
+                                                    + ($ownHeld[$it->category_id] ?? 0);
+                                            @endphp
+                                            <span class="{{ !$isDone && $available + 0.00005 < $shortAmount ? 'text-danger font-weight-bold' : '' }}"
+                                                title="{{ !$isDone && $available + 0.00005 < $shortAmount ? 'Không đủ cho số còn phải cấp' : '' }}">
+                                                {{ $expNum($available) }}
+                                            </span>
+                                        @else
+                                            <span class="md-sub">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="md-sub">
+                                        @if ($it->consumption_object_id)
+                                            <div class="font-weight-bold text-dark"><i class="fas fa-crosshairs mr-1 text-primary"></i>{{ $it->object_code }} - {{ $it->object_name }}</div>
+                                        @endif
+                                        {{ $it->purpose ?: ($it->consumption_object_id ? '' : '—') }}
+                                    </td>
                                     <td>
                                         @if ($hasLots)
                                             @php

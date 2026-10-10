@@ -134,6 +134,45 @@
     // Danh sách tổ kèm phòng ban - để lọc tổ theo phòng ban đã chọn
     window.ALL_GROUPS = @json($groups);
 
+    // Phòng ban kèm công ty - để lọc phạm vi phòng ban của từng quyền theo công ty
+    window.ROLE_DEPTS = @json($allDepartments);
+
+    // Dựng lại ô phòng ban của 1 hàng phạm vi: chỉ phòng thuộc công ty đang chọn (không chọn = mọi công ty)
+    function buildRoleDeptOptions($row, keep) {
+        var $dept = $row.find('select.select2-roledept');
+        var companies = ($row.find('select.select2-rolecompany').val() || []).map(String);
+        keep = (keep || $dept.val() || []).map(String);
+
+        $dept.empty();
+        (window.ROLE_DEPTS || []).forEach(function(d) {
+            var id = String(d.id);
+            var selected = keep.indexOf(id) !== -1;
+            if (companies.length && companies.indexOf(String(d.company_id)) === -1 && !selected) return;
+            var label = d.shortName + ' — ' + d.name + (d.company_short ? ' (' + d.company_short + ')' : '');
+            $dept.append(new Option(label, id, selected, selected));
+        });
+        $dept.trigger('change.select2');
+    }
+
+    // Ô công ty = hợp các công ty đang chọn với công ty của các phòng ban đã chọn
+    function syncRoleCompanies($row, reset, deptIds) {
+        var $comp = $row.find('select.select2-rolecompany');
+        deptIds = (deptIds || $row.find('select.select2-roledept').val() || []).map(String);
+        var comps = reset ? [] : ($comp.val() || []).map(String);
+        (window.ROLE_DEPTS || []).forEach(function(d) {
+            if (deptIds.indexOf(String(d.id)) === -1 || !d.company_id) return;
+            if (comps.indexOf(String(d.company_id)) === -1) comps.push(String(d.company_id));
+        });
+        $comp.val(comps).trigger('change.select2');
+    }
+
+    // Nạp phạm vi phòng ban cho 1 hàng (mở modal Sửa / mở modal Thêm)
+    function setRoleDeptRow($row, deptIds) {
+        deptIds = (deptIds || []).map(String);
+        syncRoleCompanies($row, true, deptIds);
+        buildRoleDeptOptions($row, deptIds);
+    }
+
     // Dựng lại danh sách tổ theo phòng ban đang chọn trong 1 modal.
     // Không chọn phòng ban -> khoá ô chọn tổ.
     function buildGroupOptions(modal, presetIds) {
@@ -188,6 +227,38 @@
                 dropdownParent: $(this).closest('.modal')
             });
         });
+        $('.select2-rolecompany').each(function() {
+            $(this).select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $(this).closest('.modal')
+            });
+        });
+
+        // Hàng phạm vi lúc tải trang (old input khi lỗi validate): suy công ty từ phòng ban
+        $('.role-dept-row').each(function() {
+            setRoleDeptRow($(this), $(this).find('select.select2-roledept').val());
+        });
+
+        // Chọn công ty -> chọn mọi phòng ban của công ty đó; bỏ công ty -> bỏ các phòng ban của nó
+        $(document).on('select2:select select2:unselect', 'select.select2-rolecompany', function(e) {
+            var $row = $(this).closest('.role-dept-row');
+            var compId = String(e.params.data.id);
+            var keep = ($row.find('select.select2-roledept').val() || []).map(String);
+            (window.ROLE_DEPTS || []).forEach(function(d) {
+                if (String(d.company_id) !== compId) return;
+                var id = String(d.id);
+                var idx = keep.indexOf(id);
+                if (e.type === 'select2:select' && idx === -1) keep.push(id);
+                if (e.type === 'select2:unselect' && idx !== -1) keep.splice(idx, 1);
+            });
+            buildRoleDeptOptions($row, keep);
+        });
+
+        // Chọn phòng ban -> bổ sung công ty của phòng đó vào ô công ty
+        $(document).on('select2:select', 'select.select2-roledept', function() {
+            syncRoleCompanies($(this).closest('.role-dept-row'), false);
+        });
 
         // Hiện hàng "phạm vi phòng ban" của đúng các role đang được chọn
         function syncRoleDeptRows($modal) {
@@ -208,7 +279,9 @@
 
         // Mở modal Thêm: xoá sạch phạm vi phòng ban của lần trước
         $('#createModal').on('show.bs.modal', function() {
-            $(this).find('.select2-roledept').val(null).trigger('change');
+            $(this).find('.role-dept-row').each(function() {
+                setRoleDeptRow($(this), []);
+            });
             syncRoleDeptRows($(this));
         });
 
@@ -238,8 +311,7 @@
             var roleDeptMap = button.data('role_dept_map') || {};
             modal.find('.role-dept-row').each(function() {
                 var rid = String($(this).data('role'));
-                var depts = (roleDeptMap[rid] || []).map(String);
-                $(this).find('select.select2-roledept').val(depts).trigger('change');
+                setRoleDeptRow($(this), roleDeptMap[rid] || []);
             });
             if (window.syncRoleDeptRows) window.syncRoleDeptRows(modal);
 

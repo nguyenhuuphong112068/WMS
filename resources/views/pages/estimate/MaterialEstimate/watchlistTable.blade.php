@@ -55,6 +55,7 @@
                 <th class="text-center" style="width: 80px">ĐVT</th>
                 <th class="text-right" style="width: 100px">Tồn Hiện Tại</th>
                 <th class="text-right" style="width: 115px">Ngưỡng Tối Thiểu</th>
+                <th class="text-right" style="width: 105px">SL Đề Nghị</th>
                 <th style="width: 125px">Bộ Phận Mua Hàng</th>
                 <th style="width: 190px">Nguồn</th>
                 <th style="width: 200px">Lý Do Dự Trù</th>
@@ -73,6 +74,7 @@
                     data-spec="{{ $item->technical_specification }}"
                     data-unit="{{ $item->unit }}"
                     data-unit-id="{{ $item->unit_id }}"
+                    data-quantity="{{ $item->quantity !== null ? $wlNum($item->quantity) : '' }}"
                     data-note="{{ $item->note }}">
                     <td class="text-center">
                         <input type="checkbox" class="js-wl-check" value="{{ $loop->index }}">
@@ -91,6 +93,7 @@
                     <td class="text-center">{{ $item->unit ?: '-' }}</td>
                     <td class="text-right">{{ $item->on_hand !== null ? $wlNum($item->on_hand) : '—' }}</td>
                     <td class="text-right">{{ $item->min_stock !== null ? $wlNum($item->min_stock) : '—' }}</td>
+                    <td class="text-right font-weight-bold">{{ $item->quantity !== null ? $wlNum($item->quantity) : '—' }}</td>
                     <td>
                         @if ($wlPurchasingLabel)
                             <span class="wl-buyer {{ $wlPurchasing }}">{{ $wlPurchasingLabel }}</span>
@@ -222,7 +225,7 @@
 
         var wlTable = $('#mdWatchlistTable').DataTable({
             "order": [],
-            "columnDefs": [{ "orderable": false, "targets": [0, 10] }],
+            "columnDefs": [{ "orderable": false, "targets": [0, 11] }],
             "language": {
                 "url": "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}",
                 "emptyTable": "Không có vật tư nào cần dự trù"
@@ -267,6 +270,8 @@
                 spec: $tr.attr('data-spec') || '',
                 unit: $tr.attr('data-unit') || '',
                 unit_id: $tr.attr('data-unit-id') || '',
+                // Số lượng đã khai lúc đề nghị dự trù, ',' ngăn nghìn của $wlNum phải bỏ trước khi điền vào ô số
+                quantity: ($tr.attr('data-quantity') || '').replace(/,/g, ''),
                 note: $tr.attr('data-note') || '',
                 purchasing: $tr.attr('data-purchasing') || 'none'
             };
@@ -396,6 +401,7 @@
                     .find('[data-field="display_name"]').text(row.name || '—').end()
                     .find('[data-field="display_spec"]').text(row.spec || '—').end()
                     .find('[data-field="unit_id"]').val(row.unit_id || '').end()
+                    .find('[data-field="amount"]').val(row.quantity).end()
                     .find('[data-field="purpose"]').val(row.note).end();
             });
         });
@@ -410,6 +416,7 @@
                     .find('[data-field="display_name"]').text(row.name || '—').end()
                     .find('[data-field="display_spec"]').text(row.spec || '—').end()
                     .find('[data-field="display_unit"]').text(row.unit || '—').end()
+                    .find('[data-field="requested_amount"]').val(row.quantity).end()
                     .find('[data-field="note"]').val(row.note).end();
             });
         });

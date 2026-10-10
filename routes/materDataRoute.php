@@ -97,6 +97,8 @@ Route::prefix('/materData')
                 Route::get('detail', 'detail')->name('detail');
                 Route::get('checkCode', 'checkCode')->name('checkCode');
                 Route::post('apply', 'apply')->name('apply');
+                Route::post('shelf', 'saveShelf')->name('saveShelf');
+                Route::post('locations', 'saveLocations')->name('saveLocations');
             });
 
         // Định Khu: Kho/Phòng - Kệ/Tủ - Cột - Tầng - Vị Trí gộp chung một màn hình, {type} là cấp đang thao tác

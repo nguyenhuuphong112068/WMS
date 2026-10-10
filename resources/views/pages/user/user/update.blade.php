@@ -1,6 +1,6 @@
 <!-- Modal -->
 <div class="modal fade" id="UpdateModal" tabindex="-1" role="dialog" aria-labelledby="ModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-dialog modal-xl" role="document" style="max-width: 900px; width: 95%">
 
         <form action="{{ route('pages.user.user.update') }}" method="POST">
             @csrf

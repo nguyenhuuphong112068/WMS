@@ -11,7 +11,7 @@
             Tồn khả dụng
             <button type="button" class="btn btn-xs btn-link p-0 ml-1 me-refresh-stock" title="Làm mới tồn khả dụng"><i class="fas fa-sync-alt"></i></button>
         </th>
-        <th style="min-width: 240px">Mục đích</th>
+        <th style="min-width: 280px" title="Đối tượng sử dụng vật tư (thiết bị, máy...) và mục đích">Đối tượng / Mục đích</th>
         <th style="width: 74px"></th>
     </tr>
 </thead>

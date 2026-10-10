@@ -1,13 +1,16 @@
 {{--
-| Bảng "Danh sách vật tư đề nghị ... theo chu kỳ". Biến vào: $type (internal|external), $lists
+| Bảng "Danh sách vật tư đề nghị / dự trù ... theo chu kỳ". Biến vào: $type (internal|external|estimate), $lists
 --}}
 @include('pages.category.shared.assets')
 @include('pages.category.PeriodicRequest.assets')
 
 @php
     $prRoute = 'pages.category.periodicRequest.';
-    $prKey = $type === 'external' ? 'External' : 'Internal';
+    $prKey = \App\Support\MaterialPeriodicRequest::typeKey($type);
     $isExternal = $type === 'external';
+    $isEstimate = $type === 'estimate';
+    // Danh sách dự trù tạo "phiếu dự trù", hai loại kia tạo "đề nghị"
+    $prDoc = $isEstimate ? 'phiếu dự trù' : 'đề nghị';
     $prSupport = \App\Support\MaterialPeriodicRequest::class;
     $prObjectTypes = \App\Http\Controllers\Pages\MaterData\ConsumptionObjectController::typeLabels();
     $prNum = fn ($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
@@ -19,7 +22,7 @@
         <div class="md-toolbar">
             @perm('category_material_periodic_manage')
                 <button type="button" class="btn btn-primary btn-pr-create" data-modal="#periodic{{ $prKey }}CreateModal">
-                    <i class="fas fa-plus mr-1"></i> Thêm danh sách {{ $isExternal ? 'liên phòng ban' : 'nội bộ' }}
+                    <i class="fas fa-plus mr-1"></i> Thêm danh sách {{ $isEstimate ? 'dự trù' : ($isExternal ? 'liên phòng ban' : 'nội bộ') }}
                 </button>
             @endperm
         </div>
@@ -30,14 +33,16 @@
                     <tr>
                         <th class="text-center" style="width: 46px">STT</th>
                         <th style="width: 190px">Tiêu Đề</th>
-                        @if ($isExternal)
+                        @if ($isEstimate)
+                            <th style="width: 150px">Dự Trù Cho</th>
+                        @elseif ($isExternal)
                             <th style="width: 150px">Phòng Cấp Phát</th>
                         @else
                             <th style="width: 210px">Đối Tượng</th>
                         @endif
                         <th style="width: 160px">Chu Kỳ</th>
-                        <th class="text-center" style="width: 110px">Tạo Đề Nghị Kế Tiếp</th>
-                        <th style="width: 160px">Đề Nghị Đã Tạo</th>
+                        <th class="text-center" style="width: 110px">{{ $isEstimate ? 'Tạo Phiếu Kế Tiếp' : 'Tạo Đề Nghị Kế Tiếp' }}</th>
+                        <th style="width: 160px">{{ $isEstimate ? 'Phiếu Đã Tạo' : 'Đề Nghị Đã Tạo' }}</th>
                         <th class="text-center" style="width: 90px">Sử Dụng</th>
                         <th class="text-center" style="width: 160px">Thao Tác</th>
                     </tr>
@@ -47,7 +52,15 @@
                         <tr>
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td class="font-weight-bold">{{ $row->title }}</td>
-                            @if ($isExternal)
+                            @if ($isEstimate)
+                                @php $prPeriod = $prSupport::estimatePeriod($row, $row->next_run_date ?: now()); @endphp
+                                <td data-order="{{ $prSupport::estimateMonthOffset($row) }}">
+                                    <div class="font-weight-bold">{{ $prSupport::ESTIMATE_MONTH_OFFSETS[$prSupport::estimateMonthOffset($row)] }}</div>
+                                    @if ($row->status_id == 1 && $row->next_run_date)
+                                        <div class="md-sub">Phiếu kế tiếp: tháng {{ $prPeriod->format('m/Y') }}</div>
+                                    @endif
+                                </td>
+                            @elseif ($isExternal)
                                 <td>
                                     {{ $row->to_department_name ?: '—' }}
                                     @if ($row->to_department_short)
@@ -107,7 +120,7 @@
                             </td>
                             <td>
                                 <div class="md-actions">
-                                    <button type="button" class="btn btn-sm btn-outline-info btn-pr-items" title="Xem vật tư đề nghị"
+                                    <button type="button" class="btn btn-sm btn-outline-info btn-pr-items" title="Xem vật tư {{ $isEstimate ? 'dự trù' : 'đề nghị' }}"
                                         data-title="{{ $row->title }}"
                                         data-items="{{ json_encode($row->items->map(fn ($item) => [
                                             'category_code' => $item->category_code,
@@ -137,6 +150,7 @@
                                                 'start_date' => $row->start_date,
                                                 'next_run_date' => $row->next_run_date,
                                                 'to_department_id' => $row->to_department_id,
+                                                'estimate_month_offset' => $prSupport::estimateMonthOffset($row),
                                                 'consumption_object_id' => $row->consumption_object_id,
                                                 'frequency' => $row->frequency,
                                                 'items' => $row->items->map(fn ($item) => [
@@ -161,11 +175,11 @@
                                     @perm('category_material_periodic_manage')
                                         @if ($row->status_id == 1)
                                             <form class="form-md-confirm d-inline" action="{{ route($prRoute . 'generateNow') }}" method="POST"
-                                                data-title="Tạo đề nghị ngay?"
-                                                data-text="Hệ thống tạo một đề nghị {{ $isExternal ? 'liên phòng ban' : 'nội bộ' }} ở trạng thái Lưu tạm từ danh sách &quot;{{ $row->title }}&quot;. Lịch tự động theo chu kỳ giữ nguyên.">
+                                                data-title="Tạo {{ $prDoc }} ngay?"
+                                                data-text="Hệ thống tạo {{ $isEstimate ? 'một phiếu dự trù vật tư ở trạng thái Nháp' : 'một đề nghị ' . ($isExternal ? 'liên phòng ban' : 'nội bộ') . ' ở trạng thái Lưu tạm' }} từ danh sách &quot;{{ $row->title }}&quot;. Lịch tự động theo chu kỳ giữ nguyên.">
                                                 @csrf
                                                 <input type="hidden" name="id" value="{{ $row->id }}">
-                                                <button type="submit" class="btn btn-sm btn-info" title="Tạo đề nghị ngay">
+                                                <button type="submit" class="btn btn-sm btn-info" title="Tạo {{ $prDoc }} ngay">
                                                     <i class="fas fa-file-medical"></i>
                                                 </button>
                                             </form>
@@ -173,7 +187,7 @@
 
                                         <form class="form-md-confirm d-inline" data-require-reason="1" action="{{ route($prRoute . 'deActive') }}" method="POST"
                                             data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} danh sách theo chu kỳ?"
-                                            data-text="{{ $row->status_id == 1 ? 'Sau khi khoá, hệ thống sẽ không tự tạo đề nghị từ' : 'Sau khi mở khoá, hệ thống tiếp tục tự tạo đề nghị từ' }} danh sách &quot;{{ $row->title }}&quot;."
+                                            data-text="{{ $row->status_id == 1 ? 'Sau khi khoá, hệ thống sẽ không tự tạo ' . $prDoc . ' từ' : 'Sau khi mở khoá, hệ thống tiếp tục tự tạo ' . $prDoc . ' từ' }} danh sách &quot;{{ $row->title }}&quot;."
                                             data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
                                             @csrf
                                             <input type="hidden" name="id" value="{{ $row->id }}">

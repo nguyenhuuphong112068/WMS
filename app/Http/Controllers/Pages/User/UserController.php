@@ -27,10 +27,22 @@ class UserController extends Controller
 
                 // Danh sách phòng ban để gán phạm vi cho từng role (mọi công ty, chỉ phòng nghiệp vụ)
                 $allDepartments = DB::table('deparments')
-                    ->where('isActive', true)
-                    ->where('is_general', 1)
-                    ->orderBy('shortName', 'asc')
-                    ->get(['id', 'shortName', 'name']);
+                    ->leftJoin('companies', 'deparments.company_id', '=', 'companies.id')
+                    ->where('deparments.isActive', true)
+                    ->where('deparments.is_general', 1)
+                    ->orderBy('companies.name', 'asc')
+                    ->orderBy('deparments.shortName', 'asc')
+                    ->get([
+                        'deparments.id', 'deparments.shortName', 'deparments.name', 'deparments.company_id',
+                        'companies.name as company_name', 'companies.short_name as company_short',
+                    ]);
+
+                // Công ty để lọc nhanh phòng ban trong phạm vi từng quyền
+                $scopeCompanies = $allDepartments
+                    ->filter(fn ($d) => $d->company_id)
+                    ->unique('company_id')
+                    ->map(fn ($d) => (object) ['id' => $d->company_id, 'name' => $d->company_name, 'short' => $d->company_short])
+                    ->values();
 
                 $groups = DB::table('groups')
                     ->leftJoin('deparments', 'groups.department_id', '=', 'deparments.id')
@@ -88,6 +100,7 @@ class UserController extends Controller
                         'datas' => $datas,
                         'deparments' => $deparments,
                         'allDepartments' => $allDepartments,
+                        'scopeCompanies' => $scopeCompanies,
                         'roles' => $roles,
                         'groups' => $groups]);
         }

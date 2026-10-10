@@ -220,8 +220,8 @@
     }
 
     .pr-picker .pr-picker-dialog {
-        max-width: 72vw;
-        margin-top: 40px;
+        max-width: 90vw;
+        margin-top: 30px;
     }
 
     @media (max-width: 767.98px) {
@@ -232,7 +232,70 @@
 
     .pr-picker-search-group {
         flex: 1 1 320px;
-        max-width: 560px;
+        max-width: 720px;
+    }
+
+    /*
+    | Thanh lọc phân loại của bảng chọn vật tư: lưới 4 cột đều nhau (7 ô = 2 hàng), hẹp dần
+    | thì về 2 cột rồi 1 cột. Nhãn cho xuống dòng thay vì cắt "...", ô chọn đặt chiều cao +
+    | padding riêng vì .form-control-sm mặc định quá thấp so với cỡ chữ của md-modal nên chữ bị che.
+    */
+    .pr-picker-filters {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px 14px;
+        padding: 12px 14px;
+        border: 1px solid var(--primary-soft);
+        border-radius: var(--border-radius-lg, 8px);
+        background: #f8fbff;
+    }
+
+    @media (max-width: 1199.98px) {
+        .pr-picker-filters {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .pr-picker-filters {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    .pr-picker-filter {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        min-width: 0;
+    }
+
+    .pr-picker-filter label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.3;
+        color: var(--primary-dark);
+        white-space: normal;
+    }
+
+    .pr-picker-filters .pr-picker-filter-select {
+        width: 100%;
+        height: 36px;
+        padding: 6px 28px 6px 10px;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        text-overflow: ellipsis;
+    }
+
+    .pr-picker-filter-select.is-active {
+        border-color: var(--primary);
+        background-color: var(--primary-soft);
+        font-weight: 700;
+    }
+
+    .pr-picker-search::-webkit-search-cancel-button {
+        display: none;
     }
 
     .pr-picker-wrap {
@@ -901,6 +964,7 @@
             prApplyCycle($form, 1);
             $form.find('select[name="to_department_id"]').val('').trigger('change');
             $form.find('select[name="consumption_object_id"]').val('').trigger('change');
+            $form.find('.pr-estimate-offset').val(@json(\App\Support\MaterialPeriodicRequest::ESTIMATE_MONTH_OFFSET_DEFAULT));
 
             prFillRows($modal, []);
             $modal.modal('show');
@@ -926,6 +990,7 @@
             $form.removeData('cal');
             prApplyCycle($form, row.cycle_day);
             $form.find('select[name="to_department_id"]').val(row.to_department_id ? String(row.to_department_id) : '').trigger('change');
+            $form.find('.pr-estimate-offset').val(row.estimate_month_offset != null ? String(row.estimate_month_offset) : '1');
             $form.find('select[name="consumption_object_id"]').val(row.consumption_object_id ? String(row.consumption_object_id) : '').trigger('change');
             prFillFrequencies($form, row.frequency, row.cycle_day);
             // Dựng tần suất xong mới đọc lịch CAL, giữ đúng cách chọn ngày đã lưu
@@ -984,12 +1049,29 @@
         function prPickerRefresh($picker) {
             var search = ($picker.find('.pr-picker-search').val() || '').toLowerCase().trim();
             var visible = 0;
+            // Các ô lọc phân loại đang chọn: [tên data attribute, giá trị]
+            var filters = [];
+
+            $picker.find('.pr-picker-filter-select').each(function() {
+                if (this.value !== '') {
+                    filters.push(['f-' + String($(this).data('filter')).replace(/_/g, '-'), this.value]);
+                }
+                $(this).toggleClass('is-active', this.value !== '');
+            });
 
             $picker.find('.pr-picker-row').each(function() {
-                var match = !search || String($(this).data('search')).indexOf(search) !== -1;
-                $(this).toggle(match);
+                var $row = $(this);
+                var match = !search || String($row.data('search')).indexOf(search) !== -1;
+
+                for (var i = 0; match && i < filters.length; i++) {
+                    match = String($row.attr('data-' + filters[i][0]) || '') === filters[i][1];
+                }
+
+                $row.toggle(match);
                 if (match) visible++;
             });
+
+            $picker.find('.pr-picker-filter-reset').prop('disabled', !search && !filters.length);
 
             var $selectable = $picker.find('.pr-picker-row:visible .pr-picker-check:not(:disabled)');
 
@@ -1010,6 +1092,7 @@
             // Vật tư đã có trong danh sách thì khoá lại, không cho chọn trùng dòng
             $picker.data('target', $modal);
             $picker.find('.pr-picker-search').val('');
+            $picker.find('.pr-picker-filter-select').val('');
             $picker.find('.pr-picker-row').each(function() {
                 var added = !!chosen[String($(this).data('id'))];
 
@@ -1032,8 +1115,27 @@
             if ($('.modal.show').length) $('body').addClass('modal-open');
         });
 
-        $(document).on('input', '.pr-picker-search', function() {
+        $(document).on('input search', '.pr-picker-search', function() {
             prPickerRefresh($(this).closest('.pr-picker'));
+        });
+
+        $(document).on('change', '.pr-picker-filter-select', function() {
+            prPickerRefresh($(this).closest('.pr-picker'));
+        });
+
+        $(document).on('click', '.pr-picker-search-clear', function() {
+            var $picker = $(this).closest('.pr-picker');
+
+            $picker.find('.pr-picker-search').val('').trigger('focus');
+            prPickerRefresh($picker);
+        });
+
+        $(document).on('click', '.pr-picker-filter-reset', function() {
+            var $picker = $(this).closest('.pr-picker');
+
+            $picker.find('.pr-picker-search').val('');
+            $picker.find('.pr-picker-filter-select').val('');
+            prPickerRefresh($picker);
         });
 
         $(document).on('change', '.pr-picker-check', function() {

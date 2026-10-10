@@ -16,9 +16,12 @@ use Illuminate\Support\Str;
  *
  *   type = internal : material_request_lists (app_status = draft) + material_request_items
  *   type = external : material_transfer_requests (status = draft) + material_transfer_items
+ *   type = estimate : material_estimates (app_status = draft) + material_estimate_items
+ *                     + material_estimate_item_amounts - phiếu DỰ TRÙ, xem createEstimate()
  *
  * Người đề nghị mở đề nghị đó ở màn Sử Dụng Vật Tư, điều chỉnh số lượng / thêm bớt dòng,
  * khai người ký rồi Trình ký (nội bộ) hoặc Gửi đề nghị (liên phòng ban) như phiếu lập tay.
+ * Phiếu dự trù mở ở màn Dự Trù Vật Tư, điều chỉnh rồi Trình ký như phiếu dự trù lập tay.
  *
  * LỊCH: periodic + cycle_day (+ cycle_length khi periodic = days | year), bắt đầu từ start_date.
  *   week      : cycle_day 1-7 = Thứ 2 ... Chủ nhật
@@ -56,6 +59,18 @@ class MaterialPeriodicRequest
     public const TYPE_INTERNAL = 'internal';
 
     public const TYPE_EXTERNAL = 'external';
+
+    public const TYPE_ESTIMATE = 'estimate';
+
+    /** Phiếu dự trù tự tạo dự trù cho tháng nào, tính từ tháng tạo phiếu - cột estimate_month_offset. */
+    public const ESTIMATE_MONTH_OFFSETS = [
+        0 => 'Tháng tạo phiếu',
+        1 => 'Tháng sau',
+        2 => '2 tháng sau',
+        3 => '3 tháng sau',
+    ];
+
+    public const ESTIMATE_MONTH_OFFSET_DEFAULT = 1;
 
     public const SYSTEM_ACTOR = 'Hệ thống';
 
@@ -128,7 +143,28 @@ class MaterialPeriodicRequest
 
     public static function typeOf($value): string
     {
-        return $value === self::TYPE_EXTERNAL ? self::TYPE_EXTERNAL : self::TYPE_INTERNAL;
+        return in_array($value, [self::TYPE_EXTERNAL, self::TYPE_ESTIMATE], true) ? $value : self::TYPE_INTERNAL;
+    }
+
+    /** Khoá viết hoa dùng ghép id modal / bảng: Internal, External, Estimate. */
+    public static function typeKey($value): string
+    {
+        return ucfirst(self::typeOf($value));
+    }
+
+    public static function estimateMonthOffset($list): int
+    {
+        $offset = $list->estimate_month_offset ?? null;
+
+        return $offset !== null && isset(self::ESTIMATE_MONTH_OFFSETS[(int) $offset])
+            ? (int) $offset
+            : self::ESTIMATE_MONTH_OFFSET_DEFAULT;
+    }
+
+    /** Tháng / năm mà phiếu dự trù tạo vào ngày $date sẽ dự trù cho (ngày đầu tháng). */
+    public static function estimatePeriod($list, $date = null): Carbon
+    {
+        return Carbon::parse($date ?? now())->startOfMonth()->addMonthsNoOverflow(self::estimateMonthOffset($list));
     }
 
     /** Tên error bag của modal: periodicInternalCreateErrors, periodicExternalUpdateErrors... */
@@ -403,7 +439,7 @@ class MaterialPeriodicRequest
      * Danh sách theo chu kỳ của một phòng, tách theo loại, mỗi danh sách kèm ->items và
      * ->history_count (số lần Sửa / Khoá / Mở khoá).
      *
-     * @return array{internal: \Illuminate\Support\Collection, external: \Illuminate\Support\Collection}
+     * @return array{internal: \Illuminate\Support\Collection, external: \Illuminate\Support\Collection, estimate: \Illuminate\Support\Collection}
      */
     public static function listsOfDepartment(int $departmentId): array
     {
@@ -442,6 +478,7 @@ class MaterialPeriodicRequest
         return [
             self::TYPE_INTERNAL => $lists->where('type', self::TYPE_INTERNAL)->values(),
             self::TYPE_EXTERNAL => $lists->where('type', self::TYPE_EXTERNAL)->values(),
+            self::TYPE_ESTIMATE => $lists->where('type', self::TYPE_ESTIMATE)->values(),
         ];
     }
 
@@ -452,6 +489,7 @@ class MaterialPeriodicRequest
      *   cấp phát nội bộ, kho phòng mới cấp được.
      * - Liên phòng ban: mọi vật tư đã duyệt của danh mục công ty - phòng mình đang thiếu nên
      *   mới xin phòng khác, giống ô chọn của đề nghị liên phòng ban.
+     * - Dự trù: cũng mọi vật tư đã duyệt của danh mục công ty, giống ô chọn của phiếu dự trù.
      * Đơn vị (unit_short_name) là đơn vị PHÒNG MÌNH đã khai, nếu có.
      */
     public static function categoryOptions(string $type, int $departmentId)
@@ -467,7 +505,12 @@ class MaterialPeriodicRequest
             ->select(
                 'material_categories.id',
                 'material_categories.code',
+                'material_categories.part_number',
                 'material_categories.technical_specification',
+                // Phân loại công ty + phân loại phòng (nếu phòng đã khai) - cho bộ lọc của bảng chọn vật tư
+                'material_categories.classification',
+                'material_categories.purchasing_department',
+                DepartmentMaterial::UNIT_ALIAS.'.classification_id',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
@@ -862,6 +905,7 @@ class MaterialPeriodicRequest
         }
 
         $isExternal = $list->type === self::TYPE_EXTERNAL;
+        $isEstimate = $list->type === self::TYPE_ESTIMATE;
         $number = fn ($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ''), '0'), '.');
 
         $items = self::activeItems([$id])->map(fn ($item) => ($item->category_code ?: '—').' '.($item->material_name ?: '')
@@ -870,8 +914,9 @@ class MaterialPeriodicRequest
 
         return array_filter([
             'Tiêu đề' => $list->title,
-            'Loại đề nghị' => $isExternal ? 'Liên phòng ban' : 'Nội bộ',
-            'Đối tượng' => $isExternal ? null : (self::objectLabel($list->consumption_object_id) ?? '—'),
+            'Loại đề nghị' => $isEstimate ? 'Dự trù' : ($isExternal ? 'Liên phòng ban' : 'Nội bộ'),
+            'Đối tượng' => $isExternal || $isEstimate ? null : (self::objectLabel($list->consumption_object_id) ?? '—'),
+            'Dự trù cho' => $isEstimate ? self::ESTIMATE_MONTH_OFFSETS[self::estimateMonthOffset($list)] : null,
             'Phòng cấp phát' => $isExternal ? ($list->to_department_name ?: '—') : null,
             'Chu kỳ' => self::scheduleLabel($list->periodic, $list->cycle_length, $list->frequency),
             'Ngày tạo trong chu kỳ' => self::dayLabel($list),
@@ -1023,7 +1068,7 @@ class MaterialPeriodicRequest
                             ($isCal && $list->cal_due_date
                                 ? 'Tự động theo lịch CAL (hạn '.Carbon::parse($list->cal_due_date)->format('d/m/Y').', SCH_ID '.$list->cal_sch_id.')'
                                 : 'Tự động theo chu kỳ')
-                                .': tạo đề nghị '.$result['code'].' (Lưu tạm).',
+                                .': tạo '.self::resultLabel($result).'.',
                             null,
                             self::SYSTEM_ACTOR
                         );
@@ -1047,7 +1092,7 @@ class MaterialPeriodicRequest
                 self::LIST_TABLE,
                 $list->id,
                 'NA',
-                'Tạo đề nghị '.$result['code'].' (Lưu tạm) từ danh sách "'.$list->title.'"',
+                'Tạo '.self::resultLabel($result).' từ danh sách "'.$list->title.'"',
                 self::SYSTEM_ACTOR
             );
 
@@ -1080,10 +1125,18 @@ class MaterialPeriodicRequest
 
             DB::table(self::LIST_TABLE)->where('id', $list->id)->update(self::generatedMark($result));
 
-            self::writeHistory((int) $list->id, 'Tạo đề nghị', 'Tạo ngay: đề nghị '.$result['code'].' (Lưu tạm).', null, $actor);
+            self::writeHistory((int) $list->id, 'Tạo đề nghị', 'Tạo ngay: '.self::resultLabel($result).'.', null, $actor);
 
             return $result;
         });
+    }
+
+    /** "đề nghị LPB-... (Lưu tạm)" / "phiếu dự trù QC261009.01 (Nháp)" - cho lịch sử, Audit Trail, thông báo. */
+    public static function resultLabel(array $result): string
+    {
+        return $result['type'] === self::TYPE_ESTIMATE
+            ? 'phiếu dự trù '.$result['code'].' (Nháp)'
+            : 'đề nghị '.$result['code'].' (Lưu tạm)';
     }
 
     /** Tạo đề nghị Lưu tạm đúng loại của danh sách. Không có dòng vật tư thì không tạo. */
@@ -1095,9 +1148,11 @@ class MaterialPeriodicRequest
             return null;
         }
 
-        return $list->type === self::TYPE_EXTERNAL
-            ? self::createExternal($list, $items, $actor)
-            : self::createInternal($list, $items, $actor, $userId);
+        return match ($list->type) {
+            self::TYPE_EXTERNAL => self::createExternal($list, $items, $actor),
+            self::TYPE_ESTIMATE => self::createEstimate($list, $items, $actor),
+            default => self::createInternal($list, $items, $actor, $userId),
+        };
     }
 
     /** Đề nghị cấp phát NỘI BỘ - cùng cách sinh mã với MaterialExportController::requestStore(). */
@@ -1136,6 +1191,13 @@ class MaterialPeriodicRequest
             'updated_at' => $now,
         ]);
 
+        // Cột "Tồn" của dòng đề nghị: chụp tồn của danh mục ngay lúc sinh phiếu, cùng cách tính
+        // với modal lập đề nghị (tổng tồn các lô còn cấp được) - xem MaterialExportController::categoryStockMap()
+        $stock = MaterialPicking::lots((int) $list->department_id)
+            ->where('suggestable', true)
+            ->groupBy('category_id')
+            ->map(fn ($lots) => (float) $lots->sum('remaining'));
+
         DB::table('material_request_items')->insert($items->map(fn ($item) => [
             'request_list_id' => $requestId,
             'category_id' => $item->category_id,
@@ -1143,7 +1205,10 @@ class MaterialPeriodicRequest
             'technical_specification' => $item->technical_specification,
             'requested_amount' => $item->requested_amount,
             'requested_unit' => $item->requested_unit,
+            'stock_at_request' => $item->category_id ? (float) ($stock[$item->category_id] ?? 0) : null,
             'purpose' => $item->purpose,
+            // Đối tượng của danh sách - nguồn cho Thống Kê Cấp Phát Vật Tư theo đối tượng
+            'consumption_object_id' => $list->consumption_object_id ?? null,
             'status' => 'pending',
             'active' => 1,
             'created_at' => $now,
@@ -1191,6 +1256,78 @@ class MaterialPeriodicRequest
         return ['id' => (int) $requestId, 'code' => $code, 'type' => self::TYPE_EXTERNAL];
     }
 
+    /**
+     * PHIẾU DỰ TRÙ VẬT TƯ (Nháp) - cùng cách sinh mã với MaterialEstimateController::nextCode(),
+     * cùng cách ghi dòng với MaterialEstimateController::watchlistEstimateStore(): mỗi vật tư một
+     * material_estimate_items kèm đúng một dòng số lượng cho tháng dự trù (estimatePeriod()).
+     *
+     * Dòng danh sách lưu đơn vị theo tên ngắn (requested_unit) còn phiếu dự trù cần unit_id: tra
+     * theo tên ngắn, không khớp thì lấy đơn vị phòng đã khai cho vật tư ở tab Vật Tư Của Phòng.
+     */
+    private static function createEstimate($list, $items, string $actor): array
+    {
+        $now = now();
+        $period = self::estimatePeriod($list, $now);
+
+        $shortName = DB::table('deparments')->where('id', $list->department_id)->value('shortName') ?? 'UNK';
+        $prefix = $shortName.$now->format('ymd').'.';
+
+        $latest = DB::table('material_estimates')
+            ->where('department_id', $list->department_id)
+            ->whereYear('created_at', $now->year)
+            ->whereMonth('created_at', $now->month)
+            ->pluck('code')
+            ->map(fn ($code) => (int) (explode('.', (string) $code)[1] ?? 0))
+            ->max();
+        $code = $prefix.str_pad((string) (($latest ?? 0) + 1), 2, '0', STR_PAD_LEFT);
+
+        $estimateId = DB::table('material_estimates')->insertGetId([
+            'code' => $code,
+            'department_id' => $list->department_id,
+            'month' => $period->month,
+            'year' => $period->year,
+            'note' => Str::limit('Tạo tự động từ danh sách dự trù theo chu kỳ "'.$list->title.'".', 500, ''),
+            'app_status' => 'draft',
+            'status_id' => 1,
+            'created_by' => $actor,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $unitIds = DB::table('units')->pluck('id', 'short_name');
+        $departmentUnits = DB::table(DepartmentMaterial::TABLE)
+            ->where('department_id', $list->department_id)
+            ->whereIn('category_id', $items->pluck('category_id')->all())
+            ->pluck('unit_id', 'category_id');
+
+        foreach ($items as $item) {
+            $itemId = DB::table('material_estimate_items')->insertGetId([
+                'material_estimate_id' => $estimateId,
+                'category_id' => $item->category_id,
+                'material_name' => null,
+                'technical_information' => null,
+                'purpose' => $item->purpose,
+                'status_id' => 1,
+                'created_by' => $actor,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            DB::table('material_estimate_item_amounts')->insert([
+                'material_estimate_item_id' => $itemId,
+                'amount' => $item->requested_amount,
+                'unit_id' => $unitIds[(string) $item->requested_unit] ?? $departmentUnits[$item->category_id] ?? null,
+                'for_month_year' => $period->toDateString(),
+                'status_id' => 1,
+                'created_by' => $actor,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        return ['id' => (int) $estimateId, 'code' => $code, 'type' => self::TYPE_ESTIMATE];
+    }
+
     private static function generatedMark(?array $result): array
     {
         return $result
@@ -1233,16 +1370,22 @@ class MaterialPeriodicRequest
         }
 
         $isExternal = $result['type'] === self::TYPE_EXTERNAL;
+        $isEstimate = $result['type'] === self::TYPE_ESTIMATE;
 
         try {
             $notificationId = DB::table('notifications')->insertGetId([
                 'sender_id' => null,
-                'activity_type' => 'Đề nghị theo chu kỳ',
-                'message' => 'Đến chu kỳ: đã tạo đề nghị '.($isExternal ? 'liên phòng ban ' : 'cấp phát vật tư ')
-                    .$result['code'].' (Lưu tạm) từ danh sách "'.$list->title.'". Vui lòng kiểm tra, điều chỉnh rồi '
-                    .($isExternal ? 'gửi đề nghị.' : 'trình ký.'),
+                'activity_type' => $isEstimate ? 'Dự trù theo chu kỳ' : 'Đề nghị theo chu kỳ',
+                'message' => $isEstimate
+                    ? 'Đến chu kỳ: đã lập phiếu dự trù vật tư '.$result['code'].' (Nháp) từ danh sách "'.$list->title
+                        .'". Vui lòng kiểm tra, điều chỉnh rồi trình ký.'
+                    : 'Đến chu kỳ: đã tạo đề nghị '.($isExternal ? 'liên phòng ban ' : 'cấp phát vật tư ')
+                        .$result['code'].' (Lưu tạm) từ danh sách "'.$list->title.'". Vui lòng kiểm tra, điều chỉnh rồi '
+                        .($isExternal ? 'gửi đề nghị.' : 'trình ký.'),
                 'reference_id' => $result['id'],
-                'url' => route('pages.export.materialExport.list', ['tab' => $isExternal ? 'transfer' : 'periodic'], false),
+                'url' => $isEstimate
+                    ? route('pages.estimate.materialEstimate.detail', ['id' => $result['id']], false)
+                    : route('pages.export.materialExport.list', ['tab' => $isExternal ? 'transfer' : 'periodic'], false),
                 'created_at' => now(),
             ]);
 

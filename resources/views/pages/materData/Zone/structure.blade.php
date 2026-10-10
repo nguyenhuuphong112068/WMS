@@ -28,12 +28,21 @@
             <div class="zs-panel-title" id="zs-wh-title">Kho/Phòng mới</div>
             <div class="zs-panel-body">
                 <div class="form-group mb-0">
-                    <label for="zs-wh-code">Mã kho/phòng <span class="text-danger">*</span></label>
+                    <label for="zs-wh-code"><span id="zs-wh-code-label">Mã kho/phòng</span> <span class="text-danger">*</span></label>
                     <input type="text" id="zs-wh-code" class="form-control form-control-sm" maxlength="40" placeholder="VD: 03">
                 </div>
                 <div class="form-group mb-0 zs-grow">
-                    <label for="zs-wh-name">Tên kho/phòng <span class="text-danger">*</span></label>
+                    <label for="zs-wh-name"><span id="zs-wh-name-label">Tên kho/phòng</span> <span class="text-danger">*</span></label>
                     <input type="text" id="zs-wh-name" class="form-control form-control-sm" maxlength="255" placeholder="VD: Kho 03">
+                </div>
+                <div class="form-group mb-0">
+                    <label for="zs-wh-zone">Phân loại định khu</label>
+                    <select id="zs-wh-zone" class="form-control form-control-sm">
+                        <option value="">Chưa phân loại</option>
+                        @foreach (\App\Support\ZoneType::TYPES as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="zs-panel-actions">
                     <button type="button" id="zs-wh-cancel" class="btn btn-sm btn-outline-secondary">Huỷ</button>
@@ -55,18 +64,54 @@
                 <span><i class="zs-swatch is-off"></i> Đang khoá</span>
                 <span><i class="zs-swatch is-new"></i> Sẽ tạo</span>
                 <span><i class="zs-swatch is-cut"></i> Sẽ khoá</span>
+                <span><i class="zs-swatch is-picked"></i> Đang chọn</span>
+                <span><i class="zs-swatch has-color"></i> Màu vị trí</span>
             </div>
 
-            <section class="zs-shelf">
+            {{-- Sửa loại lưu trữ / màu cho các vị trí đang chọn trên lưới (chỉ khi sửa kệ đã có) --}}
+            <div id="zs-loc-bar" class="zs-loc-bar" hidden>
+                <span class="zs-loc-count"><i class="fas fa-hand-pointer mr-1"></i><b id="zs-loc-count">0</b> vị trí đang chọn</span>
+                <div class="zs-loc-field">
+                    <label for="zs-loc-zone" class="mb-0">Phân loại</label>
+                    <select id="zs-loc-zone" class="form-control form-control-sm">
+                        <option value="__keep">- Giữ nguyên -</option>
+                        <option value="">Chưa phân loại</option>
+                        @foreach (\App\Support\ZoneType::TYPES as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="zs-loc-field">
+                    <label for="zs-loc-type" class="mb-0">Loại lưu trữ</label>
+                    <select id="zs-loc-type" class="form-control form-control-sm">
+                        <option value="__keep">- Giữ nguyên -</option>
+                        <option value="">Dùng chung</option>
+                        @foreach ($locationTypes as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="zs-loc-field">
+                    <label class="mb-0">Màu</label>
+                    <div id="zs-loc-colors" class="zs-loc-colors"></div>
+                </div>
+                <div class="zs-loc-actions">
+                    <button type="button" id="zs-loc-all" class="btn btn-sm btn-outline-secondary">Chọn cả kệ</button>
+                    <button type="button" id="zs-loc-clear" class="btn btn-sm btn-outline-secondary">Bỏ chọn</button>
+                    <button type="button" id="zs-loc-apply" class="btn btn-sm btn-primary"><i class="fas fa-check mr-1"></i>Áp dụng</button>
+                </div>
+            </div>
+
+            <section class="zs-shelf" data-draft="0">
                 <div class="zs-shelf-title"><i class="fas fa-layer-group"></i> <span id="zs-shelf-title">Cấu trúc kệ/tủ</span></div>
                 <div class="zs-form">
                     <div class="form-group mb-0">
                         <label for="zs-code">Mã kệ/tủ <span class="text-danger">*</span></label>
-                        <input type="text" id="zs-code" class="form-control form-control-sm" maxlength="40" placeholder="VD: 01/05">
+                        <input type="text" id="zs-code" class="form-control form-control-sm zs-code-input" maxlength="40" placeholder="VD: 01/05">
                     </div>
                     <div class="form-group mb-0 zs-grow">
                         <label for="zs-name">Tên kệ/tủ <span class="text-danger">*</span></label>
-                        <input type="text" id="zs-name" class="form-control form-control-sm" maxlength="255" placeholder="VD: Kệ/Tủ 05">
+                        <input type="text" id="zs-name" class="form-control form-control-sm zs-name-input" maxlength="255" placeholder="VD: Kệ/Tủ 05">
                     </div>
                     <div class="form-group mb-0">
                         <label for="zs-item-type">Loại lưu trữ cho vị trí mới</label>
@@ -94,13 +139,17 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="zs-columns" class="zs-columns"></div>
             </section>
 
-            <div id="zs-columns"></div>
+            {{-- Các kệ tạo thêm cùng lượt, mỗi kệ một card có lưới riêng --}}
+            <div id="zs-drafts"></div>
 
             <div id="zs-foot" class="zs-foot" hidden>
-                <button type="button" id="zs-add-column" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-plus mr-1"></i> Thêm cột
+                <button type="button" id="zs-add-shelf" class="btn btn-sm btn-outline-primary" hidden
+                        title="Thêm một kệ/tủ mới bên dưới, sao chép cấu trúc cột/tầng của kệ cuối">
+                    <i class="fas fa-plus mr-1"></i> Thêm kệ
                 </button>
                 <span id="zs-summary" class="zs-summary"></span>
             </div>
@@ -379,6 +428,27 @@
         white-space: nowrap;
     }
 
+    .zs-tile-zone {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-left: 6px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #334155;
+        background: #f1f5f9;
+        vertical-align: 1px;
+    }
+
+    .zs-tile-zone i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--zone);
+    }
+
     .zs-tile-bar {
         width: 100%;
         height: 7px;
@@ -563,6 +633,81 @@
         font-weight: 700;
     }
 
+    /* ---------- Kệ tạo thêm cùng lượt ---------- */
+    .zs-draft {
+        border-left: 4px solid var(--primary-light);
+    }
+
+    .zs-draft-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .zs-draft-head .btn,
+    .zs-foot .btn {
+        border-radius: var(--border-radius-md);
+    }
+
+    /* ---------- Dãy cột xếp ngang như kệ thật ---------- */
+    .zs-columns {
+        margin-top: 14px;
+        display: flex;
+        align-items: stretch;
+        gap: 14px;
+        overflow-x: auto;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+
+    .zs-columns:empty {
+        display: none;
+    }
+
+    .zs-columns .zs-col {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        min-width: 250px;
+        margin-bottom: 0;
+    }
+
+    /* Tầng 01 nằm dưới cùng: đẩy lưới xuống đáy để các cột thẳng hàng theo tầng */
+    .zs-columns .zs-col > .zs-grid,
+    .zs-columns .zs-col > .zs-note,
+    .zs-columns .zs-col > .zs-col-off {
+        margin-top: auto;
+    }
+
+    .zs-col-add {
+        flex: 0 0 auto;
+        width: 120px;
+        border: 2px dashed var(--primary-lighter);
+        border-radius: var(--border-radius-lg);
+        background: var(--bg-neutral);
+        color: var(--primary);
+        font-weight: 600;
+        font-size: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .zs-col-add i {
+        font-size: 1.2rem;
+    }
+
+    .zs-col-add:hover {
+        background: var(--primary-soft);
+        border-color: var(--primary);
+    }
+
     .zs-col.is-new {
         border-left: 4px solid #16A34A;
     }
@@ -574,10 +719,9 @@
 
     .zs-col-head {
         display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
         margin-bottom: 10px;
     }
 
@@ -631,7 +775,7 @@
     }
 
     .zs-bulk input {
-        width: 76px;
+        width: 60px;
     }
 
     .zs-col-tools .btn {
@@ -651,7 +795,7 @@
     }
 
     .zs-row-label {
-        width: 70px;
+        width: 52px;
         flex: none;
         font-size: 0.76rem;
         text-align: right;
@@ -702,6 +846,155 @@
         border-color: #F87171;
     }
 
+    /* Màu riêng của vị trí: vạch màu ở đáy ô, không che màu trạng thái */
+    .zs-cell.has-color {
+        box-shadow: inset 0 -4px 0 var(--loc);
+    }
+
+    .zs-swatch.has-color {
+        background: #EEF2F6;
+        box-shadow: inset 0 -4px 0 #7C3AED;
+    }
+
+    .zs-cell {
+        font-size: 9px;
+        font-weight: 700;
+        line-height: var(--zs-cell);
+        text-align: center;
+        color: #475569;
+        overflow: hidden;
+        user-select: none;
+    }
+
+    .zs-cell.is-busy {
+        color: #fff;
+    }
+
+    .zs-pickable .zs-cell[data-id] {
+        cursor: pointer;
+    }
+
+    .zs-cell.is-picked,
+    .zs-swatch.is-picked {
+        outline: 2px solid #F59E0B;
+        outline-offset: 1px;
+    }
+
+    .zs-swatch.is-picked {
+        background: #fff;
+    }
+
+    /* ---------- Thanh sửa vị trí đang chọn ---------- */
+    .zs-loc-bar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 14px;
+        margin-bottom: 14px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: var(--border-radius-lg);
+        background: var(--primary-soft);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .zs-loc-count {
+        font-size: 0.85rem;
+        color: var(--primary-dark);
+    }
+
+    .zs-loc-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .zs-loc-field select {
+        width: 150px;
+        border-radius: var(--border-radius-md);
+    }
+
+    .zs-loc-colors {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .zs-loc-color {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 1px #cbd5e1;
+        cursor: pointer;
+        padding: 0;
+        font-size: 0.6rem;
+        color: #64748b;
+        background: #fff;
+        transition: transform 0.2s;
+    }
+
+    .zs-loc-color:hover {
+        transform: translateY(-1px);
+    }
+
+    .zs-loc-color.is-on {
+        box-shadow: 0 0 0 2px var(--primary-dark);
+    }
+
+    .zs-loc-color.is-text {
+        width: auto;
+        padding: 0 6px;
+        font-weight: 600;
+    }
+
+    .zs-loc-custom {
+        width: 28px;
+        height: 24px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+    }
+
+    .zs-loc-actions {
+        display: flex;
+        gap: 6px;
+        margin-left: auto;
+    }
+
+    .zs-loc-actions .btn {
+        border-radius: var(--border-radius-md);
+    }
+
+    /* Tên cột/tầng bấm được để đổi tên */
+    .zs-rename {
+        border: none;
+        background: transparent;
+        padding: 0;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+    .zs-rename:hover {
+        color: var(--primary);
+    }
+
+    .zs-rename .fa-pen {
+        font-size: 0.6rem;
+        opacity: 0.45;
+        margin-left: 3px;
+    }
+
     .zs-handle {
         flex: none;
         width: 10px;
@@ -723,7 +1016,7 @@
 
     .zs-num {
         flex: none;
-        width: 62px;
+        width: 52px;
         font-size: 0.76rem;
         padding: 1px 4px;
         border: 1px solid #cbd5e1;
@@ -781,9 +1074,16 @@
     "detail": @json(route('pages.materData.zone.structure.detail')),
     "checkCode": @json(route('pages.materData.zone.structure.checkCode')),
     "apply": @json(route('pages.materData.zone.structure.apply')),
+    "saveShelf": @json(route('pages.materData.zone.structure.saveShelf')),
+    "saveLocations": @json(route('pages.materData.zone.structure.saveLocations')),
+    "palette": @json(\App\Support\ZoneType::PALETTE),
+    "locationTypes": @json($locationTypes),
+    "zoneTypes": @json(\App\Support\ZoneType::TYPES),
+    "zoneColors": @json(\App\Support\ZoneType::DEFAULT_COLORS),
     "maxColumns": {{ (int) $structureLimits['maxColumns'] }},
     "maxTiers": {{ (int) $structureLimits['maxTiers'] }},
     "maxLocations": {{ (int) $structureLimits['maxLocations'] }},
+    "maxBatch": {{ (int) $structureLimits['maxBatch'] }},
     "canCreate": @json(user_can('materData_common_create')),
     "canUpdate": @json(user_can('materData_common_update')),
     "csrf": @json(csrf_token())
@@ -816,6 +1116,17 @@
         whName: byId('zs-wh-name'),
         whSave: byId('zs-wh-save'),
         whCancel: byId('zs-wh-cancel'),
+        whCodeLabel: byId('zs-wh-code-label'),
+        whNameLabel: byId('zs-wh-name-label'),
+        whZone: byId('zs-wh-zone'),
+        locZone: byId('zs-loc-zone'),
+        locBar: byId('zs-loc-bar'),
+        locCount: byId('zs-loc-count'),
+        locType: byId('zs-loc-type'),
+        locColors: byId('zs-loc-colors'),
+        locAll: byId('zs-loc-all'),
+        locClear: byId('zs-loc-clear'),
+        locApply: byId('zs-loc-apply'),
         warehouses: byId('zs-warehouses'),
         shelves: byId('zs-shelves'),
         editor: byId('zs-editor'),
@@ -824,13 +1135,14 @@
         name: byId('zs-name'),
         itemType: byId('zs-item-type'),
         preview: byId('zs-preview'),
+        drafts: byId('zs-drafts'),
+        addShelf: byId('zs-add-shelf'),
         picker: byId('zs-picker'),
         pickerGrid: byId('zs-picker-grid'),
         pickerCols: byId('zs-picker-cols'),
         readout: byId('zs-picker-readout'),
         columns: byId('zs-columns'),
         foot: byId('zs-foot'),
-        addColumn: byId('zs-add-column'),
         summary: byId('zs-summary')
     };
 
@@ -846,8 +1158,14 @@
         view: 'warehouses',
         warehouses: [], shelves: [], suggest: '',
         warehouse: null, shelf: null,
-        columns: [], dirty: false, editingWarehouse: null,
-        codeCheck: null, codeTimer: null, nameTouched: false
+        columns: [], dirty: false, editingWarehouse: null, formKind: 'warehouse',
+        // Vị trí đang chọn trên lưới (id), màu định áp ('__keep' = giữ nguyên, '' = bỏ màu riêng)
+        picked: new Set(), locColor: '__keep', painting: null,
+        codeTimer: null, nameTouched: false,
+        // Tạo kệ mới: kệ đầu + các kệ thêm bên dưới [{ code, name, nameTouched, columns }], current = kệ đang thao tác
+        drafts: [], current: 0,
+        // Mã kệ đã kiểm với máy chủ: { mã: true nếu đã tồn tại }
+        taken: {}
     };
 
     // Trang còn tab "Danh sách định khu" do máy chủ dựng sẵn; lưu xong thì đánh dấu để tab đó tải lại.
@@ -942,7 +1260,11 @@
             +     (options.editable ? '<button type="button" class="zs-tile-edit" data-edit="' + item.id + '" title="Sửa mã và tên"><i class="fas fa-pen"></i></button>' : '')
             +   '</div>'
             + '</div>'
-            + '<div class="zs-tile-name">' + esc(item.name) + (off ? ' (đã khoá)' : '') + '</div>'
+            + '<div class="zs-tile-name">' + esc(item.name) + (off ? ' (đã khoá)' : '')
+            +   (item.zone_type && CFG.zoneTypes[item.zone_type]
+                ? '<span class="zs-tile-zone" style="--zone:' + (CFG.zoneColors[item.zone_type] || '#2E7BC4') + '"><i></i>' + esc(CFG.zoneTypes[item.zone_type]) + '</span>'
+                : '')
+            + '</div>'
             + '<div class="zs-tile-bar"><span style="width:' + Math.min(100, Math.max(pct, pct > 0 ? 3 : 0)) + '%"></span></div>'
             + '<div class="zs-tile-foot">'
             +   '<span><strong>' + options.meta + '</strong></span>'
@@ -977,6 +1299,9 @@
         el.add.hidden = isEditor || !CFG.canCreate;
         el.add.innerHTML = '<i class="fas fa-plus mr-1"></i> ' + (view === 'warehouses' ? 'Kho/Phòng mới' : 'Kệ/Tủ mới');
 
+        closeDrafts();
+        clearPicked();
+        el.locBar.hidden = true;
         if (!isEditor) {
             state.columns = [];
             el.columns.innerHTML = '';
@@ -1082,13 +1407,24 @@
         loadShelves();
     });
 
-    function openWarehouseForm(warehouse) {
-        state.editingWarehouse = warehouse || null;
-        el.whTitle.textContent = warehouse ? 'Sửa kho/phòng ' + warehouse.code : 'Kho/Phòng mới';
-        el.whCode.value = warehouse ? warehouse.code : '';
-        el.whName.value = warehouse ? warehouse.name : '';
+    // Khung nhập mã + tên dùng chung cho kho/phòng (thêm, sửa) và sửa nhanh kệ/tủ từ thẻ kệ.
+    function openForm(kind, item) {
+        var what = kind === 'shelf' ? 'kệ/tủ' : 'kho/phòng';
+        state.formKind = kind;
+        state.editingWarehouse = item || null;
+        el.whTitle.textContent = item ? 'Sửa ' + what + ' ' + item.code : 'Kho/Phòng mới';
+        el.whCodeLabel.textContent = 'Mã ' + what;
+        el.whNameLabel.textContent = 'Tên ' + what;
+        el.whSave.innerHTML = '<i class="fas fa-save mr-1"></i> Lưu ' + what;
+        el.whCode.value = item ? item.code : '';
+        el.whName.value = item ? item.name : '';
+        el.whZone.value = item && item.zone_type ? item.zone_type : '';
         el.whForm.hidden = false;
         el.whCode.focus();
+    }
+
+    function openWarehouseForm(warehouse) {
+        openForm('warehouse', warehouse);
     }
 
     function hideWarehouseForm() {
@@ -1102,6 +1438,11 @@
         var code = el.whCode.value.trim();
         var name = el.whName.value.trim();
 
+        if (state.formKind === 'shelf') {
+            saveShelfForm(code, name);
+            return;
+        }
+
         if (!code || !name) {
             toast('warning', 'Nhập mã và tên kho/phòng trước khi lưu.');
             return;
@@ -1111,7 +1452,8 @@
         post(CFG.saveWarehouse, {
             id: state.editingWarehouse ? state.editingWarehouse.id : null,
             code: code,
-            name: name
+            name: name,
+            zone_type: el.whZone.value
         }).then(function (result) {
             el.whSave.disabled = false;
             if (!result.ok) {
@@ -1125,6 +1467,46 @@
             loadWarehouses();
         });
     });
+
+    function saveShelfForm(code, name) {
+        var shelf = state.editingWarehouse;
+        if (!code || !name) {
+            toast('warning', 'Nhập mã và tên kệ/tủ trước khi lưu.');
+            return;
+        }
+
+        var renaming = code !== shelf.code;
+        var ask = renaming
+            ? Swal.fire({
+                icon: 'warning',
+                title: 'Đổi mã kệ/tủ ' + shelf.code + ' thành ' + code + '?',
+                text: 'Mã của mọi cột, tầng, vị trí thuộc kệ này sẽ đổi theo (VD ' + shelf.code + '/01/01/01 -> ' + code + '/01/01/01). Nhãn đã in theo mã cũ cần in lại.',
+                showCancelButton: true,
+                confirmButtonText: 'Đổi mã',
+                cancelButtonText: 'Huỷ',
+                confirmButtonColor: '#2E7BC4',
+                cancelButtonColor: '#94A3B8'
+            })
+            : Promise.resolve({ isConfirmed: true });
+
+        ask.then(function (choice) {
+            if (!choice.isConfirmed) return;
+
+            el.whSave.disabled = true;
+            post(CFG.saveShelf, { id: shelf.id, code: code, name: name, zone_type: el.whZone.value }).then(function (result) {
+                el.whSave.disabled = false;
+                if (!result.ok) {
+                    toast('error', result.data.message || 'Không lưu được kệ/tủ.');
+                    return;
+                }
+
+                window.zoneStructureStale = true;
+                toast('success', result.data.message);
+                hideWarehouseForm();
+                loadShelves();
+            });
+        });
+    }
 
     /* ---------- cấp 2: kệ/tủ ---------- */
 
@@ -1159,12 +1541,18 @@
                 icon: 'fa-layer-group',
                 meta: num(shelf.columns) + ' cột · ' + num(shelf.tiers) + ' tầng · ' + num(shelf.total) + ' vị trí',
                 action: 'Sửa cấu trúc',
-                editable: false
+                editable: CFG.canUpdate
             });
         }).join('');
     }
 
     el.shelves.addEventListener('click', function (event) {
+        var edit = event.target.closest('.zs-tile-edit');
+        if (edit) {
+            openForm('shelf', state.shelves.find(function (x) { return String(x.id) === edit.dataset.edit; }));
+            return;
+        }
+
         var card = event.target.closest('.zs-tile');
         if (card) loadShelf(card.dataset.id);
     });
@@ -1174,7 +1562,7 @@
     function newTier(position, max) {
         return {
             position: position, max: max, origMax: 0, lastBusy: 0,
-            busy: new Set(), off: new Set(), codes: {},
+            busy: new Set(), off: new Set(), codes: {}, attrs: {},
             existing: false, removed: false, wasRemoved: false,
             label: 'Tầng ' + seg(position)
         };
@@ -1189,15 +1577,25 @@
     }
 
     function shelfCode() {
-        return state.shelf ? state.shelf.code : el.code.value.trim();
+        return el.code.value.trim() || (state.shelf ? state.shelf.code : '');
+    }
+
+    // Đang đổi mã kệ có sẵn: mã con đang hiển thị đổi tiền tố theo mã mới để xem trước.
+    function renamed() {
+        return !!state.shelf && shelfCode() !== state.shelf.code;
+    }
+
+    function remap(code) {
+        if (!code || !renamed() || code.indexOf(state.shelf.code + '/') !== 0) return code;
+        return shelfCode() + code.slice(state.shelf.code.length);
     }
 
     function columnCode(column) {
-        return column.code || (shelfCode() || '?') + '/' + seg(column.position);
+        return remap(column.code) || (shelfCode() || '?') + '/' + seg(column.position);
     }
 
     function tierCode(column, tier) {
-        return tier.code || columnCode(column) + '/' + seg(tier.position);
+        return remap(tier.code) || columnCode(column) + '/' + seg(tier.position);
     }
 
     function activeTiers(column) {
@@ -1242,6 +1640,7 @@
             setDirty(false);
         }
 
+        initDrafts();
         refreshCodeCheck();
         renderCrumbs();
         el.code.focus();
@@ -1263,7 +1662,7 @@
                 state.shelf = data.shelf;
                 el.shelfTitle.textContent = 'Cấu trúc kệ/tủ ' + data.shelf.code;
                 el.code.value = data.shelf.code;
-                el.code.readOnly = true;
+                el.code.readOnly = !CFG.canUpdate;
                 el.name.value = data.shelf.name;
                 el.itemType.value = '';
                 el.preview.hidden = true;
@@ -1287,6 +1686,7 @@
                                 busy: new Set(tier.busy || []),
                                 off: new Set(tier.off || []),
                                 codes: codes,
+                                attrs: tier.attrs || {},
                                 code: tier.code,
                                 existing: true, removed: off, wasRemoved: off,
                                 label: tier.name || ('Tầng ' + seg(tier.position))
@@ -1296,6 +1696,8 @@
                 });
 
                 el.note.hidden = true;
+                el.locBar.hidden = !CFG.canUpdate;
+                updatePicked();
                 if (!state.columns.length) openPicker();
                 renderColumns();
                 renderCrumbs();
@@ -1315,29 +1717,36 @@
         el.name.value = code ? 'Kệ/Tủ ' + tail : '';
     }
 
-    el.name.addEventListener('input', function () {
-        state.nameTouched = true;
-        setDirty(true);
-    });
-
-    el.code.addEventListener('input', function () {
-        if (state.shelf) return;
-        syncName();
-        setDirty(true);
-        refreshCodeCheck();
-        renderColumns();
+    // Ô mã/tên có ở kệ đầu và ở từng kệ tạo thêm; el.code/el.name luôn trỏ vào kệ đang thao tác.
+    el.editor.addEventListener('input', function (event) {
+        if (event.target.classList.contains('zs-name-input')) {
+            state.nameTouched = true;
+            setDirty(true);
+        } else if (event.target.classList.contains('zs-code-input')) {
+            if (state.shelf) {
+                setDirty(true);
+                refreshCodeCheck();
+                renderColumns();
+                return;
+            }
+            syncName();
+            setDirty(true);
+            refreshCodeCheck();
+            renderColumns();
+            if (creatingMany()) paintAllPreviews();
+        }
     });
 
     el.itemType.addEventListener('change', function () { setDirty(true); });
 
-    // Kết quả máy chủ có thể là của lần gõ trước, nên chỉ tin khi khớp đúng mã đang nhập.
+    // Kết quả kiểm mã lưu theo từng mã, nên kết quả về trễ của lần gõ trước không lẫn sang mã đang nhập.
     function codeTaken() {
-        return !!state.codeCheck && state.codeCheck.code === el.code.value.trim() && state.codeCheck.taken;
+        return !!state.taken[el.code.value.trim()];
     }
 
     function paintPreview() {
         if (state.shelf) {
-            el.preview.hidden = true;
+            paintRenamePreview();
             return;
         }
 
@@ -1356,8 +1765,250 @@
             return;
         }
 
+        if (duplicateCode(code)) {
+            el.preview.className = 'zs-preview is-bad';
+            el.preview.innerHTML = 'Mã <b>' + esc(code) + '</b> trùng với một kệ khác đang tạo.';
+            return;
+        }
+
         el.preview.innerHTML = 'Sẽ tạo kệ/tủ <b>' + esc(code) + '</b> · cột <b>' + esc(code) + '/01</b>'
             + ' · tầng <b>' + esc(code) + '/01/01</b> · vị trí <b>' + esc(code) + '/01/01/01</b>...';
+    }
+
+    /* ---------- tạo nhiều kệ: mỗi kệ thêm là một card bên dưới, có lưới riêng ---------- */
+
+    // Mã kế tiếp: tăng phần số cuối, giữ số chữ số (01/05 -> 01/06, K9 -> K10).
+    function nextCode(code) {
+        var match = /^(.*?)(\d+)$/.exec(code || '');
+        if (!match) return '';
+        var next = String(Number(match[2]) + 1);
+        while (next.length < match[2].length) next = '0' + next;
+        return match[1] + next;
+    }
+
+    function autoName(code) {
+        return code ? 'Kệ/Tủ ' + code.split('/').pop() : '';
+    }
+
+    // Kệ đầu tiên dùng khung cố định trong HTML; kệ thêm sau được dựng trong #zs-drafts.
+    var MAIN = { columns: el.columns, code: el.code, name: el.name, preview: el.preview };
+
+    function creatingMany() {
+        return !state.shelf && state.drafts.length > 0;
+    }
+
+    function ctxOf(index) {
+        if (index === 0) return MAIN;
+        var card = el.drafts.querySelector('[data-draft="' + index + '"]');
+        return {
+            columns: card.querySelector('.zs-columns'),
+            code: card.querySelector('.zs-code-input'),
+            name: card.querySelector('.zs-name-input'),
+            preview: card.querySelector('.zs-preview')
+        };
+    }
+
+    // Ghi trạng thái kệ đang làm việc vào bản nháp của nó.
+    function saveDraft() {
+        if (!creatingMany()) return;
+        var draft = state.drafts[state.current];
+        draft.code = el.code.value;
+        draft.name = el.name.value;
+        draft.nameTouched = state.nameTouched;
+        draft.columns = state.columns;
+    }
+
+    // Các hàm vẽ/sửa lưới đều làm trên "kệ đang chọn" (el.columns, el.code, state.columns...),
+    // nên đổi kệ chỉ cần trỏ lại các tham chiếu này sang card của kệ đó.
+    function activate(index) {
+        if (!creatingMany() || index === state.current) return;
+        saveDraft();
+
+        var ctx = ctxOf(index);
+        var draft = state.drafts[index];
+        state.current = index;
+        el.columns = ctx.columns;
+        el.code = ctx.code;
+        el.name = ctx.name;
+        el.preview = ctx.preview;
+        state.columns = draft.columns;
+        state.nameTouched = draft.nameTouched;
+    }
+
+    function eachDraft(fn) {
+        var back = state.current;
+        state.drafts.forEach(function (draft, i) {
+            activate(i);
+            fn(draft, i);
+        });
+        activate(back);
+    }
+
+    function renderAllColumns() {
+        if (creatingMany()) eachDraft(renderColumns);
+        else renderColumns();
+    }
+
+    function paintAllPreviews() {
+        if (creatingMany()) eachDraft(paintPreview);
+        else paintPreview();
+    }
+
+    function duplicateCode(code) {
+        return creatingMany() && state.drafts.some(function (draft, i) {
+            return i !== state.current && draft.code.trim() === code;
+        });
+    }
+
+    function initDrafts() {
+        state.drafts = [{ code: el.code.value, name: el.name.value, nameTouched: state.nameTouched, columns: state.columns }];
+        state.current = 0;
+        el.drafts.innerHTML = '';
+        el.addShelf.hidden = !CFG.canCreate;
+        el.foot.hidden = false;
+    }
+
+    function closeDrafts() {
+        activate(0);
+        state.drafts = [];
+        state.current = 0;
+        el.drafts.innerHTML = '';
+        el.addShelf.hidden = true;
+    }
+
+    function renderDrafts() {
+        activate(0);
+
+        el.drafts.innerHTML = state.drafts.slice(1).map(function (draft, i) {
+            var index = i + 1;
+            return '<section class="zs-shelf zs-draft" data-draft="' + index + '">'
+                + '<div class="zs-draft-head">'
+                +   '<div class="zs-shelf-title mb-0"><i class="fas fa-layer-group"></i> Kệ/Tủ mới thứ ' + (index + 1) + ' trong ' + esc(state.warehouse.code) + '</div>'
+                +   '<button type="button" class="btn btn-sm btn-outline-danger zs-draft-drop"><i class="fas fa-times mr-1"></i>Bỏ kệ này</button>'
+                + '</div>'
+                + '<div class="zs-form">'
+                +   '<div class="form-group mb-0"><label>Mã kệ/tủ <span class="text-danger">*</span></label>'
+                +     '<input type="text" class="form-control form-control-sm zs-code-input" maxlength="40" value="' + esc(draft.code) + '"></div>'
+                +   '<div class="form-group mb-0 zs-grow"><label>Tên kệ/tủ <span class="text-danger">*</span></label>'
+                +     '<input type="text" class="form-control form-control-sm zs-name-input" maxlength="255" value="' + esc(draft.name) + '"></div>'
+                +   '<div class="zs-preview" hidden></div>'
+                + '</div>'
+                + '<div class="zs-columns"></div>'
+                + '</section>';
+        }).join('');
+
+        eachDraft(function () {
+            renderColumns();
+            paintPreview();
+        });
+    }
+
+    function draftCells(draft) {
+        return draft.columns.reduce(function (sum, column) { return sum + columnCells(column); }, 0);
+    }
+
+    // Lỗi đầu tiên trong các kệ sắp tạo: { index, message } hoặc null.
+    function draftProblem() {
+        var codes = state.drafts.map(function (draft) { return draft.code.trim(); });
+
+        for (var i = 0; i < state.drafts.length; i++) {
+            var draft = state.drafts[i];
+            var label = 'Kệ ' + (codes[i] || 'thứ ' + (i + 1));
+            var columns = draft.columns.filter(function (column) { return !column.removed; });
+
+            if (!codes[i] || !draft.name.trim()) return { index: i, message: label + ': chưa nhập đủ mã và tên kệ/tủ.' };
+            if (codes.indexOf(codes[i]) !== i) return { index: i, message: 'Mã kệ/tủ ' + codes[i] + ' bị lặp giữa các kệ đang tạo.' };
+            if (state.taken[codes[i]]) return { index: i, message: 'Mã kệ/tủ ' + codes[i] + ' đã tồn tại. Hãy đổi mã.' };
+            if (!columns.length) return { index: i, message: label + ': phải có ít nhất một cột.' };
+
+            var empty = columns.filter(function (column) { return !activeTiers(column).length; });
+            if (empty.length) {
+                return { index: i, message: label + ': ' + empty.map(function (c) { return c.label; }).join(', ') + ' không còn tầng nào.' };
+            }
+        }
+
+        return null;
+    }
+
+    function draftCard(index) {
+        return index === 0 ? MAIN.code.closest('.zs-shelf') : el.drafts.querySelector('[data-draft="' + index + '"]');
+    }
+
+    el.addShelf.addEventListener('click', function () {
+        saveDraft();
+
+        if (state.drafts.length >= CFG.maxBatch) {
+            toast('warning', 'Tối đa ' + CFG.maxBatch + ' kệ/tủ mỗi lượt tạo.');
+            return;
+        }
+
+        // Kệ mới sao chép cấu trúc của kệ cuối cùng để chỉ cần sửa chỗ khác biệt.
+        var last = state.drafts[state.drafts.length - 1];
+        var source = last.columns.filter(function (column) { return !column.removed; });
+        if (!source.length) {
+            toast('warning', 'Hãy khai cấu trúc cột/tầng cho kệ ' + (last.code.trim() || 'trước') + ' trước khi thêm kệ mới.');
+            return;
+        }
+
+        var codes = state.drafts.map(function (draft) { return draft.code.trim(); });
+        var code = nextCode(last.code.trim());
+        while (code && codes.indexOf(code) >= 0) code = nextCode(code);
+
+        state.drafts.push({
+            code: code,
+            name: autoName(code),
+            nameTouched: false,
+            columns: source.map(function (column, index) { return newColumn(index + 1, templateOf(column)); })
+        });
+
+        var index = state.drafts.length - 1;
+        renderDrafts();
+        activate(index);
+        refreshCodeCheck();
+        updateSummary();
+        setDirty(true);
+
+        draftCard(index).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.code.focus({ preventScroll: true });
+        el.code.select();
+    });
+
+    el.drafts.addEventListener('click', function (event) {
+        var drop = event.target.closest('.zs-draft-drop');
+        if (!drop) return;
+
+        var index = Number(drop.closest('[data-draft]').dataset.draft);
+        activate(0);
+        state.drafts.splice(index, 1);
+        renderDrafts();
+        paintAllPreviews();
+        updateSummary();
+        setDirty(true);
+    });
+
+    // Thao tác trong card nào thì chuyển "kệ đang chọn" sang kệ đó trước khi các xử lý khác chạy.
+    ['pointerdown', 'click', 'input', 'change', 'focusin'].forEach(function (type) {
+        el.editor.addEventListener(type, function (event) {
+            var card = event.target.closest ? event.target.closest('[data-draft]') : null;
+            if (card) activate(Number(card.dataset.draft));
+        }, true);
+    });
+
+    // Sửa kệ có sẵn: chỉ hiện dòng xem trước khi đang đổi mã kệ.
+    function paintRenamePreview() {
+        var code = shelfCode();
+        el.preview.hidden = !renamed();
+        if (el.preview.hidden) return;
+
+        if (codeTaken()) {
+            el.preview.className = 'zs-preview is-bad';
+            el.preview.innerHTML = 'Mã <b>' + esc(code) + '</b> đã tồn tại. Hãy đổi mã kệ/tủ.';
+            return;
+        }
+
+        el.preview.className = 'zs-preview';
+        el.preview.innerHTML = 'Đổi mã kệ <b>' + esc(state.shelf.code) + '</b> thành <b>' + esc(code) + '</b>: mã cột, tầng, vị trí con đổi theo'
+            + ' (<b>' + esc(state.shelf.code) + '/01/01/01</b> -> <b>' + esc(code) + '/01/01/01</b>). Bấm "Lưu cấu trúc" để áp dụng.';
     }
 
     function refreshCodeCheck() {
@@ -1365,12 +2016,12 @@
         clearTimeout(state.codeTimer);
 
         var code = el.code.value.trim();
-        if (state.shelf || !code) return;
+        if (!code || (state.shelf && code === state.shelf.code)) return;
 
         state.codeTimer = setTimeout(function () {
             getJson(CFG.checkCode + '?code=' + encodeURIComponent(code)).then(function (data) {
-                state.codeCheck = data;
-                paintPreview();
+                state.taken[data.code] = !!data.taken;
+                paintAllPreviews();
             }).catch(function () { /* bỏ qua, máy chủ sẽ kiểm lại khi lưu */ });
         }, 250);
     }
@@ -1454,7 +2105,11 @@
 
     var lockedSize = null;
 
-    // Mọi cột dùng chung một cỡ ô để lưới các cột thẳng hàng với nhau.
+    // Phần cố định của một khối cột ngoài các ô: nhãn tầng, tay kéo, ô số, nút gỡ, lề, khoảng cách.
+    var COLUMN_CHROME = 230;
+
+    // Mọi cột dùng chung một cỡ ô; các cột xếp ngang nên chia bề ngang cho đủ số cột,
+    // không vừa thì giữ cỡ tối thiểu và cho cuộn ngang.
     function cellSize() {
         if (lockedSize) return lockedSize;
 
@@ -1463,9 +2118,13 @@
             column.tiers.forEach(function (tier) { widest = Math.max(widest, tier.max, tier.origMax); });
         });
 
-        var available = Math.max(el.columns.clientWidth - 230, 260);
-        return Math.max(9, Math.min(Math.floor(available / widest) - 2, 26));
+        var count = Math.max(state.columns.length, 1);
+        var perColumn = Math.floor((el.columns.parentElement.clientWidth - 140) / count) - COLUMN_CHROME;
+        return Math.max(12, Math.min(Math.floor(perColumn / widest) - 2, 26));
     }
+
+    // Chữ cái hiện trong ô theo loại lưu trữ (để trống = dùng chung).
+    var TYPE_LETTERS = { material: 'V', chemical: 'H', standard: 'C' };
 
     function cellsMarkup(column, tier) {
         var width = Math.max(tier.max, tier.origMax);
@@ -1486,8 +2145,20 @@
             } else {
                 cls = 'is-free'; status = 'trống';
             }
-            var code = tier.codes[p] || tierCode(column, tier) + '/' + seg(p);
-            markup += '<span class="zs-cell ' + cls + '" title="' + esc(code) + ' - ' + status + '"></span>';
+            var code = remap(tier.codes[p]) || tierCode(column, tier) + '/' + seg(p);
+            var attr = cls === 'is-new' || cls === 'is-cut' ? null : tier.attrs[p];
+            var extra = '';
+            var letter = '';
+
+            if (attr) {
+                extra = ' data-id="' + attr.id + '"' + (attr.shown ? ' style="--loc:' + esc(attr.shown) + '"' : '');
+                cls += (attr.shown ? ' has-color' : '') + (state.picked.has(attr.id) ? ' is-picked' : '');
+                status += ' · ' + (CFG.zoneTypes[attr.zone_type] || 'Chưa phân loại')
+                    + ' · ' + (CFG.locationTypes[attr.item_type] || 'Dùng chung') + (attr.color ? ' · màu ' + attr.color : '');
+                letter = TYPE_LETTERS[attr.item_type] || '';
+            }
+
+            markup += '<span class="zs-cell ' + cls + '"' + extra + ' title="' + esc(code) + ' - ' + esc(status) + '">' + letter + '</span>';
         }
 
         return markup;
@@ -1499,7 +2170,8 @@
         var locked = column.removed;
 
         return '<div class="zs-row' + (tier.removed ? ' is-removed' : '') + '" data-pos="' + tier.position + '">'
-            + '<span class="zs-row-label" title="' + esc(tierCode(column, tier)) + '">' + esc(tier.label) + '</span>'
+            + '<button type="button" class="zs-row-label zs-rename zs-tier-rename" data-pos="' + tier.position + '" title="'
+            + esc(tierCode(column, tier)) + ' - bấm để đổi tên tầng">' + esc(tier.label) + '</button>'
             + '<div class="zs-cells" style="--cols:' + width + '">' + cellsMarkup(column, tier) + '</div>'
             + (locked ? '' :
                 '<button type="button" class="zs-handle" data-pos="' + tier.position + '" title="Kéo để đổi số vị trí' + esc(note) + '"></button>'
@@ -1521,12 +2193,13 @@
             : tiers.length + ' tầng · ' + num(columnCells(column)) + ' vị trí';
 
         var head = '<div class="zs-col-head">'
-            + '<div class="zs-col-title"><i class="fas fa-grip-lines-vertical"></i> ' + esc(column.label)
+            + '<div class="zs-col-title"><i class="fas fa-grip-lines-vertical"></i> '
+            +   '<button type="button" class="zs-rename zs-col-rename" title="Bấm để đổi tên cột">' + esc(column.label) + '<i class="fas fa-pen"></i></button>'
             +   ' <span class="zs-code">' + esc(columnCode(column)) + '</span>'
             +   ' <small>' + meta + '</small></div>'
             + '<div class="zs-col-tools">'
             + (column.removed ? '' :
-                '<div class="zs-bulk"><label class="mb-0">Đặt mọi tầng thành</label>'
+                '<div class="zs-bulk"><label class="mb-0" title="Đặt số vị trí cho mọi tầng của cột">Mọi tầng</label>'
                 + '<input type="number" class="form-control form-control-sm zs-bulk-value" min="1" max="' + CFG.maxLocations + '">'
                 + '<button type="button" class="btn btn-sm btn-outline-secondary zs-bulk-apply">Áp dụng</button></div>'
                 + '<button type="button" class="btn btn-sm btn-outline-primary zs-col-copy" title="Thêm một cột mới có cùng cấu trúc tầng">'
@@ -1556,9 +2229,13 @@
     function renderColumns() {
         state.columns.sort(function (a, b) { return a.position - b.position; });
         el.columns.style.setProperty('--zs-cell', cellSize() + 'px');
-        el.columns.innerHTML = state.columns.map(columnMarkup).join('');
-        el.foot.hidden = !state.columns.length;
-        el.addColumn.hidden = !state.columns.length;
+        el.columns.classList.toggle('zs-pickable', !!state.shelf && CFG.canUpdate);
+        el.columns.innerHTML = state.columns.map(columnMarkup).join('')
+            + (state.columns.length || state.current > 0
+                ? '<button type="button" class="zs-col-add" title="Thêm một cột bên phải, cùng cấu trúc tầng với cột cuối">'
+                    + '<i class="fas fa-plus"></i> Thêm cột</button>'
+                : '');
+        el.foot.hidden = !state.columns.length && !creatingMany();
         updateSummary();
     }
 
@@ -1578,10 +2255,14 @@
     }
 
     function updateSummary() {
-        var cols = state.columns.filter(function (column) { return !column.removed; });
+        var lists = creatingMany()
+            ? state.drafts.map(function (draft, i) { return i === state.current ? state.columns : draft.columns; })
+            : [state.columns];
+        var cols = [].concat.apply([], lists).filter(function (column) { return !column.removed; });
         var tiers = cols.reduce(function (sum, column) { return sum + activeTiers(column).length; }, 0);
         var cells = cols.reduce(function (sum, column) { return sum + columnCells(column); }, 0);
-        var text = cols.length + ' cột · ' + tiers + ' tầng · ' + num(cells) + ' vị trí';
+        var text = (lists.length > 1 ? lists.length + ' kệ · ' : '')
+            + cols.length + ' cột · ' + tiers + ' tầng · ' + num(cells) + ' vị trí';
 
         el.summary.textContent = text;
         el.total.textContent = text;
@@ -1616,7 +2297,7 @@
             .forEach(function (x, i) { x.position = base + i + 1; relabel(x); });
     }
 
-    el.columns.addEventListener('pointerdown', function (event) {
+    el.editor.addEventListener('pointerdown', function (event) {
         var handle = event.target.closest('.zs-handle');
         if (!handle) return;
 
@@ -1653,7 +2334,7 @@
         document.addEventListener('pointerup', onUp);
     });
 
-    el.columns.addEventListener('change', function (event) {
+    el.editor.addEventListener('change', function (event) {
         var input = event.target.closest('.zs-num');
         if (!input) return;
 
@@ -1670,10 +2351,28 @@
         renderColumns();
     });
 
-    el.columns.addEventListener('click', function (event) {
+    el.editor.addEventListener('click', function (event) {
+        if (event.target.closest('.zs-col-add')) {
+            var last = state.columns.filter(function (column) { return !column.removed; }).pop();
+            addColumn(templateOf(last));
+            return;
+        }
+
         var found = columnAt(event.target);
         if (!found) return;
         var column = found.column;
+
+        var renameTier = event.target.closest('.zs-tier-rename');
+        if (renameTier || event.target.closest('.zs-col-rename')) {
+            var target = renameTier ? findTier(column, renameTier.dataset.pos) : column;
+            askName(renameTier ? 'Đổi tên tầng' : 'Đổi tên cột', target.label, function (value) {
+                target.label = value;
+                target.custom = true;
+                setDirty(true);
+                renderColumns();
+            });
+            return;
+        }
 
         var drop = event.target.closest('.zs-drop');
         if (drop) {
@@ -1688,7 +2387,7 @@
             if (tier.existing) {
                 tier.removed = !tier.removed;
             } else {
-                dropNew(column.tiers, tier, function (x) { x.label = 'Tầng ' + seg(x.position); });
+                dropNew(column.tiers, tier, function (x) { if (!x.custom) x.label = 'Tầng ' + seg(x.position); });
             }
             setDirty(true);
             renderColumns();
@@ -1746,12 +2445,157 @@
                     if (!column.tiers.length) column.tiers.push(newTier(1, 10));
                 }
             } else {
-                dropNew(state.columns, column, function (x) { x.label = 'Cột ' + seg(x.position); });
+                dropNew(state.columns, column, function (x) { if (!x.custom) x.label = 'Cột ' + seg(x.position); });
             }
             setDirty(true);
             renderColumns();
         }
     });
+
+    function askName(title, current, done) {
+        Swal.fire({
+            title: title,
+            input: 'text',
+            inputValue: current,
+            inputAttributes: { maxlength: 100 },
+            showCancelButton: true,
+            confirmButtonText: 'Đổi tên',
+            cancelButtonText: 'Huỷ',
+            confirmButtonColor: '#2E7BC4',
+            cancelButtonColor: '#94A3B8',
+            inputValidator: function (value) { return value.trim() ? null : 'Tên không được để trống.'; }
+        }).then(function (result) {
+            if (result.isConfirmed) done(result.value.trim());
+        });
+    }
+
+    /* ---------- chọn vị trí để đổi loại lưu trữ / màu ---------- */
+
+    function clearPicked() {
+        state.picked.clear();
+        document.querySelectorAll('.zs-cell.is-picked').forEach(function (node) { node.classList.remove('is-picked'); });
+        updatePicked();
+    }
+
+    function updatePicked() {
+        el.locCount.textContent = num(state.picked.size);
+        el.locApply.disabled = !state.picked.size;
+        el.locClear.disabled = !state.picked.size;
+    }
+
+    function pick(node, on) {
+        var id = Number(node.dataset.id);
+        if (on) state.picked.add(id);
+        else state.picked.delete(id);
+        node.classList.toggle('is-picked', on);
+    }
+
+    function renderLocColors() {
+        var options = [{ value: '__keep', text: 'Giữ' }, { value: '', text: 'Bỏ màu' }]
+            .concat(CFG.palette.map(function (color) { return { value: color }; }));
+        var custom = state.locColor && state.locColor !== '__keep' && CFG.palette.indexOf(state.locColor) < 0;
+
+        el.locColors.innerHTML = options.map(function (option) {
+            var on = option.value === state.locColor ? ' is-on' : '';
+            return option.text
+                ? '<button type="button" class="zs-loc-color is-text' + on + '" data-color="' + option.value + '" title="'
+                    + (option.value ? 'Giữ nguyên màu hiện tại' : 'Bỏ màu riêng, ô theo màu phân loại') + '">' + option.text + '</button>'
+                : '<button type="button" class="zs-loc-color' + on + '" data-color="' + option.value + '" style="background:' + option.value + '" title="' + option.value + '"></button>';
+        }).join('')
+            + '<input type="color" class="zs-loc-custom' + (custom ? ' is-on' : '') + '" value="' + (custom ? state.locColor : '#7C3AED') + '" title="Chọn màu khác">';
+    }
+
+    el.locColors.addEventListener('click', function (event) {
+        var button = event.target.closest('.zs-loc-color');
+        if (!button) return;
+        state.locColor = button.dataset.color;
+        renderLocColors();
+    });
+
+    el.locColors.addEventListener('change', function (event) {
+        if (!event.target.classList.contains('zs-loc-custom')) return;
+        state.locColor = event.target.value.toUpperCase();
+        renderLocColors();
+    });
+
+    // Bấm hoặc rê chuột qua các ô để chọn/bỏ chọn; ô đầu tiên quyết định đang chọn hay đang bỏ.
+    el.editor.addEventListener('pointerdown', function (event) {
+        var node = event.target.closest('.zs-pickable .zs-cell[data-id]');
+        if (!node) return;
+        event.preventDefault();
+        state.painting = !state.picked.has(Number(node.dataset.id));
+        pick(node, state.painting);
+        updatePicked();
+    });
+
+    el.editor.addEventListener('pointerover', function (event) {
+        if (state.painting === null) return;
+        var node = event.target.closest('.zs-pickable .zs-cell[data-id]');
+        if (!node) return;
+        pick(node, state.painting);
+        updatePicked();
+    });
+
+    document.addEventListener('pointerup', function () {
+        state.painting = null;
+    });
+
+    el.locAll.addEventListener('click', function () {
+        el.columns.querySelectorAll('.zs-cell[data-id]').forEach(function (node) { pick(node, true); });
+        updatePicked();
+    });
+
+    el.locClear.addEventListener('click', clearPicked);
+
+    el.locApply.addEventListener('click', function () {
+        var setZone = el.locZone.value !== '__keep';
+        var setType = el.locType.value !== '__keep';
+        var setColor = state.locColor !== '__keep';
+
+        if (!state.picked.size) return;
+        if (!setZone && !setType && !setColor) {
+            toast('warning', 'Chọn phân loại, loại lưu trữ hoặc màu cần áp cho các vị trí đang chọn.');
+            return;
+        }
+
+        el.locApply.disabled = true;
+        post(CFG.saveLocations, {
+            shelf_id: state.shelf.id,
+            ids: Array.from(state.picked),
+            set_zone: setZone,
+            zone_type: setZone ? el.locZone.value : null,
+            set_type: setType,
+            item_type: setType ? el.locType.value : null,
+            set_color: setColor,
+            color: setColor ? state.locColor : null
+        }).then(function (result) {
+            el.locApply.disabled = false;
+            if (!result.ok) {
+                toast('error', result.data.message || 'Không cập nhật được vị trí.');
+                return;
+            }
+
+            var byId = {};
+            result.data.locations.forEach(function (attr) { byId[attr.id] = attr; });
+            state.columns.forEach(function (column) {
+                column.tiers.forEach(function (tier) {
+                    Object.keys(tier.attrs).forEach(function (position) {
+                        var attr = byId[tier.attrs[position].id];
+                        if (attr) tier.attrs[position] = attr;
+                    });
+                });
+            });
+
+            window.zoneStructureStale = true;
+            state.picked.clear();
+            updatePicked();
+            renderColumns();
+            toast('success', result.data.message);
+        });
+    });
+
+    renderLocColors();
+    updatePicked();
 
     function addColumn(template) {
         var highest = maxPosition(state.columns);
@@ -1768,16 +2612,11 @@
         renderColumns();
 
         var sections = el.columns.querySelectorAll('.zs-col');
-        if (sections.length) sections[sections.length - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (sections.length) sections[sections.length - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
 
-    el.addColumn.addEventListener('click', function () {
-        var last = state.columns.filter(function (column) { return !column.removed; }).pop();
-        addColumn(templateOf(last));
-    });
-
     window.addEventListener('resize', function () {
-        if (state.view === 'editor' && state.columns.length) renderColumns();
+        if (state.view === 'editor') renderAllColumns();
     });
 
     el.reset.addEventListener('click', function () {
@@ -1794,18 +2633,75 @@
 
     /* ---------- lưu ---------- */
 
-    function payloadColumns() {
-        return state.columns
+    function payloadColumns(list) {
+        return list
             .filter(function (column) { return !column.removed; })
             .map(function (column) {
                 return {
                     position: column.position,
-                    tiers: activeTiers(column).map(function (tier) { return { position: tier.position, max: tier.max }; })
+                    name: column.label,
+                    tiers: activeTiers(column).map(function (tier) { return { position: tier.position, max: tier.max, name: tier.label }; })
                 };
             });
     }
 
+    // Tạo nhiều kệ một lượt: kiểm từng tab, lỗi ở kệ nào thì mở đúng tab đó.
+    function saveDrafts() {
+        saveDraft();
+
+        var problem = draftProblem();
+        if (problem) {
+            draftCard(problem.index).scrollIntoView({ behavior: 'smooth', block: 'start' });
+            toast('warning', problem.message);
+            return;
+        }
+
+        var shelves = state.drafts.map(function (draft) {
+            return { code: draft.code.trim(), name: draft.name.trim(), columns: payloadColumns(draft.columns) };
+        });
+        var cells = state.drafts.reduce(function (sum, draft) { return sum + draftCells(draft); }, 0);
+
+        Swal.fire({
+            icon: 'question',
+            title: 'Tạo ' + shelves.length + ' kệ/tủ?',
+            text: shelves.map(function (item, i) {
+                return item.code + ' (' + item.columns.length + ' cột · ' + num(draftCells(state.drafts[i])) + ' vị trí)';
+            }).join(', ') + ' - tổng ' + num(cells) + ' vị trí.',
+            showCancelButton: true,
+            confirmButtonText: 'Tạo',
+            cancelButtonText: 'Huỷ',
+            confirmButtonColor: '#2E7BC4',
+            cancelButtonColor: '#94A3B8'
+        }).then(function (choice) {
+            if (!choice.isConfirmed) return;
+
+            var template = state.columns.filter(function (c) { return !c.removed; }).map(templateOf);
+            el.save.disabled = true;
+
+            post(CFG.apply, {
+                warehouse_id: state.warehouse.id,
+                item_type: el.itemType.value,
+                shelves: shelves
+            }).then(function (result) {
+                el.save.disabled = false;
+                if (!result.ok) {
+                    toast('error', result.data.message || 'Không lưu được.');
+                    return;
+                }
+
+                window.zoneStructureStale = true;
+                setDirty(false);
+                afterCreate(result.data.message, template);
+            });
+        });
+    }
+
     el.save.addEventListener('click', function () {
+        if (creatingMany() && state.drafts.length > 1) {
+            saveDrafts();
+            return;
+        }
+
         var code = shelfCode();
         var name = el.name.value.trim();
 
@@ -1813,12 +2709,12 @@
             toast('warning', 'Nhập mã và tên kệ/tủ trước khi lưu.');
             return;
         }
-        if (!state.shelf && codeTaken()) {
+        if ((!state.shelf || renamed()) && codeTaken()) {
             toast('warning', 'Mã kệ/tủ ' + code + ' đã tồn tại. Hãy đổi mã.');
             return;
         }
 
-        var columns = payloadColumns();
+        var columns = payloadColumns(state.columns);
         if (!columns.length) {
             toast('warning', 'Kệ/tủ phải có ít nhất một cột đang dùng.');
             return;
@@ -1848,12 +2744,15 @@
         if (shrunk) warning.push('thu nhỏ ' + shrunk + ' tầng');
 
         var text = columns.length + ' cột · ' + num(cells) + ' vị trí.';
+        if (renamed()) {
+            text += ' Đổi mã kệ ' + state.shelf.code + ' thành ' + code + ': mã mọi cột, tầng, vị trí con đổi theo, nhãn đã in theo mã cũ cần in lại.';
+        }
         if (warning.length) {
             text += ' Lượt này sẽ ' + warning.join(', ') + ': các vị trí bị loại sẽ bị KHOÁ (không xoá) và không chọn được khi nhập kho nữa.';
         }
 
         Swal.fire({
-            icon: warning.length ? 'warning' : 'question',
+            icon: warning.length || renamed() ? 'warning' : 'question',
             title: state.shelf ? 'Lưu cấu trúc kệ/tủ ' + code + '?' : 'Tạo kệ/tủ ' + code + '?',
             text: text,
             showCancelButton: true,

@@ -180,17 +180,22 @@ class DepartmentMaterialController extends Controller
 
     /**
      * "Đề nghị dự trù vật tư" bấm ngay trên một dòng của tab "Vật Tư Của Phòng" - bắt buộc
-     * nêu lý do dự trù. Hiện lại ở tab "Danh sách vật tư cần dự trù" bên Dự Trù Vật Tư -
+     * nêu số lượng cần đề nghị + lý do dự trù. Hiện lại ở tab "Danh sách vật tư cần dự trù" bên Dự Trù Vật Tư -
      * xem App\Support\MaterialWatchlist.
      */
     public function watchlistRemember(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'category_id' => ['required', 'integer', 'exists:material_categories,id'],
+            'quantity' => ['required', 'numeric', 'gt:0', 'max:999999999'],
             'note' => ['required', 'max:500'],
         ], [
             'category_id.required' => 'Không xác định được vật tư cần đề nghị dự trù!',
             'category_id.exists' => 'Vật tư được chọn không tồn tại.',
+            'quantity.required' => 'Vui lòng nhập số lượng cần đề nghị.',
+            'quantity.numeric' => 'Số lượng cần đề nghị phải là số.',
+            'quantity.gt' => 'Số lượng cần đề nghị phải lớn hơn 0.',
+            'quantity.max' => 'Số lượng cần đề nghị quá lớn.',
             'note.required' => 'Vui lòng nhập lý do dự trù.',
             'note.max' => 'Lý do dự trù tối đa 500 ký tự.',
         ]);
@@ -216,6 +221,7 @@ class DepartmentMaterialController extends Controller
             (int) $request->category_id,
             null,
             null,
+            (float) $request->quantity,
             $request->note,
             'category',
             $this->actor()

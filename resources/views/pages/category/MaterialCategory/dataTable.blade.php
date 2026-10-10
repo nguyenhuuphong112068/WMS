@@ -40,6 +40,7 @@
                         <th style="width: 100px">Mã Vật Tư</th>
                         <th>Tên Vật Tư</th>
                         <th>Nhà Sản Xuất</th>
+                        <th style="width: 120px">Part Number</th>
                         <th>Thông Tin Kỹ Thuật</th>
                         <th style="width: 190px">Phân Loại</th>
                         <th style="width: 110px">Bộ Phận Mua Hàng</th>
@@ -77,6 +78,7 @@
                                     <span class="md-empty">—</span>
                                 @endif
                             </td>
+                            <td class="md-sub">{{ $row->part_number ?: '—' }}</td>
                             <td class="md-sub">{{ $row->technical_specification ?: '—' }}</td>
                             <td>
                                 @if ($chips)
@@ -141,6 +143,7 @@
                                         'material_names_id' => $row->material_names_id,
                                         'material_names_id_text' => $row->material_name,
                                         'manufacturers_id' => $row->manufacturers_id,
+                                        'part_number' => $row->part_number,
                                         'technical_specification' => $row->technical_specification,
                                         'classification' => (object) $classification,
                                         'purchasing_department' => $row->purchasing_department,

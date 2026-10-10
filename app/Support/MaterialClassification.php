@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
  *   - price          : theo giá trị
  *   - importance     : theo mức độ quan trọng
  *   - dangerous      : có thuộc danh mục hàng hoá nguy hiểm hay không
- *   - supply         : Hành Chánh cấp phát hay Khác
+ *   - supply         : có do Hành Chánh cấp phát hay không
  *   - qa_calibration : có cần QA hiệu chuẩn trước khi sử dụng hay không
  *
  * Bộ tiêu chí do Phòng Tổng Hợp chốt: 6 tiêu chí, mỗi tiêu chí BẮT BUỘC chọn - không còn
@@ -65,8 +65,8 @@ class MaterialClassification
             'label' => 'Theo Cấp Phát Bởi Hành Chánh',
             'icon' => 'fas fa-hand-holding',
             'options' => [
-                'admin' => 'Hành Chánh',
-                'other' => 'Khác',
+                'yes' => 'Có',
+                'no' => 'Không',
             ],
         ],
         'qa_calibration' => [
@@ -87,7 +87,7 @@ class MaterialClassification
         'price' => ['low' => 'Giá thấp', 'high' => 'Giá cao'],
         'importance' => ['low' => 'Ít quan trọng', 'high' => 'Rất quan trọng'],
         'dangerous' => ['yes' => 'Hàng nguy hiểm', 'no' => 'Không nguy hiểm'],
-        'supply' => ['admin' => 'HC cấp phát', 'other' => 'Nguồn khác'],
+        'supply' => ['yes' => 'HC cấp phát', 'no' => 'HC không cấp phát'],
         'qa_calibration' => ['yes' => 'Cần hiệu chuẩn', 'no' => 'Không hiệu chuẩn'],
     ];
 

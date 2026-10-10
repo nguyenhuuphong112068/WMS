@@ -15,60 +15,41 @@ use Illuminate\Validation\Rule;
 /**
  * DỮ LIỆU GỐC - TRÌNH KÝ ĐỀ NGHỊ CẤP PHÁT VẬT TƯ
  *
- * Phòng ban khai trước quy trình ký chuẩn của phiếu đề nghị cấp phát vật tư: ứng với một
- * TỔ HỢP điều kiện của vật tư thì phiếu phải đi qua những bước ký nào, mỗi bước do VAI TRÒ
- * nào phê duyệt.
+ * Phòng ban khai các VAI TRÒ nhận trình ký đề nghị cấp phát vật tư. Mỗi vai trò một dòng:
+ *   - Cấp ký   : phiếu ký lần lượt từ cấp nhỏ tới cấp lớn
+ *   - Người ký : một hoặc nhiều người thuộc vai trò, chỉ cần một người ký là xong bước
+ *   - Điều kiện: các nhóm tiêu chí (VÀ trong nhóm, HOẶC giữa các nhóm). Đề nghị có ít nhất
+ *                một vật tư thoả một nhóm thì vai trò nhận trình ký. Bỏ trống = mọi đề nghị.
  *
- * Điều kiện gồm hai vế, bỏ trống vế nào là "Tất cả":
- *   - Phân loại của danh mục vật tư CHUNG : material_categories.classification (nhiều tiêu chí)
- *   - Phân loại của danh mục vật tư PHÒNG : department_classification.id
+ * Màn hình luôn làm việc trên phòng ban đang chọn ở topNAV - department_id lấy từ session.
+ * Khoá (status_id = 0) thay cho xoá cứng; sửa người ký thì bỏ hiệu lực dòng cũ (active = 0).
  *
- * Màn hình luôn làm việc trên phòng ban đang chọn ở topNAV - department_id lấy từ session,
- * không cho chọn tay để tránh khai nhầm sang phòng khác.
- *
- * Không có bước duyệt. Khoá (status_id = 0) thay cho xoá cứng; sửa quy trình thì bỏ hiệu
- * lực các bước cũ (active = 0) rồi ghi bước mới, không xoá cứng.
- *
- * Cách các màn hình khác đọc quy trình đã khai: App\Support\MaterialSignFlow::resolve().
+ * Cách màn hình Đề Nghị Cấp Phát Vật Tư đọc lại: App\Support\MaterialSignFlow::resolveForItems().
  */
 class MaterialSignFlowController extends Controller
 {
     use RequiresChangeReason;
 
-    private const TABLE = 'material_request_sign_flows';
+    private const TABLE = 'material_request_sign_rules';
 
-    private const STEP_TABLE = 'material_request_sign_flow_steps';
+    /** Người ký của một vai trò - mỗi người một dòng. */
+    private const USER_TABLE = 'material_request_sign_rule_users';
 
-    /** Người được ký một bước - một bước giao cho nhiều người thì mỗi người một dòng. */
-    private const STEP_USER_TABLE = 'material_request_sign_flow_step_users';
-
-    private const CLASSIFICATION_TABLE = 'department_classification';
-
-    private const LABEL = 'quy trình trình ký';
+    private const LABEL = 'vai trò trình ký';
 
     /** Danh sách người ký chọn được - nạp một lần cho cả request, xem signerOptions(). */
     private $signerOptionsCache = null;
 
+    /** Tiêu chí điều kiện của phòng đang chọn - nạp một lần cho cả request. */
+    private $criteriaCache = null;
+
     public function index()
     {
-        $departmentId = $this->departmentId();
-
-        $datas = DB::table(self::TABLE)
-            ->leftJoin(self::CLASSIFICATION_TABLE, self::CLASSIFICATION_TABLE.'.id', '=', self::TABLE.'.classification_id')
-            ->select(self::TABLE.'.*', self::CLASSIFICATION_TABLE.'.name as classification_name')
-            ->where(self::TABLE.'.department_id', $departmentId)
-            ->orderBy(self::TABLE.'.name', 'asc')
-            ->get();
-
-        // Bước ký của mọi quy trình trên trang, nạp một lần rồi gom theo quy trình
-        $steps = MaterialSignFlow::stepsOfMany($datas->pluck('id'));
-
         session()->put(['title' => 'DỮ LIỆU GỐC - TRÌNH KÝ ĐỀ NGHỊ CP VẬT TƯ']);
 
         return view('pages.materData.MaterialSignFlow.list', [
-            'datas' => $datas,
-            'steps' => $steps,
-            'classifications' => $this->classificationOptions(),
+            'datas' => MaterialSignFlow::allRules($this->departmentId()),
+            'criteriaOptions' => $this->criteriaOptions(),
             'roles' => DB::table('roles')->orderBy('name', 'asc')->get(['id', 'name']),
             'signerOptions' => $this->signerOptions(),
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
@@ -79,47 +60,38 @@ class MaterialSignFlowController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), $this->rules(), $this->messages());
-
-        $criteria = MaterialSignFlow::encode($request->input('criteria'));
-        $classificationId = $this->classificationId($request);
-
+        $conditions = $this->checkConditions($validator, $request);
         $this->checkSigners($validator, $request);
-        $this->checkDuplicate($validator, $criteria, $classificationId);
+        $this->checkLevel($validator, $request);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
         }
 
-        $name = trim((string) $request->name);
-
-        $id = DB::transaction(function () use ($request, $name, $criteria, $classificationId) {
+        $id = DB::transaction(function () use ($request, $conditions) {
             $id = DB::table(self::TABLE)->insertGetId([
-                'name' => $name,
                 'department_id' => $this->departmentId(),
-                'criteria' => $criteria,
-                'classification_id' => $classificationId,
+                'role_id' => (int) $request->role_id,
+                'level' => (int) $request->level,
+                'conditions' => MaterialSignFlow::encodeConditions($conditions),
                 'status_id' => 1,
                 'created_by' => $this->actor(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            $this->insertSteps($id, $request);
+            $this->insertSigners($id, $request);
 
             return $id;
         });
 
-        DataMasterHistory::write(
-            self::TABLE,
-            $id,
-            'Thêm mới',
-            'Khai báo mới '.self::LABEL.': '.$name.'.',
-            $this->snapshotOf($id)
-        );
+        $roleName = $this->roleName($request->role_id);
 
-        AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm '.self::LABEL.': '.$name);
+        DataMasterHistory::write(self::TABLE, $id, 'Thêm mới', 'Khai báo mới '.self::LABEL.': '.$roleName.'.', $this->snapshotOf($id));
 
-        return redirect()->back()->with('success', 'Đã thêm '.self::LABEL.' thành công!');
+        AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm '.self::LABEL.': '.$roleName);
+
+        return redirect()->back()->with('success', 'Đã thêm '.self::LABEL.' '.$roleName.'!');
     }
 
     public function update(Request $request)
@@ -135,42 +107,45 @@ class MaterialSignFlowController extends Controller
             $this->rules($current->id) + $this->changeReasonRules(),
             $this->messages() + $this->changeReasonMessages()
         );
-
-        $criteria = MaterialSignFlow::encode($request->input('criteria'));
-        $classificationId = $this->classificationId($request);
-
-        $this->checkSigners($validator, $request);
-        $this->checkDuplicate($validator, $criteria, $classificationId, $current->id);
+        $conditions = $this->checkConditions($validator, $request);
+        $this->checkSigners($validator, $request, $current->id);
+        $this->checkLevel($validator, $request, $current->id);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
-        $before = $this->descriptorOf($current, MaterialSignFlow::stepsOf((int) $current->id));
+        $before = $this->descriptorOf((int) $current->id);
 
-        $payload = [
-            'name' => trim((string) $request->name),
-            'criteria' => $criteria,
-            'classification_id' => $classificationId,
-        ];
-
-        DB::transaction(function () use ($current, $payload, $request) {
-            DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
-                'updated_by' => $this->actor(),
-                'updated_at' => now(),
-            ]);
-
-            // Sửa quy trình là khai lại toàn bộ bước ký: bỏ hiệu lực bước cũ rồi ghi bước mới
-            $this->deactivateSteps((int) $current->id);
-            $this->insertSteps((int) $current->id, $request);
-        });
-
-        $after = $this->descriptorOf($this->findOwn($current->id), MaterialSignFlow::stepsOf((int) $current->id));
-        $note = $this->diffNote($before, $after);
+        // So nội dung mới với nội dung đang lưu TRƯỚC khi ghi, không đổi gì thì không đụng CSDL
+        $note = $this->diffNote($before, $this->describe(
+            (int) $request->role_id,
+            (int) $request->level,
+            $this->signerIds($request),
+            MaterialSignFlow::encodeConditions($conditions)
+        ));
 
         if ($note === '') {
             return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
         }
+
+        DB::transaction(function () use ($current, $request, $conditions) {
+            DB::table(self::TABLE)->where('id', $current->id)->update([
+                'role_id' => (int) $request->role_id,
+                'level' => (int) $request->level,
+                'conditions' => MaterialSignFlow::encodeConditions($conditions),
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            // Khai lại người ký: bỏ hiệu lực danh sách cũ rồi ghi danh sách mới
+            DB::table(self::USER_TABLE)->where('rule_id', $current->id)->where('active', 1)->update([
+                'active' => 0,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+            $this->insertSigners((int) $current->id, $request);
+        });
 
         DataMasterHistory::write(
             self::TABLE,
@@ -181,7 +156,7 @@ class MaterialSignFlowController extends Controller
             $this->changeReason($request)
         );
 
-        AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $before['Tên quy trình'], $after['Tên quy trình']);
+        AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $before['Vai trò'], $note);
 
         return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
     }
@@ -199,6 +174,14 @@ class MaterialSignFlowController extends Controller
         }
 
         $newStatus = $current->status_id == 1 ? 0 : 1;
+
+        // Mở khoá lại mà cấp ký đã bị vai trò khác dùng thì thứ tự ký sẽ mơ hồ
+        if ($newStatus === 1 && $this->levelTaken((int) $current->level, (int) $current->id)) {
+            return redirect()->back()->with(
+                'error',
+                'Cấp ký '.$current->level.' đã được vai trò khác dùng. Sửa cấp ký trước khi mở khoá.'
+            );
+        }
 
         DB::table(self::TABLE)->where('id', $current->id)->update([
             'status_id' => $newStatus,
@@ -225,13 +208,13 @@ class MaterialSignFlowController extends Controller
 
         return redirect()->back()->with(
             'success',
-            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ').self::LABEL.' '.$current->name.'!'
+            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ').self::LABEL.' '.$this->roleName($current->role_id).'!'
         );
     }
 
     /**
      * Trả về lịch sử thay đổi của một dòng cho modal xem lịch sử.
-     * Chỉ đọc được quy trình của phòng ban đang chọn, giống các thao tác còn lại.
+     * Chỉ đọc được vai trò của phòng ban đang chọn, giống các thao tác còn lại.
      */
     public function history(Request $request)
     {
@@ -246,97 +229,41 @@ class MaterialSignFlowController extends Controller
     }
 
     /* ==========================================================
-     |  GHI BƯỚC KÝ
+     |  GHI NGƯỜI KÝ
      ========================================================== */
 
-    /**
-     * Ghi các bước ký theo đúng thứ tự người dùng xếp trên form.
-     *
-     * Mỗi bước là một cặp cùng chỉ số: steps[i] = vai trò, signers[i][] = danh sách người
-     * được ký bước đó. Người ký tách sang bảng con, mỗi người một dòng.
-     */
-    private function insertSteps(int $flowId, Request $request): void
+    private function insertSigners(int $ruleId, Request $request): void
     {
         $people = $this->signerOptions()->keyBy('id');
 
-        foreach ($this->stepPairs($request) as $index => $step) {
-            $stepId = DB::table(self::STEP_TABLE)->insertGetId([
-                'flow_id' => $flowId,
-                'step_no' => $index + 1,
-                'role_id' => $step['role_id'],
+        foreach ($this->signerIds($request) as $userId) {
+            $person = $people->get($userId);
+
+            DB::table(self::USER_TABLE)->insert([
+                'rule_id' => $ruleId,
+                'user_id' => $userId,
+                'user_name' => $person ? MaterialSignFlow::personName($person) : null,
                 'active' => 1,
                 'created_by' => $this->actor(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-
-            foreach ($step['user_ids'] as $userId) {
-                $person = $people->get($userId);
-
-                DB::table(self::STEP_USER_TABLE)->insert([
-                    'step_id' => $stepId,
-                    'user_id' => $userId,
-                    'user_name' => $person ? MaterialSignFlow::personName($person) : null,
-                    'active' => 1,
-                    'created_by' => $this->actor(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
         }
     }
 
-    /** Bỏ hiệu lực toàn bộ bước ký (và người ký của bước) của một quy trình. */
-    private function deactivateSteps(int $flowId): void
+    /** id người ký trên form, bỏ ô trống và người trùng, giữ thứ tự chọn. */
+    private function signerIds(Request $request): array
     {
-        $stepIds = DB::table(self::STEP_TABLE)->where('flow_id', $flowId)->where('active', 1)->pluck('id');
+        $ids = [];
 
-        if ($stepIds->isEmpty()) {
-            return;
-        }
-
-        DB::table(self::STEP_USER_TABLE)->whereIn('step_id', $stepIds)->update([
-            'active' => 0,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
-
-        DB::table(self::STEP_TABLE)->whereIn('id', $stepIds)->update([
-            'active' => 0,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
-    }
-
-    /**
-     * Các bước trên form dưới dạng [['role_id' => .., 'user_ids' => [..]], ...], giữ nguyên
-     * thứ tự dòng. Bỏ dòng thiếu vai trò hoặc chưa chọn người ký nào - validate đã chặn
-     * trước rồi, đây chỉ là lớp chặn cuối để không ghi bước rỗng vào CSDL.
-     */
-    private function stepPairs(Request $request): array
-    {
-        $roles = array_values((array) $request->input('steps', []));
-        $signers = array_values((array) $request->input('signers', []));
-        $pairs = [];
-
-        foreach ($roles as $index => $roleId) {
-            $roleId = (int) $roleId;
-            $userIds = [];
-
-            foreach ((array) ($signers[$index] ?? []) as $value) {
-                $userId = (int) $value;
-
-                if ($userId > 0 && ! in_array($userId, $userIds, true)) {
-                    $userIds[] = $userId;
-                }
-            }
-
-            if ($roleId > 0 && $userIds) {
-                $pairs[] = ['role_id' => $roleId, 'user_ids' => $userIds];
+        foreach ((array) $request->input('signers', []) as $value) {
+            $id = (int) $value;
+            if ($id > 0 && ! in_array($id, $ids, true)) {
+                $ids[] = $id;
             }
         }
 
-        return $pairs;
+        return $ids;
     }
 
     /* ==========================================================
@@ -348,142 +275,166 @@ class MaterialSignFlowController extends Controller
         $departmentId = $this->departmentId();
 
         return [
-            'name' => [
+            'role_id' => [
                 'required',
-                'max:150',
-                Rule::unique(self::TABLE, 'name')
+                'integer',
+                Rule::exists('roles', 'id'),
+                // Mỗi vai trò chỉ khai một lần trong phòng (kể cả dòng đã khoá - mở khoá lại mà dùng)
+                Rule::unique(self::TABLE, 'role_id')
                     ->where(fn ($query) => $query->where('department_id', $departmentId))
                     ->ignore($ignoreId),
             ],
-            'classification_id' => [
-                'nullable',
-                Rule::exists(self::CLASSIFICATION_TABLE, 'id')
-                    ->where(fn ($query) => $query->where('department_id', $departmentId)->where('status_id', 1)),
-            ],
-        ] + MaterialSignFlow::rules();
+            'level' => ['required', 'integer', 'min:1', 'max:'.MaterialSignFlow::MAX_LEVEL],
+            'signers' => ['required', 'array', 'min:1'],
+            'signers.*' => ['nullable', 'integer'],
+            'conditions' => ['nullable', 'array'],
+        ];
     }
 
     private function messages(): array
     {
         return [
-            'name.required' => 'Vui lòng nhập tên quy trình.',
-            'name.max' => 'Tên quy trình tối đa 150 ký tự.',
-            'name.unique' => 'Tên quy trình này đã tồn tại trong phòng ban.',
-            'classification_id.exists' => 'Phân loại của phòng không hợp lệ.',
-        ] + MaterialSignFlow::messages();
+            'role_id.required' => 'Vui lòng chọn vai trò nhận trình ký.',
+            'role_id.exists' => 'Vai trò không hợp lệ.',
+            'role_id.unique' => 'Vai trò này đã được khai trong phòng ban. Sửa dòng đã có thay vì thêm mới.',
+            'level.required' => 'Vui lòng nhập cấp ký.',
+            'level.integer' => 'Cấp ký phải là số nguyên.',
+            'level.min' => 'Cấp ký nhỏ nhất là 1.',
+            'level.max' => 'Cấp ký lớn nhất là '.MaterialSignFlow::MAX_LEVEL.'.',
+            'signers.required' => 'Vui lòng chọn ít nhất 1 người ký.',
+            'signers.min' => 'Vui lòng chọn ít nhất 1 người ký.',
+        ];
+    }
+
+    /** Đọc + kiểm tra các nhóm điều kiện; trả về nhóm đã chuẩn hoá (null = mọi đề nghị). */
+    private function checkConditions($validator, Request $request): ?array
+    {
+        [$groups, $errors] = MaterialSignFlow::parseConditions($request->input('conditions'), $this->criteriaOptions());
+
+        if ($errors) {
+            $validator->after(function ($v) use ($errors) {
+                foreach (array_unique($errors) as $message) {
+                    $v->errors()->add('conditions', $message);
+                }
+            });
+        }
+
+        return $groups;
     }
 
     /**
-     * Mỗi bước phải có vai trò + ít nhất một người ký, và MỌI người ký của bước phải THUỘC
-     * vai trò của bước đó. Một người không được đứng ở hai bước khác nhau - nếu không họ
-     * vừa duyệt bước trước vừa duyệt bước sau, mất ý nghĩa của quy trình nhiều cấp.
-     *
-     * Màn hình Đề Nghị Cấp Phát Vật Tư chỉ đọc lại quy trình này chứ không cho chọn lại
-     * người ký, nên bước khai thiếu người hoặc gán nhầm người sẽ làm phiếu treo không ai ký.
+     * Người ký phải thuộc công ty và THUỘC vai trò đang khai. Một người không được đứng ở hai
+     * vai trò còn hiệu lực của cùng phòng - nếu không họ ký hai bước liền trên cùng một phiếu,
+     * mất ý nghĩa của ký nhiều cấp.
      */
-    private function checkSigners($validator, Request $request): void
+    private function checkSigners($validator, Request $request, $ignoreId = null): void
     {
-        $roles = array_values((array) $request->input('steps', []));
-        $signers = array_values((array) $request->input('signers', []));
+        $roleId = (int) $request->role_id;
+        $userIds = $this->signerIds($request);
         $people = $this->signerOptions()->keyBy('id');
-        $roleNames = DB::table('roles')->pluck('name', 'id');
+        $roleName = $this->roleName($roleId);
 
-        $validator->after(function ($v) use ($roles, $signers, $people, $roleNames) {
-            if (count($signers) !== count($roles)) {
-                $v->errors()->add('signers', 'Mỗi bước trình ký phải chọn đủ vai trò và người ký.');
+        $taken = DB::table(self::USER_TABLE)
+            ->join(self::TABLE, self::TABLE.'.id', '=', self::USER_TABLE.'.rule_id')
+            ->leftJoin('roles', 'roles.id', '=', self::TABLE.'.role_id')
+            ->where(self::TABLE.'.department_id', $this->departmentId())
+            ->where(self::TABLE.'.status_id', 1)
+            ->where(self::USER_TABLE.'.active', 1)
+            ->when($ignoreId, fn ($query) => $query->where(self::TABLE.'.id', '<>', $ignoreId))
+            ->whereIn(self::USER_TABLE.'.user_id', $userIds ?: [0])
+            ->pluck('roles.name', self::USER_TABLE.'.user_id');
+
+        $validator->after(function ($v) use ($roleId, $userIds, $people, $roleName, $taken) {
+            if (! $userIds) {
+                $v->errors()->add('signers', 'Vui lòng chọn ít nhất 1 người ký.');
 
                 return;
             }
 
-            $seen = [];
+            foreach ($userIds as $userId) {
+                $person = $people->get($userId);
 
-            foreach ($roles as $index => $roleId) {
-                $stepUserIds = array_values(array_unique(array_map('intval', (array) ($signers[$index] ?? []))));
-
-                if (! $stepUserIds) {
-                    $v->errors()->add('signers.'.$index, 'Bước '.($index + 1).' chưa chọn người ký nào.');
+                if (! $person) {
+                    $v->errors()->add('signers', 'Có người ký không thuộc công ty của bạn.');
 
                     continue;
                 }
 
-                foreach ($stepUserIds as $userId) {
-                    $person = $people->get($userId);
+                $name = $person->fullName ?: $person->userName;
 
-                    if (! $person) {
-                        $v->errors()->add(
-                            'signers.'.$index,
-                            'Bước '.($index + 1).': có người ký không thuộc công ty của bạn.'
-                        );
+                if ($roleId && ! in_array($roleId, $person->role_ids, true)) {
+                    $v->errors()->add('signers', $name.' không thuộc vai trò '.$roleName.'.');
+                }
 
-                        continue;
-                    }
-
-                    if (! in_array((int) $roleId, $person->role_ids, true)) {
-                        $v->errors()->add(
-                            'signers.'.$index,
-                            'Bước '.($index + 1).': '.($person->fullName ?: $person->userName)
-                                .' không thuộc vai trò '.($roleNames[$roleId] ?? 'đã chọn').'.'
-                        );
-                    }
-
-                    if (isset($seen[$userId])) {
-                        $v->errors()->add(
-                            'signers.'.$index,
-                            'Bước '.($index + 1).': '.($person->fullName ?: $person->userName)
-                                .' đã được giao ký ở bước '.$seen[$userId].'.'
-                        );
-
-                        continue;
-                    }
-
-                    $seen[$userId] = $index + 1;
+                if ($taken->has($userId)) {
+                    $v->errors()->add('signers', $name.' đã là người ký của vai trò '.($taken[$userId] ?: 'khác').'.');
                 }
             }
         });
     }
 
-    /**
-     * Hai quy trình còn hiệu lực cùng tổ hợp điều kiện thì một vật tư sẽ khớp cả hai và
-     * hệ thống không biết chọn cái nào - chặn ngay từ lúc khai.
-     */
-    private function checkDuplicate($validator, ?string $criteria, $classificationId, $ignoreId = null): void
+    /** Hai vai trò còn hiệu lực cùng một cấp ký thì không biết ai ký trước - chặn ngay lúc khai. */
+    private function checkLevel($validator, Request $request, $ignoreId = null): void
     {
-        $signature = MaterialSignFlow::signature($criteria, $classificationId);
+        $level = (int) $request->level;
 
-        $clash = DB::table(self::TABLE)
-            ->where('department_id', $this->departmentId())
-            ->where('status_id', 1)
-            ->when($ignoreId, fn ($query) => $query->where('id', '<>', $ignoreId))
-            ->get(['id', 'name', 'criteria', 'classification_id'])
-            ->first(fn ($row) => MaterialSignFlow::signature($row->criteria, $row->classification_id) === $signature);
-
-        if ($clash) {
+        if ($level > 0 && ($clash = $this->levelTaken($level, $ignoreId))) {
             $validator->after(fn ($v) => $v->errors()->add(
-                'criteria',
-                'Tổ hợp điều kiện này đã được khai ở quy trình "'.$clash->name.'".'
+                'level',
+                'Cấp ký '.$level.' đã được vai trò '.($clash->role_name ?: 'khác').' dùng.'
             ));
         }
+    }
+
+    private function levelTaken(int $level, $ignoreId = null)
+    {
+        return DB::table(self::TABLE)
+            ->leftJoin('roles', 'roles.id', '=', self::TABLE.'.role_id')
+            ->where(self::TABLE.'.department_id', $this->departmentId())
+            ->where(self::TABLE.'.status_id', 1)
+            ->where(self::TABLE.'.level', $level)
+            ->when($ignoreId, fn ($query) => $query->where(self::TABLE.'.id', '<>', $ignoreId))
+            ->first(['roles.name as role_name']);
     }
 
     /* ==========================================================
      |  LỊCH SỬ THAY ĐỔI
      ========================================================== */
 
-    /** Nội dung đọc được của một quy trình - dùng chung cho ảnh chụp và mô tả thay đổi. */
-    private function descriptorOf($row, $steps): array
+    /** Nội dung đọc được của một vai trò đang lưu - dùng cho ảnh chụp và mô tả thay đổi. */
+    private function descriptorOf(int $id): array
     {
+        $row = DB::table(self::TABLE)->where('id', $id)->first();
+
+        if (! $row) {
+            return [];
+        }
+
+        return $this->describe(
+            (int) $row->role_id,
+            (int) $row->level,
+            MaterialSignFlow::signersOfRules([$id])->get($id, collect())->pluck('user_id')->map(fn ($v) => (int) $v)->all(),
+            $row->conditions
+        );
+    }
+
+    /** Mô tả một vai trò từ giá trị thô - dùng chung cho dữ liệu đang lưu và dữ liệu trên form. */
+    private function describe(int $roleId, int $level, array $userIds, ?string $conditions): array
+    {
+        $people = $this->signerOptions()->keyBy('id');
+        $names = DB::table('user_management')->whereIn('id', $userIds ?: [0])->pluck('fullName', 'id');
+
         return [
-            'Tên quy trình' => (string) ($row->name ?? ''),
-            'Điều kiện - Phân loại danh mục chung' => MaterialSignFlow::describe($row->criteria ?? null),
-            'Điều kiện - Phân loại của phòng' => $this->classificationName($row->classification_id ?? null),
-            'Các bước trình ký' => MaterialSignFlow::stepsText($steps) ?: '—',
+            'Vai trò' => $this->roleName($roleId),
+            'Cấp ký' => (string) $level,
+            'Người ký' => collect($userIds)
+                ->map(fn ($id) => $names[$id] ?? ($people->get($id)->fullName ?? 'NA'))
+                ->implode(' / ') ?: '—',
+            'Điều kiện nhận trình ký' => MaterialSignFlow::describeConditions($conditions, $this->criteriaOptions()),
         ];
     }
 
-    /**
-     * Ảnh chụp bản ghi cho lịch sử. Tự dựng thay vì dùng DataMasterHistory::snapshot()
-     * vì các bước ký nằm ở bảng con, không đọc ra được từ một dòng của bảng chính.
-     */
+    /** Ảnh chụp bản ghi cho lịch sử - người ký nằm ở bảng con nên tự dựng. */
     private function snapshotOf(int $id): array
     {
         $row = DB::table(self::TABLE)->where('id', $id)->first();
@@ -495,7 +446,7 @@ class MaterialSignFlowController extends Controller
         return [
             'Người tạo' => $row->created_by ?: '—',
             'Ngày tạo' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '—',
-        ] + $this->descriptorOf($row, MaterialSignFlow::stepsOf($id)) + [
+        ] + $this->descriptorOf($id) + [
             'Trạng thái sử dụng' => $row->status_id ? 'Hoạt động' : 'Đã khoá',
         ];
     }
@@ -526,37 +477,20 @@ class MaterialSignFlowController extends Controller
             ->first();
     }
 
+    private function roleName($roleId): string
+    {
+        return (string) DB::table('roles')->where('id', (int) $roleId)->value('name') ?: 'NA';
+    }
+
     /** Người được chọn làm người ký - nạp một lần cho cả request. */
     private function signerOptions()
     {
         return $this->signerOptionsCache ??= MaterialSignFlow::signerOptions();
     }
 
-    /** Phân loại của phòng đang chọn, dùng cho ô select trên modal. */
-    private function classificationOptions()
+    private function criteriaOptions(): array
     {
-        return DB::table(self::CLASSIFICATION_TABLE)
-            ->where('department_id', $this->departmentId())
-            ->where('status_id', 1)
-            ->orderBy('name', 'asc')
-            ->get(['id', 'name']);
-    }
-
-    /** Id phân loại của phòng lấy từ form; để trống nghĩa là áp dụng cho mọi phân loại. */
-    private function classificationId(Request $request)
-    {
-        $id = (int) $request->input('classification_id');
-
-        return $id > 0 ? $id : null;
-    }
-
-    private function classificationName($id): string
-    {
-        if (! $id) {
-            return MaterialSignFlow::ANY_LABEL;
-        }
-
-        return (string) DB::table(self::CLASSIFICATION_TABLE)->where('id', $id)->value('name') ?: 'NA';
+        return $this->criteriaCache ??= MaterialSignFlow::criteriaOptions($this->departmentId());
     }
 
     private function departmentId(): int

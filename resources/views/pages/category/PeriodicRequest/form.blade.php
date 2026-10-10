@@ -1,6 +1,9 @@
 {{--
 | Modal thêm / cập nhật danh sách đề nghị theo chu kỳ.
-| Biến vào: $type (internal|external), $mode (create|update), $categories, $units, $departments, $objects
+| Biến vào: $type (internal|external|estimate), $mode (create|update), $categories, $units, $departments, $objects
+|
+| Danh sách DỰ TRÙ (estimate) dùng lịch chọn tay như liên phòng ban, nhưng thay ô Phòng Cấp Phát
+| bằng ô "Dự Trù Cho" (estimate_month_offset) và bắt buộc chọn đơn vị từng dòng.
 |
 | LỊCH CHU KỲ
 | - Liên phòng ban: chọn Chu Kỳ tay (.pr-periodic là ô chọn); chu kỳ "Theo số ngày" / "Theo số
@@ -19,8 +22,10 @@
 @php
     $prSupport = \App\Support\MaterialPeriodicRequest::class;
     $prRoute = 'pages.category.periodicRequest.';
-    $prKey = $type === 'external' ? 'External' : 'Internal';
+    $prKey = $prSupport::typeKey($type);
     $isExternal = $type === 'external';
+    $isEstimate = $type === 'estimate';
+    $isInternal = ! $isExternal && ! $isEstimate;
     $isUpdate = $mode === 'update';
     $modalId = 'periodic' . $prKey . ($isUpdate ? 'Update' : 'Create') . 'Modal';
     $bag = $errors->getBag($prSupport::errorBag($type, $isUpdate ? 'Update' : 'Create'));
@@ -40,8 +45,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-{{ $isExternal ? 'exchange-alt' : 'sync-alt' }}"></i>
-                    {{ $isUpdate ? 'Cập Nhật' : 'Thêm' }} Danh Sách Đề Nghị {{ $isExternal ? 'Liên Phòng Ban' : 'Nội Bộ' }} Theo Chu Kỳ
+                    <i class="fas fa-{{ $isEstimate ? 'calendar-check' : ($isExternal ? 'exchange-alt' : 'sync-alt') }}"></i>
+                    {{ $isUpdate ? 'Cập Nhật' : 'Thêm' }} Danh Sách {{ $isEstimate ? 'Dự Trù' : ($isExternal ? 'Đề Nghị Liên Phòng Ban' : 'Đề Nghị Nội Bộ') }} Theo Chu Kỳ
                 </h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
@@ -65,7 +70,28 @@
                     @endif
 
                     <div class="form-row">
-                        @if ($isExternal)
+                        @if ($isEstimate)
+                            <div class="form-group col-md-7">
+                                <label>Tiêu Đề <span class="text-danger">*</span></label>
+                                <input type="text" name="title" maxlength="255" required
+                                    class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
+                                    value="{{ $old('title') }}" placeholder="VD: Dự trù vật tư bảo trì hằng tháng">
+                            </div>
+
+                            <div class="form-group col-md-5">
+                                <label>Dự Trù Cho <span class="text-danger">*</span></label>
+                                <select name="estimate_month_offset" required
+                                    class="form-control pr-estimate-offset {{ $bag->has('estimate_month_offset') ? 'is-invalid' : '' }}">
+                                    @foreach ($prSupport::ESTIMATE_MONTH_OFFSETS as $offsetKey => $offsetLabel)
+                                        <option value="{{ $offsetKey }}"
+                                            {{ (string) $old('estimate_month_offset', $prSupport::ESTIMATE_MONTH_OFFSET_DEFAULT) === (string) $offsetKey ? 'selected' : '' }}>
+                                            {{ $offsetLabel }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <small class="text-muted">Tính từ tháng hệ thống tạo phiếu dự trù.</small>
+                            </div>
+                        @elseif ($isExternal)
                             <div class="form-group col-md-7">
                                 <label>Tiêu Đề <span class="text-danger">*</span></label>
                                 <input type="text" name="title" maxlength="255" required
@@ -130,7 +156,7 @@
                     </div>
 
                     <div class="form-row pr-cycle-row">
-                        @if ($isExternal)
+                        @unless ($isInternal)
                             <div class="form-group col-md-3">
                                 <label>Chu Kỳ <span class="text-danger">*</span></label>
                                 <select name="periodic" required
@@ -163,11 +189,11 @@
                                 <input type="hidden" name="periodic" class="pr-periodic" value="{{ $old('periodic') }}">
                                 <input type="hidden" name="cycle_length" class="pr-cycle-length" value="{{ $old('cycle_length') }}">
                             </div>
-                        @endif
+                        @endunless
 
                         <div class="form-group col-md-3">
-                            <label>Ngày Tạo Đề Nghị Trong Chu Kỳ <span class="text-danger">*</span></label>
-                            @if ($isExternal)
+                            <label>{{ $isEstimate ? 'Ngày Tạo Phiếu Trong Chu Kỳ' : 'Ngày Tạo Đề Nghị Trong Chu Kỳ' }} <span class="text-danger">*</span></label>
+                            @unless ($isInternal)
                                 <select name="cycle_day" required
                                     class="form-control pr-cycle-day-select {{ $bag->has('cycle_day') ? 'is-invalid' : '' }}"></select>
                                 <div class="input-group pr-cycle-day-input-group">
@@ -189,10 +215,10 @@
                                     <option value="{{ $prSupport::DAY_MODE_CAL_DUE }}" disabled>Theo ngày đến hạn lịch CAL</option>
                                 </select>
                                 <small class="pr-cal-info"></small>
-                            @endif
+                            @endunless
                         </div>
 
-                        @unless ($isExternal)
+                        @if ($isInternal)
                             {{-- Chỉ hiện khi đang chọn "Ngày cố định trong chu kỳ" - JS prApplyCycle ẩn hẳn cột này ở chế độ CAL --}}
                             <div class="form-group col-md-2 pr-day-col">
                                 <label>Ngày Cụ Thể</label>
@@ -216,9 +242,9 @@
                                     <div class="input-group-append"><span class="input-group-text">ngày</span></div>
                                 </div>
                             </div>
-                        @endunless
+                        @endif
 
-                        @if ($isExternal || $isUpdate)
+                        @if (! $isInternal || $isUpdate)
                             <div class="form-group col-md-2">
                                 <label>Ngày Bắt Đầu Chu Kỳ Đầu Tiên <span class="text-danger">*</span></label>
                                 <input type="date" name="start_date" required
@@ -242,11 +268,11 @@
                     </div>
 
                     <div class="d-flex align-items-center justify-content-between flex-wrap mb-2" style="gap: 6px">
-                        <label class="mb-0">Vật Tư Đề Nghị <span class="text-danger">*</span></label>
+                        <label class="mb-0">Vật Tư {{ $isEstimate ? 'Dự Trù' : 'Đề Nghị' }} <span class="text-danger">*</span></label>
                         <div class="d-flex flex-wrap" style="gap: 6px">
                             <button type="button" class="btn btn-sm btn-outline-info pr-open-picker"
                                 data-picker="#periodic{{ $prKey }}PickerModal">
-                                <i class="fas fa-th-list mr-1"></i> {{ $isExternal ? 'Mở danh mục công ty' : 'Mở danh mục phòng' }}
+                                <i class="fas fa-th-list mr-1"></i> {{ $isInternal ? 'Mở danh mục phòng' : 'Mở danh mục công ty' }}
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary pr-add-row">
                                 <i class="fas fa-plus mr-1"></i> Thêm vật tư
@@ -301,7 +327,7 @@
                                     class="form-control form-control-sm text-right js-decimal" placeholder="0">
                             </td>
                             <td>
-                                <select data-name="requested_unit" class="form-control form-control-sm pr-unit">
+                                <select data-name="requested_unit" class="form-control form-control-sm pr-unit" {{ $isEstimate ? 'required' : '' }}>
                                     <option value="">--</option>
                                     @foreach ($units as $unit)
                                         <option value="{{ $unit->short_name }}">{{ $unit->short_name }}</option>

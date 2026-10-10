@@ -272,7 +272,10 @@
                         )
                         ->where('deparments.isActive', 1)
                         ->where('deparments.is_general', 1)
-                        ->when($allowedDeptIds !== ['*'], fn($q) => $q->whereIn('deparments.id', $allowedDeptIds ?: [0]))
+                        ->when(
+                            $allowedDeptIds !== ['*'],
+                            fn($q) => $q->whereIn('deparments.id', $allowedDeptIds ?: [0]),
+                        )
                         ->orderBy('companies.name', 'asc')
                         ->orderBy('deparments.shortName', 'asc')
                         ->get();
@@ -592,7 +595,7 @@
                         <a href="#" class="nav-link {{ request()->is('export/*') ? 'active' : '' }}">
                             <i class="fas fa-hand-holding-water"></i>
                             <p>
-                                Sử Dụng
+                                Đề Nghị - Sử Dụng
                                 <i class="right fas fa-angle-left"></i>
                             </p>
                         </a>
@@ -705,6 +708,28 @@
                     </li>
                 @endpermAny
 
+                <!-- Droplist Menu Thống Kê  -->
+                @permAny(['export_material_view'])
+                    <li class="nav-item has-treeview {{ request()->is('statistic/*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->is('statistic/*') ? 'active' : '' }}">
+                            <i class="fas fa-chart-bar"></i>
+                            <p>
+                                Thống Kê
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            @perm('export_material_view')
+                                <li class="nav-item"><a href="{{ route('pages.statistic.materialIssue.list') }}"
+                                        class="nav-link {{ request()->is('statistic/materialIssue') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-primary"></i>
+                                        <p>Vật Tư</p>
+                                    </a></li>
+                            @endperm
+                        </ul>
+                    </li>
+                @endpermAny
+
                 <!-- Droplist Menu Đánh Giá Hạn Dùng  -->
                 @permAny(['stability_standard_view', 'stability_plan_view'])
                     <li class="nav-item has-treeview {{ request()->is('stabilityAssessment/*') ? 'menu-open' : '' }}">
@@ -778,6 +803,16 @@
                         </a>
                     </li>
                 @endperm
+
+                @if (user_has_any_role(session('user')['userId'] ?? 0, ['Admin']))
+                    <li class="nav-item">
+                        <a href="{{ route('pages.database.list') }}"
+                            class="nav-link {{ request()->is('database') ? 'active' : '' }}">
+                            <i class="fas fa-database"></i>
+                            <p>Cơ Sở Dữ Liệu</p>
+                        </a>
+                    </li>
+                @endif
 
             </ul>
         </nav>

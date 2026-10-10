@@ -27,11 +27,11 @@ use Illuminate\Validation\Rule;
  * Khác chất chuẩn: vật tư BẮT BUỘC phải qua ĐỀ NGHỊ được phê duyệt trước khi lấy ra dùng.
  *
  *   1. Tổ lập ĐỀ NGHỊ (material_request_lists + items) -> Trình ký. QUY TRÌNH KÝ DUYỆT
- *      KHÔNG do người lập khai nữa mà suy thẳng từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật
- *      Tư": mỗi dòng vật tư khớp một quy trình theo phân loại của danh mục chung + phân
- *      loại của phòng, phiếu lấy quy trình CHẶT NHẤT (nhiều bước nhất) trong các dòng rồi
- *      chép các bước sang material_request_signs. Dòng nào chưa khớp quy trình nào thì
- *      chặn không cho trình ký - xem App\Support\MaterialSignFlow.
+ *      KHÔNG do người lập khai mà suy thẳng từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật Tư":
+ *      mỗi VAI TRÒ khai cấp ký + điều kiện theo phân loại vật tư; vai trò nào được ít nhất
+ *      một dòng vật tư thoả điều kiện (hoặc không khai điều kiện) thì thành một bước ký,
+ *      xếp theo cấp ký, rồi chép sang material_request_signs. Không vai trò nào được kích
+ *      hoạt thì phiếu duyệt thẳng - xem App\Support\MaterialSignFlow::resolveForItems().
  *   2. Ký lần lượt theo step_no, mỗi bước đúng người được chỉ định ký (nhập lại mật khẩu -
  *      21 CFR Part 11). Ký hết bước cuối -> approved, issue_status = waiting. Mỗi lần
  *      chuyển bước đều gửi thông báo cho người phải ký tiếp; từ chối thì báo người lập.
@@ -214,11 +214,14 @@ class MaterialExportController extends Controller
             ->leftJoin('material_categories', self::REQ_ITEM.'.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
             ->leftJoin('material_imports', self::REQ_ITEM.'.import_id', '=', 'material_imports.id')
+            ->leftJoin('consumption_objects', self::REQ_ITEM.'.consumption_object_id', '=', 'consumption_objects.id')
             ->select(
                 self::REQ_ITEM.'.*',
                 'material_names.name as category_material_name',
                 'material_categories.code as category_code',
-                'material_imports.code as issued_import_code'
+                'material_imports.code as issued_import_code',
+                'consumption_objects.code as object_code',
+                'consumption_objects.name as object_name'
             )
             ->where(self::REQ_ITEM.'.active', 1)
             ->whereIn(self::REQ_ITEM.'.request_list_id', $requestLists->pluck('id'))
@@ -336,6 +339,8 @@ class MaterialExportController extends Controller
             'quarantineBadge' => $quarantine['badge'],
             'quarantineLots' => $quarantine['lots'],
             'departmentMaterialInventory' => $departmentMaterialInventory,
+            // Cột "Tồn khả dụng" ở phiếu chi tiết đề nghị - xem categoryStockMap()
+            'liveStockByCategory' => $liveStockByCategory,
             'adjustCounts' => $this->adjustCounts($departmentId),
             'reqAppStatuses' => config('material.request_app_statuses'),
             'reqSignStatuses' => config('material.request_sign_statuses'),
@@ -395,19 +400,9 @@ class MaterialExportController extends Controller
 
         $isDraft = $request->input('action_type', 'send') === 'draft';
 
-        /*
-        | Quy trình ký lấy thẳng từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật Tư" theo phân loại
-        | của các dòng vật tư. Lưu tạm thì cho qua (phiếu nháp chưa cần ký), nhưng TRÌNH KÝ
-        | mà còn dòng chưa khớp quy trình nào là chặn - phải khai dữ liệu gốc trước.
-        */
+        // Quy trình ký lấy thẳng từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật Tư" theo phân loại
+        // của các dòng vật tư; không vai trò nào nhận trình ký thì duyệt thẳng
         $signFlow = $this->requestSignFlow($request, $departmentId);
-
-        if (! $isDraft && $signFlow['missing']) {
-            return redirect()->back()
-                ->with('error', $this->signFlowMissingMessage())
-                ->withInput()
-                ->with('activeTab', $type);
-        }
 
         $deptStr = str_pad((string) $departmentId, 2, '0', STR_PAD_LEFT);
         $prefix = $deptStr.date('dmy').'_';
@@ -497,13 +492,6 @@ class MaterialExportController extends Controller
         // Sửa dòng vật tư có thể đổi luôn quy trình ký, nên tính lại từ dữ liệu gốc
         $signFlow = $this->requestSignFlow($request, $departmentId);
 
-        if (! $isDraft && $signFlow['missing']) {
-            return redirect()->back()
-                ->with('error', $this->signFlowMissingMessage())
-                ->withInput()
-                ->with('activeTab', $req->type);
-        }
-
         $signSteps = $signFlow['steps'];
         $stepCount = $signSteps->count();
         $flow = $isDraft
@@ -574,12 +562,6 @@ class MaterialExportController extends Controller
         | ghi lúc lưu tạm: giữa hai lần đó phòng có thể đã sửa quy trình hoặc đổi người ký.
         */
         $signFlow = $this->requestSignFlowOf($req);
-
-        if ($signFlow['missing']) {
-            return redirect()->back()
-                ->with('error', $this->signFlowMissingMessage())
-                ->with('activeTab', $req->type);
-        }
 
         $signSteps = $signFlow['steps'];
         $stepCount = $signSteps->count();
@@ -907,10 +889,10 @@ class MaterialExportController extends Controller
     /**
      * QUY TRÌNH KÝ của một phiếu, suy từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật Tư".
      *
-     * Mỗi dòng vật tư khớp một quy trình theo phân loại của nó; phiếu lấy quy trình nhiều
-     * bước nhất. Người lập phiếu không khai và không sửa được quy trình này.
+     * Các vai trò mà ít nhất một dòng vật tư thoả điều kiện (hoặc vai trò không khai điều
+     * kiện) thành các bước ký, theo cấp ký. Người lập phiếu không khai và không sửa được.
      *
-     * @return array{steps: \Illuminate\Support\Collection, flow: ?object, missing: bool}
+     * @return array{steps: \Illuminate\Support\Collection}
      */
     private function requestSignFlow(Request $request, int $departmentId): array
     {
@@ -935,46 +917,35 @@ class MaterialExportController extends Controller
     }
 
     /**
-     * Quy trình ký của từng vật tư, rút gọn thành dữ liệu JSON cho JS.
+     * Bảng tra vai trò ký cho JS, rút gọn từ MaterialSignFlow::mapForDepartment().
      *
      * Khối "Quy trình ký duyệt" trên modal là CHỈ ĐỌC và phải đổi theo dòng vật tư người
      * lập đang chọn, nên gửi sẵn cả bảng tra xuống trình duyệt thay vì gọi lại server mỗi
-     * lần đổi dòng.
+     * lần đổi dòng:
+     *   rules      : vai trò đang hoạt động theo cấp ký (id, cấp, tên vai trò, người ký)
+     *   always     : id vai trò nhận mọi đề nghị
+     *   byCategory : category_id => id các vai trò vật tư đó kích hoạt
      */
     private function signFlowMapForView(int $departmentId): array
     {
         $map = MaterialSignFlow::mapForDepartment($departmentId);
 
-        $shrink = fn ($matched) => $matched === null ? null : [
-            'name' => $matched['flow']->name,
-            'steps' => $matched['steps']->map(fn ($step) => [
-                'no' => (int) $step->step_no,
-                'role' => $step->role_name ?: 'NA',
+        return [
+            'rules' => $map['rules']->map(fn ($rule) => [
+                'id' => (int) $rule->id,
+                'level' => (int) $rule->level,
+                'role' => $rule->role_name ?: 'NA',
                 // Một bước giao cho nhiều người: chỉ cần MỘT trong số họ ký là xong bước
-                'users' => collect($step->signers)->map(fn ($signer) => [
+                'users' => $rule->signers->map(fn ($signer) => [
                     'name' => MaterialSignFlow::signerLabel($signer),
                     'dept' => $signer->signer_department_short ?: '',
-                    // Người ký đã nghỉ / bị khoá tài khoản thì phải khai lại quy trình gốc
+                    // Người ký đã nghỉ / bị khoá tài khoản thì phải khai lại dữ liệu gốc
                     'inactive' => ! $signer->signer_active,
                 ])->values()->all(),
             ])->values()->all(),
+            'always' => $map['always'],
+            'byCategory' => $map['byCategory'],
         ];
-
-        return [
-            'byCategory' => collect($map['byCategory'])->map($shrink)->all(),
-            'fallback' => $shrink($map['fallback']),
-        ];
-    }
-
-    /**
-     * Câu báo lỗi khi phiếu có dòng vật tư chưa khớp quy trình ký nào.
-     * Phải khai dữ liệu gốc trước mới trình ký được - không cho khai tay bù vào.
-     */
-    private function signFlowMissingMessage(): string
-    {
-        return 'Có dòng vật tư chưa khớp quy trình trình ký nào của phòng nên chưa trình ký được. '
-            .'Vào Dữ Liệu Gốc → Trình Ký Đề Nghị CP Vật Tư để khai quy trình cho phân loại tương ứng '
-            .'(vật tư tự nhập ngoài danh mục cần một quy trình khai điều kiện "Tất cả").';
     }
 
     /** Sửa phiếu là khai lại quy trình: không xoá cứng, chỉ bỏ hiệu lực các bước cũ. */
@@ -1891,6 +1862,27 @@ class MaterialExportController extends Controller
     }
 
     /**
+     * Ô chọn Đối Tượng ở cột Mục đích của dòng đề nghị (select2 AJAX): danh mục đối tượng có
+     * hàng nghìn dòng nên tìm theo trang, 30 dòng mỗi lần - dùng chung bộ tìm của danh sách
+     * đề nghị theo chu kỳ (MaterialPeriodicRequest::objectSearch).
+     */
+    public function requestObjects(Request $request)
+    {
+        $offset = max(0, ((int) $request->page - 1) * 30);
+        $found = MaterialPeriodicRequest::objectSearch((string) $request->q, null, null, [], 30, $offset);
+
+        return response()->json([
+            'results' => collect($found['items'])->map(fn ($object) => [
+                'id' => (int) $object->id,
+                'text' => $object->code.' - '.$object->name,
+                'hint' => trim(($object->type_label ?? '').' · '.($object->frequency_label ?? '')
+                    .($object->location ? ' · '.$object->location : ''), ' ·'),
+            ])->values(),
+            'pagination' => ['more' => (bool) $found['more']],
+        ]);
+    }
+
+    /**
      * category_id -> {remaining, available} của TOÀN BỘ danh mục vật tư trong phòng, dùng để
      * dựng lại 2 cột "Tồn" / "Tồn khả dụng" ở bảng dòng đề nghị cấp phát mỗi khi mở modal
      * tạo/sửa - xem categoryStockMap().
@@ -1905,7 +1897,8 @@ class MaterialExportController extends Controller
 
     /**
      * "Đề nghị dự trù vật tư" bấm ngay trên một dòng đề nghị của modal Thường Quy / Theo ĐG
-     * Rủi Ro - không phụ thuộc đề nghị đó có được lưu hay không, bắt buộc nêu lý do dự trù.
+     * Rủi Ro - không phụ thuộc đề nghị đó có được lưu hay không, bắt buộc nêu số lượng cần
+     * đề nghị + lý do dự trù.
      * Hiện lại ở tab "Danh sách vật tư cần dự trù" bên Dự Trù Vật Tư - xem
      * App\Support\MaterialWatchlist.
      */
@@ -1915,9 +1908,14 @@ class MaterialExportController extends Controller
             'category_id' => ['nullable', 'integer', 'exists:material_categories,id'],
             'material_name' => ['nullable', 'max:255'],
             'technical_specification' => ['nullable', 'max:255'],
+            'quantity' => ['required', 'numeric', 'gt:0', 'max:999999999'],
             'note' => ['required', 'max:500'],
             'source_type' => ['nullable', 'in:regular,risk_assessment'],
         ], [
+            'quantity.required' => 'Vui lòng nhập số lượng cần đề nghị.',
+            'quantity.numeric' => 'Số lượng cần đề nghị phải là số.',
+            'quantity.gt' => 'Số lượng cần đề nghị phải lớn hơn 0.',
+            'quantity.max' => 'Số lượng cần đề nghị quá lớn.',
             'note.required' => 'Vui lòng nhập lý do dự trù.',
             'note.max' => 'Lý do dự trù tối đa 500 ký tự.',
         ]);
@@ -1931,6 +1929,7 @@ class MaterialExportController extends Controller
             $request->category_id ? (int) $request->category_id : null,
             $request->material_name,
             $request->technical_specification,
+            (float) $request->quantity,
             $request->note,
             $request->source_type,
             $this->actor()
@@ -3032,6 +3031,8 @@ class MaterialExportController extends Controller
                     ? (float) $item['stock_at_request']
                     : null,
                 'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
+                // Vật tư dòng này cấp cho Đối Tượng nào - nguồn của Thống Kê Cấp Phát Vật Tư
+                'consumption_object_id' => ! empty($item['consumption_object_id']) ? (int) $item['consumption_object_id'] : null,
                 'note' => $this->nullIfBlank($item['note'] ?? null),
                 'status' => 'pending',
                 'created_at' => now(),
@@ -3733,6 +3734,7 @@ class MaterialExportController extends Controller
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
             'items.*.stock_at_request' => ['nullable', 'numeric'],
             'items.*.purpose' => ['nullable', 'string', 'max:500'],
+            'items.*.consumption_object_id' => ['nullable', 'integer', Rule::exists('consumption_objects', 'id')],
             'items.*.note' => ['nullable', 'string', 'max:500'],
         ];
     }

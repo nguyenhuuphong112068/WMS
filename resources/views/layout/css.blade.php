@@ -55,6 +55,30 @@
                   --shadow-md: 0 4px 12px rgba(var(--primary-rgb), 0.12);
                   --transition-fast: 0.2s ease;
                   --transition-normal: 0.3s ease;
+
+                  /* Nền thẻ, chữ phụ, đường kẻ mảnh */
+                  --surface: #FFFFFF;
+                  --text-muted: #6B7A90;
+                  --border-soft: #E1ECF7;
+
+                  /* ===== Nhóm bảng dữ liệu (trang Cơ Sở Dữ Liệu) ===== */
+                  --db-group-material: #2E7BC4;
+                  --db-group-chemical: #E8663D;
+                  --db-group-standard: #7C5CD6;
+                  --db-group-master: #0E9FB8;
+                  --db-group-user: #16A34A;
+                  --db-group-utility: #D99A0B;
+                  --db-group-system: #64748B;
+                  --db-group-other: #94A3B8;
+
+                  /* Màu trạng thái chuẩn Bootstrap */
+                  --state-success: #16A34A;
+                  --state-warning: #F59E0B;
+                  --state-warning-dark: #B45309;
+                  --state-danger: #DC2626;
+                  --state-success-rgb: 22, 163, 74;
+                  --state-warning-rgb: 245, 158, 11;
+                  --state-danger-rgb: 220, 38, 38;
             }
 
             body {
