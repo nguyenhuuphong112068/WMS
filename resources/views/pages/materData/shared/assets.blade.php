@@ -329,7 +329,9 @@
 
                 $(this).DataTable({
                     autoWidth: false,
-                    responsive: true,
+                    // Bảng có form nhập trong ô gắn data-no-responsive: dòng con của Responsive
+                    // chép HTML ô sang chỗ khác, form chép sang mất sự kiện và trùng name
+                    responsive: !$(this).is('[data-no-responsive]'),
                     paging: !serverPaged,
                     info: !serverPaged,
                     lengthChange: !serverPaged,

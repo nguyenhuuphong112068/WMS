@@ -1,7 +1,9 @@
 {{--
 | SỬ DỤNG VẬT TƯ - MODAL CỦA TAB "VẬT TƯ HỎNG"
-|   #qrCreateModal  : bước 1 - cách ly
-|   #qrEditModal    : sửa số lượng / lý do khi còn đang cách ly
+|   #qrCreateModal    : bước 1 - cách ly NHIỀU mã một lần (mỗi mã một dòng, số lượng mặc định = phần
+|                       còn cách ly được, chung một lý do); server tạo mỗi mã một phiếu cách ly
+|   #qrLotPickerModal : danh mục tồn kho có bộ lọc, tick chọn nhiều mã đổ vào #qrCreateModal
+|   #qrEditModal      : sửa số lượng / lý do khi còn đang cách ly
 |   #qrDecideModal  : bước 2 - quyết định loại bỏ / trả về kho (ký bằng mật khẩu)
 |   #qrDisposeModal : bước 3 - ghi nhận huỷ một hoặc nhiều phiếu (ký bằng mật khẩu)
 --}}
@@ -15,6 +17,37 @@
 
     // Gợi ý phương pháp huỷ - vẫn gõ tự do được
     $qrMethods = ['Đốt', 'Chôn lấp', 'Chuyển đơn vị xử lý chất thải', 'Tái chế / thanh lý phế liệu'];
+
+    // Bộ lọc của Danh mục tồn kho: mức hạn dùng (ngưỡng ở config/material.php) + kho (đoạn đầu mã định khu)
+    $qrCritical = (int) config('material.near_expiry_days.critical', 30);
+    $qrWarning = (int) config('material.near_expiry_days.warning', 60);
+    $qrExpiry = fn($lot) => !$lot->expired_date ? 'none' : ($lot->expiry_level ?: 'ok');
+    $qrWarehouse = fn($lot) => $lot->location_code ? explode('/', $lot->location_code)[0] : '';
+    $qrWarehouses = collect($quarantineLots)->map($qrWarehouse)->filter()->unique()->sort()->values();
+    $qrHasNoLocation = collect($quarantineLots)->contains(fn($lot) => !$lot->location_code);
+
+    // Dữ liệu lô cho JS dựng dòng ở bảng cách ly - (object) để json luôn ra object theo id
+    $qrLotData = collect($quarantineLots)->mapWithKeys(fn($lot) => [
+        $lot->id => [
+            'id' => (int) $lot->id,
+            'code' => $lot->code,
+            'name' => $lot->material_name,
+            'category_code' => $lot->category_code,
+            'limit' => round((float) $lot->quarantinable, 4),
+            'limit_text' => $expNum($lot->quarantinable),
+            'unit' => $lot->unit_short_name,
+            'expired_date' => $lot->expired_date ? \Carbon\Carbon::parse($lot->expired_date)->format('d/m/Y') : '',
+            'expiry' => $qrExpiry($lot),
+            'days' => $lot->days_to_expiry,
+        ],
+    ]);
+
+    // Lỗi của các dòng cách ly (items, items.N.amount...) gom lại hiện dưới bảng
+    $qrItemErrors = collect($qrBag->getMessages())
+        ->filter(fn($messages, $key) => str_starts_with($key, 'items'))
+        ->flatten()
+        ->unique()
+        ->values();
 @endphp
 
 <style>
@@ -75,6 +108,64 @@
         background: #F0FDF4;
     }
 
+    .qr-lot-pick {
+        display: flex;
+        gap: 8px;
+    }
+
+    .qr-lot-pick .qr-lot-select {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .qr-lot-pick .btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        transition: transform 0.2s ease;
+    }
+
+    .qr-lot-pick .btn:hover {
+        transform: translateY(-1px);
+    }
+
+    #qrLotPickerTable thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        vertical-align: middle;
+    }
+
+    #qrLotPickerTable tbody tr.qr-lot-row {
+        cursor: pointer;
+    }
+
+    #qrLotPickerTable tr.is-checked>td {
+        background: var(--primary-soft);
+    }
+
+    #qrCreateItems thead th {
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        vertical-align: middle;
+    }
+
+    #qrCreateItems td {
+        vertical-align: middle;
+    }
+
+    #qrCreateItems tr.is-flash>td {
+        background: #FEF3C7;
+        transition: background 0.3s;
+    }
+
     .qr-dispose-list {
         max-height: 200px;
         overflow-y: auto;
@@ -100,43 +191,60 @@
 
 {{-- ============ BƯỚC 1 - CÁCH LY ============ --}}
 <div class="modal fade md-modal" id="qrCreateModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 1060px;" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-biohazard mr-2"></i>Cách ly vật tư hỏng chờ quyết định</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
-            <form action="{{ route($qrRoute . 'store') }}" method="POST">
+            <form action="{{ route($qrRoute . 'store') }}" method="POST" id="qrCreateForm">
                 @csrf
                 <div class="modal-body">
                     <div class="form-group">
                         <label>Mã xuất nhập cần cách ly <span class="text-danger">*</span></label>
-                        <select name="import_id" class="form-control exp-select {{ $qrBag->has('import_id') ? 'is-invalid' : '' }}">
-                            <option value="">-- Chọn mã xuất nhập trong kho --</option>
-                            @foreach ($quarantineLots as $lot)
-                                <option value="{{ $lot->id }}" data-limit="{{ $lot->quarantinable }}" data-unit="{{ $lot->unit_short_name }}"
-                                    {{ (string) old('import_id') === (string) $lot->id ? 'selected' : '' }}>
-                                    {{ $lot->code }} — {{ $lot->material_name }} (còn {{ $expNum($lot->quarantinable) }} {{ $lot->unit_short_name }}){{ $lot->expired ? ' · HẾT HẠN' : '' }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @if ($qrBag->has('import_id')) <div class="md-error text-danger small">{{ $qrBag->first('import_id') }}</div> @endif
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group col-md-5">
-                            <label>Số lượng cách ly <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <input type="text" inputmode="decimal" name="amount"
-                                    class="form-control js-decimal {{ $qrBag->has('amount') ? 'is-invalid' : '' }}" value="{{ old('amount') }}" required>
-                                <div class="input-group-append"><span class="input-group-text qr-unit">—</span></div>
+                        <div class="qr-lot-pick">
+                            <div class="qr-lot-select">
+                                <select id="qrQuickAdd" class="form-control exp-select">
+                                    <option value="">-- Chọn nhanh mã xuất nhập để thêm --</option>
+                                    @foreach ($quarantineLots as $lot)
+                                        <option value="{{ $lot->id }}">
+                                            {{ $lot->code }} — {{ $lot->material_name }} (còn {{ $expNum($lot->quarantinable) }} {{ $lot->unit_short_name }}){{ $lot->expired ? ' · HẾT HẠN' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
-                            @if ($qrBag->has('amount')) <div class="md-error text-danger small">{{ $qrBag->first('amount') }}</div> @endif
-                            <small class="text-muted qr-limit"></small>
+                            <button type="button" class="btn btn-outline-primary btn-qr-lot-picker"
+                                title="Mở danh mục tồn kho, lọc theo hạn dùng / kho rồi tick chọn nhiều mã">
+                                <i class="fas fa-layer-group mr-1"></i> Danh mục tồn kho
+                            </button>
                         </div>
                     </div>
 
-                    <div class="form-group mb-0">
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered table-sm mb-0" id="qrCreateItems" data-no-datatable>
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 45px">STT</th>
+                                    <th style="width: 170px">Mã Xuất Nhập</th>
+                                    <th>Vật Tư</th>
+                                    <th class="text-center" style="width: 140px">Hạn Dùng</th>
+                                    <th class="text-right" style="width: 130px">Còn Cách Ly Được</th>
+                                    <th style="width: 180px">Số Lượng Cách Ly <span class="text-danger">*</span></th>
+                                    <th class="text-center" style="width: 50px"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="qr-items-empty">
+                                    <td colspan="7" class="text-center text-muted py-3">Chưa chọn mã xuất nhập nào.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    @foreach ($qrItemErrors as $qrItemError)
+                        <div class="md-error text-danger small">{{ $qrItemError }}</div>
+                    @endforeach
+
+                    <div class="form-group mb-0 mt-3">
                         <label>Lý do cách ly <span class="text-danger">*</span></label>
                         <textarea name="reason" rows="2" maxlength="500" required
                             class="form-control {{ $qrBag->has('reason') ? 'is-invalid' : '' }}"
@@ -146,9 +254,145 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-danger"><i class="fas fa-biohazard mr-1"></i> Cách ly</button>
+                    <button type="submit" class="btn btn-danger" id="qrCreateSubmit" disabled>
+                        <i class="fas fa-biohazard mr-1"></i> Cách ly <span class="qr-create-count"></span>
+                    </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+{{-- ============ DANH MỤC TỒN KHO - CHỌN MÃ CẦN CÁCH LY ============ --}}
+<div class="modal fade md-modal" id="qrLotPickerModal" tabindex="-1" role="dialog" aria-hidden="true" style="z-index: 1065;">
+    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 92vw;" role="document">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-light py-2">
+                <h5 class="modal-title font-weight-bold text-primary" style="font-size: 1.05rem;">
+                    <i class="fas fa-layer-group mr-2"></i> Danh Mục Tồn Kho - Chọn Mã Cần Cách Ly
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+
+            <div class="modal-body p-3">
+                <div class="form-row align-items-end mb-3">
+                    <div class="col-md-5 mb-2 mb-md-0">
+                        <label class="mb-1">Tìm kiếm</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                            </div>
+                            <input type="text" id="qrPickerSearch" class="form-control" autocomplete="off"
+                                placeholder="Mã xuất nhập, mã / tên vật tư, quy cách, định khu...">
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2 mb-md-0">
+                        <label class="mb-1">Hạn dùng</label>
+                        <select id="qrPickerExpiry" class="form-control">
+                            <option value="">Tất cả</option>
+                            <option value="expired">Đã hết hạn</option>
+                            <option value="critical">Sát hạn (≤ {{ $qrCritical }} ngày)</option>
+                            <option value="warning">Cận hạn ({{ $qrCritical + 1 }}–{{ $qrWarning }} ngày)</option>
+                            <option value="ok">Còn hạn</option>
+                            <option value="none">Không có hạn dùng</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-2 mb-md-0">
+                        <label class="mb-1">Kho</label>
+                        <select id="qrPickerWarehouse" class="form-control">
+                            <option value="">Tất cả kho</option>
+                            @foreach ($qrWarehouses as $warehouse)
+                                <option value="{{ $warehouse }}">{{ $warehouse }}</option>
+                            @endforeach
+                            @if ($qrHasNoLocation)
+                                <option value="__none">Chưa xếp vị trí</option>
+                            @endif
+                        </select>
+                    </div>
+                    <div class="col-md-2 text-md-right">
+                        <span class="badge badge-info px-2 py-2" id="qrPickerCount" style="font-size: 0.85rem;">{{ count($quarantineLots) }} mã</span>
+                    </div>
+                </div>
+
+                <div class="table-responsive border rounded" style="max-height: 58vh; overflow-y: auto;">
+                    <table class="table table-sm table-bordered table-hover mb-0" id="qrLotPickerTable" style="font-size: 0.88rem;" data-no-datatable>
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width: 45px">
+                                    <input type="checkbox" id="qrPickerCheckAll" class="pick-check" title="Chọn tất cả mã đang hiện">
+                                </th>
+                                <th class="text-center" style="width: 45px">STT</th>
+                                <th style="width: 170px">Mã Xuất Nhập</th>
+                                <th style="min-width: 220px">Vật Tư</th>
+                                <th style="width: 150px">Định Khu</th>
+                                <th class="text-center" style="width: 100px">Ngày Nhập</th>
+                                <th class="text-center" style="width: 150px">Hạn Dùng</th>
+                                <th class="text-right" style="width: 140px">Còn Cách Ly Được</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($quarantineLots as $lot)
+                                @php
+                                    $lotExpiry = $qrExpiry($lot);
+                                    $lotWarehouse = $qrWarehouse($lot);
+                                @endphp
+                                <tr class="qr-lot-row" data-id="{{ $lot->id }}" data-expiry="{{ $lotExpiry }}"
+                                    data-warehouse="{{ $lotWarehouse !== '' ? $lotWarehouse : '__none' }}"
+                                    data-search="{{ implode(' ', array_filter([$lot->code, $lot->category_code, $lot->material_name, $lot->technical_specification, $lot->location_code])) }}">
+                                    <td class="text-center">
+                                        <input type="checkbox" class="qr-lot-check pick-check" value="{{ $lot->id }}">
+                                    </td>
+                                    <td class="text-center text-muted qr-lot-no">{{ $loop->iteration }}</td>
+                                    <td><span class="exp-code font-weight-bold">{{ $lot->code }}</span></td>
+                                    <td>
+                                        <div class="font-weight-bold">{{ $lot->material_name ?: '—' }}</div>
+                                        @if ($lot->category_code)
+                                            <span class="md-tag">{{ $lot->category_code }}</span>
+                                        @endif
+                                        @if ($lot->technical_specification)
+                                            <div class="small text-muted">{{ $lot->technical_specification }}</div>
+                                        @endif
+                                    </td>
+                                    <td>{{ $lot->location_code ?: '—' }}</td>
+                                    <td class="text-center">{{ $expDate($lot->imported_date) }}</td>
+                                    <td class="text-center">
+                                        @if ($lot->expired_date)
+                                            <div>{{ $expDate($lot->expired_date) }}</div>
+                                            @if ($lotExpiry === 'expired')
+                                                <span class="badge badge-danger">Hết hạn</span>
+                                            @elseif ($lotExpiry === 'critical')
+                                                <span class="badge badge-danger">Sát hạn · còn {{ $lot->days_to_expiry }} ngày</span>
+                                            @elseif ($lotExpiry === 'warning')
+                                                <span class="badge badge-warning">Cận hạn · còn {{ $lot->days_to_expiry }} ngày</span>
+                                            @endif
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                    <td class="text-right font-weight-bold">{{ $expNum($lot->quarantinable) }} <span class="md-sub">{{ $lot->unit_short_name }}</span></td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">Kho không còn mã xuất nhập nào còn tồn để cách ly.</td>
+                                </tr>
+                            @endforelse
+                            <tr class="qr-lot-none" style="display: none;">
+                                <td colspan="8" class="text-center text-muted py-4">Không có mã nào khớp bộ lọc.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer py-2 d-flex justify-content-between">
+                <span class="font-weight-bold text-primary" id="qrPickerSelected">Đã chọn: 0 mã</span>
+                <div>
+                    <button type="button" class="btn btn-secondary mr-2" data-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-primary" id="qrPickerConfirm">
+                        <i class="fas fa-check mr-1"></i> Dùng các mã đã chọn
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -309,15 +553,265 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        /* ---------- Bước 1: chọn lô -> đơn vị + số còn cách ly được ---------- */
-        function qrPaintLot() {
-            var $o = $('#qrCreateModal [name="import_id"]').find(':selected');
-            $('#qrCreateModal .qr-unit').text($o.data('unit') || '—');
-            $('#qrCreateModal .qr-limit').text($o.val() ? ('Còn cách ly được tối đa: ' + ($o.data('limit') || 0) + ' ' + ($o.data('unit') || '')) : '');
+        /* ---------- Bước 1: bảng các mã cần cách ly ---------- */
+        var qrLots = @json((object) $qrLotData->all());
+        var $qrItems = $('#qrCreateItems tbody');
+        var qrSeq = 0;
+        var QR_EPS = 0.00005;
+
+        function qrEsc(value) {
+            return $('<div>').text(value == null ? '' : value).html();
         }
 
-        $(document).on('change', '#qrCreateModal [name="import_id"]', qrPaintLot);
-        qrPaintLot();
+        function qrExpiryHtml(lot) {
+            if (!lot.expired_date) return '—';
+
+            var badge = '';
+
+            if (lot.expiry === 'expired') badge = '<span class="badge badge-danger">Hết hạn</span>';
+            else if (lot.expiry === 'critical') badge = '<span class="badge badge-danger">Sát hạn · còn ' + lot.days + ' ngày</span>';
+            else if (lot.expiry === 'warning') badge = '<span class="badge badge-warning">Cận hạn · còn ' + lot.days + ' ngày</span>';
+
+            return '<div>' + qrEsc(lot.expired_date) + '</div>' + badge;
+        }
+
+        function qrItemRow(id) {
+            return $qrItems.find('tr.qr-item[data-id="' + id + '"]');
+        }
+
+        // Thêm một mã vào bảng - số lượng mặc định = toàn bộ phần còn cách ly được
+        function qrAddItem(id, amount) {
+            var lot = qrLots[String(id)];
+
+            if (!lot) return;
+
+            if (qrItemRow(id).length) {
+                var $row = qrItemRow(id).addClass('is-flash');
+                setTimeout(function () { $row.removeClass('is-flash'); }, 800);
+
+                return;
+            }
+
+            var i = qrSeq++;
+            var value = (amount !== undefined && amount !== null && amount !== '') ? amount : lot.limit;
+
+            $qrItems.append(
+                '<tr class="qr-item" data-id="' + lot.id + '">' +
+                    '<td class="text-center qr-item-no"></td>' +
+                    '<td><span class="exp-code font-weight-bold">' + qrEsc(lot.code) + '</span>' +
+                        '<input type="hidden" name="items[' + i + '][import_id]" value="' + lot.id + '"></td>' +
+                    '<td><div class="font-weight-bold">' + qrEsc(lot.name || '—') + '</div>' +
+                        (lot.category_code ? '<span class="md-tag">' + qrEsc(lot.category_code) + '</span>' : '') + '</td>' +
+                    '<td class="text-center">' + qrExpiryHtml(lot) + '</td>' +
+                    '<td class="text-right">' + qrEsc(lot.limit_text) + ' <span class="md-sub">' + qrEsc(lot.unit) + '</span></td>' +
+                    '<td><div class="input-group input-group-sm">' +
+                        '<input type="text" inputmode="decimal" class="form-control js-decimal qr-item-amount" required' +
+                        ' name="items[' + i + '][amount]" value="' + qrEsc(value) + '">' +
+                        '<div class="input-group-append"><span class="input-group-text">' + qrEsc(lot.unit || '—') + '</span></div>' +
+                    '</div></td>' +
+                    '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-secondary qr-item-drop" title="Bỏ mã này">' +
+                        '<i class="fas fa-times"></i></button></td>' +
+                '</tr>'
+            );
+        }
+
+        // Số lượng phải > 0 và không vượt phần còn cách ly được của mã đó
+        function qrCheckAmount(el) {
+            var $input = $(el);
+            var lot = qrLots[String($input.closest('tr').attr('data-id'))];
+            var amount = parseFloat($input.val());
+
+            $input.toggleClass('is-invalid', !(amount > QR_EPS) || (!!lot && amount > lot.limit + QR_EPS));
+        }
+
+        function qrSyncItems() {
+            var $rows = $qrItems.find('tr.qr-item');
+
+            $rows.each(function (n) {
+                $(this).find('.qr-item-no').text(n + 1);
+                qrCheckAmount($(this).find('.qr-item-amount'));
+            });
+
+            $qrItems.find('.qr-items-empty').toggle(!$rows.length);
+            $('#qrCreateSubmit').prop('disabled', !$rows.length)
+                .find('.qr-create-count').text($rows.length ? '(' + $rows.length + ' mã)' : '');
+        }
+
+        $(document).on('input', '.qr-item-amount', function () {
+            qrCheckAmount(this);
+        });
+
+        $(document).on('click', '.qr-item-drop', function () {
+            $(this).closest('tr').remove();
+            qrSyncItems();
+        });
+
+        $('#qrQuickAdd').on('change', function () {
+            var id = $(this).val();
+
+            if (!id) return;
+
+            qrAddItem(id);
+            qrSyncItems();
+            $(this).val('').trigger('change');
+        });
+
+        $('#qrCreateForm').on('submit', function (e) {
+            var $rows = $qrItems.find('tr.qr-item');
+
+            $rows.find('.qr-item-amount').each(function () { qrCheckAmount(this); });
+
+            if (!$rows.length || $rows.find('.qr-item-amount.is-invalid').length) {
+                e.preventDefault();
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Chưa cách ly được',
+                    text: !$rows.length
+                        ? 'Vui lòng chọn ít nhất một mã xuất nhập cần cách ly.'
+                        : 'Số lượng cách ly phải lớn hơn 0 và không vượt phần còn cách ly được của mã đó.',
+                    confirmButtonText: 'Đã hiểu'
+                });
+            }
+        });
+
+        qrSyncItems();
+
+        /*
+        | Mở modal cách ly với ĐÚNG các mã truyền vào (bỏ các dòng đang có) - dùng ở nhóm "Vật tư
+        | sắp hết hạn dùng". Lý do chỉ điền sẵn khi ô lý do đang trống.
+        */
+        window.qrOpenCreate = function (ids, reason) {
+            $qrItems.find('tr.qr-item').remove();
+
+            (ids || []).forEach(function (id) {
+                qrAddItem(id);
+            });
+
+            qrSyncItems();
+
+            var $reason = $('#qrCreateModal [name="reason"]');
+
+            if (reason && !$.trim($reason.val())) {
+                $reason.val(reason);
+            }
+
+            $('#qrCreateModal').modal('show');
+        };
+
+        /* ---------- Danh mục tồn kho: lọc + tick chọn nhiều mã ---------- */
+        var $qrPicker = $('#qrLotPickerModal');
+        var $qrLotRows = $qrPicker.find('.qr-lot-row');
+
+        // Tìm không cần gõ dấu: "bac dan" vẫn ra "Bạc đạn"
+        function qrPlain(text) {
+            return String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+        }
+
+        $qrLotRows.each(function () {
+            $(this).data('plain', qrPlain($(this).attr('data-search')));
+        });
+
+        function qrPaintPicked() {
+            var picked = 0;
+
+            $qrLotRows.each(function () {
+                var on = $(this).find('.qr-lot-check').prop('checked');
+
+                $(this).toggleClass('is-checked', on);
+                if (on) picked++;
+            });
+
+            var $visible = $qrLotRows.filter(':visible');
+
+            $('#qrPickerSelected').text('Đã chọn: ' + picked + ' mã');
+            $('#qrPickerCheckAll').prop('checked', $visible.length > 0 && $visible.find('.qr-lot-check:not(:checked)').length === 0);
+        }
+
+        function qrFilterLots() {
+            var words = qrPlain($('#qrPickerSearch').val()).split(/\s+/).filter(Boolean);
+            var expiry = $('#qrPickerExpiry').val();
+            var warehouse = $('#qrPickerWarehouse').val();
+            var shown = 0;
+
+            $qrLotRows.each(function () {
+                var $row = $(this);
+                var plain = $row.data('plain');
+                var match = (!expiry || $row.attr('data-expiry') === expiry)
+                    && (!warehouse || $row.attr('data-warehouse') === warehouse)
+                    && words.every(function (word) { return plain.indexOf(word) !== -1; });
+
+                $row.toggle(match);
+
+                if (match) $row.find('.qr-lot-no').text(++shown);
+            });
+
+            $qrPicker.find('.qr-lot-none').toggle($qrLotRows.length > 0 && shown === 0);
+            $('#qrPickerCount').text(shown + ' mã');
+            qrPaintPicked();
+        }
+
+        $('#qrPickerSearch').on('input', qrFilterLots);
+        $('#qrPickerExpiry, #qrPickerWarehouse').on('change', qrFilterLots);
+
+        // Bấm cả dòng cũng tick / bỏ tick
+        $qrPicker.on('click', '.qr-lot-row', function (e) {
+            if ($(e.target).is('.qr-lot-check')) return;
+
+            var $check = $(this).find('.qr-lot-check');
+            $check.prop('checked', !$check.prop('checked'));
+            qrPaintPicked();
+        });
+
+        $qrPicker.on('change', '.qr-lot-check', qrPaintPicked);
+
+        // Chọn tất cả: chỉ áp cho các mã đang hiện theo bộ lọc
+        $('#qrPickerCheckAll').on('change', function () {
+            $qrLotRows.filter(':visible').find('.qr-lot-check').prop('checked', $(this).prop('checked'));
+            qrPaintPicked();
+        });
+
+        // Mở bảng: tick sẵn các mã đang có trong bảng cách ly
+        $(document).on('click', '.btn-qr-lot-picker', function () {
+            $qrLotRows.each(function () {
+                $(this).find('.qr-lot-check').prop('checked', qrItemRow($(this).attr('data-id')).length > 0);
+            });
+
+            qrFilterLots();
+            $qrPicker.modal('show');
+        });
+
+        $qrPicker.on('shown.bs.modal', function () {
+            $('#qrPickerSearch').trigger('focus');
+        });
+
+        // Bảng cách ly = đúng các mã đang tick: thêm mã mới (số lượng mặc định = tồn), bỏ mã đã bỏ tick,
+        // mã giữ nguyên thì giữ số lượng người dùng đã sửa
+        $('#qrPickerConfirm').on('click', function () {
+            var picked = {};
+
+            $qrLotRows.find('.qr-lot-check:checked').each(function () {
+                picked[String($(this).val())] = true;
+            });
+
+            $qrItems.find('tr.qr-item').each(function () {
+                if (!picked[String($(this).attr('data-id'))]) $(this).remove();
+            });
+
+            $qrLotRows.find('.qr-lot-check:checked').each(function () {
+                qrAddItem($(this).val());
+            });
+
+            qrSyncItems();
+            $qrPicker.modal('hide');
+        });
+
+        // Bảng chồng lên modal cách ly: đóng bảng thì trả lại trạng thái cuộn cho modal bên dưới
+        $qrPicker.on('hidden.bs.modal', function () {
+            if ($('.modal.show').length) {
+                $('body').addClass('modal-open');
+            }
+        });
 
         /* ---------- Sửa phiếu đang cách ly ---------- */
         $(document).on('click', '.btn-qr-edit', function () {
@@ -411,6 +905,10 @@
 
         /* ---------- Lỗi validate / sai mật khẩu: mở lại đúng modal ---------- */
         @if ($qrBag->any())
+            @json(array_values((array) old('items', []))).forEach(function (item) {
+                if (item && item.import_id) qrAddItem(item.import_id, item.amount);
+            });
+            qrSyncItems();
             $('#qrCreateModal').modal('show');
         @endif
 

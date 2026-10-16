@@ -1,6 +1,19 @@
 
         <script src="{{asset ('dataTable/plugins/jquery/jquery.min.js')}}"></script>
         <script src="{{asset ('dataTable/plugins/bootstrap/js/bootstrap.bundle.min.js')}}"></script>
+        {{--
+        | Hộp SweetAlert mở chồng lên modal Bootstrap: modal giữ con trỏ trong chính nó
+        | (focusin.bs.modal) nên ô nhập của SweetAlert không gõ được. Chặn sự kiện focusin
+        | phát ra từ trong SweetAlert trước khi tới handler của modal. Gắn ngay sau
+        | Bootstrap để luôn chạy trước handler modal gắn lúc mở (jQuery chạy theo thứ tự gắn).
+        --}}
+        <script>
+                $(document).on('focusin', function (e) {
+                        if ($(e.target).closest('.swal2-container').length) {
+                                e.stopImmediatePropagation();
+                        }
+                });
+        </script>
         <script src="{{asset ('dataTable/plugins/datatables/jquery.dataTables.min.js')}}"></script>
         <script src="{{asset ('dataTable/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js')}}"></script>
         <script src="{{asset ('dataTable/plugins/datatables-responsive/js/dataTables.responsive.min.js')}}"></script>

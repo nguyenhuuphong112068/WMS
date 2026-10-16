@@ -918,15 +918,13 @@
             var $modal = $('#rejectModal');
 
             $modal.find('[name="id"]').val($(this).data('id'));
-            $modal.find('[name="scope"]').val($(this).data('scope') || '');
             $modal.find('.est-reject-code').val($(this).data('code'));
             $modal.modal('show');
         });
 
-        /* ---------- Modal Trình ký: nhận id + mã phiếu + dựng lại bước ký đã khai trước đó ---------- */
+        /* ---------- Modal Trình ký: nhận id + mã phiếu (quy trình ký cố định, chỉ hiển thị) ---------- */
         $(document).on('click', '.btn-est-submit', function() {
             var $modal = $('#submitModal');
-            var signers = $(this).data('signers') || [];
 
             $modal.find('[name="id"]').val($(this).data('id'));
             $modal.find('[name="code"]').val($(this).data('code'));
@@ -935,11 +933,6 @@
             $modal.find('.est-submit-code').text($(this).data('code'));
             $modal.find('.md-error').remove();
             $modal.find('.is-invalid').removeClass('is-invalid');
-
-            var $box = $modal.find('.esf-box');
-            if ($box.length && window.esfLoad) {
-                window.esfLoad($box, signers);
-            }
 
             $modal.modal('show');
         });

@@ -275,7 +275,8 @@ class PeriodicRequestController extends Controller
         }
 
         return redirect()
-            ->route('pages.export.materialExport.list', ['tab' => $isExternal ? 'transfer' : 'request'])
+            // Liên phòng ban gửi tới Hành Chính nằm ở tab Đề nghị VPP
+            ->route('pages.export.materialExport.list', ['tab' => $isExternal ? \App\Support\MaterialVpp::tabFor((int) $current->to_department_id) : 'request'])
             ->with('success', 'Đã tạo đề nghị '.$result['code'].' ở trạng thái Lưu tạm. Kiểm tra, điều chỉnh rồi '
                 .($isExternal ? 'gửi đề nghị.' : 'trình ký.'));
     }
@@ -429,6 +430,15 @@ class PeriodicRequestController extends Controller
         }
 
         $validator = Validator::make($request->all(), $rules, $messages);
+
+        // Liên phòng ban gửi tới phòng Hành Chính (đề nghị VPP): chỉ vật tư Hành Chánh mua
+        if ($type === MaterialPeriodicRequest::TYPE_EXTERNAL && \App\Support\MaterialVpp::isVppDepartment((int) $request->to_department_id)) {
+            $validator->after(function ($validator) use ($request) {
+                foreach (\App\Support\MaterialVpp::itemErrors((array) $request->items) as $key => $message) {
+                    $validator->errors()->add($key, 'Phòng cấp phát là Hành Chính - '.mb_strtolower(mb_substr($message, 0, 1)).mb_substr($message, 1));
+                }
+            });
+        }
 
         if ($isCal) {
             $validator->after(function ($validator) use ($request, $object, $current) {

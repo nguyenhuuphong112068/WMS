@@ -9,10 +9,13 @@ use Illuminate\Support\Facades\DB;
 /**
  * DANH MỤC VẬT TƯ CÔNG TY MẪU (DUMMY) - ĐỦ MA TRẬN PHÂN LOẠI
  *
- * Sinh một dòng material_categories cho MỖI tổ hợp của 6 tiêu chí phân loại:
+ * Sinh một dòng material_categories cho MỖI tổ hợp của 5 tiêu chí phân loại:
  *
  *   Theo giá trị (2) × Mức độ quan trọng (2) × Hàng hoá nguy hiểm (2)
- *   × Bộ phận mua hàng (3) × Cấp phát bởi Hành Chánh (2) × Cần hiệu chuẩn (2) = 96 dòng
+ *   × Bộ phận mua hàng (2) × Cần hiệu chuẩn (2) = 32 dòng
+ *
+ * (Trước 16/10/2026 có thêm Bộ phận mua hàng IT và tiêu chí "Cấp phát bởi Hành Chánh" nên
+ * ma trận cũ là 96 dòng MATRIX #01..#96 - các dòng đó vẫn giữ, nhiều dòng giờ trùng tổ hợp.)
  *
  * Bộ tiêu chí đọc thẳng từ App\Support\MaterialClassification nên đổi tiêu chí ở đó thì
  * seeder tự sinh theo. Tên vật tư lấy lần lượt từ dữ liệu gốc đã duyệt / đang hoạt động,

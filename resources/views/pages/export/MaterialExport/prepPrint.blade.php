@@ -5,7 +5,7 @@
 | Mỗi dòng là MỘT LÔ ở MỘT vị trí, xếp theo đường đi trong kho (kho -> kệ -> cột -> tầng)
 | để nhân viên đi một vòng là lấy đủ. Cột cuối để tích tay khi đã lấy xong.
 |
-| Dữ liệu vào: $prepLines, $prepGroups, $department - xem MaterialExportController::prepPrint().
+| Dữ liệu vào: $prepLines, $prepGroups, $prepRange, $department - xem MaterialExportController::prepPrint().
 --}}
 
 @php
@@ -15,6 +15,9 @@
     $prpShort = collect($prepGroups)->filter(fn($group) => (float) $group['shortage'] > 0.00005);
 
     $prpTypeLabel = ['periodic' => 'Định kỳ', 'risk_assessment' => 'ĐG rủi ro', 'regular' => 'Thường quy'];
+
+    // Khoảng "Ngày mong muốn" đang lọc ở tab - giữ lại khi quay về
+    $prpRangeQuery = array_filter(['prep_from' => $prepRange['from'], 'prep_to' => $prepRange['to']]);
 @endphp
 <!DOCTYPE html>
 <html lang="vi">
@@ -290,7 +293,7 @@
 
     <div class="toolbar">
         <button type="button" class="go" onclick="window.print()">In / Lưu thành PDF</button>
-        <a class="back" href="{{ route('pages.export.materialExport.list', ['tab' => 'prepare']) }}">Quay lại</a>
+        <a class="back" href="{{ route('pages.export.materialExport.list', ['tab' => 'prepare'] + $prpRangeQuery) }}">Quay lại</a>
         <span class="note">Hộp thoại in hiện ra, chọn máy in hoặc "Save as PDF" / "Microsoft Print to PDF".</span>
     </div>
 
@@ -313,9 +316,14 @@
 
         <div class="meta">
             <div>Số phiếu đề nghị: <b>{{ count($prepRequests) }}</b></div>
-            <div>Số vật tư cần soạn: <b>{{ count($prepGroups) }}</b></div>
+            <div>Số dòng đề nghị cần soạn: <b>{{ count($prepGroups) }}</b></div>
             <div>Số lượt lấy hàng: <b>{{ count($prepLines) }}</b></div>
-            <div>Vật tư thiếu hàng: <b class="{{ $prpShort->count() ? 'warn' : '' }}">{{ $prpShort->count() }}</b></div>
+            <div>Dòng thiếu hàng: <b class="{{ $prpShort->count() ? 'warn' : '' }}">{{ $prpShort->count() }}</b></div>
+            @if ($prpRangeQuery)
+                <div>Ngày mong muốn:
+                    <b>{{ $prepRange['from'] ? 'từ ' . $prpDate($prepRange['from']) : '' }}{{ $prepRange['from'] && $prepRange['to'] ? ' ' : '' }}{{ $prepRange['to'] ? 'đến ' . $prpDate($prepRange['to']) : '' }}</b>
+                </div>
+            @endif
         </div>
 
         <div class="section">1. Danh sách lấy hàng (theo đường đi trong kho)</div>

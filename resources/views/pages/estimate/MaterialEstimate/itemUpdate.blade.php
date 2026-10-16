@@ -22,7 +22,11 @@
 
                 <div class="modal-body">
 
-                    <div class="form-group">
+                    {{--
+                    | Nguồn vật tư cố định theo dòng đang sửa, không cho đổi qua lại: radio vẫn giữ
+                    | (ẩn) vì JS dùng chung đọc [name="source"]:checked để hiện đúng khối danh mục / tự nhập.
+                    --}}
+                    <div class="form-group d-none">
                         <label>Nguồn Vật Tư <span class="text-danger">*</span></label>
                         <div>
                             <label class="est-switch">

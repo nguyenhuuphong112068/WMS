@@ -3,17 +3,19 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Http\Controllers\General\NotificationController;
-use App\Support\CompanyContext;
+use App\Support\EstimateSigner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 /**
  * DỰ TRÙ - QUY TRÌNH KÝ DUYỆT ĐỘNG (dùng chung 3 controller dự trù).
  *
- * Song song với cơ chế của MaterialExportController: người lập phiếu tự khai số bước ký và
- * người ký đích danh từng bước (bảng <loại>_estimate_signs), ký tuần tự theo step_no, mỗi
- * bước đúng người được chỉ định (nhập lại mật khẩu - 21 CFR Part 11). Tối thiểu 2 bước, bước
- * cuối bắt buộc thuộc vai trò config('estimate.bod_roles').
+ * Quy trình CỐ ĐỊNH 2 bước (bảng <loại>_estimate_signs), ký tuần tự theo step_no, nhập lại
+ * mật khẩu khi ký (21 CFR Part 11):
+ *   - Bước 1: Quản Lý Bộ Phận của phòng lập phiếu - ghi theo vai trò (user_id NULL), mọi người
+ *     thuộc vai trò đó của phòng đều ký được (App\Support\EstimateSigner).
+ *   - Bước 2: Ban Giám Đốc - người lập chọn đích danh trong modal Trình ký.
  *
  * Class dùng trait phải khai các hằng:
  *   - self::TABLE        : bảng đầu phiếu (vd 'chemical_estimates')
@@ -24,131 +26,68 @@ use Illuminate\Support\Facades\DB;
  */
 trait EstimateSignFlow
 {
-    /** Danh sách người ký chọn được - nạp một lần cho cả request. */
-    private $signerOptionsCache = null;
-
     /* ==========================================================
-     |  KHAI QUY TRÌNH KÝ (modal Lập / Sửa phiếu)
+     |  QUY TRÌNH KÝ (modal Trình ký)
      ========================================================== */
 
-    /**
-     * Người có thể được chọn làm người ký: user đang hoạt động thuộc CÙNG CÔNG TY với phòng
-     * ban đang chọn (để trình ký lên cấp trên ngoài phòng - Ban Giám Đốc...).
-     *
-     * Mỗi người kèm 'role_names' = MỌI vai trò của họ (role chính + role gán qua user_role
-     * có phạm vi NULL hoặc đúng phòng ban đang chọn) để lọc người ký BƯỚC CUỐI theo
-     * config('estimate.bod_roles') mà không phụ thuộc vai trò nào được đặt làm chính.
-     */
-    protected function signerOptions()
+    /** Quy trình ký cố định: bước 1 Quản Lý Bộ Phận, bước 2 Ban Giám Đốc - xem config/estimate.php. */
+    protected function signFlowStepCount(): int
     {
-        if ($this->signerOptionsCache !== null) {
-            return $this->signerOptionsCache;
-        }
-
-        $companyId = CompanyContext::currentId();
-        $departmentIds = CompanyContext::departmentIds($companyId);
-        $currentDeptId = (int) (session('user')['selected_department_id'] ?? 0);
-
-        $people = DB::table('user_management')
-            ->leftJoin('deparments', 'deparments.id', '=', 'user_management.deparment_id')
-            ->leftJoin('roles', 'roles.id', '=', 'user_management.role_id')
-            ->select(
-                'user_management.id',
-                'user_management.fullName',
-                'user_management.userName',
-                'deparments.shortName as department_short',
-                'roles.name as role_name'
-            )
-            ->where('user_management.isActive', 1)
-            ->when($companyId, fn ($query) => $query->where(function ($sub) use ($companyId, $departmentIds) {
-                if ($departmentIds) {
-                    $sub->whereIn('user_management.deparment_id', $departmentIds);
-                }
-                $sub->orWhere(fn ($q) => $q->whereNull('user_management.deparment_id')
-                    ->where('user_management.company_id', $companyId));
-            }))
-            ->orderBy('user_management.fullName', 'asc')
-            ->get();
-
-        $assignedRoles = DB::table('user_role')
-            ->join('roles', 'roles.id', '=', 'user_role.role_id')
-            ->whereIn('user_role.user_id', $people->pluck('id'))
-            ->where(function ($q) use ($currentDeptId) {
-                $q->whereNull('user_role.department_id');
-                if ($currentDeptId) {
-                    $q->orWhere('user_role.department_id', $currentDeptId);
-                }
-            })
-            ->get(['user_role.user_id', 'roles.name'])
-            ->groupBy('user_id');
-
-        foreach ($people as $person) {
-            $names = $assignedRoles->get($person->id, collect())->pluck('name')->all();
-            if ($person->role_name) {
-                $names[] = $person->role_name;
-            }
-            $person->role_names = array_values(array_unique(array_filter($names)));
-        }
-
-        return $this->signerOptionsCache = $people;
-    }
-
-    /** Id người ký trên form, giữ nguyên thứ tự và bỏ các ô để trống / trùng. */
-    protected function signerIds(Request $request): array
-    {
-        $ids = [];
-
-        foreach ((array) $request->input('signers', []) as $value) {
-            $id = (int) $value;
-
-            if ($id > 0 && ! in_array($id, $ids, true)) {
-                $ids[] = $id;
-            }
-        }
-
-        return $ids;
+        return 2;
     }
 
     /**
-     * Kiểm tra quy trình ký hợp lệ: tối thiểu 2 bước, bước cuối là Ban Giám Đốc.
-     * Trả về câu lỗi, hoặc null nếu hợp lệ.
+     * Validator của modal Trình ký. Người lập không chọn người ký nữa: cả 2 bước tự gán theo vai
+     * trò + phạm vi phòng ban (App\Support\EstimateSigner), chỉ cần phòng có đủ người ở mỗi bước.
      */
-    protected function validateSignerFlow(array $signerIds): ?string
+    protected function signFlowValidator(Request $request, int $departmentId)
     {
-        if (count($signerIds) < 2) {
-            return 'Quy trình ký duyệt phải có tối thiểu 2 bước.';
+        $validator = Validator::make([], []);
+
+        $validator->after(function ($validator) use ($departmentId) {
+            if ($flowError = $this->validateSignerFlow($departmentId)) {
+                $validator->errors()->add('signers', $flowError);
+            }
+        });
+
+        return $validator;
+    }
+
+    /**
+     * Phòng lập phiếu có đủ người ký cho cả 2 bước không. Trả về câu lỗi, hoặc null nếu hợp lệ.
+     */
+    protected function validateSignerFlow(int $departmentId): ?string
+    {
+        if (EstimateSigner::managers($departmentId)->isEmpty()) {
+            return 'Phòng ban chưa có tài khoản nào thuộc vai trò '.implode(' / ', EstimateSigner::managerRoles()).' để ký bước 1.';
         }
 
-        $lastId = end($signerIds);
-        $bodRoles = config('estimate.bod_roles');
-
-        if (! user_has_any_role($lastId, $bodRoles)) {
-            return 'Người ký ở bước cuối phải thuộc vai trò '.implode(' / ', $bodRoles).'.';
+        if (EstimateSigner::bods($departmentId)->isEmpty()) {
+            return 'Phòng ban chưa có tài khoản '.implode(' / ', EstimateSigner::bodRoles()).' nào được phân quyền (phạm vi phòng ban) để ký bước 2.';
         }
 
         return null;
     }
 
-    /** Ghi các bước ký của một phiếu theo đúng thứ tự người dùng xếp trên form. */
+    /**
+     * Ghi 2 bước ký, cả hai theo VAI TRÒ (user_id NULL): bước 1 Quản Lý Bộ Phận, bước 2 Ban Giám
+     * Đốc - ai thuộc vai trò đó với phạm vi bao gồm phòng lập phiếu cũng ký được.
+     */
     protected function insertSigns(int $listId, Request $request): void
     {
-        $people = $this->signerOptions()->keyBy('id');
+        $base = [
+            self::ESTIMATE_FK => $listId,
+            'user_id' => null,
+            'user_name' => null,
+            'status' => 'pending',
+            'active' => 1,
+            'created_by' => $this->actor(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
 
-        foreach ($this->signerIds($request) as $index => $userId) {
-            $person = $people->get($userId);
-
-            DB::table(self::SIGN_TABLE)->insert([
-                self::ESTIMATE_FK => $listId,
-                'step_no' => $index + 1,
-                'user_id' => $userId,
-                'user_name' => $person ? $this->personName($person) : null,
-                'status' => 'pending',
-                'active' => 1,
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
+        DB::table(self::SIGN_TABLE)->insert($base + ['step_no' => 1, 'role_names' => implode(', ', EstimateSigner::managerRoles())]);
+        DB::table(self::SIGN_TABLE)->insert($base + ['step_no' => 2, 'role_names' => implode(', ', EstimateSigner::bodRoles())]);
     }
 
     /** Sửa phiếu là khai lại quy trình: không xoá cứng, chỉ bỏ hiệu lực các bước cũ. */
@@ -238,6 +177,14 @@ trait EstimateSignFlow
             return (int) $sign->user_id === $userId;
         }
 
+        // Bước Quản Lý Bộ Phận / Ban Giám Đốc: phải có vai trò với phạm vi bao gồm ĐÚNG phòng lập phiếu
+        if (EstimateSigner::isScopedStep($sign)) {
+            $departmentId = (int) DB::table(self::TABLE)->where('id', $sign->{self::ESTIMATE_FK})->value('department_id');
+
+            return EstimateSigner::canSign($userId, $sign, $departmentId);
+        }
+
+        // Phiếu chuyển từ luồng 2 bước cũ: chỉ có role_names
         $roles = array_values(array_filter(array_map('trim', explode(',', (string) $sign->role_names))));
 
         return $roles ? user_has_any_role($userId, $roles) : false;
@@ -271,11 +218,22 @@ trait EstimateSignFlow
         $rows = DB::table(self::SIGN_TABLE)
             ->where(self::ESTIMATE_FK, $listId)
             ->where('active', 1)
-            ->get(['step_no', 'user_id']);
+            ->get(['step_no', 'user_id', 'role_names']);
 
         $target = $rows->firstWhere('step_no', $stepNo);
 
-        if (! $target || ! $target->user_id) {
+        if (! $target) {
+            return;
+        }
+
+        // Bước theo vai trò: báo cho mọi người ký được bước đó của phòng lập phiếu
+        $userIds = $target->user_id
+            ? [(int) $target->user_id]
+            : (EstimateSigner::isScopedStep($target)
+                ? EstimateSigner::signersOf($target, (int) DB::table(self::TABLE)->where('id', $listId)->value('department_id'))->pluck('id')->map(fn ($id) => (int) $id)->all()
+                : []);
+
+        if (! $userIds) {
             return;
         }
 
@@ -283,109 +241,28 @@ trait EstimateSignFlow
             'Phiếu '.$code.' đang chờ bạn ký duyệt (bước '.$stepNo.'/'.$rows->count().').',
             'Trình ký',
             $listId,
-            [(int) $target->user_id],
+            $userIds,
             [],
             route(self::EST_ROUTE.'list')
         );
     }
 
     /* ==========================================================
-     |  HỘP KÝ DUYỆT LIÊN PHÒNG BAN (tab "Ký duyệt (mọi phòng ban)")
+     |  TÌM PHIẾU ĐỂ KÝ / TỪ CHỐI
+     |  Tab "Ký duyệt (mọi phòng ban)" đã bỏ: người phòng ban chung mở phiếu từ Trang chủ,
+     |  hệ thống tự chuyển phòng đang chọn sang phòng của phiếu (HomeController::signUrl) nên
+     |  ký / từ chối luôn trong phạm vi phòng đang chọn.
      ========================================================== */
 
-    /** Phòng ban NHÀ của người đang đăng nhập (user_management.deparment_id). */
-    protected function homeDepartmentId(): int
-    {
-        return (int) DB::table('user_management')
-            ->where('id', session('user')['userId'] ?? 0)
-            ->value('deparment_id');
-    }
-
-    /** Được dùng hộp ký duyệt liên phòng ban không: có quyền is_BOD và phòng nhà là phòng chung. */
-    protected function canUseApprovalInbox(): bool
-    {
-        if (! user_can('is_BOD')) {
-            return false;
-        }
-
-        $homeDeptId = $this->homeDepartmentId();
-
-        return $homeDeptId
-            ? (int) DB::table('deparments')->where('id', $homeDeptId)->value('is_general') === 0
-            : false;
-    }
-
-    /** Tab cần mở lại sau khi ký / từ chối: 'inbox' khi thao tác từ hộp ký duyệt, còn lại 'list'. */
+    /** Tab cần mở lại sau khi ký / từ chối. */
     protected function approvalActiveTab(Request $request): string
     {
-        return $request->input('scope') === 'inbox' && $this->canUseApprovalInbox() ? 'inbox' : 'list';
+        return 'list';
     }
 
-    /**
-     * Tìm phiếu để ký / từ chối. Bình thường lấy theo phòng ban đang chọn; khi thao tác từ hộp
-     * ký duyệt liên phòng ban (scope = inbox) thì lấy theo CÔNG TY đang làm việc -
-     * currentSign() + canSignRow() vẫn chặn đúng người ký nên không lỏng quyền.
-     */
+    /** Phiếu để ký / từ chối: thuộc phòng ban đang chọn. */
     protected function resolveEstimateForApproval(Request $request)
     {
-        if ($request->input('scope') === 'inbox' && $this->canUseApprovalInbox()) {
-            $companyDeptIds = CompanyContext::departmentIds(CompanyContext::currentId());
-
-            return DB::table(self::TABLE)
-                ->where('id', $request->id)
-                ->when($companyDeptIds !== null, fn ($query) => $query->whereIn('department_id', $companyDeptIds))
-                ->first();
-        }
-
         return $this->findOwn($request->id);
-    }
-
-    /**
-     * Dữ liệu tab "Ký duyệt (mọi phòng ban)": các phiếu dự trù pending_sign của mọi phòng
-     * trong cùng công ty mà BƯỚC ĐANG CHỜ được giao đích danh cho người đang đăng nhập.
-     */
-    protected function approvalInboxData(): array
-    {
-        $empty = ['show' => false, 'requests' => collect(), 'items' => collect(), 'signs' => collect(), 'badge' => 0];
-
-        if (! $this->canUseApprovalInbox()) {
-            return $empty;
-        }
-
-        $myUserId = (int) (session('user')['userId'] ?? 0);
-        $companyDeptIds = CompanyContext::departmentIds(CompanyContext::currentId());
-
-        $requests = DB::table(self::TABLE)
-            ->join(self::SIGN_TABLE, function ($join) {
-                $join->on(self::SIGN_TABLE.'.'.self::ESTIMATE_FK, '=', self::TABLE.'.id')
-                    ->on(self::SIGN_TABLE.'.step_no', '=', self::TABLE.'.current_step')
-                    ->where(self::SIGN_TABLE.'.active', 1);
-            })
-            ->leftJoin('deparments', self::TABLE.'.department_id', '=', 'deparments.id')
-            ->where(self::TABLE.'.app_status', 'pending_sign')
-            ->where(self::SIGN_TABLE.'.user_id', $myUserId)
-            ->where(self::SIGN_TABLE.'.status', 'pending')
-            ->when($companyDeptIds !== null, fn ($query) => $query->whereIn(self::TABLE.'.department_id', $companyDeptIds))
-            ->select(
-                self::TABLE.'.*',
-                'deparments.name as department_name',
-                'deparments.shortName as department_short',
-                self::SIGN_TABLE.'.step_no as my_step_no'
-            )
-            ->orderBy(self::TABLE.'.submitted_at', 'asc')
-            ->orderBy(self::TABLE.'.id', 'asc')
-            ->get();
-
-        $ids = $requests->pluck('id');
-
-        $items = $ids->mapWithKeys(fn ($id) => [$id => self::itemsOf($id)]);
-
-        return [
-            'show' => true,
-            'requests' => $requests,
-            'items' => $items,
-            'signs' => $this->signRows($ids),
-            'badge' => $requests->count(),
-        ];
     }
 }

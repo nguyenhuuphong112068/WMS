@@ -429,6 +429,13 @@
                                         <p>Trình Ký Đề Nghị CP Vật Tư</p>
                                     </a></li>
                             @endperm
+                            @perm('materData_material_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.transferSignFlow.list') }}"
+                                        class="nav-link {{ request()->is('materData/transferSignFlow') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-warning"></i>
+                                        <p>Trình Ký Đề Nghị Liên Phòng Ban</p>
+                                    </a></li>
+                            @endperm
                             @perm('materData_common_view')
                                 <li class="nav-item"><a href="{{ route('pages.materData.productName.list') }}"
                                         class="nav-link {{ request()->is('materData/productName') ? 'active' : '' }}"><i

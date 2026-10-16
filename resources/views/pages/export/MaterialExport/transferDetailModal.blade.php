@@ -7,6 +7,7 @@
 @php
     $mtStatus = $mtStatus ?? [
         'draft' => ['label' => 'Lưu tạm', 'class' => 'neutral'],
+        'pending_sign' => ['label' => 'Chờ ký', 'class' => 'warning'],
         'pending' => ['label' => 'Chờ cấp phát', 'class' => 'pending'],
         'partial' => ['label' => 'Cấp một phần', 'class' => 'warning'],
         'completed' => ['label' => 'Đã cấp đủ', 'class' => 'accepted'],
@@ -17,7 +18,15 @@
         'returned' => ['label' => 'Đã từ chối nhận', 'class' => 'rejected'],
     ];
     $mtBadge = $mtBadge ?? fn($status) => $mtStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
-    $mtAll = $transferSent->getCollection()->merge($transferReceived->getCollection())->unique('id');
+    // Cả đề nghị liên phòng ban lẫn đề nghị VPP (tab Đề nghị VPP) dùng chung modal chi tiết
+    $mtAll = $transferSent->getCollection()
+        ->merge($transferReceived->getCollection())
+        ->merge($vppSent->getCollection())
+        ->merge($vppReceived->getCollection())
+        // Phiếu chờ mình ký có thể không nằm trong 4 danh sách trên (VD người ký thuộc phòng thứ ba)
+        ->merge($transferToSign)
+        ->merge($vppToSign)
+        ->unique('id');
 @endphp
 
 <style>

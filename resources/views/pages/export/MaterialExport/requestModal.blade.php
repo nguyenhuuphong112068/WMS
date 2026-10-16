@@ -370,7 +370,8 @@
 
         (map.always || []).forEach(function (id) { picked[id] = true; });
 
-        $box.closest('form').find('.me-rows').children('tr').each(function () {
+        // .me-rows: bảng của modal Tạo đề nghị; .me-edit-rows: bảng của modal Sửa đề nghị
+        $box.closest('form').find('.me-rows, .me-edit-rows').children('tr').each(function () {
             var catId = String($(this).find('.me-cat').val() || '');
 
             ((catId && map.byCategory[catId]) || []).forEach(function (id) { picked[id] = true; });

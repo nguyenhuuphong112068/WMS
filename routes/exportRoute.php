@@ -118,10 +118,13 @@ Route::prefix('/export')
             Route::get('requestStockMap', 'requestStockMap')->name('requestStockMap');
             // Ô chọn Đối Tượng ở cột Mục đích của dòng đề nghị (select2 AJAX)
             Route::get('requestObjects', 'requestObjects')->name('requestObjects');
-            // Soạn vật tư cấp phát - phiếu soạn hàng A4 in theo đường đi trong kho
+            // Tab "Cấp phát vật tư" - phiếu soạn hàng A4 in theo đường đi trong kho
             Route::get('prepPrint', 'prepPrint')->name('prepPrint');
             // "Ghi nhớ vật tư cần dự trù" từ dòng đề nghị - hiện ở tab Dự Trù Vật Tư
             Route::post('watchlistRemember', 'watchlistRemember')->name('watchlistRemember');
+            // Tab "Đề nghị VPP": lập đề nghị tới kho VPP (Hành Chính) từ danh sách vật tư cần đề nghị
+            Route::post('vppWatchlistStore', 'vppWatchlistStore')->name('vppWatchlistStore');
+            Route::post('watchlistDismiss', 'watchlistDismiss')->name('watchlistDismiss');
 
             // Đề nghị cấp phát + trình ký
             Route::post('requestStore', 'requestStore')->name('requestStore');
@@ -146,11 +149,14 @@ Route::prefix('/export')
             Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
             Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
             Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
+            // Ký duyệt đề nghị liên phòng ban / VPP theo quy trình ở Dữ Liệu Gốc > Trình Ký Đề Nghị Liên Phòng Ban
+            Route::post('transferSign', 'transferSign')->name('transferSign');
+            Route::post('transferSignReject', 'transferSignReject')->name('transferSignReject');
         });
 
         /*
         | LOẠI BỎ VẬT TƯ HỎNG - 3 bước: Cách ly chờ quyết định (trả về kho được) -> Loại bỏ
-        | (trừ tồn, không quay lại kho) -> Huỷ. Nằm trong tab "Vật tư hỏng" của Sử Dụng
+        | (trừ tồn, không quay lại kho) -> Huỷ. Nằm trong tab "Cách ly - Loại Bỏ - Huỷ" của Sử Dụng
         | Vật Tư, dữ liệu do MaterialExportController::index() nạp sẵn.
         */
         Route::prefix('/materialQuarantine')->name('materialQuarantine.')->controller(MaterialQuarantineController::class)->group(function () {

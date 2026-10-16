@@ -562,6 +562,21 @@
         color: #B91C1C;
     }
 
+    /* ---------- Dòng vừa cập nhật ngầm (vd. sau khi Xác nhận kiểm tra) nháy nhẹ để dễ thấy ---------- */
+    .imp-row-flash > td {
+        animation: impRowFlash 2.4s ease-out;
+    }
+
+    @keyframes impRowFlash {
+        from {
+            background-color: rgba(var(--state-success-rgb), 0.22);
+        }
+
+        to {
+            background-color: transparent;
+        }
+    }
+
     /*
     | ---------- Modal chọn danh mục khi nhập (vd. "Chọn Vật Tư") ----------
     | Mở chồng lên modal Nhập nên đẩy z-index cao hơn; bảng cuộn trong khung, tiêu đề dính.

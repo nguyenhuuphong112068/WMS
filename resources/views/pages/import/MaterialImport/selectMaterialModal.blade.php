@@ -24,7 +24,6 @@
         'importance' => 'fas fa-star',
         'dangerous' => 'fas fa-exclamation-triangle',
         'purchasing' => 'fas fa-shopping-cart',
-        'supply' => 'fas fa-hand-holding',
         'qa_calibration' => 'fas fa-ruler-combined',
         'dept_class' => 'fas fa-layer-group',
     ];

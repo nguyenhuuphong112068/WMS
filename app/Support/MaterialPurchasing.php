@@ -7,66 +7,58 @@ use Illuminate\Support\Facades\DB;
 /**
  * BỘ PHẬN MUA HÀNG của vật tư dự trù -> phòng ban thật trong bảng deparments.
  *
- * Danh mục vật tư khai material_categories.purchasing_department là một KHOÁ
- * (supply / admin / it - xem MaterialClassification::PURCHASING_DEPARTMENTS), không phải
- * id phòng ban. Lớp này dò phòng ban tương ứng theo tên / tên viết tắt, trong phạm vi một
- * công ty. Vật tư ngoài danh mục (không có khoá) mặc định do Cung Ứng mua.
+ * Danh mục vật tư khai material_categories.purchasing_department là một KHOÁ (supply / admin -
+ * xem MaterialClassification::PURCHASING_DEPARTMENTS), không phải id phòng ban. Phòng ban nào
+ * đảm nhận khoá nào khai ở Dữ Liệu Gốc > Phòng Ban (cột deparments.purchasing_key) - thực tế chỉ
+ * Cung Ứng - NM2 và Hành Chính - NM2. Bộ phận mua hàng tiếp nhận dự trù / đề nghị VPP của MỌI
+ * công ty (NM1 không có bộ phận mua hàng, gửi về NM2). Vật tư ngoài danh mục (không có khoá)
+ * mặc định do Cung Ứng mua.
  */
 class MaterialPurchasing
 {
     public const DEFAULT_KEY = 'supply';
 
-    /** Cách nhận ra phòng ban của từng khoá: [tên chứa..., tên viết tắt bắt đầu bằng...]. */
-    private const MATCHERS = [
-        'supply' => [['Cung Ứng', 'Cung ứng'], ['PROC', 'CU']],
-        'admin' => [['Hành Ch'], ['HC']],
-        'it' => [['Công Nghệ Thông Tin', 'Công nghệ thông tin'], ['IT']],
-    ];
+    /** @var array<int, ?string> purchasing_key theo id phòng - nạp một lần cho cả request */
+    private static ?array $keys = null;
 
     public static function keyOf(?string $key): string
     {
-        return $key && isset(self::MATCHERS[$key]) ? $key : self::DEFAULT_KEY;
+        return $key && isset(MaterialClassification::PURCHASING_DEPARTMENTS[$key]) ? $key : self::DEFAULT_KEY;
     }
 
-    /** Các khoá bộ phận mua hàng mà phòng ban này đảm nhận (thường 0 hoặc 1 khoá). */
+    private static function departmentKeys(): array
+    {
+        return self::$keys ??= DB::table('deparments')
+            ->where('isActive', 1)
+            ->whereNotNull('purchasing_key')
+            ->pluck('purchasing_key', 'id')
+            ->mapWithKeys(fn ($key, $id) => [(int) $id => (string) $key])
+            ->all();
+    }
+
+    /** Các khoá bộ phận mua hàng mà phòng ban này đảm nhận (0 hoặc 1 khoá). */
     public static function keysOfDepartment(int $departmentId): array
     {
-        $department = DB::table('deparments')->where('id', $departmentId)->first();
+        $key = self::departmentKeys()[$departmentId] ?? null;
 
-        if (! $department) {
-            return [];
-        }
-
-        $keys = [];
-
-        foreach (self::MATCHERS as $key => [$names, $prefixes]) {
-            $match = false;
-
-            foreach ($names as $name) {
-                $match = $match || mb_stripos((string) $department->name, $name) !== false;
-            }
-
-            foreach ($prefixes as $prefix) {
-                $match = $match || stripos((string) $department->shortName, $prefix) === 0;
-            }
-
-            if ($match) {
-                $keys[] = $key;
-            }
-        }
-
-        return $keys;
+        return $key ? [$key] : [];
     }
 
-    /** Phòng ban đang chọn có phải bộ phận mua hàng của khoá $key, cùng công ty với phiếu không. */
-    public static function isPurchaser(int $departmentId, ?string $key, ?int $companyId): bool
+    /** Mọi phòng ban đang hoạt động đảm nhận khoá $key, theo id tăng dần. */
+    public static function departmentIdsOf(string $key): array
     {
-        if (! in_array(self::keyOf($key), self::keysOfDepartment($departmentId), true)) {
-            return false;
-        }
+        $ids = array_keys(array_filter(self::departmentKeys(), fn ($value) => $value === $key));
+        sort($ids);
 
-        $ownCompany = DB::table('deparments')->where('id', $departmentId)->value('company_id');
+        return $ids;
+    }
 
-        return ! $companyId || ! $ownCompany || (int) $ownCompany === (int) $companyId;
+    /**
+     * Phòng ban đang chọn có phải bộ phận mua hàng của khoá $key không. Bộ phận mua hàng phục vụ
+     * mọi công ty nên không còn đối chiếu công ty của phiếu ($companyId giữ để không đổi chữ ký hàm).
+     */
+    public static function isPurchaser(int $departmentId, ?string $key, ?int $companyId = null): bool
+    {
+        return in_array(self::keyOf($key), self::keysOfDepartment($departmentId), true);
     }
 }

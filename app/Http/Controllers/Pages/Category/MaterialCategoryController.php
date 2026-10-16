@@ -532,9 +532,9 @@ class MaterialCategoryController extends Controller
             'part_number' => $partNumber === '' ? null : $partNumber,
             'technical_specification' => $techSpec === '' ? null : $techSpec,
             'classification' => MaterialClassification::encode($request->input('classification')),
-            'purchasing_department' => MaterialClassification::purchasingLabel($request->purchasing_department) === ''
-                ? null
-                : $request->purchasing_department,
+            'purchasing_department' => isset(MaterialClassification::PURCHASING_DEPARTMENTS[(string) $request->purchasing_department])
+                ? $request->purchasing_department
+                : null,
             'lead_time_days' => MaterialClassification::leadTimeValue($request->lead_time_days),
         ];
     }

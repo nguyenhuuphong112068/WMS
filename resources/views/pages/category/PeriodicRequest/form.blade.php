@@ -18,6 +18,10 @@
 | MaterialPeriodicRequest::calSchedulePreview().
 |
 | Dòng vật tư do JS dựng từ <template class="pr-row-template"> - xem assets.blade.php.
+|
+| Liên phòng ban gửi tới phòng Hành Chính (đề nghị VPP): chỉ chọn được vật tư có Bộ Phận Mua
+| Hàng = Hành Chánh (data-hc="1" trên lựa chọn) - JS ẩn lựa chọn khác, khoá ô lọc Bộ Phận Mua
+| Hàng ở bảng chọn nhiều vật tư; server chặn lại ở PeriodicRequestController.
 --}}
 @php
     $prSupport = \App\Support\MaterialPeriodicRequest::class;
@@ -312,11 +316,13 @@
                                     <option value="">-- Chọn vật tư --</option>
                                     @foreach ($categories as $category)
                                         <option value="{{ $category->id }}" data-unit="{{ $category->unit_short_name }}"
-                                            data-spec="{{ $category->technical_specification }}">
+                                            data-spec="{{ $category->technical_specification }}"
+                                            data-hc="{{ \App\Support\MaterialClassification::isAdminPurchased($category->purchasing_department ?? null) ? 1 : 0 }}">
                                             {{ $category->code }} — {{ $category->material_name }}{{ $category->manufacturer_short_name ? ' (' . $category->manufacturer_short_name . ')' : '' }}{{ $category->technical_specification ? ' · ' . $category->technical_specification : '' }}
                                         </option>
                                     @endforeach
                                 </select>
+                                <small class="pr-hc-warn">Vật tư không do Hành Chánh mua - chọn vật tư khác hoặc xoá dòng.</small>
                             </td>
                             <td>
                                 {{-- Chỉ hiển thị, lấy theo vật tư đang chọn - không gửi lên server --}}

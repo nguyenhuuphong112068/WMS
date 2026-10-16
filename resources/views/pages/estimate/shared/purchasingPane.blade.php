@@ -1,6 +1,6 @@
 {{--
 | Tab "Bộ phận mua hàng" ở màn Dự Trù Vật Tư / Hoá Chất / Chất Chuẩn - chỉ hiện với
-| phòng là bộ phận mua hàng (Cung Ứng / Hành Chánh / IT, xem App\Support\MaterialPurchasing).
+| phòng là bộ phận mua hàng (Cung Ứng / Hành Chánh, xem App\Support\MaterialPurchasing).
 |
 | Các mục dự trù đã duyệt (cùng công ty) do phòng đang chọn phụ trách mua, chưa giao,
 | chưa huỷ. Bộ phận mua hàng xác nhận / từ chối đề nghị huỷ của phòng đề nghị, hoặc tự

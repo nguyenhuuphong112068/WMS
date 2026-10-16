@@ -1,13 +1,16 @@
 {{--
-| SỬ DỤNG VẬT TƯ - TAB "VẬT TƯ HỎNG"
+| SỬ DỤNG VẬT TƯ - TAB "CÁCH LY - LOẠI BỎ - HUỶ"
 |
 | Quy trình 3 bước - xem MaterialQuarantineController:
 |   1. Cách ly chờ quyết định : hàng bị giữ chỗ, không cấp phát được; trả về kho được.
 |   2. Loại bỏ                : trừ tồn thật (sinh phiếu Loại bỏ ở Sổ sử dụng), không quay lại kho.
 |   3. Huỷ                    : ghi nhận đã huỷ thực tế.
+| Nhóm "Vật tư sắp hết hạn dùng" (qstatus=expiring) không phải phiếu mà là danh sách LÔ còn tồn có
+| hạn dùng <= ngưỡng sát hạn (kể cả đã hết hạn) - tick chọn rồi đem cách ly (window.qrOpenCreate).
+| Không có nhóm "Tất cả": mở tab không chỉ rõ nhóm thì vào "Đang cách ly".
 |
 | Dữ liệu vào: $quarantineRows (paginator), $quarantineRange, $quarantineKeyword,
-| $quarantinePerPage, $quarantineStatus, $quarantineCounts.
+| $quarantinePerPage, $quarantineStatus, $quarantineCounts, $quarantineExpiring, $quarantineExpiringDays.
 --}}
 
 @php
@@ -25,7 +28,11 @@
     $qrKeep = collect(request()->query())
         ->reject(fn($value, $key) => is_array($value) || in_array($key, ['tab', 'qstatus', 'qr_page'], true))
         ->all();
-    $qrStatusUrl = fn($status) => route($expRoute . 'list', array_merge($qrKeep, ['tab' => 'quarantine'], $status ? ['qstatus' => $status] : []));
+    $qrStatusUrl = fn($status) => route($expRoute . 'list', array_merge($qrKeep, ['tab' => 'quarantine', 'qstatus' => $status]));
+
+    $qrExpiringTab = $quarantineStatus === $qrCtrl::EXPIRING;
+    $qrRemovedTab = $quarantineStatus === 'removed';
+    $qrCanQuarantine = user_can('export_material_quarantine');
 
     // Bước hiện tại của tiến trình 1-2-3 theo trạng thái
     $qrStep = fn($status) => match ($status) {
@@ -175,12 +182,21 @@
         font-size: 0.78rem;
         line-height: 1.45;
     }
+
+    .qr-filter .qr-filter-count.is-warn {
+        background: #DC2626;
+        color: #fff;
+    }
 </style>
 
 <div class="qr-toolbar">
     <div class="qr-filters">
-        <a href="{{ $qrStatusUrl(null) }}" class="qr-filter {{ $quarantineStatus === '' ? 'is-on' : '' }}">
-            <i class="fas fa-list"></i> Tất cả
+        <a href="{{ $qrStatusUrl($qrCtrl::EXPIRING) }}" class="qr-filter {{ $qrExpiringTab ? 'is-on' : '' }}"
+            title="Lô còn tồn có hạn dùng ≤ {{ $quarantineExpiringDays }} ngày, kể cả đã hết hạn">
+            <i class="fas fa-hourglass-half"></i> Vật tư sắp hết hạn dùng
+            @if ($quarantineExpiring->count())
+                <span class="qr-filter-count is-warn">{{ $quarantineExpiring->count() }}</span>
+            @endif
         </a>
         @foreach ($qrStatusMeta as $stKey => $meta)
             <a href="{{ $qrStatusUrl($stKey) }}" class="qr-filter {{ $quarantineStatus === $stKey ? 'is-on' : '' }}">
@@ -194,9 +210,16 @@
 
     @perm('export_material_quarantine')
         <div class="qr-actions">
-            <button type="button" class="btn btn-outline-danger" id="qrDisposeSelected" disabled>
-                <i class="fas fa-fire mr-1"></i> Huỷ mục đã chọn <span class="qr-selected-count"></span>
-            </button>
+            @if ($qrRemovedTab)
+                <button type="button" class="btn btn-outline-danger" id="qrDisposeSelected" disabled>
+                    <i class="fas fa-fire mr-1"></i> Huỷ mục đã chọn <span class="qr-selected-count"></span>
+                </button>
+            @endif
+            @if ($qrExpiringTab)
+                <button type="button" class="btn btn-outline-danger" id="qrQuarantineSelected" disabled>
+                    <i class="fas fa-biohazard mr-1"></i> Cách ly mục đã chọn <span class="qr-exp-selected-count"></span>
+                </button>
+            @endif
             <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#qrCreateModal">
                 <i class="fas fa-biohazard mr-1"></i> Cách ly vật tư hỏng
             </button>
@@ -204,10 +227,141 @@
     @endperm
 </div>
 
+@if ($qrExpiringTab)
+    <div class="table-responsive">
+        <table id="meExpiringTable" class="table table-bordered table-hover w-100 md-table">
+            <thead>
+                <tr>
+                    @if ($qrCanQuarantine)
+                        <th class="text-center" style="width:36px" data-orderable="false">
+                            <input type="checkbox" id="qrExpCheckAll" title="Chọn tất cả mã trên trang">
+                        </th>
+                    @endif
+                    <th class="text-center" style="width:45px">STT</th>
+                    <th style="width:170px">Mã Xuất Nhập</th>
+                    <th>Vật Tư</th>
+                    <th style="width:150px">Định Khu</th>
+                    <th class="text-center qr-exp-due" style="width:160px">Hạn Dùng</th>
+                    <th class="text-right" style="width:110px">Tồn Kho</th>
+                    <th class="text-right" style="width:110px">Đang Cách Ly</th>
+                    <th class="text-right" style="width:130px">Còn Cách Ly Được</th>
+                    <th class="text-center" style="width:90px">Thao Tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($quarantineExpiring as $lot)
+                    @php $days = (int) $lot->days_to_expiry; @endphp
+                    <tr>
+                        @if ($qrCanQuarantine)
+                            <td class="text-center">
+                                <input type="checkbox" class="qr-exp-check" value="{{ $lot->id }}" data-expired="{{ $days < 0 ? 1 : 0 }}">
+                            </td>
+                        @endif
+                        <td class="text-center">{{ $loop->iteration }}</td>
+                        <td>
+                            <span class="exp-code font-weight-bold">{{ $lot->code }}</span>
+                            <div class="md-sub small text-muted">Nhập {{ $expDate($lot->imported_date) }}</div>
+                        </td>
+                        <td>
+                            <div class="font-weight-bold">{{ $lot->material_name ?: '—' }}</div>
+                            @if ($lot->category_code)
+                                <span class="md-tag">{{ $lot->category_code }}</span>
+                            @endif
+                            @if ($lot->technical_specification)
+                                <div class="md-sub small text-muted">{{ $lot->technical_specification }}</div>
+                            @endif
+                        </td>
+                        <td>{{ $lot->location_code ?: '—' }}</td>
+                        <td class="text-center" data-order="{{ $days }}">
+                            <div>{{ $expDate($lot->expired_date) }}</div>
+                            @if ($days < 0)
+                                <span class="badge badge-danger">Đã hết hạn {{ -$days }} ngày</span>
+                            @elseif ($days === 0)
+                                <span class="badge badge-danger">Hết hạn hôm nay</span>
+                            @else
+                                <span class="badge badge-warning">Còn {{ $days }} ngày</span>
+                            @endif
+                        </td>
+                        <td class="text-right" data-order="{{ $lot->remaining }}">{{ $expNum($lot->remaining) }} <span class="md-sub">{{ $lot->unit_short_name }}</span></td>
+                        <td class="text-right" data-order="{{ $lot->quarantined }}">
+                            {{ $lot->quarantined > 0.00005 ? $expNum($lot->quarantined) : '—' }}
+                        </td>
+                        <td class="text-right font-weight-bold" data-order="{{ $lot->quarantinable }}">{{ $expNum($lot->quarantinable) }} <span class="md-sub">{{ $lot->unit_short_name }}</span></td>
+                        <td class="text-center">
+                            @if ($qrCanQuarantine)
+                                <button type="button" class="btn btn-sm btn-danger btn-qr-exp-one" title="Cách ly mã này"
+                                    data-id="{{ $lot->id }}" data-expired="{{ $days < 0 ? 1 : 0 }}">
+                                    <i class="fas fa-biohazard"></i>
+                                </button>
+                            @else
+                                <span class="md-sub text-muted">—</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="{{ $qrCanQuarantine ? 10 : 9 }}" class="text-center text-muted">Không có vật tư nào hết hạn hoặc còn ≤ {{ $quarantineExpiringDays }} ngày hạn dùng.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var $table = $('#meExpiringTable');
+            var dt = $.fn.DataTable.isDataTable($table) ? $table.DataTable() : null;
+
+            // Sát hạn / đã hết hạn lên đầu (DataTables mặc định sắp theo cột 1)
+            if (dt) dt.order([$table.find('thead th.qr-exp-due').index(), 'asc']).draw();
+
+            // Ô tick ở mọi trang của bảng, không chỉ trang đang xem
+            function qrExpChecks() {
+                return (dt ? dt.rows().nodes().to$() : $table.find('tbody tr')).find('.qr-exp-check');
+            }
+
+            function qrExpPaint() {
+                var n = qrExpChecks().filter(':checked').length;
+                var $page = $table.find('tbody .qr-exp-check');
+
+                $('#qrQuarantineSelected').prop('disabled', n === 0).find('.qr-exp-selected-count').text(n ? '(' + n + ')' : '');
+                $('#qrExpCheckAll').prop('checked', $page.length > 0 && $page.filter(':not(:checked)').length === 0);
+            }
+
+            // Lý do điền sẵn theo hạn dùng của các mã đem cách ly (vẫn sửa được)
+            function qrExpReason(expired) {
+                return expired ? 'Hết hạn sử dụng' : 'Sắp hết hạn sử dụng';
+            }
+
+            $(document).on('change', '.qr-exp-check', qrExpPaint);
+            $table.on('draw.dt', qrExpPaint);
+
+            $('#qrExpCheckAll').on('change', function () {
+                $table.find('tbody .qr-exp-check').prop('checked', this.checked);
+                qrExpPaint();
+            });
+
+            $(document).on('click', '.btn-qr-exp-one', function () {
+                window.qrOpenCreate([$(this).data('id')], qrExpReason(String($(this).data('expired')) === '1'));
+            });
+
+            $('#qrQuarantineSelected').on('click', function () {
+                var $checked = qrExpChecks().filter(':checked');
+                var ids = $checked.map(function () { return this.value; }).get();
+
+                if (ids.length) {
+                    window.qrOpenCreate(ids, qrExpReason($checked.filter('[data-expired="1"]').length > 0));
+                }
+            });
+
+            qrExpPaint();
+        });
+    </script>
+@else
+
 @include('pages.shared.rangeFilter', [
     'rfRoute' => $expRoute . 'list',
     'rfTab' => 'quarantine',
     'rfPrefix' => 'qr_',
+    'rfInBar' => true,
     'rfRange' => $quarantineRange,
     'rfPerPage' => $quarantinePerPage,
     'rfKeyword' => $quarantineKeyword,
@@ -219,9 +373,11 @@
     <table id="meQuarantineTable" class="table table-bordered table-hover w-100 md-table">
         <thead>
             <tr>
-                <th class="text-center" style="width:36px">
-                    <input type="checkbox" id="qrCheckAll" title="Chọn tất cả phiếu chờ huỷ trên trang">
-                </th>
+                @if ($qrRemovedTab)
+                    <th class="text-center" style="width:36px" data-orderable="false">
+                        <input type="checkbox" id="qrCheckAll" title="Chọn tất cả phiếu chờ huỷ trên trang">
+                    </th>
+                @endif
                 <th class="text-center" style="width:45px">STT</th>
                 <th style="width:190px">Phiếu Cách Ly</th>
                 <th>Vật Tư</th>
@@ -249,11 +405,11 @@
                     ];
                 @endphp
                 <tr>
-                    <td class="text-center">
-                        @if ($row->app_status === 'removed')
+                    @if ($qrRemovedTab)
+                        <td class="text-center">
                             <input type="checkbox" class="qr-check" value="{{ $row->id }}" data-row="{{ json_encode($qrData) }}">
-                        @endif
-                    </td>
+                        </td>
+                    @endif
                     <td class="text-center">{{ $quarantineRows->firstItem() + $loop->index }}</td>
                     <td>
                         <span class="exp-code font-weight-bold">{{ $row->code }}</span>
@@ -347,7 +503,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-center text-muted">Chưa có phiếu cách ly vật tư hỏng nào.</td></tr>
+                <tr><td colspan="{{ $qrRemovedTab ? 9 : 8 }}" class="text-center text-muted">Không có phiếu nào ở nhóm này.</td></tr>
             @endforelse
         </tbody>
     </table>
@@ -358,3 +514,4 @@
     'pgTab' => 'quarantine',
     'pgUnit' => 'phiếu cách ly',
 ])
+@endif

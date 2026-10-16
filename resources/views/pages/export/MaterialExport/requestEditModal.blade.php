@@ -23,7 +23,7 @@
                             <input type="date" name="needed_date" class="form-control" value="{{ $req->needed_date ? \Carbon\Carbon::parse($req->needed_date)->format('Y-m-d') : '' }}">
                         </div>
 
-                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqEditModal_{{ $req->id }} .me-edit-rows"
+                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqEditModal_{{ $req->id }} .me-edit-rows">
                             <i class="fas fa-boxes-stacked mr-1"></i>Danh mục tồn của phòng
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-primary shadow-sm me-edit-add">

@@ -288,6 +288,28 @@
         text-overflow: ellipsis;
     }
 
+    /* Dòng có vật tư không do Hành Chánh mua trong danh sách gửi tới phòng Hành Chính */
+    .pr-hc-warn {
+        display: none;
+        margin-top: 3px;
+        color: #DC2626;
+        font-size: 0.76rem;
+        font-weight: 600;
+    }
+
+    .pr-rows tr.is-not-hc .pr-hc-warn {
+        display: block;
+    }
+
+    .pr-rows tr.is-not-hc .select2-selection {
+        border-color: #DC2626 !important;
+    }
+
+    .pr-picker-filter-select:disabled {
+        cursor: not-allowed;
+        opacity: 1;
+    }
+
     .pr-picker-filter-select.is-active {
         border-color: var(--primary);
         background-color: var(--primary-soft);
@@ -894,6 +916,30 @@
             $row.find('.pr-spec').val(spec).attr('title', spec);
         }
 
+        /*
+        | DANH SÁCH GỬI TỚI PHÒNG HÀNH CHÍNH (đề nghị VPP): chỉ vật tư có Bộ Phận Mua Hàng =
+        | Hành Chánh (option data-hc="1"). Ô chọn vật tư ẩn lựa chọn khác qua templateResult của Select2,
+        | dòng đã chọn sẵn vật tư khác (đổi phòng sau khi chọn / sửa danh sách cũ) bị tô đỏ.
+        */
+        var PR_HC_DEPTS = @json(array_map('strval', \App\Support\MaterialVpp::departmentIds()));
+
+        function prHcOnly($modal) {
+            var dept = $modal.find('select[name="to_department_id"]').val();
+
+            return !!dept && PR_HC_DEPTS.indexOf(String(dept)) !== -1;
+        }
+
+        function prCheckHc($modal) {
+            var hcOnly = prHcOnly($modal);
+
+            $modal.find('.pr-rows tr').each(function() {
+                var $option = $(this).find('.pr-cat option:selected');
+                var bad = hcOnly && !!$option.val() && String($option.data('hc')) !== '1';
+
+                $(this).toggleClass('is-not-hc', bad);
+            });
+        }
+
         function prAddRow($modal, data) {
             data = data || {};
 
@@ -920,6 +966,14 @@
                 dropdownParent: $modal,
                 width: '100%',
                 placeholder: '-- Chọn vật tư --',
+                // Trả null = ẩn lựa chọn (Select2 4.0.x) - gửi tới Hành Chính chỉ còn vật tư Hành Chánh mua
+                templateResult: function(state) {
+                    if (state.element && state.id && prHcOnly($modal) && String($(state.element).data('hc')) !== '1') {
+                        return null;
+                    }
+
+                    return state.text;
+                },
                 language: {
                     noResults: function() {
                         return 'Không tìm thấy vật tư phù hợp';
@@ -937,6 +991,8 @@
             (items && items.length ? items : [{}]).forEach(function(item) {
                 prAddRow($modal, item);
             });
+
+            prCheckHc($modal);
         }
 
         function prClearErrors($modal) {
@@ -1043,6 +1099,12 @@
 
             if (unit) prSetUnit($row, String(unit));
             prSetSpec($row);
+            prCheckHc($(this).closest('.pr-modal'));
+        });
+
+        // Đổi phòng cấp phát: tô lại các dòng không còn hợp lệ với phòng mới
+        $(document).on('change', '.pr-modal select[name="to_department_id"]', function() {
+            prCheckHc($(this).closest('.pr-modal'));
         });
 
         /* ---------- Bảng chọn nhiều vật tư từ danh mục ---------- */
@@ -1071,7 +1133,9 @@
                 if (match) visible++;
             });
 
-            $picker.find('.pr-picker-filter-reset').prop('disabled', !search && !filters.length);
+            $picker.find('.pr-picker-filter-reset').prop('disabled', !search && !$picker.find('.pr-picker-filter-select:not(:disabled)').filter(function() {
+                return this.value !== '';
+            }).length);
 
             var $selectable = $picker.find('.pr-picker-row:visible .pr-picker-check:not(:disabled)');
 
@@ -1092,7 +1156,13 @@
             // Vật tư đã có trong danh sách thì khoá lại, không cho chọn trùng dòng
             $picker.data('target', $modal);
             $picker.find('.pr-picker-search').val('');
-            $picker.find('.pr-picker-filter-select').val('');
+            $picker.find('.pr-picker-filter-select').val('').prop('disabled', false).removeAttr('title');
+
+            // Gửi tới phòng Hành Chính: khoá ô lọc Bộ Phận Mua Hàng ở Hành Chánh
+            if (prHcOnly($modal)) {
+                $picker.find('.pr-picker-filter-select[data-filter="purchasing"]').val(@json(\App\Support\MaterialClassification::PURCHASING_ADMIN)).prop('disabled', true)
+                    .attr('title', 'Phòng cấp phát là Hành Chính - chỉ chọn vật tư do Hành Chánh mua');
+            }
             $picker.find('.pr-picker-row').each(function() {
                 var added = !!chosen[String($(this).data('id'))];
 
@@ -1134,7 +1204,8 @@
             var $picker = $(this).closest('.pr-picker');
 
             $picker.find('.pr-picker-search').val('');
-            $picker.find('.pr-picker-filter-select').val('');
+            // Ô lọc đang bị khoá (Bộ Phận Mua Hàng = Hành Chánh) giữ nguyên
+            $picker.find('.pr-picker-filter-select:not(:disabled)').val('');
             prPickerRefresh($picker);
         });
 
@@ -1193,6 +1264,7 @@
                 }
             });
 
+            prCheckHc($modal);
             $picker.modal('hide');
         });
 

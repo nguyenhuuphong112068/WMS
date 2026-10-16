@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Validator;
 /**
  * SỬ DỤNG - LOẠI BỎ VẬT TƯ HỎNG (3 BƯỚC)
  *
- * Nằm trong tab "Vật tư hỏng" của Sử Dụng Vật Tư nên không có action index riêng; dữ
+ * Nằm trong tab "Cách ly - Loại Bỏ - Huỷ" của Sử Dụng Vật Tư nên không có action index riêng; dữ
  * liệu do MaterialExportController::index() nạp qua paneData().
  *
  *   BƯỚC 1 - CÁCH LY  (quarantined): phát hiện hàng hỏng thì cách ly chờ quyết định. Hàng
@@ -59,6 +59,16 @@ class MaterialQuarantineController extends Controller
         'returned' => 'Đã trả về kho',
     ];
 
+    /**
+     * Nhóm "Vật tư sắp hết hạn dùng" (qstatus=expiring) của tab: không phải trạng thái phiếu mà là
+     * danh sách LÔ còn tồn có hạn dùng <= ngưỡng sát hạn (config material.near_expiry_days.critical),
+     * kể cả lô đã hết hạn - nguồn để chọn đem cách ly.
+     */
+    public const EXPIRING = 'expiring';
+
+    /** Mở tab không chỉ rõ nhóm thì vào danh sách đang cách ly - việc chờ quyết định. */
+    public const DEFAULT_STATUS = 'quarantined';
+
     /** Phiếu CHƯA XONG - bộ lọc khoảng ngày luôn giữ lại dù đã ngoài khoảng lọc. */
     private const PENDING_STATUSES = ['quarantined', 'removed'];
 
@@ -76,9 +86,9 @@ class MaterialQuarantineController extends Controller
         $range = ListRange::of($request, self::PREFIX);
         $keyword = ListRange::keyword($request, self::PREFIX);
         $perPage = ListRange::perPage($request, self::PREFIX);
-        $status = array_key_exists((string) $request->input('qstatus'), self::STATUSES)
+        $status = in_array((string) $request->input('qstatus'), array_merge([self::EXPIRING], array_keys(self::STATUSES)), true)
             ? (string) $request->input('qstatus')
-            : '';
+            : self::DEFAULT_STATUS;
 
         $rows = DB::table(self::TABLE)
             ->leftJoin('material_imports', self::TABLE.'.import_id', '=', 'material_imports.id')
@@ -98,7 +108,9 @@ class MaterialQuarantineController extends Controller
             )
             ->where(self::TABLE.'.department_id', $departmentId)
             ->where(self::TABLE.'.status_id', 1)
-            ->when($status !== '', fn ($query) => $query->where(self::TABLE.'.app_status', $status))
+            ->when($status !== self::EXPIRING, fn ($query) => $query->where(self::TABLE.'.app_status', $status))
+            // Nhóm "sắp hết hạn" hiện danh sách lô, không hiện phiếu cách ly
+            ->when($status === self::EXPIRING, fn ($query) => $query->whereIn(self::TABLE.'.id', []))
             ->tap(ListRange::dateFilterKeepPending(self::TABLE.'.created_at', $range, self::TABLE.'.app_status', self::PENDING_STATUSES))
             ->tap(ListRange::search([
                 self::TABLE.'.code',
@@ -133,6 +145,22 @@ class MaterialQuarantineController extends Controller
             ->filter(fn ($lot) => $lot->quarantinable > self::EPSILON)
             ->values();
 
+        // Mã vật tư của từng lô - bảng "Danh mục tồn kho" ở modal cách ly tìm được theo mã vật tư
+        $categoryCodes = DB::table('material_categories')
+            ->whereIn('id', $lots->pluck('category_id')->filter()->unique()->values())
+            ->pluck('code', 'id');
+
+        foreach ($lots as $lot) {
+            $lot->category_code = $categoryCodes[$lot->category_id] ?? null;
+        }
+
+        // Nhóm "Vật tư sắp hết hạn dùng": lô còn cách ly được, hạn dùng <= ngưỡng sát hạn (kể cả đã hết hạn)
+        $expiringDays = (int) config('material.near_expiry_days.critical', 30);
+        $expiring = $lots
+            ->filter(fn ($lot) => $lot->days_to_expiry !== null && $lot->days_to_expiry <= $expiringDays)
+            ->sortBy('days_to_expiry')
+            ->values();
+
         return [
             'rows' => $rows,
             'range' => $range,
@@ -142,6 +170,8 @@ class MaterialQuarantineController extends Controller
             'counts' => $counts,
             'badge' => (int) $counts->sum(),
             'lots' => $lots,
+            'expiring' => $expiring,
+            'expiringDays' => $expiringDays,
         ];
     }
 
@@ -149,39 +179,66 @@ class MaterialQuarantineController extends Controller
      |  BƯỚC 1 - CÁCH LY
      ========================================================== */
 
+    /**
+     * Cách ly NHIỀU mã xuất nhập một lần (items[][import_id|amount], chung một lý do).
+     *
+     * Mỗi mã vẫn là MỘT phiếu cách ly riêng - quyết định loại bỏ / trả về kho và huỷ ở bước
+     * sau đi theo từng phiếu. Cả đợt ghi trong một transaction: một mã sai thì không ghi mã nào.
+     */
     public function store(Request $request)
     {
         $departmentId = $this->departmentId();
 
         $validator = Validator::make($request->all(), [
-            'import_id' => ['required'],
-            'amount' => ['required', 'numeric', 'min:0.0001'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.import_id' => ['required', 'integer'],
+            'items.*.amount' => ['required', 'numeric', 'min:0.0001'],
             'reason' => ['required', 'string', 'max:500'],
         ], $this->messages());
 
-        $lot = null;
+        // import_id => ['lot' => lô, 'amount' => tổng số cách ly]
+        $picked = [];
 
-        $validator->after(function ($v) use ($request, $departmentId, &$lot) {
-            if (! $request->filled('import_id')) {
+        $validator->after(function ($v) use ($request, $departmentId, &$picked) {
+            if (! is_array($request->items)) {
                 return;
             }
 
-            $lot = MaterialPicking::lots($departmentId)->firstWhere('id', (int) $request->import_id);
+            $lots = MaterialPicking::lots($departmentId)->keyBy('id');
 
-            if (! $lot) {
-                $v->errors()->add('import_id', 'Không tìm thấy mã xuất nhập trong kho phòng ban này.');
+            foreach ($request->items as $item) {
+                $importId = (int) ($item['import_id'] ?? 0);
 
-                return;
+                // Dòng thiếu mã / số lượng đã có lỗi từ rules ở trên
+                if ($importId <= 0 || ! is_numeric($item['amount'] ?? null)) {
+                    continue;
+                }
+
+                $lot = $lots->get($importId);
+
+                if (! $lot) {
+                    $v->errors()->add('items', 'Không tìm thấy mã xuất nhập đã chọn trong kho phòng ban này.');
+
+                    continue;
+                }
+
+                // Cùng một mã chọn hai lần thì cộng dồn rồi mới so với phần còn cách ly được
+                $picked[$importId] = [
+                    'lot' => $lot,
+                    'amount' => round(($picked[$importId]['amount'] ?? 0) + (float) $item['amount'], 4),
+                ];
             }
 
-            $limit = max($lot->remaining - $lot->quarantined, 0);
+            foreach ($picked as $row) {
+                $limit = max($row['lot']->remaining - $row['lot']->quarantined, 0);
 
-            if (is_numeric($request->amount) && (float) $request->amount > $limit + self::EPSILON) {
-                $v->errors()->add(
-                    'amount',
-                    'Mã xuất nhập '.$lot->code.' chỉ còn '.$this->number($limit).' '.$lot->unit_short_name
-                    .' chưa cách ly, không cách ly vượt số này được.'
-                );
+                if ($row['amount'] > $limit + self::EPSILON) {
+                    $v->errors()->add(
+                        'items',
+                        'Mã xuất nhập '.$row['lot']->code.' chỉ còn '.$this->number($limit).' '.$row['lot']->unit_short_name
+                        .' chưa cách ly, không cách ly vượt số này được.'
+                    );
+                }
             }
         });
 
@@ -192,31 +249,50 @@ class MaterialQuarantineController extends Controller
                 ->with('activeTab', 'quarantine');
         }
 
-        $code = $this->nextCode($departmentId);
+        $reason = trim((string) $request->reason);
 
-        $id = DB::table(self::TABLE)->insertGetId([
-            'code' => $code,
-            'department_id' => $departmentId,
-            'import_id' => (int) $lot->id,
-            'amount' => round((float) $request->amount, 4),
-            'reason' => trim((string) $request->reason),
-            'app_status' => 'quarantined',
-            'status_id' => 1,
-            'created_by' => $this->actor(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $created = DB::transaction(function () use ($picked, $departmentId, $reason) {
+            $created = [];
 
-        AuditTrialController::log(
-            'Cách ly vật tư hỏng',
-            self::TABLE,
-            $id,
-            'NA',
-            'Phiếu '.$code.', mã xuất nhập: '.$lot->code.', số lượng: '.$this->number((float) $request->amount).', lý do: '.trim((string) $request->reason)
-        );
+            foreach ($picked as $row) {
+                $code = $this->nextCode($departmentId);
+
+                $id = DB::table(self::TABLE)->insertGetId([
+                    'code' => $code,
+                    'department_id' => $departmentId,
+                    'import_id' => (int) $row['lot']->id,
+                    'amount' => $row['amount'],
+                    'reason' => $reason,
+                    'app_status' => 'quarantined',
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                AuditTrialController::log(
+                    'Cách ly vật tư hỏng',
+                    self::TABLE,
+                    $id,
+                    'NA',
+                    'Phiếu '.$code.', mã xuất nhập: '.$row['lot']->code.', số lượng: '.$this->number($row['amount']).', lý do: '.$reason
+                );
+
+                $created[] = $row + ['code' => $code];
+            }
+
+            return $created;
+        });
+
+        $message = count($created) === 1
+            ? 'Đã cách ly '.$this->number($created[0]['amount']).' '.$created[0]['lot']->unit_short_name
+                .' của mã xuất nhập '.$created[0]['lot']->code.' (phiếu '.$created[0]['code'].').'
+            : 'Đã cách ly '.count($created).' mã xuất nhập: '.collect($created)
+                ->map(fn ($row) => $row['lot']->code.' ('.$this->number($row['amount']).' '.$row['lot']->unit_short_name.' - phiếu '.$row['code'].')')
+                ->implode(', ').'.';
 
         return redirect()->back()
-            ->with('success', 'Đã cách ly '.$this->number((float) $request->amount).' '.$lot->unit_short_name.' của mã xuất nhập '.$lot->code.' (phiếu '.$code.'). Hàng không còn cấp phát được cho tới khi có quyết định.')
+            ->with('success', $message.' Hàng không còn cấp phát được cho tới khi có quyết định.')
             ->with('activeTab', 'quarantine');
     }
 
@@ -549,6 +625,13 @@ class MaterialQuarantineController extends Controller
     {
         return [
             'import_id.required' => 'Vui lòng chọn mã xuất nhập cần cách ly.',
+            'items.required' => 'Vui lòng chọn ít nhất một mã xuất nhập cần cách ly.',
+            'items.min' => 'Vui lòng chọn ít nhất một mã xuất nhập cần cách ly.',
+            'items.*.import_id.required' => 'Có dòng chưa chọn mã xuất nhập.',
+            'items.*.import_id.integer' => 'Mã xuất nhập được chọn không hợp lệ.',
+            'items.*.amount.required' => 'Vui lòng nhập số lượng cách ly cho mọi mã đã chọn.',
+            'items.*.amount.numeric' => 'Số lượng cách ly phải là số.',
+            'items.*.amount.min' => 'Số lượng cách ly phải lớn hơn 0.',
             'amount.required' => 'Vui lòng nhập số lượng.',
             'amount.numeric' => 'Số lượng phải là số.',
             'amount.min' => 'Số lượng phải lớn hơn 0.',

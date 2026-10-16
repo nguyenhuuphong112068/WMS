@@ -1263,6 +1263,9 @@ class MaterialPeriodicRequest
      *
      * Dòng danh sách lưu đơn vị theo tên ngắn (requested_unit) còn phiếu dự trù cần unit_id: tra
      * theo tên ngắn, không khớp thì lấy đơn vị phòng đã khai cho vật tư ở tab Vật Tư Của Phòng.
+     *
+     * Thông tin kỹ thuật chép từ quy cách của danh mục; Ngày mong muốn giao = ngày tạo phiếu +
+     * Thời gian đặt hàng + 7 ngày - xem MaterialLeadTime::defaultExpectedDate().
      */
     private static function createEstimate($list, $items, string $actor): array
     {
@@ -1305,8 +1308,9 @@ class MaterialPeriodicRequest
                 'material_estimate_id' => $estimateId,
                 'category_id' => $item->category_id,
                 'material_name' => null,
-                'technical_information' => null,
+                'technical_information' => $item->technical_specification ?: null,
                 'purpose' => $item->purpose,
+                'expected_delivery_date' => MaterialLeadTime::defaultExpectedDate($item->lead_time_days, $now),
                 'status_id' => 1,
                 'created_by' => $actor,
                 'created_at' => $now,
@@ -1349,6 +1353,7 @@ class MaterialPeriodicRequest
                 self::ITEM_TABLE.'.*',
                 'material_categories.code as category_code',
                 'material_categories.technical_specification',
+                'material_categories.lead_time_days',
                 'material_names.name as material_name'
             )
             ->whereIn(self::ITEM_TABLE.'.periodic_request_list_id', $listIds)
@@ -1385,7 +1390,7 @@ class MaterialPeriodicRequest
                 'reference_id' => $result['id'],
                 'url' => $isEstimate
                     ? route('pages.estimate.materialEstimate.detail', ['id' => $result['id']], false)
-                    : route('pages.export.materialExport.list', ['tab' => $isExternal ? 'transfer' : 'periodic'], false),
+                    : route('pages.export.materialExport.list', ['tab' => $isExternal ? MaterialVpp::tabFor((int) $list->to_department_id) : 'periodic'], false),
                 'created_at' => now(),
             ]);
 

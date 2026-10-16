@@ -177,7 +177,7 @@ trait EstimateItemCancel
     }
 
     /**
-     * Tab "Bộ phận mua hàng": mục đã duyệt (cùng công ty) do phòng đang chọn phụ trách mua,
+     * Tab "Bộ phận mua hàng": mục đã duyệt (mọi công ty) do phòng đang chọn phụ trách mua,
      * chưa giao / chưa huỷ; đề nghị huỷ chờ xác nhận lên đầu. Không phải bộ phận mua hàng -> null.
      */
     protected function purchasingItems(int $departmentId)
@@ -190,7 +190,6 @@ trait EstimateItemCancel
             return null;
         }
 
-        $companyId = DB::table('deparments')->where('id', $departmentId)->value('company_id');
         $cat = $cfg['category_table'];
 
         return DB::table(self::ITEM_TABLE)
@@ -210,7 +209,7 @@ trait EstimateItemCancel
             ->where(self::ITEM_TABLE.'.active', 1)
             ->where(self::ITEM_TABLE.'.status_id', 1)
             ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
-            ->when($companyId, fn ($q) => $q->where('deparments.company_id', $companyId))
+            // Bộ phận mua hàng tiếp nhận phiếu của MỌI công ty (NM1 không có bộ phận mua hàng)
             ->when($cfg['purchasing_col'], function ($q) use ($keys, $cat, $cfg) {
                 $q->where(function ($q) use ($keys, $cat, $cfg) {
                     $q->whereIn($cat.'.'.$cfg['purchasing_col'], $keys);

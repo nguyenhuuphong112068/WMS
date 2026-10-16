@@ -15,6 +15,20 @@ use Carbon\Carbon;
  */
 class MaterialLeadTime
 {
+    /** Phiếu do hệ thống lập sẵn: Ngày mong muốn giao = ngày lập + Thời gian đặt hàng + số ngày này. */
+    public const DELIVERY_BUFFER_DAYS = 7;
+
+    /**
+     * Ngày mong muốn giao mặc định cho dòng dự trù hệ thống tự điền (phiếu theo chu kỳ, phiếu lập
+     * từ tab Vật tư cần dự trù): ngày lập + Thời gian đặt hàng (trống = 0) + DELIVERY_BUFFER_DAYS.
+     */
+    public static function defaultExpectedDate($leadDays, $base = null): string
+    {
+        return Carbon::parse($base ?? now())->startOfDay()
+            ->addDays(max((int) $leadDays, 0) + self::DELIVERY_BUFFER_DAYS)
+            ->toDateString();
+    }
+
     /**
      * null khi không cần cảnh báo; ngược lại ['lead_days' => int, 'available_days' => int, 'base' => 'approved'|'created'].
      */

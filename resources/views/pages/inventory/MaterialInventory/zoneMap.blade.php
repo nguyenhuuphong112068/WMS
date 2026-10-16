@@ -93,10 +93,13 @@
     .mz-tier-head .sub { margin-left: auto; font-size: .7rem; font-weight: 600; color: #94A3B8; text-transform: none; letter-spacing: 0; }
 
     /* ---------- Ô vị trí ---------- */
-    .mz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; }
+    .mz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; align-items: stretch; }
+    /* Thẻ là <button>: ép flex cột + height 100% để các thẻ cùng hàng cao bằng nhau. */
     .mz-cell {
-        display: block; width: 100%; text-align: left; background: #fff; padding: 10px 12px;
+        display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch;
+        width: 100%; height: 100%; text-align: left; background: #fff; background-image: none; padding: 10px 12px;
         border: 1px solid #DCE7F3; border-top: 3px solid #CBD5E1; border-radius: 10px; transition: all .2s;
+        appearance: none; -webkit-appearance: none;
     }
     .mz-cell:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--primary-light); }
     .mz-cell.is-ok { border-top-color: #16A34A; }
@@ -116,29 +119,24 @@
     .mz-cell.is-danger .mz-cell-lots { background: #FEE2E2; color: #991B1B; }
     .mz-cell.is-empty .mz-cell-lots { background: #EEF2F6; color: #94A3B8; }
     .mz-cell-name { font-size: .78rem; color: var(--text-main); font-weight: 600; margin-bottom: 6px; }
-    .mz-cell-items { font-size: .73rem; color: #64748B; line-height: 1.45; min-height: 32px; }
+    .mz-cell-items { font-size: .73rem; color: #64748B; line-height: 1.45; min-height: 32px; margin-bottom: 6px; }
     .mz-cell-items > div { display: flex; align-items: baseline; gap: 8px; }
     .mz-cell-items .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mz-cell-items .qty { margin-left: auto; flex: none; font-weight: 700; color: var(--primary-dark); }
     .mz-cell-items .qty .u { font-weight: 600; color: #94A3B8; }
     .mz-cell.is-warn .mz-cell-items .qty { color: #B45309; }
     .mz-cell.is-danger .mz-cell-items .qty { color: #B91C1C; }
-    .mz-cell-foot { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #E2E8F0; font-size: .7rem; color: #94A3B8; font-weight: 600; }
+    .mz-cell-foot { margin-top: auto; padding-top: 6px; border-top: 1px dashed #E2E8F0; font-size: .7rem; color: #94A3B8; font-weight: 600; }
     .mz-cell-foot .alert { color: #C2410C; }
     .mz-cell-empty-note { font-size: .73rem; color: #94A3B8; font-style: italic; }
 
-    /* Nền thẻ tô theo màu định khu của vị trí (App\Support\ZoneType::badge()) - tách biệt
-       với is-ok/is-warn/is-danger/is-empty ở trên, vốn chỉ nói tình trạng hàng đang đứng ở
-       đó; viền trên (border-top) vẫn giữ nguyên màu trạng thái để không mất tín hiệu đó. */
-    .mz-cell.is-zoned { background: var(--chip); }
-    .mz-cell.is-zoned .mz-cell-code,
-    .mz-cell.is-zoned .mz-cell-name,
-    .mz-cell.is-zoned .mz-cell-items,
-    .mz-cell.is-zoned .mz-cell-items .qty,
-    .mz-cell.is-zoned .mz-cell-items .qty .u,
-    .mz-cell.is-zoned .mz-cell-foot { color: var(--chip-text); }
+    /* Màu định khu của vị trí (App\Support\ZoneType::badge()) chỉ tô dải header (mã vị trí),
+       thân thẻ giữ nền theo tình trạng hàng (is-ok/is-warn/is-danger/is-empty) ở trên. */
+    .mz-cell.is-zoned .mz-cell-top {
+        margin: -10px -12px 8px; padding: 7px 12px; background: var(--chip); border-radius: 7px 7px 0 0;
+    }
+    .mz-cell.is-zoned .mz-cell-code { color: var(--chip-text); }
     .mz-cell.is-zoned .mz-cell-lots { background: rgba(255, 255, 255, .3); color: var(--chip-text); }
-    .mz-cell.is-zoned .mz-cell-foot { border-top-color: rgba(255, 255, 255, .35); }
 
     /* ---------- Khối chưa xếp vị trí + trạng thái rỗng ---------- */
     .mz-unzoned { border: 1px dashed #F59E0B; background: #FFFBEB; border-radius: var(--border-radius-lg); padding: 14px 18px; margin-bottom: 16px; }

@@ -223,13 +223,13 @@
     /* ---------- Tab chuyển giữa Sổ sử dụng và Báo cáo ---------- */
     .exp-tabs {
         display: flex;
-        gap: 6px;
-        margin-bottom: 18px;
+        gap: 4px;
+        margin-bottom: 10px;
         border-bottom: 1px solid var(--primary-soft);
     }
 
     .exp-tab {
-        padding: 9px 18px;
+        padding: 7px 14px;
         border: none;
         background: transparent;
         color: #64748b;
@@ -248,6 +248,87 @@
     .exp-tab.is-active {
         color: var(--primary);
         border-bottom-color: var(--primary);
+    }
+
+    /*
+     | NHÓM TAB DẠNG DROPDOWN: nhiều tab cùng chủ đề gom dưới một nút. Nút nhóm KHÔNG mang class
+     | .exp-tab (không có data-pane) nên không lọt vào handler chuyển tab; các mục trong menu
+     | vẫn là .exp-tab bình thường. Nút nhóm sáng lên + ghi tên mục con khi một mục đang mở.
+     */
+    .exp-tab-group {
+        position: relative;
+    }
+
+    .exp-tab-toggle {
+        padding: 7px 14px;
+        border: none;
+        background: transparent;
+        color: #64748b;
+        font-weight: 600;
+        font-size: 0.9rem;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .exp-tab-toggle:hover,
+    .exp-tab-group.show .exp-tab-toggle {
+        color: var(--primary-dark);
+    }
+
+    .exp-tab-toggle.is-active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
+
+    .exp-tab-toggle::after {
+        margin-left: 6px;
+        vertical-align: 0.15em;
+    }
+
+    .exp-tab-current {
+        font-weight: 700;
+    }
+
+    .exp-tab-menu {
+        min-width: 270px;
+        padding: 6px;
+        border: 1px solid var(--primary-soft);
+        border-radius: var(--border-radius-md);
+        box-shadow: var(--shadow-md);
+    }
+
+    .exp-tab-menu .exp-tab {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 8px 12px;
+        margin: 0;
+        border-bottom: none;
+        border-left: 3px solid transparent;
+        border-radius: 6px;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .exp-tab-menu .exp-tab i {
+        width: 18px;
+        text-align: center;
+        margin-right: 8px;
+    }
+
+    .exp-tab-menu .exp-tab .exp-tab-count {
+        margin-left: auto;
+    }
+
+    .exp-tab-menu .exp-tab:hover {
+        background: var(--primary-soft);
+    }
+
+    .exp-tab-menu .exp-tab.is-active {
+        background: var(--primary-soft);
+        border-left-color: var(--primary);
     }
 
     .exp-pane {
@@ -354,7 +435,7 @@
         border-radius: var(--border-radius-lg, 14px);
         box-shadow: 0 4px 16px rgba(var(--primary-rgb), .10);
         overflow: hidden;
-        margin-bottom: 22px;
+        margin-bottom: 14px;
         background: #fff;
     }
 
@@ -362,7 +443,7 @@
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 12px 18px;
+        padding: 8px 16px;
         cursor: pointer;
         user-select: none;
         background: linear-gradient(135deg, var(--primary-dark), var(--primary));
@@ -405,7 +486,7 @@
     }
 
     .exp-req-card-body {
-        padding: 18px;
+        padding: 12px 14px;
     }
 
     /* ---------- Ô tick chọn nhiều dòng trong các bảng picker ----------
@@ -1236,6 +1317,14 @@
 
             $('.exp-pane').removeClass('is-active');
             $('#' + target).addClass('is-active');
+
+            // Nhóm tab dạng dropdown: nút nhóm sáng lên + ghi tên mục con khi mục con đang mở
+            $('.exp-tab-group').each(function() {
+                var $current = $(this).find('.exp-tab.is-active');
+
+                $(this).find('.exp-tab-toggle').toggleClass('is-active', $current.length > 0);
+                $(this).find('.exp-tab-current').text($current.length ? '· ' + $current.data('short') : '');
+            });
 
             // DataTables đo sai bề rộng cột khi bảng bị ẩn lúc khởi tạo
             $.fn.dataTable.tables({

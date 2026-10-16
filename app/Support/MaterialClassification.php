@@ -14,12 +14,15 @@ use Illuminate\Validation\Rule;
  *   - price          : theo giá trị
  *   - importance     : theo mức độ quan trọng
  *   - dangerous      : có thuộc danh mục hàng hoá nguy hiểm hay không
- *   - supply         : có do Hành Chánh cấp phát hay không
  *   - qa_calibration : có cần QA hiệu chuẩn trước khi sử dụng hay không
  *
- * Bộ tiêu chí do Phòng Tổng Hợp chốt: 6 tiêu chí, mỗi tiêu chí BẮT BUỘC chọn - không còn
+ * Bộ tiêu chí do Phòng Tổng Hợp chốt: 5 tiêu chí, mỗi tiêu chí BẮT BUỘC chọn - không còn
  * mục "Chưa xác định". Bộ Phận Mua Hàng là tiêu chí thứ 4 trên form nhưng vẫn lưu ở cột
  * riêng purchasing_department, xem formGroups().
+ *
+ * Tiêu chí "Theo Cấp Phát Bởi Hành Chánh" (khoá supply) ĐÃ BỎ từ 16/10/2026: vật tư do
+ * Hành Chánh cấp phát chính là vật tư có Bộ Phận Mua Hàng = Hành Chánh - xem isAdminPurchased().
+ * Khoá cũ chỉ còn ở RETIRED_CRITERIA để lịch sử thay đổi trước đó vẫn đọc ra chữ.
  *
  * Trước đây phân loại là dữ liệu gốc của từng phòng (bảng material_classifications, cột
  * material_department_categories.classification_id). Nhưng "vật tư đắt hay rẻ, có nguy
@@ -61,14 +64,6 @@ class MaterialClassification
                 'no' => 'Không',
             ],
         ],
-        'supply' => [
-            'label' => 'Theo Cấp Phát Bởi Hành Chánh',
-            'icon' => 'fas fa-hand-holding',
-            'options' => [
-                'yes' => 'Có',
-                'no' => 'Không',
-            ],
-        ],
         'qa_calibration' => [
             'label' => 'Theo Cần Hiệu Chuẩn Trước Khi Dùng',
             'icon' => 'fas fa-ruler-combined',
@@ -87,7 +82,6 @@ class MaterialClassification
         'price' => ['low' => 'Giá thấp', 'high' => 'Giá cao'],
         'importance' => ['low' => 'Ít quan trọng', 'high' => 'Rất quan trọng'],
         'dangerous' => ['yes' => 'Hàng nguy hiểm', 'no' => 'Không nguy hiểm'],
-        'supply' => ['yes' => 'HC cấp phát', 'no' => 'HC không cấp phát'],
         'qa_calibration' => ['yes' => 'Cần hiệu chuẩn', 'no' => 'Không hiệu chuẩn'],
     ];
 
@@ -100,14 +94,36 @@ class MaterialClassification
         'qa_calibration' => ['yes' => 'banned'],
     ];
 
+    /**
+     * Tiêu chí ĐÃ BỎ - không khai được nữa, decode()/encode() bỏ qua; chỉ describe() đọc để lịch
+     * sử thay đổi cũ không mất chữ (migration 2026_10_16_100000_drop_supply_material_classification).
+     */
+    public const RETIRED_CRITERIA = [
+        'supply' => [
+            'label' => 'Theo Cấp Phát Bởi Hành Chánh (đã bỏ)',
+            'options' => ['yes' => 'Có', 'no' => 'Không', 'admin' => 'Hành Chánh', 'other' => 'Khác'],
+        ],
+    ];
+
+    /** Bộ phận mua hàng Hành Chánh - vật tư này do Hành Chánh mua VÀ cấp phát (kho VPP). */
+    public const PURCHASING_ADMIN = 'admin';
+
     /** Bộ phận chịu trách nhiệm mua vật tư này. */
     public const PURCHASING_DEPARTMENTS = [
         'supply' => 'Cung Ứng',
         'admin' => 'Hành Chánh',
-        'it' => 'IT',
     ];
 
-    /** Nhãn + icon của tiêu chí Bộ Phận Mua Hàng khi dựng form chung với 5 tiêu chí kia. */
+    /**
+     * Khoá bộ phận mua hàng ĐÃ BỎ - không chọn được nữa, chỉ giữ nhãn để lịch sử / Audit Trail
+     * cũ vẫn đọc ra chữ. IT bỏ ngày 16/10/2026, dữ liệu đang dùng đã chuyển về Cung Ứng
+     * (migration 2026_10_16_090000_remove_it_purchasing_department).
+     */
+    public const RETIRED_PURCHASING_DEPARTMENTS = [
+        'it' => 'IT (đã bỏ)',
+    ];
+
+    /** Nhãn + icon của tiêu chí Bộ Phận Mua Hàng khi dựng form chung với 4 tiêu chí kia. */
     public const PURCHASING_LABEL = 'Theo Bộ Phận Mua Hàng';
     public const PURCHASING_ICON = 'fas fa-cart-shopping';
 
@@ -189,13 +205,23 @@ class MaterialClassification
         return implode(', ', $parts);
     }
 
-    /** Mô tả đầy đủ dùng cho lịch sử thay đổi và Audit Trail. */
+    /** Mô tả đầy đủ dùng cho lịch sử thay đổi và Audit Trail - đọc cả tiêu chí đã bỏ của bản ghi cũ. */
     public static function describe(?string $json): string
     {
         $parts = [];
 
         foreach (self::decode($json) as $key => $value) {
             $parts[] = self::CRITERIA[$key]['label'].': '.self::CRITERIA[$key]['options'][$value];
+        }
+
+        $raw = json_decode((string) $json, true);
+
+        foreach (self::RETIRED_CRITERIA as $key => $criterion) {
+            $value = is_array($raw) ? ($raw[$key] ?? null) : null;
+
+            if (is_string($value) && isset($criterion['options'][$value])) {
+                $parts[] = $criterion['label'].': '.$criterion['options'][$value];
+            }
         }
 
         return $parts ? implode('; ', $parts) : 'Chưa phân loại';
@@ -207,10 +233,20 @@ class MaterialClassification
         return (self::decode($json)['qa_calibration'] ?? null) === 'yes';
     }
 
-    /** Nhãn bộ phận mua hàng, chưa khai thì trả về chuỗi rỗng. */
+    /**
+     * Vật tư do Hành Chánh mua - cũng là vật tư Hành Chánh cấp phát từ kho VPP (thay cho tiêu chí
+     * "Theo Cấp Phát Bởi Hành Chánh" đã bỏ). Dùng chung cho mọi chỗ lọc / chặn vật tư gửi tới
+     * phòng Hành Chính: Đề nghị VPP, danh sách liên phòng ban theo chu kỳ gửi Hành Chính.
+     */
+    public static function isAdminPurchased(?string $purchasingDepartment): bool
+    {
+        return $purchasingDepartment === self::PURCHASING_ADMIN;
+    }
+
+    /** Nhãn bộ phận mua hàng (kể cả khoá đã bỏ, cho lịch sử cũ), chưa khai thì trả về chuỗi rỗng. */
     public static function purchasingLabel(?string $key): string
     {
-        return self::PURCHASING_DEPARTMENTS[(string) $key] ?? '';
+        return self::PURCHASING_DEPARTMENTS[(string) $key] ?? self::RETIRED_PURCHASING_DEPARTMENTS[(string) $key] ?? '';
     }
 
     /**

@@ -94,7 +94,7 @@
 
                 <div class="md-hint">
                     <i class="fas fa-info-circle mr-1"></i>
-                    Cột là phát sinh trong từng mốc, đường là <b>tồn cuối mốc</b> cộng dồn từ tồn đầu kỳ - đường đi
+                    Cột là phát sinh trong từng mốc, thanh xanh lá <b>Tồn</b> là tồn tại cuối mốc cộng dồn từ tồn đầu kỳ - thanh Tồn thấp dần
                     xuống mà cột nhập vắng bóng là dấu hiệu sắp phải đặt hàng. Biểu đồ đọc đúng
                     <b>kỳ báo cáo</b> đang chọn trên màn hình; muốn xem khoảng khác thì đổi kỳ rồi mở lại.
                 </div>

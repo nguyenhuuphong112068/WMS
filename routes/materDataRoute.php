@@ -20,6 +20,7 @@ use App\Http\Controllers\Pages\MaterData\DepartmentController;
 use App\Http\Controllers\Pages\MaterData\GroupController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
 use App\Http\Controllers\Pages\MaterData\MaterialSignFlowController;
+use App\Http\Controllers\Pages\MaterData\TransferSignFlowController;
 use App\Http\Controllers\Pages\MaterData\MixtureHazardCategoryController;
 use App\Http\Controllers\Pages\MaterData\PackagingSpecificationController;
 use App\Http\Controllers\Pages\MaterData\ProductNameController;
@@ -181,6 +182,16 @@ Route::prefix('/materData')
         // Trình ký đề nghị cấp phát vật tư: phòng khai trước quy trình ký chuẩn ứng với
         // từng tổ hợp phân loại (danh mục chung + danh mục của phòng), mỗi bước một vai trò.
         Route::prefix('/materialSignFlow')->name('materialSignFlow.')->controller(MaterialSignFlowController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+        });
+
+        // Trình ký đề nghị chuyển vật tư liên phòng ban (gồm Đề nghị VPP): mỗi dòng một bước ký
+        // theo loại đề nghị + công ty của phòng đề nghị - xem App\Support\MaterialTransferSignFlow.
+        Route::prefix('/transferSignFlow')->name('transferSignFlow.')->controller(TransferSignFlowController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');

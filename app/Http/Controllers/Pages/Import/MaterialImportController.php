@@ -72,37 +72,7 @@ class MaterialImportController extends Controller
         $bookRange = ListRange::of($request, 'book_');
         $bookKeyword = ListRange::keyword($request, 'book_');
 
-        $datas = DB::table(self::TABLE)
-            ->leftJoin('material_categories', self::TABLE.'.category_id', '=', 'material_categories.id')
-            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
-            ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
-            ->tap(fn ($query) => DepartmentMaterial::join($query, $departmentId, self::TABLE.'.category_id'))
-            ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
-            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
-            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
-            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
-            ->select(
-                self::TABLE.'.*',
-                'material_categories.code as category_code',
-                'material_categories.technical_specification',
-                'material_names.name as material_name',
-                'manufacturers.name as manufacturer_name',
-                'manufacturers.short_name as manufacturer_short_name',
-                'material_categories.classification',
-                DepartmentMaterial::minStockColumn(),
-                'units.short_name as unit_short_name',
-                'units.name as unit_name',
-                'locations.code as location_code',
-                'locations.zone_type as location_zone_type',
-                'locations.color as location_color',
-                'warehouses.name as warehouse_name',
-                'shelves.name as shelf_name',
-                'columns.name as column_name',
-                'tiers.name as tier_name'
-            )
-            ->where(self::TABLE.'.department_id', $departmentId)
+        $datas = $this->bookQuery($departmentId)
             ->tap(ListRange::dateFilter(self::TABLE.'.imported_date', $bookRange))
             ->tap(ListRange::search([
                 self::TABLE.'.code',
@@ -189,6 +159,81 @@ class MaterialImportController extends Controller
             'pendingRows' => $pendingRows,
             'pendingCount' => $pendingRows->count(),
         ]);
+    }
+
+    /**
+     * Phiếu nhập của phòng ban kèm đủ thông tin để vẽ một dòng SỔ NHẬP (bookRow.blade.php):
+     * vật tư, đơn vị + ngưỡng tồn của phòng, vị trí lưu trữ. Dùng chung cho index() và cho
+     * confirmCheck() khi render lại riêng dòng vừa kiểm tra.
+     */
+    private function bookQuery(int $departmentId)
+    {
+        return DB::table(self::TABLE)
+            ->leftJoin('material_categories', self::TABLE.'.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
+            ->tap(fn ($query) => DepartmentMaterial::join($query, $departmentId, self::TABLE.'.category_id'))
+            ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            ->select(
+                self::TABLE.'.*',
+                'material_categories.code as category_code',
+                'material_categories.technical_specification',
+                'material_names.name as material_name',
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                'material_categories.classification',
+                DepartmentMaterial::minStockColumn(),
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
+                'locations.color as location_color',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
+            ->where(self::TABLE.'.department_id', $departmentId);
+    }
+
+    /**
+     * HTML một dòng SỔ NHẬP sau khi thay đổi, để trang thay vào bảng mà không tải lại.
+     *
+     * Biến $imp* bình thường do list.blade.php khai báo; render riêng thì phải truyền vào,
+     * giữ đúng công thức hiển thị bên đó.
+     */
+    private function bookRowHtml(int $departmentId, int $id): ?string
+    {
+        $row = $this->bookQuery($departmentId)->where(self::TABLE.'.id', $id)->first();
+
+        if (! $row) {
+            return null;
+        }
+
+        return view('pages.import.MaterialImport.bookRow', [
+            'row' => $row,
+            'stt' => '',
+            'attachments' => DB::table(self::ATTACHMENT_TABLE)
+                ->where('material_import_id', $id)
+                ->orderBy('id', 'asc')
+                ->get()
+                ->groupBy('material_import_id'),
+            // Cùng điều kiện với historyCounts(), chỉ đếm cho đúng phiếu này
+            'historyCounts' => [$id => DB::table(self::HISTORY_TABLE)
+                ->where('material_import_id', $id)
+                ->where('action', '<>', 'Thêm mới')
+                ->count()],
+            'impNum' => fn ($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.'),
+            'impDate' => fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—',
+            'impToday' => \Carbon\Carbon::today(),
+            'impRoute' => 'pages.import.materialImport.',
+            'impLabel' => self::LABEL,
+        ])->render();
     }
 
     /**
@@ -487,10 +532,20 @@ class MaterialImportController extends Controller
      *                       Chờ kiểm tra. Bắt buộc ghi lý do, không hồi lại được.
      *
      * Cả hai trường hợp đều ghi người kiểm tra + thời điểm kiểm tra.
+     *
+     * Modal Xác nhận kiểm tra gửi NGẦM (AJAX): trả JSON {success, message, errors?, data?}
+     * để trang tự gỡ dòng khỏi tab Chờ kiểm tra và thay dòng ở Sổ nhập, không tải lại.
+     * Gửi form thường (không AJAX) vẫn redirect như cũ.
      */
     public function confirmCheck(Request $request)
     {
         $departmentId = $this->departmentId();
+
+        $fail = function (string $message) use ($request) {
+            return $request->ajax()
+                ? response()->json(['success' => false, 'message' => $message])
+                : redirect()->back()->with('error', $message);
+        };
 
         $current = DB::table(self::TABLE)
             ->where('id', $request->id)
@@ -498,19 +553,18 @@ class MaterialImportController extends Controller
             ->first();
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần xác nhận kiểm tra!');
+            return $fail('Không tìm thấy '.self::LABEL.' cần xác nhận kiểm tra!');
         }
 
         if (\App\Support\CheckStatus::isFinal($current->check_result)) {
-            return redirect()->back()->with(
-                'error',
+            return $fail(
                 'Mã xuất nhập '.$current->code.' đã kiểm tra trước đó rồi (tình trạng: '
                 .\App\Support\CheckStatus::label($current->check_result).'), không kiểm tra lại được.'
             );
         }
 
         if (! $current->status_id) {
-            return redirect()->back()->with('error', 'Mã xuất nhập '.$current->code.' đang bị khoá nên chưa xác nhận kiểm tra được.');
+            return $fail('Mã xuất nhập '.$current->code.' đang bị khoá nên chưa xác nhận kiểm tra được.');
         }
 
         $passed = $request->input('check_result') === \App\Support\CheckStatus::PASSED;
@@ -522,6 +576,14 @@ class MaterialImportController extends Controller
         );
 
         if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validator->errors()->first(),
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
             return redirect()->back()->withErrors($validator, 'checkErrors')->withInput();
         }
 
@@ -583,12 +645,22 @@ class MaterialImportController extends Controller
             $note
         );
 
-        return redirect()->back()->with(
-            'success',
-            $passed
-                ? 'Mã xuất nhập '.$current->code.' đã KIỂM TRA ĐẠT! Lô đã được cộng vào tồn kho và sẵn sàng để đề nghị / sử dụng.'
-                : 'Mã xuất nhập '.$current->code.' KHÔNG ĐẠT - lô được trả hàng và không nhập kho.'
-        );
+        $message = $passed
+            ? 'Mã xuất nhập '.$current->code.' đã KIỂM TRA ĐẠT! Lô đã được cộng vào tồn kho và sẵn sàng để đề nghị / sử dụng.'
+            : 'Mã xuất nhập '.$current->code.' KHÔNG ĐẠT - lô được trả hàng và không nhập kho.';
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'id' => (int) $current->id,
+                    'book_row' => $this->bookRowHtml($departmentId, (int) $current->id),
+                ],
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 
     /** Lịch sử điều chỉnh của một phiếu nhập, trả JSON cho modal trên bảng. */

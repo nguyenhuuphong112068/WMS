@@ -23,7 +23,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {{ $activeTab === 'watchlist' ? 'active' : '' }}" id="watchlist-tab" data-toggle="tab" href="#watchlist" role="tab">
-                            Danh sách vật tư cần dự trù <span class="badge badge-warning">{{ $watchlistItems->count() }}</span>
+                            Danh sách vật tư cần dự trù <span class="badge badge-warning">{{ $watchlistItems->filter(fn ($item) => ! $item->in_progress)->count() }}</span>
                         </a>
                     </li>
                     @if ($purchasingItems !== null)
@@ -36,14 +36,6 @@
                             <a class="nav-link {{ $activeTab === 'purchasing' ? 'active' : '' }}" id="purchasing-tab" data-toggle="tab" href="#purchasing" role="tab">
                                 Bộ phận mua hàng
                                 @if ($purchasingPending)<span class="badge badge-danger" title="Đề nghị huỷ chờ xác nhận">{{ $purchasingPending }}</span>@endif
-                            </a>
-                        </li>
-                    @endif
-                    @if ($showApprovalInbox)
-                        <li class="nav-item">
-                            <a class="nav-link {{ $activeTab === 'inbox' ? 'active' : '' }}" id="inbox-tab" data-toggle="tab" href="#inbox" role="tab">
-                                Ký duyệt (mọi phòng ban)
-                                @if ($inboxBadgeCount)<span class="badge badge-danger">{{ $inboxBadgeCount }}</span>@endif
                             </a>
                         </li>
                     @endif
@@ -152,8 +144,7 @@
                                                 </button>
 
                                                 <button type="button" class="btn btn-sm btn-success btn-est-submit" title="Trình ký"
-                                                    data-id="{{ $row->id }}" data-code="{{ $row->code }}"
-                                                    data-signers="{{ $signRows->get($row->id, collect())->pluck('user_id')->filter()->values()->toJson() }}">
+                                                    data-id="{{ $row->id }}" data-code="{{ $row->code }}">
                                                     <i class="fas fa-paper-plane"></i>
                                                 </button>
                                             @endif
@@ -165,14 +156,13 @@
                                                     data-text="{{ $estIsLast ? 'Phiếu sẽ được phê duyệt và ghi nhận tiếp nhận.' : 'Phiếu sẽ chuyển tới người ký bước ' . ($row->pending_sign->step_no + 1) . '.' }}">
                                                     @csrf
                                                     <input type="hidden" name="id" value="{{ $row->id }}">
-                                                    <input type="hidden" name="scope" value="">
                                                     <button type="submit" class="btn btn-sm btn-success" title="Ký duyệt bước {{ $row->pending_sign->step_no }}">
                                                         <i class="fas fa-{{ $estIsLast ? 'stamp' : 'signature' }}"></i>
                                                     </button>
                                                 </form>
 
                                                 <button type="button" class="btn btn-sm btn-outline-danger btn-est-reject"
-                                                    title="Từ chối" data-id="{{ $row->id }}" data-code="{{ $row->code }}" data-scope="">
+                                                    title="Từ chối" data-id="{{ $row->id }}" data-code="{{ $row->code }}">
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             @endif
@@ -207,11 +197,6 @@
                     @if ($purchasingItems !== null)
                         <div class="tab-pane fade {{ $activeTab === 'purchasing' ? 'show active' : '' }}" id="purchasing" role="tabpanel">
                             @include('pages.estimate.shared.purchasingPane', ['items' => $purchasingItems])
-                        </div>
-                    @endif
-                    @if ($showApprovalInbox)
-                        <div class="tab-pane fade {{ $activeTab === 'inbox' ? 'show active' : '' }}" id="inbox" role="tabpanel">
-                            @include('pages.estimate.shared.inboxPane')
                         </div>
                     @endif
                 </div>

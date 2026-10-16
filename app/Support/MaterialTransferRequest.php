@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\DB;
  * Phiếu được lập ở hai nơi, cùng ghi vào một bộ bảng:
  *   1. SỬ DỤNG VẬT TƯ, tab "Đề nghị chuyển liên phòng ban" - lập thủ công từ đầu
  *      (App\Http\Controllers\Pages\Export\MaterialExportController).
- *   2. DỰ TRÙ VẬT TƯ, tab "Danh sách vật tư cần dự trù" - gom các vật tư do Hành Chánh
- *      mua rồi gửi thẳng cho phòng Hành Chánh, thay vì lập phiếu dự trù
- *      (App\Http\Controllers\Pages\Estimate\MaterialEstimateController).
+ *   2. SỬ DỤNG VẬT TƯ, tab "Đề nghị VPP" > "Danh sách vật tư cần đề nghị Hành Chính" - gom
+ *      các vật tư do Hành Chính mua rồi gửi thẳng cho kho VPP của phòng Hành Chính, thay vì
+ *      lập phiếu dự trù (MaterialExportController::vppWatchlistStore, App\Support\MaterialVpp).
  *
  * Gom ở đây để mã phiếu và cách ghi dòng đề nghị của hai màn hình không lệch nhau. Ba bước
  * tiếp theo (phòng nhận cấp phát -> phòng đề nghị nhận hàng) vẫn do màn Sử Dụng Vật Tư xử lý.
@@ -49,10 +49,14 @@ class MaterialTransferRequest
      * Ghi một phiếu đề nghị kèm các dòng vật tư, trả về [id, code].
      *
      * $items là mảng các dòng ['category_id', 'requested_amount', 'requested_unit', 'note'].
-     * $status là 'draft' (lưu tạm) hoặc 'pending' (gửi đi ngay) - dòng con mang cùng trạng thái.
+     * $status là 'draft' (lưu tạm) hoặc 'pending' (gửi đi ngay). Gửi ngay thì ghi Lưu tạm rồi đi
+     * qua MaterialTransferSignFlow::start(): có quy trình ký thì phiếu thành 'pending_sign', chưa
+     * tới phòng được đề nghị. Gửi ngay thì kết quả có thêm khoá 'send' (kết quả của start()).
      */
     public static function create(int $departmentId, int $toDepartmentId, array $head, array $items, string $status, string $actor): array
     {
+        $send = $status === 'pending';
+        $status = 'draft';
         $code = self::nextCode($departmentId, $toDepartmentId);
 
         $id = DB::transaction(function () use ($departmentId, $toDepartmentId, $head, $items, $status, $actor, $code) {
@@ -85,6 +89,7 @@ class MaterialTransferRequest
             return $id;
         });
 
-        return ['id' => $id, 'code' => $code];
+        return ['id' => $id, 'code' => $code]
+            + ($send ? ['send' => MaterialTransferSignFlow::start((int) $id, $actor)] : []);
     }
 }

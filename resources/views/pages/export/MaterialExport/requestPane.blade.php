@@ -53,6 +53,7 @@
     'rfRoute' => $expRoute . 'list',
     'rfTab' => $reqType,
     'rfPrefix' => $reqPrefix,
+    'rfInBar' => true,
     'rfRange' => $reqRange,
     'rfPerPage' => $reqPerPage,
     'rfSearch' => false,

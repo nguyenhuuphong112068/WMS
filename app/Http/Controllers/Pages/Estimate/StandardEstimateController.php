@@ -111,12 +111,10 @@ class StandardEstimateController extends Controller
 
         $trackedItems = self::trackedItems($departmentId);
 
-        $inbox = $this->approvalInboxData();
-
         // Tab "Bộ phận mua hàng" (xác nhận huỷ 2 bên) - chỉ hiện với Cung Ứng
         $purchasingItems = $this->purchasingItems($departmentId);
 
-        $tabs = ['list', 'tracking', 'inbox', 'purchasing'];
+        $tabs = ['list', 'tracking', 'purchasing'];
         $activeTab = in_array($request->query('tab'), $tabs, true)
             ? $request->query('tab')
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'list');
@@ -130,17 +128,11 @@ class StandardEstimateController extends Controller
             'signStatuses' => config('estimate.sign_statuses'),
             'receptionStatuses' => config('estimate.reception_statuses'),
             'signRows' => $signRows,
-            'signerOptions' => $this->signerOptions(),
             'signPermission' => self::SIGN_PERMISSION,
             'nextCode' => $this->nextCode($departmentId),
             'trackedItems' => $trackedItems,
             'activeTab' => $activeTab,
             'purchasingItems' => $purchasingItems,
-            'showApprovalInbox' => $inbox['show'],
-            'inboxRequests' => $inbox['requests'],
-            'inboxItems' => $inbox['items'],
-            'inboxSigns' => $inbox['signs'],
-            'inboxBadgeCount' => $inbox['badge'],
         ]);
     }
 
@@ -671,21 +663,8 @@ class StandardEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$current->code.' chưa có chất chuẩn nào, chưa trình ký được!');
         }
 
-        $validator = Validator::make($request->all(), [
-            'signers' => ['required', 'array', 'min:2'],
-            'signers.*' => ['required', 'integer', 'exists:user_management,id'],
-        ], [
-            'signers.required' => 'Vui lòng khai quy trình ký duyệt (tối thiểu 2 bước).',
-            'signers.min' => 'Quy trình ký duyệt phải có tối thiểu 2 bước.',
-            'signers.*.required' => 'Vui lòng chọn người ký cho mỗi bước.',
-            'signers.*.exists' => 'Người ký được chọn không hợp lệ.',
-        ]);
-
-        $signerIds = $this->signerIds($request);
-
-        if ($flowError = $this->validateSignerFlow($signerIds)) {
-            $validator->after(fn ($v) => $v->errors()->add('signers', $flowError));
-        }
+        // Bước 1 Quản Lý Bộ Phận (tự gán theo phòng lập phiếu), bước 2 Ban Giám Đốc người lập chọn
+        $validator = $this->signFlowValidator($request, (int) $current->department_id);
 
         if ($validator->fails()) {
             return redirect()->back()
@@ -699,7 +678,7 @@ class StandardEstimateController extends Controller
         }
 
         $now = now();
-        $stepCount = count($signerIds);
+        $stepCount = $this->signFlowStepCount();
 
         DB::transaction(function () use ($current, $request, $stepCount, $now) {
             DB::table(self::TABLE)->where('id', $current->id)->update([

@@ -278,6 +278,11 @@
                                                 ]);
                                                 $planLines = $plan['lines'] ?? [];
                                                 $shortage = (float) ($plan['shortage'] ?? 0);
+
+                                                // Không có quyền điều chỉnh: khoá lô theo đề xuất, chỉ sửa được số lượng
+                                                $lotLocked = !user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::LOT_ADJUST_PERMISSION);
+                                                // Không có quyền điều chỉnh số lượng: khoá đúng số đề xuất
+                                                $amountLocked = !user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::AMOUNT_ADJUST_PERMISSION);
                                             @endphp
                                             <form action="{{ route($expRoute . 'issueStore') }}" method="POST"
                                                 class="me-issue-form" data-item-id="{{ $it->id }}"
@@ -285,6 +290,8 @@
                                                 data-material="{{ $it->display_name }}"
                                                 data-needed="{{ $shortAmount }}" data-unit="{{ $unitLabel }}"
                                                 data-need-label="{{ $isPartial ? 'Cần cấp thêm' : 'Đề nghị' }}"
+                                                data-lot-locked="{{ $lotLocked ? '1' : '0' }}"
+                                                data-amount-locked="{{ $amountLocked ? '1' : '0' }}"
                                                 data-plan="{{ json_encode($planLines) }}">
                                                 @csrf
                                                 <input type="hidden" name="item_id" value="{{ $it->id }}">
@@ -292,10 +299,16 @@
                                                 <div class="me-issue-lines"></div>
 
                                                 <div class="me-issue-foot">
-                                                    <button type="button"
-                                                        class="btn btn-xs btn-outline-primary me-issue-add">
-                                                        <i class="fas fa-plus mr-1"></i>Thêm mã xuất nhập
-                                                    </button>
+                                                    @if ($lotLocked || $amountLocked)
+                                                        <span class="md-sub small" title="{{ $lotLocked ? 'Cần quyền Điều Chỉnh Mã Xuất Nhập Khi Cấp Phát Vật Tư để đổi / thêm mã xuất nhập' : 'Cần quyền Điều Chỉnh Số Lượng Khi Cấp Phát Vật Tư để sửa số lượng' }}">
+                                                            <i class="fas fa-lock mr-1"></i>{{ $lotLocked ? 'Cấp theo mã đề xuất' : 'Cấp theo số lượng đề xuất' }}
+                                                        </span>
+                                                    @else
+                                                        <button type="button"
+                                                            class="btn btn-xs btn-outline-primary me-issue-add">
+                                                            <i class="fas fa-plus mr-1"></i>Thêm mã xuất nhập
+                                                        </button>
+                                                    @endif
                                                     <input type="text" name="issued_unit"
                                                         class="form-control form-control-sm me-issue-unit"
                                                         value="{{ $unitLabel }}" title="Đơn vị tính">

@@ -1,12 +1,19 @@
 {{--
 | Modal ĐIỀU CHỈNH ĐỀ NGHỊ CHUYỂN VẬT TƯ LIÊN PHÒNG BAN đang lưu tạm.
-| Chỉ dựng cho các phiếu phòng mình gửi đi và còn ở trạng thái draft.
+| Chỉ dựng cho các phiếu phòng mình gửi đi và còn ở trạng thái draft - cả đề nghị liên phòng
+| ban lẫn đề nghị VPP. Phiếu VPP giữ cố định phòng nhận là phòng Hành Chính đã chọn.
 |
 | Dòng vật tư, nút thêm dòng và picker "Danh mục tồn của phòng" dùng chung với modal tạo
 | (transferRequestModal + transferRowFields), nên hai form không lệch nhau.
 --}}
-@foreach ($transferSent->where('status', 'draft') as $req)
-    @php $rows = ($transferItems[$req->id] ?? collect())->values(); @endphp
+@foreach ($transferSent->getCollection()->merge($vppSent->getCollection())->where('status', 'draft') as $req)
+    @php
+        $rows = ($transferItems[$req->id] ?? collect())->values();
+        $mtEditVpp = in_array((int) $req->to_department_id, $vppDepartmentIds, true);
+        $mtEditDepartments = $mtEditVpp
+            ? \Illuminate\Support\Facades\DB::table('deparments')->select('id', 'name', 'shortName')->where('id', $req->to_department_id)->get()
+            : $transferDepartments;
+    @endphp
     <div class="modal fade md-modal" id="matTransferEditModal_{{ $req->id }}" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 85%; width: 85%;">
             <div class="modal-content">
@@ -43,9 +50,12 @@
                                     <i class="fas fa-building mr-1 text-primary"></i> Gửi Đến Phòng Ban <span class="text-danger">*</span>:
                                 </label>
                                 <div style="min-width: 280px;">
-                                    <select name="to_department_id" class="form-control font-weight-bold" style="height: 38px !important;" required>
-                                        <option value="">-- Chọn phòng ban đang giữ vật tư --</option>
-                                        @foreach ($transferDepartments as $dept)
+                                    <select name="to_department_id" class="form-control font-weight-bold {{ $mtEditVpp ? 'mat-transfer-dept-fixed' : '' }}"
+                                        style="height: 38px !important;" {{ $mtEditVpp ? 'tabindex=-1' : '' }} required>
+                                        @unless ($mtEditVpp)
+                                            <option value="">-- Chọn phòng ban đang giữ vật tư --</option>
+                                        @endunless
+                                        @foreach ($mtEditDepartments as $dept)
                                             <option value="{{ $dept->id }}" {{ $req->to_department_id == $dept->id ? 'selected' : '' }}>
                                                 {{ $dept->name }} ({{ $dept->shortName }})
                                             </option>
@@ -68,12 +78,14 @@
                         <div class="table-responsive border rounded">
                             <table class="table table-bordered mb-0 mat-transfer-table" style="font-size: 0.9rem;">
                                 @include('pages.export.MaterialExport.transferRowsHead')
-                                <tbody id="matTransferEditRows_{{ $req->id }}" data-next-idx="{{ max($rows->count(), 1) }}">
+                                <tbody id="matTransferEditRows_{{ $req->id }}" data-next-idx="{{ max($rows->count(), 1) }}"
+                                    data-template="{{ $mtEditVpp ? 'matVppRowTemplate' : 'matTransferRowTemplate' }}">
                                     @for ($idx = 0; $idx < max($rows->count(), 1); $idx++)
                                         @include('pages.export.MaterialExport.transferRowFields', [
                                             'idx' => $idx,
                                             'item' => $rows->get($idx),
                                             'onlyRow' => $rows->count() <= 1,
+                                            'rowCategories' => $mtEditVpp ? $vppCategories : $transferCategories,
                                         ])
                                     @endfor
                                 </tbody>
