@@ -3,10 +3,39 @@
 @php
     // 3 tab đề nghị cấp phát: key = material_request_lists.type (cũng là tên tab)
     $reqTabMeta = [
-        'periodic' => ['pane' => 'mePanePeriodic', 'icon' => 'fas fa-sync-alt', 'label' => 'Đề Nghị Theo Định Kỳ', 'prefix' => 'reqp_', 'create' => false, 'empty' => 'Chưa có đề nghị định kỳ nào.'],
-        'risk_assessment' => ['pane' => 'mePaneRisk', 'icon' => 'fas fa-shield-alt', 'label' => 'Đề Nghị Theo ĐG Rủi Ro', 'prefix' => 'reqk_', 'create' => true, 'empty' => 'Chưa có đề nghị theo đánh giá rủi ro nào.'],
-        'regular' => ['pane' => 'mePaneRegular', 'icon' => 'fas fa-file-signature', 'label' => 'Đề Nghị Thường Quy', 'prefix' => 'reqt_', 'create' => true, 'empty' => 'Chưa có đề nghị cấp phát vật tư nào.'],
+        'periodic' => ['pane' => 'mePanePeriodic', 'icon' => 'fas fa-sync-alt', 'label' => 'Đề Nghị Theo Định Kỳ', 'short' => 'Theo Định Kỳ', 'prefix' => 'reqp_', 'create' => false, 'empty' => 'Chưa có đề nghị định kỳ nào.'],
+        'risk_assessment' => ['pane' => 'mePaneRisk', 'icon' => 'fas fa-shield-alt', 'label' => 'Đề Nghị Theo ĐG Rủi Ro', 'short' => 'Theo ĐG Rủi Ro', 'prefix' => 'reqk_', 'create' => true, 'empty' => 'Chưa có đề nghị theo đánh giá rủi ro nào.'],
+        'regular' => ['pane' => 'mePaneRegular', 'icon' => 'fas fa-file-signature', 'label' => 'Đề Nghị Thường Quy', 'short' => 'Thường Quy', 'prefix' => 'reqt_', 'create' => true, 'empty' => 'Chưa có đề nghị cấp phát vật tư nào.'],
     ];
+
+    /*
+    | Nhóm "Đề Nghị" trên thanh tab: 3 tab đề nghị cấp phát + tab đề nghị VPP (gửi kho VPP của
+    | Hành Chính) + tab đề nghị chuyển liên phòng ban gom thành một dropdown. Mỗi mục vẫn là .exp-tab với pane riêng như trước nên ?tab= và
+    | activeTab sau khi lưu không đổi.
+    */
+    $reqGroupTabs = collect($reqTabMeta)->map(fn($meta, $type) => [
+        'key' => $type,
+        'pane' => $meta['pane'],
+        'icon' => $meta['icon'],
+        'label' => $meta['short'],
+        'count' => $reqTabs[$type]['list']->total(),
+    ])->values()->push([
+        'key' => 'vpp',
+        'pane' => 'mePaneVpp',
+        'icon' => 'fas fa-paperclip',
+        'label' => 'Đề nghị VPP',
+        // Phiếu chờ xử lý, Controller đếm - số vật tư cần đề nghị hiện ở tab con trong pane
+        'count' => $vppBadgeCount,
+    ])->push([
+        'key' => 'transfer',
+        'pane' => 'mePaneTransfer',
+        'icon' => 'fas fa-people-arrows',
+        'label' => 'Chuyển liên phòng ban',
+        // Do Controller đếm trên toàn bộ dữ liệu, không chỉ trang đang xem
+        'count' => $transferBadgeCount,
+    ]);
+    $reqGroupActive = $reqGroupTabs->firstWhere('key', $activeTab);
+    $reqGroupCount = $reqGroupTabs->sum('count');
 @endphp
 
 <div class="content-wrapper">
@@ -15,54 +44,57 @@
             <div class="card-body">
 
                 <div class="exp-tabs">
-                    <button type="button" class="exp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}" data-pane="mePaneBook">
-                        <i class="fas fa-book mr-1"></i> Sổ sử dụng vật tư
-                    </button>
-                    @foreach ($reqTabMeta as $reqType => $meta)
-                        <button type="button" class="exp-tab {{ $activeTab === $reqType ? 'is-active' : '' }}" data-pane="{{ $meta['pane'] }}">
-                            <i class="{{ $meta['icon'] }} mr-1"></i> {{ $meta['label'] }}
-                            @if ($reqTabs[$reqType]['list']->total())
-                                <span class="exp-tab-count">{{ $reqTabs[$reqType]['list']->total() }}</span>
+                    <div class="exp-tab-group dropdown">
+                        <button type="button" class="exp-tab-toggle dropdown-toggle {{ $reqGroupActive ? 'is-active' : '' }}"
+                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-file-signature mr-1"></i> Đề Nghị
+                            <span class="exp-tab-current">{{ $reqGroupActive ? '· ' . $reqGroupActive['label'] : '' }}</span>
+                            @if ($reqGroupCount)
+                                <span class="exp-tab-count">{{ $reqGroupCount }}</span>
                             @endif
                         </button>
-                    @endforeach
+                        <div class="dropdown-menu exp-tab-menu">
+                            @foreach ($reqGroupTabs as $groupTab)
+                                <button type="button" class="exp-tab {{ $activeTab === $groupTab['key'] ? 'is-active' : '' }}"
+                                    data-pane="{{ $groupTab['pane'] }}" data-short="{{ $groupTab['label'] }}">
+                                    <i class="{{ $groupTab['icon'] }}"></i> {{ $groupTab['label'] }}
+                                    @if ($groupTab['count'])
+                                        <span class="exp-tab-count">{{ $groupTab['count'] }}</span>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
                     <button type="button" class="exp-tab {{ $activeTab === 'prepare' ? 'is-active' : '' }}" data-pane="mePanePrepare">
-                        <i class="fas fa-dolly mr-1"></i> Soạn vật tư cấp phát
+                        <i class="fas fa-dolly mr-1"></i> Cấp Phát
                         @if ($prepBadgeCount)
                             <span class="exp-tab-count">{{ $prepBadgeCount }}</span>
                         @endif
                     </button>
-                    <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}" data-pane="mePaneTransfer">
-                        <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
-                        {{-- Do Controller đếm trên toàn bộ dữ liệu, không chỉ trang đang xem --}}
-                        @if ($transferBadgeCount)
-                            <span class="exp-tab-count">{{ $transferBadgeCount }}</span>
+                    <button type="button" class="exp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}" data-pane="mePaneBook">
+                        <i class="fas fa-book mr-1"></i> Sổ Cấp Phát
+                    </button>
+                    <button type="button" class="exp-tab {{ $activeTab === 'quarantine' ? 'is-active' : '' }}" data-pane="mePaneQuarantine">
+                        <i class="fas fa-biohazard mr-1"></i> Cách ly - Loại bỏ - Huỷ
+                        @if ($quarantineBadge)
+                            <span class="exp-tab-count">{{ $quarantineBadge }}</span>
                         @endif
                     </button>
-                    @if ($showApprovalInbox)
-                        <button type="button" class="exp-tab {{ $activeTab === 'inbox' ? 'is-active' : '' }}" data-pane="mePaneInbox">
-                            <i class="fas fa-inbox mr-1"></i> Ký duyệt (mọi phòng ban)
-                            @if ($inboxBadgeCount)
-                                <span class="exp-tab-count">{{ $inboxBadgeCount }}</span>
-                            @endif
-                        </button>
-                    @endif
+                    <button type="button" class="exp-tab {{ $activeTab === 'late' ? 'is-active' : '' }}" data-pane="mePaneLate">
+                        <i class="fas fa-hourglass-end mr-1"></i> Ghi nhận cấp phát trễ
+                        @if ($lateRows->count())
+                            <span class="exp-tab-count">{{ $lateRows->count() }}</span>
+                        @endif
+                    </button>
                 </div>
 
                 {{-- ============ SỔ SỬ DỤNG ============ --}}
                 <div class="exp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="mePaneBook">
-                    <div class="md-toolbar">
-                        @perm('export_material_issue')
-                            <button type="button" class="btn btn-danger btn-md-create">
-                                <i class="fas fa-trash-alt mr-1"></i> Loại bỏ vật tư hỏng / hết hạn
-                            </button>
-                        @endperm
-                    </div>
-
                     @include('pages.shared.rangeFilter', [
                         'rfRoute' => $expRoute . 'list',
                         'rfTab' => 'book',
                         'rfPrefix' => 'book_',
+                        'rfInBar' => true,
                         'rfRange' => $bookRange,
                         'rfPerPage' => $bookPerPage,
                         'rfKeyword' => $bookKeyword,
@@ -88,6 +120,10 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @php
+                                    // Không có quyền điều chỉnh: vẫn hiện nút nhưng khoá lại (server cũng chặn ở update())
+                                    $meCanUpdate = user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::UPDATE_PERMISSION);
+                                @endphp
                                 @foreach ($exports as $row)
                                     <tr>
                                         <td class="text-center">{{ $exports->firstItem() + $loop->index }}</td>
@@ -141,10 +177,13 @@
                                             @if ($row->type === 'transfer_out')
                                                 {{-- Phiếu cấp phát liên phòng ban chỉ đổi được qua thao tác Nhận / Từ chối nhận của phòng nhận --}}
                                                 <span class="md-sub text-muted">—</span>
+                                            @elseif ($row->quarantine_id)
+                                                {{-- Loại bỏ theo quyết định ở tab "Cách ly - Loại Bỏ - Huỷ": không quay lại kho được --}}
+                                                <span class="md-sub text-muted" title="Loại bỏ theo quyết định, không điều chỉnh được"><i class="fas fa-lock"></i></span>
                                             @else
                                             <div class="md-actions">
                                                 <span class="exp-btn-wrap">
-                                                    @perm('export_material_issue')
+                                                    @if ($meCanUpdate)
                                                         <button type="button" class="btn btn-sm btn-warning btn-me-edit" title="Điều chỉnh"
                                                             data-row="{{ json_encode([
                                                                 'id' => $row->id,
@@ -166,7 +205,12 @@
                                                             ]) }}">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
-                                                    @endperm
+                                                    @else
+                                                        <button type="button" class="btn btn-sm btn-warning" disabled
+                                                            title="Cần quyền Điều Chỉnh Sổ Sử Dụng Vật Tư">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                    @endif
                                                     @php $c = (int) ($adjustCounts[$row->id] ?? 0); @endphp
                                                     @if ($c > 0)
                                                         <button type="button" class="exp-count-badge btn-exp-history"
@@ -212,15 +256,20 @@
                     @include('pages.export.MaterialExport.preparePane')
                 </div>
 
+                {{-- ============ CẤP PHÁT TRỄ HẠN ============ --}}
+                <div class="exp-pane {{ $activeTab === 'late' ? 'is-active' : '' }}" id="mePaneLate">
+                    @include('pages.export.MaterialExport.latePane')
+                </div>
+
+                {{-- ============ VẬT TƯ HỎNG: CÁCH LY -> LOẠI BỎ -> HUỶ ============ --}}
+                <div class="exp-pane {{ $activeTab === 'quarantine' ? 'is-active' : '' }}" id="mePaneQuarantine">
+                    @include('pages.export.MaterialExport.quarantinePane')
+                </div>
+
                 {{-- ============ ĐỀ NGHỊ CHUYỂN LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.MaterialExport.transferPane')
+                @include('pages.export.MaterialExport.vppPane')
 
-                {{-- ============ KÝ DUYỆT (MỌI PHÒNG BAN) ============ --}}
-                @if ($showApprovalInbox)
-                    <div class="exp-pane {{ $activeTab === 'inbox' ? 'is-active' : '' }}" id="mePaneInbox">
-                        @include('pages.export.MaterialExport.inboxPane')
-                    </div>
-                @endif
 
             </div>
         </div>
@@ -230,11 +279,5 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([5, 'desc']).draw();
-
-        // Điền form loại bỏ / điều chỉnh
-        $(document).on('click', '.btn-md-create', function () {
-            $('#createModal form')[0].reset();
-            $('#createModal').modal('show');
-        });
     });
 </script>

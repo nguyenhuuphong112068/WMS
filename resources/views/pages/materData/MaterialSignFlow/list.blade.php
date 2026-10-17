@@ -5,15 +5,14 @@
     |--------------------------------------------------------------------------
     | DỮ LIỆU GỐC - TRÌNH KÝ ĐỀ NGHỊ CẤP PHÁT VẬT TƯ
     |--------------------------------------------------------------------------
-    | Phòng ban khai trước quy trình ký chuẩn của phiếu đề nghị cấp phát vật tư:
-    | một TỔ HỢP điều kiện (phân loại của danh mục vật tư chung + phân loại của
-    | danh mục vật tư phòng) ứng với một dãy BƯỚC KÝ, mỗi bước do một VAI TRÒ
-    | phê duyệt. Màn hình luôn làm việc trên phòng ban đang chọn ở topNAV.
+    | Phòng ban khai các VAI TRÒ nhận trình ký: cấp ký, người ký và điều kiện
+    | (nhóm VÀ, giữa các nhóm HOẶC) theo phân loại vật tư. Đề nghị đi qua các vai
+    | trò được kích hoạt theo thứ tự cấp ký. Luôn làm việc trên phòng ban đang chọn.
     */
 
     $mdRoute = 'pages.materData.materialSignFlow.';
-    $mdLabel = 'quy trình trình ký';
-    $mdTitle = 'Quy Trình Trình Ký';
+    $mdLabel = 'vai trò trình ký';
+    $mdTitle = 'Vai Trò Trình Ký';
     $mdIcon = 'fas fa-file-signature';
 @endphp
 

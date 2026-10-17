@@ -68,13 +68,13 @@
                         <table class="table table-bordered md-table wl-items-table w-100" data-no-datatable>
                             <thead>
                                 <tr>
-                                    <th class="text-center" style="width: 45px">STT</th>
-                                    <th style="width: 230px">Vật Tư</th>
-                                    <th>Quy Cách</th>
+                                    <th class="text-center" style="width: 55px">STT</th>
+                                    <th style="width: 260px">Vật Tư</th>
+                                    <th style="width: 170px">Quy Cách</th>
                                     <th style="width: 130px">Số Lượng <span class="text-danger">*</span></th>
-                                    <th style="width: 150px">Đơn Vị <span class="text-danger">*</span></th>
-                                    <th style="width: 160px">Tháng Cần Dùng <span class="text-danger">*</span></th>
-                                    <th style="width: 200px">Mục Đích Sử Dụng</th>
+                                    <th style="width: 130px">Đơn Vị <span class="text-danger">*</span></th>
+                                    <th style="width: 170px">Tháng Cần Dùng <span class="text-danger">*</span></th>
+                                    <th>Mục Đích Sử Dụng</th>
                                 </tr>
                             </thead>
                             <tbody class="wl-items-body"></tbody>
@@ -111,8 +111,8 @@
                                     value="{{ $wlPeriodNow }}">
                             </td>
                             <td>
-                                <input type="text" maxlength="1000" class="form-control form-control-sm"
-                                    name="items[__INDEX__][purpose]" data-field="purpose">
+                                <textarea rows="1" maxlength="1000" class="form-control form-control-sm wl-autogrow"
+                                    name="items[__INDEX__][purpose]" data-field="purpose"></textarea>
                             </td>
                         </tr>
                     </template>
@@ -129,12 +129,81 @@
     </div>
 </div>
 
+<style>
+    /* modal-xl của bản Bootstrap đang dùng không đủ rộng cho bảng 7 cột - đặt theo id như #itemCreateModal */
+    #watchlistEstimateModal .modal-dialog {
+        max-width: 90vw !important;
+        width: 90vw;
+        margin: 2vh auto;
+    }
+
+    #watchlistEstimateModal .modal-body {
+        padding: 18px 22px;
+        max-height: calc(96vh - 140px);
+        overflow-y: auto;
+    }
+
+    #watchlistEstimateModal .wl-items-table {
+        table-layout: fixed;
+        min-width: 1100px;
+        margin-bottom: 0;
+    }
+
+    #watchlistEstimateModal .wl-items-table thead th {
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    /* Dòng cao theo nội dung: tên / quy cách dài tự xuống dòng thay vì bị cắt */
+    #watchlistEstimateModal .wl-items-table td {
+        vertical-align: middle;
+        height: auto;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    /* form-control-sm mặc định khoá chiều cao nên chữ trong ô chọn đơn vị bị che - mở ra */
+    #watchlistEstimateModal .wl-items-table .form-control {
+        width: 100%;
+        height: auto;
+        min-height: 34px;
+        padding: 6px 10px;
+        font-size: 0.875rem;
+        line-height: 1.45;
+    }
+
+    #watchlistEstimateModal .wl-items-table select.form-control {
+        padding-right: 26px;
+        text-overflow: ellipsis;
+    }
+
+    #watchlistEstimateModal .wl-items-table textarea.wl-autogrow {
+        resize: none;
+        overflow: hidden;
+    }
+</style>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Đánh lại số thứ tự hiển thị mỗi lần modal mở (tên ô đã do JS của bảng đánh số)
+        // Ô mục đích sử dụng giãn theo nội dung
+        function wlAutoGrow(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 2 + 'px';
+        }
+
+        $(document).on('input', '#watchlistEstimateModal .wl-autogrow', function() {
+            wlAutoGrow(this);
+        });
+
         $('#watchlistEstimateModal').on('shown.bs.modal', function() {
             $(this).find('.wl-items-body tr').each(function(index) {
                 $(this).find('.wl-stt').text(index + 1);
+            });
+
+            // Lý do điền sẵn từ danh sách chỉ đo được chiều cao khi modal đã hiện
+            $(this).find('.wl-autogrow').each(function() {
+                wlAutoGrow(this);
             });
         });
     });

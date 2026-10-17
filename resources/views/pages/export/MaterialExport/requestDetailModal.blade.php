@@ -2,6 +2,24 @@
 @php
     $b = $expReqBadge($req->app_status);
     $canIssue = $req->app_status === 'approved';
+
+    /*
+    | Cột "Tồn khả dụng" = tồn thực hiện tại - phần các đề nghị chưa cấp phát đang giữ chỗ
+    | (MaterialExportController::categoryStockMap). Đề nghị đang xem nếu đang giữ chỗ (chờ ký,
+    | hoặc đã duyệt mà kho chưa cấp đủ) thì cộng trả phần của CHÍNH NÓ, để con số cho biết kho
+    | còn bao nhiêu dành được cho đề nghị này - cùng nghĩa với cột ở modal lập đề nghị.
+    */
+    $reqHolds = $req->app_status === 'pending_sign'
+        || ($req->app_status === 'approved' && in_array($req->issue_status, ['waiting', 'partial']));
+    $ownHeld = [];
+    if ($reqHolds) {
+        foreach ($items as $held) {
+            if ($held->category_id && in_array($held->status, ['pending', 'partial'])) {
+                $ownHeld[$held->category_id] = ($ownHeld[$held->category_id] ?? 0)
+                    + max((float) $held->requested_amount - (float) $held->issued_amount, 0);
+            }
+        }
+    }
 @endphp
 <div class="modal fade md-modal" id="reqDetailModal_{{ $req->id }}" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 90vw;">
@@ -76,7 +94,9 @@
                                 <th style="width:170px">Vật tư</th>
                                 <th style="width:120px">Quy cách</th>
                                 <th style="width:90px">SL đề nghị</th>
-                                <th style="width:140px">Mục đích</th>
+                                <th style="width:90px" title="Tồn kho của vật tư tại thời điểm lập đề nghị">Tồn lúc lập</th>
+                                <th style="width:100px" title="Tồn thực hiện tại - số lượng các đề nghị khác chưa được cấp phát">Tồn khả dụng</th>
+                                <th style="width:200px">Đối tượng / Mục đích</th>
                                 <th style="width:115px">Trạng thái</th>
                                 <th>Cấp phát</th>
                             </tr>
@@ -121,7 +141,33 @@
                                     <td class="text-right">
                                         {{ rtrim(rtrim(number_format((float) $it->requested_amount, 4, '.', ''), '0'), '.') }}
                                         {{ $it->requested_unit }}</td>
-                                    <td class="md-sub">{{ $it->purpose ?: '—' }}</td>
+                                    <td class="text-right">
+                                        @if ($it->category_id && $it->stock_at_request !== null)
+                                            {{ $expNum($it->stock_at_request) }}
+                                        @else
+                                            <span class="md-sub" title="{{ $it->category_id ? 'Phiếu lập trước khi hệ thống chụp tồn' : 'Vật tư ngoài danh mục' }}">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-right">
+                                        @if ($it->category_id)
+                                            @php
+                                                $available = (($liveStockByCategory ?? [])[$it->category_id]['available'] ?? 0)
+                                                    + ($ownHeld[$it->category_id] ?? 0);
+                                            @endphp
+                                            <span class="{{ !$isDone && $available + 0.00005 < $shortAmount ? 'text-danger font-weight-bold' : '' }}"
+                                                title="{{ !$isDone && $available + 0.00005 < $shortAmount ? 'Không đủ cho số còn phải cấp' : '' }}">
+                                                {{ $expNum($available) }}
+                                            </span>
+                                        @else
+                                            <span class="md-sub">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="md-sub">
+                                        @if ($it->consumption_object_id)
+                                            <div class="font-weight-bold text-dark"><i class="fas fa-crosshairs mr-1 text-primary"></i>{{ $it->object_code }} - {{ $it->object_name }}</div>
+                                        @endif
+                                        {{ $it->purpose ?: ($it->consumption_object_id ? '' : '—') }}
+                                    </td>
                                     <td>
                                         @if ($hasLots)
                                             @php
@@ -232,6 +278,11 @@
                                                 ]);
                                                 $planLines = $plan['lines'] ?? [];
                                                 $shortage = (float) ($plan['shortage'] ?? 0);
+
+                                                // Không có quyền điều chỉnh: khoá lô theo đề xuất, chỉ sửa được số lượng
+                                                $lotLocked = !user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::LOT_ADJUST_PERMISSION);
+                                                // Không có quyền điều chỉnh số lượng: khoá đúng số đề xuất
+                                                $amountLocked = !user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::AMOUNT_ADJUST_PERMISSION);
                                             @endphp
                                             <form action="{{ route($expRoute . 'issueStore') }}" method="POST"
                                                 class="me-issue-form" data-item-id="{{ $it->id }}"
@@ -239,6 +290,8 @@
                                                 data-material="{{ $it->display_name }}"
                                                 data-needed="{{ $shortAmount }}" data-unit="{{ $unitLabel }}"
                                                 data-need-label="{{ $isPartial ? 'Cần cấp thêm' : 'Đề nghị' }}"
+                                                data-lot-locked="{{ $lotLocked ? '1' : '0' }}"
+                                                data-amount-locked="{{ $amountLocked ? '1' : '0' }}"
                                                 data-plan="{{ json_encode($planLines) }}">
                                                 @csrf
                                                 <input type="hidden" name="item_id" value="{{ $it->id }}">
@@ -246,10 +299,16 @@
                                                 <div class="me-issue-lines"></div>
 
                                                 <div class="me-issue-foot">
-                                                    <button type="button"
-                                                        class="btn btn-xs btn-outline-primary me-issue-add">
-                                                        <i class="fas fa-plus mr-1"></i>Thêm mã xuất nhập
-                                                    </button>
+                                                    @if ($lotLocked || $amountLocked)
+                                                        <span class="md-sub small" title="{{ $lotLocked ? 'Cần quyền Điều Chỉnh Mã Xuất Nhập Khi Cấp Phát Vật Tư để đổi / thêm mã xuất nhập' : 'Cần quyền Điều Chỉnh Số Lượng Khi Cấp Phát Vật Tư để sửa số lượng' }}">
+                                                            <i class="fas fa-lock mr-1"></i>{{ $lotLocked ? 'Cấp theo mã đề xuất' : 'Cấp theo số lượng đề xuất' }}
+                                                        </span>
+                                                    @else
+                                                        <button type="button"
+                                                            class="btn btn-xs btn-outline-primary me-issue-add">
+                                                            <i class="fas fa-plus mr-1"></i>Thêm mã xuất nhập
+                                                        </button>
+                                                    @endif
                                                     <input type="text" name="issued_unit"
                                                         class="form-control form-control-sm me-issue-unit"
                                                         value="{{ $unitLabel }}" title="Đơn vị tính">

@@ -171,6 +171,8 @@ class ZoneController extends Controller
             'zoneTypeColors' => ZoneType::DEFAULT_COLORS,
             'zoneTypeIcons' => ZoneType::ICONS,
             'zonePalette' => ZoneType::PALETTE,
+            // Ngưỡng của lưới Cấu trúc kho (số cột / tầng / vị trí tối đa)
+            'structureLimits' => ZoneStructureController::limits(),
             /*
             | Số lần thay đổi của từng mục, khoá là '<bảng>-<id>' vì năm cấp nằm chung
             | một trang. Badge trên nút Sửa đọc từ đây, nội dung lịch sử tải sau qua
@@ -200,7 +202,9 @@ class ZoneController extends Controller
             return $this->backToTab($type, 'create')->withErrors($validator, 'create_' . $type);
         }
 
-        $id = DB::table($zone['table'])->insertGetId($this->payload($request, $zone) + [
+        $payload = $this->payload($request, $zone);
+
+        $id = DB::table($zone['table'])->insertGetId($payload + $this->position($zone, $payload) + [
             'department_id' => session('user')['selected_department_id'],
             'status_id' => 1,
             'created_by' => $this->actor(),
@@ -257,7 +261,10 @@ class ZoneController extends Controller
             return $this->backToTab($type)->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.');
         }
 
-        DB::table($zone['table'])->where('id', $current->id)->update($payload + [
+        // Chuyển sang cấp cha khác thì xếp xuống cuối cấp cha mới trên lưới Cấu trúc kho
+        $moved = ($parent = self::POSITION_PARENT[$zone['table']] ?? null) && $current->$parent != $payload[$parent];
+
+        DB::table($zone['table'])->where('id', $current->id)->update($payload + ($moved ? $this->position($zone, $payload) : []) + [
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
@@ -384,6 +391,29 @@ class ZoneController extends Controller
         );
 
         return $this->backToTab($type)->with('success', 'Đã xoá ' . $zone['label'] . ' ' . $current->code . ' thành công!');
+    }
+
+    /** Cột cha quyết định thứ tự (position) của cột / tầng / vị trí trên lưới Cấu trúc kho. */
+    private const POSITION_PARENT = [
+        'columns' => 'shelf_id',
+        'tiers' => 'column_id',
+        'locations' => 'tier_id',
+    ];
+
+    /** Thứ tự kế tiếp trong cấp cha, để mục thêm tay vẫn hiện trên lưới Cấu trúc kho. */
+    private function position(array $zone, array $payload): array
+    {
+        $parent = self::POSITION_PARENT[$zone['table']] ?? null;
+
+        if (! $parent) {
+            return [];
+        }
+
+        if (empty($payload[$parent])) {
+            return ['position' => null];
+        }
+
+        return ['position' => (int) DB::table($zone['table'])->where($parent, $payload[$parent])->max('position') + 1];
     }
 
     /** Lấy cấu hình của một cấp, chặn mọi giá trị {type} lạ. */

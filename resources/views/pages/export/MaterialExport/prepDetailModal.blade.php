@@ -1,5 +1,5 @@
 {{--
-| CHI TIẾT SOẠN HÀNG CỦA MỘT VẬT TƯ - mở từ tab "Soạn vật tư cấp phát".
+| CHI TIẾT SOẠN HÀNG CỦA MỘT VẬT TƯ - mở từ tab "Cấp phát vật tư".
 | Biến vào: $g (một nhóm của $prepGroups), $prepIndex (thứ tự nhóm, dùng làm id modal).
 --}}
 @php

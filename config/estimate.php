@@ -36,9 +36,14 @@ return [
     ],
 
     /*
-     | Vai trò được phép làm BƯỚC KÝ CUỐI của một phiếu dự trù. Người lập khai quy trình
-     | ký, hệ thống kiểm tra người ở bước cuối phải thuộc một trong các vai trò này.
+     | QUY TRÌNH KÝ CỐ ĐỊNH 2 BƯỚC của phiếu dự trù:
+     |   Bước 1 - QUẢN LÝ BỘ PHẬN của phòng lập phiếu: không chỉ định đích danh, MỌI người
+     |            thuộc vai trò dưới đây trong phòng đó đều ký được (xem App\Support\EstimateSigner).
+     |   Bước 2 - BAN GIÁM ĐỐC: người lập bắt buộc chọn đích danh một người thuộc bod_roles.
+     | Tên vai trò giữ đúng như bảng roles (kể cả "Bộ Phân" thiếu dấu).
      */
+    'department_manager_roles' => ['Quản Lý Bộ Phân'],
+
     'bod_roles' => ['Ban Giám Đốc'],
 
     /*

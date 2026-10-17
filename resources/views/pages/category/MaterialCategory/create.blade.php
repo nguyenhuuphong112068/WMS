@@ -81,6 +81,21 @@
                                 </div>
                             </div>
 
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Part Number</label>
+                                        <input type="text" name="part_number" maxlength="100"
+                                            class="form-control {{ $bag->has('part_number') ? 'is-invalid' : '' }}"
+                                            value="{{ old('part_number') }}"
+                                            placeholder="Mã linh kiện của nhà sản xuất">
+                                        @if ($bag->has('part_number'))
+                                            <span class="md-error">{{ $bag->first('part_number') }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="md-hint">
                                 <i class="fas fa-info-circle mr-1"></i>
                                 Ô chọn chỉ hiển thị dữ liệu gốc <b>đã duyệt</b> và <b>đang hoạt động</b>.

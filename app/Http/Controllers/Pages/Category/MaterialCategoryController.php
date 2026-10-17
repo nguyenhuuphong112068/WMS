@@ -51,6 +51,7 @@ class MaterialCategoryController extends Controller
     private const FIELDS = [
         'material_names_id' => 'Tên vật tư',
         'manufacturers_id' => 'Nhà sản xuất',
+        'part_number' => 'Part Number',
         'technical_specification' => 'Thông tin kỹ thuật',
         'classification' => 'Phân loại',
         'purchasing_department' => 'Bộ phận mua hàng',
@@ -125,9 +126,10 @@ class MaterialCategoryController extends Controller
                 \App\Support\CategoryUnitConversion::TYPE_MATERIAL
             ),
 
-            // Dữ liệu của 2 tab đề nghị theo chu kỳ, tiền tố periodic
+            // Dữ liệu của 3 tab theo chu kỳ (đề nghị nội bộ / liên phòng ban, dự trù), tiền tố periodic
             'periodicInternalLists' => $periodicLists[MaterialPeriodicRequest::TYPE_INTERNAL],
             'periodicExternalLists' => $periodicLists[MaterialPeriodicRequest::TYPE_EXTERNAL],
+            'periodicEstimateLists' => $periodicLists[MaterialPeriodicRequest::TYPE_ESTIMATE],
             'periodicInternalCategories' => MaterialPeriodicRequest::categoryOptions(MaterialPeriodicRequest::TYPE_INTERNAL, $departmentId),
             'periodicExternalCategories' => MaterialPeriodicRequest::categoryOptions(MaterialPeriodicRequest::TYPE_EXTERNAL, $departmentId),
             'periodicUnits' => DepartmentMaterial::unitOptions(),
@@ -279,6 +281,7 @@ class MaterialCategoryController extends Controller
                     'Mã vật tư' => $row->code ?: '—',
                     'Tên vật tư' => $row->material_name ?: '—',
                     'Nhà sản xuất' => $row->manufacturer_name ?: '—',
+                    'Part Number' => $row->part_number ?: '—',
                     'Thông tin kỹ thuật' => $row->technical_specification ?: '—',
                     'Phân loại' => MaterialClassification::describe($row->classification),
                     'Bộ phận mua hàng' => MaterialClassification::purchasingLabel($row->purchasing_department) ?: '—',
@@ -363,6 +366,7 @@ class MaterialCategoryController extends Controller
             'code' => $row->code,
             'material_names_id' => $row->material_names_id,
             'manufacturers_id' => $row->manufacturers_id,
+            'part_number' => $row->part_number,
             'technical_specification' => $row->technical_specification,
             'classification' => $row->classification,
             'purchasing_department' => $row->purchasing_department,
@@ -395,7 +399,7 @@ class MaterialCategoryController extends Controller
                 $parts[] = $title . ': '
                     . (MaterialClassification::purchasingLabel($current->$field) ?: '—') . ' -> '
                     . (MaterialClassification::purchasingLabel($payload[$field]) ?: '—');
-            } elseif ($field === 'technical_specification' || $field === 'lead_time_days') {
+            } elseif (in_array($field, ['part_number', 'technical_specification', 'lead_time_days'], true)) {
                 $parts[] = $title . ': '
                     . (($current->$field === null || $current->$field === '') ? '—' : $current->$field) . ' -> '
                     . (($payload[$field] === null || $payload[$field] === '') ? '—' : $payload[$field]);
@@ -512,6 +516,7 @@ class MaterialCategoryController extends Controller
         return [
             'material_names_id' => ['required', 'integer', 'exists:material_names,id'],
             'manufacturers_id' => ['required', 'integer', 'exists:manufacturers,id'],
+            'part_number' => ['nullable', 'string', 'max:100'],
             'technical_specification' => ['nullable', 'string', 'max:100'],
         ] + MaterialClassification::rules();
     }
@@ -519,15 +524,17 @@ class MaterialCategoryController extends Controller
     private function payload(Request $request): array
     {
         $techSpec = trim((string) $request->technical_specification);
+        $partNumber = trim((string) $request->part_number);
 
         return [
             'material_names_id' => (int) $request->material_names_id,
             'manufacturers_id' => (int) $request->manufacturers_id,
+            'part_number' => $partNumber === '' ? null : $partNumber,
             'technical_specification' => $techSpec === '' ? null : $techSpec,
             'classification' => MaterialClassification::encode($request->input('classification')),
-            'purchasing_department' => MaterialClassification::purchasingLabel($request->purchasing_department) === ''
-                ? null
-                : $request->purchasing_department,
+            'purchasing_department' => isset(MaterialClassification::PURCHASING_DEPARTMENTS[(string) $request->purchasing_department])
+                ? $request->purchasing_department
+                : null,
             'lead_time_days' => MaterialClassification::leadTimeValue($request->lead_time_days),
         ];
     }
@@ -539,6 +546,7 @@ class MaterialCategoryController extends Controller
             'material_names_id.exists' => 'Tên vật tư không hợp lệ.',
             'manufacturers_id.required' => 'Vui lòng chọn nhà sản xuất.',
             'manufacturers_id.exists' => 'Nhà sản xuất không hợp lệ.',
+            'part_number.max' => 'Part Number tối đa 100 ký tự.',
             'technical_specification.max' => 'Thông tin kỹ thuật tối đa 100 ký tự.',
         ] + MaterialClassification::messages();
     }

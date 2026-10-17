@@ -12,6 +12,7 @@
 use App\Http\Controllers\Pages\Export\ChemicalDisposalController;
 use App\Http\Controllers\Pages\Export\ChemicalExportController;
 use App\Http\Controllers\Pages\Export\MaterialExportController;
+use App\Http\Controllers\Pages\Export\MaterialQuarantineController;
 use App\Http\Controllers\Pages\Export\StandardExportController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -105,21 +106,25 @@ Route::prefix('/export')
         | ký và người ký từng bước do người lập phiếu tự khai (0 bước = duyệt thẳng đến
         | người cấp phát). Cấp phát là xuất kho, trừ tồn
         | ngay và tính luôn là vật tư đã đem sử dụng - không có bước chốt lại.
-        | Loại bỏ (type = cancel) hàng hỏng thì lập thẳng, không cần đề nghị.
+        | Loại bỏ hàng hỏng đi riêng quy trình 3 bước ở MaterialQuarantineController.
         */
         Route::prefix('/materialExport')->name('materialExport.')->controller(MaterialExportController::class)->group(function () {
             Route::get('', 'index')->name('list');
-            Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::get('history', 'history')->name('history');
             Route::get('lookup', 'lookup')->name('lookup');
             Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');
             Route::get('requestStockMap', 'requestStockMap')->name('requestStockMap');
-            // Soạn vật tư cấp phát - phiếu soạn hàng A4 in theo đường đi trong kho
+            // Ô chọn Đối Tượng ở cột Mục đích của dòng đề nghị (select2 AJAX)
+            Route::get('requestObjects', 'requestObjects')->name('requestObjects');
+            // Tab "Cấp phát vật tư" - phiếu soạn hàng A4 in theo đường đi trong kho
             Route::get('prepPrint', 'prepPrint')->name('prepPrint');
             // "Ghi nhớ vật tư cần dự trù" từ dòng đề nghị - hiện ở tab Dự Trù Vật Tư
             Route::post('watchlistRemember', 'watchlistRemember')->name('watchlistRemember');
+            // Tab "Đề nghị VPP": lập đề nghị tới kho VPP (Hành Chính) từ danh sách vật tư cần đề nghị
+            Route::post('vppWatchlistStore', 'vppWatchlistStore')->name('vppWatchlistStore');
+            Route::post('watchlistDismiss', 'watchlistDismiss')->name('watchlistDismiss');
 
             // Đề nghị cấp phát + trình ký
             Route::post('requestStore', 'requestStore')->name('requestStore');
@@ -144,5 +149,20 @@ Route::prefix('/export')
             Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
             Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
             Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
+            // Ký duyệt đề nghị liên phòng ban / VPP theo quy trình ở Dữ Liệu Gốc > Trình Ký Đề Nghị Liên Phòng Ban
+            Route::post('transferSign', 'transferSign')->name('transferSign');
+            Route::post('transferSignReject', 'transferSignReject')->name('transferSignReject');
+        });
+
+        /*
+        | LOẠI BỎ VẬT TƯ HỎNG - 3 bước: Cách ly chờ quyết định (trả về kho được) -> Loại bỏ
+        | (trừ tồn, không quay lại kho) -> Huỷ. Nằm trong tab "Cách ly - Loại Bỏ - Huỷ" của Sử Dụng
+        | Vật Tư, dữ liệu do MaterialExportController::index() nạp sẵn.
+        */
+        Route::prefix('/materialQuarantine')->name('materialQuarantine.')->controller(MaterialQuarantineController::class)->group(function () {
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('decide', 'decide')->name('decide');
+            Route::post('dispose', 'dispose')->name('dispose');
         });
     });

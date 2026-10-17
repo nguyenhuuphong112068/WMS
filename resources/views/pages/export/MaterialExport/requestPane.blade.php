@@ -53,6 +53,7 @@
     'rfRoute' => $expRoute . 'list',
     'rfTab' => $reqType,
     'rfPrefix' => $reqPrefix,
+    'rfInBar' => true,
     'rfRange' => $reqRange,
     'rfPerPage' => $reqPerPage,
     'rfSearch' => false,
@@ -80,6 +81,26 @@
                     $b = $expReqBadge($req->app_status);
                     $items = $requestItems->get($req->id, collect());
                     $editable = in_array($req->app_status, ['draft', 'rejected']) && user_can('export_material_request');
+
+                    /*
+                    | Phiếu chưa trình ký thì chưa có bước ký nào trên phiếu - quy trình chỉ dựng
+                    | lúc bấm Trình ký. Xem trước bằng đúng cách tra của
+                    | MaterialSignFlow::resolveForItems(): vai trò nhận mọi đề nghị + vai trò mà
+                    | ít nhất một dòng vật tư kích hoạt, theo cấp ký.
+                    */
+                    $flowPreview = null;
+                    if (in_array($req->app_status, ['draft', 'rejected'])) {
+                        $picked = array_flip($signFlowMap['always']);
+                        foreach ($items as $it) {
+                            foreach ($signFlowMap['byCategory'][(int) $it->category_id] ?? [] as $ruleId) {
+                                $picked[$ruleId] = true;
+                            }
+                        }
+                        $flowPreview = array_column(
+                            array_filter($signFlowMap['rules'], fn($rule) => isset($picked[$rule['id']])),
+                            'role'
+                        );
+                    }
                 @endphp
                 <tr>
                     <td class="text-center">{{ $reqList->firstItem() + $loop->index }}</td>
@@ -101,7 +122,9 @@
                     </td>
                     <td>
                         @php $signs = $requestSigns->get($req->id, collect()); @endphp
-                        @if ($signs->isEmpty())
+                        @if ($signs->isEmpty() && $flowPreview)
+                            <span class="md-sub" title="{{ implode(' → ', $flowPreview) }}">Chưa trình ký ({{ count($flowPreview) }} bước)</span>
+                        @elseif ($signs->isEmpty())
                             <span class="md-sub">Không cần ký duyệt</span>
                         @else
                             <div class="me-flow">
@@ -149,7 +172,9 @@
                                 </button>
                                 <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSubmit') }}" method="POST"
                                     data-title="Trình ký đề nghị {{ $req->code }}?"
-                                    data-text="{{ $signs->isEmpty() ? 'Đề nghị không khai bước ký nào nên sẽ được duyệt ngay, kho có thể cấp phát.' : 'Đề nghị sẽ chuyển tới người ký bước 1 trong ' . $signs->count() . ' bước.' }}">
+                                    data-text="{{ $flowPreview
+                                        ? 'Đề nghị ký qua ' . count($flowPreview) . ' bước: ' . implode(' → ', $flowPreview) . '.'
+                                        : 'Không vai trò nào nhận trình ký nên đề nghị sẽ được duyệt ngay, kho có thể cấp phát.' }}">
                                     @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
                                     <button type="submit" class="btn btn-sm btn-success" title="Trình ký"><i class="fas fa-paper-plane"></i></button>
                                 </form>

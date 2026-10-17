@@ -7,8 +7,8 @@
 |   sẵn phím Enter nên không cần thêm gì (xem barcodeSearch.blade.php, export/shared/assets.blade.php).
 | - Camera máy tính / tablet / điện thoại: dùng thư viện html5-qrcode (đã có sẵn ở
 |   public/js) đọc trực tiếp qua webcam. Đọc được CẢ HAI kiểu nhãn đang in:
-|   mã QR trên nhãn lô vật tư (QrCode::svg()) và mã vạch Code 128 trên nhãn lô
-|   hoá chất / chất chuẩn (Barcode128::svg()).
+|   mã QR trên nhãn lô vật tư / hoá chất (QrCode) và mã vạch Code 128 trên nhãn lô
+|   chất chuẩn (Barcode128::svg()) - kể cả nhãn hoá chất cũ in mã vạch trước đây.
 |
 | Cách gắn nút quét camera vào một ô quét mã:
 |   1. Khối bọc ô input phải có thêm class "scan-box" và chỉ chứa ĐÚNG MỘT
@@ -191,8 +191,8 @@
             function camStart(cameraIdOrConfig) {
                 camShowStatus('<i class="fas fa-spinner fa-spin mr-1"></i> Đang mở camera...');
 
-                // Đọc cả hai kiểu nhãn đang in: nhãn lô hoá chất / chất chuẩn là mã vạch
-                // Code 128 (Barcode128::svg()), nhãn lô vật tư là mã QR (QrCode::svg()).
+                // Đọc cả hai kiểu nhãn đang in: nhãn lô vật tư / hoá chất là mã QR (QrCode),
+                // nhãn lô chất chuẩn (và nhãn hoá chất cũ) là mã vạch Code 128 (Barcode128::svg()).
                 camEngine = camEngine || new Html5Qrcode('cameraScanView', {
                     formatsToSupport: [
                         Html5QrcodeSupportedFormats.QR_CODE,

@@ -10,10 +10,22 @@ class SwitchProductionController extends Controller
 {
     public function switchProduction(Request $request)
     {
-        // Lấy thông tin phòng ban từ shortName
+        // Chọn công ty trước rồi tới phòng ban nên shortName có thể trùng giữa hai công ty:
+        // ưu tiên id phòng ban gửi kèm, không có mới dò theo shortName.
         $selected_dept_name = $request->selected_department;
         $user = $request->session()->get('user', []);
-        $selected_department_id = DB::table('deparments')->where('shortName', $selected_dept_name)->value('id');
+
+        $selected_dept = DB::table('deparments')
+            ->when(
+                $request->filled('selected_department_id'),
+                fn ($q) => $q->where('id', $request->selected_department_id),
+                fn ($q) => $q->where('shortName', $selected_dept_name)
+            )
+            ->select('id', 'shortName')
+            ->first();
+
+        $selected_department_id = $selected_dept->id ?? null;
+        $selected_dept_name = $selected_dept->shortName ?? $selected_dept_name;
 
         // Chỉ cho chuyển sang phòng ban user được cấp (role gán theo phòng, hoặc phòng chính)
         if ($selected_department_id

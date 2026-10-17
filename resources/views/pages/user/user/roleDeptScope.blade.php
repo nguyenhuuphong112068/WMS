@@ -1,8 +1,10 @@
 {{--
 | Phạm vi phòng ban cho từng role.
 | - Chỉ hiện hàng của role đang được chọn ở ô "Phân Quyền" (JS toggle theo class d-none).
+| - Chọn công ty = tự chọn mọi phòng ban của công ty đó; bỏ công ty = bỏ các phòng ban của nó.
+|   Ô công ty chỉ để lọc/chọn nhanh, không gửi lên server (suy lại từ phòng ban khi mở modal).
 | - Bỏ trống danh sách phòng ban = role đó áp dụng cho MỌI phòng ban.
-| Biến vào: $roles, $allDepartments
+| Biến vào: $roles, $allDepartments, $scopeCompanies
 --}}
 <div class="form-group role-dept-wrap">
     <label class="mb-2" style="font-weight: 600; color: var(--text-main, #2D3748)">
@@ -16,16 +18,30 @@
             style="border-left: 3px solid var(--primary-lighter, #9CC7EE); padding: 6px 0 6px 12px; margin-bottom: 8px">
             <div style="font-size: 13px; margin-bottom: 4px">
                 <strong>{{ $role->name }}</strong>
-                <span class="text-muted">— để trống nghĩa là áp dụng mọi phòng ban</span>
+                <span class="text-muted">— để trống phòng ban nghĩa là áp dụng mọi phòng ban</span>
             </div>
-            <select class="form-control select2-roledept" name="roleDept[{{ $role->id }}][]" multiple
-                data-placeholder="Mọi phòng ban">
-                @foreach ($allDepartments as $d)
-                    <option value="{{ $d->id }}" {{ in_array((string) $d->id, $preRD, true) ? 'selected' : '' }}>
-                        {{ $d->shortName }} — {{ $d->name }}
-                    </option>
-                @endforeach
-            </select>
+            <div>
+                <div class="mb-2">
+                    <label class="mb-1" style="font-size: 13px">Công ty</label>
+                    <select class="form-control select2-rolecompany" multiple data-placeholder="Mọi công ty">
+                        @foreach ($scopeCompanies as $c)
+                            <option value="{{ $c->id }}">{{ $c->short ?: $c->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1" style="font-size: 13px">Phòng ban</label>
+                    <select class="form-control select2-roledept" name="roleDept[{{ $role->id }}][]" multiple
+                        data-placeholder="Mọi phòng ban">
+                        @foreach ($allDepartments as $d)
+                            <option value="{{ $d->id }}" data-company="{{ $d->company_id }}"
+                                {{ in_array((string) $d->id, $preRD, true) ? 'selected' : '' }}>
+                                {{ $d->shortName }} — {{ $d->name }}@if (!empty($d->company_short)) ({{ $d->company_short }})@endif
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
         </div>
     @endforeach
 </div>

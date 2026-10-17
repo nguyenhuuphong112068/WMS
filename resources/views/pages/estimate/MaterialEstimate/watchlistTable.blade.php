@@ -1,8 +1,29 @@
+{{--
+| BẢNG "VẬT TƯ CẦN ..." - dùng chung cho hai màn hình, chọn bằng $wlMode:
+|
+|   estimate (mặc định): DỰ TRÙ VẬT TƯ, tab "Danh sách vật tư cần dự trù" - vật tư Cung Ứng mua
+|                        (MaterialWatchlist::forEstimate), chọn nhiều dòng rồi Lập phiếu dự trù.
+|   vpp                : SỬ DỤNG VẬT TƯ, tab Đề nghị VPP > "Danh sách vật tư cần đề nghị Hành Chính"
+|                        - vật tư Hành Chính mua (MaterialWatchlist::forVpp), chọn nhiều dòng rồi
+|                        Lập đề nghị VPP gửi phòng Hành Chính (modal #vppWatchlistModal).
+|
+| Biến vào: $items, $wlMode. Hai màn hình không bao giờ cùng trang nên id bảng / nút giữ nguyên.
+--}}
 @php
     use App\Support\MaterialClassification;
+    use App\Support\MaterialVpp;
+    use App\Support\MaterialWatchlist;
 
-    // Bảng này chỉ dùng riêng cho Dự Trù Vật Tư nên $estRoute cố định trỏ đúng module này
+    $wlMode = ($wlMode ?? 'estimate') === 'vpp' ? 'vpp' : 'estimate';
+    $wlIsVpp = $wlMode === 'vpp';
+    $wlSources = MaterialWatchlist::sourceLabels();
+
+    // Phòng Hành Chính tự dự trù cả vật tư Hành Chính mua nên mới cần cột Bộ Phận Mua Hàng
+    $wlShowBuyer = ! $wlIsVpp && MaterialVpp::isVppDepartment((int) (session('user')['selected_department_id'] ?? 0));
+    $wlActionCol = $wlShowBuyer ? 11 : 10;
+
     $wlEstRoute = 'pages.estimate.materialEstimate.';
+    $wlDismissRoute = $wlIsVpp ? 'pages.export.materialExport.watchlistDismiss' : $wlEstRoute . 'watchlistDismiss';
     $wlNum = fn ($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
     $wlSourceLabel = fn ($type) => match ($type) {
         'risk_assessment' => 'Đề Nghị Theo ĐG Rủi Ro',
@@ -18,28 +39,35 @@
             <i class="far fa-check-square mr-1"></i> Chọn tất cả
         </button>
 
-        @perm('estimate_material_create')
-            <button type="button" class="btn btn-primary btn-sm btn-wl-estimate" disabled>
-                <i class="fas fa-clipboard-check mr-1"></i> Lập phiếu dự trù <span class="wl-count"></span>
-            </button>
-        @endperm
-
-        @perm('export_material_request')
-            <button type="button" class="btn btn-info btn-sm btn-wl-transfer" disabled
-                title="Chỉ dùng được khi mọi vật tư đã chọn đều do Hành Chánh mua và có trong danh mục">
-                <i class="fas fa-share-square mr-1"></i> Đề nghị liên phòng ban <span class="wl-count"></span>
-            </button>
-        @endperm
+        @if ($wlIsVpp)
+            @perm('export_material_request')
+                <button type="button" class="btn btn-primary btn-sm btn-wl-vpp" disabled>
+                    <i class="fas fa-paper-plane mr-1"></i> Lập đề nghị VPP <span class="wl-count"></span>
+                </button>
+            @endperm
+        @else
+            @perm('estimate_material_create')
+                <button type="button" class="btn btn-primary btn-sm btn-wl-estimate" disabled>
+                    <i class="fas fa-clipboard-check mr-1"></i> Lập phiếu dự trù <span class="wl-count"></span>
+                </button>
+            @endperm
+        @endif
     </div>
 
     <div class="md-filter">
-        <label for="wlPurchasingFilter"><i class="fas fa-filter mr-1"></i> Bộ phận mua hàng</label>
-        <select id="wlPurchasingFilter" class="form-control form-control-sm">
+        <label for="wlProgressFilter"><i class="fas fa-filter mr-1"></i> Trạng thái</label>
+        <select id="wlProgressFilter" class="form-control form-control-sm">
+            <option value="open">{{ $wlIsVpp ? 'Chưa đề nghị' : 'Chưa lập phiếu' }}</option>
+            <option value="done">{{ $wlIsVpp ? 'Đã đề nghị' : 'Đã lập phiếu' }}</option>
             <option value="all">Tất cả</option>
-            @foreach ($purchasingDepartments as $key => $label)
+        </select>
+
+        <label for="wlSourceFilter" class="ml-2"><i class="fas fa-filter mr-1"></i> Nguồn</label>
+        <select id="wlSourceFilter" class="form-control form-control-sm">
+            <option value="all">Tất cả</option>
+            @foreach ($wlSources as $key => $label)
                 <option value="{{ $key }}">{{ $label }}</option>
             @endforeach
-            <option value="none">Chưa khai</option>
         </select>
     </div>
 </div>
@@ -55,9 +83,12 @@
                 <th class="text-center" style="width: 80px">ĐVT</th>
                 <th class="text-right" style="width: 100px">Tồn Hiện Tại</th>
                 <th class="text-right" style="width: 115px">Ngưỡng Tối Thiểu</th>
-                <th style="width: 125px">Bộ Phận Mua Hàng</th>
+                <th class="text-right" style="width: 105px">SL Đề Nghị</th>
+                @if ($wlShowBuyer)
+                    <th style="width: 125px">Bộ Phận Mua Hàng</th>
+                @endif
                 <th style="width: 190px">Nguồn</th>
-                <th style="width: 200px">Lý Do Dự Trù</th>
+                <th style="width: 200px">{{ $wlIsVpp ? 'Lý Do Đề Nghị' : 'Lý Do Dự Trù' }}</th>
                 <th class="text-center" style="width: 80px">Thao Tác</th>
             </tr>
         </thead>
@@ -67,15 +98,25 @@
                     $wlPurchasing = $item->purchasing_department ?: null;
                     $wlPurchasingLabel = MaterialClassification::purchasingLabel($wlPurchasing);
                 @endphp
-                <tr data-purchasing="{{ $wlPurchasing ?: 'none' }}"
+                <tr data-sources="{{ implode(' ', $item->sources) }}"
+                    data-month="{{ $item->forecast->month ?? '' }}"
                     data-category-id="{{ $item->category_id }}"
                     data-name="{{ $item->material_name }}"
                     data-spec="{{ $item->technical_specification }}"
                     data-unit="{{ $item->unit }}"
                     data-unit-id="{{ $item->unit_id }}"
-                    data-note="{{ $item->note }}">
+                    {{-- Chưa có SL đề nghị thì mặc định bằng ngưỡng tối thiểu của phòng --}}
+                    data-quantity="{{ $item->quantity !== null ? $wlNum($item->quantity) : ($item->min_stock ? $wlNum($item->min_stock) : '') }}"
+                    data-note="{{ $item->note ?: ($item->forecast ? $wlSources[MaterialWatchlist::SOURCE_FORECAST] : '') }}"
+                    data-progress="{{ $item->in_progress ? 'done' : 'open' }}"
+                    class="{{ $item->in_progress ? 'is-wl-progress' : '' }}">
                     <td class="text-center">
-                        <input type="checkbox" class="js-wl-check" value="{{ $loop->index }}">
+                        @if ($item->in_progress)
+                            {{-- Đã có phiếu chưa xong - không chọn lại được --}}
+                            <i class="fas fa-lock wl-lock" title="{{ $wlIsVpp ? 'Đã đề nghị, chờ xử lý xong mới đề nghị lại được' : 'Đã lập phiếu, chờ xử lý xong mới dự trù lại được' }}"></i>
+                        @else
+                            <input type="checkbox" class="js-wl-check" value="{{ $loop->index }}">
+                        @endif
                     </td>
                     <td class="text-center">{{ $loop->iteration }}</td>
                     <td>
@@ -91,16 +132,41 @@
                     <td class="text-center">{{ $item->unit ?: '-' }}</td>
                     <td class="text-right">{{ $item->on_hand !== null ? $wlNum($item->on_hand) : '—' }}</td>
                     <td class="text-right">{{ $item->min_stock !== null ? $wlNum($item->min_stock) : '—' }}</td>
-                    <td>
-                        @if ($wlPurchasingLabel)
-                            <span class="wl-buyer {{ $wlPurchasing }}">{{ $wlPurchasingLabel }}</span>
-                        @else
-                            <span class="md-empty">—</span>
-                        @endif
-                    </td>
+                    <td class="text-right font-weight-bold">{{ $item->quantity !== null ? $wlNum($item->quantity) : '—' }}</td>
+                    @if ($wlShowBuyer)
+                        <td>
+                            @if ($wlPurchasingLabel)
+                                <span class="wl-buyer {{ $wlPurchasing }}">{{ $wlPurchasingLabel }}</span>
+                            @else
+                                <span class="md-empty">—</span>
+                            @endif
+                        </td>
+                    @endif
                     <td>
                         @if ($item->below_threshold)
                             <span class="md-badge rejected">Dưới ngưỡng tồn tối thiểu</span>
+                        @endif
+                        @foreach ($item->in_progress as $ref)
+                            <div class="md-sub mt-1">
+                                @if ($ref['type'] === 'estimate')
+                                    <a href="{{ route($wlEstRoute . 'detail', ['id' => $ref['id']]) }}" class="md-badge wl-progress" title="Mở phiếu dự trù">
+                                        <i class="fas fa-file-signature mr-1"></i>Đã lập {{ $ref['code'] }} · {{ $ref['status'] }}
+                                    </a>
+                                @else
+                                    <a href="{{ route('pages.export.materialExport.list', ['tab' => $ref['tab'] ?? 'transfer']) }}" class="md-badge wl-progress"
+                                        title="{{ $ref['label'] }} - theo dõi ở Sử Dụng Vật Tư">
+                                        <i class="fas fa-share-square mr-1"></i>Đã đề nghị {{ $ref['code'] }} · {{ $ref['status'] }}
+                                    </a>
+                                @endif
+                            </div>
+                        @endforeach
+                        @if ($item->forecast)
+                            <div class="md-sub mt-1">
+                                <span class="md-badge wl-forecast"
+                                    title="Khả dụng {{ $wlNum($item->forecast->available) }} - Nhu cầu chu kỳ {{ $wlNum($item->forecast->demand) }} = Thiếu {{ $wlNum(-$item->forecast->gap) }}">
+                                    {{ $wlSources[MaterialWatchlist::SOURCE_FORECAST] }}
+                                </span>
+                            </div>
                         @endif
                         @if ($item->watchlist_id)
                             <div class="md-sub mt-1">
@@ -124,8 +190,8 @@
                     </td>
                     <td class="text-center">
                         @if ($item->watchlist_id)
-                            <form action="{{ route($wlEstRoute . 'watchlistDismiss') }}" method="POST" class="form-md-confirm-cancel d-inline"
-                                data-title="Bỏ ghi nhớ vật tư này?" data-text="Vật tư sẽ chỉ còn hiện lại ở đây nếu tồn xuống dưới ngưỡng tối thiểu.">
+                            <form action="{{ route($wlDismissRoute) }}" method="POST" class="form-md-confirm-cancel d-inline"
+                                data-title="Bỏ ghi nhớ vật tư này?" data-text="Vật tư sẽ chỉ còn hiện lại ở đây nếu tồn xuống dưới ngưỡng tối thiểu hoặc thiếu tồn khả dụng cho tháng tới.">
                                 @csrf
                                 <input type="hidden" name="id" value="{{ $item->watchlist_id }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Bỏ ghi nhớ"><i class="fas fa-bookmark"></i></button>
@@ -159,6 +225,34 @@
         min-width: 180px;
     }
 
+    .md-badge.wl-progress {
+        background: #DCFCE7;
+        color: #15803D;
+        border: 1px solid #86EFAC;
+        text-decoration: none;
+        transition: background 0.2s;
+    }
+
+    a.md-badge.wl-progress:hover {
+        background: #BBF7D0;
+    }
+
+    #mdWatchlistTable tr.is-wl-progress > td {
+        background: #F8FAFC;
+    }
+
+    #mdWatchlistTable .wl-lock {
+        color: var(--primary-lighter);
+        cursor: help;
+    }
+
+    .md-badge.wl-forecast {
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        border: 1px solid var(--primary-lighter);
+        cursor: help;
+    }
+
     /* Nhãn bộ phận mua hàng trên bảng */
     .wl-buyer {
         display: inline-block;
@@ -178,10 +272,14 @@
         border-color: #FCD34D;
     }
 
-    .wl-buyer.it {
-        background: #EDE9FE;
-        color: #6D28D9;
-        border-color: #C4B5FD;
+    /* Cột ô chọn: cố định hẹp, không để DataTables / trình duyệt chia thêm chỗ trống */
+    #mdWatchlistTable thead th.wl-check-col,
+    #mdWatchlistTable tbody td:first-child:not(.dataTables_empty) {
+        width: 42px !important;
+        min-width: 42px;
+        max-width: 42px;
+        padding-left: 4px;
+        padding-right: 4px;
     }
 
     #mdWatchlistTable .js-wl-check {
@@ -193,15 +291,6 @@
 
     #mdWatchlistTable tr.is-wl-picked > td {
         background: var(--primary-soft);
-    }
-
-    /* Dòng khác bộ phận mua hàng với dòng đang chọn - tạm khoá, không chọn kèm được */
-    #mdWatchlistTable tr.is-wl-locked > td {
-        opacity: 0.45;
-    }
-
-    #mdWatchlistTable .js-wl-check:disabled {
-        cursor: not-allowed;
     }
 
     .md-toolbar .wl-count:not(:empty) {
@@ -221,11 +310,13 @@
         }
 
         var wlTable = $('#mdWatchlistTable').DataTable({
+            // Giữ bề rộng khai ở <th> - autoWidth chia lại cột và làm cột ô chọn phình to
+            "autoWidth": false,
             "order": [],
-            "columnDefs": [{ "orderable": false, "targets": [0, 10] }],
+            "columnDefs": [{ "orderable": false, "targets": [0, {{ $wlActionCol }}] }],
             "language": {
                 "url": "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}",
-                "emptyTable": "Không có vật tư nào cần dự trù"
+                "emptyTable": @json($wlIsVpp ? 'Không có vật tư nào cần đề nghị Hành Chính' : 'Không có vật tư nào cần dự trù')
             }
         });
 
@@ -233,23 +324,41 @@
             $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
         });
 
-        /* ---------- Lọc theo bộ phận mua hàng ---------- */
-        var wlBuyerWant = 'all';
+        /* ---------- Lọc theo trạng thái + nguồn ---------- */
+        var wlSourceWant = 'all';
+        var wlProgressWant = 'open';
 
         $.fn.dataTable.ext.search.push(function(settings, data, index) {
             if (settings.nTable.id !== 'mdWatchlistTable') return true;
-            if (wlBuyerWant === 'all') return true;
 
-            return ($(settings.aoData[index].nTr).attr('data-purchasing') || 'none') === wlBuyerWant;
+            var $tr = $(settings.aoData[index].nTr);
+
+            if (wlProgressWant !== 'all' && $tr.attr('data-progress') !== wlProgressWant) {
+                return false;
+            }
+
+            // Một dòng có thể thuộc nhiều nguồn cùng lúc
+            return wlSourceWant === 'all' || ($tr.attr('data-sources') || '').split(' ').indexOf(wlSourceWant) !== -1;
         });
 
         // Đổi bộ lọc là đổi hẳn tập vật tư đang nhìn, giữ lại các dòng đã tick nhưng bị ẩn
         // sẽ khiến phiếu lập ra có cả vật tư người dùng không còn thấy
-        $(document).on('change', '#wlPurchasingFilter', function() {
-            wlBuyerWant = this.value;
+        $(document).on('change', '#wlSourceFilter', function() {
+            wlSourceWant = this.value;
             wlTable.draw();
             wlClearPicked();
         });
+
+        $(document).on('change', '#wlProgressFilter', function() {
+            wlProgressWant = this.value;
+            wlTable.draw();
+            wlClearPicked();
+        });
+
+        // Trình duyệt có thể giữ lại giá trị ô lọc khi tải lại trang mà không phát 'change'
+        wlSourceWant = $('#wlSourceFilter').val() || 'all';
+        wlProgressWant = $('#wlProgressFilter').val() || 'open';
+        wlTable.draw();
 
         /* ---------- Chọn các mục ---------- */
         // Dòng ở trang khác của DataTables vẫn nằm trong bộ nhớ nên phải quét qua API,
@@ -267,37 +376,12 @@
                 spec: $tr.attr('data-spec') || '',
                 unit: $tr.attr('data-unit') || '',
                 unit_id: $tr.attr('data-unit-id') || '',
+                // Số lượng đã khai lúc đề nghị dự trù, ',' ngăn nghìn của $wlNum phải bỏ trước khi điền vào ô số
+                quantity: ($tr.attr('data-quantity') || '').replace(/,/g, ''),
                 note: $tr.attr('data-note') || '',
-                purchasing: $tr.attr('data-purchasing') || 'none'
+                // Tháng của nguồn "Thiếu tồn khả dụng" - điền sẵn tháng cần dùng của phiếu dự trù
+                month: $tr.attr('data-month') || ''
             };
-        }
-
-        /*
-        | MỖI LẦN CHỌN CHỈ ĐƯỢC MỘT BỘ PHẬN MUA HÀNG
-        |
-        | Hai lối đi sau khi chọn khác nhau theo bộ phận mua hàng (Cung Ứng / IT chỉ lập
-        | phiếu dự trù, Hành Chánh còn có đề nghị liên phòng ban), nên trộn nhiều bộ phận
-        | trong một lần chọn là không xử lý được. Tick dòng đầu tiên xong, các dòng khác bộ
-        | phận bị khoá cho tới khi bỏ chọn hết.
-        */
-        function wlPickedBuyer() {
-            var $rows = wlPicked();
-
-            return $rows.length ? ($rows.first().attr('data-purchasing') || 'none') : null;
-        }
-
-        function wlLockOtherBuyers() {
-            var buyer = wlPickedBuyer();
-
-            $(wlTable.rows({ search: 'applied' }).nodes()).each(function() {
-                var $tr = $(this);
-                var same = buyer === null || ($tr.attr('data-purchasing') || 'none') === buyer;
-
-                $tr.toggleClass('is-wl-locked', !same);
-                $tr.find('.js-wl-check')
-                    .prop('disabled', !same)
-                    .attr('title', same ? null : 'Mỗi lần chỉ chọn vật tư của cùng một bộ phận mua hàng');
-            });
         }
 
         function wlClearPicked() {
@@ -308,29 +392,16 @@
             wlSyncButtons();
         }
 
-        // Nút "Đề nghị liên phòng ban" chỉ mở khi các dòng đã chọn đều do Hành Chánh mua và
-        // có trong danh mục - phòng nhận cần category_id để tra tồn của mình
         function wlSyncButtons() {
-            var $rows = wlPicked();
-            var count = $rows.length;
-            var allAdmin = count > 0;
-
-            $rows.each(function() {
-                var row = wlRowData($(this));
-
-                if (row.purchasing !== 'admin' || !row.category_id) allAdmin = false;
-            });
-
-            wlLockOtherBuyers();
+            var count = wlPicked().length;
 
             $('.wl-count').text(count ? count : '');
-            $('.btn-wl-estimate').prop('disabled', count === 0);
-            $('.btn-wl-transfer').prop('disabled', !allAdmin);
+            $('.btn-wl-estimate, .btn-wl-vpp').prop('disabled', count === 0);
 
-            // "Chọn tất cả" chỉ tính trên các dòng còn chọn được, tức cùng bộ phận mua hàng
+            // "Chọn tất cả" chỉ tính trên các dòng còn chọn được - dòng đã lập phiếu không có ô chọn
             var total = $(wlTable.rows({ search: 'applied' }).nodes())
                 .filter(function() {
-                    return !$(this).find('.js-wl-check').prop('disabled');
+                    return $(this).find('.js-wl-check').length > 0;
                 }).length;
 
             $('.btn-wl-select-all')
@@ -345,28 +416,16 @@
             wlSyncButtons();
         });
 
-        // Chưa chọn gì thì "Chọn tất cả" lấy bộ phận mua hàng của dòng đầu tiên đang hiển thị
         $(document).on('click', '.btn-wl-select-all', function() {
-            var check = $(this).attr('data-mode') === 'all';
-            var $visible = $(wlTable.rows({ search: 'applied' }).nodes());
-
-            if (!check) {
+            if ($(this).attr('data-mode') !== 'all') {
                 wlClearPicked();
 
                 return;
             }
 
-            var buyer = wlPickedBuyer();
-
-            if (buyer === null && $visible.length) {
-                buyer = $visible.first().attr('data-purchasing') || 'none';
-            }
-
-            $visible.each(function() {
-                if (($(this).attr('data-purchasing') || 'none') !== buyer) return;
-
+            $(wlTable.rows({ search: 'applied' }).nodes()).each(function() {
                 $(this).find('.js-wl-check').prop('checked', true);
-                $(this).addClass('is-wl-picked');
+                $(this).toggleClass('is-wl-picked', $(this).find('.js-wl-check').length > 0);
             });
 
             wlSyncButtons();
@@ -396,13 +455,15 @@
                     .find('[data-field="display_name"]').text(row.name || '—').end()
                     .find('[data-field="display_spec"]').text(row.spec || '—').end()
                     .find('[data-field="unit_id"]').val(row.unit_id || '').end()
+                    .find('[data-field="amount"]').val(row.quantity).end()
+                    .find('[data-field="for_month_year"]').val(function(i, val) { return row.month || val; }).end()
                     .find('[data-field="purpose"]').val(row.note).end();
             });
         });
 
-        $(document).on('click', '.btn-wl-transfer', function() {
-            wlFill('#watchlistTransferModal', function(row, index) {
-                var tpl = $('#watchlistTransferModal').find('.wl-row-template').html();
+        $(document).on('click', '.btn-wl-vpp', function() {
+            wlFill('#vppWatchlistModal', function(row, index) {
+                var tpl = $('#vppWatchlistModal').find('.wl-row-template').html();
 
                 return $(tpl.replace(/__INDEX__/g, index))
                     .find('[data-field="category_id"]').val(row.category_id).end()
@@ -410,6 +471,7 @@
                     .find('[data-field="display_name"]').text(row.name || '—').end()
                     .find('[data-field="display_spec"]').text(row.spec || '—').end()
                     .find('[data-field="display_unit"]').text(row.unit || '—').end()
+                    .find('[data-field="requested_amount"]').val(row.quantity).end()
                     .find('[data-field="note"]').val(row.note).end();
             });
         });

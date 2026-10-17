@@ -134,7 +134,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Định Khu</label>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <label>Định Khu</label>
+                            <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-toggle="modal"
+                                data-target="#storageChartModal">
+                                <i class="fas fa-th mr-1"></i> Sơ đồ tương kỵ
+                            </button>
+                        </div>
                         <select name="default_location_id"
                             data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'chemical']) }}"
                             class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
@@ -154,7 +160,9 @@
                             <span class="md-error">{{ $bag->first('default_location_id') }}</span>
                         @endif
                         <small class="md-sub">Chỗ <b>dự kiến</b> để hàng. Định khu thật của từng lô vẫn khai lúc
-                            nhập.</small>
+                            nhập. Định khu cùng kệ/tủ với hoá chất tương kỵ bị khoá, không chọn được.</small>
+                        {{-- Kết quả đối chiếu tương kỵ (Sơ đồ lưu trữ GHS), JS đổ vào khi chọn định khu --}}
+                        <div class="dc-compat" hidden></div>
                     </div>
 
                     <div class="form-group">

@@ -16,6 +16,8 @@ use Illuminate\Validation\Rule;
  *
  * - Tab "Danh sách vật tư đề nghị nội bộ theo chu kỳ"       : type = internal
  * - Tab "Danh sách vật tư đề nghị liên phòng ban theo chu kỳ": type = external
+ * - Tab "Danh sách dự trù theo chu kỳ"                        : type = estimate - đến hạn tự lập
+ *   phiếu dự trù vật tư (Nháp) dự trù cho tháng estimate_month_offset kể từ tháng tạo phiếu
  *
  * Mỗi danh sách là một đề nghị cấp phát lập sẵn. Đến ngày next_run_date hệ thống tự tạo
  * một đề nghị Lưu tạm (xem App\Support\MaterialPeriodicRequest), người đề nghị điều chỉnh
@@ -262,11 +264,19 @@ class PeriodicRequestController extends Controller
             self::LIST_TABLE,
             $current->id,
             'NA',
-            'Tạo đề nghị '.$result['code'].' (Lưu tạm) từ danh sách "'.$current->title.'"'
+            'Tạo '.MaterialPeriodicRequest::resultLabel($result).' từ danh sách "'.$current->title.'"'
         );
 
+        // Phiếu dự trù: mở thẳng trang chi tiết phiếu để điều chỉnh rồi trình ký
+        if ($current->type === MaterialPeriodicRequest::TYPE_ESTIMATE) {
+            return redirect()
+                ->route('pages.estimate.materialEstimate.detail', ['id' => $result['id']])
+                ->with('success', 'Đã lập phiếu dự trù '.$result['code'].' ở trạng thái Nháp. Kiểm tra, điều chỉnh rồi trình ký.');
+        }
+
         return redirect()
-            ->route('pages.export.materialExport.list', ['tab' => $isExternal ? 'transfer' : 'request'])
+            // Liên phòng ban gửi tới Hành Chính nằm ở tab Đề nghị VPP
+            ->route('pages.export.materialExport.list', ['tab' => $isExternal ? \App\Support\MaterialVpp::tabFor((int) $current->to_department_id) : 'request'])
             ->with('success', 'Đã tạo đề nghị '.$result['code'].' ở trạng thái Lưu tạm. Kiểm tra, điều chỉnh rồi '
                 .($isExternal ? 'gửi đề nghị.' : 'trình ký.'));
     }
@@ -383,7 +393,11 @@ class PeriodicRequestController extends Controller
             'items.*.purpose' => ['nullable', 'string', 'max:500'],
         ];
 
-        if (! $isInternal) {
+        if ($type === MaterialPeriodicRequest::TYPE_ESTIMATE) {
+            $rules['estimate_month_offset'] = ['required', 'integer', Rule::in(array_keys(MaterialPeriodicRequest::ESTIMATE_MONTH_OFFSETS))];
+            // Phiếu dự trù bắt buộc có đơn vị cho từng dòng số lượng
+            $rules['items.*.requested_unit'] = ['required', 'string', 'max:50', Rule::exists('units', 'short_name')];
+        } elseif (! $isInternal) {
             $rules['to_department_id'] = [
                 'required',
                 'integer',
@@ -416,6 +430,15 @@ class PeriodicRequestController extends Controller
         }
 
         $validator = Validator::make($request->all(), $rules, $messages);
+
+        // Liên phòng ban gửi tới phòng Hành Chính (đề nghị VPP): chỉ vật tư Hành Chánh mua
+        if ($type === MaterialPeriodicRequest::TYPE_EXTERNAL && \App\Support\MaterialVpp::isVppDepartment((int) $request->to_department_id)) {
+            $validator->after(function ($validator) use ($request) {
+                foreach (\App\Support\MaterialVpp::itemErrors((array) $request->items) as $key => $message) {
+                    $validator->errors()->add($key, 'Phòng cấp phát là Hành Chính - '.mb_strtolower(mb_substr($message, 0, 1)).mb_substr($message, 1));
+                }
+            });
+        }
 
         if ($isCal) {
             $validator->after(function ($validator) use ($request, $object, $current) {
@@ -492,6 +515,10 @@ class PeriodicRequestController extends Controller
             'items.*.requested_amount.numeric' => 'Số lượng đề nghị phải là số.',
             'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
             'items.*.purpose.max' => 'Mục đích sử dụng tối đa 500 ký tự.',
+            'items.*.requested_unit.required' => 'Vui lòng chọn đơn vị cho mọi dòng vật tư dự trù.',
+            'items.*.requested_unit.exists' => 'Đơn vị không hợp lệ.',
+            'estimate_month_offset.required' => 'Vui lòng chọn tháng dự trù.',
+            'estimate_month_offset.in' => 'Tháng dự trù không hợp lệ.',
         ];
     }
 
@@ -499,6 +526,7 @@ class PeriodicRequestController extends Controller
     {
         $periodic = (string) $request->periodic;
         $isInternal = $type === MaterialPeriodicRequest::TYPE_INTERNAL;
+        $isEstimate = $type === MaterialPeriodicRequest::TYPE_ESTIMATE;
         $dayMode = $isInternal
             ? MaterialPeriodicRequest::dayModeOf($request->cycle_day_mode)
             : MaterialPeriodicRequest::DAY_MODE_FIXED;
@@ -515,7 +543,8 @@ class PeriodicRequestController extends Controller
                 ? max(0, min(MaterialPeriodicRequest::CAL_LEAD_DAYS_MAX, (int) $request->cal_lead_days))
                 : MaterialPeriodicRequest::CAL_LEAD_DAYS_DEFAULT,
             'start_date' => \Carbon\Carbon::parse($request->start_date)->toDateString(),
-            'to_department_id' => $isInternal ? null : (int) $request->to_department_id,
+            'to_department_id' => $type === MaterialPeriodicRequest::TYPE_EXTERNAL ? (int) $request->to_department_id : null,
+            'estimate_month_offset' => $isEstimate ? (int) $request->estimate_month_offset : null,
             'consumption_object_id' => $isInternal && $request->filled('consumption_object_id')
                 ? (int) $request->consumption_object_id
                 : null,

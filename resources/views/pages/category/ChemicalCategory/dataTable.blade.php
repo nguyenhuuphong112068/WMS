@@ -26,6 +26,7 @@
                         <th class="text-center" style="width: 55px">STT</th>
                         <th style="width: 130px">Mã Danh Mục</th>
                         <th>Tên Hoá Chất</th>
+                        <th style="width: 130px">Số CAS</th>
                         <th>Nhà Sản Xuất</th>
                         <th class="text-center" style="width: 105px">Tỉ Trọng d<br><small>(g/ml)</small></th>
                         <th style="width: 180px">Điều Kiện Bảo Quản</th>
@@ -36,6 +37,9 @@
                         <th class="text-center" style="width: 155px"
                             title="Đối chiếu tổng tồn trữ toàn công ty của hoạt chất với ngưỡng Phụ lục IV NĐ 24/2026/NĐ-CP">
                             Ngưỡng Tồn Trữ PL IV</th>
+                        <th class="text-center" style="width: 140px"
+                            title="Đã khai báo trên Cổng thông tin quốc gia - chỉ xác nhận được một lần">
+                            Khai Báo Cổng TT Quốc Gia</th>
                         <th style="width: 170px"
                             title="Các phòng ban đã khai dùng hoá chất này (bảng chemical_department_categories)">
                             Phòng Ban Đang Dùng</th>
@@ -68,10 +72,8 @@
                             </td>
                             <td>
                                 <span class="font-weight-bold">{{ $row->chem_name ?: '—' }}</span>
-                                @if ($row->cas_no)
-                                    <br><small class="md-sub">CAS: {{ $row->cas_no }}</small>
-                                @endif
                             </td>
+                            @include('pages.category.shared.casCell', ['casNo' => $row->cas_no])
                             <td class="md-sub">
                                 @if ($row->manufacturer_name)
                                     {{ $row->manufacturer_name }}
@@ -191,6 +193,31 @@
                                             <div class="md-sub" style="color: var(--warning, #F59E0B)" title="Một số lô chưa quy đổi được ra kg - con số chưa đầy đủ">* chưa đủ dữ liệu</div>
                                         @endif
                                     </div>
+                                @endif
+                            </td>
+                            {{-- Khai báo Cổng thông tin quốc gia: xác nhận MỘT lần (Chưa -> Đã), sau đó khoá --}}
+                            <td class="text-center" data-order="{{ $row->national_portal_declared ? 1 : 0 }}">
+                                @if ($row->national_portal_declared)
+                                    <span class="badge badge-success"><i class="fas fa-check mr-1"></i>Đã khai báo</span>
+                                    <div class="md-sub mt-1">{{ $row->national_portal_declared_by ?: '—' }}</div>
+                                    @if ($row->national_portal_declared_at)
+                                        <small class="md-sub">{{ \Carbon\Carbon::parse($row->national_portal_declared_at)->format('d/m/Y') }}</small>
+                                    @endif
+                                @else
+                                    <span class="badge badge-warning">Chưa khai báo</span>
+                                    @perm('category_chemical_update')
+                                        <form class="form-md-confirm mt-1" data-require-password="1"
+                                            action="{{ route($mdRoute . 'declarePortal') }}" method="POST"
+                                            data-title="Xác nhận đã khai báo trên Cổng thông tin quốc gia?"
+                                            data-text="Mã {{ $row->code }} - {{ $row->chem_name }}. Thông tin này chỉ cập nhật được MỘT lần, sau khi xác nhận sẽ không sửa hay gỡ lại được.">
+                                            @csrf
+                                            <input type="hidden" name="id" value="{{ $row->id }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary"
+                                                title="Xác nhận đã khai báo trên Cổng thông tin quốc gia">
+                                                <i class="fas fa-check mr-1"></i>Xác nhận
+                                            </button>
+                                        </form>
+                                    @endperm
                                 @endif
                             </td>
                             {{-- Phòng ban đang dùng: danh mục chung toàn công ty, phòng nào khai mới hiện --}}

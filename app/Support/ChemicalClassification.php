@@ -5,9 +5,11 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 
 /**
- * PHÂN LOẠI HOÁ CHẤT THEO NGHỊ ĐỊNH 24/2026/NĐ-CP - 10 nhóm của "hình 1", cộng thêm
- * nhóm 11 "Hoá chất cấm theo Luật Đầu tư 2025, số 143/2025/QH15" (khai đơn chất, không
- * thuộc phạm vi NĐ 24/2026 nhưng gộp chung danh sách để khai/lọc/cảnh báo cùng một chỗ).
+ * PHÂN LOẠI HOÁ CHẤT THEO NGHỊ ĐỊNH 24/2026/NĐ-CP - 10 nhóm của "hình 1", cộng thêm khối
+ * "PHÂN LOẠI KHÁC" (OTHER_GROUPS) tick tay trên tên hoá chất: nhóm 11 "Hoá chất cấm theo Luật
+ * Đầu tư 2025, số 143/2025/QH15" (chem_names.is_banned) và nhóm 12 "Hàng hoá đặc biệt"
+ * (chem_names.is_special_goods). Hai nhóm này không thuộc phạm vi NĐ 24/2026 nhưng gộp chung
+ * danh sách để khai/lọc/cảnh báo cùng một chỗ.
  *
  * Nguồn sự thật DUY NHẤT để suy 10 nhóm. Không còn cột chemical_categories.classification
  * và không còn active_ingredients.is_table_a - mọi phân loại suy tự động từ hai dữ liệu gốc:
@@ -24,6 +26,8 @@ use Illuminate\Support\Facades\DB;
  *   Nhóm 10: hỗn hợp (>= 2 hoạt chất) có >= 1 thành phần nhóm 9 (PL IV bảng A) VÀ tick
  *            >= 1 nhóm nguy hại mixture_hazard_categories (đã duyệt, đang hoạt động).
  * Tên hoá chất đơn chất (<= 1 thành phần) thì mang đúng nhóm của thành phần đó.
+ * Nhóm 11, 12 (Phân loại khác) cộng thêm cho mọi tên hoá chất - đơn chất lẫn hỗn hợp - có tick
+ * cột tương ứng trong OTHER_GROUPS.
  *
  * Danh mục hoá chất (chemical_categories) trỏ về đúng một tên hoá chất -> nhóm của mã danh
  * mục = nhóm suy được của tên hoá chất đó.
@@ -45,6 +49,13 @@ class ChemicalClassification
         9 => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng A)',
         10 => 'Hoá chất phải xây dựng kế hoạch phòng ngừa, ứng phó sự cố hoá chất (Phụ lục IV_Bảng B)',
         11 => 'Hoá chất cấm theo Luật Đầu tư 2025, số 143/2025/QH15',
+        12 => 'Hàng hoá đặc biệt',
+    ];
+
+    /** Nhãn chip của các nhóm ngoài NĐ 24/2026 - không đánh số như 'Nhóm 1'..'Nhóm 10'. */
+    private const SHORT_LABELS = [
+        11 => 'Nhóm HC Cấm',
+        12 => 'Nhóm HH Đặc Biệt',
     ];
 
     /**
@@ -69,7 +80,16 @@ class ChemicalClassification
     public const SPECIAL_CONTROL_LABEL = 'Hoá chất kiểm soát đặc biệt';
 
     /** Nhóm khai được ở màn "Tên Hoạt Chất" (đơn chất). */
-    public const SINGLE_SUBSTANCE_GROUPS = [1, 3, 4, 5, 6, 7, 9, 11];
+    public const SINGLE_SUBSTANCE_GROUPS = [1, 3, 4, 5, 6, 7, 9];
+
+    /**
+     * Khối "Phân loại khác" (ngoài NĐ 24/2026) - tick tay trên tên hoá chất, áp cho cả đơn
+     * chất lẫn hỗn hợp, không suy từ hoạt chất thành phần: [số nhóm => cột của chem_names].
+     */
+    public const OTHER_GROUPS = [
+        11 => 'is_banned',
+        12 => 'is_special_goods',
+    ];
 
     /** Nhóm chỉ dành cho hỗn hợp, suy ở màn "Tên Hoá Chất". */
     public const MIXTURE_GROUPS = [2, 8, 10];
@@ -90,10 +110,6 @@ class ChemicalClassification
         'III|2|B'  => 6,
         'III|2|C'  => 7,
         'IV||A'    => 9,
-        // Không thuộc Nghị định 24/2026 - "Hoá chất cấm" theo Luật Đầu tư 2025 (số
-        // 143/2025/QH15). Dùng chung bảng active_ingredient_classifications, khoá appendix
-        // riêng 'LDT' để không đụng các phụ lục II/III/IV ở trên.
-        'LDT||'    => 11,
     ];
 
     /** Ngưỡng % để nhóm 8 kích hoạt theo nhóm của thành phần. */
@@ -147,11 +163,11 @@ class ChemicalClassification
 
     /**
      * Nhãn ngắn hiển thị dạng chip/badge: 'Nhóm 1'..'Nhóm 10' theo đúng số nhóm NĐ 24/2026.
-     * Riêng nhóm 11 không thuộc NĐ 24/2026 nên không đánh số, hiển thị 'Nhóm HC Cấm'.
+     * Nhóm 11, 12 không thuộc NĐ 24/2026 nên không đánh số: 'Nhóm HC Cấm', 'Nhóm HH Đặc Biệt'.
      */
     public static function shortLabel(int $group): string
     {
-        return $group === 11 ? 'Nhóm HC Cấm' : 'Nhóm ' . $group;
+        return self::SHORT_LABELS[$group] ?? 'Nhóm ' . $group;
     }
 
     /** Mã hiển thị ngắn: 1 -> 'N1'. */
@@ -312,7 +328,7 @@ class ChemicalClassification
      */
     public static function groupsByChemName(?array $chemNameIds = null): array
     {
-        $chemQuery = DB::table('chem_names')->select('id');
+        $chemQuery = DB::table('chem_names')->select(array_merge(['id'], array_values(self::OTHER_GROUPS)));
 
         if ($chemNameIds !== null) {
             $chemNameIds = array_values(array_unique(array_filter(array_map('intval', $chemNameIds))));
@@ -404,6 +420,13 @@ class ChemicalClassification
             // Nhóm 2 - hỗn hợp >= 2 thành phần, có >= 1 thành phần thuộc nhóm 1
             if ($isMixture && $hasG1) {
                 $groups[2] = true;
+            }
+
+            // Phân loại khác (nhóm 11 Hoá chất cấm, 12 Hàng hoá đặc biệt): tick tay trên tên hoá chất
+            foreach (self::OTHER_GROUPS as $g => $column) {
+                if ((int) $chem->$column === 1) {
+                    $groups[$g] = true;
+                }
             }
 
             $keys = array_keys($groups);

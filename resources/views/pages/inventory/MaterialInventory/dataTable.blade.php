@@ -142,7 +142,9 @@
                                     <th class="text-center" style="width:45px">STT</th>
                                     <th style="width:150px">Mã Xuất Nhập</th>
                                     <th>Vật Tư</th>
+                                    <th style="width:120px">Nhà Sản Xuất</th>
                                     <th style="width:150px">Vị Trí</th>
+                                    <th class="text-center" style="width:70px">Đơn Vị</th>
                                     <th class="text-right" style="width:90px">Tồn Đầu Kỳ</th>
                                     <th class="text-right" style="width:90px">Nhập Trong Kỳ</th>
                                     <th class="text-right" style="width:90px">Sử Dụng</th>
@@ -166,19 +168,19 @@
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->material_name ?: '—' }}</div>
-                                            <div class="md-sub small text-muted">
-                                                {{ $row->manufacturer_short_name ?: '' }}
-                                                @if ($row->technical_specification) · {{ $row->technical_specification }} @endif
-                                                @php $rowClassification = \App\Support\MaterialClassification::summary($row->classification); @endphp
-                                                @if ($rowClassification !== '') · {{ $rowClassification }} @endif
-                                            </div>
+                                            @if ($row->technical_specification)
+                                                <div class="md-sub small text-muted">{{ $row->technical_specification }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="md-sub" title="{{ $row->manufacturer_name }}">
+                                            {{ $row->manufacturer_short_name ?: '—' }}
                                         </td>
                                         <td class="md-sub">
                                             @if ($row->location_code)
                                                 <span class="md-tag">{{ $row->location_code }}</span>
-                                                <div>{{ $row->warehouse_name }} / {{ $row->shelf_name }} / {{ $row->column_name }} / {{ $row->tier_name }}</div>
                                             @else <span class="text-muted">—</span> @endif
                                         </td>
+                                        <td class="text-center md-sub">{{ $row->unit_short_name ?: ($row->unit_name ?: '—') }}</td>
                                         <td class="text-right" data-order="{{ $row->opening }}">
                                             <button type="button" class="{{ $mvCls($row->opening) }}" data-scope="import"
                                                 data-id="{{ $row->id }}" data-metric="opening">{{ $invNum($row->opening) }}</button>
@@ -198,7 +200,6 @@
                                         <td class="text-right font-weight-bold {{ $row->gap < 0 ? 'text-danger' : '' }}" data-order="{{ $row->gap }}">
                                             <button type="button" class="{{ $mvCls($row->gap) }}" data-scope="import"
                                                 data-id="{{ $row->id }}" data-metric="closing">{{ $invNum($row->gap) }}</button>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
                                         </td>
                                         <td class="text-right" data-order="{{ $row->category_remaining }}">
                                             <button type="button" class="{{ $mvCls($row->category_remaining, 'in') }}" data-scope="category"
@@ -257,14 +258,15 @@
                                     <th class="text-center" style="width:45px">STT</th>
                                     <th style="width:130px">Mã Vật Tư</th>
                                     <th>Vật Tư</th>
+                                    <th style="width:120px">Nhà Sản Xuất</th>
                                     <th class="text-center" style="width:90px">Số Lô</th>
+                                    <th class="text-center" style="width:70px">Đơn Vị</th>
                                     <th class="text-right" style="width:100px">Tồn Đầu Kỳ</th>
                                     <th class="text-right" style="width:100px">Nhập Trong Kỳ</th>
                                     <th class="text-right" style="width:100px">Sử Dụng</th>
                                     <th class="text-right" style="width:90px">Loại Bỏ</th>
                                     <th class="text-right" style="width:110px">Tồn Cuối Kỳ</th>
                                     <th class="text-center" style="width:100px">Hạn Gần Nhất</th>
-                                    <th class="text-center" style="width:90px">Cần Chú Ý</th>
                                     <th class="text-center inv-chart-th" style="width:115px">Biểu Đồ</th>
                                 </tr>
                             </thead>
@@ -275,12 +277,15 @@
                                         <td><span class="md-tag">{{ $s->category_code ?: '—' }}</span></td>
                                         <td>
                                             <div class="font-weight-bold">{{ $s->material_name ?: '—' }}</div>
-                                            <div class="md-sub small text-muted">
-                                                {{ $s->manufacturer_short_name ?: '' }}
-                                                @if ($s->technical_specification) · {{ $s->technical_specification }} @endif
-                                            </div>
+                                            @if ($s->technical_specification)
+                                                <div class="md-sub small text-muted">{{ $s->technical_specification }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="md-sub" title="{{ $s->manufacturer_name }}">
+                                            {{ $s->manufacturer_short_name ?: '—' }}
                                         </td>
                                         <td class="text-center">{{ $s->in_stock_count }}/{{ $s->code_count }}</td>
+                                        <td class="text-center md-sub">{{ $s->unit ?: '—' }}</td>
                                         <td class="text-right" data-order="{{ $s->opening }}">
                                             <button type="button" class="{{ $mvCls($s->opening) }}" data-scope="category"
                                                 data-id="{{ $s->category_id }}" data-metric="opening">{{ $invNum($s->opening) }}</button>
@@ -300,14 +305,8 @@
                                         <td class="text-right font-weight-bold" data-order="{{ $s->closing }}">
                                             <button type="button" class="{{ $mvCls($s->closing) }}" data-scope="category"
                                                 data-id="{{ $s->category_id }}" data-metric="closing">{{ $invNum($s->closing) }}</button>
-                                            <span class="md-sub">{{ $s->unit }}</span>
                                         </td>
                                         <td class="text-center md-sub">{{ $invDate($s->nearest_expiry) }}</td>
-                                        <td class="text-center">
-                                            @if ($s->alert_count > 0)
-                                                <span class="badge badge-warning">{{ $s->alert_count }}</span>
-                                            @else <span class="text-muted">—</span> @endif
-                                        </td>
                                         {{-- Mở biểu đồ nhập - xuất - tồn của đúng vật tư này, theo kỳ đang xem --}}
                                         <td class="text-center">
                                             <button type="button" class="btn btn-sm btn-outline-primary btn-inv-chart"

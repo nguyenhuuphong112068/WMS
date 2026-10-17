@@ -21,6 +21,7 @@ use App\Http\Controllers\Pages\MaterData\GroupController;
 use App\Http\Controllers\Pages\MaterData\InitialDataController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
 use App\Http\Controllers\Pages\MaterData\MaterialSignFlowController;
+use App\Http\Controllers\Pages\MaterData\TransferSignFlowController;
 use App\Http\Controllers\Pages\MaterData\MixtureHazardCategoryController;
 use App\Http\Controllers\Pages\MaterData\PackagingSpecificationController;
 use App\Http\Controllers\Pages\MaterData\ProductNameController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\Pages\MaterData\StatusController;
 use App\Http\Controllers\Pages\MaterData\StorageConditionController;
 use App\Http\Controllers\Pages\MaterData\UnitController;
 use App\Http\Controllers\Pages\MaterData\ZoneController;
+use App\Http\Controllers\Pages\MaterData\ZoneStructureController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
 
@@ -86,6 +88,20 @@ Route::prefix('/materData')
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
         });
+
+        // Định Khu - Cấu trúc kho: khai Kệ/Tủ -> Cột -> Tầng -> Vị Trí trên một lưới (API cho màn Định Khu)
+        Route::prefix('/zone/structure')->name('zone.structure.')
+            ->controller(ZoneStructureController::class)
+            ->group(function () {
+                Route::get('warehouses', 'warehouses')->name('warehouses');
+                Route::post('warehouse', 'saveWarehouse')->name('saveWarehouse');
+                Route::get('shelves', 'shelves')->name('shelves');
+                Route::get('detail', 'detail')->name('detail');
+                Route::get('checkCode', 'checkCode')->name('checkCode');
+                Route::post('apply', 'apply')->name('apply');
+                Route::post('shelf', 'saveShelf')->name('saveShelf');
+                Route::post('locations', 'saveLocations')->name('saveLocations');
+            });
 
         // Định Khu: Kho/Phòng - Kệ/Tủ - Cột - Tầng - Vị Trí gộp chung một màn hình, {type} là cấp đang thao tác
         Route::prefix('/zone')->name('zone.')
@@ -167,6 +183,16 @@ Route::prefix('/materData')
         // Trình ký đề nghị cấp phát vật tư: phòng khai trước quy trình ký chuẩn ứng với
         // từng tổ hợp phân loại (danh mục chung + danh mục của phòng), mỗi bước một vai trò.
         Route::prefix('/materialSignFlow')->name('materialSignFlow.')->controller(MaterialSignFlowController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+        });
+
+        // Trình ký đề nghị chuyển vật tư liên phòng ban (gồm Đề nghị VPP): mỗi dòng một bước ký
+        // theo loại đề nghị + công ty của phòng đề nghị - xem App\Support\MaterialTransferSignFlow.
+        Route::prefix('/transferSignFlow')->name('transferSignFlow.')->controller(TransferSignFlowController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');

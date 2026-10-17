@@ -3,10 +3,9 @@
 {{--
 | DỰ TRÙ - MODAL TRÌNH KÝ
 |--------------------------------------------------------------------------
-| Mở khi bấm nút "Trình ký" ở danh sách. Người lập khai QUY TRÌNH KÝ DUYỆT ngay tại đây
-| (số bước + người ký từng bước, tối thiểu 2, bước cuối là Ban Giám Đốc) rồi nhập lại mật
-| khẩu để ký xác nhận. Id + mã phiếu + bước ký đã khai trước đó do JS đổ vào khi bấm nút
-| (xem pages/estimate/shared/assets.blade.php).
+| Mở khi bấm nút "Trình ký" ở danh sách. Quy trình ký cố định 2 bước (Quản Lý Bộ Phận ->
+| Ban Giám Đốc) tự gán theo vai trò + phạm vi phòng ban, chỉ hiển thị; người lập nhập lại mật
+| khẩu để ký xác nhận. Id + mã phiếu do JS đổ vào khi bấm nút (pages/estimate/shared/assets.blade.php).
 --}}
 <div class="modal fade md-modal" id="submitModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document">
@@ -25,7 +24,7 @@
                 <input type="hidden" name="code" value="{{ old('code') }}">
 
                 <div class="modal-body">
-                    @include('pages.estimate.shared.signFlowFields', ['flowSigners' => old('signers', []), 'flowErrorBag' => 'submitErrors'])
+                    @include('pages.estimate.shared.signFlowFields', ['flowErrorBag' => 'submitErrors'])
 
                     <div class="form-group">
                         <label>Ghi Chú Trình Ký</label>

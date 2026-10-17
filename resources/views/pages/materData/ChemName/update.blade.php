@@ -3,6 +3,7 @@
     $oldAiIds = array_map('intval', (array) old('active_ingredients_ids', []));
     $oldHazardIds = array_map('intval', (array) old('hazard_category_ids', []));
     $oldPercents = (array) old('content_percent', []);
+    $oldOther = collect(\App\Support\ChemicalClassification::OTHER_GROUPS)->mapWithKeys(fn ($col) => [$col => (bool) old($col)])->all();
 @endphp
 
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
@@ -37,6 +38,7 @@
                         'oldAiIds' => $oldAiIds,
                         'oldHazardIds' => $oldHazardIds,
                         'oldPercents' => $oldPercents,
+                        'oldOther' => $oldOther,
                     ])
 
                     <div class="md-hint">

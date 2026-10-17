@@ -8,6 +8,8 @@ use App\Support\DataMasterHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 
 /**
  * DỮ LIỆU GỐC - PHÒNG BAN
@@ -27,6 +29,7 @@ class DepartmentController extends Controller
         'shortName' => 'Tên viết tắt',
         'name' => 'Tên phòng ban',
         'is_general' => 'Phòng ban chung',
+        'purchasing_key' => 'Bộ phận mua hàng',
     ];
 
     public function index()
@@ -57,15 +60,16 @@ class DepartmentController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'company_id' => 'required|integer|exists:companies,id',
-            'shortName' => 'required|unique:deparments,shortName',
-            'name' => 'required|unique:deparments,name',
+            'shortName' => ['required', $this->uniqueInCompany('shortName', $request)],
+            'name' => ['required', $this->uniqueInCompany('name', $request)],
+            'purchasing_key' => ['nullable', Rule::in(array_keys(\App\Support\MaterialClassification::PURCHASING_DEPARTMENTS))],
         ], [
             'company_id.required' => 'Vui lòng chọn Công Ty',
             'company_id.exists' => 'Công Ty không hợp lệ.',
             'name.required' => 'Vui lòng nhập Tên Phòng Ban',
-            'name.unique' => 'Tên Phòng Ban đã tồn tại.',
+            'name.unique' => 'Tên Phòng Ban đã tồn tại trong công ty này.',
             'shortName.required' => 'Vui lòng nhập Tên Viết Tắt',
-            'shortName.unique' => 'Tên Viết Tắt đã tồn tại.',
+            'shortName.unique' => 'Tên Viết Tắt đã tồn tại trong công ty này.',
         ]);
 
         if ($validator->fails()) {
@@ -94,15 +98,16 @@ class DepartmentController extends Controller
 
         $validator = Validator::make($request->all(), [
             'company_id' => 'required|integer|exists:companies,id',
-            'shortName' => 'required|unique:deparments,shortName,' . $request->id,
-            'name' => 'required|unique:deparments,name,' . $request->id,
+            'shortName' => ['required', $this->uniqueInCompany('shortName', $request, (int) $request->id)],
+            'name' => ['required', $this->uniqueInCompany('name', $request, (int) $request->id)],
+            'purchasing_key' => ['nullable', Rule::in(array_keys(\App\Support\MaterialClassification::PURCHASING_DEPARTMENTS))],
         ] + $this->changeReasonRules(), [
             'company_id.required' => 'Vui lòng chọn Công Ty',
             'company_id.exists' => 'Công Ty không hợp lệ.',
             'name.required' => 'Vui lòng nhập Tên Phòng Ban',
-            'name.unique' => 'Tên Phòng Ban đã tồn tại.',
+            'name.unique' => 'Tên Phòng Ban đã tồn tại trong công ty này.',
             'shortName.required' => 'Vui lòng nhập Tên Viết Tắt',
-            'shortName.unique' => 'Tên Viết Tắt đã tồn tại.',
+            'shortName.unique' => 'Tên Viết Tắt đã tồn tại trong công ty này.',
         ] + $this->changeReasonMessages());
 
         if ($validator->fails()) {
@@ -165,6 +170,19 @@ class DepartmentController extends Controller
         ]);
     }
 
+    /**
+     * Mã phòng / tên phòng chỉ cần duy nhất TRONG MỘT CÔNG TY.
+     *
+     * Hai công ty khác nhau được phép trùng mã (VD: công ty nào cũng có phòng "QA"), nên
+     * khoá duy nhất là cặp (company_id, cột) - khớp unique index trên bảng deparments.
+     */
+    private function uniqueInCompany(string $column, Request $request, ?int $ignoreId = null): Unique
+    {
+        $rule = Rule::unique(self::TABLE, $column)->where('company_id', (int) $request->company_id);
+
+        return $ignoreId ? $rule->ignore($ignoreId) : $rule;
+    }
+
     private function actor(): string
     {
         return \App\Support\Signer::actor();
@@ -176,6 +194,7 @@ class DepartmentController extends Controller
         return [
             'company_id' => DB::table('companies')->pluck('name', 'id')->all(),
             'is_general' => [1 => 'Không', 0 => 'Có'],
+            'purchasing_key' => \App\Support\MaterialClassification::PURCHASING_DEPARTMENTS,
         ];
     }
 
@@ -188,6 +207,8 @@ class DepartmentController extends Controller
             // Checkbox trên form là "Phòng ban chung" (is_common) - ngược dấu với cột
             // is_general: tick vào nghĩa là KHÔNG tham gia nghiệp vụ nên is_general = 0.
             'is_general' => $request->has('is_common') ? 0 : 1,
+            // Bộ phận mua hàng tiếp nhận dự trù / đề nghị VPP của mọi công ty - xem App\Support\MaterialPurchasing
+            'purchasing_key' => $request->filled('purchasing_key') ? (string) $request->purchasing_key : null,
         ];
     }
 }

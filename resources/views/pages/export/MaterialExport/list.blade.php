@@ -7,7 +7,7 @@
     |--------------------------------------------------------------------------
     | Vật tư bắt buộc qua đề nghị được phê duyệt rồi kho cấp phát; số bước ký và người ký
     | từng bước do người lập phiếu tự khai (0 bước = duyệt thẳng đến người cấp phát).
-    | Loại bỏ hàng hỏng thì lập thẳng, không cần đề nghị.
+    | Loại bỏ hàng hỏng đi 3 bước ở tab "Cách ly - Loại Bỏ - Huỷ": Cách ly -> Loại bỏ -> Huỷ.
     */
 
     $expRoute = 'pages.export.materialExport.';
@@ -47,24 +47,20 @@
     {{-- Đặt sau các phiếu chi tiết: dựng dòng cấp phát + bảng chọn mã xuất nhập cho mọi mục còn chờ --}}
     @include('pages.export.MaterialExport.issueLotPickerModal')
 
-    {{-- Tab "Soạn vật tư cấp phát": một modal chi tiết cho mỗi vật tư đang chờ soạn --}}
+    {{-- Tab "Cấp phát vật tư": mỗi dòng đề nghị một modal chi tiết soạn hàng --}}
     @foreach ($prepGroups as $prepIndex => $g)
         @include('pages.export.MaterialExport.prepDetailModal', ['g' => $g, 'prepIndex' => $prepIndex])
     @endforeach
 
-    {{-- Tab "Đề nghị chuyển liên phòng ban" --}}
+    {{-- Tab "Cách ly - Loại Bỏ - Huỷ" --}}
+    @include('pages.export.MaterialExport.quarantineModals')
+
+    {{-- Tab "Đề nghị chuyển liên phòng ban" + tab "Đề nghị VPP" (cùng bộ bảng, khác phòng nhận) --}}
     @include('pages.export.MaterialExport.transferRequestModal')
     @include('pages.export.MaterialExport.transferRequestEditModal')
     @include('pages.export.MaterialExport.transferDetailModal')
     @include('pages.export.MaterialExport.transferStockPickerModal')
     @include('pages.export.MaterialExport.transferImportPickerModal')
+    @include('pages.export.MaterialExport.vppWatchlistModal')
 
-    {{-- Tab "Ký duyệt (mọi phòng ban)" - xem nhanh nội dung phiếu chờ ký --}}
-    @foreach ($inboxRequests as $req)
-        @include('pages.export.MaterialExport.inboxDetailModal', [
-            'req' => $req,
-            'items' => $inboxItems->get($req->id, collect()),
-            'signs' => $inboxSigns->get($req->id, collect()),
-        ])
-    @endforeach
 @endsection

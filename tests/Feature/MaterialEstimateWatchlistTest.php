@@ -2,21 +2,25 @@
 
 namespace Tests\Feature;
 
+use App\Support\MaterialVpp;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
  * DỰ TRÙ VẬT TƯ - tab "Danh sách vật tư cần dự trù".
  *
- * Kiểm hai lối đi của các vật tư người dùng tick chọn trên tab:
- * - Lập phiếu dự trù (mọi bộ phận mua hàng).
- * - Gửi đề nghị liên phòng ban (chỉ vật tư Hành Chánh mua, có trong danh mục).
+ * Kiểm hai lối đi của các vật tư người dùng tick chọn:
+ * - DỰ TRÙ VẬT TƯ, "Danh sách vật tư cần dự trù" (vật tư Cung Ứng mua): lập phiếu dự trù.
+ * - SỬ DỤNG VẬT TƯ, Đề nghị VPP > "Danh sách vật tư cần đề nghị Hành Chính" (vật tư Hành
+ *   Chính mua): gửi đề nghị tới kho VPP của phòng Hành Chính.
  *
  * Chạy trên CSDL thật nhưng mọi thao tác ghi nằm trong transaction và được rollback.
  */
 class MaterialEstimateWatchlistTest extends TestCase
 {
     private const LIST_URL = '/estimate/materialEstimate';
+
+    private const EXPORT_URL = '/export/materialExport';
 
     private const DEPARTMENT_ID = 4;
 
@@ -60,17 +64,28 @@ class MaterialEstimateWatchlistTest extends TestCase
             ->where('status_id', 1)->where('app_status', 'approved')->value('id');
     }
 
-    public function test_watchlist_tab_shows_purchasing_column_and_actions(): void
+    public function test_watchlist_tab_only_lets_create_estimate(): void
     {
         $this->withSession($this->fakeSession())->get(self::LIST_URL.'?tab=watchlist')
             ->assertStatus(200)
-            ->assertSee('Bộ Phận Mua Hàng', false)
-            ->assertSee('wlPurchasingFilter', false)
+            ->assertSee('wlSourceFilter', false)
+            ->assertSee('Thiếu tồn khả dụng cho tháng', false)
             ->assertSee('btn-wl-select-all', false)
             ->assertSee('watchlistEstimateModal', false)
-            ->assertSee('watchlistTransferModal', false)
             ->assertSee('estimate/materialEstimate/watchlistEstimateStore', false)
-            ->assertSee('estimate/materialEstimate/watchlistTransferStore', false);
+            // Vật tư Hành Chính mua đã chuyển sang tab Đề nghị VPP ở Sử Dụng Vật Tư
+            ->assertDontSee('wlPurchasingFilter', false)
+            ->assertDontSee('watchlistTransferStore', false);
+    }
+
+    public function test_vpp_tab_shows_watchlist_of_admin_items(): void
+    {
+        $this->withSession($this->fakeSession())->get(self::EXPORT_URL.'?tab=vpp&sub=watchlist')
+            ->assertStatus(200)
+            ->assertSee('mePaneVpp', false)
+            ->assertSee('Danh sách vật tư cần đề nghị Hành Chính', false)
+            ->assertSee('vppWatchlistModal', false)
+            ->assertSee('export/materialExport/vppWatchlistStore', false);
     }
 
     public function test_create_estimate_from_selected_watchlist_items(): void
@@ -147,21 +162,24 @@ class MaterialEstimateWatchlistTest extends TestCase
             ->assertSessionHasErrors(['items.0.amount', 'items.0.unit_id'], null, 'watchlistEstimateErrors');
     }
 
-    public function test_transfer_request_from_selected_watchlist_items(): void
+    public function test_vpp_request_from_selected_watchlist_items(): void
     {
         DB::beginTransaction();
 
         try {
-            $categoryId = $this->categoryId();
-            $toDepartmentId = (int) DB::table('deparments')
-                ->where('isActive', 1)
-                ->where('id', '!=', self::DEPARTMENT_ID)
+            $categoryId = (int) DB::table('material_categories')
+                ->where('status_id', 1)->where('app_status', 'approved')
+                ->where('purchasing_department', MaterialVpp::PURCHASING_KEY)
                 ->value('id');
+            $toDepartmentId = MaterialVpp::targetDepartmentId(self::DEPARTMENT_ID);
+
+            $this->assertNotNull($toDepartmentId, 'Phải có phòng Hành Chính để gửi đề nghị VPP.');
 
             $this->withSession($this->fakeSession())
-                ->post(self::LIST_URL.'/watchlistTransferStore', [
-                    'title' => 'ZTEST de nghi lien phong ban',
-                    'to_department_id' => $toDepartmentId,
+                ->post(self::EXPORT_URL.'/vppWatchlistStore', [
+                    'title' => 'ZTEST de nghi VPP',
+                    // Phòng nhận do server tự xác định, gửi phòng khác lên cũng không đổi
+                    'to_department_id' => self::DEPARTMENT_ID,
                     'needed_date' => '2099-11-20',
                     'note' => 'ZTEST ghi chu',
                     'items' => [
@@ -171,11 +189,11 @@ class MaterialEstimateWatchlistTest extends TestCase
                 ->assertSessionHas('success');
 
             $req = DB::table('material_transfer_requests')
-                ->where('title', 'ZTEST de nghi lien phong ban')
+                ->where('title', 'ZTEST de nghi VPP')
                 ->first();
 
-            $this->assertNotNull($req, 'Không tạo được đề nghị liên phòng ban.');
-            $this->assertEquals('pending', $req->status, 'Đề nghị gửi đi phải ở trạng thái Chờ xử lý.');
+            $this->assertNotNull($req, 'Không tạo được đề nghị VPP.');
+            $this->assertEquals('pending', $req->status, 'Đề nghị gửi đi phải ở trạng thái Chờ cấp phát.');
             $this->assertEquals(self::DEPARTMENT_ID, (int) $req->department_id);
             $this->assertEquals($toDepartmentId, (int) $req->to_department_id);
             $this->assertStringStartsWith('LPB-', $req->code);
@@ -190,16 +208,15 @@ class MaterialEstimateWatchlistTest extends TestCase
         }
     }
 
-    public function test_transfer_request_rejects_own_department_and_missing_category(): void
+    public function test_vpp_request_rejects_missing_category(): void
     {
         $this->withSession($this->fakeSession())
-            ->post(self::LIST_URL.'/watchlistTransferStore', [
+            ->post(self::EXPORT_URL.'/vppWatchlistStore', [
                 'title' => 'ZTEST',
-                'to_department_id' => self::DEPARTMENT_ID,
                 'items' => [
                     ['requested_amount' => '1'],
                 ],
             ])
-            ->assertSessionHasErrors(['to_department_id', 'items.0.category_id'], null, 'watchlistTransferErrors');
+            ->assertSessionHasErrors(['items.0.category_id'], null, 'vppWatchlistErrors');
     }
 }

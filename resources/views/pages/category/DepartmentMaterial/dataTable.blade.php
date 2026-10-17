@@ -106,7 +106,8 @@
                                 <div class="md-actions">
                                     @if ($row->status_id == 1)
                                         <button type="button" class="btn btn-sm btn-outline-warning btn-dm-watchlist" title="Đề nghị dự trù vật tư"
-                                            data-category-id="{{ $row->category_id }}">
+                                            data-category-id="{{ $row->category_id }}"
+                                            data-unit="{{ $row->unit_short_name ?: $row->unit_name }}">
                                             <i class="fas fa-bookmark"></i>
                                         </button>
 
@@ -159,7 +160,8 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         /*
-         | ĐỀ NGHỊ DỰ TRÙ VẬT TƯ - hỏi lý do dự trù rồi gửi AJAX ngay. Dòng đã khoá
+         | ĐỀ NGHỊ DỰ TRÙ VẬT TƯ - hỏi số lượng cần đề nghị (theo đơn vị của phòng) + lý do
+         | dự trù rồi gửi AJAX ngay. Dòng đã khoá
          | sẽ không hiển thị nút này. Hiện lại ở tab "Danh sách vật tư cần dự trù" bên Dự Trù
          | Vật Tư - xem App\Support\MaterialWatchlist.
          */
@@ -167,22 +169,43 @@
             var $btn = $(this);
             var categoryId = $btn.data('category-id');
 
+            var unit = $btn.data('unit') || '';
+
             Swal.fire({
                 title: 'Đề nghị dự trù vật tư này?',
-                input: 'textarea',
-                inputLabel: 'Lý do dự trù',
-                inputPlaceholder: 'Nêu rõ lý do cần dự trù vật tư này...',
-                inputAttributes: { maxlength: '500' },
+                html:
+                    '<div class="text-left">' +
+                        '<label class="font-weight-bold mb-1" for="dmWlQty">Số lượng cần đề nghị <span class="text-danger">*</span></label>' +
+                        '<div class="input-group mb-3">' +
+                            '<input id="dmWlQty" type="text" inputmode="decimal" class="form-control text-right js-decimal" placeholder="0">' +
+                            (unit ? '<div class="input-group-append"><span class="input-group-text"></span></div>' : '') +
+                        '</div>' +
+                        '<label class="font-weight-bold mb-1" for="dmWlNote">Lý do dự trù <span class="text-danger">*</span></label>' +
+                        '<textarea id="dmWlNote" class="form-control" rows="4" maxlength="500" placeholder="Nêu rõ lý do cần dự trù vật tư này..."></textarea>' +
+                    '</div>',
                 showCancelButton: true,
                 confirmButtonColor: '#2E7BC4',
                 cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Gửi đề nghị',
                 cancelButtonText: 'Huỷ',
-                preConfirm: function(value) {
-                    if (!value || !value.trim()) {
-                        Swal.showValidationMessage('Vui lòng nhập lý do dự trù');
+                didOpen: function(popup) {
+                    // Gán bằng .text() để tên đơn vị không bị hiểu thành HTML
+                    $(popup).find('.input-group-text').text(unit);
+                    $(popup).find('#dmWlQty').trigger('focus');
+                },
+                preConfirm: function() {
+                    var qty = $.trim($('#dmWlQty').val()).replace(',', '.');
+                    var note = $.trim($('#dmWlNote').val());
+
+                    if (!qty || isNaN(qty) || parseFloat(qty) <= 0) {
+                        Swal.showValidationMessage('Vui lòng nhập số lượng cần đề nghị lớn hơn 0');
+                        return false;
                     }
-                    return value;
+                    if (!note) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do dự trù');
+                        return false;
+                    }
+                    return { quantity: qty, note: note };
                 }
             }).then(function(result) {
                 if (!result.isConfirmed) return;
@@ -192,7 +215,8 @@
                 $.post('{{ route($mdRoute . "watchlistRemember") }}', {
                     _token: '{{ csrf_token() }}',
                     category_id: categoryId,
-                    note: result.value
+                    quantity: result.value.quantity,
+                    note: result.value.note
                 }).done(function(res) {
                     Swal.fire({
                         icon: res.success ? 'success' : 'error',

@@ -185,6 +185,27 @@
         transform: translateX(3px);
     }
 
+    /* ---------- Menu cấp 3 (chọn công ty rồi tới phòng ban) ---------- */
+    .nav-sidebar .nav-treeview .nav-treeview {
+        margin: 2px 0 4px 6px;
+        padding-left: 10px;
+    }
+
+    .nav-sidebar .nav-treeview>.nav-item.has-treeview>.nav-link {
+        font-weight: 600;
+        color: var(--primary-dark) !important;
+    }
+
+    .nav-sidebar .nav-treeview>.nav-item.has-treeview>.nav-link>.nav-icon {
+        font-size: 0.85rem;
+    }
+
+    .nav-sidebar .nav-treeview .nav-link>p>.right {
+        top: 10px;
+        right: 10px;
+        font-size: 0.72rem;
+    }
+
     /* ---------- Trạng thái thu gọn (sidebar-mini) ---------- */
     .sidebar-collapse .main-sidebar:not(:hover) .sidebar {
         margin-top: var(--sidebar-brand-h-sm) !important;
@@ -235,20 +256,43 @@
                 <!-- Droplist Menu Chuyển Bộ Phận  -->
                 @php
                     $currentDept = session('user')['selected_department'] ?? (session('user')['department'] ?? null);
+                    $currentCompanyId = session('user')['company_id'] ?? null;
 
                     // Phòng ban user được phép làm việc (Admin -> tất cả; user thường -> phòng được gán role).
                     // Phòng ban chung (is_general = 0, VD: BOD, Cung Ứng) chỉ để tạo user, không có kho riêng.
                     $allowedDeptIds = user_allowed_department_ids(session('user')['userId'] ?? 0);
                     $switchableDepts = DB::table('deparments')
-                        ->where('isActive', 1)
-                        ->where('is_general', 1)
-                        ->when($allowedDeptIds !== ['*'], fn($q) => $q->whereIn('id', $allowedDeptIds ?: [0]))
-                        ->orderBy('shortName', 'asc')
+                        ->leftJoin('companies', 'companies.id', '=', 'deparments.company_id')
+                        ->select(
+                            'deparments.id',
+                            'deparments.shortName',
+                            'deparments.company_id',
+                            'companies.short_name as company_short_name',
+                            'companies.name as company_name',
+                        )
+                        ->where('deparments.isActive', 1)
+                        ->where('deparments.is_general', 1)
+                        ->when(
+                            $allowedDeptIds !== ['*'],
+                            fn($q) => $q->whereIn('deparments.id', $allowedDeptIds ?: [0]),
+                        )
+                        ->orderBy('companies.name', 'asc')
+                        ->orderBy('deparments.shortName', 'asc')
                         ->get();
+
+                    // Gom theo công ty: chọn công ty trước rồi mới chọn phòng ban.
+                    // Chỉ có một công ty thì giữ danh sách phẳng cho đỡ một lần bấm.
+                    $deptsByCompany = $switchableDepts->groupBy('company_id');
+                    $companyLabels = [];
+                    foreach ($switchableDepts as $dept) {
+                        $companyLabels[$dept->company_id] =
+                            $dept->company_short_name ?: ($dept->company_name ?: 'Chưa gán công ty');
+                    }
                 @endphp
                 @if ($switchableDepts->count() > 1)
                     <li class="nav-item has-treeview">
-                        <a href="#" class="nav-link">
+                        <a href="#" class="nav-link"
+                            title="{{ trim((session('user')['company_name'] ?? '') . ' - ' . ($currentDept ?? ''), ' -') }}">
                             <i class="fas fa-building"></i>
                             <p>
                                 {{ $currentDept ?? 'Chưa chọn bộ phận' }}
@@ -256,16 +300,44 @@
                             </p>
                         </a>
                         <ul class="nav nav-treeview">
-                            @foreach ($switchableDepts as $dept)
-                                <li class="nav-item">
-                                    <a href="{{ route('switch', ['selected_department' => $dept->shortName, 'redirect' => url()->current()]) }}"
-                                        class="nav-link">
-                                        <i
-                                            class="far fa-circle nav-icon {{ $currentDept == $dept->shortName ? 'text-danger' : '' }}"></i>
-                                        <p>{{ $dept->shortName }}</p>
-                                    </a>
-                                </li>
-                            @endforeach
+                            @if ($deptsByCompany->count() > 1)
+                                @foreach ($deptsByCompany as $companyId => $depts)
+                                    @php $isCurrentCompany = (string) $companyId === (string) $currentCompanyId; @endphp
+                                    <li class="nav-item has-treeview {{ $isCurrentCompany ? 'menu-open' : '' }}">
+                                        <a href="#" class="nav-link">
+                                            <i
+                                                class="fas fa-city nav-icon {{ $isCurrentCompany ? 'text-primary' : '' }}"></i>
+                                            <p>
+                                                {{ $companyLabels[$companyId] ?? 'Chưa gán công ty' }}
+                                                <i class="right fas fa-angle-left"></i>
+                                            </p>
+                                        </a>
+                                        <ul class="nav nav-treeview">
+                                            @foreach ($depts as $dept)
+                                                <li class="nav-item">
+                                                    <a href="{{ route('switch', ['selected_department' => $dept->shortName, 'selected_department_id' => $dept->id, 'redirect' => url()->current()]) }}"
+                                                        class="nav-link">
+                                                        <i
+                                                            class="far fa-circle nav-icon {{ $currentDept == $dept->shortName ? 'text-danger' : '' }}"></i>
+                                                        <p>{{ $dept->shortName }}</p>
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </li>
+                                @endforeach
+                            @else
+                                @foreach ($switchableDepts as $dept)
+                                    <li class="nav-item">
+                                        <a href="{{ route('switch', ['selected_department' => $dept->shortName, 'selected_department_id' => $dept->id, 'redirect' => url()->current()]) }}"
+                                            class="nav-link">
+                                            <i
+                                                class="far fa-circle nav-icon {{ $currentDept == $dept->shortName ? 'text-danger' : '' }}"></i>
+                                            <p>{{ $dept->shortName }}</p>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            @endif
                         </ul>
                     </li>
                 @else
@@ -355,6 +427,13 @@
                                         class="nav-link {{ request()->is('materData/materialSignFlow') ? 'active' : '' }}"><i
                                             class="far fa-circle nav-icon text-warning"></i>
                                         <p>Trình Ký Đề Nghị CP Vật Tư</p>
+                                    </a></li>
+                            @endperm
+                            @perm('materData_material_view')
+                                <li class="nav-item"><a href="{{ route('pages.materData.transferSignFlow.list') }}"
+                                        class="nav-link {{ request()->is('materData/transferSignFlow') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-warning"></i>
+                                        <p>Trình Ký Đề Nghị Liên Phòng Ban</p>
                                     </a></li>
                             @endperm
                             @perm('materData_common_view')
@@ -530,7 +609,7 @@
                         <a href="#" class="nav-link {{ request()->is('export/*') ? 'active' : '' }}">
                             <i class="fas fa-hand-holding-water"></i>
                             <p>
-                                Sử Dụng
+                                Đề Nghị - Sử Dụng
                                 <i class="right fas fa-angle-left"></i>
                             </p>
                         </a>
@@ -643,6 +722,28 @@
                     </li>
                 @endpermAny
 
+                <!-- Droplist Menu Thống Kê  -->
+                @permAny(['export_material_view'])
+                    <li class="nav-item has-treeview {{ request()->is('statistic/*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->is('statistic/*') ? 'active' : '' }}">
+                            <i class="fas fa-chart-bar"></i>
+                            <p>
+                                Thống Kê
+                                <i class="right fas fa-angle-left"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            @perm('export_material_view')
+                                <li class="nav-item"><a href="{{ route('pages.statistic.materialIssue.list') }}"
+                                        class="nav-link {{ request()->is('statistic/materialIssue') ? 'active' : '' }}"><i
+                                            class="far fa-circle nav-icon text-primary"></i>
+                                        <p>Vật Tư</p>
+                                    </a></li>
+                            @endperm
+                        </ul>
+                    </li>
+                @endpermAny
+
                 <!-- Droplist Menu Đánh Giá Hạn Dùng  -->
                 @permAny(['stability_standard_view', 'stability_plan_view'])
                     <li class="nav-item has-treeview {{ request()->is('stabilityAssessment/*') ? 'menu-open' : '' }}">
@@ -716,6 +817,16 @@
                         </a>
                     </li>
                 @endperm
+
+                @if (user_has_any_role(session('user')['userId'] ?? 0, ['Admin']))
+                    <li class="nav-item">
+                        <a href="{{ route('pages.database.list') }}"
+                            class="nav-link {{ request()->is('database') ? 'active' : '' }}">
+                            <i class="fas fa-database"></i>
+                            <p>Cơ Sở Dữ Liệu</p>
+                        </a>
+                    </li>
+                @endif
 
             </ul>
         </nav>

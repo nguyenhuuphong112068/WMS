@@ -1551,7 +1551,7 @@
                     .html('<i class="fas ' + icon + '"></i><span>' + esc(text) + '</span>');
             }
 
-            /** Cột phát sinh trong mốc + đường tồn cuối mốc + đường ngưỡng tồn tối thiểu */
+            /** Cột phát sinh trong mốc + thanh Tồn cuối mốc + đường ngưỡng tồn tối thiểu */
             function chartDatasets(data) {
                 var bars = [
                     { key: 'imported', label: 'Nhập', color: '#5AA0DE' },
@@ -1576,18 +1576,13 @@
                     };
                 });
 
+                // Tồn tại cuối từng mốc - vẽ thành thanh đứng cạnh các cột phát sinh của mốc đó
                 datasets.push({
-                    type: 'line',
-                    label: 'Tồn cuối mốc',
+                    label: 'Tồn',
+                    backgroundColor: '#16A34A',
                     borderColor: '#16A34A',
-                    backgroundColor: 'rgba(22, 163, 74, 0.10)',
-                    borderWidth: 3,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#16A34A',
-                    lineTension: 0.25,
-                    fill: true,
                     yAxisID: 'stock',
-                    order: 1,
+                    order: 3,
                     data: data.points.map(function(point) { return point.closing; })
                 });
 
@@ -1674,7 +1669,7 @@
                                     gridLines: { display: false },
                                     scaleLabel: {
                                         display: true,
-                                        labelString: 'Tồn cuối mốc' + (unit ? ' (' + unit + ')' : '')
+                                        labelString: 'Tồn' + (unit ? ' (' + unit + ')' : '')
                                     }
                                 }
                             ]

@@ -481,58 +481,14 @@ class MixtureHazardThreshold
      * Cộng các dòng số lượng ({amount, unit_id}) của một mặt hàng dự trù, quy về kg THÔ
      * (KHÔNG nhân % hàm lượng) theo tỉ trọng của mã danh mục.
      *
+     * Có $departmentId thì đi qua đơn vị danh mục của phòng + hệ số quy đổi của từng dòng -
+     * xem App\Support\ChemicalEstimateThreshold::rawKg().
+     *
      * @return array{kg: float, unconvertible: bool}
      */
-    public static function sumEstimateKg(int $categoryId, $amountRows): array
+    public static function sumEstimateKg(int $categoryId, $amountRows, ?int $departmentId = null): array
     {
-        $cat = DB::table('chemical_categories')
-            ->where('id', $categoryId)
-            ->select('density')
-            ->first();
-
-        $rows = collect($amountRows);
-
-        if (! $cat) {
-            return ['kg' => 0.0, 'unconvertible' => $rows->isNotEmpty()];
-        }
-
-        $unitIds = $rows->map(fn ($r) => (int) ($r->unit_id ?? ($r['unit_id'] ?? 0)))->filter()->unique()->all();
-        $units = $unitIds ? DB::table('units')->whereIn('id', $unitIds)->get()->keyBy('id') : collect();
-
-        $density = $cat->density !== null ? (float) $cat->density : null;
-        $kgUnit = (object) ['unit_group' => 'mass', 'factor_to_base' => 1000.0];
-
-        $totalKg = 0.0;
-        $unconvertible = false;
-
-        foreach ($rows as $row) {
-            $qty = (float) ($row->amount ?? ($row['amount'] ?? 0));
-            $unitId = (int) ($row->unit_id ?? ($row['unit_id'] ?? 0));
-            $unit = $unitId ? ($units[$unitId] ?? null) : null;
-
-            if ($qty <= 0) {
-                continue;
-            }
-
-            if (! $unit || $unit->unit_group === 'count'
-                || ($unit->unit_group === 'volume' && ($density === null || $density <= 0))) {
-                $unconvertible = true;
-
-                continue;
-            }
-
-            $base = UnitConverter::convert($qty, $unit, $kgUnit, $density);
-
-            if ($base === null) {
-                $unconvertible = true;
-
-                continue;
-            }
-
-            $totalKg += $base;
-        }
-
-        return ['kg' => $totalKg, 'unconvertible' => $unconvertible];
+        return ChemicalEstimateThreshold::rawKg($categoryId, $amountRows, $departmentId);
     }
 
     /**
@@ -542,10 +498,14 @@ class MixtureHazardThreshold
      * Trả null nếu mã danh mục không thuộc diện Bảng B (không N9/N10/CAM, hoặc hỗn hợp chưa
      * đủ điều kiện / chưa có ngưỡng).
      *
-     * @return object|null {chem_name, strictest_group, threshold_kg, current_kg, add_kg,
+     * $pendingKgByCategory (category_id => kg thô đang dự trù chưa hoàn thành - xem
+     * App\Support\ChemicalEstimateThreshold::pendingByCategory()['B']) được cộng theo mọi mã
+     * danh mục của cùng hỗn hợp.
+     *
+     * @return object|null {chem_name, strictest_group, threshold_kg, current_kg, pending_kg, add_kg,
      *                       projected_kg, current_ratio, add_ratio, projected_ratio, level}
      */
-    public static function projectedForCategory(int $categoryId, float $addKg, ?int $companyId = null): ?object
+    public static function projectedForCategory(int $categoryId, float $addKg, ?int $companyId = null, array $pendingKgByCategory = []): ?object
     {
         $eval = self::forCategories($companyId)[$categoryId] ?? null;
 
@@ -553,15 +513,21 @@ class MixtureHazardThreshold
             return null;
         }
 
+        $pendingKg = 0.0;
+        foreach ($eval->category_ids as $ownerCategoryId) {
+            $pendingKg += $pendingKgByCategory[$ownerCategoryId] ?? 0.0;
+        }
+
         $threshold = (float) $eval->min_threshold_kg;
         $addKg = max($addKg, 0.0);
-        $projectedKg = $eval->total_kg + $addKg;
+        $projectedKg = $eval->total_kg + $pendingKg + $addKg;
 
         return (object) [
             'chem_name' => $eval->chem_name,
             'strictest_group' => $eval->strictest_group,
             'threshold_kg' => $threshold,
             'current_kg' => $eval->total_kg,
+            'pending_kg' => $pendingKg,
             'add_kg' => $addKg,
             'projected_kg' => $projectedKg,
             'current_ratio' => $eval->ratio,

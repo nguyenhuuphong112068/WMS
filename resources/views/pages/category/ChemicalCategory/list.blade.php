@@ -57,7 +57,7 @@
                     <a class="nav-link {{ $activeTab === 'company' ? 'active' : '' }}" id="tabCompanyLink"
                         data-toggle="pill" href="#tabCompany" role="tab">
                         <i class="{{ $mdIcon }}"></i>
-                        <span>{{ $mdTitle }}</span>
+                        <span>Danh mục hoá chất công ty</span>
                         <span class="cat-tab-count">{{ $datas->count() }}</span>
                     </a>
                 </li>
@@ -65,7 +65,7 @@
                     <a class="nav-link {{ $activeTab === 'department' ? 'active' : '' }}" id="tabDepartmentLink"
                         data-toggle="pill" href="#tabDepartment" role="tab">
                         <i class="{{ $dcIcon }}"></i>
-                        <span>{{ $dcTitle }}</span>
+                        <span>Hoá chất của phòng</span>
                         <span class="cat-tab-count">{{ $dcDatas->count() }}</span>
                     </a>
                 </li>
@@ -113,8 +113,6 @@
             color: #64748b;
             font-weight: 700;
             font-size: 0.88rem;
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
             background: transparent;
             transition: all var(--transition-fast, 0.2s ease);
         }
@@ -227,6 +225,8 @@
 
 @section('model')
     @include('pages.shared.classifyGuideModal')
+    {{-- Sơ đồ lưu trữ hoá chất theo hình đồ cảnh báo (GHS) - mở từ ô Cảnh Báo An Toàn / Định Khu --}}
+    @include('pages.shared.storageChartModal')
     @include('pages.category.ChemicalCategory.create')
     @include('pages.category.ChemicalCategory.update')
     @include('pages.category.shared.historyModal')
@@ -257,4 +257,6 @@
         'unitsInUse' => $dcUnitsInUse,
         'conversions' => $dcConversions,
     ])
+    {{-- Cảnh báo tương kỵ ở ô Định Khu của 2 modal trên --}}
+    @include('pages.category.DepartmentChemical.compatibility')
 @endsection

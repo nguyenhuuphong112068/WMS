@@ -23,7 +23,7 @@
                             <input type="date" name="needed_date" class="form-control" value="{{ $req->needed_date ? \Carbon\Carbon::parse($req->needed_date)->format('Y-m-d') : '' }}">
                         </div>
 
-                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqEditModal_{{ $req->id }} .me-edit-rows"
+                        <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-me-picker" data-target-rows="#reqEditModal_{{ $req->id }} .me-edit-rows">
                             <i class="fas fa-boxes-stacked mr-1"></i>Danh mục tồn của phòng
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-primary shadow-sm me-edit-add">
@@ -66,7 +66,23 @@
                                             <input type="hidden" class="me-stock-hidden" name="items[{{ $i }}][stock_at_request]" value="{{ $it->stock_at_request ?? '' }}">
                                         </td>
                                         <td class="text-right"><span class="me-available">—</span></td>
-                                        <td><textarea name="items[{{ $i }}][purpose]" maxlength="500" rows="1" class="form-control form-control-sm me-autosize" placeholder="Mục đích sử dụng...">{{ $it->purpose }}</textarea></td>
+                                        <td>
+                                            <textarea name="items[{{ $i }}][purpose]" maxlength="500" rows="1" class="form-control form-control-sm me-autosize" placeholder="Mục đích sử dụng...">{{ $it->purpose }}</textarea>
+                                            {{-- Ô Đối tượng ẩn sẵn, chỉ hiện khi dòng đã gắn đối tượng hoặc bấm "Gắn đối tượng" --}}
+                                            <div class="me-object-wrap mt-1 {{ $it->consumption_object_id ? '' : 'd-none' }}">
+                                                <select name="items[{{ $i }}][consumption_object_id]" class="form-control form-control-sm me-object">
+                                                    <option value=""></option>
+                                                    @if ($it->consumption_object_id)
+                                                        <option value="{{ $it->consumption_object_id }}" selected>{{ $it->object_code }} - {{ $it->object_name }}</option>
+                                                    @endif
+                                                </select>
+                                            </div>
+                                            @if ($it->consumption_object_id)
+                                                <button type="button" class="btn btn-xs btn-link p-0 mt-1 me-object-toggle text-danger"><i class="fas fa-unlink mr-1"></i>Bỏ đối tượng</button>
+                                            @else
+                                                <button type="button" class="btn btn-xs btn-link p-0 mt-1 me-object-toggle"><i class="fas fa-link mr-1"></i>Gắn đối tượng</button>
+                                            @endif
+                                        </td>
                                         <td class="text-center">
                                             <button type="button" class="btn btn-xs btn-outline-warning me-remember-row mr-1" title="Đề nghị dự trù vật tư"><i class="fas fa-bookmark"></i></button>
                                             <button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button>

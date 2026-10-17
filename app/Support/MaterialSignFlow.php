@@ -3,234 +3,261 @@
 namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
 /**
- * QUY TRÌNH TRÌNH KÝ ĐỀ NGHỊ CẤP PHÁT VẬT TƯ
+ * TRÌNH KÝ ĐỀ NGHỊ CẤP PHÁT VẬT TƯ - VAI TRÒ + ĐIỀU KIỆN
  *
- * Nguồn sự thật duy nhất cho hai bảng material_request_sign_flows và
- * material_request_sign_flow_steps (xem migration create_material_request_sign_flow_tables).
+ * Nguồn sự thật duy nhất cho hai bảng material_request_sign_rules và
+ * material_request_sign_rule_users (xem migration convert_material_sign_flows_to_role_rules).
  *
- * Một quy trình = ĐIỀU KIỆN ÁP DỤNG + DANH SÁCH BƯỚC KÝ.
+ * Mỗi phòng khai danh sách VAI TRÒ nhận trình ký, mỗi vai trò một dòng gồm:
+ *   - level      : CẤP KÝ. Phiếu ký lần lượt từ cấp nhỏ tới cấp lớn.
+ *   - conditions : khi nào vai trò này nhận trình ký. Bỏ trống = nhận mọi đề nghị.
+ *   - người ký   : một hoặc nhiều người thuộc vai trò, chỉ cần MỘT người ký là xong bước.
  *
- * Điều kiện áp dụng có hai vế, mỗi vế để trống nghĩa là "Tất cả":
- *   - criteria          : phân loại của danh mục vật tư CHUNG (material_categories.classification),
- *                         dùng lại đúng bộ tiêu chí của App\Support\MaterialClassification
- *                         để hai màn hình không lệch nhau.
- *   - classification_id : phân loại của danh mục vật tư PHÒNG (department_classification.id).
+ * ĐIỀU KIỆN là danh sách NHÓM, lưu JSON [{"price":"high","importance":"high"},{"dangerous":"yes"}]:
+ *   - trong một nhóm các tiêu chí nối bằng VÀ, các nhóm nối với nhau bằng HOẶC
+ *   - giá trị ANY_VALUE ("Tất cả") = tiêu chí đó không giới hạn, mọi vật tư đều thoả
+ *   - khoá là tiêu chí phân loại danh mục vật tư CHUNG (MaterialClassification::CRITERIA,
+ *     material_categories.classification), riêng DEPT_KEY là phân loại danh mục vật tư
+ *     của PHÒNG (material_department_categories.classification_id)
  *
- * Một vật tư có thể khớp nhiều quy trình (ví dụ quy trình mặc định không điều kiện và
- * quy trình riêng cho vật tư giá cao). Quy trình nào khai NHIỀU điều kiện hơn thì cụ thể
- * hơn nên được ưu tiên - xem specificity() và resolve().
+ * Một đề nghị KÍCH HOẠT vai trò khi có ít nhất MỘT dòng vật tư thoả một nhóm (cả nhóm phải
+ * đúng trên cùng một dòng). Các vai trò được kích hoạt xếp theo cấp ký thành dãy bước ký
+ * của phiếu. Không vai trò nào được kích hoạt thì phiếu được duyệt thẳng khi trình ký.
+ * Dòng tên tự nhập ngoài danh mục không có phân loại nên chỉ gặp các vai trò "mọi đề nghị".
  */
 class MaterialSignFlow
 {
-    /** Giá trị của ô "Tất cả" trên form - tiêu chí không tham gia điều kiện lọc. */
-    public const ANY = '';
+    /** Khoá điều kiện ứng với phân loại danh mục vật tư của phòng. */
+    public const DEPT_KEY = 'classification_id';
 
-    /** Nhãn hiển thị khi một vế điều kiện không khai. */
+    /** Nhãn khi vai trò không khai điều kiện nào. */
+    public const ALWAYS_LABEL = 'Mọi đề nghị';
+
+    /** Giá trị "Tất cả" của một tiêu chí trong nhóm: tiêu chí đó nhận mọi giá trị. */
+    public const ANY_VALUE = '*';
+
     public const ANY_LABEL = 'Tất cả';
 
-    /** Số bước ký tối đa của một quy trình - chặn khai nhầm hàng chục bước. */
-    public const MAX_STEPS = 10;
+    /** Chặn khai nhầm quá nhiều nhóm / cấp. */
+    public const MAX_GROUPS = 10;
+
+    public const MAX_LEVEL = 50;
+
+    private const RULE_TABLE = 'material_request_sign_rules';
+
+    private const USER_TABLE = 'material_request_sign_rule_users';
 
     /* ==========================================================
-     |  ĐIỀU KIỆN THEO PHÂN LOẠI DANH MỤC CHUNG (cột criteria)
+     |  TIÊU CHÍ DÙNG ĐƯỢC TRONG ĐIỀU KIỆN
      ========================================================== */
 
-    /** Đọc cột JSON thành mảng [tiêu chí => giá trị], bỏ hết khoá / giá trị lạ. */
-    public static function decode(?string $json): array
+    /**
+     * Các tiêu chí khai được điều kiện của một phòng: [khoá => ['label', 'options' => [giá trị => nhãn]]].
+     * Gồm 5 tiêu chí của danh mục chung + phân loại của phòng (nếu phòng đã khai).
+     */
+    public static function criteriaOptions(int $departmentId): array
     {
-        $decoded = json_decode((string) $json, true);
+        $options = [];
+
+        foreach (MaterialClassification::CRITERIA as $key => $criterion) {
+            $options[$key] = [
+                'label' => $criterion['label'],
+                'options' => array_map('strval', $criterion['options']),
+                'short' => MaterialClassification::SHORT_LABELS[$key] ?? [],
+            ];
+        }
+
+        $departmentClasses = DB::table('department_classification')
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->orderBy('name', 'asc')
+            ->pluck('name', 'id');
+
+        if ($departmentClasses->isNotEmpty()) {
+            $options[self::DEPT_KEY] = [
+                'label' => 'Phân Loại Của Phòng',
+                'options' => $departmentClasses->mapWithKeys(fn ($name, $id) => [(string) $id => (string) $name])->all(),
+                'short' => [],
+            ];
+        }
+
+        return $options;
+    }
+
+    /* ==========================================================
+     |  ĐỌC / GHI ĐIỀU KIỆN
+     ========================================================== */
+
+    /**
+     * Đọc cột JSON thành danh sách nhóm [[khoá => giá trị], ...]. Chỉ giữ cấu trúc hợp lệ,
+     * không đối chiếu giá trị với danh sách lựa chọn (phân loại của phòng có thể đã khoá).
+     */
+    public static function decodeConditions($json): array
+    {
+        $decoded = is_array($json) ? $json : json_decode((string) $json, true);
 
         if (! is_array($decoded)) {
             return [];
         }
 
-        $result = [];
-
-        foreach (MaterialClassification::CRITERIA as $key => $criterion) {
-            $value = $decoded[$key] ?? null;
-
-            if (is_string($value) && isset($criterion['options'][$value])) {
-                $result[$key] = $value;
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Gom lựa chọn từ form thành chuỗi JSON để lưu. Tiêu chí chọn "Tất cả" (chuỗi rỗng)
-     * bị loại hẳn khỏi JSON - còn mặt trong JSON nghĩa là có tham gia điều kiện lọc.
-     *
-     * Luôn đi theo thứ tự khai báo của CRITERIA để cùng một nội dung luôn ra cùng một
-     * chuỗi, nhờ vậy so sánh cũ / mới lúc ghi lịch sử không báo thay đổi giả và
-     * signature() của hai quy trình trùng điều kiện luôn bằng nhau.
-     */
-    public static function encode($input): ?string
-    {
-        $input = is_array($input) ? $input : [];
-        $result = [];
-
-        foreach (MaterialClassification::CRITERIA as $key => $criterion) {
-            $value = $input[$key] ?? null;
-
-            if (is_string($value) && isset($criterion['options'][$value])) {
-                $result[$key] = $value;
-            }
-        }
-
-        return $result ? json_encode($result, JSON_UNESCAPED_UNICODE) : null;
-    }
-
-    /**
-     * Các nhóm radio để dựng form khai điều kiện: mỗi tiêu chí thêm ô "Tất cả" đứng đầu.
-     * Khác với MaterialClassification::formGroups() - bên đó bắt buộc chọn một giá trị,
-     * bên này được phép bỏ qua tiêu chí.
-     */
-    public static function formGroups(array $selected = []): array
-    {
         $groups = [];
 
-        foreach (MaterialClassification::CRITERIA as $key => $criterion) {
-            $groups[] = [
-                'label' => $criterion['label'],
-                'icon' => $criterion['icon'],
-                'name' => 'criteria['.$key.']',
-                'errorKey' => 'criteria.'.$key,
-                'options' => [self::ANY => self::ANY_LABEL] + $criterion['options'],
-                'value' => (string) ($selected[$key] ?? self::ANY),
-            ];
+        foreach ($decoded as $group) {
+            if (! is_array($group)) {
+                continue;
+            }
+
+            $clean = [];
+            foreach ($group as $key => $value) {
+                if (is_string($key) && (is_string($value) || is_int($value))) {
+                    $clean[$key] = (string) $value;
+                }
+            }
+
+            if ($clean) {
+                $groups[] = $clean;
+            }
         }
 
         return $groups;
     }
 
-    /** Danh sách chip để hiện trên bảng: [['short', 'label', 'class'], ...]. */
-    public static function chips(?string $json): array
+    /**
+     * Đọc điều kiện người dùng dựng trên form: conditions[nhóm][dòng][key|value].
+     *
+     * Trả về [nhóm đã chuẩn hoá hoặc null nếu không có nhóm nào, danh sách lỗi]. Dòng chưa
+     * chọn tiêu chí bị bỏ qua; nhóm rỗng bị bỏ; nhóm trùng nhau chỉ giữ một. Cùng một tiêu
+     * chí chọn hai lần trong một nhóm là lỗi (VÀ hai giá trị khác nhau thì không vật tư nào
+     * thoả). Khoá được sắp theo thứ tự tiêu chí để cùng nội dung luôn ra cùng một chuỗi JSON.
+     */
+    public static function parseConditions($input, array $criteriaOptions): array
     {
-        $chips = [];
+        $groups = [];
+        $errors = [];
+        $order = array_flip(array_keys($criteriaOptions));
 
-        foreach (self::decode($json) as $key => $value) {
-            $chips[] = [
-                'short' => MaterialClassification::SHORT_LABELS[$key][$value]
-                    ?? MaterialClassification::CRITERIA[$key]['options'][$value],
-                'label' => MaterialClassification::CRITERIA[$key]['label'].': '
-                    .MaterialClassification::CRITERIA[$key]['options'][$value],
-                'class' => MaterialClassification::CHIP_CLASSES[$key][$value] ?? '',
+        foreach (array_values(is_array($input) ? $input : []) as $index => $rows) {
+            $group = [];
+
+            foreach ((is_array($rows) ? $rows : []) as $row) {
+                $key = (string) ($row['key'] ?? '');
+                $value = (string) ($row['value'] ?? '');
+
+                if ($key === '') {
+                    continue;
+                }
+
+                if (! isset($criteriaOptions[$key])) {
+                    $errors[] = 'Nhóm '.($index + 1).': tiêu chí không hợp lệ.';
+
+                    continue;
+                }
+
+                if ($value !== self::ANY_VALUE && ! isset($criteriaOptions[$key]['options'][$value])) {
+                    $errors[] = 'Nhóm '.($index + 1).': chưa chọn giá trị cho "'.$criteriaOptions[$key]['label'].'".';
+
+                    continue;
+                }
+
+                if (isset($group[$key]) && $group[$key] !== $value) {
+                    $errors[] = 'Nhóm '.($index + 1).': "'.$criteriaOptions[$key]['label']
+                        .'" chọn hai giá trị khác nhau trong cùng một nhóm VÀ.';
+
+                    continue;
+                }
+
+                $group[$key] = $value;
+            }
+
+            if ($group) {
+                uksort($group, fn ($a, $b) => $order[$a] <=> $order[$b]);
+                $groups[json_encode($group)] = $group;
+            }
+        }
+
+        if (count($groups) > self::MAX_GROUPS) {
+            $errors[] = 'Tối đa '.self::MAX_GROUPS.' nhóm điều kiện.';
+        }
+
+        return [$groups ? array_values($groups) : null, $errors];
+    }
+
+    /** Chuỗi JSON để lưu, NULL khi vai trò nhận mọi đề nghị. */
+    public static function encodeConditions(?array $groups): ?string
+    {
+        return $groups ? json_encode(array_values($groups), JSON_UNESCAPED_UNICODE) : null;
+    }
+
+    /** Nhãn ngắn của một tiêu chí = giá trị, dùng cho chip trên bảng. */
+    public static function chipOf(string $key, string $value, array $criteriaOptions): array
+    {
+        $criterion = $criteriaOptions[$key] ?? null;
+
+        if ($value === self::ANY_VALUE) {
+            $name = preg_replace('/^Theo\s+/u', '', (string) ($criterion['label'] ?? $key));
+
+            return [
+                'short' => $name.': '.self::ANY_LABEL,
+                'label' => ($criterion['label'] ?? $key).': '.self::ANY_LABEL,
+                'class' => 'any',
             ];
         }
 
-        return $chips;
-    }
+        $valueLabel = $criterion['options'][$value] ?? ($key === self::DEPT_KEY ? 'Phân loại đã khoá' : $value);
 
-    /** Mô tả đầy đủ dùng cho lịch sử thay đổi và Audit Trail. */
-    public static function describe(?string $json): string
-    {
-        $parts = [];
-
-        foreach (self::decode($json) as $key => $value) {
-            $parts[] = MaterialClassification::CRITERIA[$key]['label'].': '
-                .MaterialClassification::CRITERIA[$key]['options'][$value];
-        }
-
-        return $parts ? implode('; ', $parts) : self::ANY_LABEL;
-    }
-
-    /* ==========================================================
-     |  KIỂM TRA TRÙNG ĐIỀU KIỆN
-     ========================================================== */
-
-    /**
-     * Chuỗi nhận dạng của một tổ hợp điều kiện. Hai quy trình cùng chuỗi này là cùng
-     * điều kiện áp dụng, không được tồn tại song song trong một phòng ban.
-     */
-    public static function signature(?string $criteriaJson, $classificationId): string
-    {
-        return (string) self::encode(self::decode($criteriaJson))
-            .'|'.((int) $classificationId ?: 0);
-    }
-
-    /** Số điều kiện đã khai - quy trình càng nhiều điều kiện thì càng cụ thể. */
-    public static function specificity(?string $criteriaJson, $classificationId): int
-    {
-        return count(self::decode($criteriaJson)) + ((int) $classificationId ? 1 : 0);
-    }
-
-    /* ==========================================================
-     |  VALIDATE FORM KHAI BÁO
-     ========================================================== */
-
-    /**
-     * Quy tắc validate phần điều kiện + các bước ký.
-     * Tên quy trình và phân loại của phòng do Controller tự khai vì còn ràng buộc theo
-     * phòng ban đang chọn.
-     *
-     * Mỗi bước là một cặp cùng chỉ số: steps[i] = vai trò phê duyệt, signers[i][] = DANH
-     * SÁCH người được ký bước đó (chỉ cần một trong số họ ký là xong bước).
-     */
-    public static function rules(): array
-    {
-        $rules = [
-            'criteria' => ['nullable', 'array'],
-            'steps' => ['required', 'array', 'min:1', 'max:'.self::MAX_STEPS],
-            'steps.*' => ['required', 'integer', Rule::exists('roles', 'id')],
-            'signers' => ['required', 'array', 'min:1', 'max:'.self::MAX_STEPS],
-            'signers.*' => ['required', 'array', 'min:1'],
-            'signers.*.*' => ['required', 'integer', Rule::exists('user_management', 'id')],
+        return [
+            'short' => $criterion['short'][$value] ?? $valueLabel,
+            'label' => ($criterion['label'] ?? $key).': '.$valueLabel,
+            'class' => $key === self::DEPT_KEY ? 'dept' : (MaterialClassification::CHIP_CLASSES[$key][$value] ?? ''),
         ];
-
-        foreach (MaterialClassification::CRITERIA as $key => $criterion) {
-            $rules['criteria.'.$key] = ['nullable', Rule::in(array_keys($criterion['options']))];
-        }
-
-        return $rules;
     }
 
-    /** Thông báo lỗi tiếng Việt cho các quy tắc trên. */
-    public static function messages(): array
+    /** Các nhóm điều kiện dưới dạng chip: [[chip, chip], [chip]]. */
+    public static function chipGroups($json, array $criteriaOptions): array
     {
-        $messages = [
-            'steps.required' => 'Quy trình phải có ít nhất 1 bước trình ký.',
-            'steps.min' => 'Quy trình phải có ít nhất 1 bước trình ký.',
-            'steps.max' => 'Quy trình tối đa '.self::MAX_STEPS.' bước trình ký.',
-            'steps.*.required' => 'Vui lòng chọn vai trò phê duyệt cho từng bước.',
-            'steps.*.exists' => 'Vai trò phê duyệt không hợp lệ.',
-            'signers.required' => 'Vui lòng chọn người ký cho từng bước.',
-            'signers.*.required' => 'Mỗi bước phải có ít nhất 1 người ký.',
-            'signers.*.min' => 'Mỗi bước phải có ít nhất 1 người ký.',
-            'signers.*.*.required' => 'Vui lòng chọn người ký cho từng bước.',
-            'signers.*.*.exists' => 'Người ký được chọn không hợp lệ.',
-        ];
+        return array_map(
+            fn ($group) => array_map(
+                fn ($key) => self::chipOf($key, $group[$key], $criteriaOptions),
+                array_keys($group)
+            ),
+            self::decodeConditions($json)
+        );
+    }
 
-        foreach (MaterialClassification::CRITERIA as $key => $criterion) {
-            $messages['criteria.'.$key.'.in'] = 'Điều kiện "'.$criterion['label'].'" không hợp lệ.';
-        }
+    /** Mô tả một dòng cho lịch sử thay đổi: "(Giá cao VÀ Rất quan trọng) HOẶC (Hàng nguy hiểm)". */
+    public static function describeConditions($json, array $criteriaOptions): string
+    {
+        $groups = array_map(
+            fn ($chips) => '('.implode(' VÀ ', array_column($chips, 'label')).')',
+            self::chipGroups($json, $criteriaOptions)
+        );
 
-        return $messages;
+        return $groups ? implode(' HOẶC ', $groups) : self::ALWAYS_LABEL;
     }
 
     /* ==========================================================
-     |  TRA QUY TRÌNH ÁP DỤNG CHO MỘT VẬT TƯ
+     |  KHỚP ĐIỀU KIỆN
      ========================================================== */
 
     /**
-     * Điều kiện của quy trình có khớp với vật tư không.
+     * Một dòng vật tư có thoả TRỌN một nhóm điều kiện không.
      *
-     * Chỉ soi các tiêu chí quy trình CÓ khai; tiêu chí bỏ trống ("Tất cả") thì vật tư
-     * khai gì cũng khớp. Vế phân loại của phòng cũng vậy.
+     * @param  array  $item  ['criteria' => [tiêu chí => giá trị], 'classification_id' => ?int]
      */
-    public static function matches($flow, ?string $categoryCriteriaJson, $categoryClassificationId): bool
+    public static function groupMatches(array $group, array $item): bool
     {
-        if ($flow->classification_id && (int) $flow->classification_id !== (int) $categoryClassificationId) {
-            return false;
-        }
+        foreach ($group as $key => $value) {
+            if ((string) $value === self::ANY_VALUE) {
+                continue;
+            }
 
-        $category = self::decode($categoryCriteriaJson);
+            $actual = $key === self::DEPT_KEY
+                ? (string) ((int) ($item['classification_id'] ?? 0) ?: '')
+                : (string) ($item['criteria'][$key] ?? '');
 
-        foreach (self::decode($flow->criteria) as $key => $value) {
-            if (($category[$key] ?? null) !== $value) {
+            if ($actual === '' || $actual !== (string) $value) {
                 return false;
             }
         }
@@ -238,210 +265,201 @@ class MaterialSignFlow
         return true;
     }
 
-    /**
-     * Quy trình trình ký áp dụng cho một vật tư của phòng, kèm các bước ký đã sắp thứ tự.
-     *
-     * Đây là điểm vào cho màn hình Đề Nghị Cấp Phát Vật Tư: truyền phân loại của danh mục
-     * chung (material_categories.classification) và phân loại của phòng
-     * (material_department_categories.classification_id) để biết phiếu phải đi qua những
-     * vai trò nào. Không quy trình nào khớp thì trả về null - phiếu giữ cách khai tay cũ.
-     *
-     * Nhiều quy trình cùng khớp thì lấy quy trình CỤ THỂ NHẤT (khai nhiều điều kiện nhất);
-     * cùng độ cụ thể thì lấy quy trình khai trước để kết quả ổn định.
-     *
-     * @return null|object{id:int, name:string, criteria:?string, classification_id:?int, steps:\Illuminate\Support\Collection}
-     */
-    public static function resolve(int $departmentId, ?string $categoryCriteriaJson, $categoryClassificationId)
+    /** Một dòng vật tư có kích hoạt vai trò (thoả ít nhất một nhóm) không. */
+    public static function itemTriggers(array $groups, array $item): bool
     {
-        $flows = DB::table('material_request_sign_flows')
-            ->where('department_id', $departmentId)
-            ->where('status_id', 1)
-            ->orderBy('id', 'asc')
-            ->get();
-
-        $matched = $flows
-            ->filter(fn ($flow) => self::matches($flow, $categoryCriteriaJson, $categoryClassificationId))
-            ->sortByDesc(fn ($flow) => self::specificity($flow->criteria, $flow->classification_id))
-            ->first();
-
-        if (! $matched) {
-            return null;
+        foreach ($groups as $group) {
+            if (self::groupMatches($group, $item)) {
+                return true;
+            }
         }
 
-        $matched->steps = self::stepsOf((int) $matched->id);
+        return false;
+    }
 
-        return $matched;
+    /* ==========================================================
+     |  TRA DÃY BƯỚC KÝ CỦA MỘT ĐỀ NGHỊ
+     ========================================================== */
+
+    /**
+     * Các vai trò ĐANG HOẠT ĐỘNG của phòng, xếp theo cấp ký, kèm ->groups (điều kiện đã đọc),
+     * ->role_name và ->signers. Vai trò chưa có người ký nào còn hiệu lực bị bỏ qua - không
+     * ai ký được thì phiếu sẽ treo.
+     */
+    public static function activeRules(int $departmentId)
+    {
+        $rules = self::rulesQuery()
+            ->where(self::RULE_TABLE.'.department_id', $departmentId)
+            ->where(self::RULE_TABLE.'.status_id', 1)
+            ->get();
+
+        return self::attachSigners($rules)
+            ->filter(fn ($rule) => $rule->signers->isNotEmpty())
+            ->values();
+    }
+
+    /** Mọi vai trò (kể cả đã khoá) của phòng cho màn hình Dữ Liệu Gốc. */
+    public static function allRules(int $departmentId)
+    {
+        return self::attachSigners(
+            self::rulesQuery()->where(self::RULE_TABLE.'.department_id', $departmentId)->get()
+        );
     }
 
     /**
-     * QUY TRÌNH KÝ CỦA TỪNG VẬT TƯ TRONG MỘT PHÒNG - nạp một lần cho cả màn hình.
-     *
-     * Màn hình Đề Nghị Cấp Phát Vật Tư phải biết ngay quy trình của mọi vật tư trong danh
-     * mục của phòng (để JS dựng lại khối "Quy trình ký duyệt" khi người lập đổi dòng vật
-     * tư mà không phải gọi lại server), nên tra hàng loạt thay vì resolve() từng dòng.
-     *
-     * Trả về:
-     *   'byCategory' : material_categories.id => ['flow' => đầu quy trình, 'steps' => bước ký]
-     *   'fallback'   : quy trình cho dòng KHÔNG thuộc danh mục (tên tự nhập) - chỉ khớp
-     *                  được quy trình không khai điều kiện nào; null nếu phòng chưa khai.
-     *
-     * Vật tư không khớp quy trình nào thì không có mặt trong 'byCategory'.
+     * Dữ liệu phân loại của các vật tư trong danh mục phòng: category_id => item
+     * ['criteria' => [...], 'classification_id' => ?int].
      */
-    public static function mapForDepartment(int $departmentId): array
+    public static function categoryItems(int $departmentId, ?array $categoryIds = null): array
     {
-        $flows = DB::table('material_request_sign_flows')
-            ->where('department_id', $departmentId)
-            ->where('status_id', 1)
-            ->orderBy('id', 'asc')
-            ->get();
-
-        $stepsByFlow = self::stepsOfMany($flows->pluck('id'));
-
-        // Quy trình chỉ tính là dùng được khi thật sự có bước ký còn hiệu lực
-        $usable = $flows->filter(fn ($flow) => ($stepsByFlow[$flow->id] ?? collect())->isNotEmpty())->values();
-
-        $pick = function (?string $criteriaJson, $classificationId) use ($usable, $stepsByFlow) {
-            $flow = $usable
-                ->filter(fn ($f) => self::matches($f, $criteriaJson, $classificationId))
-                ->sortByDesc(fn ($f) => self::specificity($f->criteria, $f->classification_id))
-                ->first();
-
-            return $flow ? ['flow' => $flow, 'steps' => $stepsByFlow[$flow->id]] : null;
-        };
-
-        $categories = DB::table('material_department_categories')
+        $rows = DB::table('material_department_categories')
             ->join('material_categories', 'material_categories.id', '=', 'material_department_categories.category_id')
             ->where('material_department_categories.department_id', $departmentId)
             ->where('material_department_categories.status_id', 1)
+            ->when($categoryIds !== null, fn ($query) => $query->whereIn('material_categories.id', $categoryIds))
             ->get([
                 'material_categories.id',
                 'material_categories.classification',
                 'material_department_categories.classification_id',
             ]);
 
-        $byCategory = [];
+        $items = [];
 
-        foreach ($categories as $category) {
-            if ($matched = $pick($category->classification, $category->classification_id)) {
-                $byCategory[(int) $category->id] = $matched;
-            }
+        foreach ($rows as $row) {
+            $items[(int) $row->id] = [
+                'criteria' => MaterialClassification::decode($row->classification),
+                'classification_id' => $row->classification_id ? (int) $row->classification_id : null,
+            ];
         }
 
-        return [
-            'byCategory' => $byCategory,
-            'fallback' => $pick(null, null),
-        ];
+        return $items;
     }
 
     /**
-     * Quy trình áp dụng cho CẢ MỘT PHIẾU có nhiều dòng vật tư.
+     * DÃY BƯỚC KÝ của một phiếu có nhiều dòng vật tư.
      *
-     * Mỗi dòng khớp một quy trình riêng, phiếu lấy quy trình CHẶT NHẤT - nhiều bước ký
-     * nhất - để vật tư nào cần duyệt kỹ thì cả phiếu duyệt kỹ. Dòng nào không khớp quy
-     * trình nào thì trả về trong 'missing' để Controller chặn không cho trình ký.
+     * Vai trò nào không khai điều kiện, hoặc có ít nhất một dòng vật tư thoả một nhóm điều
+     * kiện của nó, thì thành một bước ký. Bước xếp theo cấp ký, đánh số lại 1, 2, 3...
+     * Rỗng = không cần ký duyệt, phiếu được duyệt thẳng.
      *
      * @param  array  $categoryIds  category_id của từng dòng; phần tử rỗng = dòng tên tự nhập
-     * @return array{steps: \Illuminate\Support\Collection, flow: ?object, missing: bool}
+     * @return array{steps: \Illuminate\Support\Collection}
      */
     public static function resolveForItems(int $departmentId, array $categoryIds): array
     {
-        $map = self::mapForDepartment($departmentId);
-        $best = null;
-        $missing = false;
+        $ids = array_values(array_unique(array_filter(array_map('intval', $categoryIds))));
+        $items = $ids ? self::categoryItems($departmentId, $ids) : [];
 
-        foreach ($categoryIds as $categoryId) {
-            $matched = (int) $categoryId > 0
-                ? ($map['byCategory'][(int) $categoryId] ?? null)
-                : $map['fallback'];
-
-            if (! $matched) {
-                $missing = true;
-
-                continue;
+        $triggered = self::activeRules($departmentId)->filter(function ($rule) use ($items) {
+            if (! $rule->groups) {
+                return true;
             }
 
-            if (! $best || $matched['steps']->count() > $best['steps']->count()) {
-                $best = $matched;
+            foreach ($items as $item) {
+                if (self::itemTriggers($rule->groups, $item)) {
+                    return true;
+                }
             }
-        }
 
-        return [
-            'steps' => $best ? $best['steps'] : collect(),
-            'flow' => $best ? $best['flow'] : null,
-            'missing' => $missing,
-        ];
-    }
+            return false;
+        });
 
-    /** Các bước ký còn hiệu lực của một quy trình, kèm vai trò + người ký, theo thứ tự ký. */
-    public static function stepsOf(int $flowId)
-    {
-        return self::stepsOfMany([$flowId])->get($flowId, collect());
+        return ['steps' => self::asSteps($triggered)];
     }
 
     /**
-     * Bước ký của NHIỀU quy trình cùng lúc: flow_id => các bước.
-     * Dùng cho màn hình liệt kê nhiều quy trình để khỏi truy vấn lại từng dòng.
-     *
-     * Mỗi bước kèm ->signers: danh sách NGƯỜI ĐƯỢC KÝ bước đó. Một bước giao cho nhiều
-     * người thì chỉ cần MỘT trong số họ ký là xong bước.
+     * Bảng tra cho JS dựng lại khối "Quy trình ký duyệt" trên modal đề nghị ngay khi người
+     * lập đổi dòng vật tư, không phải gọi lại server:
+     *   'rules'      : các vai trò đang hoạt động, theo cấp ký
+     *   'always'     : id vai trò nhận mọi đề nghị
+     *   'byCategory' : category_id => id các vai trò mà vật tư đó kích hoạt
      */
-    public static function stepsOfMany($flowIds)
+    public static function mapForDepartment(int $departmentId): array
     {
-        $flowIds = collect($flowIds)->filter()->values();
+        $rules = self::activeRules($departmentId);
+        $always = [];
+        $byCategory = [];
 
-        if ($flowIds->isEmpty()) {
-            return collect();
+        foreach ($rules as $rule) {
+            if (! $rule->groups) {
+                $always[] = (int) $rule->id;
+            }
         }
 
-        $steps = DB::table('material_request_sign_flow_steps')
-            ->leftJoin('roles', 'roles.id', '=', 'material_request_sign_flow_steps.role_id')
-            ->select(
-                'material_request_sign_flow_steps.id',
-                'material_request_sign_flow_steps.flow_id',
-                'material_request_sign_flow_steps.step_no',
-                'material_request_sign_flow_steps.role_id',
-                'roles.name as role_name'
-            )
-            ->whereIn('material_request_sign_flow_steps.flow_id', $flowIds)
-            ->where('material_request_sign_flow_steps.active', 1)
-            ->orderBy('material_request_sign_flow_steps.step_no', 'asc')
-            ->get();
-
-        $signers = self::signersOfSteps($steps->pluck('id'));
-
-        foreach ($steps as $step) {
-            $step->signers = $signers->get($step->id, collect());
+        foreach (self::categoryItems($departmentId) as $categoryId => $item) {
+            foreach ($rules as $rule) {
+                if ($rule->groups && self::itemTriggers($rule->groups, $item)) {
+                    $byCategory[$categoryId][] = (int) $rule->id;
+                }
+            }
         }
 
-        return $steps->groupBy('flow_id');
+        return ['rules' => $rules, 'always' => $always, 'byCategory' => $byCategory];
     }
 
-    /** Người ký của một loạt bước: step_id => danh sách người, kèm tên và phòng ban hiện tại. */
-    public static function signersOfSteps($stepIds)
+    /** Đổi danh sách vai trò được kích hoạt thành các bước ký đánh số 1, 2, 3... */
+    private static function asSteps($rules)
     {
-        $stepIds = collect($stepIds)->filter()->values();
+        return collect($rules)->values()->map(function ($rule, $index) {
+            $step = clone $rule;
+            $step->step_no = $index + 1;
 
-        if ($stepIds->isEmpty()) {
+            return $step;
+        });
+    }
+
+    private static function rulesQuery()
+    {
+        return DB::table(self::RULE_TABLE)
+            ->leftJoin('roles', 'roles.id', '=', self::RULE_TABLE.'.role_id')
+            ->select(self::RULE_TABLE.'.*', 'roles.name as role_name')
+            ->orderBy(self::RULE_TABLE.'.level', 'asc')
+            ->orderBy(self::RULE_TABLE.'.id', 'asc');
+    }
+
+    /** Gắn ->groups và ->signers cho từng vai trò. */
+    private static function attachSigners($rules)
+    {
+        $signers = self::signersOfRules($rules->pluck('id'));
+
+        foreach ($rules as $rule) {
+            $rule->groups = self::decodeConditions($rule->conditions);
+            $rule->signers = $signers->get($rule->id, collect());
+        }
+
+        return $rules;
+    }
+
+    /** Người ký của một loạt vai trò: rule_id => danh sách người, kèm tên và phòng ban hiện tại. */
+    public static function signersOfRules($ruleIds)
+    {
+        $ruleIds = collect($ruleIds)->filter()->values();
+
+        if ($ruleIds->isEmpty()) {
             return collect();
         }
 
-        return DB::table('material_request_sign_flow_step_users')
-            ->leftJoin('user_management', 'user_management.id', '=', 'material_request_sign_flow_step_users.user_id')
+        return DB::table(self::USER_TABLE)
+            ->leftJoin('user_management', 'user_management.id', '=', self::USER_TABLE.'.user_id')
             ->leftJoin('deparments', 'deparments.id', '=', 'user_management.deparment_id')
             ->select(
-                'material_request_sign_flow_step_users.step_id',
-                'material_request_sign_flow_step_users.user_id',
-                'material_request_sign_flow_step_users.user_name',
+                self::USER_TABLE.'.rule_id',
+                self::USER_TABLE.'.user_id',
+                self::USER_TABLE.'.user_name',
                 'user_management.fullName as signer_full_name',
                 'user_management.isActive as signer_active',
                 'deparments.shortName as signer_department_short'
             )
-            ->whereIn('material_request_sign_flow_step_users.step_id', $stepIds)
-            ->where('material_request_sign_flow_step_users.active', 1)
-            ->orderBy('material_request_sign_flow_step_users.id', 'asc')
+            ->whereIn(self::USER_TABLE.'.rule_id', $ruleIds)
+            ->where(self::USER_TABLE.'.active', 1)
+            ->orderBy(self::USER_TABLE.'.id', 'asc')
             ->get()
-            ->groupBy('step_id');
+            ->groupBy('rule_id');
     }
+
+    /* ==========================================================
+     |  HIỂN THỊ NGƯỜI KÝ
+     ========================================================== */
 
     /** Tên một người ký: ưu tiên tên hiện tại, chưa có thì dùng ảnh chụp lúc khai. */
     public static function signerLabel($signer): string
@@ -457,16 +475,6 @@ class MaterialSignFlow
         return $names ? implode(' / ', $names) : 'NA';
     }
 
-    /** Một dòng gọn cho lịch sử thay đổi: "1. Trưởng Phòng - A / B -> 2. ...". */
-    public static function stepsText($steps): string
-    {
-        $parts = collect($steps)
-            ->map(fn ($step) => $step->step_no.'. '.($step->role_name ?: 'NA').' - '.self::stepSignerNames($step))
-            ->all();
-
-        return $parts ? implode(' -> ', $parts) : '';
-    }
-
     /* ==========================================================
      |  NGƯỜI ĐƯỢC CHỌN LÀM NGƯỜI KÝ
      ========================================================== */
@@ -477,7 +485,7 @@ class MaterialSignFlow
      *
      * Mỗi người kèm 'role_ids' = MỌI vai trò của họ (role chính + role gán qua user_role
      * có phạm vi NULL hoặc đúng phòng ban đang chọn), dùng để lọc danh sách người ký theo
-     * vai trò của từng bước. Cùng cách xác định vai trò với EstimateSignFlow::signerOptions().
+     * vai trò. Cùng cách xác định vai trò với EstimateSignFlow::signerOptions().
      */
     public static function signerOptions()
     {

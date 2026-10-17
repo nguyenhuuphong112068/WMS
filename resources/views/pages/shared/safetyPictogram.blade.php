@@ -2,16 +2,30 @@
 | LOGO CẢNH BÁO AN TOÀN HOÁ CHẤT - kiểu GHS (hình thoi viền đỏ, nền trắng, biểu tượng đen)
 |
 | Dùng ở: modal Thêm/Sửa Danh Mục Hoá Chất, bảng danh mục, modal lịch sử thay đổi.
-| $code là một mã trong config('chemical.safety_warnings'). Mã lạ (chưa có @case riêng)
-| vẫn vẽ được khung thoi kèm dấu chấm than mặc định, không làm vỡ giao diện.
+| $code là một mã trong config('chemical.safety_warnings') (hoặc mã cũ trong
+| safety_warnings_legacy). Mã lạ (chưa có @case riêng) vẫn vẽ được khung thoi kèm dấu chấm
+| than mặc định, không làm vỡ giao diện.
+|
+| 4 nhóm dễ cháy của Sơ đồ lưu trữ GHS cùng logo ngọn lửa, phân biệt bằng MÀU NỀN ô vuông phía
+| sau giống hệt sơ đồ giấy: lỏng - tím, rắn - vàng cam, gặp nước - hồng, tự bốc cháy - xanh lá.
 |
 | Cách dùng: @include('pages.shared.safetyPictogram', ['code' => 'TOXIC', 'size' => 26])
 --}}
 @php
     $size = $size ?? 26;
+
+    $pictoBacking = [
+        'FLAMMABLE_LIQUID' => '#9933FF',
+        'FLAMMABLE_SOLID' => '#FFC000',
+        'WATER_REACTIVE' => '#FF99FF',
+        'PYROPHORIC' => '#66FF33',
+    ][$code] ?? null;
 @endphp
 <svg class="safety-picto" width="{{ $size }}" height="{{ $size }}" viewBox="0 0 100 100"
     xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    @if ($pictoBacking)
+        <rect x="0" y="0" width="100" height="100" rx="12" fill="{{ $pictoBacking }}" />
+    @endif
     <rect x="18" y="18" width="64" height="64" rx="8" fill="#fff" stroke="#DC2626" stroke-width="7"
         transform="rotate(45 50 50)" />
     @switch($code)
@@ -26,6 +40,8 @@
         @break
 
         @case('CORROSIVE')
+        @case('CORROSIVE_ACID')
+        @case('CORROSIVE_BASE')
             {{-- Hai ống nghiệm đổ chất lỏng ăn mòn xuống thanh ngang --}}
             <g stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round">
                 <line x1="38" y1="24" x2="30" y2="42" />
@@ -39,6 +55,10 @@
         @break
 
         @case('FLAMMABLE')
+        @case('FLAMMABLE_LIQUID')
+        @case('FLAMMABLE_SOLID')
+        @case('WATER_REACTIVE')
+        @case('PYROPHORIC')
             {{-- Ngọn lửa --}}
             <path
                 d="M50 20 C41 33 32 43 32 56 C32 70 40 80 50 80 C60 80 68 70 68 56 C68 47 62 43 59 37 C58 45 53 49 49 45 C45 41 47 33 50 20 Z"
@@ -57,6 +77,14 @@
             {{-- Dấu chấm than --}}
             <rect x="46" y="24" width="8" height="32" rx="3" fill="#000" />
             <circle cx="50" cy="67" r="5.5" fill="#000" />
+        @break
+
+        @case('HEALTH_HAZARD')
+            {{-- Người + ngôi sao nổ ở ngực (GHS08) --}}
+            <circle cx="50" cy="29" r="8" fill="#000" />
+            <path d="M36 72 L37 50 Q38 41 45 40 L55 40 Q62 41 63 50 L64 72 Z" fill="#000" />
+            <polygon fill="#fff"
+                points="50,46 52.6,53 60,52.4 54.4,57.4 57.4,64.6 50,60.6 42.6,64.6 45.6,57.4 40,52.4 47.4,53" />
         @break
 
         @case('ENV_HAZARD')

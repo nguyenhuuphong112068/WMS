@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
+use App\Support\ChemicalCompatibility;
 use App\Support\DepartmentChemical;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -49,6 +50,8 @@ class DepartmentChemicalController extends Controller
         $this->checkConversions($validator, $request, (int) $request->category_id, $departmentId);
 
         $this->checkStockRange($validator, $request);
+
+        $this->checkCompatibility($validator, $request, (int) $request->category_id);
 
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dcCreateErrors')->withInput();
@@ -104,6 +107,8 @@ class DepartmentChemicalController extends Controller
         $this->checkConversions($validator, $request, (int) $current->category_id, $departmentId);
 
         $this->checkStockRange($validator, $request);
+
+        $this->checkCompatibility($validator, $request, (int) $current->category_id, (int) $current->default_location_id);
 
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dcUpdateErrors')->withInput();
@@ -230,6 +235,32 @@ class DepartmentChemicalController extends Controller
 
             if ((float) $max < (float) $min) {
                 $validator->errors()->add('max_stock', 'Ngưỡng tồn tối đa phải lớn hơn hoặc bằng ngưỡng tồn tối thiểu.');
+            }
+        });
+    }
+
+    /**
+     * Không cho đặt hoá chất cùng kệ/tủ với hoá chất tương kỵ theo Sơ đồ lưu trữ hoá chất theo
+     * hình đồ cảnh báo (GHS) - xem App\Support\ChemicalCompatibility.
+     *
+     * Chỉ chặn khi ĐẶT MỚI: khai mới, hoặc sửa mà đổi định khu. Sửa ô khác mà giữ nguyên định khu
+     * cũ thì cho lưu - chỗ cũ có thể thành tương kỵ do lô khác được xếp vào sau, lỗi đó không nằm
+     * ở dòng này (modal vẫn hiện cảnh báo để phòng chuyển chỗ).
+     */
+    private function checkCompatibility($validator, Request $request, int $categoryId, int $currentLocationId = 0): void
+    {
+        $validator->after(function ($validator) use ($request, $categoryId, $currentLocationId) {
+            $locationId = (int) $request->default_location_id;
+
+            if (! $locationId || ! $categoryId || $locationId === $currentLocationId
+                || $validator->errors()->has('default_location_id') || $validator->errors()->has('category_id')) {
+                return;
+            }
+
+            $result = ChemicalCompatibility::checkPlacement($categoryId, $locationId);
+
+            if ($result['conflicts']) {
+                $validator->errors()->add('default_location_id', ChemicalCompatibility::message($result));
             }
         });
     }

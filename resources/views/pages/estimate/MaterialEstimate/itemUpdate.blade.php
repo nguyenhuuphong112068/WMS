@@ -22,7 +22,11 @@
 
                 <div class="modal-body">
 
-                    <div class="form-group">
+                    {{--
+                    | Nguồn vật tư cố định theo dòng đang sửa, không cho đổi qua lại: radio vẫn giữ
+                    | (ẩn) vì JS dùng chung đọc [name="source"]:checked để hiện đúng khối danh mục / tự nhập.
+                    --}}
+                    <div class="form-group d-none">
                         <label>Nguồn Vật Tư <span class="text-danger">*</span></label>
                         <div>
                             <label class="est-switch">
@@ -57,6 +61,14 @@
                         <input type="text" name="material_name" maxlength="255"
                             class="form-control {{ $bag->has('material_name') ? 'is-invalid' : '' }}" value="{{ old('material_name') }}">
                         @if ($bag->has('material_name')) <span class="md-error">{{ $bag->first('material_name') }}</span> @endif
+                    </div>
+
+                    <div class="form-group">
+                        <label>Part Number</label>
+                        <input type="text" name="part_number" maxlength="100"
+                            class="form-control w-50 {{ $bag->has('part_number') ? 'is-invalid' : '' }}" value="{{ old('part_number') }}"
+                            placeholder="Mã P/N của nhà sản xuất">
+                        @if ($bag->has('part_number')) <span class="md-error">{{ $bag->first('part_number') }}</span> @endif
                     </div>
 
                     <div class="form-row">

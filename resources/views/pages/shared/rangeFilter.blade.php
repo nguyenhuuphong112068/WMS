@@ -18,6 +18,14 @@
 | - rfSearch      : true/false - có hiện ô tìm kiếm hay không (mặc định theo rfKeyword)
 | - rfPlaceholder : gợi ý trong ô tìm kiếm
 | - rfDateLabel   : tên cột ngày đang lọc, ví dụ 'Ngày nhập'
+| - rfShowPerPage : true/false - có hiện ô Số dòng hay không (mặc định true; bảng lọc
+|                   ở trình duyệt, không phân trang server thì tắt)
+| - rfQuick       : nút chọn nhanh riêng, mảng [['label' => ..., 'from' => 'Y-m-d'|'', 'to' => ...]]
+|                   - bỏ trống thì dùng bộ nút nhìn về quá khứ (30 ngày, tháng này...)
+| - rfInBar       : true = bộ lọc một hàng (nhãn nằm cạnh ô, không nằm trên) và gắn class
+|                   .md-tablebar-item để layout tự kéo vào chung thanh nút + Tìm kiếm phía
+|                   trên bảng DataTables (layout/master.blade.php). Bảng không dùng DataTables
+|                   thì vẫn đứng riêng nhưng gọn một hàng.
 --}}
 
 @php
@@ -29,6 +37,16 @@
     $rfSearch = $rfSearch ?? ($rfKeyword !== null);
     $rfPlaceholder = $rfPlaceholder ?? 'Tìm theo mã, tên...';
     $rfDateLabel = $rfDateLabel ?? 'Khoảng ngày';
+    $rfShowPerPage = $rfShowPerPage ?? true;
+    $rfInBar = $rfInBar ?? false;
+    $rfQuick = $rfQuick ?? [
+        ['label' => '30 ngày', 'from' => now()->subDays(29)->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+        ['label' => 'Tháng này', 'from' => now()->startOfMonth()->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+        ['label' => 'Tháng trước', 'from' => now()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d'), 'to' => now()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d')],
+        ['label' => 'Quý này', 'from' => now()->startOfQuarter()->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+        ['label' => 'Năm nay', 'from' => now()->startOfYear()->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+        ['label' => 'Tất cả', 'from' => '', 'to' => ''],
+    ];
 
     // Giữ nguyên tham số của các bảng khác trên cùng trang: form GET chỉ gửi ô của
     // chính nó, không kèm lại thì lọc bảng này sẽ xoá mất lọc của bảng kia.
@@ -38,7 +56,7 @@
         ->all();
 @endphp
 
-<form method="GET" action="{{ route($rfRoute) }}" class="rgf-box" data-prefix="{{ $rfPrefix }}">
+<form method="GET" action="{{ route($rfRoute) }}" class="rgf-box {{ $rfInBar ? 'rgf-inline md-tablebar-item' : '' }}" data-prefix="{{ $rfPrefix }}">
     @if ($rfTab)
         <input type="hidden" name="tab" value="{{ $rfTab }}">
     @endif
@@ -66,16 +84,18 @@
             </div>
         @endif
 
-        <div class="rgf-field">
-            <label>Số dòng</label>
-            <select name="{{ $rfPrefix }}per" class="form-control">
-                @foreach (\App\Support\ListRange::PER_PAGE_OPTIONS as $rfOption)
-                    <option value="{{ $rfOption }}" {{ (int) $rfPerPage === $rfOption ? 'selected' : '' }}>
-                        {{ $rfOption }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+        @if ($rfShowPerPage)
+            <div class="rgf-field">
+                <label>Số dòng</label>
+                <select name="{{ $rfPrefix }}per" class="form-control">
+                    @foreach (\App\Support\ListRange::PER_PAGE_OPTIONS as $rfOption)
+                        <option value="{{ $rfOption }}" {{ (int) $rfPerPage === $rfOption ? 'selected' : '' }}>
+                            {{ $rfOption }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
 
         <div class="rgf-field">
             <button type="submit" class="btn btn-primary">
@@ -84,17 +104,10 @@
         </div>
 
         <div class="rgf-quick">
-            <button type="button" data-from="{{ now()->subDays(29)->format('Y-m-d') }}"
-                data-to="{{ now()->format('Y-m-d') }}">30 ngày</button>
-            <button type="button" data-from="{{ now()->startOfMonth()->format('Y-m-d') }}"
-                data-to="{{ now()->format('Y-m-d') }}">Tháng này</button>
-            <button type="button" data-from="{{ now()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d') }}"
-                data-to="{{ now()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d') }}">Tháng trước</button>
-            <button type="button" data-from="{{ now()->startOfQuarter()->format('Y-m-d') }}"
-                data-to="{{ now()->format('Y-m-d') }}">Quý này</button>
-            <button type="button" data-from="{{ now()->startOfYear()->format('Y-m-d') }}"
-                data-to="{{ now()->format('Y-m-d') }}">Năm nay</button>
-            <button type="button" data-from="" data-to="">Tất cả</button>
+            @foreach ($rfQuick as $rfBtn)
+                <button type="button" data-from="{{ $rfBtn['from'] }}" data-to="{{ $rfBtn['to'] }}"
+                    class="{{ (string) $rfRange['from'] === (string) $rfBtn['from'] && (string) $rfRange['to'] === (string) $rfBtn['to'] ? 'is-active' : '' }}">{{ $rfBtn['label'] }}</button>
+            @endforeach
         </div>
     </div>
 </form>
@@ -187,9 +200,56 @@
             transition: background 0.2s ease, color 0.2s ease;
         }
 
-        .rgf-quick button:hover {
+        .rgf-quick button:hover,
+        .rgf-quick button.is-active {
             background: var(--primary, #2e7bc4);
             color: #ffffff;
+        }
+
+        /* ---------- Bộ lọc một hàng (rfInBar): nhãn đứng cạnh ô ---------- */
+        .rgf-inline {
+            padding: 5px 10px;
+        }
+
+        .rgf-inline .rgf-row {
+            align-items: center;
+            gap: 6px 10px;
+        }
+
+        .rgf-inline .rgf-field {
+            flex-direction: row;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .rgf-inline .rgf-field label {
+            font-size: 0.8rem;
+            text-transform: none;
+            letter-spacing: 0;
+            white-space: nowrap;
+        }
+
+        .rgf-inline .rgf-field input[type="date"] {
+            width: 132px;
+        }
+
+        .rgf-inline .rgf-field-wide {
+            flex: 0 1 220px;
+        }
+
+        .rgf-inline .rgf-quick {
+            padding-bottom: 0;
+        }
+
+        .rgf-inline .rgf-quick button {
+            padding: 1px 9px;
+            font-size: 0.76rem;
+        }
+
+        /* Đã được kéo vào thanh công cụ của bảng: chiều cao theo hàng nút chung */
+        .md-tablebar .rgf-inline .rgf-field .form-control,
+        .md-tablebar .rgf-inline .rgf-field .btn {
+            height: 30px;
         }
     </style>
 

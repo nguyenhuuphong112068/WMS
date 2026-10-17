@@ -39,6 +39,11 @@
                                 @else
                                     <span class="badge badge-secondary">Chung</span>
                                 @endif
+                                @if ($data->purchasing_key)
+                                    <span class="badge badge-warning" title="Bộ phận mua hàng - tiếp nhận dự trù / đề nghị VPP của mọi công ty">
+                                        <i class="fas fa-cart-shopping mr-1"></i>{{ \App\Support\MaterialClassification::purchasingLabel($data->purchasing_key) }}
+                                    </span>
+                                @endif
                             </td>
                             <td class="text-center">
                                 @if ($data->isActive)
@@ -55,7 +60,7 @@
                                         <button type="button" class="btn btn-warning btn-edit mb-1"
                                             data-id="{{ $data->id }}" data-shortname="{{ $data->shortName }}"
                                             data-name="{{ $data->name }}" data-company_id="{{ $data->company_id }}"
-                                            data-is_general="{{ $data->is_general }}"
+                                            data-is_general="{{ $data->is_general }}" data-purchasing_key="{{ $data->purchasing_key }}"
                                             data-toggle="modal" data-target="#updateModal">
                                             <i class="fas fa-edit"></i>
                                         </button>
@@ -120,6 +125,7 @@
             modal.find('#update_shortName').val(button.data('shortname'));
             modal.find('#update_name').val(button.data('name'));
             modal.find('#update_is_common').prop('checked', !button.data('is_general'));
+            modal.find('#update_purchasing_key').val(button.data('purchasing_key') || '');
             modal.find('[name="change_reason"]').val('');
         });
 

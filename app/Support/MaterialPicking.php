@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
  *
  *      tồn      = amount + Σ material_balancings - Σ material_exports
  *      đang giữ = Σ material_pick_lines.suggested_amount   (đợt + dòng còn treo)
+ *               + Σ material_quarantines.amount             (hàng hỏng đang cách ly)
  *      khả dụng = tồn - đang giữ
  *
  * Query Builder thuần, không Eloquent - song song với App\Support\DepartmentMaterial.
@@ -41,6 +42,12 @@ class MaterialPicking
 
     /** Trạng thái đợt còn giữ chỗ tồn. Đã xuất thì tồn đã trừ thật, huỷ thì nhả. */
     public const HOLDING_WAVE_STATUSES = ['new', 'picking', 'picked', 'packed'];
+
+    /** Phiếu cách ly vật tư hỏng - xem App\Http\Controllers\Pages\Export\MaterialQuarantineController. */
+    public const QUARANTINE_TABLE = 'material_quarantines';
+
+    /** Chỉ phiếu còn "Đang cách ly" mới giữ chỗ tồn; trả về kho thì nhả, loại bỏ thì đã trừ tồn thật. */
+    public const QUARANTINE_HOLDING_STATUS = 'quarantined';
 
     /** Trạng thái dòng còn giữ chỗ tồn. Dòng bị bỏ (canceled) nhả ngay. */
     public const HOLDING_LINE_STATUSES = ['pending', 'picked', 'short'];
@@ -62,6 +69,7 @@ class MaterialPicking
     public static function lots(int $departmentId, ?int $categoryId = null)
     {
         $held = self::heldByImport($departmentId);
+        $quarantined = self::quarantinedByImport($departmentId);
         $exported = self::sumByImport('material_exports', 'amount', $departmentId);
         $balanced = self::sumByImport('material_balancings', 'balancing_amount', $departmentId);
 
@@ -102,10 +110,13 @@ class MaterialPicking
             ->orderBy('material_imports.imported_date', 'asc')  // 3. FIFO
             ->orderBy('material_imports.id', 'asc')
             ->get()
-            ->map(function ($lot) use ($held, $exported, $balanced, $today, $warningDays, $criticalDays) {
+            ->map(function ($lot) use ($held, $quarantined, $exported, $balanced, $today, $warningDays, $criticalDays) {
                 $lot->exported = (float) ($exported[$lot->id] ?? 0);
                 $lot->balanced = (float) ($balanced[$lot->id] ?? 0);
-                $lot->held = (float) ($held[$lot->id] ?? 0);
+                // Hàng đang CÁCH LY chờ quyết định vẫn nằm trong kho nhưng không được dùng -
+                // tính chung vào phần đang giữ để mọi màn cấp phát / chuyển đi tự chặn.
+                $lot->quarantined = (float) ($quarantined[$lot->id] ?? 0);
+                $lot->held = (float) ($held[$lot->id] ?? 0) + $lot->quarantined;
 
                 // Tồn sổ sách - vẫn là con số màn Tồn Kho hiển thị
                 $lot->remaining = max((float) $lot->amount + $lot->balanced - $lot->exported, 0);
@@ -281,10 +292,10 @@ class MaterialPicking
             ->pluck('total', 'import_id');
     }
 
-    /** Phần đang giữ của MỘT lô - dùng khi kiểm tra ngay trước lúc ghi. */
+    /** Phần đang giữ của MỘT lô (đợt lấy hàng + hàng cách ly) - dùng khi kiểm tra ngay trước lúc ghi. */
     public static function heldOf(int $importId, ?int $ignoreWaveId = null): float
     {
-        return (float) DB::table(self::LINE_TABLE)
+        return self::quarantinedOf($importId) + (float) DB::table(self::LINE_TABLE)
             ->join(self::WAVE_TABLE, self::LINE_TABLE.'.wave_id', '=', self::WAVE_TABLE.'.id')
             ->where(self::LINE_TABLE.'.import_id', $importId)
             ->where(self::WAVE_TABLE.'.status_id', 1)
@@ -293,6 +304,34 @@ class MaterialPicking
             ->when($ignoreWaveId, fn ($query) => $query->where(self::WAVE_TABLE.'.id', '<>', $ignoreWaveId))
             ->selectRaw('COALESCE(SUM('.self::HELD_AMOUNT.'), 0) as total')
             ->value('total');
+    }
+
+    /**
+     * Hàng HỎNG ĐANG CÁCH LY chờ quyết định của từng lô (bước 1 quy trình loại bỏ). Đã
+     * loại bỏ thì đã thành material_exports type = cancel nên không cộng ở đây nữa.
+     *
+     * @return \Illuminate\Support\Collection import_id => số lượng đang cách ly
+     */
+    public static function quarantinedByImport(int $departmentId)
+    {
+        return DB::table(self::QUARANTINE_TABLE)
+            ->select('import_id', DB::raw('SUM(amount) as total'))
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->where('app_status', self::QUARANTINE_HOLDING_STATUS)
+            ->groupBy('import_id')
+            ->pluck('total', 'import_id');
+    }
+
+    /** Hàng đang cách ly của MỘT lô. */
+    public static function quarantinedOf(int $importId, ?int $ignoreQuarantineId = null): float
+    {
+        return (float) DB::table(self::QUARANTINE_TABLE)
+            ->where('import_id', $importId)
+            ->where('status_id', 1)
+            ->where('app_status', self::QUARANTINE_HOLDING_STATUS)
+            ->when($ignoreQuarantineId, fn ($query) => $query->where('id', '<>', $ignoreQuarantineId))
+            ->sum('amount');
     }
 
     /** Tổng một cột theo từng mã xuất nhập của phòng - giống MaterialExportController::sumByImport. */

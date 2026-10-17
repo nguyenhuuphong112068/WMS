@@ -1,6 +1,11 @@
 {{--
 | Bảng chọn NHIỀU vật tư cùng lúc để đổ vào danh sách đề nghị theo chu kỳ.
-| Biến vào: $type (internal|external), $categories (= ô chọn vật tư của modal thêm / sửa)
+| Biến vào: $type (internal|external|estimate), $categories (= ô chọn vật tư của modal thêm / sửa),
+|           $classifications (phân loại riêng của phòng đang chọn)
+|
+| BỘ LỌC: ô tìm kiếm + mỗi tiêu chí phân loại của danh mục công ty một ô chọn (5 tiêu chí ở
+| MaterialClassification::CRITERIA + Bộ Phận Mua Hàng) + Phân loại phòng. Mỗi dòng mang sẵn
+| giá trị phân loại ở data-f-<khoá>, JS prPickerRefresh() ẩn dòng không khớp mọi ô đang chọn.
 |
 | Mở từ nút ".pr-open-picker" trong modal thêm / sửa; JS ở assets.blade.php ghi nhớ modal
 | đang mở, khoá sẵn các vật tư đã có trong danh sách, bấm "Thêm vào danh sách" thì điền vào
@@ -10,8 +15,25 @@
 | của danh mục công ty (phòng mình đang thiếu nên mới xin phòng khác).
 --}}
 @php
-    $prKey = $type === 'external' ? 'External' : 'Internal';
-    $isExternal = $type === 'external';
+    $prKey = \App\Support\MaterialPeriodicRequest::typeKey($type);
+    // Liên phòng ban + dự trù chọn trong cả danh mục công ty, nội bộ chỉ chọn trong danh mục phòng
+    $isExternal = $type !== 'internal';
+
+    $pkCriteria = \App\Support\MaterialClassification::CRITERIA;
+    // Các ô lọc theo đúng thứ tự trên form danh mục công ty: [khoá => [nhãn, icon, lựa chọn]]
+    $pkFilters = collect(\App\Support\MaterialClassification::formGroups())
+        ->mapWithKeys(function ($group) {
+            $key = $group['name'] === 'purchasing_department'
+                ? 'purchasing'
+                : str_replace(['classification[', ']'], '', $group['name']);
+
+            return [$key => [$group['label'], $group['icon'], $group['options']]];
+        })
+        ->put('dept_class', [
+            'Phân Loại Phòng',
+            'fas fa-layer-group',
+            ($classifications ?? collect())->pluck('name', 'id')->all() + ['none' => 'Chưa phân loại'],
+        ]);
 @endphp
 
 <div class="modal fade md-modal pr-picker" id="periodic{{ $prKey }}PickerModal" tabindex="-1" role="dialog" aria-hidden="true">
@@ -31,10 +53,34 @@
                         <div class="input-group-prepend">
                             <span class="input-group-text"><i class="fas fa-search"></i></span>
                         </div>
-                        <input type="text" class="form-control pr-picker-search"
-                            placeholder="Tìm theo mã, tên vật tư, nhà sản xuất, thông tin kỹ thuật...">
+                        <input type="search" class="form-control pr-picker-search"
+                            placeholder="Tìm nhanh theo mã, tên vật tư, nhà sản xuất, thông tin kỹ thuật...">
+                        <div class="input-group-append">
+                            <button type="button" class="btn btn-outline-secondary pr-picker-search-clear" title="Xoá nội dung tìm kiếm">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
                     </div>
-                    <span class="md-tag pr-picker-visible">{{ $categories->count() }} vật tư</span>
+                    <div class="d-flex align-items-center" style="gap: 8px">
+                        <button type="button" class="btn btn-sm btn-outline-secondary pr-picker-filter-reset" title="Bỏ mọi bộ lọc">
+                            <i class="fas fa-eraser mr-1"></i> Bỏ lọc
+                        </button>
+                        <span class="md-tag pr-picker-visible">{{ $categories->count() }} vật tư</span>
+                    </div>
+                </div>
+
+                <div class="pr-picker-filters mb-3">
+                    @foreach ($pkFilters as $filterKey => [$filterLabel, $filterIcon, $filterOptions])
+                        <div class="pr-picker-filter">
+                            <label><i class="{{ $filterIcon }} mr-1"></i>{{ $filterLabel }}</label>
+                            <select class="form-control form-control-sm pr-picker-filter-select" data-filter="{{ $filterKey }}">
+                                <option value="">Tất cả</option>
+                                @foreach ($filterOptions as $optionValue => $optionLabel)
+                                    <option value="{{ $optionValue }}">{{ $optionLabel }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endforeach
                 </div>
 
                 <div class="table-responsive pr-picker-wrap">
@@ -54,12 +100,21 @@
                         </thead>
                         <tbody>
                             @forelse ($categories as $category)
+                                @php
+                                    $pkClass = \App\Support\MaterialClassification::decode($category->classification ?? null);
+                                @endphp
                                 <tr class="pr-picker-row" data-id="{{ $category->id }}"
+                                    @foreach (array_keys($pkCriteria) as $criterionKey)
+                                        data-f-{{ str_replace('_', '-', $criterionKey) }}="{{ $pkClass[$criterionKey] ?? '' }}"
+                                    @endforeach
+                                    data-f-purchasing="{{ $category->purchasing_department ?? '' }}"
+                                    data-f-dept-class="{{ ($category->classification_id ?? null) ?: 'none' }}"
                                     data-search="{{ mb_strtolower(implode(' ', array_filter([
                                         $category->code,
                                         $category->material_name,
                                         $category->manufacturer_name,
                                         $category->manufacturer_short_name,
+                                        $category->part_number ?? null,
                                         $category->technical_specification,
                                     ]))) }}">
                                     <td class="text-center">

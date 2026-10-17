@@ -1,6 +1,6 @@
 <!-- Modal -->
 <div class="modal fade" id="UpdateModal" tabindex="-1" role="dialog" aria-labelledby="ModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
+    <div class="modal-dialog modal-xl" role="document" style="max-width: 900px; width: 95%">
 
         <form action="{{ route('pages.user.user.update') }}" method="POST">
             @csrf
@@ -94,8 +94,8 @@
                             <option value="">-- Chọn phòng ban --</option>
 
                             @foreach ($deparments as $department)
-                                <option value="{{ $department->shortName }}" data-id="{{ $department->id }}"
-                                    {{ old('deparment') == $department->shortName ? 'selected' : '' }}>
+                                <option value="{{ $department->id }}" data-id="{{ $department->id }}"
+                                    {{ old('deparment') == $department->id ? 'selected' : '' }}>
                                     {{ $department->name }}@if (!empty($department->company_name)) — {{ $department->company_name }}@endif
                                 </option>
                             @endforeach

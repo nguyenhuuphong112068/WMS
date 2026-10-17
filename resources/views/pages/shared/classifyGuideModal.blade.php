@@ -40,7 +40,7 @@
                         </tbody>
                     </table>
 
-                    <h6 class="cg-h">Mười một nhóm phân loại ("hình 1" + Nhóm HC Cấm theo Luật Đầu tư)</h6>
+                    <h6 class="cg-h">Mười hai nhóm phân loại ("hình 1" + Phân loại khác: Nhóm HC Cấm, Nhóm HH Đặc Biệt)</h6>
                     <table class="table table-sm table-bordered cg-table cg-groups mb-2">
                         <thead>
                             <tr>
@@ -68,9 +68,11 @@
 
                     <div class="md-hint mb-4">
                         <i class="fas fa-info-circle mr-1"></i>
-                        <b>Nhóm HC Cấm</b> không thuộc Nghị định 24/2026/NĐ-CP - là "Hoá chất cấm" theo
-                        <b>Luật Đầu tư 2025, số 143/2025/QH15</b>, gộp chung vào danh sách phân loại để khai
-                        và cảnh báo cùng một chỗ với các nhóm hoạt chất khác.
+                        <b>Phân loại khác</b> không thuộc Nghị định 24/2026/NĐ-CP, tick trực tiếp trên
+                        <b>Dữ Liệu Gốc → Hoá Chất</b> (áp cho cả đơn chất lẫn hỗn hợp):
+                        <b>Nhóm HC Cấm</b> - "Hoá chất cấm" theo <b>Luật Đầu tư 2025, số 143/2025/QH15</b>;
+                        <b>Nhóm HH Đặc Biệt</b> - Hàng hoá đặc biệt. Cả hai được gộp chung vào danh sách phân
+                        loại để khai và cảnh báo cùng một chỗ với các nhóm khác.
                     </div>
 
                     <h6 class="cg-h">Cách xác định một hỗn hợp có thuộc nhóm 2 hay không</h6>

@@ -398,6 +398,7 @@ class MaterialAvailabilityForecast
                 'material_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 DepartmentMaterial::minStockColumn(),
+                DepartmentMaterial::UNIT_ALIAS.'.unit_id',
                 'units.short_name as unit_short_name'
             )
             ->whereIn('material_categories.id', $categoryIds)

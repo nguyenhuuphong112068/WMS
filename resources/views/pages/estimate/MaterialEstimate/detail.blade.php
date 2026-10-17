@@ -14,17 +14,69 @@
 @php
     $estIcon = 'fas fa-clipboard-check';
     $estNum = fn($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
-    $estStatusClass = match ($list->app_status) {
-        'approved' => 'approved',
-        'rejected' => 'rejected',
-        default => 'pending',
-    };
 @endphp
 
 @section('mainContent')
     @include('pages.estimate.shared.assets')
 
     <style>
+        .est-item-files {
+            margin-top: 6px;
+        }
+
+        .est-item-file {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            max-width: 100%;
+        }
+
+        .est-item-file a {
+            color: var(--primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Vật tư có file đính kèm: nhãn cam nổi bật kèm số file */
+        .est-file-count {
+            display: inline-block;
+            margin-bottom: 4px;
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            background: #FEF3C7;
+            color: #B45309;
+            border: 1px solid #FCD34D;
+        }
+
+        .est-item-files:has(.est-file-count) .est-item-file {
+            background: #FFFBEB;
+            border-radius: 6px;
+            padding: 1px 6px;
+            margin-bottom: 2px;
+        }
+
+        .est-item-files:has(.est-file-count) .est-item-file a {
+            color: #B45309;
+            font-weight: 600;
+        }
+
+        .est-lead-warn {
+            white-space: normal;
+            text-align: left;
+            line-height: 1.35;
+        }
+
+        .est-item-attach {
+            font-size: 0.72rem;
+            padding: 1px 8px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+
         .sgr-version {
             display: inline-block;
             background: #EDE9FE;
@@ -41,63 +93,6 @@
     <div class="content-wrapper">
         <div class="md-page">
 
-            <div class="est-info">
-                <div class="box">
-                    <label>Trạng Thái Trình Ký</label>
-                    <div class="val">
-                        <span class="md-badge {{ $estStatusClass }}">
-                            {{ $appStatuses[$list->app_status] ?? $list->app_status }}
-                        </span>
-                    </div>
-                </div>
-
-                <div class="box">
-                    <label>Người Lập Phiếu</label>
-                    <div class="val">{{ $list->updated_by ?: $list->created_by ?: '—' }}</div>
-                    <div class="md-sub">
-                        {{ $list->created_at ? \Carbon\Carbon::parse($list->created_at)->format('d/m/Y H:i') : '' }}
-                    </div>
-                </div>
-
-                @foreach ($signs as $step)
-                    @php
-                        $stepWho = $step->signer_full_name ?: ($step->user_name ?: ($step->role_names ?: '—'));
-                        $stepIsBod = (int) $step->step_no === (int) $signs->count();
-                    @endphp
-                    <div class="box">
-                        <label>Bước {{ $step->step_no }}{{ $stepIsBod ? ' - Ban Giám Đốc' : '' }}</label>
-                        <div class="val">{{ $stepWho }}</div>
-                        <div class="md-sub">
-                            @if ($step->status === 'signed')
-                                Đã ký &middot; {{ $step->signed_at ? \Carbon\Carbon::parse($step->signed_at)->format('d/m/Y H:i') : '' }}
-                            @elseif ($step->status === 'rejected')
-                                <span class="text-danger">Đã từ chối</span>
-                            @elseif ($list->app_status === 'pending_sign' && (int) $list->current_step === (int) $step->step_no)
-                                <span class="text-primary">Đang chờ ký</span>
-                            @else
-                                Chưa ký
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
-
-                <div class="box">
-                    <label>Tiếp Nhận</label>
-                    <div class="val">
-                        @if ($list->reception_status)
-                            <span class="est-badge {{ $list->reception_status }}">
-                                {{ $receptionStatuses[$list->reception_status] ?? $list->reception_status }}
-                            </span>
-                        @else
-                            <span class="est-badge none">Chưa duyệt xong</span>
-                        @endif
-                    </div>
-                    @if ($list->received_by)
-                        <div class="md-sub">{{ $list->received_by }}</div>
-                    @endif
-                </div>
-            </div>
-
             @if ($list->app_status === 'rejected' && $list->reject_reason)
                 <div class="est-reject-note">
                     <i class="fas fa-triangle-exclamation mr-1"></i>
@@ -111,43 +106,38 @@
             <div class="card md-card">
                 <div class="card-body">
 
+                    {{-- Nút là con trực tiếp của .md-toolbar để layout gom chung một hàng với
+                         ô Hiển thị / Tìm kiếm của DataTables (.md-tablebar - layout/master.blade.php) --}}
                     <div class="md-toolbar">
-                        <div>
-                            <a href="{{ $backRoute }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left mr-1"></i> Quay lại danh sách
-                            </a>
+                        <a href="{{ $backRoute }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left mr-1"></i> Quay lại danh sách
+                        </a>
 
-                            @if ($canEditItems && user_can('estimate_material_update'))
-                                <button type="button" class="btn btn-primary btn-est-item-create ml-1">
-                                    <i class="fas fa-plus mr-1"></i> Thêm vật tư
-                                </button>
-                            @endif
-
-                            <button type="button" class="btn btn-info ml-1 btn-est-history"
-                                data-url="{{ route($estRoute . 'history', ['id' => $list->id]) }}"
-                                data-title="Phiếu {{ $list->code }}">
-                                <i class="fas fa-route mr-1"></i> Theo dõi trình ký
+                        @if ($canEditItems && user_can('estimate_material_update'))
+                            <button type="button" class="btn btn-primary btn-est-item-create">
+                                <i class="fas fa-plus mr-1"></i> Thêm vật tư
                             </button>
-                        </div>
+                        @endif
 
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            @if ($canEditItems && user_can('estimate_material_update'))
-                                Mỗi vật tư khai được nhiều dòng số lượng cho nhiều tháng khác nhau.
-                            @else
-                                Phiếu đã trình ký nên chi tiết chỉ xem, không sửa được.
-                            @endif
-                        </p>
+                        <button type="button" class="btn btn-info btn-est-history"
+                            data-url="{{ route($estRoute . 'history', ['id' => $list->id]) }}"
+                            data-title="Phiếu {{ $list->code }}">
+                            <i class="fas fa-route mr-1"></i> Theo dõi trình ký
+                        </button>
                     </div>
 
-                    <div class="table-responsive">
+                    <div class="table-responsive est-detail-table">
                         <table id="mdTable" class="table table-bordered table-hover w-100">
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 55px">STT</th>
-                                    <th style="width: 240px">Vật Tư</th>
+                                    <th style="width: 95px">Mã Vật Tư</th>
+                                    <th style="width: 220px">Vật Tư</th>
+                                    <th style="width: 90px">NSX</th>
+                                    <th style="width: 130px">Quy Cách</th>
                                     <th>Thông Tin Kỹ Thuật</th>
                                     <th>Mục Đích Sử Dụng</th>
+                                    <th style="width: 150px">Ngày Mong Muốn</th>
                                     <th style="width: 200px">Số Lượng Dự Trù</th>
                                     <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
                                     <th style="width: 110px">Người Tạo</th>
@@ -160,71 +150,86 @@
                                 @foreach ($items as $item)
                                     <tr>
                                         <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td class="font-weight-bold text-nowrap">{{ $item->material_code ?: '—' }}</td>
                                         <td>
                                             <div class="font-weight-bold">{{ $item->display_name ?: '—' }}</div>
-                                            <div class="md-sub">
-                                                @if ($item->category_id)
-                                                    <small>NSX: {{ $item->category_manufacturer_short_name ?: ($item->category_manufacturer_name ?: '—') }}</small>
-                                                    @if ($item->category_technical_specification)
-                                                        <br><small>Quy cách: {{ $item->category_technical_specification }}</small>
-                                                    @endif
-                                                @else
-                                                    <span class="est-outside">Ngoài danh mục</span>
+                                            @unless ($item->category_id)
+                                                <span class="est-outside">Ngoài danh mục</span>
+                                            @endunless
+
+                                            {{-- File đính kèm của riêng vật tư này - có file thì nổi màu kèm số lượng --}}
+                                            <div class="est-item-files">
+                                                @if ($item->files->count())
+                                                    <span class="est-file-count" title="Vật tư này có {{ $item->files->count() }} file đính kèm">
+                                                        <i class="fas fa-paperclip mr-1"></i>{{ $item->files->count() }} file đính kèm
+                                                    </span>
+                                                @endif
+                                                @foreach ($item->files as $itemFile)
+                                                    <div class="est-item-file">
+                                                        <a href="{{ route($estRoute . 'downloadAttachment', ['id' => $itemFile->id]) }}" target="_blank"
+                                                            title="{{ $itemFile->file_name }} · {{ $itemFile->created_by }}">
+                                                            <i class="fas fa-paperclip mr-1"></i>{{ $itemFile->file_name }}
+                                                        </a>
+                                                        @if ($canEditItems && user_can('estimate_material_update'))
+                                                            <form action="{{ route($estRoute . 'deleteAttachment') }}" method="POST"
+                                                                class="d-inline form-md-confirm" data-title="Xoá file đính kèm?"
+                                                                data-text="{{ $itemFile->file_name }}">
+                                                                @csrf
+                                                                <input type="hidden" name="id" value="{{ $itemFile->id }}">
+                                                                <button type="submit" class="btn btn-link btn-sm p-0 text-danger" title="Xoá file">
+                                                                    <i class="fas fa-times"></i>
+                                                                </button>
+                                                            </form>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+
+                                                @if ($canEditItems && user_can('estimate_material_update'))
+                                                    <form action="{{ route($estRoute . 'uploadAttachment') }}" method="POST"
+                                                        enctype="multipart/form-data" class="d-inline">
+                                                        @csrf
+                                                        <input type="hidden" name="material_estimate_id" value="{{ $list->id }}">
+                                                        <input type="hidden" name="material_estimate_item_id" value="{{ $item->id }}">
+                                                        <label class="btn btn-xs btn-outline-secondary mb-0 mt-1 est-item-attach" title="Đính kèm file cho vật tư này">
+                                                            <i class="fas fa-paperclip mr-1"></i> Đính kèm
+                                                            <input type="file" name="attachments[]" multiple class="d-none"
+                                                                onchange="if (this.files.length) this.form.submit();">
+                                                        </label>
+                                                    </form>
                                                 @endif
                                             </div>
+                                        </td>
+                                        <td class="md-sub">
+                                            {{ $item->category_id ? ($item->category_manufacturer_short_name ?: ($item->category_manufacturer_name ?: '—')) : '—' }}
+                                        </td>
+                                        <td class="md-sub">
+                                            {{ $item->category_id ? ($item->category_technical_specification ?: '—') : '—' }}
+                                            @if ($item->part_number)
+                                                <div class="mt-1">P/N: <b>{{ $item->part_number }}</b></div>
+                                            @endif
                                         </td>
                                         <td class="md-sub">{{ $item->technical_information ?: '—' }}</td>
                                         <td class="md-sub">
                                             <div class="mb-1">{{ $item->purpose ?: '—' }}</div>
+                                            @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_material_tracking'])
+                                        </td>
+                                        <td data-order="{{ $item->expected_delivery_date }}">
                                             @if ($item->expected_delivery_date)
-                                                <div class="text-primary"><i class="fas fa-calendar-alt mr-1"></i> Mong muốn giao: <b>{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</b></div>
-                                            @endif
-
-                                            @if ($list->app_status === 'approved' && user_can('estimate_material_tracking'))
-                                                <div class="mt-2 pt-2 border-top">
-                                                    @if ($item->status_id == 0)
-                                                        <span class="badge badge-danger mb-1">Đã huỷ không dự trù</span>
-                                                        @if ($item->cancel_reason)
-                                                            <div class="text-danger small mb-1">Lý do: {{ $item->cancel_reason }}</div>
-                                                        @endif
-                                                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline ml-2 form-md-confirm" data-title="Khôi phục lại mặt hàng?" data-text="Bạn muốn tiếp tục dự trù mặt hàng này?">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $item->id }}">
-                                                            <input type="hidden" name="action" value="undo">
-                                                            <button type="submit" class="btn btn-xs btn-outline-secondary" title="Hoàn tác"><i class="fas fa-undo"></i> Hoàn tác</button>
-                                                        </form>
-                                                    @elseif ($item->fulfilled_date)
-                                                        <div class="text-success mb-1"><i class="fas fa-check-circle mr-1"></i> Đã giao: <b>{{ \Carbon\Carbon::parse($item->fulfilled_date)->format('d/m/Y') }}</b></div>
-                                                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline mt-1 form-md-confirm" data-title="Hoàn tác trạng thái?" data-text="Mặt hàng này chưa được giao?">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $item->id }}">
-                                                            <input type="hidden" name="action" value="undo">
-                                                            <button type="submit" class="btn btn-xs btn-outline-secondary" title="Hoàn tác"><i class="fas fa-undo"></i> Hoàn tác</button>
-                                                        </form>
-                                                    @else
-                                                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline mr-1 form-md-confirm" data-title="Xác nhận hoàn thành?" data-text="Mặt hàng này đã được giao đến khoa/phòng?">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $item->id }}">
-                                                            <input type="hidden" name="action" value="complete">
-                                                            <button type="submit" class="btn btn-sm btn-success" title="Xác nhận đã được giao"><i class="fas fa-check"></i> Hoàn thành</button>
-                                                        </form>
-                                                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm-cancel" data-title="Huỷ dự trù mặt hàng này?" data-text="Xác nhận khoa/phòng không cần dự trù mặt hàng này nữa?" data-danger="1">
-                                                            @csrf
-                                                            <input type="hidden" name="id" value="{{ $item->id }}">
-                                                            <input type="hidden" name="action" value="cancel">
-                                                            <button type="submit" class="btn btn-sm btn-danger" title="Không cần dự trù nữa"><i class="fas fa-times"></i> Huỷ</button>
-                                                        </form>
-                                                    @endif
-                                                </div>
-                                            @elseif ($item->status_id == 0)
-                                                <div class="mt-2 pt-2 border-top">
-                                                    <span class="badge badge-danger">Đã huỷ không dự trù</span>
-                                                    @if ($item->cancel_reason)
-                                                        <div class="text-danger small mt-1">Lý do: {{ $item->cancel_reason }}</div>
-                                                    @endif
-                                                </div>
-                                            @elseif ($item->fulfilled_date)
-                                                <div class="text-success mt-1 border-top pt-2"><i class="fas fa-check-circle mr-1"></i> Đã giao: <b>{{ \Carbon\Carbon::parse($item->fulfilled_date)->format('d/m/Y') }}</b></div>
+                                                <div class="text-primary font-weight-bold">{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</div>
+                                                @php
+                                                    $leadWarn = \App\Support\MaterialLeadTime::check(
+                                                        $list->created_at, $approvedAt ?? null,
+                                                        $item->expected_delivery_date, $item->category_lead_time_days
+                                                    );
+                                                @endphp
+                                                @if ($leadWarn)
+                                                    <span class="badge badge-danger mt-1 est-lead-warn" title="{{ \App\Support\MaterialLeadTime::message($leadWarn) }}">
+                                                        <i class="fas fa-exclamation-triangle mr-1"></i>Không kịp đặt hàng
+                                                        <br>cần {{ $leadWarn['lead_days'] }} ngày, còn {{ $leadWarn['available_days'] }} ngày
+                                                    </span>
+                                                @endif
+                                            @else
+                                                <span class="md-empty">—</span>
                                             @endif
                                         </td>
                                         <td>
@@ -287,6 +292,7 @@
                                                             'id' => $item->id,
                                                             'category_id' => $item->category_id,
                                                             'material_name' => $item->material_name,
+                                                            'part_number' => $item->part_number,
                                                             'technical_information' => $item->technical_information,
                                                             'purpose' => $item->purpose,
                                                             'expected_delivery_date' => $item->expected_delivery_date,
@@ -319,8 +325,45 @@
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
+
+    <style>
+        /*
+        | TIÊU ĐỀ BẢNG CỐ ĐỊNH KHI CUỘN - position: sticky ngay trên <th> gốc nên tiêu đề và
+        | thân bảng luôn chung một bảng, cột không bao giờ lệch (FixedHeader chép tiêu đề ra
+        | bảng nổi riêng nên lệch cột với bảng có Responsive).
+        |
+        | Sticky chỉ bám được cửa sổ khi không thẻ cha nào cắt overflow: mở .table-responsive
+        | của trang này ra - bảng đã bật Responsive (cột thừa tự thu gọn) nên không cần cuộn ngang.
+        | --est-sticky-top = chiều cao topNAV cố định, JS bên dưới đo lại cho đúng.
+        */
+        .est-detail-table {
+            overflow: visible;
+        }
+
+        .est-detail-table #mdTable thead th {
+            position: sticky;
+            top: var(--est-sticky-top, 57px);
+            z-index: 3;
+            background: var(--primary-soft);
+            box-shadow: inset 0 -2px 0 var(--primary-lighter);
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            function estStickyTop() {
+                var height = $('.main-header').outerHeight() || 57;
+
+                document.documentElement.style.setProperty('--est-sticky-top', height + 'px');
+            }
+
+            estStickyTop();
+            $(window).on('resize', estStickyTop);
+        });
+    </script>
 @endsection
 
 @section('model')

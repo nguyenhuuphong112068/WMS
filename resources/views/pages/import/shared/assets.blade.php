@@ -561,6 +561,417 @@
         border-color: #FCA5A5;
         color: #B91C1C;
     }
+
+    /* ---------- Dòng vừa cập nhật ngầm (vd. sau khi Xác nhận kiểm tra) nháy nhẹ để dễ thấy ---------- */
+    .imp-row-flash > td {
+        animation: impRowFlash 2.4s ease-out;
+    }
+
+    @keyframes impRowFlash {
+        from {
+            background-color: rgba(var(--state-success-rgb), 0.22);
+        }
+
+        to {
+            background-color: transparent;
+        }
+    }
+
+    /*
+    | ---------- Modal chọn danh mục khi nhập (vd. "Chọn Vật Tư") ----------
+    | Mở chồng lên modal Nhập nên đẩy z-index cao hơn; bảng cuộn trong khung, tiêu đề dính.
+    */
+    .imp-pick {
+        z-index: 1060;
+    }
+
+    .imp-pick .imp-pick-dialog {
+        max-width: min(1320px, 94vw);
+    }
+
+    @media (max-width: 767.98px) {
+        .imp-pick .imp-pick-dialog {
+            max-width: none;
+        }
+    }
+
+    .imp-pick .modal-body {
+        padding: 18px 22px;
+    }
+
+    .imp-pick .imp-pick-total {
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .imp-pick-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .imp-pick-search-group {
+        flex: 1 1 300px;
+        min-width: 0;
+    }
+
+    .imp-pick-search-group .input-group-text {
+        background: var(--primary-soft);
+        border: 1px solid #dbe6f2;
+        border-right: 0;
+        border-radius: var(--border-radius-md) 0 0 var(--border-radius-md);
+        color: var(--primary);
+    }
+
+    .md-modal .imp-pick-search-group .imp-pick-search {
+        height: 38px;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+    }
+
+    .imp-pick-search::-webkit-search-cancel-button {
+        display: none;
+    }
+
+    .imp-pick-search-clear {
+        background: #fff;
+        border: 1px solid #dbe6f2;
+        border-left: 0;
+        border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
+        color: #94a3b8;
+        transition: color var(--transition-fast);
+    }
+
+    .imp-pick-search-clear:hover {
+        color: var(--state-danger);
+    }
+
+    .imp-pick-search-group:focus-within .input-group-text,
+    .imp-pick-search-group:focus-within .imp-pick-search,
+    .imp-pick-search-group:focus-within .imp-pick-search-clear {
+        border-color: var(--primary-light);
+    }
+
+    .md-modal .imp-pick-search-group:focus-within .imp-pick-search {
+        box-shadow: none;
+    }
+
+    .md-modal .imp-pick-filter-select {
+        height: 38px;
+        padding: 6px 28px 6px 10px;
+        font-size: 0.85rem;
+        text-overflow: ellipsis;
+        transition: border-color var(--transition-fast), background-color var(--transition-fast);
+    }
+
+    .md-modal .imp-pick-quick {
+        flex: 0 1 220px;
+        width: auto;
+        min-width: 180px;
+    }
+
+    .md-modal .imp-pick-filter-select.is-active {
+        border-color: var(--primary);
+        background-color: var(--primary-soft);
+        color: var(--primary-dark);
+        font-weight: 700;
+    }
+
+    .imp-pick-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 38px;
+        border-radius: var(--border-radius-md);
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: transform var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+    }
+
+    .imp-pick-btn:not(:disabled):hover {
+        transform: translateY(-1px);
+    }
+
+    .imp-pick-more-count {
+        display: none;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: var(--primary);
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        line-height: 18px;
+        text-align: center;
+    }
+
+    .imp-pick-more:hover .imp-pick-more-count,
+    .imp-pick-more[aria-expanded="true"] .imp-pick-more-count {
+        background: #fff;
+        color: var(--primary);
+    }
+
+    .imp-pick-more.has-active .imp-pick-more-count {
+        display: inline-block;
+    }
+
+    .imp-pick-filters {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px 14px;
+        margin-bottom: 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--primary-soft);
+        border-radius: var(--border-radius-lg);
+        background: var(--bg-neutral);
+    }
+
+    @media (max-width: 991.98px) {
+        .imp-pick-filters {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .imp-pick-filters {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    .imp-pick-filter {
+        min-width: 0;
+    }
+
+    .md-modal .imp-pick-filter label {
+        display: block;
+        margin-bottom: 4px;
+        overflow: hidden;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--primary-dark);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .md-modal .imp-pick-filter .imp-pick-filter-select {
+        width: 100%;
+        height: 36px;
+    }
+
+    .imp-pick-wrap {
+        position: relative;
+        max-height: 56vh;
+        overflow: auto;
+        border: 1px solid var(--primary-soft);
+        border-radius: var(--border-radius-md);
+    }
+
+    .imp-pick-table {
+        margin-bottom: 0;
+        font-size: 0.86rem;
+    }
+
+    .imp-pick-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 10px;
+        border-top: 0;
+        border-bottom: 1px solid var(--primary-lighter);
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .imp-pick-table thead th[data-sort] {
+        cursor: pointer;
+        user-select: none;
+        transition: background-color var(--transition-fast);
+    }
+
+    .imp-pick-table thead th[data-sort]:hover,
+    .imp-pick-table thead th.is-sorted {
+        background: rgba(var(--primary-rgb), 0.16);
+    }
+
+    .imp-pick-sort-icon {
+        margin-left: 4px;
+        font-size: 0.7rem;
+        opacity: 0.45;
+    }
+
+    .imp-pick-table th.is-sorted .imp-pick-sort-icon {
+        opacity: 1;
+    }
+
+    .imp-pick-table td {
+        padding: 9px 10px;
+        border-top: 1px solid var(--primary-soft);
+        vertical-align: middle;
+    }
+
+    .imp-pick-row {
+        transition: background-color var(--transition-fast);
+    }
+
+    .imp-pick-table tbody .imp-pick-row:hover {
+        background: var(--primary-soft);
+    }
+
+    .imp-pick-row.is-current {
+        background: rgba(var(--primary-rgb), 0.08);
+        box-shadow: inset 3px 0 0 var(--primary);
+    }
+
+    .imp-pick-name {
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .imp-pick-current {
+        display: none;
+        margin-left: 6px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--primary);
+        color: #fff;
+        font-size: 0.68rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .imp-pick-row.is-current .imp-pick-current {
+        display: inline-block;
+    }
+
+    .imp-pick-mfr-short {
+        display: inline-block;
+        margin-top: 3px;
+        padding: 0 7px;
+        border: 1px solid var(--border-soft);
+        border-radius: 6px;
+        background: var(--bg-neutral);
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        font-weight: 700;
+    }
+
+    .imp-pick-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .imp-pick-chip {
+        display: inline-block;
+        padding: 1px 8px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        font-size: 0.7rem;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: help;
+    }
+
+    /* Hàng nguy hiểm: đỏ - Cần hiệu chuẩn trước khi dùng: vàng (cùng quy ước chip ở Danh Mục) */
+    .imp-pick-chip.critical {
+        background: #FEE2E2;
+        border-color: #FCA5A5;
+        color: #B91C1C;
+    }
+
+    .imp-pick-chip.banned {
+        background: #FEF3C7;
+        border-color: #FCD34D;
+        color: var(--state-warning-dark);
+    }
+
+    /* Cột Tồn: xanh còn hàng, vàng dưới ngưỡng tối thiểu, đỏ hết hàng, xanh trời vượt tối đa */
+    .imp-pick-stock {
+        display: inline-block;
+        min-width: 58px;
+        padding: 2px 10px;
+        border: 1px solid;
+        border-radius: 999px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        cursor: help;
+    }
+
+    .imp-pick-stock.is-ok {
+        background: rgba(var(--state-success-rgb), 0.1);
+        border-color: rgba(var(--state-success-rgb), 0.35);
+        color: #15803D;
+    }
+
+    .imp-pick-stock.is-low {
+        background: rgba(var(--state-warning-rgb), 0.12);
+        border-color: rgba(var(--state-warning-rgb), 0.45);
+        color: var(--state-warning-dark);
+    }
+
+    .imp-pick-stock.is-out {
+        background: rgba(var(--state-danger-rgb), 0.08);
+        border-color: rgba(var(--state-danger-rgb), 0.35);
+        color: #B91C1C;
+    }
+
+    .imp-pick-stock.is-over {
+        background: rgba(var(--primary-rgb), 0.1);
+        border-color: var(--primary-lighter);
+        color: var(--primary-dark);
+    }
+
+    .imp-pick-stock-sub {
+        margin-top: 3px;
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        white-space: nowrap;
+    }
+
+    .imp-pick-select {
+        border-radius: var(--border-radius-md);
+        font-weight: 600;
+        padding: 4px 14px;
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .imp-pick-select:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .imp-pick-table .imp-pick-none td {
+        padding: 30px 12px;
+        color: var(--text-muted);
+        text-align: center;
+    }
+
+    .imp-pick-none i {
+        margin-right: 6px;
+        color: var(--primary-lighter);
+    }
+
+    .imp-pick-visible {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+
+    .imp-pick-visible b {
+        color: var(--primary);
+    }
 </style>
 
 <script>

@@ -52,15 +52,17 @@
     */
     $dmHasErrors = $errors->getBag('dmCreateErrors')->any() || $errors->getBag('dmUpdateErrors')->any();
 
-    // ----- Tab 3, 4: Danh sách vật tư đề nghị theo chu kỳ (PeriodicRequestController) -----
-    $prHasErrors = fn ($type) => $errors->getBag(\App\Support\MaterialPeriodicRequest::errorBag($type, 'Create'))->any()
-        || $errors->getBag(\App\Support\MaterialPeriodicRequest::errorBag($type, 'Update'))->any();
+    // ----- Tab 3, 4, 5: Danh sách đề nghị / dự trù theo chu kỳ (PeriodicRequestController) -----
+    $prHasErrors = fn($type) => $errors
+        ->getBag(\App\Support\MaterialPeriodicRequest::errorBag($type, 'Create'))
+        ->any() || $errors->getBag(\App\Support\MaterialPeriodicRequest::errorBag($type, 'Update'))->any();
 
     $activeTab = match (true) {
         $dmHasErrors => 'department',
         $prHasErrors('internal') => 'internal',
         $prHasErrors('external') => 'external',
-        in_array(session('activeTab'), ['department', 'internal', 'external'], true) => session('activeTab'),
+        $prHasErrors('estimate') => 'estimate',
+        in_array(session('activeTab'), ['department', 'internal', 'external', 'estimate'], true) => session('activeTab'),
         default => 'company',
     };
 
@@ -69,6 +71,7 @@
         'department' => '#tabDepartment',
         'internal' => '#tabPeriodicInternal',
         'external' => '#tabPeriodicExternal',
+        'estimate' => '#tabPeriodicEstimate',
     ];
 @endphp
 
@@ -78,10 +81,10 @@
 
             <ul class="nav cat-tabs" role="tablist">
                 <li class="nav-item">
-                    <a class="nav-link {{ $activeTab === 'company' ? 'active' : '' }}" id="tabCompanyLink"
-                        data-toggle="pill" href="#tabCompany" role="tab">
+                    <a class="nav-link {{ $activeTab === 'company' ? 'active' : '' }}" id="tabCompanyLink" data-toggle="pill"
+                        href="#tabCompany" role="tab">
                         <i class="{{ $mdIcon }}"></i>
-                        <span>{{ $mdTitle }}</span>
+                        <span>Danh mục vật tư công ty</span>
                         <span class="cat-tab-count">{{ $datas->count() }}</span>
                     </a>
                 </li>
@@ -89,7 +92,7 @@
                     <a class="nav-link {{ $activeTab === 'department' ? 'active' : '' }}" id="tabDepartmentLink"
                         data-toggle="pill" href="#tabDepartment" role="tab">
                         <i class="{{ $dmIcon }}"></i>
-                        <span>{{ $dmTitle }}</span>
+                        <span>Vật tư của phòng</span>
                         <span class="cat-tab-count">{{ $dmDatas->count() }}</span>
                     </a>
                 </li>
@@ -97,7 +100,7 @@
                     <a class="nav-link {{ $activeTab === 'internal' ? 'active' : '' }}" id="tabPeriodicInternalLink"
                         data-toggle="pill" href="#tabPeriodicInternal" role="tab">
                         <i class="fas fa-sync-alt"></i>
-                        <span>Danh sách vật tư đề nghị nội bộ theo chu kỳ</span>
+                        <span>DS đề nghị nội bộ theo chu kỳ</span>
                         <span class="cat-tab-count">{{ $periodicInternalLists->count() }}</span>
                     </a>
                 </li>
@@ -105,8 +108,16 @@
                     <a class="nav-link {{ $activeTab === 'external' ? 'active' : '' }}" id="tabPeriodicExternalLink"
                         data-toggle="pill" href="#tabPeriodicExternal" role="tab">
                         <i class="fas fa-exchange-alt"></i>
-                        <span>Danh sách vật tư đề nghị liên phòng ban theo chu kỳ</span>
+                        <span>DS đề nghị liên phòng ban theo chu kỳ</span>
                         <span class="cat-tab-count">{{ $periodicExternalLists->count() }}</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ $activeTab === 'estimate' ? 'active' : '' }}" id="tabPeriodicEstimateLink"
+                        data-toggle="pill" href="#tabPeriodicEstimate" role="tab">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>DS dự trù theo chu kỳ</span>
+                        <span class="cat-tab-count">{{ $periodicEstimateLists->count() }}</span>
                     </a>
                 </li>
             </ul>
@@ -143,6 +154,14 @@
                         'lists' => $periodicExternalLists,
                     ])
                 </div>
+
+                <div class="tab-pane fade {{ $activeTab === 'estimate' ? 'show active' : '' }}" id="tabPeriodicEstimate"
+                    role="tabpanel">
+                    @include('pages.category.PeriodicRequest.dataTable', [
+                        'type' => 'estimate',
+                        'lists' => $periodicEstimateLists,
+                    ])
+                </div>
             </div>
         </div>
     </div>
@@ -167,8 +186,6 @@
             color: #64748b;
             font-weight: 700;
             font-size: 0.88rem;
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
             background: transparent;
             transition: all var(--transition-fast, 0.2s ease);
         }
@@ -283,7 +300,7 @@
         'conversions' => $dmConversions,
     ])
 
-    @foreach (['internal' => $periodicInternalCategories, 'external' => $periodicExternalCategories] as $prType => $prCategories)
+    @foreach (['internal' => $periodicInternalCategories, 'external' => $periodicExternalCategories, 'estimate' => $periodicExternalCategories] as $prType => $prCategories)
         @include('pages.category.PeriodicRequest.create', [
             'type' => $prType,
             'categories' => $prCategories,
@@ -301,6 +318,7 @@
         @include('pages.category.PeriodicRequest.picker', [
             'type' => $prType,
             'categories' => $prCategories,
+            'classifications' => $dmClassifications,
         ])
         @include('pages.category.PeriodicRequest.objectPicker', [
             'type' => $prType,

@@ -38,6 +38,15 @@
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
+                    <div class="form-group">
+                        <label for="purchasing_key">Bộ Phận Mua Hàng</label>
+                        <select name="purchasing_key" id="purchasing_key" class="form-control">
+                            <option value="">-- Không phải bộ phận mua hàng --</option>
+                            @foreach (\App\Support\MaterialClassification::PURCHASING_DEPARTMENTS as $key => $label)
+                                <option value="{{ $key }}" {{ old('purchasing_key') === $key ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="form-group form-check">
                         <input type="checkbox" name="is_common" id="is_common" class="form-check-input" value="1" {{ old('is_common') ? 'checked' : '' }}>
                         <label class="form-check-label" for="is_common">Phòng ban chung (chỉ để tạo user, không hiện trong Chuyển Bộ Phận, không tham gia nghiệp vụ)</label>

@@ -71,9 +71,9 @@
                             <span class="md-error">{{ $bag->first('import_id') }}</span>
                         @endif
                         <small class="md-sub">
-                            Chỉ liệt kê ống <b>{{ $assessGroupName }} ({{ $assessGroupCode }})</b> còn hiệu lực và
-                            <b>chưa có phiếu đánh giá</b>. Ống đã có phiếu chưa huỷ không xuất hiện lại ở đây;
-                            muốn lập phiếu mới thì huỷ phiếu cũ trước.
+                            Chỉ liệt kê ống <b>{{ $assessGroupName }} ({{ $assessGroupCode }})</b> còn hiệu lực, đã
+                            tick <b>Lô đánh giá hạn dùng</b> ở phiếu nhập và <b>chưa có phiếu đánh giá</b>. Ống đã có
+                            phiếu chưa huỷ không xuất hiện lại ở đây; muốn lập phiếu mới thì huỷ phiếu cũ trước.
                         </small>
                     </div>
 
@@ -81,8 +81,8 @@
                         <div class="md-hint mb-3">
                             <i class="fas fa-triangle-exclamation mr-1"></i>
                             Phòng <b>{{ session('user')['selected_department'] }}</b> chưa có ống
-                            <b>{{ $assessGroupName }} ({{ $assessGroupCode }})</b> nào cần lập phiếu - hoặc tất cả
-                            đều đã có phiếu đánh giá rồi.
+                            <b>{{ $assessGroupName }} ({{ $assessGroupCode }})</b> nào được tick <b>Lô đánh giá hạn
+                                dùng</b> ở phiếu nhập - hoặc tất cả đều đã có phiếu đánh giá rồi.
                         </div>
                     @endif
 

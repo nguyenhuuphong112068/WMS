@@ -16,6 +16,9 @@
             <form action="{{ route($mdRoute . 'update') }}" method="POST">
                 @csrf
                 <input type="hidden" name="id" value="{{ $old('id') }}">
+                {{-- Chỉ phục vụ khung cảnh báo tương kỵ ở client; controller đọc lại từ dòng đang sửa --}}
+                <input type="hidden" name="category_id" value="{{ $old('category_id') }}">
+                <input type="hidden" name="original_location_id" value="{{ $old('original_location_id') }}">
 
                 <div class="modal-body">
 
@@ -117,7 +120,13 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label>Định Khu</label>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <label>Định Khu</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-toggle="modal"
+                                    data-target="#storageChartModal">
+                                    <i class="fas fa-th mr-1"></i> Sơ đồ tương kỵ
+                                </button>
+                            </div>
                             <select name="default_location_id"
                                 data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'chemical']) }}"
                                 class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
@@ -155,6 +164,9 @@
                             @endif
                         </div>
                     </div>
+
+                    {{-- Kết quả đối chiếu tương kỵ (Sơ đồ lưu trữ GHS), JS đổ vào khi chọn định khu --}}
+                    <div class="dc-compat mb-3" hidden></div>
 
                     <div class="form-group">
                         <label>Ghi Chú</label>
@@ -196,6 +208,10 @@
 
             $form.find('.dc-chem-view').val(
                 (row.category_code || '') + ' - ' + (row.chem_name || ''));
+
+            // Hoá chất + định khu đang lưu: khung cảnh báo tương kỵ phân biệt "chỗ cũ" với "đặt mới"
+            $form.find('[name="category_id"]').val(row.category_id || '');
+            $form.find('[name="original_location_id"]').val(row.default_location_id || '');
 
             $form.find('.dc-shelf-hint').text(row.category_shelf_life_months ?
                 'Để trống thì lấy mặc định của danh mục: ' + row.category_shelf_life_months + ' tháng.' :

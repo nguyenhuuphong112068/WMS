@@ -49,7 +49,7 @@
 
 <style>
     /* ---------- Dòng cấp phát trong phiếu chi tiết ---------- */
-    /* Mỗi dòng chia hai cột: bên trái ô chọn mã xuất nhập + số lượng, bên phải cột khuyến nghị FEFO/FIFO tách riêng */
+    /* Mỗi dòng: ô chọn mã xuất nhập + số lượng, kèm badge FEFO/FIFO của mã đang chọn */
     .me-issue-row {
         display: flex;
         flex-wrap: wrap;
@@ -110,53 +110,14 @@
         padding: 5px 9px;
     }
 
-    /* Cột khuyến nghị nên xuất - tách hẳn khỏi ô chọn, badge xếp theo nhóm cho dễ đọc */
+    /* Badge FEFO/FIFO của mã xuất nhập đang chọn, nằm ngay cạnh ô chọn */
     .me-issue-note {
-        flex: 0 1 300px;
-        border: 1px solid var(--primary-lighter);
-        border-left: 3px solid var(--primary);
-        border-radius: var(--border-radius-md);
-        background: var(--primary-soft);
-        padding: 8px 10px;
+        flex: 0 0 auto;
+        align-self: center;
     }
 
     .me-issue-note:empty {
         display: none;
-    }
-
-    @media (max-width: 991px) {
-        .me-issue-note {
-            flex-basis: 100%;
-        }
-    }
-
-    .me-reco-head {
-        margin-bottom: 6px;
-        font-size: 0.68rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-        color: var(--primary-dark);
-    }
-
-    .me-reco-badges {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    .me-reco-info {
-        margin-top: 6px;
-        padding-top: 6px;
-        border-top: 1px dashed var(--primary-lighter);
-        font-size: 0.74rem;
-        line-height: 1.6;
-        color: #6B7280;
-    }
-
-    .me-reco-info b {
-        color: var(--text-main);
-        font-weight: 700;
     }
 
     .me-issue-foot {
@@ -377,8 +338,17 @@
             })[0] || null;
         }
 
+        /* Badge quy tắc chọn lô: FEFO kèm hạn dùng, FIFO kèm ngày nhập - hiện ở bảng chọn và ở dòng cấp phát */
+        function lotRuleBadge(lot) {
+            if (lot.rule === 'FEFO') {
+                return '<span class="me-badge fefo">FEFO · hạn ' + esc(lot.expired) + '</span>';
+            }
+
+            return '<span class="me-badge fifo">FIFO · nhập ' + esc(lot.imported || '—') + '</span>';
+        }
+
         /*
-        | Badge lý do nên xuất của một lô - dùng chung cho bảng chọn và cột khuyến nghị ở dòng cấp phát.
+        | Badge lý do nên xuất của một lô trong bảng chọn mã xuất nhập.
         | Xếp theo nhóm cố định cho dễ đọc: 1) mức ưu tiên  2) quy tắc FEFO/FIFO  3) cảnh báo hạn dùng  4) ghi chú tồn.
         */
         function lotBadges(lot) {
@@ -394,11 +364,7 @@
             }
 
             // 2) Quy tắc chọn lô
-            if (lot.rule === 'FEFO') {
-                out.push('<span class="me-badge fefo">FEFO · hạn ' + esc(lot.expired) + '</span>');
-            } else {
-                out.push('<span class="me-badge fifo">FIFO · nhập ' + esc(lot.imported || '—') + '</span>');
-            }
+            out.push(lotRuleBadge(lot));
 
             // 3) Cảnh báo hạn dùng
             if (lot.level === 'expired') {
@@ -426,59 +392,60 @@
             return out.join('');
         }
 
-        function lotOptionText(lot) {
-            var text = (lot.rank === 1 ? '★ NÊN XUẤT — ' : '') + lot.code +
-                ' (còn ' + num(lot.available) + ' ' + (lot.unit || '') + ')';
-
-            if (lot.rule === 'FEFO') {
-                text += ' · hạn ' + lot.expired;
-            } else if (lot.imported) {
-                text += ' · nhập ' + lot.imported;
-            }
-
-            if (lot.level === 'expired') {
-                text += ' · HẾT HẠN';
-            } else if (lot.level === 'critical') {
-                text += ' · SÁT HẠN còn ' + lot.days + ' ngày';
-            } else if (lot.level === 'warning') {
-                text += ' · cận hạn còn ' + lot.days + ' ngày';
-            }
-
-            if (lot.held > EPS) {
-                text += ' · giữ ' + num(lot.held) + ' cho đợt lấy hàng';
-            }
-
-            return text;
+        /*
+         | Chữ trong ô chọn chỉ gồm MÃ XUẤT NHẬP + TÊN VẬT TƯ cho gọn; FEFO · hạn / FIFO · nhập
+         | hiện ở badge cạnh ô, các thông tin khác xem trong bảng chọn mã xuất nhập.
+         */
+        function lotOptionText(lot, material) {
+            return lot.code + (material ? ' — ' + material : '');
         }
 
         /* ---------- Dòng cấp phát của một mục đề nghị ---------- */
 
         function addLine($form, importId, amount) {
             var categoryId = $form.data('category-id');
+            var material = $form.data('material') || '';
             var index = parseInt($form.data('line-seq') || 0, 10);
             $form.data('line-seq', index + 1);
 
+            /*
+             | Không có quyền "Điều Chỉnh Mã Xuất Nhập Khi Cấp Phát Vật Tư": ô chọn lô bị khoá đúng
+             | lô hệ thống đề xuất (select disabled không được gửi lên nên giá trị đi qua ô ẩn),
+             | ẩn nút danh mục tồn / bỏ dòng; vẫn sửa được số lượng. Server kiểm lại ở issueStore().
+             */
+            var locked = String($form.data('lot-locked')) === '1';
+            // Không có quyền "Điều Chỉnh Số Lượng Khi Cấp Phát": ô số lượng khoá đúng số đề xuất,
+            // bỏ nút bỏ dòng (đổi lô vẫn được nếu có quyền đổi lô, tổng phải giữ nguyên)
+            var amountLocked = String($form.data('amount-locked')) === '1';
+            var lotName = 'lots[' + index + '][import_id]';
             var options = ['<option value="">-- Chọn mã xuất nhập --</option>'];
 
             lotsOf(categoryId).forEach(function(lot) {
                 options.push(
                     '<option value="' + lot.id + '"' + (lot.selectable ? '' : ' disabled') +
                     (String(lot.id) === String(importId) ? ' selected' : '') + '>' +
-                    esc(lotOptionText(lot)) + '</option>'
+                    esc(lotOptionText(lot, material)) + '</option>'
                 );
             });
 
             $form.find('.me-issue-lines').append(
                 '<div class="me-issue-row">' +
                 '<div class="me-issue-line">' +
-                '<select class="form-control form-control-sm me-issue-lot" name="lots[' + index +
-                '][import_id]">' + options.join('') + '</select>' +
+                (locked
+                    ? '<select class="form-control form-control-sm me-issue-lot" disabled' +
+                      ' title="Không có quyền điều chỉnh mã xuất nhập">' + options.join('') + '</select>' +
+                      '<input type="hidden" name="' + lotName + '" value="' + esc(importId || '') + '">'
+                    : '<select class="form-control form-control-sm me-issue-lot" name="' + lotName + '">' +
+                      options.join('') + '</select>') +
                 '<input type="text" inputmode="decimal" min="0" class="form-control form-control-sm me-issue-amount js-decimal"' +
+                (amountLocked ? ' readonly title="Không có quyền điều chỉnh số lượng cấp phát"' : '') +
                 ' name="lots[' + index + '][amount]" value="' + (amount ? num(amount) : '') + '">' +
-                '<button type="button" class="btn btn-sm btn-outline-primary me-issue-pick"' +
-                ' title="Danh mục tồn có thể cấp phát của vật tư này"><i class="fas fa-layer-group"></i></button>' +
-                '<button type="button" class="btn btn-sm btn-outline-secondary me-issue-drop"' +
-                ' title="Bỏ dòng này"><i class="fas fa-times"></i></button>' +
+                (locked ? '' :
+                    '<button type="button" class="btn btn-sm btn-outline-primary me-issue-pick"' +
+                    ' title="Danh mục tồn có thể cấp phát của vật tư này"><i class="fas fa-layer-group"></i></button>' +
+                    (amountLocked ? '' :
+                    '<button type="button" class="btn btn-sm btn-outline-secondary me-issue-drop"' +
+                    ' title="Bỏ dòng này"><i class="fas fa-times"></i></button>')) +
                 '</div>' +
                 '<div class="me-issue-note"></div>' +
                 '</div>'
@@ -520,19 +487,7 @@
                     return;
                 }
 
-                var badges = lotBadges(lot);
-
-                if (amount > lot.available + EPS) {
-                    badges += '<span class="me-badge danger">Vượt tồn khả dụng của lô</span>';
-                }
-
-                $note.html(
-                    '<div class="me-reco-head"><i class="fas fa-lightbulb mr-1"></i>Khuyến nghị nên xuất</div>' +
-                    '<div class="me-reco-badges">' + badges + '</div>' +
-                    '<div class="me-reco-info">còn cấp được <b>' + num(lot.available) + ' ' + esc(
-                        lot.unit) + '</b>' +
-                    (lot.location ? ' · định khu <b>' + esc(lot.location) + '</b>' : '') + '</div>'
-                );
+                $note.html(lotRuleBadge(lot));
             });
 
             var short = needed - total;
@@ -561,10 +516,26 @@
             $form.find('.me-issue-sum').removeClass('is-short is-over').addClass(cls).html(text);
         }
 
-        // Dựng sẵn kế hoạch chia lô mà máy chủ đề xuất cho từng mục còn chờ cấp
-        $('.me-issue-form').each(function() {
-            var $form = $(this);
-            var plan = $form.data('plan') || [];
+        /*
+        | Dựng sẵn kế hoạch chia lô mà máy chủ đề xuất cho từng mục còn chờ cấp.
+        | Form nằm trong bảng DataTables (tab "Cấp phát vật tư") ở trang 2 trở đi đã bị tách
+        | khỏi DOM nên lấy thêm qua rows().nodes() - không thì sang trang sau form trống.
+        */
+        var $issueForms = $('.me-issue-form');
+
+        if ($.fn.dataTable) {
+            $($.fn.dataTable.tables()).each(function() {
+                $issueForms = $issueForms.add($(this).DataTable().rows().nodes().to$().find('.me-issue-form'));
+            });
+        }
+
+        function buildLines($form, plan) {
+            $form.find('.me-issue-lines').empty();
+
+            // Tổng số đề xuất - người không có quyền điều chỉnh số lượng phải cấp đúng số này
+            $form.data('planned-total', plan.reduce(function(sum, line) {
+                return sum + (parseFloat(line.suggested_amount) || 0);
+            }, 0));
 
             if (!plan.length) {
                 addLine($form, '', '');
@@ -575,7 +546,18 @@
             }
 
             syncForm($form);
+        }
+
+        $issueForms.each(function() {
+            buildLines($(this), $(this).data('plan') || []);
         });
+
+        /*
+        | Dựng lại các dòng cấp phát của một form theo kế hoạch mới ([{import_id, suggested_amount}]).
+        | Tab "Cấp phát vật tư" gọi sau mỗi lần cấp phát chạy ngầm: tồn các lô đã đổi mà trang
+        | không tải lại.
+        */
+        window.meIssueRebuild = buildLines;
 
         $(document).on('change input', '.me-issue-lot, .me-issue-amount', function() {
             syncForm($(this).closest('.me-issue-form'));
@@ -771,17 +753,29 @@
             }
 
             var chosen = [];
+            var chosenTotal = 0;
 
             $pickerBody.find('.me-lot-take').each(function() {
                 var amount = parseFloat($(this).val()) || 0;
 
                 if (amount > EPS) {
+                    chosenTotal += amount;
                     chosen.push({
                         import_id: $(this).data('import-id'),
                         amount: amount
                     });
                 }
             });
+
+            // Đổi lô được nhưng không có quyền điều chỉnh số lượng: tổng các lô phải đúng số đề xuất
+            var plannedTotal = parseFloat(pickerForm.data('planned-total')) || 0;
+
+            if (String(pickerForm.data('amount-locked')) === '1' && Math.abs(chosenTotal - plannedTotal) > EPS) {
+                alert('Bạn không có quyền điều chỉnh số lượng cấp phát - tổng các lô phải đúng ' +
+                    num(plannedTotal) + ' ' + (pickerForm.data('unit') || '') + '.');
+
+                return;
+            }
 
             if (!chosen.length) {
                 alert('Vui lòng nhập số lượng cần lấy ở ít nhất một mã xuất nhập!');

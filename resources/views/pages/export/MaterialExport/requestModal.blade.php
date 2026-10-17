@@ -336,7 +336,13 @@
             <input type="hidden" class="me-stock-hidden" name="items[__i__][stock_at_request]" value="">
         </td>
         <td class="text-right"><span class="me-available">—</span></td>
-        <td><textarea name="items[__i__][purpose]" maxlength="500" rows="1" class="form-control form-control-sm me-autosize" placeholder="Mục đích sử dụng..."></textarea></td>
+        <td>
+            <textarea name="items[__i__][purpose]" maxlength="500" rows="1" class="form-control form-control-sm me-autosize" placeholder="Mục đích sử dụng..."></textarea>
+            <div class="me-object-wrap mt-1 d-none">
+                <select name="items[__i__][consumption_object_id]" class="form-control form-control-sm me-object"><option value=""></option></select>
+            </div>
+            <button type="button" class="btn btn-xs btn-link p-0 mt-1 me-object-toggle"><i class="fas fa-link mr-1"></i>Gắn đối tượng</button>
+        </td>
         <td class="text-center">
             <button type="button" class="btn btn-xs btn-outline-warning me-remember-row mr-1" title="Đề nghị dự trù vật tư"><i class="fas fa-bookmark"></i></button>
             <button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button>
@@ -346,35 +352,36 @@
 
 
 <script>
-    // Quy trình ký của từng vật tư trong danh mục của phòng, gửi từ Controller
+    // Bảng tra vai trò ký của phòng, gửi từ Controller (xem signFlowMapForView)
     window.meSignFlowMap = @json($signFlowMap);
 
     /*
      | QUY TRÌNH KÝ DUYỆT - CHỈ ĐỌC, suy từ dữ liệu gốc "Trình Ký Đề Nghị CP Vật Tư".
      |
-     | meSignFlowMap gửi từ Controller: byCategory[<category_id>] là quy trình của vật tư
-     | đó, fallback là quy trình cho dòng tên tự nhập (chỉ khớp quy trình không khai điều
-     | kiện nào). Mỗi dòng vật tư khớp một quy trình riêng; phiếu lấy quy trình NHIỀU BƯỚC
-     | NHẤT. Còn dòng chưa khớp quy trình nào thì khoá nút Trình ký - phải khai dữ liệu gốc
-     | trước, đúng như Controller chặn ở phía server.
+     | Bước ký = vai trò nhận mọi đề nghị (always) + vai trò mà ít nhất một dòng vật tư kích
+     | hoạt (byCategory[<category_id>]), xếp theo cấp ký. Dòng tên tự nhập không kích hoạt
+     | vai trò nào. Không có bước nào thì phiếu được duyệt thẳng khi trình ký - giống hệt
+     | MaterialSignFlow::resolveForItems() ở phía server.
      */
     window.meRenderSignFlow = function (box) {
         var $box = $(box);
-        var map = window.meSignFlowMap || { byCategory: {}, fallback: null };
-        var best = null;
-        var missing = [];
+        var map = window.meSignFlowMap || { rules: [], always: [], byCategory: {} };
+        var picked = {};
 
-        $box.closest('form').find('.me-rows').children('tr').each(function (i) {
+        (map.always || []).forEach(function (id) { picked[id] = true; });
+
+        // .me-rows: bảng của modal Tạo đề nghị; .me-edit-rows: bảng của modal Sửa đề nghị
+        $box.closest('form').find('.me-rows, .me-edit-rows').children('tr').each(function () {
             var catId = String($(this).find('.me-cat').val() || '');
-            var flow = catId ? map.byCategory[catId] : map.fallback;
 
-            if (!flow) {
-                missing.push(i + 1);
-                return;
-            }
-
-            if (!best || flow.steps.length > best.steps.length) best = flow;
+            ((catId && map.byCategory[catId]) || []).forEach(function (id) { picked[id] = true; });
         });
+
+        // map.rules đã xếp sẵn theo cấp ký
+        var steps = (map.rules || [])
+            .filter(function (rule) { return picked[rule.id]; })
+            .map(function (rule, i) { return { no: i + 1, role: rule.role, users: rule.users }; });
+        var best = steps.length ? { steps: steps } : null;
 
         var $steps = $box.find('.me-flow-steps').empty();
 
@@ -414,22 +421,10 @@
             $steps.append($row);
         });
 
-        $box.find('.me-flow-count').text(best ? best.steps.length + ' bước ký · ' + best.name : 'Chưa xác định');
+        $box.find('.me-flow-count').text(best ? best.steps.length + ' bước ký' : 'Không cần ký duyệt');
 
-        // Dòng chưa khớp quy trình nào -> báo ngay và khoá Trình ký, vẫn cho Lưu tạm
-        var $none = $box.find('.me-flow-none');
-
-        if (missing.length) {
-            $box.find('.me-flow-none-detail').text(
-                'Dòng ' + missing.join(', ') + ' chưa khớp quy trình nào của phòng. '
-                + 'Vào Dữ Liệu Gốc → Trình Ký Đề Nghị CP Vật Tư để khai quy trình cho phân loại tương ứng.'
-            );
-            $none.css('display', 'flex');
-        } else {
-            $none.hide();
-        }
-
-        $box.closest('form').find('.me-btn-send').prop('disabled', missing.length > 0);
+        // Không vai trò nào nhận trình ký -> phiếu được duyệt thẳng khi trình ký
+        $box.find('.me-flow-none').css('display', best ? 'none' : 'flex');
     };
 
     /** Dựng lại khối quy trình ký của form chứa một phần tử bất kỳ. */
@@ -453,10 +448,82 @@
 
         var $row = $tbody.children('tr').last();
         window.meAutoSize($row);
+        window.meInitObjects($row);
         window.meSyncSignFlow($tbody);
 
         return $row;
     };
+
+    /*
+     | Ô chọn ĐỐI TƯỢNG (dữ liệu gốc consumption_objects) ở cột Mục đích: khai vật tư của dòng
+     | cấp cho thiết bị / máy nào - nguồn của trang Thống Kê Cấp Phát Vật Tư. Danh mục có hàng
+     | nghìn dòng nên select2 tìm qua AJAX theo trang. Không bắt buộc chọn.
+     */
+    window.meInitObjects = function (scope) {
+        // Chỉ dựng ô đang hiện: select2 dựng lúc ô bị ẩn sẽ đo sai bề rộng
+        $(scope).find('.me-object-wrap:not(.d-none) select.me-object').not('.select2-hidden-accessible').each(function () {
+            var $select = $(this);
+
+            $select.select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                allowClear: true,
+                placeholder: '-- Đối tượng --',
+                dropdownParent: $select.closest('.modal'),
+                ajax: {
+                    url: @json(route('pages.export.materialExport.requestObjects')),
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) { return { q: params.term || '', page: params.page || 1 }; },
+                    processResults: function (data) { return data; }
+                },
+                language: {
+                    searching: function () { return 'Đang tìm...'; },
+                    noResults: function () { return 'Không có đối tượng phù hợp'; },
+                    loadingMore: function () { return 'Đang tải thêm...'; }
+                },
+                templateResult: function (item) {
+                    if (!item.id) return item.text;
+                    return $('<div></div>').text(item.text)
+                        .append(item.hint ? $('<div class="small text-muted"></div>').text(item.hint) : null);
+                }
+            });
+        });
+    };
+
+    /*
+     | Ô Đối tượng mặc định ẩn - chỉ hiện khi người lập bấm "Gắn đối tượng" (hoặc dòng đã có
+     | sẵn đối tượng). Bấm "Bỏ đối tượng" thì xoá lựa chọn rồi ẩn lại, để ô ẩn không gửi kèm
+     | một đối tượng mà người dùng không còn thấy.
+     */
+    window.meShowObject = function (cell, show) {
+        var $cell = $(cell);
+        var $wrap = $cell.find('.me-object-wrap');
+        var $btn = $cell.find('.me-object-toggle');
+
+        $wrap.toggleClass('d-none', !show);
+        $btn.html(show
+            ? '<i class="fas fa-unlink mr-1"></i>Bỏ đối tượng'
+            : '<i class="fas fa-link mr-1"></i>Gắn đối tượng');
+        $btn.toggleClass('text-danger', show);
+
+        if (!show) {
+            $wrap.find('select.me-object').val(null).trigger('change');
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        $(document).on('click', '.me-object-toggle', function () {
+            var $cell = $(this).closest('td');
+            var show = $cell.find('.me-object-wrap').hasClass('d-none');
+
+            window.meShowObject($cell, show);
+            if (show) {
+                window.meInitObjects($cell);
+                $cell.find('select.me-object').select2('open');
+            }
+        });
+    });
 
     /*
      | CỘT "TỒN KHẢ DỤNG" - tính động, KHÔNG lưu DB, khác cột "Tồn" (chụp tĩnh một lần lúc
@@ -505,7 +572,8 @@
         $(document).on('click', '.me-add-row', function () { addRow('#reqCreateModal .me-rows'); });
 
         /*
-         | ĐỀ NGHỊ DỰ TRÙ VẬT TƯ - nút trên từng dòng đề nghị, hỏi lý do dự trù rồi gửi AJAX
+         | ĐỀ NGHỊ DỰ TRÙ VẬT TƯ - nút trên từng dòng đề nghị, hỏi số lượng cần đề nghị (điền
+         | sẵn số lượng của dòng) + lý do dự trù rồi gửi AJAX
          | ngay (không phụ thuộc đề nghị có được lưu hay không). Hiện lại ở tab "Danh sách
          | vật tư cần dự trù" bên Dự Trù Vật Tư - xem App\Support\MaterialWatchlist.
          */
@@ -523,22 +591,44 @@
                 return;
             }
 
+            var unit = $tr.find('.me-unit').val() || '';
+            var rowQty = $.trim($tr.find('[name$="[requested_amount]"]').val() || '');
+
             Swal.fire({
                 title: 'Đề nghị dự trù vật tư này?',
-                input: 'textarea',
-                inputLabel: 'Lý do dự trù',
-                inputPlaceholder: 'Nêu rõ lý do cần dự trù vật tư này...',
-                inputAttributes: { maxlength: '500' },
+                html:
+                    '<div class="text-left">' +
+                        '<label class="font-weight-bold mb-1" for="meWlQty">Số lượng cần đề nghị <span class="text-danger">*</span></label>' +
+                        '<div class="input-group mb-3">' +
+                            '<input id="meWlQty" type="text" inputmode="decimal" class="form-control text-right js-decimal" placeholder="0">' +
+                            (unit ? '<div class="input-group-append"><span class="input-group-text"></span></div>' : '') +
+                        '</div>' +
+                        '<label class="font-weight-bold mb-1" for="meWlNote">Lý do dự trù <span class="text-danger">*</span></label>' +
+                        '<textarea id="meWlNote" class="form-control" rows="4" maxlength="500" placeholder="Nêu rõ lý do cần dự trù vật tư này..."></textarea>' +
+                    '</div>',
                 showCancelButton: true,
                 confirmButtonColor: '#2E7BC4',
                 cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Gửi đề nghị',
                 cancelButtonText: 'Huỷ',
-                preConfirm: function (value) {
-                    if (!value || !value.trim()) {
-                        Swal.showValidationMessage('Vui lòng nhập lý do dự trù');
+                didOpen: function (popup) {
+                    // Gán bằng .text()/.val() để dữ liệu người dùng không bị hiểu thành HTML
+                    $(popup).find('.input-group-text').text(unit);
+                    $(popup).find('#meWlQty').val(rowQty).trigger('focus');
+                },
+                preConfirm: function () {
+                    var qty = $.trim($('#meWlQty').val()).replace(',', '.');
+                    var note = $.trim($('#meWlNote').val());
+
+                    if (!qty || isNaN(qty) || parseFloat(qty) <= 0) {
+                        Swal.showValidationMessage('Vui lòng nhập số lượng cần đề nghị lớn hơn 0');
+                        return false;
                     }
-                    return value;
+                    if (!note) {
+                        Swal.showValidationMessage('Vui lòng nhập lý do dự trù');
+                        return false;
+                    }
+                    return { quantity: qty, note: note };
                 }
             }).then(function (result) {
                 if (!result.isConfirmed) return;
@@ -550,7 +640,8 @@
                     category_id: categoryId || '',
                     material_name: materialName,
                     technical_specification: spec,
-                    note: result.value,
+                    quantity: result.value.quantity,
+                    note: result.value.note,
                     source_type: srcType
                 }).done(function (res) {
                     window.meWatchlistToast.fire({ icon: res.success ? 'success' : 'error', title: res.message || 'Có lỗi xảy ra!' });
@@ -617,6 +708,7 @@
                 addRow('#reqCreateModal .me-rows');
             }
             window.meAutoSize($(this));
+            window.meInitObjects($(this));
 
             // Mở modal thì làm mới ngay "Tồn khả dụng" của mọi dòng đang có trong đúng modal này
             var $rows = $(this).find('.me-rows, .me-edit-rows');
@@ -632,11 +724,19 @@
         @if ($bag->any())
             $(function () {
                 $('#reqCreateModal').modal('show');
-                var old = @json(old('items', []));
+                var old = @json(array_values(old('items', [])));
+                // Ô Đối tượng tìm qua AJAX nên chưa có sẵn option - dựng lại nhãn của đối tượng đã chọn
+                var oldObjects = @json(collect(old('items', []))->pluck('consumption_object_id')->filter()->unique()
+                    ->mapWithKeys(fn($id) => [$id => \App\Support\MaterialPeriodicRequest::objectLabel($id)]));
                 (old.length ? old : [{}]).forEach(function (row) {
                     addRow('#reqCreateModal .me-rows');
                     var $tr = $('#reqCreateModal .me-rows tr').last();
+                    if (row.consumption_object_id && oldObjects[row.consumption_object_id]) {
+                        $tr.find('.me-object').append(new Option(oldObjects[row.consumption_object_id], row.consumption_object_id, true, true));
+                        window.meShowObject($tr.find('.me-object').closest('td'), true);
+                    }
                     Object.keys(row).forEach(function (k) { $tr.find('[name$="[' + k + ']"]').val(row[k]); });
+                    $tr.find('.me-object').trigger('change');
                     window.meAutoSize($tr);
                 });
             });

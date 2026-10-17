@@ -1,11 +1,5 @@
 @php
     $bag = $errors->getBag('updateErrors');
-
-    // Sửa dở bị lỗi validate thì đổ lại đúng những gì người dùng vừa chọn;
-    // mở modal bình thường thì JS ở dataTable đổ dữ liệu của dòng đang sửa vào.
-    $oldCriteria = $bag->any() ? (array) old('criteria', []) : [];
-    $oldSteps = $bag->any() ? array_values((array) old('steps', [])) : [];
-    $oldSigners = $bag->any() ? array_values((array) old('signers', [])) : [];
 @endphp
 
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
@@ -20,20 +14,20 @@
                 @csrf
                 <input type="hidden" name="id" value="{{ old('id') }}">
                 <div class="modal-body">
-
                     @include('pages.materData.MaterialSignFlow.formFields', [
                         'bag' => $bag,
-                        'selected' => $oldCriteria,
-                        'selectedClass' => $bag->any() ? old('classification_id') : null,
-                        'selectedSteps' => $oldSteps,
-                        'selectedSigners' => $oldSigners,
+                        // Sửa dở bị lỗi validate thì dựng lại đúng những gì vừa chọn; mở modal
+                        // bình thường thì JS đổ dữ liệu của dòng đang sửa vào.
+                        'initial' => $bag->any()
+                            ? ['signers' => array_values((array) old('signers', [])), 'conditions' => array_values((array) old('conditions', []))]
+                            : null,
                     ])
 
-                    <div class="form-group">
+                    <div class="form-group mt-3">
                         <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
                         <textarea name="change_reason" rows="2" maxlength="500" required
                             class="form-control @error('change_reason', 'updateErrors') is-invalid @enderror"
-                            placeholder="Nêu rõ lý do sửa quy trình này">{{ old('change_reason') }}</textarea>
+                            placeholder="Nêu rõ lý do sửa vai trò trình ký này">{{ old('change_reason') }}</textarea>
                         @error('change_reason', 'updateErrors')
                             <span class="md-error">{{ $message }}</span>
                         @enderror

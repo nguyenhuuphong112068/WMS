@@ -27,6 +27,9 @@ use Illuminate\Validation\Rule;
  *               tick >= 1 nhóm nguy hại Bảng B (chem_name_mixture_hazard_category).
  * Hỗn hợp (>= 2 thành phần) CHỈ mang nhóm 2 / 8 / 10; các nhóm đơn chất (1, 3, 4, 5, 6,
  * 7, 9) là của từng hoạt chất thành phần, hiển thị ở cột "Hoạt Chất Thành Phần".
+ * PHÂN LOẠI KHÁC (ngoài NĐ 24/2026) tick tay ở màn này, áp cho cả đơn chất lẫn hỗn hợp:
+ * nhóm 11 "Hoá chất cấm theo Luật Đầu tư 2025" (cột is_banned) và nhóm 12 "Hàng hoá đặc
+ * biệt" (cột is_special_goods) - ChemicalClassification::OTHER_GROUPS.
  * App\Support\ChemicalClassification lo toàn bộ việc suy nhóm.
  *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", chỉ dùng được sau khi phê duyệt.
@@ -44,6 +47,8 @@ class ChemNameController extends Controller
     /** Cột người dùng nhập trực tiếp trên bảng chem_names. */
     private const FIELDS = [
         'name' => 'Tên hoá chất',
+        'is_banned' => 'Hoá chất cấm (Luật Đầu tư 2025)',
+        'is_special_goods' => 'Hàng hoá đặc biệt',
     ];
 
     public function index()
@@ -124,8 +129,10 @@ class ChemNameController extends Controller
         $hazardIds = $this->cleanIds($request->input('hazard_category_ids', []));
         $percents = $this->cleanPercents($request->input('content_percent', []));
 
-        $id = DB::transaction(function () use ($request, $aiIds, $hazardIds, $percents) {
-            $newId = DB::table(self::TABLE)->insertGetId([
+        $otherGroups = $this->otherGroupsFromRequest($request);
+
+        $id = DB::transaction(function () use ($request, $aiIds, $hazardIds, $percents, $otherGroups) {
+            $newId = DB::table(self::TABLE)->insertGetId($otherGroups + [
                 'name' => trim((string) $request->name),
                 'app_status' => 'pending',
                 'status_id' => 1,
@@ -141,6 +148,9 @@ class ChemNameController extends Controller
         });
 
         $note = 'Khai báo mới ' . self::LABEL . ': ' . $request->name . '.';
+        if ($otherLabels = $this->otherGroupLabels($otherGroups)) {
+            $note .= ' Phân loại khác: ' . $otherLabels . '.';
+        }
         if ($aiIds) {
             $note .= ' Hoạt chất: ' . $this->aiLabels($aiIds, $percents) . '.';
         }
@@ -184,7 +194,7 @@ class ChemNameController extends Controller
 
         $payload = [
             'name' => trim((string) $request->name),
-        ];
+        ] + $this->otherGroupsFromRequest($request);
 
         $noteParts = [];
         if ($nameNote = DataMasterHistory::note(self::FIELDS, $current, $payload, $this->maps())) {
@@ -340,7 +350,27 @@ class ChemNameController extends Controller
     /** Bảng tra giá trị đọc được cho lịch sử thay đổi. */
     private function maps(): array
     {
-        return [];
+        return array_fill_keys(ChemicalClassification::OTHER_GROUPS, [0 => 'Không', 1 => 'Có']);
+    }
+
+    /** [cột phân loại khác => 0|1] theo các ô tick gửi lên (không tick = 0). */
+    private function otherGroupsFromRequest(Request $request): array
+    {
+        $out = [];
+        foreach (ChemicalClassification::OTHER_GROUPS as $column) {
+            $out[$column] = $request->boolean($column) ? 1 : 0;
+        }
+
+        return $out;
+    }
+
+    /** "Hoá chất cấm (Luật Đầu tư 2025), Hàng hoá đặc biệt" - các ô phân loại khác đang tick. */
+    private function otherGroupLabels(array $values): string
+    {
+        return collect(ChemicalClassification::OTHER_GROUPS)
+            ->filter(fn ($column) => ! empty($values[$column]))
+            ->map(fn ($column) => self::FIELDS[$column])
+            ->implode(', ');
     }
 
     /* -------------------------------------------------------------------------
@@ -661,6 +691,8 @@ class ChemNameController extends Controller
     {
         return [
             'name' => ['required', 'max:255', Rule::unique(self::TABLE, 'name')->ignore($ignoreId)],
+            'is_banned' => ['nullable', 'boolean'],
+            'is_special_goods' => ['nullable', 'boolean'],
             'active_ingredients_ids' => ['nullable', 'array'],
             'active_ingredients_ids.*' => ['integer', 'exists:active_ingredients,id'],
             'content_percent' => ['nullable', 'array'],
@@ -676,6 +708,8 @@ class ChemNameController extends Controller
             'name.required' => 'Vui lòng nhập tên hoá chất.',
             'name.max' => 'Tên hoá chất tối đa 255 ký tự.',
             'name.unique' => 'Tên hoá chất này đã tồn tại.',
+            'is_banned.boolean' => 'Giá trị "Hoá chất cấm" không hợp lệ.',
+            'is_special_goods.boolean' => 'Giá trị "Hàng hoá đặc biệt" không hợp lệ.',
             'active_ingredients_ids.array' => 'Danh sách hoạt chất không hợp lệ.',
             'active_ingredients_ids.*.integer' => 'Hoạt chất không hợp lệ.',
             'active_ingredients_ids.*.exists' => 'Có hoạt chất không hợp lệ hoặc chưa được duyệt.',

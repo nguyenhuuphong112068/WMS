@@ -13,13 +13,18 @@
 |
 | $maxStock (tuỳ chọn, lấy thẳng từ dữ liệu của màn hình cha - App\Support\MaxStockWarning)
 | là ngưỡng tồn tối đa + tồn hiện tại của từng mã danh mục, để cảnh báo dự trù quá nhiều.
+|
+| $factorUnits (tuỳ chọn, chỉ Dự Trù Hoá Chất): [category_id => {unit_id, unit, group, base}]
+| đơn vị danh mục của phòng cho hoá chất nhóm 9 / 10 - có thì mỗi dòng kèm ô hệ số quy đổi.
 --}}
 @php
     $oldRows = $oldRows ?? [];
     $defaultPeriods = $defaultPeriods ?? [];
+    $withFactor = isset($factorUnits);
 @endphp
 
-<div class="est-amounts" data-default-periods="{{ json_encode($defaultPeriods) }}">
+<div class="est-amounts" data-default-periods="{{ json_encode($defaultPeriods) }}"
+    @if ($withFactor) data-factor-units="{{ json_encode((object) $factorUnits, JSON_UNESCAPED_UNICODE) }}" @endif>
     <div class="est-amount-head">
         <div class="col-amount">Số Lượng <span class="text-danger">*</span></div>
         <div class="col-unit">Đơn Vị <span class="text-danger">*</span></div>
@@ -35,6 +40,8 @@
                 'amount' => $oldRow['amount'] ?? '',
                 'unitId' => $oldRow['unit_id'] ?? '',
                 'period' => $oldRow['for_month_year'] ?? '',
+                'withFactor' => $withFactor,
+                'factor' => $oldRow['conversion_factor'] ?? '',
             ])
         @endforeach
     </div>
@@ -46,6 +53,7 @@
             'amount' => '',
             'unitId' => '',
             'period' => '',
+            'withFactor' => $withFactor,
         ])
     </template>
 
