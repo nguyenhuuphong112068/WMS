@@ -275,7 +275,7 @@
                 Swal.fire({
                     icon: 'info',
                     title: 'Bỏ qua ' + skipped.length + ' vật tư',
-                    text: 'Không có trong danh sách vật tư của phiếu này (đề nghị VPP chỉ gồm vật tư do Hành Chánh mua): ' + skipped.join(', ')
+                    text: 'Không có trong danh sách vật tư của phiếu này (đề nghị cấp phát VPP đến HC chỉ gồm vật tư do Hành Chánh mua): ' + skipped.join(', ')
                 });
             }
         });

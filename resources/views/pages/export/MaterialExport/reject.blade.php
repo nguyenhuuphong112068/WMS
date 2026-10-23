@@ -44,9 +44,20 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         $(document).on('click', '.btn-req-reject', function () {
-            $('#reqRejectModal [name="request_list_id"]').val($(this).data('id'));
-            $('#reqRejectModal .req-reject-code').val($(this).data('code'));
-            $('#reqRejectModal').modal('show');
+            var $btn = $(this);
+            var $parent = $btn.closest('.modal');
+            var open = function () {
+                $('#reqRejectModal [name="request_list_id"]').val($btn.data('id'));
+                $('#reqRejectModal .req-reject-code').val($btn.data('code'));
+                $('#reqRejectModal').modal('show');
+            };
+
+            // Nút nằm trong modal chi tiết đề nghị: đóng modal đó rồi mới mở modal từ chối
+            if ($parent.length && $parent.is(':visible')) {
+                $parent.one('hidden.bs.modal', open).modal('hide');
+            } else {
+                open();
+            }
         });
     });
 </script>

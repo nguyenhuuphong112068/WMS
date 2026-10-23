@@ -19,7 +19,7 @@
                                 <option value="">-- Chọn vật tư phòng đang dùng --</option>
                                 @foreach ($categories as $c)
                                     <option value="{{ $c->id }}">
-                                        {{ $c->material_name }} — {{ $c->manufacturer_short_name ?: $c->manufacturer_name }}
+                                        {{ $c->code }} - {{ $c->material_name }} — {{ $c->manufacturer_short_name ?: $c->manufacturer_name }}
                                         @if ($c->technical_specification) ({{ $c->technical_specification }}) @endif
                                     </option>
                                 @endforeach
@@ -76,7 +76,7 @@
                         <select name="location_id" class="form-control imp-select">
                             <option value="">-- Chưa định khu --</option>
                             @foreach ($locations as $loc)
-                                <option value="{{ $loc->id }}">
+                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}">
                                     {{ $loc->code }} — {{ $loc->warehouse_name }} / {{ $loc->shelf_name }} / {{ $loc->column_name }} / {{ $loc->tier_name }}
                                 </option>
                             @endforeach

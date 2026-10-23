@@ -33,6 +33,9 @@ Route::prefix('/inventory')
 
         Route::prefix('/chemicalInventory')->name('chemicalInventory.')->controller(ChemicalInventoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            // Dữ liệu JSON của các bảng tồn - trang chỉ trả khung, bảng nạp bằng AJAX
+            Route::get('data', 'data')->name('data');
+            Route::get('zones', 'zones')->name('zones');
             // Dữ liệu JSON cho modal Biểu Đồ Nhập - Xuất - Tồn của một hoá chất
             Route::get('chart', 'chart')->name('chart');
             // Dữ liệu JSON cho modal "Chi Tiết Con Số" (bấm badge trên bảng tồn)

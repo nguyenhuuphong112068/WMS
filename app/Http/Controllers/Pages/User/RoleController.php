@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 class RoleController extends Controller
@@ -33,6 +34,7 @@ class RoleController extends Controller
                 'permissions.name',
                 'permissions.display_name',
                 'permissions.description',
+                Schema::hasColumn('permissions', 'parent_id') ? 'permissions.parent_id' : DB::raw('NULL as parent_id'),
                 'permission_groups.name as group_name',
                 'permission_groups.sort_order',
             )
@@ -58,6 +60,14 @@ class RoleController extends Controller
             $tree[$modelKey]['groups'][$groupName][] = $permission;
         }
 
+        // Quyền con (parent_id) đứng ngay dưới quyền cha trong cùng nhóm
+        foreach ($tree as &$model) {
+            foreach ($model['groups'] as &$groupPermissions) {
+                $groupPermissions = $this->nestChildren($groupPermissions);
+            }
+        }
+        unset($model, $groupPermissions);
+
         // Bỏ băng model không có quyền nào để bảng không lòi ra dòng trống
         $tree = array_filter($tree, fn ($model) => !empty($model['groups']));
 
@@ -74,6 +84,42 @@ class RoleController extends Controller
             'tree' => $tree,
             'assigned' => $assigned,
         ]);
+    }
+
+    /**
+     * Xếp quyền con ngay sau quyền cha (giữ thứ tự gốc của quyền cha), quyền con có cha
+     * nằm nhóm khác / không tồn tại thì giữ nguyên chỗ.
+     */
+    private function nestChildren(array $permissions): array
+    {
+        $ids = array_map(fn ($permission) => $permission->id, $permissions);
+        $children = [];
+
+        foreach ($permissions as $permission) {
+            if ($permission->parent_id && in_array($permission->parent_id, $ids)) {
+                $children[$permission->parent_id][] = $permission;
+            }
+        }
+
+        // Đệ quy để quyền nhiều tầng (vd. Trao đổi -> tab Theo dõi -> Xem trang) cũng hiện, depth để thụt lề
+        $ordered = [];
+        $append = function ($permission, int $depth) use (&$append, &$ordered, $children) {
+            $permission->depth = $depth;
+            $ordered[] = $permission;
+            foreach ($children[$permission->id] ?? [] as $child) {
+                $append($child, $depth + 1);
+            }
+        };
+
+        foreach ($permissions as $permission) {
+            if ($permission->parent_id && in_array($permission->parent_id, $ids)) {
+                continue;
+            }
+
+            $append($permission, 0);
+        }
+
+        return $ordered;
     }
 
     /**

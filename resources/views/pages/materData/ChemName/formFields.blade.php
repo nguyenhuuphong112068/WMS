@@ -15,21 +15,14 @@
             <i class="fas fa-table mr-1"></i> Chọn từ dữ liệu gốc
         </button>
     </div>
+    {{-- Gõ tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị old() khi validate lỗi --}}
     <select name="active_ingredients_ids[]" class="form-control chem-ai-select" multiple
-        data-placeholder="Chọn một hay nhiều hoạt chất có trong hỗn hợp">
-        @foreach ($activeIngredients as $ai)
-            @php
-                $aiLabel = $ai->name;
-                if ($ai->cas_no) {
-                    $aiLabel .= ' — CAS ' . $ai->cas_no;
-                }
-                if (!empty($ai->groups)) {
-                    $aiLabel .= ' — Nhóm ' . implode(', ', $ai->groups);
-                }
-            @endphp
+        data-placeholder="Chọn một hay nhiều hoạt chất có trong hỗn hợp"
+        data-lookup-url="{{ route('pages.category.lookup.activeIngredients') }}">
+        @foreach (collect($activeIngredients)->whereIn('id', $oldAiIds) as $ai)
             <option value="{{ $ai->id }}" data-name="{{ $ai->name }}"
-                data-g9="{{ in_array(9, $ai->groups ?? [], true) ? 1 : 0 }}"
-                {{ in_array((int) $ai->id, $oldAiIds, true) ? 'selected' : '' }}>{{ $aiLabel }}</option>
+                data-g9="{{ in_array(9, $ai->groups ?? [], true) ? 1 : 0 }}" selected>
+                {{ \App\Support\CategoryLookup::activeIngredientLabel($ai, $ai->groups ?? []) }}</option>
         @endforeach
     </select>
     @if ($bag->has('active_ingredients_ids') || $bag->has('active_ingredients_ids.*'))
@@ -267,7 +260,8 @@
 
 {{--
 | Modal chọn nhanh hoạt chất từ dữ liệu gốc "Tên Hoạt Chất".
-| Cùng nguồn dữ liệu với ô select ở trên ($activeIngredients) nên không cần gọi API.
+| Dòng lấy từ $activeIngredients nhưng nạp sau (data-deferred="lazy") ở lần mở đầu tiên; ô select
+| ở trên tìm qua AJAX nên khi xác nhận, hoạt chất chưa có option được dựng từ data-label của dòng.
 | Dùng chung cho cả modal Thêm mới và Cập nhật - nút .chem-ai-picker-open cho biết
 | ô .chem-ai-select nào là đích. Bọc @once để include hai lần chỉ in ra một bản.
 --}}
@@ -345,7 +339,7 @@
                     </div>
 
                     <div class="chem-aip-tablebox">
-                        <table class="table table-sm table-hover mb-0" id="chemAiPickerTable">
+                        <table class="table table-sm table-hover mb-0" id="chemAiPickerTable" data-deferred="lazy">
                             <thead>
                                 <tr>
                                     <th style="width: 42px" class="text-center">
@@ -359,6 +353,7 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @deferredRows('chemAiPickerTable')
                                 @forelse ($activeIngredients as $ai)
                                     @php
                                         $aiGroups = $ai->groups ?? [];
@@ -378,6 +373,8 @@
                                     @endphp
                                     <tr class="chem-ai-pick-row" data-id="{{ $ai->id }}"
                                         data-name="{{ $ai->name }}" data-groups="{{ implode(',', $aiGroups) }}"
+                                        data-label="{{ \App\Support\CategoryLookup::activeIngredientLabel($ai, $aiGroups) }}"
+                                        data-g9="{{ in_array(9, $aiGroups, true) ? 1 : 0 }}"
                                         data-search="{{ $search }}">
                                         <td class="text-center align-middle">
                                             <input type="checkbox" class="chem-ai-pick-check"
@@ -421,6 +418,7 @@
                                         </td>
                                     </tr>
                                 @endforelse
+                                @enddeferredRows
                             </tbody>
                         </table>
                     </div>
@@ -510,8 +508,20 @@
             // Đưa modal ra thẳng <body> để không nằm lồng trong <form> của modal cha
             $modal.appendTo(document.body);
 
+            var $table = $('#chemAiPickerTable');
             var $rows = $modal.find('tbody tr.chem-ai-pick-row');
             var $targetSelect = null;
+
+            /*
+            | Danh sách hoạt chất (~1.700 dòng) nạp sau: bảng data-deferred="lazy" chỉ lấy dòng ở
+            | lần mở modal đầu tiên (pages/shared/deferredRows), không làm nặng lúc tải trang.
+            */
+            function withRows(done) {
+                mdDeferred.fillLazy($table, function() {
+                    $rows = $modal.find('tbody tr.chem-ai-pick-row');
+                    done();
+                }, 'Đang tải danh sách hoạt chất...');
+            }
 
             function refreshPicked() {
                 $modal.find('[data-pick-selected]').text($modal.find('.chem-ai-pick-check:checked').length);
@@ -543,17 +553,20 @@
                 $targetSelect = $(this).closest('.md-modal').find('.chem-ai-select');
                 var current = ($targetSelect.val() || []).map(String);
 
-                $modal.find('.chem-ai-pick-check').each(function() {
-                    var on = current.indexOf(String(this.value)) !== -1;
-                    $(this).prop('checked', on).closest('tr').toggleClass('is-picked', on);
-                });
-
                 $modal.find('#chemAiPickerSearch').val('');
                 $modal.find('#chemAiPickerGroup').val('');
                 $modal.find('#chemAiPickerSelectedOnly').prop('checked', false);
-                refreshPicked();
-                applyFilter();
                 $modal.modal('show');
+
+                withRows(function() {
+                    $modal.find('.chem-ai-pick-check').each(function() {
+                        var on = current.indexOf(String(this.value)) !== -1;
+                        $(this).prop('checked', on).closest('tr').toggleClass('is-picked', on);
+                    });
+
+                    refreshPicked();
+                    applyFilter();
+                });
             });
 
             $modal.on('input', '#chemAiPickerSearch', applyFilter);
@@ -588,6 +601,14 @@
                     return;
                 }
                 var ids = $modal.find('.chem-ai-pick-check:checked').map(function() {
+                    var $row = $(this).closest('tr');
+
+                    // Ô chọn tìm qua AJAX chỉ có option đang chọn: thiếu thì dựng từ dòng picker
+                    wmsEnsureOption($targetSelect, this.value, $row.attr('data-label') || $row.attr('data-name'), {
+                        name: $row.attr('data-name'),
+                        g9: $row.attr('data-g9')
+                    });
+
                     return this.value;
                 }).get();
                 $targetSelect.val(ids).trigger('change');

@@ -28,12 +28,6 @@
 
     /** Hoá chất thuộc nhóm 3..8 (Phụ lục III - kiểm soát đặc biệt). */
     $impIsSpecial = fn($categoryId) => \App\Support\ChemicalClassification::isSpecialControl($classificationCodes[$categoryId] ?? []);
-
-
-    // Số liệu tổng của tab báo cáo
-    $impReportTimes = $report->sum('times');
-    $impReportTotalKg = $report->whereNotNull('total_kg')->sum('total_kg');
-    $impReportNotConvertible = $report->whereNull('total_kg')->count();
 @endphp
 
 @section('mainContent')

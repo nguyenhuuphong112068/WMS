@@ -50,6 +50,7 @@
     */
     $dsHasErrors = $errors->getBag('dsCreateErrors')->any() || $errors->getBag('dsUpdateErrors')->any();
     $activeTab = session('activeTab') === 'department' || $dsHasErrors ? 'department' : 'company';
+    $activeTab = \App\Support\PageTabs::active('category_standard', $activeTab);
 @endphp
 
 @section('mainContent')
@@ -57,6 +58,7 @@
         <div class="md-page">
 
             <ul class="nav cat-tabs" role="tablist">
+                @tab('category_standard', 'company')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'company' ? 'active' : '' }}" id="tabCompanyLink"
                         data-toggle="pill" href="#tabCompany" role="tab">
@@ -65,6 +67,8 @@
                         <span class="cat-tab-count">{{ $datas->count() }}</span>
                     </a>
                 </li>
+                @endtab
+                @tab('category_standard', 'department')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'department' ? 'active' : '' }}" id="tabDepartmentLink"
                         data-toggle="pill" href="#tabDepartment" role="tab">
@@ -73,14 +77,18 @@
                         <span class="cat-tab-count">{{ $dsDatas->count() }}</span>
                     </a>
                 </li>
+                @endtab
             </ul>
 
             <div class="tab-content">
+                @tab('category_standard', 'company')
                 <div class="tab-pane fade {{ $activeTab === 'company' ? 'show active' : '' }}" id="tabCompany"
                     role="tabpanel">
                     @include('pages.category.StandardCategory.dataTable')
                 </div>
+                @endtab
 
+                @tab('category_standard', 'department')
                 <div class="tab-pane fade {{ $activeTab === 'department' ? 'show active' : '' }}" id="tabDepartment"
                     role="tabpanel">
                     @include('pages.category.DepartmentStandard.dataTable', [
@@ -92,6 +100,7 @@
                         'groups' => $groups,
                     ])
                 </div>
+                @endtab
             </div>
         </div>
     </div>

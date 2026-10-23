@@ -4,6 +4,7 @@ namespace App\Http\Controllers\General;
 
 use App\Http\Controllers\Controller;
 use App\Support\CompanyContext;
+use App\Support\MaterialCalibration;
 use App\Support\EstimateSigner;
 use App\Support\MaterialPurchasing;
 use App\Support\MaterialTransferSignFlow;
@@ -131,7 +132,11 @@ class HomeController extends Controller
         session()->put(['title' => 'TRANG CHỦ']);
 
         return view('pages.home', [
-            'reviewSections' => $this->reviewSections($approvals),
+            'reviewGroups' => $this->reviewGroups($approvals),
+            'reviewMatrix' => $this->reviewMatrix($approvals),
+            'reviewGroupInfo' => self::REVIEW_GROUPS,
+            'reviewObjects' => self::REVIEW_OBJECTS,
+            'reviewActors' => self::REVIEW_ACTORS,
             'reviewTotal' => count($approvals),
             // reviewRows() đã xếp chờ lâu nhất lên đầu
             'reviewOldest' => $approvals[0] ?? null,
@@ -387,28 +392,58 @@ class HomeController extends Controller
     /** Số đề nghị hiện sẵn trên mỗi thẻ, phần còn lại mở màn hình gốc để xem. */
     private const REVIEW_PREVIEW = 5;
 
-    /** Hai khối của bảng đề nghị chờ xem xét, theo thứ tự hiển thị. */
-    private const REVIEW_SECTIONS = [
-        'sign' => ['label' => 'Chờ bạn ký duyệt', 'icon' => 'fas fa-signature'],
-        'dept' => ['label' => 'Chờ phòng ban xử lý', 'icon' => 'fas fa-people-carry'],
+    /** Ai phải làm: chờ chính người đăng nhập ký / duyệt, hoặc chờ phòng ban đang chọn xử lý. */
+    private const REVIEW_ACTORS = [
+        'sign' => ['label' => 'Chờ bạn ký duyệt', 'short' => 'Bạn ký duyệt', 'icon' => 'fas fa-signature'],
+        'dept' => ['label' => 'Chờ phòng ban xử lý', 'short' => 'Phòng xử lý', 'icon' => 'fas fa-people-carry'],
     ];
 
-    /** Loại đề nghị, theo thứ tự hiển thị trong từng khối. */
-    private const REVIEW_TYPES = [
-        'estimate_chemical' => ['section' => 'sign', 'label' => 'Dự trù hoá chất', 'icon' => 'fas fa-flask'],
-        'estimate_standard' => ['section' => 'sign', 'label' => 'Dự trù chất chuẩn', 'icon' => 'fas fa-vial'],
-        'estimate_material' => ['section' => 'sign', 'label' => 'Dự trù vật tư', 'icon' => 'fas fa-boxes'],
-        'material_request' => ['section' => 'sign', 'label' => 'Đề nghị cấp phát vật tư', 'icon' => 'fas fa-clipboard-list'],
-        'transfer_sign' => ['section' => 'sign', 'label' => 'Đề nghị liên phòng ban / VPP', 'icon' => 'fas fa-people-arrows'],
-        'chemical_disposal' => ['section' => 'sign', 'label' => 'Đợt huỷ hoá chất', 'icon' => 'fas fa-trash-alt'],
-        'material_quarantine' => ['section' => 'sign', 'label' => 'Vật tư hỏng chờ quyết định', 'icon' => 'fas fa-gavel'],
-        'category' => ['section' => 'sign', 'label' => 'Danh mục chờ duyệt', 'icon' => 'fas fa-clipboard-check'],
-        'master_data' => ['section' => 'sign', 'label' => 'Dữ liệu gốc chờ duyệt', 'icon' => 'fas fa-database'],
-        'transfer_issue' => ['section' => 'dept', 'label' => 'Đề nghị liên phòng ban chờ cấp phát', 'icon' => 'fas fa-exchange-alt'],
-        'transfer_receipt' => ['section' => 'dept', 'label' => 'Hàng liên phòng ban chờ nhận', 'icon' => 'fas fa-inbox'],
-        'issue_pending' => ['section' => 'dept', 'label' => 'Đề nghị cấp phát chờ kho cấp', 'icon' => 'fas fa-dolly'],
-        'estimate_cancel' => ['section' => 'dept', 'label' => 'Đề nghị huỷ mục dự trù', 'icon' => 'fas fa-ban'],
+    /**
+     * Đối tượng của đề nghị - mỗi đối tượng một màu cố định (biến --db-group-<color> ở layout/css.blade.php).
+     * 'dc' = dữ liệu dùng chung không thuộc riêng loại hàng nào (đơn vị tính, nhà sản xuất...).
+     */
+    private const REVIEW_OBJECTS = [
+        'vt' => ['label' => 'Vật tư', 'icon' => 'fas fa-boxes', 'color' => 'material'],
+        'hc' => ['label' => 'Hoá chất', 'icon' => 'fas fa-flask', 'color' => 'chemical'],
+        'cc' => ['label' => 'Chất chuẩn', 'icon' => 'fas fa-vial', 'color' => 'standard'],
+        'dc' => ['label' => 'Dùng chung', 'icon' => 'fas fa-database', 'color' => 'master'],
     ];
+
+    /**
+     * Nhóm nghiệp vụ = hàng của ma trận tổng quan và nhóm card, theo thứ tự hiển thị.
+     * direction: đề nghị đi giữa hai phòng - ô ma trận tách ← nhận / → gửi.
+     */
+    private const REVIEW_GROUPS = [
+        'estimate' => ['label' => 'Dự trù', 'icon' => 'fas fa-file-invoice', 'direction' => false],
+        'internal' => ['label' => 'Đề nghị nội bộ', 'icon' => 'fas fa-clipboard-list', 'direction' => false],
+        'transfer' => ['label' => 'Liên phòng ban', 'icon' => 'fas fa-exchange-alt', 'direction' => true],
+        'vpp' => ['label' => 'Văn phòng phẩm', 'icon' => 'fas fa-paperclip', 'direction' => true],
+        'quality' => ['label' => 'KS chất lượng / hàng hỏng', 'icon' => 'fas fa-shield-alt', 'direction' => false],
+        'data' => ['label' => 'Phê duyệt dữ liệu', 'icon' => 'fas fa-check-double', 'direction' => false],
+    ];
+
+    /** Loại đề nghị: thuộc nhóm nghiệp vụ nào, ai phải làm. Card = một loại × một đối tượng. */
+    private const REVIEW_TYPES = [
+        'estimate_sign' => ['group' => 'estimate', 'actor' => 'sign', 'label' => 'Ký dự trù'],
+        'estimate_reception' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Dự trù mới chờ tiếp nhận'],
+        'estimate_cancel' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Đề nghị huỷ mục dự trù'],
+        'material_request' => ['group' => 'internal', 'actor' => 'sign', 'label' => 'Ký đề nghị cấp phát'],
+        'issue_pending' => ['group' => 'internal', 'actor' => 'dept', 'label' => 'Chờ kho cấp'],
+        'transfer_sign' => ['group' => 'transfer', 'actor' => 'sign', 'label' => 'Ký đề nghị liên phòng ban'],
+        'transfer_issue' => ['group' => 'transfer', 'actor' => 'dept', 'label' => 'Chờ phòng bạn cấp phát'],
+        'transfer_receipt' => ['group' => 'transfer', 'actor' => 'dept', 'label' => 'Hàng đã cấp, chờ bạn nhận'],
+        'vpp_sign' => ['group' => 'vpp', 'actor' => 'sign', 'label' => 'Ký đề nghị VPP'],
+        'vpp_issue' => ['group' => 'vpp', 'actor' => 'dept', 'label' => 'Chờ phòng bạn cấp VPP'],
+        'vpp_receipt' => ['group' => 'vpp', 'actor' => 'dept', 'label' => 'VPP đã cấp, chờ bạn nhận'],
+        'material_calibration' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Chờ QA hiệu chuẩn'],
+        'material_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Vật tư hỏng chờ quyết định'],
+        'chemical_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Hoá chất hỏng chờ quyết định'],
+        'category' => ['group' => 'data', 'actor' => 'sign', 'label' => 'Danh mục chờ duyệt'],
+        'master_data' => ['group' => 'data', 'actor' => 'sign', 'label' => 'Dữ liệu gốc chờ duyệt'],
+    ];
+
+    /** Đối tượng theo phạm vi quyền materData_<phạm vi>_approve của dữ liệu gốc. */
+    private const MASTER_DATA_OBJECTS = ['chemical' => 'hc', 'standard' => 'cc', 'material' => 'vt', 'common' => 'dc'];
 
     /**
      * Ba loại dự trù dùng chung luồng ký động (trait EstimateSignFlow), chỉ khác bộ bảng.
@@ -417,7 +452,7 @@ class HomeController extends Controller
      */
     private const ESTIMATE_KINDS = [
         'chemical' => [
-            'type' => 'estimate_chemical',
+            'object' => 'hc',
             'label' => 'Dự trù hoá chất',
             'table' => 'chemical_estimates',
             'sign_table' => 'chemical_estimate_signs',
@@ -427,10 +462,11 @@ class HomeController extends Controller
             'category_table' => 'chemical_categories',
             'purchasing_col' => null,
             'permission' => 'estimate_chemical_sign',
+            'purchasing_permission' => 'estimate_chemical_purchasing',
             'route' => 'pages.estimate.chemicalEstimate.',
         ],
         'standard' => [
-            'type' => 'estimate_standard',
+            'object' => 'cc',
             'label' => 'Dự trù chất chuẩn',
             'table' => 'standard_estimates',
             'sign_table' => 'standard_estimate_signs',
@@ -440,10 +476,11 @@ class HomeController extends Controller
             'category_table' => 'standard_categories',
             'purchasing_col' => null,
             'permission' => 'estimate_standard_sign',
+            'purchasing_permission' => 'estimate_standard_purchasing',
             'route' => 'pages.estimate.standardEstimate.',
         ],
         'material' => [
-            'type' => 'estimate_material',
+            'object' => 'vt',
             'label' => 'Dự trù vật tư',
             'table' => 'material_estimates',
             'sign_table' => 'material_estimate_signs',
@@ -453,6 +490,7 @@ class HomeController extends Controller
             'category_table' => 'material_categories',
             'purchasing_col' => 'purchasing_department',
             'permission' => 'estimate_material_sign',
+            'purchasing_permission' => 'estimate_material_purchasing',
             'route' => 'pages.estimate.materialEstimate.',
         ],
     ];
@@ -480,14 +518,16 @@ class HomeController extends Controller
             $this->estimateSignReviews(),
             $this->materialRequestSignReviews(),
             $this->transferSignReviews(),
-            $this->disposalReviews(),
             $this->quarantineReviews(),
+            $this->chemicalQuarantineReviews(),
+            $this->calibrationReviews(),
             $this->categoryReviews(),
             $this->masterDataReviews(),
             $this->transferIssueReviews(),
             $this->transferReceiptReviews(),
             $this->issuePendingReviews(),
-            $this->estimateCancelReviews()
+            $this->estimateCancelReviews(),
+            $this->estimateReceptionReviews()
         );
 
         usort($rows, fn ($a, $b) => strcmp((string) $a['since'], (string) $b['since']));
@@ -496,70 +536,126 @@ class HomeController extends Controller
     }
 
     /**
-     * Thống kê theo loại đề nghị, chia hai khối 'sign' / 'dept' cho trang chủ.
-     * Loại không có đề nghị nào thì không hiện; khối rỗng cũng bỏ.
+     * Card đề nghị = một loại × một đối tượng, gom theo nhóm nghiệp vụ (hàng của ma trận).
+     * Card không có đề nghị nào thì không hiện; nhóm rỗng cũng bỏ.
      */
-    private function reviewSections(array $rows): array
+    private function reviewGroups(array $rows): array
     {
-        $byType = [];
+        $cards = [];
 
         foreach ($rows as $row) {
-            $byType[$row['type']][] = $row;
+            $key = $row['type'].'-'.$row['object'];
+
+            if (! isset($cards[$key])) {
+                $type = self::REVIEW_TYPES[$row['type']];
+                $cards[$key] = [
+                    'key' => $key,
+                    'type' => $row['type'],
+                    'group' => $type['group'],
+                    'actor' => $type['actor'],
+                    'object' => $row['object'],
+                    'label' => $type['label'],
+                    'items' => [],
+                    'in' => 0,
+                    'out' => 0,
+                ];
+            }
+
+            $cards[$key]['items'][] = $row;
+            $cards[$key]['in'] += $row['direction'] === 'in' ? 1 : 0;
+            $cards[$key]['out'] += $row['direction'] === 'out' ? 1 : 0;
         }
 
-        $sections = [];
+        $typeOrder = array_flip(array_keys(self::REVIEW_TYPES));
+        $objectOrder = array_flip(array_keys(self::REVIEW_OBJECTS));
 
-        foreach (self::REVIEW_SECTIONS as $sectionKey => $section) {
-            $types = [];
+        uasort($cards, fn ($a, $b) => [$typeOrder[$a['type']], $objectOrder[$a['object']]]
+            <=> [$typeOrder[$b['type']], $objectOrder[$b['object']]]);
 
-            foreach (self::REVIEW_TYPES as $typeKey => $type) {
-                if ($type['section'] !== $sectionKey || empty($byType[$typeKey])) {
+        $groups = [];
+
+        foreach (self::REVIEW_GROUPS as $groupKey => $group) {
+            $groupCards = [];
+
+            foreach ($cards as $card) {
+                if ($card['group'] !== $groupKey) {
                     continue;
                 }
 
-                $items = $byType[$typeKey];
-
-                $types[] = $type + [
-                    'key' => $typeKey,
-                    'count' => count($items),
-                    // "Chờ bạn ký duyệt" liệt kê ĐỦ từng phiếu (đã bỏ tab "Ký duyệt (mọi phòng ban)",
-                    // trang chủ là nơi duy nhất gom phiếu chờ ký của mọi phòng); khối khác xem trước
-                    'items' => $sectionKey === 'sign' ? $items : array_slice($items, 0, self::REVIEW_PREVIEW),
-                    // Bấm vào thẻ: mở màn hình của đề nghị chờ lâu nhất
-                    'url' => $items[0]['url'],
-                ];
+                $items = $card['items'];
+                $card['count'] = count($items);
+                // "Chờ bạn ký duyệt" liệt kê ĐỦ từng phiếu (trang chủ là nơi duy nhất gom phiếu chờ ký
+                // của mọi phòng); việc của phòng chỉ xem trước
+                $card['items'] = $card['actor'] === 'sign' ? $items : array_slice($items, 0, self::REVIEW_PREVIEW);
+                // Bấm vào thẻ: mở màn hình của đề nghị chờ lâu nhất
+                $card['url'] = $items[0]['url'];
+                $groupCards[] = $card;
             }
 
-            if ($types) {
-                $sections[] = $section + [
-                    'key' => $sectionKey,
-                    'total' => array_sum(array_column($types, 'count')),
-                    'types' => $types,
+            if ($groupCards) {
+                $groups[] = $group + [
+                    'key' => $groupKey,
+                    'total' => array_sum(array_column($groupCards, 'count')),
+                    'cards' => $groupCards,
                 ];
             }
         }
 
-        return $sections;
+        return $groups;
     }
 
-    /** Một dòng đề nghị, đủ khoá cho cả bảng thống kê lẫn khối "Mục cần duyệt" đang tạm ẩn. */
-    private function reviewRow(string $type, ?string $code, ?string $title, ?string $meta, $since, string $url): array
+    /**
+     * Ma trận tổng quan: [nhóm nghiệp vụ][đối tượng][ai phải làm] => số đề nghị, kèm số theo
+     * hướng ← nhận / → gửi. Tách theo ai phải làm để nút gạt ở view cộng lại được.
+     */
+    private function reviewMatrix(array $rows): array
+    {
+        $cells = [];
+
+        foreach (array_keys(self::REVIEW_GROUPS) as $group) {
+            foreach (array_keys(self::REVIEW_OBJECTS) as $object) {
+                foreach (array_keys(self::REVIEW_ACTORS) as $actor) {
+                    $cells[$group][$object][$actor] = ['count' => 0, 'in' => 0, 'out' => 0];
+                }
+            }
+        }
+
+        foreach ($rows as $row) {
+            $cell = &$cells[$row['group']][$row['object']][$row['actor']];
+            $cell['count']++;
+            $cell['in'] += $row['direction'] === 'in' ? 1 : 0;
+            $cell['out'] += $row['direction'] === 'out' ? 1 : 0;
+            unset($cell);
+        }
+
+        return $cells;
+    }
+
+    /**
+     * Một dòng đề nghị. $direction cho đề nghị đi giữa hai phòng: 'in' = phòng khác đề nghị
+     * phòng mình (← Từ $partner), 'out' = phòng mình đề nghị phòng khác (→ Đến $partner).
+     */
+    private function reviewRow(string $type, string $object, ?string $code, ?string $title, ?string $meta, $since, string $url, ?string $direction = null, ?string $partner = null): array
     {
         $info = self::REVIEW_TYPES[$type];
 
         return [
             'type' => $type,
+            'object' => $object,
+            'group' => $info['group'],
+            'actor' => $info['actor'],
             'code' => $code ?: 'NA',
             'title' => $title ?: '',
             'meta' => $meta ?: '',
             'since' => $since,
             'url' => $url,
+            'direction' => $direction,
+            'partner' => $partner,
             // Khoá cũ của khối "Mục cần duyệt" (đang @if (false) trong view)
-            'group' => self::REVIEW_SECTIONS[$info['section']]['label'],
-            'icon' => $info['icon'],
+            'icon' => self::REVIEW_OBJECTS[$object]['icon'],
             'label' => $info['label'],
             'status_label' => $meta ?: $info['label'],
-            'waiting_me' => $info['section'] === 'sign',
+            'waiting_me' => $info['actor'] === 'sign',
         ];
     }
 
@@ -626,12 +722,13 @@ class HomeController extends Controller
                 }
 
                 $rows[] = $this->reviewRow(
-                    $kind['type'],
+                    'estimate_sign',
+                    $kind['object'],
                     $record->code,
                     'Kỳ '.str_pad((string) $record->month, 2, '0', STR_PAD_LEFT).'/'.$record->year,
                     $this->joinMeta([$this->stepLabel($record), $record->department_short]),
                     $record->submitted_at ?: $record->created_at,
-                    $this->signUrl((int) $record->department_id, $kind['route'].'list', 'list')
+                    $this->signUrl((int) $record->department_id, $kind['route'].'detail', ['id' => $record->id])
                 );
             }
         }
@@ -710,11 +807,12 @@ class HomeController extends Controller
 
             $rows[] = $this->reviewRow(
                 'material_request',
+                'vt',
                 $record->code,
                 $record->name,
                 $this->joinMeta([$this->stepLabel($record), $record->department_short]),
                 $record->submitted_at ?: $record->created_at,
-                $this->signUrl((int) $record->department_id, 'pages.export.materialExport.list', $record->type ?: 'regular')
+                $this->signUrl((int) $record->department_id, 'pages.export.materialExport.list', ['tab' => $record->type ?: 'regular', 'open' => 'reqDetailModal_'.$record->id])
             );
         }
 
@@ -743,7 +841,7 @@ class HomeController extends Controller
             ->leftJoin('deparments as t', 't.id', '=', 'r.to_department_id')
             ->where('r.status', MaterialTransferSignFlow::STATUS_PENDING_SIGN)
             ->select(
-                'r.id', 'r.code', 'r.title', 'r.to_department_id', 'r.updated_at', 'r.created_at',
+                'r.id', 'r.code', 'r.title', 'r.department_id', 'r.to_department_id', 'r.updated_at', 'r.created_at',
                 's.step_no', 's.role_names', 's.department_id as sign_department_id',
                 'd.shortName as from_short', 't.shortName as to_short'
             )
@@ -758,45 +856,19 @@ class HomeController extends Controller
                 continue;
             }
 
+            // Hướng nhìn từ phòng của bước ký: bước ở phòng đề nghị là "gửi đi", còn lại là "nhận về"
+            $outgoing = (int) $record->sign_department_id === (int) $record->department_id;
+
             $rows[] = $this->reviewRow(
-                'transfer_sign',
+                MaterialVpp::isVppDepartment((int) $record->to_department_id) ? 'vpp_sign' : 'transfer_sign',
+                'vt',
                 $record->code,
                 $record->title,
-                $this->joinMeta(['Bước '.$record->step_no, $record->from_short.' → '.$record->to_short]),
+                'Bước '.$record->step_no,
                 $record->updated_at ?: $record->created_at,
-                $this->signUrl((int) $record->sign_department_id, 'pages.export.materialExport.list', MaterialVpp::tabFor((int) $record->to_department_id))
-            );
-        }
-
-        return $rows;
-    }
-
-    /** Đợt huỷ hoá chất của phòng đã trình, chờ người có quyền ghi quyết định huỷ. */
-    private function disposalReviews(): array
-    {
-        $departmentId = $this->departmentId();
-
-        if ($departmentId <= 0 || ! user_can('export_chemical_disposal_decide')) {
-            return [];
-        }
-
-        $records = DB::table('chemical_disposals')
-            ->select('id', 'code', 'period_month', 'period_year', 'submitted_at', 'created_at')
-            ->where('department_id', $departmentId)
-            ->where('status_id', 1)
-            ->where('app_status', 'pending')
-            ->get();
-
-        $rows = [];
-
-        foreach ($records as $record) {
-            $rows[] = $this->reviewRow(
-                'chemical_disposal',
-                $record->code,
-                'Đợt '.str_pad((string) $record->period_month, 2, '0', STR_PAD_LEFT).'/'.$record->period_year,
-                'Chờ quyết định huỷ',
-                $record->submitted_at ?: $record->created_at,
-                route('pages.export.chemicalExport.list', ['tab' => 'disposal'])
+                $this->signUrl((int) $record->sign_department_id, 'pages.export.materialExport.list', ['tab' => MaterialVpp::tabFor((int) $record->to_department_id), 'open' => 'matTransferDetailModal_'.$record->id]),
+                $outgoing ? 'out' : 'in',
+                $outgoing ? $record->to_short : $record->from_short
             );
         }
 
@@ -827,12 +899,100 @@ class HomeController extends Controller
         foreach ($records as $record) {
             $rows[] = $this->reviewRow(
                 'material_quarantine',
+                'vt',
                 $record->code,
                 $record->material_name,
                 $record->import_code,
                 $record->created_at,
                 route('pages.export.materialExport.list', ['tab' => 'quarantine', 'qstatus' => 'quarantined'])
             );
+        }
+
+        return $rows;
+    }
+
+    /** Phiếu cách ly hoá chất hỏng của phòng chưa có quyết định Loại bỏ / Trả về kho. */
+    private function chemicalQuarantineReviews(): array
+    {
+        $departmentId = $this->departmentId();
+
+        if ($departmentId <= 0 || ! user_can('export_chemical_quarantine_decide')) {
+            return [];
+        }
+
+        $records = DB::table('chemical_quarantines as q')
+            ->leftJoin('chemical_imports as i', 'q.import_id', '=', 'i.id')
+            ->leftJoin('chemical_categories as c', 'i.category_id', '=', 'c.id')
+            ->leftJoin('chem_names as n', 'c.chem_names_id', '=', 'n.id')
+            ->select('q.id', 'q.code', 'q.created_at', 'i.code as import_code', 'n.name as chem_name')
+            ->where('q.department_id', $departmentId)
+            ->where('q.status_id', 1)
+            ->where('q.app_status', 'quarantined')
+            ->get();
+
+        $rows = [];
+
+        foreach ($records as $record) {
+            $rows[] = $this->reviewRow(
+                'chemical_quarantine',
+                'hc',
+                $record->code,
+                $record->chem_name,
+                $record->import_code,
+                $record->created_at,
+                route('pages.export.chemicalExport.list', ['tab' => 'quarantine', 'qstatus' => 'quarantined'])
+            );
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Phiếu đề nghị hiệu chuẩn vật tư chờ QA xác nhận (App\Support\MaterialCalibration): mọi phòng QA
+     * người dùng vào được và có quyền xác nhận ở đó; bấm phiếu tự chuyển sang phòng QA.
+     */
+    private function calibrationReviews(): array
+    {
+        $userId = $this->userId();
+        $qaDepartmentIds = DB::table('deparments')->where('EngshortName', 'QA')->where('isActive', 1)->pluck('id');
+        $rows = [];
+        $seen = [];
+
+        foreach ($qaDepartmentIds as $qaDepartmentId) {
+            $qaDepartmentId = (int) $qaDepartmentId;
+
+            if (! user_can_access_department($userId, $qaDepartmentId)
+                || ! isset(user_permission_names($userId, $qaDepartmentId)[MaterialCalibration::CONFIRM_PERMISSION])) {
+                continue;
+            }
+
+            $records = DB::table(MaterialCalibration::TABLE.' as c')
+                ->leftJoin('material_categories as mc', 'c.category_id', '=', 'mc.id')
+                ->leftJoin('material_names as n', 'mc.material_names_id', '=', 'n.id')
+                ->leftJoin('deparments as d', 'c.department_id', '=', 'd.id')
+                ->select('c.code', DB::raw('MIN(c.requested_at) as requested_at'), DB::raw('MAX(n.name) as material_name'), DB::raw('MAX(d.name) as department_name'))
+                ->whereIn('c.department_id', MaterialCalibration::sourceDepartmentIds($qaDepartmentId))
+                ->where('c.status_id', 1)
+                ->where('c.app_status', 'pending')
+                ->groupBy('c.code')
+                ->get();
+
+            foreach ($records as $record) {
+                if (isset($seen[$record->code])) {
+                    continue;
+                }
+
+                $seen[$record->code] = true;
+                $rows[] = $this->reviewRow(
+                    'material_calibration',
+                    'vt',
+                    $record->code,
+                    $record->material_name,
+                    $record->department_name,
+                    $record->requested_at,
+                    $this->signUrl($qaDepartmentId, 'pages.export.materialExport.list', ['tab' => 'calibration'])
+                );
+            }
         }
 
         return $rows;
@@ -845,14 +1005,14 @@ class HomeController extends Controller
     private function categoryReviews(): array
     {
         $tables = [
-            ['chemical_categories', 'chem_names', 'chem_names_id', 'category_chemical_approve', 'Danh mục hoá chất', 'pages.category.chemicalCategory.list'],
-            ['standard_categories', 'standard_names', 'chem_names_id', 'category_standard_approve', 'Danh mục chất chuẩn', 'pages.category.standardCategory.list'],
-            ['material_categories', 'material_names', 'material_names_id', 'category_material_approve', 'Danh mục vật tư', 'pages.category.materialCategory.list'],
+            ['chemical_categories', 'chem_names', 'chem_names_id', 'category_chemical_approve', 'hc', 'pages.category.chemicalCategory.list'],
+            ['standard_categories', 'standard_names', 'chem_names_id', 'category_standard_approve', 'cc', 'pages.category.standardCategory.list'],
+            ['material_categories', 'material_names', 'material_names_id', 'category_material_approve', 'vt', 'pages.category.materialCategory.list'],
         ];
 
         $rows = [];
 
-        foreach ($tables as [$table, $names, $nameKey, $permission, $label, $route]) {
+        foreach ($tables as [$table, $names, $nameKey, $permission, $object, $route]) {
             if (! user_can($permission)) {
                 continue;
             }
@@ -867,9 +1027,10 @@ class HomeController extends Controller
             foreach ($records as $record) {
                 $rows[] = $this->reviewRow(
                     'category',
+                    $object,
                     $record->code,
                     $record->item_name,
-                    $label,
+                    null,
                     $record->updated_at ?: $record->created_at,
                     route($route)
                 );
@@ -919,6 +1080,7 @@ class HomeController extends Controller
 
                 $rows[] = $this->reviewRow(
                     'master_data',
+                    self::MASTER_DATA_OBJECTS[$scope],
                     $codeColumn ? ($record->{$codeColumn} ?: $name) : $name,
                     $codeColumn ? $name : null,
                     $label,
@@ -941,7 +1103,7 @@ class HomeController extends Controller
     {
         return [
             [
-                'label' => 'Hoá chất',
+                'object' => 'hc',
                 'requests' => 'chemical_transfer_requests',
                 'items' => 'chemical_transfer_items',
                 'issue_permission' => 'export_chemical_transfer',
@@ -949,7 +1111,7 @@ class HomeController extends Controller
                 'url' => route('pages.export.chemicalExport.list', ['tab' => 'request']),
             ],
             [
-                'label' => 'Chất chuẩn',
+                'object' => 'cc',
                 'requests' => 'standard_transfer_requests',
                 'items' => 'standard_transfer_items',
                 'issue_permission' => 'export_standard_issue',
@@ -957,7 +1119,7 @@ class HomeController extends Controller
                 'url' => route('pages.export.standardExport.list', ['tab' => 'transfer']),
             ],
             [
-                'label' => 'Vật tư',
+                'object' => 'vt',
                 'requests' => 'material_transfer_requests',
                 'items' => 'material_transfer_items',
                 'issue_permission' => 'export_material_transfer',
@@ -992,14 +1154,20 @@ class HomeController extends Controller
                 ->whereIn('t.status', ['pending', 'partial'])
                 ->get();
 
+            // Vật tư gửi tới phòng Hành Chính là đề nghị VPP
+            $isVpp = isset($kind['vpp_url']) && MaterialVpp::isVppDepartment($departmentId);
+
             foreach ($records as $record) {
                 $rows[] = $this->reviewRow(
-                    'transfer_issue',
+                    $isVpp ? 'vpp_issue' : 'transfer_issue',
+                    $kind['object'],
                     $record->code,
                     $record->title,
-                    $this->joinMeta([$kind['label'], $record->from_department ? 'từ '.$record->from_department : null]),
+                    null,
                     $record->created_at,
-                    isset($kind['vpp_url']) && MaterialVpp::isVppDepartment($departmentId) ? $kind['vpp_url'] : $kind['url']
+                    $isVpp ? $kind['vpp_url'] : $kind['url'],
+                    'in',
+                    $record->from_department
                 );
             }
         }
@@ -1038,13 +1206,18 @@ class HomeController extends Controller
                 ->get();
 
             foreach ($records as $record) {
+                $isVpp = isset($kind['vpp_url']) && MaterialVpp::isVppDepartment((int) $record->to_department_id);
+
                 $rows[] = $this->reviewRow(
-                    'transfer_receipt',
+                    $isVpp ? 'vpp_receipt' : 'transfer_receipt',
+                    $kind['object'],
                     $record->code,
                     $record->title,
-                    $this->joinMeta([$kind['label'], $record->item_count.' mục chờ nhận']),
+                    $record->item_count.' mục chờ nhận',
                     $record->first_issued_at,
-                    isset($kind['vpp_url']) && MaterialVpp::isVppDepartment((int) $record->to_department_id) ? $kind['vpp_url'] : $kind['url']
+                    $isVpp ? $kind['vpp_url'] : $kind['url'],
+                    'out',
+                    $record->to_department
                 );
             }
         }
@@ -1077,9 +1250,10 @@ class HomeController extends Controller
 
                 $rows[] = $this->reviewRow(
                     'issue_pending',
+                    'vt',
                     $record->code,
                     $record->name,
-                    $this->joinMeta(['Vật tư', $record->issue_status === 'partial' ? 'Đã cấp một phần' : null]),
+                    $record->issue_status === 'partial' ? 'Đã cấp một phần' : null,
                     $record->updated_at ?: $record->created_at,
                     route('pages.export.materialExport.list', [
                         'tab' => $type,
@@ -1100,11 +1274,76 @@ class HomeController extends Controller
             foreach ($records as $record) {
                 $rows[] = $this->reviewRow(
                     'issue_pending',
+                    'cc',
                     $record->code,
                     $record->group_name ? 'Tổ '.$record->group_name : null,
-                    $this->joinMeta(['Chất chuẩn', $record->status === 'partial' ? 'Đã cấp một phần' : null]),
+                    $record->status === 'partial' ? 'Đã cấp một phần' : null,
                     $record->created_at,
                     route('pages.export.standardExport.list', ['tab' => 'request'])
+                );
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Phiếu dự trù vừa được Ban Giám Đốc duyệt, chờ bộ phận mua hàng (phòng đang chọn) bấm
+     * Tiếp nhận - EstimateItemCancel::receive() lưu người + ngày tiếp nhận.
+     */
+    private function estimateReceptionReviews(): array
+    {
+        $departmentId = $this->departmentId();
+
+        if ($departmentId <= 0) {
+            return [];
+        }
+
+        // Bộ phận mua hàng tiếp nhận phiếu của MỌI công ty; loại hàng không khai bộ phận mua thì chỉ Cung Ứng
+        $purchasingKeys = MaterialPurchasing::keysOfDepartment($departmentId);
+        $isDefaultPurchaser = in_array(MaterialPurchasing::DEFAULT_KEY, $purchasingKeys, true);
+        $rows = [];
+
+        foreach (self::ESTIMATE_KINDS as $kind) {
+            if (! $purchasingKeys || (! $kind['purchasing_col'] && ! $isDefaultPurchaser)
+                || ! user_can($kind['purchasing_permission'])) {
+                continue;
+            }
+
+            $lists = DB::table($kind['table'].' as e')
+                ->leftJoin('deparments as d', 'e.department_id', '=', 'd.id')
+                ->select('e.id', 'e.code', 'e.month', 'e.year', 'e.updated_at', 'd.shortName as department_short')
+                ->where('e.app_status', 'approved')
+                ->where('e.reception_status', 'waiting')
+                // Vật tư: chỉ phiếu có mục do phòng đang chọn phụ trách mua
+                ->when($kind['purchasing_col'], function ($query) use ($kind, $purchasingKeys, $isDefaultPurchaser) {
+                    $query->whereExists(function ($sub) use ($kind, $purchasingKeys, $isDefaultPurchaser) {
+                        $sub->select(DB::raw(1))
+                            ->from($kind['item_table'].' as i')
+                            ->leftJoin($kind['category_table'].' as c', 'i.category_id', '=', 'c.id')
+                            ->whereColumn('i.'.$kind['item_fk'], 'e.id')
+                            ->where('i.active', 1)
+                            ->where(function ($q) use ($kind, $purchasingKeys, $isDefaultPurchaser) {
+                                $q->whereIn('c.'.$kind['purchasing_col'], $purchasingKeys);
+
+                                if ($isDefaultPurchaser) {
+                                    $q->orWhereNull('c.'.$kind['purchasing_col']);
+                                }
+                            });
+                    });
+                })
+                ->get();
+
+            foreach ($lists as $record) {
+                $rows[] = $this->reviewRow(
+                    'estimate_reception',
+                    $kind['object'],
+                    $record->code,
+                    $kind['label'],
+                    $this->joinMeta(['Kỳ '.str_pad($record->month, 2, '0', STR_PAD_LEFT).'/'.$record->year, $record->department_short]),
+                    // Mốc chờ: lúc Ban Giám Đốc ký bước cuối (phiếu cập nhật lần cuối)
+                    $record->updated_at,
+                    route($kind['route'].'detail', ['id' => $record->id, 'from' => 'approved'])
                 );
             }
         }
@@ -1150,6 +1389,7 @@ class HomeController extends Controller
             foreach ($requested as $record) {
                 $rows[] = $this->reviewRow(
                     'estimate_cancel',
+                    $kind['object'],
                     $record->code,
                     $kind['label'],
                     $record->item_count.' mục - bộ phận mua hàng đề nghị huỷ',
@@ -1161,7 +1401,8 @@ class HomeController extends Controller
             // Bên bộ phận mua hàng: loại hàng không khai bộ phận mua thì chỉ Cung Ứng phụ trách
             $isDefaultPurchaser = in_array(MaterialPurchasing::DEFAULT_KEY, $purchasingKeys, true);
 
-            if (! $purchasingKeys || (! $kind['purchasing_col'] && ! $isDefaultPurchaser)) {
+            if (! $purchasingKeys || (! $kind['purchasing_col'] && ! $isDefaultPurchaser)
+                || ! user_can($kind['purchasing_permission'])) {
                 continue;
             }
 
@@ -1189,11 +1430,13 @@ class HomeController extends Controller
             foreach ($purchasing as $record) {
                 $rows[] = $this->reviewRow(
                     'estimate_cancel',
+                    $kind['object'],
                     $record->code,
                     $kind['label'],
                     $this->joinMeta([$record->item_count.' mục - phòng đề nghị xin huỷ', $record->department_short]),
                     $record->since,
-                    route($kind['route'].'list', ['tab' => 'purchasing'])
+                    // Mở chi tiết phiếu ở chế độ bộ phận mua hàng: nút Đồng ý huỷ / Không đồng ý nằm trên từng mục
+                    route($kind['route'].'detail', ['id' => $record->id, 'from' => 'approved'])
                 );
             }
         }
@@ -1217,21 +1460,25 @@ class HomeController extends Controller
 
     /**
      * Link mở phiếu chờ ký. Phiếu của phòng khác phòng đang chọn thì đi qua route 'switch' để đổi
-     * phòng đang chọn trên leftNAV sang phòng của phiếu rồi mở thẳng tab của màn hình - màn hình
-     * nghiệp vụ chỉ ký / từ chối được phiếu của phòng đang chọn (đã bỏ tab "Ký duyệt (mọi phòng ban)").
+     * phòng đang chọn trên leftNAV sang phòng của phiếu rồi mở thẳng màn hình - màn hình nghiệp vụ
+     * chỉ ký / từ chối được phiếu của phòng đang chọn (đã bỏ tab "Ký duyệt (mọi phòng ban)").
+     *
+     * Mở THẲNG phiếu: dự trù đi tới trang chi tiết (['id' => ...]); đề nghị vật tư thêm
+     * 'open' => id modal chi tiết, màn Sử Dụng Vật Tư tự bật modal đó (MaterialExport/list) -
+     * nút Đồng ý / Từ chối nằm trong modal / trang chi tiết.
      */
-    private function signUrl(int $recordDepartmentId, string $routeName, string $ownTab): string
+    private function signUrl(int $recordDepartmentId, string $routeName, array $params): string
     {
         if ($recordDepartmentId > 0
             && $recordDepartmentId !== $this->departmentId()
             && user_can_access_department($this->userId(), $recordDepartmentId)) {
             return route('switch', [
                 'selected_department_id' => $recordDepartmentId,
-                'redirect' => route($routeName, ['tab' => $ownTab], false),
+                'redirect' => route($routeName, $params, false),
             ]);
         }
 
-        return route($routeName, ['tab' => $ownTab]);
+        return route($routeName, $params);
     }
 
     /** Id phòng ban cùng công ty đang làm việc; null = không giới hạn (phiên chưa có công ty). */

@@ -50,6 +50,7 @@
     }
 </style>
 
+@tab('export_standard', 'request')
 <div class="exp-pane {{ $activeTab === 'request' ? 'is-active' : '' }}" id="expPaneRequest">
 
     <div class="md-toolbar">
@@ -162,3 +163,4 @@
         'pgUnit' => 'đề nghị',
     ])
 </div>
+@endtab

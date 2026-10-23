@@ -954,11 +954,28 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
 
-        var table = $('#mdTable').DataTable();
+        /*
+        | Hai kiểu bảng cùng chạy trên khối JS này:
+        | - Bảng render sẵn ở server (tồn Vật Tư / Chuẩn): đọc data-* trên <tr>.
+        | - Bảng nạp JSON (tồn Hoá Chất): dòng là object, DataTables chỉ dựng <tr> của
+        |   trang đang xem (deferRender) nên dòng chưa hiện không có node để đọc.
+        | invRowValue() đọc được cả hai: object thì lấy thuộc tính, mảng thì đọc data-* của <tr>.
+        */
+        window.invRowValue = function(rowData, tr, key, attr) {
+            // Dòng nạp sau dạng chung (pages/shared/deferredRows): thuộc tính <tr> nằm trong JSON
+            if (rowData && rowData.c && window.mdDeferred) return mdDeferred.rowAttr(rowData, tr, attr || key);
+            if ($.isPlainObject(rowData)) return rowData[key];
+
+            return tr ? $(tr).data(attr || key) : undefined;
+        };
+
+        // Bảng chính có thể chưa khởi tạo (bảng nạp JSON tự dựng sau khi tải dữ liệu)
+        function invMainTable() {
+            return $.fn.dataTable.isDataTable('#mdTable') ? $('#mdTable').DataTable() : null;
+        }
 
         // Bảng dùng chung nhắc bấm "Thêm mới", màn hình tồn không có nút đó
-        table.settings()[0].oLanguage.sEmptyTable =
-            'Chưa có phiếu nhập nào để tính tồn kho. Hãy tạo phiếu ở màn hình Nhập Hoá Chất.';
+        mdDeferred.setEmpty('#mdTable', 'Chưa có phiếu nhập nào để tính tồn kho. Hãy tạo phiếu ở màn hình Nhập Hoá Chất.');
 
         /* ---------- Kỳ báo cáo: mốc chọn nhanh ---------- */
         // Điền sẵn hai ô ngày rồi gửi form luôn, người dùng không phải chọn tay từng ngày
@@ -973,25 +990,25 @@
         /* ---------- Lọc nhanh theo trạng thái tồn ---------- */
         var invState = 'all';
 
-        $.fn.dataTable.ext.search.push(function(settings, data, index) {
+        $.fn.dataTable.ext.search.push(function(settings, data, index, rowData) {
             if (settings.nTable.id !== 'mdTable' || invState === 'all') return true;
 
-            return $(settings.aoData[index].nTr).data('state') === invState;
+            return invRowValue(rowData, settings.aoData[index].nTr, 'state') === invState;
         });
 
-        $(document).on('click', '.inv-chip', function() {
+        $(document).on('click', '.inv-chip[data-state]', function() {
             invState = $(this).data('state');
 
-            $('.inv-chip').removeClass('is-active');
+            $('.inv-chip[data-state]').removeClass('is-active');
             $(this).addClass('is-active');
 
-            table.draw();
+            if (invMainTable()) invMainTable().draw();
         });
 
         /* ---------- Bảng phụ: tồn theo hoá chất và lịch sử cân đối ---------- */
-        // Trả về API của bảng để nơi gọi dùng lại (ví dụ bộ lọc định khu cần draw)
-        function invTable(selector, order, emptyText, columnDefs) {
-            return $(selector).DataTable({
+        // Cấu hình chung của các bảng phụ - bảng nạp JSON dùng lại rồi gộp thêm data/columns
+        window.invTableOptions = function(order, emptyText, columnDefs) {
+            return {
                 autoWidth: false,
                 responsive: true,
                 pageLength: 25,
@@ -1013,7 +1030,18 @@
                         next: 'Sau'
                     }
                 }
-            });
+            };
+        };
+
+        // Trả về API của bảng để nơi gọi dùng lại (ví dụ bộ lọc định khu cần draw).
+        // Bảng data-inv-lazy do màn hình tự dựng khi mở tab nên bỏ qua ở đây.
+        function invTable(selector, order, emptyText, columnDefs) {
+            if (!$(selector).length || $(selector).is('[data-inv-lazy]')) return null;
+
+            var options = invTableOptions(order, emptyText, columnDefs);
+
+            // Bảng data-deferred: dòng nạp sau bằng AJAX (pages/shared/deferredRows)
+            return $(selector).DataTable(mdDeferred.is(selector) ? mdDeferred.extend(selector, options) : options);
         }
 
         // Cột cuối của bảng tồn hoá chất là nút Biểu Đồ - không sắp xếp, không tìm kiếm
@@ -1037,8 +1065,13 @@
             'Không có đối tượng nào có khai báo kiểm soát khối lượng.');
 
         // Theo định khu: cột 1 = Vị Trí, gom các mã cùng chỗ đứng cạnh nhau
-        var zoneTable = invTable('#invZoneTable', [1, 'asc'],
+        invTable('#invZoneTable', [1, 'asc'],
             'Chưa có mã xuất nhập nào ở định khu đang chọn.');
+
+        // Bảng định khu nạp JSON chỉ có sau khi mở tab nên lấy API ở thời điểm dùng
+        function zoneTable() {
+            return $.fn.dataTable.isDataTable('#invZoneTable') ? $('#invZoneTable').DataTable() : null;
+        }
 
         /* ---------- Lọc tồn theo định khu Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí ----------
         | Năm ô chọn dây chuyền: chọn cấp trên thì cấp dưới chỉ còn các mục thuộc cấp đó.
@@ -1047,8 +1080,8 @@
         */
         var $picker = $('.inv-zone-picker');
 
-        if ($picker.length) {
-            var zones = $picker.data('zones') || {};
+        function invZonePicker(zones) {
+            zones = zones || {};
 
             // Cấp dưới lọc theo cột nào của cấp trên
             var levels = [
@@ -1081,12 +1114,21 @@
 
                 $el.find('option:gt(0)').remove();
                 items.forEach(function(item) {
-                    $el.append($('<option></option>')
+                    var $option = $('<option></option>')
                         .attr('value', item.id)
-                        .text(item.name + (item.code ? ' (' + item.code + ')' : '')));
+                        .text(item.name ? item.name + (item.code ? ' (' + item.code + ')' : '') : item.code);
+                    // Cấp vị trí: chấm màu phân loại định khu (window.wmsZoneTemplate)
+                    if (level.name === 'location') $option.attr('data-zone', item.zone_type || '');
+                    $el.append($option);
                 });
 
                 $el.val(picked[level.name] || '').prop('disabled', items.length === 0);
+                if ($el.hasClass('select2-hidden-accessible')) $el.trigger('change.select2');
+            }
+
+            // Ô Vị trí dùng select2 để hiện chấm màu phân loại trước mã vị trí
+            if ($.fn.select2) {
+                $select('location').select2({ theme: 'bootstrap4', width: '100%' });
             }
 
             function fillAll() {
@@ -1107,30 +1149,46 @@
             }
 
             // Lọc dòng: cấp nào đang chọn thì dòng phải khớp đúng cấp đó
-            $.fn.dataTable.ext.search.push(function(settings, data, index) {
+            // Dòng JSON mang <cấp>_id, dòng render sẵn mang data-<cấp> trên <tr>
+            $.fn.dataTable.ext.search.push(function(settings, data, index, rowData) {
                 if (settings.nTable.id !== 'invZoneTable') return true;
 
-                var $row = $(settings.aoData[index].nTr);
+                var tr = settings.aoData[index].nTr;
 
                 return levels.every(function(level) {
                     return !picked[level.name] ||
-                        String($row.data(level.name) || '') === String(picked[level.name]);
+                        String(invRowValue(rowData, tr, level.name + '_id', level.name) || '') ===
+                        String(picked[level.name]);
                 });
             });
 
             function applyZone() {
-                zoneTable.draw();
+                $('.inv-zone-path').text(pathText());
+
+                var api = zoneTable();
+
+                if (!api) return;
+
+                api.draw();
 
                 // Đếm trên đúng phần đang hiển thị sau khi lọc
-                var rows = zoneTable.rows({ search: 'applied' }).nodes();
+                var count = 0;
                 var chems = {};
 
-                $(rows).each(function() { chems[$(this).data('category')] = true; });
+                api.rows({ search: 'applied' }).every(function() {
+                    chems[invRowValue(this.data(), this.node(), 'category_id', 'category')] = true;
+                    count++;
+                });
 
-                $('.inv-zone-path').text(pathText());
-                $('.inv-zone-codes').text(rows.length);
+                $('.inv-zone-codes').text(count);
                 $('.inv-zone-chems').text(Object.keys(chems).length);
             }
+
+            // Bảng định khu nạp JSON gọi lại sau khi dựng để đếm số mã / hoá chất
+            window.invApplyZone = applyZone;
+
+            // Bảng định khu data-deferred: dòng về sau khi trang dựng xong thì đếm lại
+            $('#invZoneTable').on('md:rows-loaded', applyZone);
 
             $(document).on('change', '.inv-zone-select', function() {
                 picked[$(this).data('level')] = $(this).val();
@@ -1150,7 +1208,36 @@
             applyZone();
         }
 
+        /*
+        | Danh sách 5 cấp định khu: nằm sẵn ở [data-zones], hoặc tải khi mở tab Theo định
+        | khu lần đầu nếu picker khai [data-zones-url] - phòng nhiều vị trí thì danh sách
+        | này nặng, không cần tải cho người chỉ xem tab khác.
+        */
+        if ($picker.length) {
+            var zonesUrl = $picker.data('zones-url');
+            var zonesPane = $picker.closest('.inv-pane').attr('id');
+            var zonesRequested = false;
 
+            function invLoadZones() {
+                if (zonesRequested) return;
+
+                zonesRequested = true;
+                $.getJSON(zonesUrl).done(invZonePicker).fail(function() {
+                    // Lỗi mạng thì cho thử lại ở lần mở tab sau
+                    zonesRequested = false;
+                });
+            }
+
+            if (!zonesUrl) {
+                invZonePicker($picker.data('zones'));
+            } else {
+                if ($picker.closest('.inv-pane').hasClass('is-active')) invLoadZones();
+
+                $(document).on('inv:pane-shown', function(e, pane) {
+                    if (pane === zonesPane) invLoadZones();
+                });
+            }
+        }
 
         /* ---------- Modal Cân Đối ---------- */
         var $balancing = $('#balancingModal');
@@ -1861,7 +1948,7 @@
                 mvHideState();
 
                 $mvTable.find('tbody').html(rows.map(function(row, index) {
-                    var opening = row.kind === 'Tồn đầu kỳ';
+                    var opening = row.kind === @json(\App\Support\InventoryMovements::OPENING_ROW);
                     return '<tr class="' + (opening ? 'imv-row-opening' : '') + '">' +
                         '<td class="text-center">' + (index + 1) + '</td>' +
                         cols.map(function(c) { return mvCell(row, c); }).join('') +
@@ -1942,6 +2029,9 @@
 
             $('.inv-pane').removeClass('is-active');
             $('#' + target).addClass('is-active');
+
+            // Màn hình nạp JSON dựng bảng của tab ở lần mở đầu tiên
+            $(document).trigger('inv:pane-shown', [target]);
 
             // DataTables đo sai bề rộng cột khi bảng bị ẩn lúc khởi tạo
             $.fn.dataTable.tables({

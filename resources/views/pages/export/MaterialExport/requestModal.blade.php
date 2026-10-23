@@ -251,7 +251,7 @@
                     <div class="me-req-toolbar mb-3">
                         <div class="me-field flex-grow-1" style="min-width: 280px;">
                             <label>Tiêu đề đề nghị</label>
-                            <input type="text" name="name" maxlength="255" class="form-control" value="{{ old('name') }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
+                            <input type="text" name="name" maxlength="255" class="form-control" list="matTitleOptionsRequest" autocomplete="off" value="{{ old('name') }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
                         </div>
                         <div class="me-field">
                             <label>Ngày mong muốn</label>
@@ -644,7 +644,12 @@
                     note: result.value.note,
                     source_type: srcType
                 }).done(function (res) {
-                    window.meWatchlistToast.fire({ icon: res.success ? 'success' : 'error', title: res.message || 'Có lỗi xảy ra!' });
+                    // Vật tư đang nằm trong phiếu chưa xong: thông báo dài, giữ hộp thoại cho người dùng đọc
+                    if (res.success && res.in_progress) {
+                        Swal.fire({ icon: 'info', title: 'Đã ghi nhận đề nghị', text: res.message });
+                    } else {
+                        window.meWatchlistToast.fire({ icon: res.success ? 'success' : 'error', title: res.message || 'Có lỗi xảy ra!' });
+                    }
                     if (res.success) $btn.find('i').removeClass('fa-bookmark').addClass('fa-check');
                 }).fail(function () {
                     window.meWatchlistToast.fire({ icon: 'error', title: 'Có lỗi xảy ra, vui lòng thử lại!' });

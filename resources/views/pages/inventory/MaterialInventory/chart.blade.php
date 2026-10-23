@@ -20,7 +20,7 @@
 --}}
 
 <div class="modal fade md-modal inv-chart-modal" id="matChartModal" tabindex="-1" role="dialog"
-    data-cancel-label="Loại bỏ" data-url="{{ route('pages.inventory.materialInventory.chart') }}"
+    data-cancel-label="Cách ly/Huỷ" data-url="{{ route('pages.inventory.materialInventory.chart') }}"
     data-from="{{ $period['from'] }}" data-to="{{ $period['to'] }}">
     <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 92vw;" role="document">
         <div class="modal-content">
@@ -77,7 +77,7 @@
                         <b class="inv-chart-used">—</b>
                     </div>
                     <div class="inv-chart-stat is-cancelled">
-                        <label>Loại Bỏ Trong Kỳ</label>
+                        <label>Cách Ly/Huỷ Trong Kỳ</label>
                         <b class="inv-chart-cancelled">—</b>
                     </div>
                     <div class="inv-chart-stat is-closing">

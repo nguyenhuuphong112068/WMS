@@ -97,6 +97,7 @@ class PublicChemicalLookupController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 'locations.warehouse_id',
                 'locations.shelf_id',
                 'locations.column_id',

@@ -87,7 +87,7 @@
     $zoneTypeLabel = fn($value) => $locationTypes[$value] ?? 'Dùng chung';
 
     /*
-    | PHÂN LOẠI & MÀU - dùng chung cho cả 5 cấp.
+    | PHÂN LOẠI chỉ khai ở cấp vị trí; MÀU dùng chung cho cả 5 cấp.
     | Màu hiển thị của một dòng: màu người dùng tự chọn, thiếu thì lấy màu mặc định
     | của phân loại, chưa phân loại nữa thì dùng màu chủ đạo (App\Support\ZoneType).
     */

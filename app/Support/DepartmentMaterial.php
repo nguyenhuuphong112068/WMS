@@ -205,6 +205,7 @@ class DepartmentMaterial
                 'material_categories.code as category_code',
                 'material_categories.technical_specification as category_technical_specification',
                 'material_categories.classification as category_classification',
+                'material_categories.purchasing_department as category_purchasing_department',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
@@ -212,6 +213,7 @@ class DepartmentMaterial
                 'units.name as unit_name',
                 'department_classification.name as classification_name',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',
@@ -235,8 +237,12 @@ class DepartmentMaterial
             ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
             ->select(
                 'material_categories.id',
+                'material_categories.code',
                 'material_categories.technical_specification',
                 'material_categories.classification',
+                'material_categories.part_number',
+                'material_categories.purchasing_department',
+                'material_categories.lead_time_days',
                 'material_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name'
@@ -251,7 +257,44 @@ class DepartmentMaterial
             $query->whereNotIn('material_categories.id', $exclude);
         }
 
-        return $query->get();
+        $categories = $query->get();
+        $suggested = self::suggestedUnits($categories->pluck('id')->all());
+
+        foreach ($categories as $category) {
+            $category->suggested_unit_id = $suggested[$category->id] ?? null;
+        }
+
+        return $categories;
+    }
+
+    /**
+     * Đơn vị tính gợi ý khi phòng khai một vật tư: đơn vị được các phòng ĐÃ khai vật tư đó
+     * dùng nhiều nhất (hoà thì lấy đơn vị của lần khai gần nhất). Vật tư chưa phòng nào
+     * khai thì không có gợi ý.
+     *
+     * @return array<int, int> category_id => unit_id
+     */
+    public static function suggestedUnits(array $categoryIds): array
+    {
+        if (! $categoryIds) {
+            return [];
+        }
+
+        $rows = DB::table(self::TABLE)
+            ->select('category_id', 'unit_id', DB::raw('COUNT(*) as uses'), DB::raw('MAX(id) as last_id'))
+            ->whereIn('category_id', $categoryIds)
+            ->whereNotNull('unit_id')
+            ->groupBy('category_id', 'unit_id')
+            ->orderByDesc('uses')
+            ->orderByDesc('last_id')
+            ->get();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row->category_id] ??= (int) $row->unit_id;
+        }
+
+        return $result;
     }
 
     /**

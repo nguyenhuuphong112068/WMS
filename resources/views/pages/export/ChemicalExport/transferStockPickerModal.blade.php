@@ -257,7 +257,11 @@
                     $row = window.chemAddTransferRow($tbody);
                 }
 
-                $row.find('.select-chem-transfer-category').val(catId).trigger('change');
+                // Ô chọn tìm qua AJAX: dựng option từ dòng picker (đơn vị phòng mình tra lại khi change)
+                var $category = $row.find('.select-chem-transfer-category');
+
+                wmsEnsureOption($category, catId, $(this).data('code') + ' - ' + $(this).data('name'), { code: $(this).data('code') });
+                $category.val(catId).trigger('change');
             });
 
             $('#chemStockPickerModal').modal('hide');

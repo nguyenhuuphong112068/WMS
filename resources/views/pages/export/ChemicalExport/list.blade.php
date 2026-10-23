@@ -12,9 +12,6 @@
     $expLabel = 'phiếu sử dụng hoá chất';
     $expIcon = 'fas fa-vials';
 
-    // Bước 2 của nghiệp vụ huỷ bỏ: gom phiếu loại bỏ thành đợt xin quyết định huỷ
-    $dspRoute = 'pages.export.chemicalDisposal.';
-
     /**
      * Hoá chất thuộc Nhóm HC Cấm (Luật Đầu tư 2025, số 143/2025/QH15) - bắt buộc khai
      * Người Kiểm Tra trên phiếu sử dụng, hoá chất thường thì không.
@@ -44,6 +41,7 @@
 
     /** Ngày hiển thị d/m/Y, trống thì gạch ngang. */
     $expDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
+    $expDateTime = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y H:i') : '—';
 
     /**
      * Nhóm NĐ 24/2026 (suy tự động, mã N1..N10) của một mã danh mục -> chuỗi "N3,N9"
@@ -69,9 +67,7 @@
 
 @section('model')
     @include('pages.export.shared.historyModal')
-    @include('pages.export.ChemicalExport.disposalModal')
-    @include('pages.export.ChemicalExport.disposalDecideModal')
-    @include('pages.export.ChemicalExport.disposalCompleteModal')
+    @include('pages.export.ChemicalExport.quarantineModals')
     @include('pages.export.ChemicalExport.create')
     @include('pages.export.ChemicalExport.update')
     @include('pages.export.ChemicalExport.picker')
@@ -79,5 +75,7 @@
     @include('pages.export.ChemicalExport.transferStockPickerModal')
     @include('pages.export.ChemicalExport.transferRequestModal')
     @include('pages.export.ChemicalExport.transferRequestEditModal')
+    @include('pages.shared.titleDatalist', ['id' => 'chemTitleOptionsTransfer', 'titles' => $transferTitles])
     @include('pages.export.ChemicalExport.transferDetailModal')
+    @include('pages.export.ChemicalExport.transferReceiveCheckModal')
 @endsection

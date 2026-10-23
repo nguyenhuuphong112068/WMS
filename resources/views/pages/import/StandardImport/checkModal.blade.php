@@ -158,11 +158,13 @@
                         <div class="form-group col-md-12">
                             <label>Định khu vị trí lưu trữ thật <span class="text-danger">*</span></label>
                             <select name="location_id"
+                                data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'all']) }}" data-zone-filter
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}"
                                 required>
                                 <option value="">-- Chọn vị trí lưu trữ --</option>
-                                @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}"
+                                {{-- Gõ tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị old() --}}
+                                @foreach ($locations->where('id', old('location_id')) as $location)
+                                    <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
@@ -213,6 +215,8 @@
             $form.find('[name="expired_date"]').val(dateValue(row.expired_date));
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('[name="supplier_id"]').val(row.supplier_id || '').trigger('change');
+            // Ô định khu tìm qua AJAX: dựng option của định khu đang ghi trên ống
+            wmsEnsureOption($form.find('[name="location_id"]'), row.location_id, row.location_id_text, { zone: row.location_id_zone });
             $form.find('[name="location_id"]').val(row.location_id || '').trigger('change');
 
             $('#checkModal .sc-code').text(row.code || '—');

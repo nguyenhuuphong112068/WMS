@@ -20,10 +20,12 @@
                     <div class="form-row">
                         <div class="form-group col-md-8">
                             <label>Hoá Chất <span class="text-danger">*</span></label>
-                            <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
+                            <select name="category_id"
+                                data-lookup-url="{{ route('pages.category.lookup.chemicalCategories', ['scope' => 'import']) }}" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
                                 data-threshold-url="{{ route($impRoute . 'checkThreshold') }}" required>
                                 <option value="">-- Chọn hoá chất phòng đang dùng --</option>
-                                @foreach ($categories as $category)
+                                {{-- Gõ tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị old() --}}
+                                @foreach ($categories->where('id', old('category_id')) as $category)
                                     <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
                                         {{ $category->code }} - {{ $category->chem_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}
                                     </option>
@@ -85,10 +87,12 @@
                         <div class="form-group col-md-12">
                             <label>Định Khu</label>
                             <select name="location_id"
+                                data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'all']) }}" data-zone-filter
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
-                                @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}"
+                                {{-- Gõ tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị old() --}}
+                                @foreach ($locations->where('id', old('location_id')) as $location)
+                                    <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /

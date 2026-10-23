@@ -168,6 +168,17 @@
         color: var(--text-main, #2D3748);
     }
 
+    /* Quyền con (permissions.parent_id): thụt vào dưới quyền cha */
+    .permission-row.is-child .perm-name-cell {
+        padding-left: 36px;
+    }
+
+    .perm-child-icon {
+        margin-right: 6px;
+        font-size: 11px;
+        color: var(--primary-lighter, #9CC7EE);
+    }
+
     .perm-name-cell .permission-code {
         font-size: 11.5px;
         color: #9AA7B4;
@@ -293,9 +304,12 @@
                                         </tr>
 
                                         @foreach ($groupPermissions as $permission)
-                                            <tr class="permission-row">
-                                                <td class="perm-name-cell">
+                                            <tr class="permission-row {{ $permission->parent_id ? 'is-child' : '' }}">
+                                                <td class="perm-name-cell" @if (($permission->depth ?? 0) > 1) style="padding-left: {{ 12 + 24 * $permission->depth }}px" @endif>
                                                     <div class="permission-name">
+                                                        @if ($permission->parent_id)
+                                                            <i class="fas fa-level-up-alt fa-rotate-90 perm-child-icon"></i>
+                                                        @endif
                                                         {{ $permission->display_name ?: $permission->name }}
                                                     </div>
                                                     <div class="permission-code">{{ $permission->name }}</div>
@@ -309,6 +323,7 @@
                                                         <input class="step-checkbox" type="checkbox"
                                                             data-role="{{ $role->id }}"
                                                             data-permission="{{ $permission->id }}"
+                                                            data-parent="{{ $permission->parent_id }}"
                                                             id="checkbox-{{ $permission->id }}-{{ $role->id }}"
                                                             name="permission" {{ user_can('role_update', 'disabled') }}
                                                             {{ isset($assigned[$role->id . '-' . $permission->id]) ? 'checked' : '' }}>
@@ -531,6 +546,18 @@
                 role_id: input.data('role'),
                 permission_id: input.data('permission'),
                 checked: checked
+            },
+            success: function() {
+                // Quyền con chỉ có hiệu lực khi có quyền cha: tick con thì tick cha, bỏ cha thì bỏ con
+                var role = input.data('role');
+                if (checked && input.data('parent')) {
+                    var parent = $('.step-checkbox[data-role="' + role + '"][data-permission="' + input.data('parent') + '"]');
+                    if (!parent.is(':checked')) parent.prop('checked', true).trigger('change');
+                }
+                if (!checked) {
+                    $('.step-checkbox[data-role="' + role + '"][data-parent="' + input.data('permission') + '"]:checked')
+                        .prop('checked', false).trigger('change');
+                }
             },
             error: function(xhr) {
                 var message = (xhr.responseJSON && xhr.responseJSON.error) ?

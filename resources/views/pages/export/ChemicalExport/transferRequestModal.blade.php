@@ -19,6 +19,7 @@
                                 Tiêu Đề Đề Nghị <span class="text-danger">*</span>
                             </label>
                             <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
+                                list="chemTitleOptionsTransfer" autocomplete="off"
                                 placeholder="VD: Xin hoá chất phục vụ thí nghiệm..." value="{{ old('title') }}" required>
                         </div>
                         <div class="form-group mb-0">
@@ -35,11 +36,7 @@
                             <div style="min-width: 280px;">
                                 <select name="to_department_id" class="form-control font-weight-bold" style="height: 38px !important;" required>
                                     <option value="">-- Chọn phòng ban đang giữ hoá chất --</option>
-                                    @foreach ($transferDepartments as $dept)
-                                        <option value="{{ $dept->id }}" {{ old('to_department_id') == $dept->id ? 'selected' : '' }}>
-                                            {{ $dept->name }} ({{ $dept->shortName }})
-                                        </option>
-                                    @endforeach
+                                    @include('layout.departmentOptions', ['departments' => $transferDepartments, 'selected' => old('to_department_id')])
                                 </select>
                             </div>
                         </div>
@@ -87,13 +84,10 @@
                                         <span class="badge badge-secondary px-2 py-1 chem-transfer-code" style="font-size: 0.82rem;"></span>
                                     </td>
                                     <td>
-                                        <select name="items[0][category_id]" class="form-control select-chem-transfer-category" required>
+                                        {{-- Gõ tìm qua AJAX (mọi hoá chất đã duyệt, kèm đơn vị phòng mình) --}}
+                                        <select name="items[0][category_id]" class="form-control select-chem-transfer-category"
+                                            data-lookup-url="{{ route('pages.category.lookup.chemicalCategories', ['scope' => 'approved']) }}" required>
                                             <option value="">-- Chọn hoá chất --</option>
-                                            @foreach ($categories as $cat)
-                                                <option value="{{ $cat->id }}" data-code="{{ $cat->code }}" data-unit="{{ $cat->unit_short_name ?: '' }}">
-                                                    {{ $cat->code }} - {{ $cat->chem_name }}
-                                                </option>
-                                            @endforeach
                                         </select>
                                     </td>
                                     <td>
@@ -151,10 +145,41 @@
      * Chỉ số items[i] đếm riêng từng bảng ở data-next-idx nên form tạo và các form điều
      * chỉnh không đụng nhau. Picker "Danh mục hoá chất phòng nguồn" cũng gọi hàm này.
      */
+    /*
+    | Ô chọn hoá chất của dòng đề nghị: select2 tìm qua AJAX (data-lookup-url), không in sẵn
+    | ~1.000 option cho mỗi dòng / mỗi modal điều chỉnh.
+    */
+    window.chemInitTransferSelect = function ($select) {
+        if (!$select.length || $select.hasClass('select2-hidden-accessible')) return;
+
+        var $modal = $select.closest('.modal');
+
+        $select.select2({
+            theme: 'bootstrap4',
+            width: '100%',
+            dropdownParent: $modal.length ? $modal : $(document.body),
+            placeholder: '-- Chọn hoá chất --',
+            ajax: wmsLookupAjax($select),
+            language: {
+                noResults: function () { return 'Không tìm thấy dữ liệu phù hợp'; },
+                searching: function () { return 'Đang tìm...'; },
+                loadingMore: function () { return 'Đang tải thêm...'; },
+                errorLoading: function () { return 'Không tải được dữ liệu, vui lòng thử lại'; }
+            }
+        });
+    };
+
     window.chemAddTransferRow = function (tbody) {
         var $tbody = $(tbody);
         var next = parseInt($tbody.attr('data-next-idx') || $tbody.children('tr').length, 10);
         var $newRow = $tbody.children('tr').first().clone();
+
+        // Bản sao mang theo khung select2 của dòng gốc: gỡ ra rồi khởi tạo lại cho ô mới
+        $newRow.find('.select2-container').remove();
+        $newRow.find('select.select-chem-transfer-category')
+            .removeClass('select2-hidden-accessible')
+            .removeAttr('data-select2-id aria-hidden tabindex')
+            .find('option').not('[value=""]').remove();
 
         $newRow.find('select, input, textarea').each(function () {
             var name = $(this).attr('name');
@@ -169,6 +194,7 @@
         $newRow.find('.chem-transfer-code').text('');
         $tbody.attr('data-next-idx', next + 1);
         $tbody.append($newRow);
+        window.chemInitTransferSelect($newRow.find('select.select-chem-transfer-category'));
         $tbody.find('.btn-remove-chem-transfer-row').prop('disabled', $tbody.children('tr').length <= 1);
 
         return $tbody.children('tr').last();
@@ -185,17 +211,41 @@
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        // Chọn hoá chất thì hiện mã và điền sẵn đơn vị phòng mình đang dùng cho hoá chất đó
-        $(document).on('change', '.select-chem-transfer-category', function() {
-            var $option = $(this).find('option:selected');
-            var $row = $(this).closest('tr');
-            var unit = $option.data('unit') || '';
+        $('.select-chem-transfer-category').each(function() {
+            window.chemInitTransferSelect($(this));
+        });
 
-            $row.find('.chem-transfer-code').text($option.data('code') || '');
-
+        function chemApplyTransferUnit($row, unit) {
             if (unit && $row.find('select[name*="[requested_unit]"] option[value="' + unit + '"]').length) {
                 $row.find('select[name*="[requested_unit]"]').val(unit);
             }
+        }
+
+        // Chọn hoá chất thì hiện mã và điền sẵn đơn vị phòng mình đang dùng cho hoá chất đó.
+        // Kết quả tìm AJAX mang sẵn code/unit; option render sẵn mang data-code/data-unit.
+        $(document).on('change', '.select-chem-transfer-category', function() {
+            var $select = $(this);
+            var $row = $select.closest('tr');
+            var item = wmsSelectedItems($select)[0] || {};
+
+            $row.find('.chem-transfer-code').text(item.code || '');
+
+            if (item.unit !== undefined) {
+                chemApplyTransferUnit($row, item.unit);
+                return;
+            }
+
+            // Option dựng từ picker tồn phòng nguồn chưa biết đơn vị phòng mình: tra lại theo mã
+            if (!item.id || !item.code) return;
+
+            $.getJSON($select.data('lookup-url'), { q: item.code, page: 1 }).done(function(res) {
+                var hit = ((res && res.results) || []).filter(function(r) { return String(r.id) === String(item.id); })[0];
+
+                if (hit && String($select.val()) === String(item.id)) {
+                    $select.find('option:selected').attr('data-unit', hit.unit || '');
+                    chemApplyTransferUnit($row, hit.unit);
+                }
+            });
         });
 
         $(document).on('click', '.btn-add-chem-transfer-row', function() {

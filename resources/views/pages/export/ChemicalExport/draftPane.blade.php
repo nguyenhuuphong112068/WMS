@@ -1,5 +1,7 @@
 {{--
-| SỬ DỤNG - TAB PHIẾU TẠM
+| SỬ DỤNG - TAB "SỬ DỤNG HOÁ CHẤT" (tab đầu, khoá quyền vẫn là 'draft')
+|
+| Có nút "Sử dụng hoá chất" mở modal lập phiếu (create.blade.php) + danh sách Phiếu Tạm bên dưới.
 |
 | Hoá chất đã chọn ở picker "Tồn Kho Của Phòng" rồi bấm Lưu Tạm - CHỈ chứa dòng loại
 | Sử dụng, chưa trừ kho. Loại bỏ / Chuyển kho luôn trừ kho ngay nên không bao giờ
@@ -20,9 +22,96 @@
     // Giá trị đổ vào ô nhập KHÔNG có dấu phân cách nghìn, tránh "1,234.5" gửi lên bị
     // đọc nhầm; các ô chỉ xem vẫn dùng $expNum (có dấu ",") cho dễ đọc.
     $draftRaw = fn ($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ''), '0'), '.');
+
+    // Phiếu của người đang đăng nhập luôn đứng đầu, người khác giữ nguyên thứ tự Controller trả về
+    $drafts = $drafts->sortBy(fn ($rows, $owner) => $owner === $draftActor ? 0 : 1);
 @endphp
 
+<style>
+    /* ---------- Card Phiếu Tạm theo từng người: viền đậm + thu gọn / phóng to ---------- */
+    #expPaneDraft .draft-card {
+        border: 1.5px solid var(--primary-lighter);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    #expPaneDraft .draft-card:hover {
+        border-color: var(--primary-light);
+    }
+
+    #expPaneDraft .draft-card.is-mine {
+        border: 2px solid var(--primary);
+        border-left-width: 5px;
+    }
+
+    #expPaneDraft .draft-card>.card-body {
+        padding: 14px 18px;
+    }
+
+    #expPaneDraft .draft-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    #expPaneDraft .draft-card-title {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    #expPaneDraft .draft-toggle {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        margin-right: 6px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: var(--border-radius-md);
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        transition: all 0.2s;
+    }
+
+    #expPaneDraft .draft-toggle:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+    }
+
+    #expPaneDraft .draft-toggle i {
+        transition: transform 0.25s;
+    }
+
+    #expPaneDraft .draft-card.is-collapsed .draft-toggle i {
+        transform: rotate(-90deg);
+    }
+
+    #expPaneDraft .draft-card-body {
+        margin-top: 12px;
+    }
+
+    #expPaneDraft .draft-card.is-collapsed .draft-card-body {
+        display: none;
+    }
+</style>
+
+@tab('export_chemical', 'draft')
 <div class="exp-pane {{ $activeTab === 'draft' ? 'is-active' : '' }}" id="expPaneDraft">
+
+    <div class="md-toolbar">
+        @perm('export_chemical_issue')
+            <button type="button" class="btn btn-primary btn-md-create">
+                <i class="fas fa-plus mr-1"></i> Sử dụng hoá chất
+            </button>
+        @endperm
+    </div>
 
     @if ($draftErrBag->any())
         <div class="alert alert-danger">
@@ -41,7 +130,8 @@
             $draftIsMine = $draftOwnerKey === $draftActor;
             $draftSavedAt = $rows->max('created_at');
         @endphp
-        <div class="card md-card mb-3">
+        {{-- data-owner: khoá nhớ trạng thái thu gọn / phóng to của từng card trên trình duyệt người xem --}}
+        <div class="card md-card mb-3 draft-card {{ $draftIsMine ? 'is-mine' : '' }}" data-owner="{{ $draftOwner }}">
             <div class="card-body">
                 {{-- Cả card là MỘT form: các ô sửa của mọi dòng cùng gửi lên, nút nào bấm thì
                      JS đổi action + đặt only_id cho nút đó (xem khối script cuối file) --}}
@@ -49,8 +139,11 @@
                     @csrf
                     <input type="hidden" name="only_id" value="">
 
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div>
+                <div class="draft-card-head">
+                    <div class="draft-card-title" title="Thu gọn / phóng to">
+                        <button type="button" class="btn draft-toggle" aria-label="Thu gọn / phóng to">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
                         <i class="fas fa-user-clock mr-1 text-primary"></i>
                         <b>{{ $draftOwner }}</b>
                         @if ($draftIsMine)
@@ -83,7 +176,7 @@
                     </div>
                 </div>
 
-                <div class="table-responsive">
+                <div class="table-responsive draft-card-body">
                     {{-- data-no-datatable: bảng có ô nhập, để DataTables gỡ dòng sang trang khác
                          thì các ô đang sửa rời khỏi DOM và không gửi lên được --}}
                     <table class="table table-bordered table-sm md-table mb-0" data-no-datatable>
@@ -95,7 +188,6 @@
                                 <th class="text-right" style="width: 110px">Số Lượng</th>
                                 <th style="width: 150px">Người Kiểm Tra</th>
                                 <th>Mục Đích Sử Dụng</th>
-                                <th class="text-right" style="width: 140px">Còn Lại / Hạn Mức</th>
                                 <th class="text-center" style="width: 110px">Ngày Lưu</th>
                                 <th style="width: 150px">Người Lưu</th>
                                 <th class="text-center" style="width: 110px">Thao Tác</th>
@@ -157,8 +249,8 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <input type="text" name="items[{{ $row->id }}][purpose]" maxlength="500"
-                                                class="form-control form-control-sm" value="{{ $row->purpose }}"
+                                            <input type="text" name="items[{{ $row->id }}][purpose]" maxlength="500" autocomplete="off"
+                                                class="form-control form-control-sm js-product-ac" value="{{ $row->purpose }}"
                                                 placeholder="Mục đích / lý do">
                                         </td>
                                     @else
@@ -175,13 +267,8 @@
                                             @endif
                                         </td>
                                     @endif
-                                    <td class="text-right md-sub">
-                                        {{ $expNum($row->draft_available ?? 0) }} /
-                                        <b class="{{ ($row->draft_over ?? false) ? 'text-danger' : '' }}">{{ $expNum($row->draft_limit ?? 0) }}</b>
-                                        <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
-                                    </td>
                                     <td class="text-center md-sub">
-                                        {{ \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') }}
+                                        {{ $expDate($row->created_at) }}
                                     </td>
                                     <td class="md-sub">{{ $row->created_by ?: '—' }}</td>
                                     <td class="text-center">
@@ -216,14 +303,55 @@
         </div>
     @empty
         <div class="text-center md-empty py-4">
-            Chưa có Phiếu Tạm nào. Mở modal <b>Sử dụng hoá chất</b>, bấm <b>Tồn Kho Của Phòng</b> rồi
-            <b>Lưu Tạm</b>.
+            Chưa có Phiếu Tạm nào.
         </div>
     @endforelse
 </div>
+@endtab
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        /*
+        | THU GỌN / PHÓNG TO card từng người. Mặc định phiếu của mình mở, phiếu người khác thu gọn;
+        | người xem đổi thì nhớ lại trên trình duyệt (localStorage, lỗi / chặn thì dùng mặc định).
+        */
+        var draftStoreKey = 'wms.chemicalExport.draftCollapsed';
+
+        function draftLoadState() {
+            try {
+                return JSON.parse(localStorage.getItem(draftStoreKey) || '{}') || {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function draftSaveState(state) {
+            try {
+                localStorage.setItem(draftStoreKey, JSON.stringify(state));
+            } catch (e) {}
+        }
+
+        var draftState = draftLoadState();
+        var draftHasErrors = {{ $draftErrBag->any() ? 'true' : 'false' }};
+
+        $('#expPaneDraft .draft-card').each(function() {
+            var owner = String($(this).data('owner'));
+            var collapsed = owner in draftState ? !!draftState[owner] : !$(this).hasClass('is-mine');
+
+            // Vừa lưu lỗi thì luôn mở phiếu của mình để thấy dòng cần sửa
+            if (draftHasErrors && $(this).hasClass('is-mine')) collapsed = false;
+
+            $(this).toggleClass('is-collapsed', collapsed);
+        });
+
+        $(document).on('click', '#expPaneDraft .draft-card-title', function() {
+            var $card = $(this).closest('.draft-card');
+
+            $card.toggleClass('is-collapsed');
+            draftState[String($card.data('owner'))] = $card.hasClass('is-collapsed');
+            draftSaveState(draftState);
+        });
+
         /*
         | Mọi nút của Phiếu Tạm đi chung MỘT form của card để phần người dùng đang sửa
         | trên bảng luôn được gửi kèm. Nút nào bấm thì đặt lại action + only_id của nút
@@ -233,6 +361,9 @@
         $(document).on('click', '#expPaneDraft .draft-action', function() {
             var $btn = $(this);
             var $form = $btn.closest('form.draft-form');
+
+            // Ô nhập nằm trong card đang thu gọn thì trình duyệt không báo lỗi được - mở card ra trước
+            $btn.closest('.draft-card').removeClass('is-collapsed');
 
             // Số lượng bỏ trống / người kiểm tra bắt buộc còn thiếu thì báo ngay tại ô.
             // Nút xoá không cần xét: đang xoá thì ô nhập còn thiếu cũng không sao.

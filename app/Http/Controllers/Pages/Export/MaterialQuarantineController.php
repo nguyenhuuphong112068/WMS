@@ -9,6 +9,7 @@ use App\Support\DepartmentMaterial;
 use App\Support\ListRange;
 use App\Support\MaterialCode;
 use App\Support\MaterialPicking;
+use App\Support\ZoneType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -19,15 +20,16 @@ use Illuminate\Support\Facades\Validator;
  * Nằm trong tab "Cách ly - Loại Bỏ - Huỷ" của Sử Dụng Vật Tư nên không có action index riêng; dữ
  * liệu do MaterialExportController::index() nạp qua paneData().
  *
- *   BƯỚC 1 - CÁCH LY  (quarantined): phát hiện hàng hỏng thì cách ly chờ quyết định. Hàng
- *                     KHÔNG trừ tồn sổ sách (vẫn nằm trong kho) nhưng bị giữ chỗ qua
- *                     App\Support\MaterialPicking - mọi màn cấp phát / chuyển đi không lấy
- *                     được. Quyết định "Trả về kho" (returned) thì nhả ra dùng lại.
- *   BƯỚC 2 - LOẠI BỎ  (removed)    : quyết định loại bỏ -> sinh material_exports type =
- *                     cancel (quarantine_id trỏ về phiếu cách ly), TRỪ TỒN THẬT. Phiếu này
- *                     bị khoá sửa / khoá ở Sổ sử dụng: không có đường quay lại kho.
+ *   BƯỚC 1 - CÁCH LY  (quarantined): phát hiện hàng hỏng thì dời sang định khu "Chờ Quyết
+ *                     Định" -> TRỪ TỒN NGAY bằng material_exports type = cancel (quarantine_id
+ *                     trỏ về phiếu cách ly, xem deductStock()): hàng không còn ở vị trí sử
+ *                     dụng nên không cấp phát / chuyển đi được. Quyết định "Trả về kho"
+ *                     (returned) thì khoá dòng xuất đó (status_id = 0) - tồn quay lại.
+ *   BƯỚC 2 - LOẠI BỎ  (removed)    : quyết định loại bỏ -> giữ nguyên dòng xuất đã trừ ở bước
+ *                     1, hàng dời sang định khu "Loại Bỏ/Chờ Huỷ". Dòng xuất bị khoá sửa /
+ *                     khoá ở Sổ sử dụng: không có đường quay lại kho.
  *   BƯỚC 3 - HUỶ      (destroyed)  : ghi nhận đã huỷ thực tế (phương pháp, ghi chú). Không
- *                     động tồn - tồn đã trừ từ bước 2.
+ *                     động tồn - tồn đã trừ từ bước 1.
  *
  * Quyết định (bước 2) và huỷ (bước 3) là thao tác ký xác nhận: nhập lại mật khẩu -
  * 21 CFR Part 11.
@@ -53,7 +55,7 @@ class MaterialQuarantineController extends Controller
     private const EPSILON = 0.00005;
 
     public const STATUSES = [
-        'quarantined' => 'Đang cách ly',
+        'quarantined' => 'Cách ly - Chờ quyết định',
         'removed' => 'Đã loại bỏ - chờ huỷ',
         'destroyed' => 'Đã huỷ',
         'returned' => 'Đã trả về kho',
@@ -71,6 +73,14 @@ class MaterialQuarantineController extends Controller
 
     /** Phiếu CHƯA XONG - bộ lọc khoảng ngày luôn giữ lại dù đã ngoài khoảng lọc. */
     private const PENDING_STATUSES = ['quarantined', 'removed'];
+
+    /** Định khu hàng đang cách ly (bước 1) và hàng đã loại bỏ chờ huỷ (bước 2) - App\Support\ZoneType. */
+    public const PENDING_ZONE = 'pending';
+
+    public const REJECTED_ZONE = 'rejected';
+
+    /** Trả về kho: được đặt vào mọi định khu vật tư của phòng, trừ khu Chờ Quyết Định / Loại Bỏ. */
+    private const NOT_RETURN_ZONES = [self::PENDING_ZONE, self::REJECTED_ZONE];
 
     public const DECISIONS = [
         'remove' => 'Loại bỏ',
@@ -95,6 +105,9 @@ class MaterialQuarantineController extends Controller
             ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
             ->leftJoin('locations', 'material_imports.location_id', '=', 'locations.id')
+            ->leftJoin('locations as pending_locations', self::TABLE.'.pending_location_id', '=', 'pending_locations.id')
+            ->leftJoin('locations as rejected_locations', self::TABLE.'.rejected_location_id', '=', 'rejected_locations.id')
+            ->leftJoin('locations as returned_locations', self::TABLE.'.returned_location_id', '=', 'returned_locations.id')
             ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
             ->select(
                 self::TABLE.'.*',
@@ -104,6 +117,14 @@ class MaterialQuarantineController extends Controller
                 'material_categories.technical_specification',
                 'material_names.name as material_name',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
+                'pending_locations.code as pending_location_code',
+                'pending_locations.zone_type as pending_location_zone_type',
+                'rejected_locations.code as rejected_location_code',
+                'rejected_locations.zone_type as rejected_location_zone_type',
+                'returned_locations.code as returned_location_code',
+                'returned_locations.zone_type as returned_location_zone_type',
+                'material_imports.location_id as lot_location_id',
                 'units.short_name as unit_short_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
@@ -134,11 +155,11 @@ class MaterialQuarantineController extends Controller
             ->groupBy('app_status')
             ->pluck('total', 'app_status');
 
-        // Lô cách ly được: còn tồn sổ sách chưa bị cách ly (kể cả lô hết hạn - hàng hết hạn
-        // cũng là hàng phải loại bỏ; kể cả phần đang hứa cho đợt lấy hàng).
+        // Lô cách ly được: còn tồn sổ sách (hàng đang cách ly đã trừ tồn rồi; kể cả lô hết hạn -
+        // hàng hết hạn cũng là hàng phải loại bỏ; kể cả phần đang hứa cho đợt lấy hàng).
         $lots = MaterialPicking::lots($departmentId)
             ->map(function ($lot) {
-                $lot->quarantinable = max($lot->remaining - $lot->quarantined, 0);
+                $lot->quarantinable = $lot->remaining;
 
                 return $lot;
             })
@@ -172,6 +193,9 @@ class MaterialQuarantineController extends Controller
             'lots' => $lots,
             'expiring' => $expiring,
             'expiringDays' => $expiringDays,
+            'pendingLocations' => self::zoneLocations($departmentId, self::PENDING_ZONE),
+            'rejectedLocations' => self::zoneLocations($departmentId, self::REJECTED_ZONE),
+            'returnLocations' => self::returnLocations($departmentId),
         ];
     }
 
@@ -194,6 +218,7 @@ class MaterialQuarantineController extends Controller
             'items.*.import_id' => ['required', 'integer'],
             'items.*.amount' => ['required', 'numeric', 'min:0.0001'],
             'reason' => ['required', 'string', 'max:500'],
+            'pending_location_id' => ['required', 'integer'],
         ], $this->messages());
 
         // import_id => ['lot' => lô, 'amount' => tổng số cách ly]
@@ -203,6 +228,8 @@ class MaterialQuarantineController extends Controller
             if (! is_array($request->items)) {
                 return;
             }
+
+            $this->checkZoneLocation($v, 'pending_location_id', $request->pending_location_id, self::PENDING_ZONE);
 
             $lots = MaterialPicking::lots($departmentId)->keyBy('id');
 
@@ -230,7 +257,7 @@ class MaterialQuarantineController extends Controller
             }
 
             foreach ($picked as $row) {
-                $limit = max($row['lot']->remaining - $row['lot']->quarantined, 0);
+                $limit = $row['lot']->remaining;
 
                 if ($row['amount'] > $limit + self::EPSILON) {
                     $v->errors()->add(
@@ -250,8 +277,10 @@ class MaterialQuarantineController extends Controller
         }
 
         $reason = trim((string) $request->reason);
+        $locationId = (int) $request->pending_location_id;
+        $locationCode = (string) DB::table('locations')->where('id', $locationId)->value('code');
 
-        $created = DB::transaction(function () use ($picked, $departmentId, $reason) {
+        $created = DB::transaction(function () use ($picked, $departmentId, $reason, $locationId, $locationCode) {
             $created = [];
 
             foreach ($picked as $row) {
@@ -263,6 +292,7 @@ class MaterialQuarantineController extends Controller
                     'import_id' => (int) $row['lot']->id,
                     'amount' => $row['amount'],
                     'reason' => $reason,
+                    'pending_location_id' => $locationId,
                     'app_status' => 'quarantined',
                     'status_id' => 1,
                     'created_by' => $this->actor(),
@@ -270,12 +300,14 @@ class MaterialQuarantineController extends Controller
                     'updated_at' => now(),
                 ]);
 
+                self::deductStock($id, $this->actor());
+
                 AuditTrialController::log(
                     'Cách ly vật tư hỏng',
                     self::TABLE,
                     $id,
                     'NA',
-                    'Phiếu '.$code.', mã xuất nhập: '.$row['lot']->code.', số lượng: '.$this->number($row['amount']).', lý do: '.$reason
+                    'Phiếu '.$code.', mã xuất nhập: '.$row['lot']->code.', số lượng: '.$this->number($row['amount']).', định khu chờ quyết định: '.$locationCode.', lý do: '.$reason
                 );
 
                 $created[] = $row + ['code' => $code];
@@ -292,7 +324,7 @@ class MaterialQuarantineController extends Controller
                 ->implode(', ').'.';
 
         return redirect()->back()
-            ->with('success', $message.' Hàng không còn cấp phát được cho tới khi có quyết định.')
+            ->with('success', $message.' Đã trừ tồn, hàng không còn cấp phát được cho tới khi có quyết định.')
             ->with('activeTab', 'quarantine');
     }
 
@@ -308,11 +340,15 @@ class MaterialQuarantineController extends Controller
         $validator = Validator::make($request->all(), [
             'amount' => ['required', 'numeric', 'min:0.0001'],
             'reason' => ['required', 'string', 'max:500'],
+            'pending_location_id' => ['required', 'integer'],
         ], $this->messages());
 
         $validator->after(function ($v) use ($request, $current) {
+            $this->checkZoneLocation($v, 'pending_location_id', $request->pending_location_id, self::PENDING_ZONE);
+
             $lot = MaterialPicking::lots($this->departmentId())->firstWhere('id', (int) $current->import_id);
-            $limit = $lot ? max($lot->remaining - MaterialPicking::quarantinedOf((int) $lot->id, (int) $current->id), 0) : 0;
+            // Phần của chính phiếu này đã trừ khỏi tồn - cộng lại trước khi so
+            $limit = ($lot ? $lot->remaining : 0) + ($current->export_id ? (float) $current->amount : 0);
 
             if (is_numeric($request->amount) && (float) $request->amount > $limit + self::EPSILON) {
                 $v->errors()->add('amount', 'Mã xuất nhập chỉ còn '.$this->number($limit).' có thể cách ly.');
@@ -325,6 +361,7 @@ class MaterialQuarantineController extends Controller
 
         $amount = round((float) $request->amount, 4);
         $reason = trim((string) $request->reason);
+        $locationId = (int) $request->pending_location_id;
         $changes = [];
 
         if (abs($amount - (float) $current->amount) > self::EPSILON) {
@@ -335,16 +372,38 @@ class MaterialQuarantineController extends Controller
             $changes[] = 'Lý do: '.$current->reason.' -> '.$reason;
         }
 
+        if ($locationId !== (int) $current->pending_location_id) {
+            $codes = DB::table('locations')->whereIn('id', [$locationId, (int) $current->pending_location_id])->pluck('code', 'id');
+            $changes[] = 'Định khu chờ quyết định: '.($codes[$current->pending_location_id] ?? '—').' -> '.($codes[$locationId] ?? '—');
+        }
+
         if (! $changes) {
             return $this->fail('Không có thông tin nào thay đổi.');
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update([
-            'amount' => $amount,
-            'reason' => $reason,
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($current, $amount, $reason, $locationId) {
+            DB::table(self::TABLE)->where('id', $current->id)->update([
+                'amount' => $amount,
+                'reason' => $reason,
+                'pending_location_id' => $locationId,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            // Dòng xuất trừ tồn đi theo số lượng / lý do của phiếu cách ly
+            if ($current->export_id) {
+                DB::table(self::EXPORT_TABLE)->where('id', $current->export_id)->update([
+                    'amount' => $amount,
+                    'reason' => mb_substr('Cách ly (phiếu '.$current->code.'): '.$reason, 0, 500),
+                    'updated_by' => $this->actor(),
+                    'updated_at' => now(),
+                ]);
+
+                self::writeExportHistory((int) $current->export_id, 'Cập nhật', 'Sửa phiếu cách ly '.$current->code, $this->actor());
+            } else {
+                self::deductStock((int) $current->id, $this->actor());
+            }
+        });
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->code, implode('; ', $changes));
 
@@ -366,12 +425,28 @@ class MaterialQuarantineController extends Controller
         $validator = Validator::make($request->all(), [
             'decision' => ['required', 'in:'.implode(',', array_keys(self::DECISIONS))],
             'decision_note' => ['required', 'string', 'max:500'],
+            'rejected_location_id' => ['required_if:decision,remove', 'nullable', 'integer'],
+            'returned_location_id' => ['required_if:decision,return', 'nullable', 'integer'],
         ], [
+            'returned_location_id.required_if' => 'Vui lòng chọn định khu đặt vật tư trả về kho.',
+            'returned_location_id.integer' => 'Định khu trả về kho không hợp lệ.',
+            'rejected_location_id.required_if' => 'Vui lòng chọn định khu Loại Bỏ/Chờ Huỷ cho vật tư bị loại bỏ.',
+            'rejected_location_id.integer' => 'Định khu Loại Bỏ/Chờ Huỷ không hợp lệ.',
             'decision.required' => 'Vui lòng chọn quyết định.',
             'decision.in' => 'Quyết định không hợp lệ.',
             'decision_note.required' => 'Vui lòng nhập nội dung / căn cứ quyết định.',
             'decision_note.max' => 'Nội dung quyết định tối đa 500 ký tự.',
         ]);
+
+        $validator->after(function ($v) use ($request, $current) {
+            if ($request->decision === 'remove' && $request->filled('rejected_location_id')) {
+                $this->checkZoneLocation($v, 'rejected_location_id', $request->rejected_location_id, self::REJECTED_ZONE);
+            }
+
+            if ($request->decision === 'return' && is_numeric($request->returned_location_id)) {
+                $this->checkReturnLocation($v, $current, (int) $request->returned_location_id);
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->back()
@@ -391,34 +466,89 @@ class MaterialQuarantineController extends Controller
         $at = now();
 
         if ($request->decision === 'return') {
-            DB::table(self::TABLE)->where('id', $current->id)->update([
-                'app_status' => 'returned',
-                'decision_note' => $note,
-                'decided_by' => $actor,
-                'decided_at' => $at,
-                'updated_by' => $actor,
-                'updated_at' => $at,
-            ]);
+            $returnedLocationId = (int) $request->returned_location_id;
+            $import = DB::table('material_imports')->where('id', $current->import_id)->first();
+            $oldLocationId = (int) ($import->location_id ?? 0);
+            $codes = DB::table('locations')->whereIn('id', [$returnedLocationId, $oldLocationId])->pluck('code', 'id');
 
-            AuditTrialController::log('Trả vật tư cách ly về kho', self::TABLE, $current->id, 'app_status: quarantined', 'app_status: returned; '.$note);
+            $done = DB::transaction(function () use ($current, $import, $note, $actor, $at, $returnedLocationId, $oldLocationId) {
+                $claimed = DB::table(self::TABLE)
+                    ->where('id', $current->id)
+                    ->where('app_status', 'quarantined')
+                    ->update([
+                        'app_status' => 'returned',
+                        'decision_note' => $note,
+                        'returned_location_id' => $returnedLocationId,
+                        'decided_by' => $actor,
+                        'decided_at' => $at,
+                        'updated_by' => $actor,
+                        'updated_at' => $at,
+                    ]);
+
+                if (! $claimed) {
+                    return false;
+                }
+
+                // Hoàn tồn: khoá dòng xuất đã trừ lúc cách ly - mọi công thức tồn chỉ cộng status_id = 1
+                if ($current->export_id) {
+                    DB::table(self::EXPORT_TABLE)->where('id', $current->export_id)->update([
+                        'status_id' => 0,
+                        'updated_by' => $actor,
+                        'updated_at' => $at,
+                    ]);
+
+                    self::writeExportHistory((int) $current->export_id, 'Trả về kho', 'Trả về kho theo quyết định phiếu cách ly '.$current->code.': '.$note, $actor);
+                }
+
+                // Cách ly cả lô (checkReturnLocation đã chặn một phần lô đổi vị trí): lô dời theo vị trí mới
+                if ($import && $returnedLocationId !== $oldLocationId) {
+                    DB::table('material_imports')->where('id', $import->id)->update([
+                        'location_id' => $returnedLocationId,
+                        'updated_by' => $actor,
+                        'updated_at' => $at,
+                    ]);
+                }
+
+                return true;
+            });
+
+            if (! $done) {
+                return $this->fail('Phiếu cách ly không còn ở trạng thái chờ quyết định!');
+            }
+
+            $moved = $returnedLocationId !== $oldLocationId;
+
+            AuditTrialController::log(
+                'Trả vật tư cách ly về kho',
+                self::TABLE,
+                $current->id,
+                'app_status: quarantined',
+                'app_status: returned; định khu trả về: '.($codes[$returnedLocationId] ?? '—')
+                    .($moved ? ' (vị trí lô: '.($codes[$oldLocationId] ?? '—').' -> '.($codes[$returnedLocationId] ?? '—').')' : '')
+                    .'; '.$note
+            );
 
             return redirect()->back()
-                ->with('success', 'Đã trả '.$this->number((float) $current->amount).' vật tư của phiếu '.$current->code.' về kho, hàng dùng lại được.')
+                ->with('success', 'Đã trả '.$this->number((float) $current->amount).' vật tư của phiếu '.$current->code
+                    .' về kho tại '.($codes[$returnedLocationId] ?? '—').', hàng dùng lại được.')
                 ->with('activeTab', 'quarantine');
         }
 
-        // Loại bỏ: trừ tồn thật. Tồn có thể đã giảm sau khi cách ly (cân đối kiểm kê...)
+        // Loại bỏ: tồn đã trừ từ lúc cách ly. Phiếu cũ (trước khi cách ly trừ tồn) chưa có dòng
+        // xuất thì mới phải xét tồn còn đủ không rồi trừ lúc này.
         $import = DB::table('material_imports')->where('id', $current->import_id)->first();
         $remaining = $import ? $this->remaining($import) : 0;
 
-        if ((float) $current->amount > $remaining + self::EPSILON) {
+        if (! $current->export_id && (float) $current->amount > $remaining + self::EPSILON) {
             return $this->fail(
                 'Mã xuất nhập '.($import->code ?? '').' chỉ còn tồn '.$this->number($remaining)
                 .', không đủ để loại bỏ '.$this->number((float) $current->amount).'. Hãy sửa lại số lượng cách ly trước.'
             );
         }
 
-        $done = DB::transaction(function () use ($current, $import, $note, $actor, $at) {
+        $rejectedLocationId = (int) $request->rejected_location_id;
+
+        $done = DB::transaction(function () use ($current, $import, $note, $actor, $at, $rejectedLocationId) {
             // Chốt trạng thái trước: hai người bấm quyết định cùng lúc thì chỉ một người thắng
             $claimed = DB::table(self::TABLE)
                 ->where('id', $current->id)
@@ -429,25 +559,19 @@ class MaterialQuarantineController extends Controller
                 return false;
             }
 
-            $exportId = DB::table(self::EXPORT_TABLE)->insertGetId([
-                'code' => $import->code,
-                'import_id' => (int) $import->id,
-                'department_id' => (int) $current->department_id,
-                'quarantine_id' => (int) $current->id,
-                'amount' => (float) $current->amount,
-                'type' => 'cancel',
-                'reason' => mb_substr($current->reason.' | Quyết định: '.$note, 0, 500),
-                'used_by' => $actor,
-                'status_id' => 1,
-                'created_by' => $actor,
-                'created_at' => $at,
+            $exportId = $current->export_id ? (int) $current->export_id : self::deductStock((int) $current->id, $actor);
+
+            DB::table(self::EXPORT_TABLE)->where('id', $exportId)->update([
+                'reason' => mb_substr($current->reason.' | Quyết định loại bỏ: '.$note, 0, 500),
+                'updated_by' => $actor,
                 'updated_at' => $at,
             ]);
 
-            $this->logExportHistory($exportId, 'Thêm mới', 'Loại bỏ từ phiếu cách ly '.$current->code);
+            self::writeExportHistory($exportId, 'Loại bỏ', 'Quyết định loại bỏ phiếu cách ly '.$current->code, $actor);
 
             DB::table(self::TABLE)->where('id', $current->id)->update([
                 'decision_note' => $note,
+                'rejected_location_id' => $rejectedLocationId,
                 'decided_by' => $actor,
                 'decided_at' => $at,
                 'export_id' => $exportId,
@@ -462,7 +586,13 @@ class MaterialQuarantineController extends Controller
             return $this->fail('Phiếu cách ly '.$current->code.' vừa được người khác quyết định, vui lòng tải lại trang.');
         }
 
-        AuditTrialController::log('Loại bỏ vật tư hỏng', self::TABLE, $current->id, 'app_status: quarantined', 'app_status: removed; '.$note);
+        AuditTrialController::log(
+            'Loại bỏ vật tư hỏng',
+            self::TABLE,
+            $current->id,
+            'app_status: quarantined',
+            'app_status: removed; định khu loại bỏ: '.DB::table('locations')->where('id', $rejectedLocationId)->value('code').'; '.$note
+        );
 
         return redirect()->back()
             ->with('success', 'Đã loại bỏ '.$this->number((float) $current->amount).' vật tư của phiếu '.$current->code.' (đã trừ tồn, không quay lại kho được). Chờ ghi nhận huỷ.')
@@ -540,6 +670,66 @@ class MaterialQuarantineController extends Controller
      |  HỖ TRỢ
      ========================================================== */
 
+    /** Vị trí định khu vật tư của phòng ban thuộc đúng một phân loại (pending / rejected), dùng cho ô chọn ở modal. */
+    public static function zoneLocations(int $departmentId, string $zoneType)
+    {
+        return DepartmentMaterial::locationOptions($departmentId)
+            ->where('zone_type', $zoneType)
+            ->values();
+    }
+
+    /** Định khu được chọn khi trả về kho: định khu vật tư của phòng, trừ khu Chờ Quyết Định / Loại Bỏ. */
+    public static function returnLocations(int $departmentId)
+    {
+        return DepartmentMaterial::locationOptions($departmentId)
+            ->reject(fn ($loc) => in_array($loc->zone_type, self::NOT_RETURN_ZONES, true))
+            ->values();
+    }
+
+    /**
+     * Vị trí trả về hợp lệ: thuộc returnLocations(), riêng vị trí cũ của lô luôn hợp lệ.
+     * Lô chỉ có MỘT vị trí - phiếu cách ly một phần lô thì phần còn lại vẫn ở vị trí cũ,
+     * nên chỉ trả về đúng vị trí đó; cách ly cả lô mới được đổi vị trí.
+     */
+    private function checkReturnLocation($validator, $current, int $locationId): void
+    {
+        $import = DB::table('material_imports')->where('id', $current->import_id)->first();
+        $oldLocationId = (int) ($import->location_id ?? 0);
+
+        if ($locationId === $oldLocationId) {
+            return;
+        }
+
+        if (! self::returnLocations($this->departmentId())->contains('id', $locationId)) {
+            $validator->errors()->add('returned_location_id', 'Vị trí đã chọn không phải định khu vật tư dùng được của phòng ban này.');
+
+            return;
+        }
+
+        // Tồn hiện tại đã trừ phần đang cách ly: còn tồn tức là phần còn lại của lô vẫn nằm ở vị trí cũ
+        $rest = $import ? $this->remaining($import) - ($current->export_id ? 0 : (float) $current->amount) : 0;
+
+        if ($import && $rest > self::EPSILON) {
+            $validator->errors()->add(
+                'returned_location_id',
+                'Phiếu chỉ cách ly một phần lô '.$import->code.', phần còn lại vẫn ở vị trí '
+                .(DB::table('locations')->where('id', $oldLocationId)->value('code') ?? '—').', chỉ trả về được đúng vị trí này.'
+            );
+        }
+    }
+
+    /** Vị trí được chọn phải là định khu vật tư của phòng ban đang chọn và đúng phân loại yêu cầu. */
+    private function checkZoneLocation($validator, string $field, $locationId, string $zoneType): void
+    {
+        if (! is_numeric($locationId)) {
+            return;
+        }
+
+        if (! self::zoneLocations($this->departmentId(), $zoneType)->contains('id', (int) $locationId)) {
+            $validator->errors()->add($field, 'Vị trí đã chọn không phải định khu "'.ZoneType::label($zoneType).'" của phòng ban này.');
+        }
+    }
+
     private function find($id)
     {
         return DB::table(self::TABLE)
@@ -563,8 +753,41 @@ class MaterialQuarantineController extends Controller
         return max((float) $import->amount + $balanced - $exported, 0);
     }
 
-    /** Ghi lịch sử phiếu loại bỏ vào sổ sử dụng - cùng khuôn MaterialExportController::logHistory. */
-    private function logExportHistory(int $exportId, string $action, ?string $note = null): void
+    /**
+     * TRỪ TỒN phần cách ly của một phiếu: sinh material_exports type = cancel gắn quarantine_id
+     * và ghi export_id lên phiếu. Gọi lúc cách ly (kể cả phiếu tự sinh từ QA hiệu chuẩn không
+     * đạt - MaterialCalibrationController). Trả về id dòng xuất.
+     */
+    public static function deductStock(int $quarantineId, string $actor): int
+    {
+        $quarantine = DB::table(self::TABLE)->where('id', $quarantineId)->first();
+        $importCode = DB::table('material_imports')->where('id', $quarantine->import_id)->value('code');
+        $at = now();
+
+        $exportId = DB::table(self::EXPORT_TABLE)->insertGetId([
+            'code' => $importCode,
+            'import_id' => (int) $quarantine->import_id,
+            'department_id' => (int) $quarantine->department_id,
+            'quarantine_id' => (int) $quarantine->id,
+            'amount' => (float) $quarantine->amount,
+            'type' => 'cancel',
+            'reason' => mb_substr('Cách ly (phiếu '.$quarantine->code.'): '.$quarantine->reason, 0, 500),
+            'used_by' => $actor,
+            'status_id' => 1,
+            'created_by' => $actor,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
+
+        DB::table(self::TABLE)->where('id', $quarantine->id)->update(['export_id' => $exportId]);
+
+        self::writeExportHistory($exportId, 'Thêm mới', 'Cách ly vật tư hỏng - phiếu '.$quarantine->code, $actor);
+
+        return $exportId;
+    }
+
+    /** Ghi lịch sử dòng xuất của phiếu cách ly vào sổ sử dụng - cùng khuôn MaterialExportController::logHistory. */
+    private static function writeExportHistory(int $exportId, string $action, ?string $note, string $actor): void
     {
         $row = DB::table(self::EXPORT_TABLE)->where('id', $exportId)->first();
 
@@ -581,7 +804,7 @@ class MaterialQuarantineController extends Controller
             'used_by' => $row->used_by,
             'status_id' => $row->status_id,
             'change_note' => $note,
-            'created_by' => $this->actor(),
+            'created_by' => $actor,
             'created_at' => now(),
         ]);
     }
@@ -637,6 +860,8 @@ class MaterialQuarantineController extends Controller
             'amount.min' => 'Số lượng phải lớn hơn 0.',
             'reason.required' => 'Vui lòng nhập lý do cách ly (hỏng / hết hạn...).',
             'reason.max' => 'Lý do tối đa 500 ký tự.',
+            'pending_location_id.required' => 'Vui lòng chọn định khu Chờ Quyết Định để đặt vật tư cách ly.',
+            'pending_location_id.integer' => 'Định khu Chờ Quyết Định không hợp lệ.',
         ];
     }
 }

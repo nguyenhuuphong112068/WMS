@@ -908,6 +908,58 @@
             $unit.val(unit);
         }
 
+        /*
+        | ĐVT mặc định theo danh mục: danh sách liên phòng ban lấy đơn vị PHÒNG CẤP PHÁT đã khai
+        | cho vật tư (giống modal đề nghị liên phòng ban), phòng đó chưa khai thì dùng đơn vị
+        | phòng mình (data-unit). ĐVT đã lưu / người dùng chọn tay (data-manual) thì giữ nguyên.
+        */
+        var PR_SOURCE_UNITS_URL = "{{ route('pages.export.materialExport.transferDepartmentStock') }}";
+        var prSourceUnits = {};
+
+        function prSourceUnitsOf($modal) {
+            var dept = $modal.find('select[name="to_department_id"]').val();
+
+            return dept ? (prSourceUnits[dept] || {}) : {};
+        }
+
+        function prApplyRowUnit($row, units) {
+            var $option = $row.find('.pr-cat option:selected');
+            var unit;
+
+            if (!$option.val() || $row.find('.pr-unit').data('manual')) return;
+
+            unit = (units || {})[$option.val()] || $option.data('unit') || '';
+            if (unit) prSetUnit($row, String(unit));
+        }
+
+        function prLoadSourceUnits($modal) {
+            var dept = $modal.find('select[name="to_department_id"]').val();
+            var apply = function() {
+                $modal.find('.pr-rows tr').each(function() {
+                    prApplyRowUnit($(this), prSourceUnits[dept]);
+                });
+            };
+
+            if (!dept) return;
+
+            if (prSourceUnits[dept]) {
+                apply();
+
+                return;
+            }
+
+            $.get(PR_SOURCE_UNITS_URL, { department_id: dept }).done(function(res) {
+                var map = {};
+
+                (res.ok ? res.rows || [] : []).forEach(function(row) {
+                    if (row.unit) map[row.id] = row.unit;
+                });
+
+                prSourceUnits[dept] = map;
+                if ($modal.find('select[name="to_department_id"]').val() === dept) apply();
+            });
+        }
+
         /** Thông tin kỹ thuật của vật tư đang chọn - chỉ hiển thị, có title để xem đủ khi bị cắt */
         function prSetSpec($row) {
             var spec = $row.find('.pr-cat option:selected').data('spec');
@@ -959,7 +1011,12 @@
             $row.find('[data-name="requested_amount"]').val(prTrimNumber(data.requested_amount));
             prSetSpec($row);
             $row.find('[data-name="purpose"]').val(data.purpose || '');
-            prSetUnit($row, data.requested_unit || $category.find('option:selected').data('unit') || '');
+            if (data.requested_unit) {
+                prSetUnit($row, String(data.requested_unit));
+                $row.find('.pr-unit').data('manual', true);
+            } else {
+                prApplyRowUnit($row, prSourceUnitsOf($modal));
+            }
 
             $category.select2({
                 theme: 'bootstrap4',
@@ -1095,16 +1152,23 @@
 
         $(document).on('change', '.pr-modal .pr-cat', function() {
             var $row = $(this).closest('tr');
-            var unit = $(this).find('option:selected').data('unit');
+            var $modal = $(this).closest('.pr-modal');
 
-            if (unit) prSetUnit($row, String(unit));
+            prApplyRowUnit($row, prSourceUnitsOf($modal));
             prSetSpec($row);
-            prCheckHc($(this).closest('.pr-modal'));
+            prCheckHc($modal);
         });
 
-        // Đổi phòng cấp phát: tô lại các dòng không còn hợp lệ với phòng mới
+        $(document).on('change', '.pr-modal .pr-unit', function() {
+            $(this).data('manual', true);
+        });
+
+        // Đổi phòng cấp phát: tô lại các dòng không còn hợp lệ, điền lại ĐVT theo danh mục phòng mới
         $(document).on('change', '.pr-modal select[name="to_department_id"]', function() {
-            prCheckHc($(this).closest('.pr-modal'));
+            var $modal = $(this).closest('.pr-modal');
+
+            prCheckHc($modal);
+            prLoadSourceUnits($modal);
         });
 
         /* ---------- Bảng chọn nhiều vật tư từ danh mục ---------- */

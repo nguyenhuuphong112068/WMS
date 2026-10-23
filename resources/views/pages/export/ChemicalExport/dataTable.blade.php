@@ -1,4 +1,5 @@
 @include('pages.export.shared.assets')
+@php $activeTab = \App\Support\PageTabs::active('export_chemical', $activeTab ?? 'draft'); @endphp
 
 @php
     // transfer_out không nằm trong $types (không chọn được ở form chung, chỉ tạo qua
@@ -13,17 +14,22 @@
             <div class="card-body">
 
                 <div class="exp-tabs">
+                    @tab('export_chemical', 'draft')
+                    <button type="button" class="exp-tab {{ $activeTab === 'draft' ? 'is-active' : '' }}"
+                        data-pane="expPaneDraft">
+                        <i class="fas fa-vials mr-1"></i> Sử Dụng Hoá Chất
+                        @if ($drafts->count())
+                            <span class="exp-tab-count" title="Số người đang có dòng Lưu Tạm">{{ $drafts->count() }}</span>
+                        @endif
+                    </button>
+                    @endtab
+                    @tab('export_chemical', 'book')
                     <button type="button" class="exp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}"
                         data-pane="expPaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ sử dụng hoá chất
                     </button>
-                    <button type="button" class="exp-tab {{ $activeTab === 'draft' ? 'is-active' : '' }}"
-                        data-pane="expPaneDraft">
-                        <i class="fas fa-cart-shopping mr-1"></i> Phiếu Tạm
-                        @if ($drafts->count())
-                            <span class="exp-tab-count">{{ $drafts->count() }}</span>
-                        @endif
-                    </button>
+                    @endtab
+                    @tab('export_chemical', 'banned')
                     <button type="button" class="exp-tab {{ $activeTab === 'banned' ? 'is-active' : '' }}"
                         data-pane="expPaneBanned">
                         <i class="fas fa-ban mr-1"></i> Hoá chất Cấm
@@ -33,6 +39,8 @@
                             <span class="exp-tab-count exp-tab-count-banned">{{ $bannedActiveLots }}</span>
                         @endif
                     </button>
+                    @endtab
+                    @tab('export_chemical', 'request')
                     <button type="button" class="exp-tab {{ $activeTab === 'request' ? 'is-active' : '' }}"
                         data-pane="expPaneRequest">
                         <i class="fas fa-people-arrows mr-1"></i> Đề nghị chuyển liên phòng ban
@@ -42,31 +50,27 @@
                             <span class="exp-tab-count">{{ $transferBadgeCount }}</span>
                         @endif
                     </button>
-                    @perm('export_chemical_disposal_view')
-                        <button type="button" class="exp-tab {{ $activeTab === 'disposal' ? 'is-active' : '' }}"
-                            data-pane="expPaneDisposal">
-                            <i class="fas fa-dumpster-fire mr-1"></i> Hoá chất chờ huỷ
-                            @if ($waitingDisposal->count())
-                                <span class="exp-tab-count">{{ $waitingDisposal->count() }}</span>
-                            @endif
-                        </button>
-                        @endperm
+                    @endtab
+                    @tab('export_chemical', 'quarantine')
+                    <button type="button" class="exp-tab {{ $activeTab === 'quarantine' ? 'is-active' : '' }}"
+                        data-pane="expPaneQuarantine">
+                        <i class="fas fa-biohazard mr-1"></i> Cách ly - Loại bỏ - Huỷ
+                        @if ($quarantineBadge)
+                            <span class="exp-tab-count">{{ $quarantineBadge }}</span>
+                        @endif
+                    </button>
+                    @endtab
+                    @tab('export_chemical', 'report')
                     <button type="button" class="exp-tab {{ $activeTab === 'report' ? 'is-active' : '' }}"
                         data-pane="expPaneReport">
                         <i class="fas fa-chart-column mr-1"></i> Báo cáo theo khoảng thời gian
                     </button>
+                    @endtab
                 </div>
 
                 {{-- ============ SỔ SỬ DỤNG HOÁ CHẤT ============ --}}
+                @tab('export_chemical', 'book')
                 <div class="exp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="expPaneBook">
-
-                    <div class="md-toolbar">
-                        @perm('export_chemical_issue')
-                            <button type="button" class="btn btn-primary btn-md-create">
-                                <i class="fas fa-plus mr-1"></i> Sử dụng hoá chất
-                            </button>
-                        @endperm
-                    </div>
 
                     @include('pages.shared.rangeFilter', [
                         'rfRoute' => $expRoute . 'list',
@@ -77,6 +81,16 @@
                         'rfKeyword' => $bookKeyword,
                         'rfDateLabel' => 'Ngày sử dụng',
                         'rfPlaceholder' => 'Mã xuất nhập, tên hoá chất, mục đích, người sử dụng...',
+                        // Mặc định "Hôm nay" (ListRange::of(..., 'book_', 1) ở Controller)
+                        'rfQuick' => [
+                            ['label' => 'Hôm nay', 'from' => now()->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+                            ['label' => '30 ngày', 'from' => now()->subDays(29)->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+                            ['label' => 'Tháng này', 'from' => now()->startOfMonth()->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+                            ['label' => 'Tháng trước', 'from' => now()->subMonthNoOverflow()->startOfMonth()->format('Y-m-d'), 'to' => now()->subMonthNoOverflow()->endOfMonth()->format('Y-m-d')],
+                            ['label' => 'Quý này', 'from' => now()->startOfQuarter()->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+                            ['label' => 'Năm nay', 'from' => now()->startOfYear()->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
+                            ['label' => 'Tất cả', 'from' => '', 'to' => ''],
+                        ],
                     ])
 
                     @include('pages.shared.barcodeSearch', [
@@ -111,7 +125,16 @@
                             </thead>
                             <tbody>
                                 @foreach ($datas as $row)
-                                    @php $expAdjust = (int) ($adjustCounts[$row->id] ?? 0); @endphp
+                                    @php
+                                        $expAdjust = (int) ($adjustCounts[$row->id] ?? 0);
+                                        // Lý do khoá nút Sửa / Khoá (chuỗi rỗng = không khoá)
+                                        $expLocked = $row->quarantine_id
+                                            ? 'Sinh từ phiếu cách ly ' . $row->quarantine_code . ', chỉ điều chỉnh ở tab Cách ly - Loại bỏ - Huỷ'
+                                            : ($row->disposal_id ? 'Đã nằm trong đợt xin quyết định huỷ trước đây' : '');
+                                        // Nút Sửa chỉ mở cho phiếu sử dụng TRONG NGÀY, qua ngày là chốt sổ
+                                        $expEditLocked = $expLocked ?: (\Carbon\Carbon::parse($row->exported_date)->isToday()
+                                            ? '' : 'Chỉ điều chỉnh được phiếu sử dụng trong ngày, phiếu ngày ' . $expDate($row->exported_date) . ' đã chốt');
+                                    @endphp
                                     {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
                                     <tr data-classification="{{ $expCls($row->category_id) }}">
                                         <td class="text-center">{{ $datas->firstItem() + $loop->index }}</td>
@@ -150,22 +173,14 @@
                                                 </div>
                                             @endif
 
-                                            {{-- Phiếu loại bỏ: cho biết đang chờ gom hay đã nằm trong đợt xin huỷ nào --}}
-                                            @if ($row->type === 'cancel')
-                                                @if ($row->disposal_code)
-                                                    <div class="md-sub mt-1">
-                                                        <span class="exp-received"
-                                                            title="Đã gom vào đợt xin quyết định huỷ {{ $row->disposal_code }} ({{ $disposalStatuses[$row->disposal_status] ?? $row->disposal_status }})">
-                                                            {{ $row->disposal_code }}
-                                                        </span>
-                                                    </div>
-                                                @else
-                                                    <div class="md-sub mt-1">
-                                                        <span class="exp-pending"
-                                                            title="Chưa gom vào đợt nào, xem tab Hoá chất chờ huỷ">Chờ
-                                                            huỷ</span>
-                                                    </div>
-                                                @endif
+                                            {{-- Dòng trừ tồn của phiếu cách ly hoá chất hỏng: mã + bước hiện tại của phiếu --}}
+                                            @if ($row->quarantine_code)
+                                                <div class="md-sub mt-1">
+                                                    <span class="{{ in_array($row->quarantine_status, ['destroyed', 'returned'], true) ? 'exp-received' : 'exp-pending' }}"
+                                                        title="Phiếu cách ly {{ $row->quarantine_code }} - xem tab Cách ly - Loại bỏ - Huỷ">
+                                                        {{ \App\Http\Controllers\Pages\Export\ChemicalQuarantineController::STATUSES[$row->quarantine_status] ?? $row->quarantine_status }}
+                                                    </span>
+                                                </div>
                                             @endif
                                         </td>
                                         <td class="text-center md-sub">
@@ -190,11 +205,11 @@
                                                 <div class="md-actions">
                                                     {{-- Badge số lần điều chỉnh nằm ở góc trên bên phải nút Sửa --}}
                                                     <div class="exp-btn-wrap">
-                                                        {{-- Đã gom vào đợt xin huỷ thì khoá: số liệu trên phiếu đã vào hồ sơ --}}
+                                                        {{-- Dòng sinh từ phiếu cách ly (hoặc đã gom vào đợt huỷ cũ) chỉ điều chỉnh qua phiếu đó --}}
                                                         @perm('export_chemical_issue')
                                                             <button type="button" class="btn btn-sm btn-warning btn-md-edit"
-                                                                {{ $row->disposal_id ? 'disabled' : '' }}
-                                                                title="{{ $row->disposal_id ? 'Đã gom vào đợt xin huỷ ' . $row->disposal_code . ', gỡ khỏi đợt ở tab Hoá chất chờ huỷ mới sửa được' : 'Sửa' }}"
+                                                                {{ $expEditLocked ? 'disabled' : '' }}
+                                                                title="{{ $expEditLocked ?: 'Sửa' }}"
                                                                 data-row="{{ json_encode([
                                                                     'id' => $row->id,
                                                                     'import_id' => $row->import_id,
@@ -228,8 +243,8 @@
                                                             <input type="hidden" name="id" value="{{ $row->id }}">
                                                             <button type="submit"
                                                                 class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                                {{ $row->disposal_id ? 'disabled' : '' }}
-                                                                title="{{ $row->disposal_id ? 'Đã gom vào đợt xin huỷ ' . $row->disposal_code . ', gỡ khỏi đợt trước khi khoá' : ($row->status_id == 1 ? 'Khoá' : 'Mở khoá') }}">
+                                                                {{ $expLocked ? 'disabled' : '' }}
+                                                                title="{{ $expLocked ?: ($row->status_id == 1 ? 'Khoá' : 'Mở khoá') }}">
                                                                 <i
                                                                     class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
                                                             </button>
@@ -250,6 +265,7 @@
                         'pgUnit' => 'phiếu sử dụng',
                     ])
                 </div>
+                @endtab
 
                 {{-- ============ PHIẾU TẠM (LƯU TẠM TỪ PICKER TỒN KHO CỦA PHÒNG) ============ --}}
                 @include('pages.export.ChemicalExport.draftPane')
@@ -260,9 +276,14 @@
                 {{-- ============ ĐỀ NGHỊ CHUYỂN HOÁ CHẤT LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.ChemicalExport.transferPane')
 
-                {{-- ============ HOÁ CHẤT CHỜ HUỶ (BƯỚC 2 CỦA HUỶ BỎ) ============ --}}
-                @include('pages.export.ChemicalExport.disposalPane')
+                {{-- ============ HOÁ CHẤT HỎNG: CÁCH LY - LOẠI BỎ - HUỶ ============ --}}
+                @tab('export_chemical', 'quarantine')
+                <div class="exp-pane {{ $activeTab === 'quarantine' ? 'is-active' : '' }}" id="expPaneQuarantine">
+                    @include('pages.export.ChemicalExport.quarantinePane')
+                </div>
+                @endtab
 
+                @tab('export_chemical', 'report')
                 <div class="exp-pane {{ $activeTab === 'report' ? 'is-active' : '' }}" id="expPaneReport">
 
                     <form method="GET" action="{{ route($expRoute . 'list') }}" class="exp-range">
@@ -359,6 +380,11 @@
                                             @else
                                                 <span class="exp-kg-na" title="{{ $row->convert_note }}">Không quy
                                                     đổi</span>
+                                                @if ($row->convert_cause ?? '')
+                                                    <div class="kg-na-cause" title="{{ $row->convert_note }}">
+                                                        <i class="fas fa-info-circle"></i>{{ $row->convert_cause }}
+                                                    </div>
+                                                @endif
                                             @endif
                                         </td>
                                     </tr>
@@ -381,6 +407,7 @@
                         </table>
                     </div>
                 </div>
+                @endtab
 
             </div>
         </div>

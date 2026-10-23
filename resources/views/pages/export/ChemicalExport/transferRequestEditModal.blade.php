@@ -28,7 +28,7 @@
                                     Tiêu Đề Đề Nghị <span class="text-danger">*</span>
                                 </label>
                                 <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
-                                    value="{{ $req->title }}" required>
+                                    list="chemTitleOptionsTransfer" autocomplete="off" value="{{ $req->title }}" required>
                             </div>
                             <div class="form-group mb-0">
                                 <label class="font-weight-bold" style="font-size: 0.9rem;">Ngày Mong Muốn</label>
@@ -44,11 +44,7 @@
                                 <div style="min-width: 280px;">
                                     <select name="to_department_id" class="form-control font-weight-bold" style="height: 38px !important;" required>
                                         <option value="">-- Chọn phòng ban đang giữ hoá chất --</option>
-                                        @foreach ($transferDepartments as $dept)
-                                            <option value="{{ $dept->id }}" {{ $req->to_department_id == $dept->id ? 'selected' : '' }}>
-                                                {{ $dept->name }} ({{ $dept->shortName }})
-                                            </option>
-                                        @endforeach
+                                        @include('layout.departmentOptions', ['departments' => $transferDepartments, 'selected' => $req->to_department_id])
                                     </select>
                                 </div>
                             </div>
@@ -87,14 +83,15 @@
                                                 <span class="badge badge-secondary px-2 py-1 chem-transfer-code" style="font-size: 0.82rem;">{{ $itemCode }}</span>
                                             </td>
                                             <td>
-                                                <select name="items[{{ $idx }}][category_id]" class="form-control select-chem-transfer-category" required>
+                                                {{-- Gõ tìm qua AJAX, chỉ in sẵn option của hoá chất dòng đang mang --}}
+                                                <select name="items[{{ $idx }}][category_id]" class="form-control select-chem-transfer-category"
+                                                    data-lookup-url="{{ route('pages.category.lookup.chemicalCategories', ['scope' => 'approved']) }}" required>
                                                     <option value="">-- Chọn hoá chất --</option>
-                                                    @foreach ($categories as $cat)
-                                                        <option value="{{ $cat->id }}" data-code="{{ $cat->code }}" data-unit="{{ $cat->unit_short_name ?: '' }}"
-                                                            {{ $item && $item->category_id == $cat->id ? 'selected' : '' }}>
+                                                    @if ($item && ($cat = $categories->firstWhere('id', $item->category_id)))
+                                                        <option value="{{ $cat->id }}" data-code="{{ $cat->code }}" data-unit="{{ $cat->unit_short_name ?: '' }}" selected>
                                                             {{ $cat->code }} - {{ $cat->chem_name }}
                                                         </option>
-                                                    @endforeach
+                                                    @endif
                                                 </select>
                                             </td>
                                             <td>

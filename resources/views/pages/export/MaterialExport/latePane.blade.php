@@ -9,7 +9,8 @@
 --}}
 
 @php
-    $lateTypeLabel = ['periodic' => 'Định kỳ', 'risk_assessment' => 'ĐG rủi ro', 'regular' => 'Thường quy'];
+    $lateTypeLabel = ['periodic' => 'Định kỳ', 'risk_assessment' => 'ĐG rủi ro', 'regular' => 'Thường quy',
+        'transfer' => 'Liên phòng ban', \App\Support\MaterialVpp::TAB => 'Đề nghị VPP'];
 
     $lateCauseMeta = [
         'approve' => ['label' => 'Duyệt trễ', 'icon' => 'fas fa-file-signature', 'class' => 'late-cause-approve'],
@@ -187,7 +188,11 @@
                     <td class="text-center">{{ $loop->iteration }}</td>
                     <td data-order="{{ $row->request_code }}">
                         <span class="exp-code font-weight-bold">{{ $row->request_code }}</span>
-                        <div class="md-sub small">{{ $lateTypeLabel[$row->request_type] ?? $row->request_type }}</div>
+                        <div class="md-sub small">{{ $lateTypeLabel[$row->request_type] ?? $row->request_type }}
+                            @if (! empty($row->direction))
+                                · <span class="text-info">{{ $row->direction }}</span>
+                            @endif
+                        </div>
                         <div class="md-sub small text-muted">{{ $row->request_created_by }} · {{ $expDate($row->request_created_at) }}</div>
                     </td>
                     <td>

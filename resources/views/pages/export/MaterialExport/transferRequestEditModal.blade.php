@@ -36,6 +36,7 @@
                                     Tiêu Đề Đề Nghị <span class="text-danger">*</span>
                                 </label>
                                 <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
+                                    list="{{ $mtEditVpp ? 'matTitleOptionsVpp' : 'matTitleOptionsTransfer' }}" autocomplete="off"
                                     value="{{ $req->title }}" required>
                             </div>
                             <div class="form-group mb-0">
@@ -55,11 +56,7 @@
                                         @unless ($mtEditVpp)
                                             <option value="">-- Chọn phòng ban đang giữ vật tư --</option>
                                         @endunless
-                                        @foreach ($mtEditDepartments as $dept)
-                                            <option value="{{ $dept->id }}" {{ $req->to_department_id == $dept->id ? 'selected' : '' }}>
-                                                {{ $dept->name }} ({{ $dept->shortName }})
-                                            </option>
-                                        @endforeach
+                                        @include('layout.departmentOptions', ['departments' => $mtEditDepartments, 'selected' => $req->to_department_id])
                                     </select>
                                 </div>
                             </div>

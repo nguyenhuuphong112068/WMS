@@ -469,7 +469,7 @@
                         if (x.sub) $mat.append($('<div class="md-sub small text-muted"></div>').text(x.sub));
                         $tr.append($mat);
 
-                        $tr.append($('<td class="md-sub"></td>').text(x.location_code));
+                        $tr.append($('<td class="md-sub"></td>').html(window.wmsZoneTag(x.location_code, x.location_zone_type)));
                         $tr.append($('<td class="text-right"></td>').text(x.system_amount + ' ' + (x.unit || '')));
                         $tr.append($('<td class="text-right font-weight-bold"></td>').text(x.actual_amount));
                         $tr.append($('<td class="text-right"></td>').append(

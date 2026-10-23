@@ -1,5 +1,16 @@
 @php $bag = $errors->getBag('updateErrors'); @endphp
 
+<style>
+    /* Loại phiếu chỉ hiển thị, không đổi được: ẩn lựa chọn còn lại */
+    #updateModal .exp-type-fixed {
+        pointer-events: none;
+    }
+
+    #updateModal .exp-type-fixed:not(.is-checked) {
+        display: none;
+    }
+</style>
+
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
@@ -16,20 +27,35 @@
                     <div class="form-row">
                         <div class="form-group col-md-8">
                             <label>Phiếu Nhập <span class="text-danger">*</span></label>
+                            @php
+                                /*
+                                | Giữ cả phiếu hết hạn / hết tồn để phiếu xuất cũ còn chọn lại được đúng phiếu
+                                | nhập của nó; Controller chỉ chặn khi ĐỔI sang một phiếu khác.
+                                |
+                                | Nhãn cần số tồn controller vừa tính nên không tìm ở server: cả danh sách đi
+                                | theo [data-local-options] dạng JSON, ô chọn tìm ngay trên mảng này
+                                | (window.wmsLocalLookup) và chỉ dựng option của dòng đang hiện, không in sẵn
+                                | ~1.400 <option>.
+                                */
+                                $expImportOptions = $imports->map(fn($import) => [
+                                    'id' => $import->id,
+                                    'text' => $import->code . ' - ' . $import->chem_name
+                                        . ($import->batch_no ? ' - Lô ' . $import->batch_no : '')
+                                        . ' (còn ' . $expNum($import->remaining) . ' ' . $import->unit_short_name
+                                        . ($import->expired ? ', ĐÃ HẾT HẠN' : ($import->waiting_internal ? ', CHƯA CÓ HẠN NỘI BỘ' : (!$import->selectable ? ', ĐÃ HẾT TỒN' : '')))
+                                        . ')',
+                                ])->values();
+                                $expOldImport = $expImportOptions->firstWhere('id', old('import_id'));
+                            @endphp
                             <select name="import_id"
                                 class="form-control exp-select {{ $bag->has('import_id') ? 'is-invalid' : '' }}"
                                 data-imports="{{ json_encode($expImportMap) }}" data-over="{{ $expOverRatio }}"
+                                data-local-options="{{ json_encode($expImportOptions) }}"
                                 required>
                                 <option value="">-- Chọn phiếu nhập --</option>
-                                {{-- Giữ cả phiếu hết hạn / hết tồn để phiếu xuất cũ còn chọn lại được đúng phiếu
-                                     nhập của nó; Controller chỉ chặn khi ĐỔI sang một phiếu khác. --}}
-                                @foreach ($imports as $import)
-                                    <option value="{{ $import->id }}"
-                                        {{ old('import_id') == $import->id ? 'selected' : '' }}>
-                                        {{ $import->code }} - {{ $import->chem_name }}{{ $import->batch_no ? ' - Lô ' . $import->batch_no : '' }}
-                                        (còn {{ $expNum($import->remaining) }} {{ $import->unit_short_name }}@if ($import->expired), ĐÃ HẾT HẠN @elseif($import->waiting_internal), CHƯA CÓ HẠN NỘI BỘ @elseif(!$import->selectable), ĐÃ HẾT TỒN @endif)
-                                    </option>
-                                @endforeach
+                                @if ($expOldImport)
+                                    <option value="{{ $expOldImport['id'] }}" selected>{{ $expOldImport['text'] }}</option>
+                                @endif
                             </select>
                             @if ($bag->has('import_id'))
                                 <span class="md-error">{{ $bag->first('import_id') }}</span>
@@ -46,7 +72,7 @@
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group col-md-4">
+                        <div class="form-group col-md-6">
                             <label>Số Lượng <span class="text-danger">*</span></label>
                             <input type="text" inputmode="decimal" name="amount" min="0.0001"
                                 class="form-control js-decimal {{ $bag->has('amount') ? 'is-invalid' : '' }}"
@@ -57,23 +83,8 @@
                             <span class="exp-remaining"></span>
                         </div>
 
-                        <div class="form-group col-md-4">
-                            <label>Loại Phiếu <span class="text-danger">*</span></label>
-                            <div class="exp-types">
-                                @foreach ($types as $value => $label)
-                                    <label class="exp-type {{ old('type') == $value ? 'is-checked' : '' }}">
-                                        <input type="radio" name="type" value="{{ $value }}"
-                                            {{ old('type') == $value ? 'checked' : '' }}>
-                                        <span>{{ $label }}</span>
-                                    </label>
-                                @endforeach
-                            </div>
-                            @if ($bag->has('type'))
-                                <span class="md-error">{{ $bag->first('type') }}</span>
-                            @endif
-                        </div>
-
-                        <div class="form-group col-md-4">
+                        {{-- Không có ô Loại Phiếu: loại phiếu không đổi khi điều chỉnh, Controller giữ nguyên type cũ --}}
+                        <div class="form-group col-md-6">
                             <label>Ngày Sử Dụng</label>
                             <input type="text" class="form-control exp-readonly exp-up-exported-date" readonly>
                             <small class="md-sub">Ngày ghi nhận lúc lập phiếu, không sửa được.</small>
@@ -127,8 +138,8 @@
 
                     <div class="form-group">
                         <label>Mục Đích Sử Dụng</label>
-                        <textarea name="purpose" rows="2" maxlength="500"
-                            class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}">{{ old('purpose') }}</textarea>
+                        <textarea name="purpose" rows="2" maxlength="500" autocomplete="off"
+                            class="form-control js-product-ac {{ $bag->has('purpose') ? 'is-invalid' : '' }}">{{ old('purpose') }}</textarea>
                         @if ($bag->has('purpose'))
                             <span class="md-error">{{ $bag->first('purpose') }}</span>
                         @endif

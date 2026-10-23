@@ -13,7 +13,7 @@
 | - Ô xem trước mã xuất nhập   : class="imp-code-preview" kèm data-codes='{"<category_id>":"<mã>"}'
 | - Nút chuyển tab         : class="imp-tab" kèm data-pane="<id của pane>"
 | - Vùng nội dung của tab  : class="imp-pane", tab đang mở thêm class="is-active"
-| - Bảng báo cáo           : id="impReportTable"
+| - Bảng báo cáo           : class="imp-report-table" kèm data-empty (ChemicalImport/reportTable)
 | - Nút chọn nhanh khoảng thời gian : trong .imp-quick, kèm data-from / data-to
 | - Nút xem lịch sử điều chỉnh : class="btn-imp-history" kèm data-url / data-title
 | - Modal lịch sử          : id="historyModal"
@@ -374,8 +374,65 @@
         transform: translateY(-1px);
     }
 
+    /* ---------- Card báo cáo: Hoá chất mua / Nhận chuyển liên phòng ban ---------- */
+    .imp-report-card {
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+        margin-bottom: 16px;
+        background: #fff;
+    }
+
+    .imp-report-card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 16px;
+        background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+        color: #fff;
+    }
+
+    .imp-report-card.is-transfer .imp-report-card-header {
+        background: linear-gradient(135deg, #15803D, #16A34A);
+    }
+
+    .imp-report-card-title {
+        font-size: 0.92rem;
+        font-weight: 700;
+        letter-spacing: .3px;
+    }
+
+    .imp-report-card-count {
+        min-width: 22px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .22);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .imp-report-card-body {
+        padding: 14px 16px 16px;
+    }
+
+    .imp-subtabs {
+        margin-bottom: 12px;
+    }
+
+    .imp-subtabs .nav-link {
+        font-weight: 700;
+        font-size: 0.88rem;
+        color: #64748b;
+        transition: color 0.2s;
+    }
+
+    .imp-subtabs .nav-link.active {
+        color: var(--primary);
+    }
+
     /* ---------- Bảng báo cáo ---------- */
-    #impReportTable thead th {
+    .imp-report-table thead th {
         background: var(--primary-soft);
         color: var(--primary);
         font-weight: 700;
@@ -386,11 +443,11 @@
         vertical-align: middle;
     }
 
-    #impReportTable tbody tr:hover {
+    .imp-report-table tbody tr:hover {
         background: rgba(var(--primary-rgb), 0.04);
     }
 
-    #impReportTable tfoot th {
+    .imp-report-table tfoot th {
         background: var(--primary-soft);
         color: var(--primary-dark);
         font-weight: 700;
@@ -410,6 +467,23 @@
         font-weight: 600;
         cursor: help;
         white-space: nowrap;
+    }
+
+    /* Nguyên nhân không quy đổi được, hiện ngay dưới chữ "Không quy đổi" */
+    .kg-na-cause {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 3px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: #FFFBEB;
+        border: 1px solid #FCD34D;
+        color: #92400E;
+        font-size: 0.7rem;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: help;
     }
 
     /* ---------- Lịch sử điều chỉnh ---------- */
@@ -585,13 +659,44 @@
         z-index: 1060;
     }
 
+    /* Khung modal chiếm 80% màn hình; bảng giãn lấp phần còn lại của thân modal */
     .imp-pick .imp-pick-dialog {
-        max-width: min(1320px, 94vw);
+        width: 80vw;
+        max-width: 80vw;
+    }
+
+    .imp-pick .imp-pick-dialog .modal-content {
+        height: 80vh;
+    }
+
+    .imp-pick .imp-pick-dialog .modal-body {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .imp-pick .imp-pick-dialog .modal-body > * {
+        flex-shrink: 0;
+    }
+
+    .imp-pick .imp-pick-dialog .modal-body > .imp-pick-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
     }
 
     @media (max-width: 767.98px) {
         .imp-pick .imp-pick-dialog {
+            width: auto;
             max-width: none;
+        }
+
+        .imp-pick .imp-pick-dialog .modal-content {
+            height: auto;
+        }
+
+        .imp-pick .imp-pick-dialog .modal-body > .imp-pick-wrap {
+            max-height: 56vh;
         }
     }
 
@@ -981,16 +1086,38 @@
         $('.md-modal').each(function() {
             var $modal = $(this);
 
-            $modal.find('.imp-select').select2({
-                theme: 'bootstrap4',
-                dropdownParent: $modal,
-                width: '100%',
-                placeholder: '-- Chọn --',
-                language: {
-                    noResults: function() {
-                        return 'Không tìm thấy dữ liệu phù hợp';
+            $modal.find('.imp-select').each(function() {
+                var $select = $(this);
+                var options = {
+                    theme: 'bootstrap4',
+                    dropdownParent: $modal,
+                    width: '100%',
+                    placeholder: '-- Chọn --',
+                    language: {
+                        noResults: function() {
+                            return 'Không tìm thấy dữ liệu phù hợp';
+                        },
+                        searching: function() {
+                            return 'Đang tìm...';
+                        },
+                        loadingMore: function() {
+                            return 'Đang tải thêm...';
+                        },
+                        errorLoading: function() {
+                            return 'Không tải được dữ liệu, vui lòng thử lại';
+                        }
                     }
+                };
+
+                // Ô danh sách lớn (định khu, hoá chất) gõ tìm qua AJAX thay vì nhúng hàng trăm option
+                if ($select.data('lookup-url')) {
+                    options.placeholder = $select.find('option[value=""]').first().text().trim() || options.placeholder;
+                    // Option trống không nằm trong kết quả tìm: ô không bắt buộc phải xoá được lựa chọn
+                    options.allowClear = !$select.prop('required');
+                    options.ajax = wmsLookupAjax($select);
                 }
+
+                $select.select2(options);
             });
         });
 
@@ -1079,30 +1206,50 @@
             });
         }
 
-        /* ---------- Bảng báo cáo nhập theo khoảng thời gian ---------- */
-        $('#impReportTable').DataTable({
-            autoWidth: false,
-            responsive: true,
-            pageLength: 25,
-            order: [
-                [1, 'asc']
-            ],
-            lengthMenu: [
-                [10, 25, 50, 100, -1],
-                [10, 25, 50, 100, 'Tất cả']
-            ],
-            language: {
-                search: 'Tìm kiếm:',
-                lengthMenu: 'Hiển thị _MENU_ dòng',
-                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
-                infoEmpty: 'Không có dữ liệu',
-                zeroRecords: 'Không tìm thấy dòng nào phù hợp',
-                emptyTable: 'Không có phiếu nhập nào trong khoảng thời gian đã chọn.',
-                paginate: {
-                    previous: 'Trước',
-                    next: 'Sau'
+        /* ---------- Bảng báo cáo nhập theo khoảng thời gian (mua + nhận chuyển) ---------- */
+        $('.imp-report-table').each(function() {
+            $(this).DataTable({
+                autoWidth: false,
+                responsive: true,
+                pageLength: 25,
+                order: [
+                    [1, 'asc']
+                ],
+                lengthMenu: [
+                    [10, 25, 50, 100, -1],
+                    [10, 25, 50, 100, 'Tất cả']
+                ],
+                language: {
+                    search: 'Tìm kiếm:',
+                    lengthMenu: 'Hiển thị _MENU_ dòng',
+                    info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                    infoEmpty: 'Không có dữ liệu',
+                    zeroRecords: 'Không tìm thấy dòng nào phù hợp',
+                    emptyTable: $(this).data('empty') || 'Không có phiếu nhập nào trong khoảng thời gian đã chọn.',
+                    paginate: {
+                        previous: 'Trước',
+                        next: 'Sau'
+                    }
                 }
-            }
+            });
+        });
+
+        /*
+        | Tab con Nhận chuyển cùng công ty / khác công ty: nhớ vào ô ẩn rsub của form lọc + URL
+        | để Xem báo cáo / tải lại vẫn mở đúng tab; căn lại cột bảng vừa hiện.
+        */
+        $(document).on('shown.bs.tab', '.imp-subtabs a', function() {
+            var value = $(this).data('sub-value') || '';
+
+            $('.imp-rsub').val(value);
+
+            try {
+                var url = new URL(window.location.href);
+                value ? url.searchParams.set('rsub', value) : url.searchParams.delete('rsub');
+                window.history.replaceState(null, '', url.toString());
+            } catch (e) {}
+
+            $($(this).attr('href')).find('table.dataTable').DataTable().columns.adjust();
         });
 
         /* ---------- Chuyển tab ---------- */
@@ -1163,10 +1310,16 @@
             $form.find('[name="original_category_id"]').val(row.category_id || '');
             $form.find('[name="original_amount"]').val(row.amount || '');
 
-            // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
+            // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ. Ô tìm qua AJAX
+            // chưa có option của giá trị đang dùng thì dựng từ nhãn row['<tên ô>_text'].
             $form.find('.imp-select').each(function() {
                 var field = $(this).attr('name');
-                $(this).val(row[field] === undefined || row[field] === null ? '' : row[field]).trigger('change');
+                var value = row[field] === undefined || row[field] === null ? '' : row[field];
+
+                if ($(this).data('lookup-url')) {
+                    wmsEnsureOption($(this), value, row[field + '_text'], { zone: row[field + '_zone'] });
+                }
+                $(this).val(value).trigger('change');
             });
 
             $form.find('.imp-switch input').each(function() {

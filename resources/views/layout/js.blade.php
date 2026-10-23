@@ -22,6 +22,283 @@
 
         <!-- Select2 -->
         <script src="{{asset ('dataTable/plugins/select2/js/select2.full.min.js')}}"></script>
+        {{-- Ô chọn Định Khu toàn hệ thống: chấm màu cố định của phân loại (App\Support\ZoneType) trước nhãn.
+             Option render sẵn khai data-zone="<zone_type>" (rỗng = chưa phân loại); kết quả AJAX trả kèm zone_type.
+             Ô không có data-zone/zone_type giữ nguyên nhãn chữ. --}}
+        <script>
+            (function ($) {
+                var colors = @json(\App\Support\ZoneType::DEFAULT_COLORS);
+                var labels = @json(\App\Support\ZoneType::TYPES);
+
+                window.wmsZoneDot = function (item) {
+                    var type;
+                    if (item && Object.prototype.hasOwnProperty.call(item, 'zone_type')) {
+                        type = item.zone_type || '';
+                    } else if (item && item.element && item.element.hasAttribute && item.element.hasAttribute('data-zone')) {
+                        type = item.element.getAttribute('data-zone') || '';
+                    } else {
+                        return null;
+                    }
+
+                    var color = colors[type];
+                    return $('<i class="zone-dot">')
+                        .toggleClass('is-none', !color)
+                        .attr('style', color ? '--dot:' + color : null)
+                        .attr('title', labels[type] || 'Chưa phân loại');
+                };
+
+                // Thẻ mã vị trí dựng bằng JS - cùng giao diện với App\Support\ZoneType::tag() (chỉ mã vị trí, tô màu phân loại)
+                window.wmsZoneTag = function (code, type, empty) {
+                    if (!code || code === '—') return $('<span>').text(empty === undefined ? '—' : empty).html();
+
+                    var color = colors[type];
+                    var $tag = $('<span class="zone-tag">').text(code).attr('title', labels[type] || 'Chưa phân loại');
+                    if (color) {
+                        var n = parseInt(color.slice(1), 16);
+                        var light = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 160;
+                        $tag.attr('style', '--zt:' + color + ';--zt-text:' + (light ? '#1F2937' : '#FFFFFF'));
+                    } else {
+                        $tag.addClass('is-none');
+                    }
+
+                    return $tag.prop('outerHTML');
+                };
+
+                window.wmsZoneTemplate = function (item) {
+                    var dot = window.wmsZoneDot(item);
+                    return dot ? $('<span>').append(dot, document.createTextNode(item.text)) : item.text;
+                };
+
+                if (!$ || !$.fn.select2) return;
+
+                $.fn.select2.defaults.set('templateResult', window.wmsZoneTemplate);
+                $.fn.select2.defaults.set('templateSelection', window.wmsZoneTemplate);
+
+                /*
+                | LỌC NHANH THEO PHÂN LOẠI: ô chọn định khu (option có data-zone, hoặc ô AJAX khai
+                | data-zone-filter) hiện hàng chip phân loại dưới ô tìm kiếm. Chip đang chọn lưu ở
+                | $select.data('zoneFilter') ('' = tất cả, '__none' = chưa phân loại): ô render sẵn lọc
+                | qua matcher bên dưới, ô AJAX gửi kèm tham số zone_filter (category/shared/assets).
+                */
+                var baseMatcher = $.fn.select2.defaults.defaults.matcher;
+
+                $.fn.select2.defaults.set('matcher', function (params, data) {
+                    var select = data.element && data.element.closest ? data.element.closest('select') : null;
+                    var filter = select ? $(select).data('zoneFilter') : '';
+
+                    if (filter && data.element.tagName === 'OPTION') {
+                        if (!data.element.hasAttribute('data-zone') || !data.element.value) return null;
+                        if ((data.element.getAttribute('data-zone') || '__none') !== filter) return null;
+                    }
+
+                    return baseMatcher(params, data);
+                });
+
+                function isZoneSelect($select) {
+                    return $select.is('[data-zone-filter]') || $select.find('option[data-zone]').length > 0;
+                }
+
+                function renderChips($select, $bar) {
+                    var current = $select.data('zoneFilter') || '';
+                    var local = !$select.is('[data-zone-filter]');
+                    var counts = { '': 0, '__none': 0 };
+
+                    if (local) {
+                        $select.find('option[data-zone]').each(function () {
+                            if (!this.value) return;
+                            var zone = this.getAttribute('data-zone') || '__none';
+                            counts[zone] = (counts[zone] || 0) + 1;
+                            counts['']++;
+                        });
+                    }
+
+                    var items = [{ key: '', label: 'Tất cả', color: null }]
+                        .concat(Object.keys(labels).map(function (key) {
+                            return { key: key, label: labels[key], color: colors[key] };
+                        }))
+                        .concat([{ key: '__none', label: 'Chưa phân loại', color: null, none: true }]);
+
+                    $bar.empty();
+                    items.forEach(function (item) {
+                        // Ô render sẵn: ẩn phân loại không có vị trí nào để hàng chip gọn
+                        if (local && item.key && !counts[item.key]) return;
+
+                        var $chip = $('<button type="button" class="zone-filter-chip">')
+                            .toggleClass('is-active', item.key === current)
+                            .attr('data-zone-key', item.key)
+                            .attr('style', item.color ? '--dot:' + item.color : null);
+
+                        if (item.key) {
+                            $chip.append($('<i class="zone-dot">').toggleClass('is-none', !!item.none)
+                                .attr('style', item.color ? '--dot:' + item.color : null));
+                        }
+                        $chip.append(document.createTextNode(item.label));
+                        if (local) $chip.append($('<b>').text(counts[item.key] || 0));
+                        $bar.append($chip);
+                    });
+
+                    // Chỉ còn "Tất cả" + một phân loại thì lọc không có ý nghĩa
+                    $bar.prop('hidden', local && $bar.children().length <= 2);
+                }
+
+                $(document).on('select2:open', 'select', function () {
+                    var $select = $(this);
+                    var instance = $select.data('select2');
+                    if (!instance || !isZoneSelect($select)) return;
+
+                    var $dropdown = instance.$dropdown.find('.select2-dropdown');
+                    var $bar = $dropdown.children('.zone-filter-bar');
+                    if (!$bar.length) {
+                        $bar = $('<div class="zone-filter-bar">').data('zoneSelect', $select);
+                        var $search = $dropdown.children('.select2-search');
+                        $search.length ? $bar.insertAfter($search) : $dropdown.prepend($bar);
+                    }
+                    renderChips($select, $bar);
+                });
+
+                // mousedown: không để ô tìm kiếm mất focus / dropdown đóng lại khi bấm chip
+                $(document).on('mousedown', '.zone-filter-chip', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                });
+
+                $(document).on('click', '.zone-filter-chip', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    var $bar = $(this).closest('.zone-filter-bar');
+                    var $select = $bar.data('zoneSelect');
+                    var instance = $select && $select.data('select2');
+                    if (!instance) return;
+
+                    $select.data('zoneFilter', String($(this).attr('data-zone-key') || ''));
+                    renderChips($select, $bar);
+
+                    var term = instance.$dropdown.find('.select2-search__field').val() || '';
+                    instance.trigger('query', { term: term });
+                });
+
+                // Mở lại ô chọn thì bắt đầu từ "Tất cả"
+                $(document).on('select2:close', 'select', function () {
+                    $(this).removeData('zoneFilter');
+                });
+
+                /*
+                | Ô chọn định khu chưa có select2 riêng của trang: gắn class "wms-zone-select" (option vẫn
+                | khai data-zone) là tự thành select2 có chấm màu + chip lọc. Khởi tạo lúc tải trang và mỗi
+                | lần mở modal (nội dung modal có thể vừa được dựng lại). Gọi window.wmsInitZoneSelects(root)
+                | nếu trang tự chèn ô mới bằng JS.
+                */
+                window.wmsInitZoneSelects = function (root) {
+                    $(root || document).find('select.wms-zone-select').each(function () {
+                        var $select = $(this);
+                        if ($select.hasClass('select2-hidden-accessible')) return;
+
+                        var $modal = $select.closest('.modal');
+                        $select.select2({
+                            theme: 'bootstrap4',
+                            width: '100%',
+                            dropdownParent: $modal.length ? $modal : $(document.body)
+                        });
+                    });
+                };
+
+                $(function () { window.wmsInitZoneSelects(document); });
+                $(document).on('shown.bs.modal', '.modal', function () { window.wmsInitZoneSelects(this); });
+
+                /*
+                | Ô CHỌN DANH SÁCH LỚN - không render sẵn hàng nghìn <option> trong modal.
+                |
+                | wmsLookupAjax($select): cấu hình ajax select2 gọi data-lookup-url (App\Support\CategoryLookup),
+                |   tham số cố định khai ở data-lookup-query='{"type":"all"}', mỗi lần 30 dòng.
+                | wmsLocalLookup(items): như trên nhưng tìm ngay trên mảng [{id, text, search?}] đã có ở trang
+                |   (nhãn cần số liệu controller vừa tính) - không gọi server, chỉ dựng 30 option mỗi lần.
+                | wmsEnsureOption($select, value, text, attrs): giá trị đặt bằng JS (nút Sửa, picker, điền sẵn)
+                |   chưa có option thì tạo, attrs thành data-*.
+                | wmsSelectedItems($select): dòng đang chọn kèm trường riêng của kết quả tìm (code, unit, name...)
+                |   lẫn data-* của option render sẵn.
+                */
+                window.wmsLookupAjax = function ($select) {
+                    return {
+                        url: $select.data('lookup-url'),
+                        dataType: 'json',
+                        delay: 250,
+                        cache: true,
+                        data: function (params) {
+                            var extra = $select.data('lookupParams');
+
+                            return $.extend({
+                                q: params.term || '',
+                                page: params.page || 1,
+                                zone_filter: $select.data('zoneFilter') || ''
+                            }, $select.data('lookup-query') || {}, typeof extra === 'function' ? extra($select) : {});
+                        }
+                    };
+                };
+
+                window.wmsLocalLookup = function (items, pageSize) {
+                    pageSize = pageSize || 30;
+
+                    function fold(value) {
+                        return String(value || '').toLowerCase().normalize('NFD')
+                            .replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+                    }
+
+                    var index = (items || []).map(function (item) { return fold(item.search || item.text); });
+
+                    return {
+                        delay: 150,
+                        data: function (params) {
+                            return { q: params.term || '', page: params.page || 1 };
+                        },
+                        transport: function (params, success) {
+                            var terms = fold(params.data.q).split(/\s+/).filter(Boolean);
+                            var page = params.data.page || 1;
+                            var hits = [];
+
+                            for (var i = 0; i < index.length; i++) {
+                                if (terms.every(function (term) { return index[i].indexOf(term) !== -1; })) hits.push(items[i]);
+                            }
+
+                            success({
+                                results: hits.slice((page - 1) * pageSize, page * pageSize),
+                                pagination: { more: hits.length > page * pageSize }
+                            });
+
+                            return { abort: function () {} };
+                        }
+                    };
+                };
+
+                window.wmsEnsureOption = function ($select, value, text, attrs) {
+                    if (value === null || value === undefined || value === '') return;
+
+                    value = String(value);
+
+                    if ($select.find('option').filter(function () { return this.value === value; }).length) return;
+
+                    var option = new Option(text || value, value, false, false);
+
+                    $.each(attrs || {}, function (name, attr) {
+                        if (attr !== null && attr !== undefined) option.setAttribute('data-' + name, attr);
+                    });
+
+                    $select.append(option);
+                };
+
+                window.wmsSelectedItems = function ($select) {
+                    var items = $select.hasClass('select2-hidden-accessible') ? $select.select2('data') :
+                        $select.find('option:selected').map(function () {
+                            return { id: this.value, text: $(this).text(), element: this };
+                        }).get();
+
+                    return items.filter(function (item) { return item.id !== '' && item.id !== undefined; })
+                        .map(function (item) {
+                            return $.extend({}, item.element ? $(item.element).data() : {}, item);
+                        });
+                };
+            })(window.jQuery);
+        </script>
         <!-- Bootstrap4 Duallistbox -->
         <script src="{{asset ('dataTable/plugins/bootstrap4-duallistbox/jquery.bootstrap-duallistbox.min.js')}}"></script>
         <!-- InputMask -->
@@ -234,4 +511,42 @@
                                 scan(document);
                         }
                 })();
+        </script>
+
+        {{-- Ô chọn bộ phận (layout/departmentOptions): select2 có ô tìm kiếm, gom theo công ty --}}
+        <script>
+                (function ($) {
+                        if (!$ || !$.fn.select2) return;
+
+                        function deptSelects(root) {
+                                return $(root).find('select').filter(function () {
+                                        return $(this).children('optgroup[data-dept-group]').length > 0
+                                                && !$(this).hasClass('mat-transfer-dept-fixed');
+                                });
+                        }
+
+                        function init(root) {
+                                deptSelects(root).each(function () {
+                                        var $select = $(this);
+                                        if ($select.hasClass('select2-hidden-accessible')) return; // trang đã tự bật select2
+                                        var $modal = $select.closest('.modal');
+                                        $select.select2({
+                                                theme: 'bootstrap4',
+                                                width: '100%',
+                                                dropdownParent: $modal.length ? $modal : $(document.body),
+                                                placeholder: $select.find('option[value=""]').first().text().trim() || '-- Chọn phòng ban --',
+                                                language: { noResults: function () { return 'Không tìm thấy phòng ban phù hợp'; } }
+                                        });
+                                });
+                        }
+
+                        // Chạy sau script của từng trang để không giành quyền khởi tạo
+                        $(function () { setTimeout(function () { init(document); }, 0); });
+
+                        // JS mở modal hay gán .val() mà không trigger change -> làm mới chữ hiển thị
+                        $(document).on('shown.bs.modal', function (e) {
+                                init(e.target);
+                                deptSelects(e.target).filter('.select2-hidden-accessible').trigger('change.select2');
+                        });
+                })(window.jQuery);
         </script>

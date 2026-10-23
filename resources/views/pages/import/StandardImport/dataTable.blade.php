@@ -1,4 +1,5 @@
 @include('pages.import.shared.assets')
+@php $activeTab = \App\Support\PageTabs::active('import_standard', $activeTab ?? 'book'); @endphp
 
 @php
     $impToday = \Carbon\Carbon::today();
@@ -36,19 +37,24 @@
             <div class="card-body">
 
                 <div class="imp-tabs">
+                    @tab('import_standard', 'book')
                     <button type="button" class="imp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}"
                         data-pane="impPaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ nhập chất chuẩn
                     </button>
-                    <button type="button" class="imp-tab" data-pane="impPaneCheck">
+                    @endtab
+                    @tab('import_standard', 'check')
+                    <button type="button" class="imp-tab {{ $activeTab === 'check' ? 'is-active' : '' }}" data-pane="impPaneCheck">
                         <i class="fas fa-clipboard-check mr-1"></i> Chờ kiểm tra
                         @if ($pendingCount > 0)
                             <span class="imp-tab-count">{{ $pendingCount }}</span>
                         @endif
                     </button>
+                    @endtab
                 </div>
 
                 {{-- ============ SỔ NHẬP CHẤT CHUẨN ============ --}}
+                @tab('import_standard', 'book')
                 <div class="imp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="impPaneBook">
 
                     <div class="md-toolbar">
@@ -206,10 +212,8 @@
                                         <td class="md-sub">
                                             @if ($row->location_code)
                                                 <div class="font-weight-bold">
-                                                    <span class="md-tag">{{ $row->location_code }}</span>
+                                                    {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                                 </div>
-                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
-                                                    {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
                                             @else
                                                 <span class="imp-no-location">Chưa xếp vị trí</span>
                                             @endif
@@ -293,6 +297,8 @@
                                                                 'requires_aliquot' => $row->requires_aliquot,
                                                                 'stability_batch' => $row->stability_batch,
                                                                 'location_id' => $row->location_id,
+                                                                'location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                                'location_id_zone' => $row->location_zone_type,
                                                                 'purpose_id' => $row->purpose_id,
                                                                 'note' => $row->note,
                                                                 'attachments' => $rowAttachments->map(fn($a) => ['id' => $a->id, 'file_name' => $a->file_name])->toArray(),
@@ -348,9 +354,11 @@
                         'pgUnit' => 'phiếu nhập',
                     ])
                 </div>
+                @endtab
 
                 {{-- ============ CHỜ KIỂM TRA ============ --}}
-                <div class="imp-pane" id="impPaneCheck">
+                @tab('import_standard', 'check')
+                <div class="imp-pane {{ $activeTab === 'check' ? 'is-active' : '' }}" id="impPaneCheck">
                     <div class="table-responsive">
                         <table id="mdTableCheck" class="table table-bordered table-hover w-100 md-table">
                             <thead>
@@ -403,8 +411,7 @@
                                             {{ $impDate($row->expired_date) }}</td>
                                         <td class="md-sub">
                                             @if ($row->location_code)
-                                                <span class="md-tag">{{ $row->location_code }}</span>
-                                                <div>{{ $row->warehouse_name ?: '—' }}</div>
+                                                {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                             @else
                                                 <span class="imp-no-location">Chưa định khu</span>
                                             @endif
@@ -428,6 +435,8 @@
                                                         'expired_date' => $row->expired_date,
                                                         'supplier_id' => $row->supplier_id,
                                                         'location_id' => $row->location_id,
+                                                        'location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                        'location_id_zone' => $row->location_zone_type,
                                                     ]) }}">
                                                     <i class="fas fa-clipboard-check mr-1"></i> Kiểm tra
                                                 </button>
@@ -439,6 +448,7 @@
                         </table>
                     </div>
                 </div>
+                @endtab
 
             </div>
         </div>

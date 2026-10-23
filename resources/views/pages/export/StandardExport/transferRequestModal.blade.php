@@ -19,6 +19,7 @@
                                 Tiêu Đề Đề Nghị <span class="text-danger">*</span>
                             </label>
                             <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
+                                list="stdTitleOptionsTransfer" autocomplete="off"
                                 placeholder="VD: Xin chất chuẩn phục vụ hiệu chuẩn..." value="{{ old('title') }}" required>
                         </div>
                         <div class="form-group mb-0">
@@ -35,15 +36,7 @@
                             <div style="min-width: 280px;">
                                 <select name="to_department_id" class="form-control font-weight-bold" style="height: 38px !important;" required>
                                     <option value="">-- Chọn phòng ban đang giữ chuẩn --</option>
-                                    @foreach ($transferDepartments->groupBy('company_name') as $companyName => $depts)
-                                        <optgroup label="{{ $companyName ?: 'Chưa gán công ty' }}">
-                                            @foreach ($depts as $dept)
-                                                <option value="{{ $dept->id }}" {{ old('to_department_id') == $dept->id ? 'selected' : '' }}>
-                                                    {{ $dept->name }}
-                                                </option>
-                                            @endforeach
-                                        </optgroup>
-                                    @endforeach
+                                    @include('layout.departmentOptions', ['departments' => $transferDepartments, 'selected' => old('to_department_id')])
                                 </select>
                             </div>
                         </div>

@@ -26,6 +26,7 @@
     $stdReqBadge = $stdReqBadge ?? fn($status) => $stdReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
 @endphp
 
+@tab('export_standard', 'transfer')
 <div class="exp-pane {{ $activeTab === 'transfer' ? 'is-active' : '' }}" id="expPaneTransfer">
 
     <div class="md-toolbar">
@@ -259,3 +260,4 @@
         </div>
     </div>
 </div>
+@endtab

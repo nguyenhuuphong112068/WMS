@@ -1,27 +1,12 @@
 @include('pages.inventory.shared.assets')
+@php $activeTab = \App\Support\PageTabs::active('inventory_chemical', $activeTab ?? 'code'); @endphp
 
 @php
     $invDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
-
-    /*
-    | Phiếu chưa xác định hạn dùng nội bộ: hoá chất có khai báo hạn dùng mặc định
-    | (chemical_categories.shelf_life_months > 0) nhưng imports.internal_expired_date còn trống.
-    | Những phiếu này CHƯA ĐƯỢC SỬ DỤNG - màn hình Sử Dụng Hoá Chất không cho chọn.
-    */
-    $invWaitingInternal = $datas->filter(fn($row) => $row->can_internal_expiry && !$row->internal_expired_date)->values();
-
-    /*
-    | Sắp hết hạn: còn tồn và hạn ÁP DỤNG (hạn nội bộ nếu có, không thì hạn nhà sản xuất)
-    | rơi vào trong 6 tháng tới - kể cả các mã đã quá hạn, đó là phần gấp nhất.
-    | Gần hết hạn nhất xếp trước để biết phải xử lý mã nào.
-    */
-    $invExpiringSoon = $datas->filter(fn($row) => $row->is_expiring_soon)
-        ->sortBy('effective_expired_date')
-        ->values();
 @endphp
 
 <div class="content-wrapper">
-    <div class="md-page">
+    <div class="md-page inv-compact">
 
         <div class="card md-card">
             <div class="card-body">
@@ -59,54 +44,73 @@
                         @endforeach
                     </div>
 
-                    <div class="inv-period-note">
-                        @if ($period['is_current'])
-                            <i class="fas fa-circle-check"></i> Kỳ đang chạy - Tồn Cuối Kỳ chính là tồn thực tế
-                            đang có trong kho.
-                        @else
-                            <i class="fas fa-clock-rotate-left"></i> Đang xem lại kỳ đã qua - mọi số liệu tính đến
-                            hết ngày {{ $invDate($period['to']) }}.
-                        @endif
+                    {{-- Lọc thuộc tính Hoá chất VS cho mọi tab; nằm trong form để đổi kỳ vẫn giữ lựa chọn --}}
+                    <div class="inv-period-field">
+                        <label for="invVsFilter">Hoá chất VS</label>
+                        <select id="invVsFilter" name="vs"
+                            class="form-control inv-vs-select {{ $vsFilter !== 'all' ? 'is-on' : '' }}"
+                            title="Lọc theo thuộc tính Hoá chất vi sinh của phiếu nhập, áp dụng cho mọi tab">
+                            <option value="all" @selected($vsFilter === 'all')>Tất cả</option>
+                            <option value="yes" @selected($vsFilter === 'yes')>Hoá chất VS</option>
+                            <option value="no" @selected($vsFilter === 'no')>Không phải VS</option>
+                        </select>
+                    </div>
+
+                    {{-- Diễn giải kỳ để ở tooltip, không chiếm thêm một hàng --}}
+                    <div class="inv-period-note"
+                        title="{{ $period['is_current']
+                            ? 'Kỳ đang chạy - Tồn Cuối Kỳ chính là tồn thực tế đang có trong kho.'
+                            : 'Đang xem lại kỳ đã qua - mọi số liệu tính đến hết ngày ' . $invDate($period['to']) . '.' }} Chỉ hiện mã còn tồn cuối kỳ, có sử dụng hoặc có loại bỏ trong kỳ.">
+                        <i class="fas {{ $period['is_current'] ? 'fa-circle-check' : 'fa-clock-rotate-left' }}"></i>
                         <span class="inv-period-days">{{ $period['days'] }} ngày</span>
-                        <span class="inv-period-rule"><i class="fas fa-filter"></i>Chỉ hiện mã còn tồn cuối kỳ,
-                            có sử dụng hoặc có loại bỏ trong kỳ.</span>
                     </div>
                 </form>
 
                 <div class="inv-tabs">
-                    <button type="button" class="inv-tab is-active" data-pane="invPaneCode">
+                    @tab('inventory_chemical', 'code')
+                    <button type="button" class="inv-tab {{ $activeTab === 'code' ? 'is-active' : '' }}" data-pane="invPaneCode">
                         <i class="fas fa-barcode mr-1"></i> Theo mã xuất nhập
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneChem">
+                    @endtab
+                    @tab('inventory_chemical', 'chemical')
+                    <button type="button" class="inv-tab {{ $activeTab === 'chemical' ? 'is-active' : '' }}" data-pane="invPaneChem">
                         <i class="fas fa-flask mr-1"></i> Theo hoá chất
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneZone">
+                    @endtab
+                    @tab('inventory_chemical', 'zone')
+                    <button type="button" class="inv-tab {{ $activeTab === 'zone' ? 'is-active' : '' }}" data-pane="invPaneZone">
                         <i class="fas fa-map-location-dot mr-1"></i> Theo định khu
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneExpiring">
-                        <i class="fas fa-calendar-xmark mr-1"></i> Hạn dùng dưới {{ $expiringSoonMonths }} tháng
-                        <span class="inv-tab-count">{{ $invExpiringSoon->count() }}</span>
+                    @endtab
+                    @tab('inventory_chemical', 'expiring')
+                    <button type="button" class="inv-tab {{ $activeTab === 'expiring' ? 'is-active' : '' }}" data-pane="invPaneExpiring">
+                        <i class="fas fa-calendar-xmark mr-1"></i> Cận Hạn Dùng
+                        <span class="inv-tab-count" data-inv-count="expiring">…</span>
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneInternal">
+                    @endtab
+                    @tab('inventory_chemical', 'internal')
+                    <button type="button" class="inv-tab {{ $activeTab === 'internal' ? 'is-active' : '' }}" data-pane="invPaneInternal">
                         <i class="fas fa-hourglass-half mr-1"></i> Chưa có hạn nội bộ
-                        <span class="inv-tab-count">{{ $invWaitingInternal->count() }}</span>
+                        <span class="inv-tab-count" data-inv-count="internal">…</span>
                     </button>
+                    @endtab
                 </div>
 
                 {{-- ============ TỒN THEO TỪNG MÃ XUẤT NHẬP ============ --}}
-                <div class="inv-pane is-active" id="invPaneCode">
+                @tab('inventory_chemical', 'code')
+                <div class="inv-pane {{ $activeTab === 'code' ? 'is-active' : '' }}" id="invPaneCode">
 
-                    <div class="inv-filters">
+                    <div class="inv-filters md-tablebar-item">
                         <button type="button" class="inv-chip is-active" data-state="all">
                             <i class="fas fa-layer-group"></i> Tất cả
-                            <span class="count">{{ $datas->count() }}</span>
+                            <span class="count">…</span>
                         </button>
                         @foreach ($states as $key => $label)
                             {{-- Cách tính từng trạng thái để ở tooltip, không chiếm thêm một hàng trên màn hình --}}
                             <button type="button" class="inv-chip" data-state="{{ $key }}"
                                 title="{{ $invStateHints[$key] ?? $label }}">
                                 <span class="inv-badge inv-badge-{{ $key }}">{{ $label }}</span>
-                                <span class="count">{{ $invStateCounts[$key] }}</span>
+                                <span class="count">…</span>
                             </button>
                         @endforeach
                     </div>
@@ -115,12 +119,11 @@
                         'scanTitle' => 'Quét mã vạch',
                         'scanTables' => [
                             ['id' => 'mdTable', 'column' => 1, 'pane' => 'invPaneCode', 'label' => 'Theo mã xuất nhập'],
-                            ['id' => 'invZoneTable', 'column' => 2, 'pane' => 'invPaneZone', 'label' => 'Theo định khu'],
                             [
                                 'id' => 'invExpiringTable',
                                 'column' => 1,
                                 'pane' => 'invPaneExpiring',
-                                'label' => 'Hạn dùng dưới ' . $expiringSoonMonths . ' tháng',
+                                'label' => 'Cận Hạn Dùng',
                             ],
                             [
                                 'id' => 'invInternalTable',
@@ -134,7 +137,7 @@
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'mdTable'])
 
                     <div class="table-responsive">
-                        <table id="mdTable" class="table table-bordered table-hover w-100">
+                        <table id="mdTable" class="table table-bordered table-hover w-100" data-no-datatable>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
@@ -143,18 +146,19 @@
                                     <th style="width: 175px"
                                         title="Vị trí lưu trữ thực tế của lô hàng này (Kho / Phòng / Kệ/Tủ / Vị trí)">
                                         Vị Trí Lưu Trữ</th>
-                                    <th class="text-right inv-th-period" style="width: 110px"
+                                    <th class="text-center" style="width: 70px">Đơn Vị</th>
+                                    <th class="text-right" style="width: 110px"
                                         title="Tồn của mã xuất nhập này trước ngày {{ $invDate($period['from']) }}">
                                         Tồn Đầu Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 110px"
+                                    <th class="text-right" style="width: 110px"
                                         title="Số nhập kho trong kỳ {{ $invPeriodLabel }}">Nhập Trong Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 105px"
+                                    <th class="text-right" style="width: 105px"
                                         title="Số đã cân đối trong kỳ {{ $invPeriodLabel }}">Cân Đối Trong Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 115px"
+                                    <th class="text-right" style="width: 115px"
                                         title="Số đã sử dụng trong kỳ {{ $invPeriodLabel }}">Sử Dụng Trong Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 105px"
+                                    <th class="text-right" style="width: 105px"
                                         title="Số đã huỷ bỏ trong kỳ {{ $invPeriodLabel }}">Huỷ Trong Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 150px"
+                                    <th class="text-right" style="width: 150px"
                                         title="Tồn đầu kỳ + nhập + cân đối - sử dụng - huỷ, tính đến hết ngày {{ $invDate($period['to']) }}">
                                         Tồn Cuối Kỳ</th>
                                     <th class="text-right" style="width: 125px"
@@ -166,459 +170,94 @@
                                     <th class="text-center" style="width: 115px">Trạng Thái</th>
                                     <th class="text-center" style="width: 60px" title="File hồ sơ đính kèm của phiếu nhập">
                                         <i class="fas fa-paperclip"></i></th>
-                                    <th class="text-center" style="width: 190px">Thao Tác</th>
+                                    <th class="text-center" style="width: 110px">Thao Tác</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($datas as $row)
-                                    {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
-                                    <tr data-state="{{ $row->state }}"
-                                        data-classification="{{ $invCls($row->category_id) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td>
-                                            <span class="inv-code">{{ $row->code }}</span>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-bold">
-                                                {{ $row->chem_name ?: '—' }}
-                                                @if ($invIsSpecial($row->category_id))
-                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
-                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            <div class="md-sub">
-                                                @if (!empty($row->category_type))
-                                                    <span class="md-tag">{{ $row->category_type }}</span>
-                                                @endif
-                                                @if ($row->batch_no)
-                                                    <span class="{{ !empty($row->category_type) ? 'ml-1' : '' }}">Lô {{ $row->batch_no }}</span>
-                                                @endif
-                                                @if ($row->supplier_name)
-                                                    <span class="ml-1">· {{ $row->supplier_name }}</span>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        {{-- Vị trí THỰC TẾ của lô, sắp xếp theo đường dẫn định khu --}}
-                                        <td class="md-sub"
-                                            data-order="{{ $row->location_code ? $row->warehouse_name . '/' . $row->shelf_name . '/' . $row->column_name . '/' . $row->tier_name . '/' . $row->location_code : 'zzz' }}">
-                                            @if ($row->location_code)
-                                                <div class="font-weight-bold">
-                                                    <span class="md-tag">{{ $row->location_code }}</span>
-                                                </div>
-                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
-                                                    {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
-                                            @else
-                                                <span class="inv-zone-none">Chưa xếp vị trí</span>
-                                            @endif
-                                        </td>
-                                        {{-- Tồn đầu kỳ: phát sinh trước ngày bắt đầu kỳ --}}
-                                        <td class="text-right" data-order="{{ $row->opening }}">
-                                            <button type="button" class="{{ $mvCls($row->opening) }}" data-scope="import"
-                                                data-id="{{ $row->id }}" data-metric="opening">{{ $invNum($row->opening) }}</button>
-                                            <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
-                                            @if ($row->is_new_in_period)
-                                                <div class="md-sub"><span class="inv-period-tag">Mới nhập trong
-                                                        kỳ</span></div>
-                                            @endif
-                                        </td>
-                                        {{-- Nhập trong kỳ: phiếu nhập có ngày nhập nằm trong kỳ --}}
-                                        <td class="text-right" data-order="{{ $row->period_imported }}">
-                                            <button type="button" class="{{ $mvCls($row->period_imported) }}" data-scope="import"
-                                                data-id="{{ $row->id }}" data-metric="period_in">{{ $invNum($row->period_imported) }}</button>
-                                            <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
-                                            @if ($row->period_imported > 0)
-                                                <div class="md-sub">Nhập {{ $invDate($row->imported_date) }}</div>
-                                            @endif
-                                        </td>
-                                        {{-- Cân đối trong kỳ: inventory_balancings ghi trong kỳ --}}
-                                        <td class="text-right" data-order="{{ $row->period_balanced }}">
-                                            <button type="button" class="{{ $mvCls($row->period_balanced) }}" data-scope="import"
-                                                data-id="{{ $row->id }}" data-metric="period_balanced">{{ $row->period_balanced > 0 ? '+' : '' }}{{ $invNum($row->period_balanced) }}</button>
-                                            @if ($row->period_balancing_times > 0)
-                                                <div class="md-sub">{{ $row->period_balancing_times }} lần</div>
-                                            @endif
-                                        </td>
-                                        {{-- Sử dụng trong kỳ: exports type = 'export' --}}
-                                        <td class="text-right" data-order="{{ $row->period_used }}">
-                                            <button type="button" class="{{ $mvCls($row->period_used, 'out') }}" data-scope="import"
-                                                data-id="{{ $row->id }}" data-metric="period_used">{{ $invNum($row->period_used) }}</button>
-                                            <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
-                                            @if ($row->period_export_times > 0)
-                                                <div class="md-sub">{{ $row->period_export_times }} lần xuất</div>
-                                            @endif
-                                        </td>
-                                        {{-- Huỷ trong kỳ: exports type = 'cancel' --}}
-                                        <td class="text-right" data-order="{{ $row->period_cancelled }}">
-                                            <button type="button" class="{{ $mvCls($row->period_cancelled, 'out') }}" data-scope="import"
-                                                data-id="{{ $row->id }}" data-metric="period_cancelled">{{ $invNum($row->period_cancelled) }}</button>
-                                            <div class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</div>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->gap }}">
-                                            {{-- Tồn âm (đã xuất vượt) hiện đúng số âm để thấy phần phải cân đối --}}
-                                            <button type="button"
-                                                class="{{ $mvCls($row->gap) }} {{ $row->state === 'over' ? 'is-out' : '' }}"
-                                                data-scope="import" data-id="{{ $row->id }}" data-metric="closing">{{ $invNum($row->gap) }}</button>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
-                                            <div
-                                                class="inv-bar {{ $row->state === 'out' ? 'is-out' : ($row->state === 'low' ? 'is-low' : '') }}">
-                                                <span style="width: {{ $row->used_percent }}%"></span>
-                                            </div>
-                                            {{-- Luỹ kế từ lúc nhập đến hết kỳ, không chỉ riêng phần phát sinh trong kỳ --}}
-                                            <div class="md-sub">Đã dùng {{ $row->used_percent }}% (luỹ kế
-                                                {{ $invNum($row->used + $row->cancelled) }})</div>
-                                        </td>
-                                        {{-- Cùng hoá chất + cùng số lô --}}
-                                        <td class="text-right" data-order="{{ $row->batch_remaining }}">
-                                            <button type="button" class="{{ $mvCls($row->batch_remaining, 'in') }}" data-scope="category"
-                                                data-id="{{ $row->category_id }}" data-metric="stock_batch"
-                                                data-batch="{{ $row->batch_no }}">{{ $invNum($row->batch_remaining) }}</button>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
-                                            <div class="md-sub">
-                                                @if ($row->batch_no)
-                                                    Lô {{ $row->batch_no }}
-                                                @else
-                                                    Chưa có số lô
-                                                @endif
-                                                · {{ $row->batch_codes }} mã
-                                            </div>
-                                        </td>
-                                        {{-- Cùng hoá chất, gộp mọi số lô --}}
-                                        <td class="text-right" data-order="{{ $row->category_remaining }}">
-                                            <button type="button" class="{{ $mvCls($row->category_remaining, 'in') }}" data-scope="category"
-                                                data-id="{{ $row->category_id }}" data-metric="stock_category">{{ $invNum($row->category_remaining) }}</button>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
-                                            <div class="md-sub">
-                                                {{ $row->category_batches }} lô · {{ $row->category_codes }} mã
-                                            </div>
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->expired_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->expired_date) }}
-                                            @if ($row->days_to_expiry !== null && $row->remaining > 0)
-                                                <div>
-                                                    @if ($row->days_to_expiry < 0)
-                                                        <span class="text-danger font-weight-bold">Quá
-                                                            {{ abs($row->days_to_expiry) }} ngày</span>
-                                                    @else
-                                                        Còn {{ $row->days_to_expiry }} ngày
-                                                    @endif
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->internal_expired_date ?: '9999-12-31' }}">
-                                            @if ($row->internal_expired_date)
-                                                <span class="inv-internal">{{ $invDate($row->internal_expired_date) }}</span>
-                                            @elseif ($row->can_internal_expiry)
-                                                <span class="inv-internal-none">Chưa xác định</span>
-                                            @else
-                                                <span class="md-empty" title="Hoá chất chưa khai báo hạn dùng mặc định trong Danh Mục">—</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-center">
-                                            <span
-                                                class="inv-badge inv-badge-{{ $row->state }}">{{ $row->state_label }}</span>
-                                        </td>
-                                        <td class="text-center">
-                                            @include('pages.shared.attachmentList', [
-                                                'attachments' => $attachments->get($row->id) ?? collect(),
-                                                'routePrefix' => 'pages.inventory.chemicalInventory.',
-                                                'uploadPerm' => 'import_chemical_attachment_upload',
-                                                'parentId' => $row->id,
-                                                'statusPerm' => 'import_chemical_attachment_status',
-                                                'code' => $row->code,
-                                                'name' => $row->chem_name,
-                                                'typeLabel' => 'Hoá chất',
-                                            ])
-                                        </td>
-                                        <td class="text-center">
-                                            @if ($row->can_internal_expiry)
-                                                @perm('inventory_chemical_internalExpiry')
-                                                    <button type="button" class="btn btn-sm btn-outline-primary btn-inv-internal mb-1"
-                                                        title="Xác định hạn dùng nội bộ cho mã xuất nhập này"
-                                                        data-row="{{ json_encode([
-                                                            'import_id' => $row->id,
-                                                            'code' => $row->code,
-                                                            'chem_name' => $row->chem_name,
-                                                            'shelf_life_months' => $row->shelf_life_months,
-                                                            'expired_date' => $row->expired_date,
-                                                            'internal_expired_date' => $row->internal_expired_date,
-                                                        ]) }}">
-                                                        <i class="fas fa-hourglass-half mr-1"></i> Hạn nội bộ
-                                                    </button>
-                                                @endperm
-                                            @endif
-                                            {{-- Badge góc trên bên phải: số lần đã cân đối, bấm vào để xem lịch sử --}}
-                                            <span class="inv-btn-wrap">
-                                                @perm('inventory_chemical_balancing')
-                                                    <button type="button"
-                                                        class="btn btn-sm btn-{{ $row->state === 'over' ? 'danger' : 'primary' }} btn-inv-balancing"
-                                                        title="Cân đối số lượng nhập của mã xuất nhập này"
-                                                        data-row="{{ json_encode([
-                                                            'import_id' => $row->id,
-                                                            'code' => $row->code,
-                                                            'chem_name' => $row->chem_name,
-                                                            'unit' => $row->unit_short_name ?: $row->unit_name,
-                                                            'imported' => (float) $row->imported,
-                                                            // Cân đối ghi vào dữ liệu hiện tại nên không cắt theo kỳ
-                                                            'balanced' => (float) $row->balanced_all,
-                                                            'gap' => (float) $row->gap_all,
-                                                            'limit' => (float) $row->balancing_limit,
-                                                            'min_input' => (float) $row->balancing_min_input,
-                                                            'max_input' => (float) $row->balancing_max_input,
-                                                        ]) }}">
-                                                        <i class="fas fa-balance-scale mr-1"></i> Cân đối
-                                                    </button>
-                                                    @endperm
-                                                @if ($row->balancing_times > 0)
-                                                    <button type="button" class="inv-count-badge btn-inv-history"
-                                                        title="Xem {{ $row->balancing_times }} lần cân đối của mã xuất nhập này"
-                                                        data-row="{{ json_encode([
-                                                            'import_id' => $row->id,
-                                                            'code' => $row->code,
-                                                            'chem_name' => $row->chem_name,
-                                                            'category_code' => $row->category_code,
-                                                            'unit' => $row->unit_short_name ?: $row->unit_name,
-                                                            'imported' => (float) $row->imported,
-                                                            'balanced' => (float) $row->balanced_all,
-                                                            'gap' => (float) $row->gap_all,
-                                                        ]) }}">{{ $row->balancing_times }}</button>
-                                                @endif
-                                            </span>
-                                        </td>
-                                    </tr>
-                                @endforeach
+                                <tr class="inv-loading-row">
+                                    <td colspan="18" class="text-center md-sub">
+                                        <i class="fas fa-circle-notch fa-spin mr-1"></i> Đang tải dữ liệu tồn kho...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ TỒN CỘNG DỒN THEO HOÁ CHẤT ============ --}}
-                <div class="inv-pane" id="invPaneChem">
+                @tab('inventory_chemical', 'chemical')
+                <div class="inv-pane {{ $activeTab === 'chemical' ? 'is-active' : '' }}" id="invPaneChem">
 
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'invSummaryTable'])
 
                     <div class="table-responsive">
-                        <table id="invSummaryTable" class="table table-bordered table-hover w-100">
+                        <table id="invSummaryTable" class="table table-bordered table-hover w-100" data-inv-lazy>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
                                     <th>Hoá Chất</th>
-                                    <th class="text-center" style="width: 120px">Mã Xuất Nhập</th>
-                                    <th class="text-right inv-th-period" style="width: 110px">Tồn Đầu Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 110px">Nhập Trong Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 105px">Cân Đối Trong Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 110px">Sử Dụng Trong Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 100px">Huỷ Trong Kỳ</th>
-                                    <th class="text-right inv-th-period" style="width: 130px">Tồn Cuối Kỳ</th>
+                                    <th class="text-center" style="width: 120px"
+                                        title="Số mã xuất nhập còn tồn / tổng số mã xuất nhập trong kỳ">Số Mã Xuất Nhập</th>
+                                    <th class="text-center" style="width: 70px">Đơn Vị</th>
+                                    <th class="text-right" style="width: 110px">Tồn Đầu Kỳ</th>
+                                    <th class="text-right" style="width: 110px">Nhập Trong Kỳ</th>
+                                    <th class="text-right" style="width: 105px">Cân Đối Trong Kỳ</th>
+                                    <th class="text-right" style="width: 110px">Sử Dụng Trong Kỳ</th>
+                                    <th class="text-right" style="width: 100px">Huỷ Trong Kỳ</th>
+                                    <th class="text-right" style="width: 130px">Tồn Cuối Kỳ</th>
                                     <th class="text-center" style="width: 120px">Hạn Gần Nhất</th>
-                                    <th class="text-center" style="width: 110px">Cần Chú Ý</th>
                                     <th class="text-center inv-chart-th" style="width: 115px">Biểu Đồ</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($summaries as $sum)
-                                    <tr data-classification="{{ $invCls($sum->category_id) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td>
-                                            <div class="font-weight-bold">
-                                                {{ $sum->chem_name ?: '—' }}
-                                                @if ($invIsSpecial($sum->category_id))
-                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
-                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $sum->category_code ?: '—' }}</span>
-                                            </div>
-                                        </td>
-                                        <td class="text-center md-sub" data-order="{{ $sum->code_count }}">
-                                            {{ $sum->in_stock_count }}/{{ $sum->code_count }} còn tồn
-                                        </td>
-                                        <td class="text-right" data-order="{{ $sum->opening }}">
-                                            <button type="button" class="{{ $mvCls($sum->opening) }}" data-scope="category"
-                                                data-id="{{ $sum->category_id }}" data-metric="opening">{{ $invNum($sum->opening) }}</button>
-                                            <div class="md-sub">{{ $sum->unit }}</div>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $sum->period_imported }}">
-                                            <button type="button" class="{{ $mvCls($sum->period_imported) }}" data-scope="category"
-                                                data-id="{{ $sum->category_id }}" data-metric="period_in">{{ $invNum($sum->period_imported) }}</button>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $sum->period_balanced }}">
-                                            <button type="button" class="{{ $mvCls($sum->period_balanced) }}" data-scope="category"
-                                                data-id="{{ $sum->category_id }}" data-metric="period_balanced">{{ $sum->period_balanced > 0 ? '+' : '' }}{{ $invNum($sum->period_balanced) }}</button>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $sum->period_used }}">
-                                            <button type="button" class="{{ $mvCls($sum->period_used, 'out') }}" data-scope="category"
-                                                data-id="{{ $sum->category_id }}" data-metric="period_used">{{ $invNum($sum->period_used) }}</button>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $sum->period_cancelled }}">
-                                            <button type="button" class="{{ $mvCls($sum->period_cancelled, 'out') }}" data-scope="category"
-                                                data-id="{{ $sum->category_id }}" data-metric="period_cancelled">{{ $invNum($sum->period_cancelled) }}</button>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $sum->closing }}">
-                                            <button type="button" class="{{ $mvCls($sum->closing) }}" data-scope="category"
-                                                data-id="{{ $sum->category_id }}" data-metric="closing">{{ $invNum($sum->closing) }}</button>
-                                            <span class="md-sub">{{ $sum->unit }}</span>
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $sum->nearest_expiry ?: '9999-12-31' }}">
-                                            {{ $invDate($sum->nearest_expiry) }}
-                                        </td>
-                                        <td class="text-center" data-order="{{ $sum->alert_count }}">
-                                            @if ($sum->alert_count > 0)
-                                                <span class="inv-badge inv-badge-near">{{ $sum->alert_count }} mã
-                                                    phiếu</span>
-                                            @else
-                                                <span class="md-empty">—</span>
-                                            @endif
-                                        </td>
-                                        {{-- Mở biểu đồ nhập - xuất - tồn của đúng hoá chất này, theo kỳ đang xem --}}
-                                        <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-outline-primary btn-inv-chart"
-                                                data-category="{{ $sum->category_id }}"
-                                                data-chem="{{ $sum->chem_name }}"
-                                                title="Xem biểu đồ nhập - xuất - tồn của hoá chất này">
-                                                <i class="fas fa-chart-bar mr-1"></i> Biểu đồ
-                                            </button>
-                                        </td>
-                                    </tr>
-                                @endforeach
+                                <tr class="inv-loading-row">
+                                    <td colspan="12" class="text-center md-sub">
+                                        <i class="fas fa-circle-notch fa-spin mr-1"></i> Đang tải dữ liệu tồn kho...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ TỒN THEO ĐỊNH KHU ============ --}}
-                <div class="inv-pane" id="invPaneZone">
+                @tab('inventory_chemical', 'zone')
+                <div class="inv-pane {{ $activeTab === 'zone' ? 'is-active' : '' }}" id="invPaneZone">
 
-                    {{-- 5 ô chọn dây chuyền: chọn cấp trên thì cấp dưới tự lọc lại --}}
-                    <div class="inv-zone-picker" data-zones="{{ json_encode($zones) }}">
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-warehouse"></i> Kho/Phòng</label>
-                            <select class="form-control inv-zone-select" data-level="warehouse">
-                                <option value="">Tất cả kho/phòng</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-layer-group"></i> Kệ/Tủ</label>
-                            <select class="form-control inv-zone-select" data-level="shelf">
-                                <option value="">Tất cả kệ/tủ</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-grip-lines-vertical"></i> Cột</label>
-                            <select class="form-control inv-zone-select" data-level="column">
-                                <option value="">Tất cả cột</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-bars"></i> Tầng</label>
-                            <select class="form-control inv-zone-select" data-level="tier">
-                                <option value="">Tất cả tầng</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-map-pin"></i> Vị trí</label>
-                            <select class="form-control inv-zone-select" data-level="location">
-                                <option value="">Tất cả vị trí</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-outline-secondary btn-inv-zone-reset">
-                            <i class="fas fa-rotate-left mr-1"></i> Bỏ lọc
-                        </button>
-                    </div>
-
-                    <div class="inv-zone-summary">
-                        <span class="path"><i class="fas fa-location-dot mr-1"></i><span
-                                class="inv-zone-path">Toàn bộ định khu của phòng</span></span>
-                        <span class="stat"><i class="fas fa-barcode"></i> <b class="inv-zone-codes">0</b> mã xuất
-                            nhập</span>
-                        <span class="stat"><i class="fas fa-flask"></i> <b class="inv-zone-chems">0</b> hoá chất</span>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table id="invZoneTable" class="table table-bordered table-hover w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-center" style="width: 55px">STT</th>
-                                    <th style="width: 200px">Vị Trí</th>
-                                    <th style="width: 130px">Mã Xuất Nhập</th>
-                                    <th>Hoá Chất</th>
-                                    <th class="text-right" style="width: 120px">Tồn Cuối Kỳ</th>
-                                    <th class="text-center" style="width: 115px">Hạn Áp Dụng</th>
-                                    <th class="text-center" style="width: 110px">Trạng Thái</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($datas as $row)
-                                    {{-- 5 cấp định khu để JS lọc; mã chưa xếp vị trí thì cả 5 đều rỗng --}}
-                                    <tr data-classification="{{ $invCls($row->category_id) }}"
-                                        data-warehouse="{{ $row->warehouse_id }}" data-shelf="{{ $row->shelf_id }}"
-                                        data-column="{{ $row->column_id }}" data-tier="{{ $row->tier_id }}"
-                                        data-location="{{ $row->location_id }}"
-                                        data-category="{{ $row->category_id }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td class="md-sub">
-                                            @if ($row->location_code)
-                                                <div class="font-weight-bold">
-                                                    <span class="md-tag">{{ $row->location_code }}</span>
-                                                </div>
-                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
-                                                    {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
-                                            @else
-                                                <span class="inv-zone-none">Chưa xếp vị trí</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <span class="inv-code">{{ $row->code }}</span>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                            </div>
-                                            @if ($row->batch_no)
-                                                <div class="md-sub">Lô {{ $row->batch_no }}</div>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-bold">{{ $row->chem_name ?: '—' }}</div>
-                                            @if (!empty($row->category_type))
-                                                <div class="md-sub">
-                                                    <span class="md-tag">{{ $row->category_type }}</span>
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->gap }}">
-                                            <span
-                                                class="inv-remaining {{ $row->state === 'over' ? 'is-over' : ($row->remaining > 0 ? '' : 'is-zero') }}">{{ $invNum($row->gap) }}</span>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->effective_expired_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->effective_expired_date) }}
-                                        </td>
-                                        <td class="text-center">
-                                            <span
-                                                class="inv-badge inv-badge-{{ $row->state }}">{{ $row->state_label }}</span>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                    {{-- Sơ đồ thẻ Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí như Tồn Kho Vật Tư, dựng ở script --}}
+                    @include('pages.inventory.shared.zoneGrid', [
+                        'zgId' => 'invZoneMap',
+                        'zgItem' => 'hoá chất',
+                        'zgCode' => 'Mã xuất nhập',
+                    ])
                 </div>
+                @endtab
 
-                {{-- ============ HẠN DÙNG DƯỚI 6 THÁNG ============ --}}
-                <div class="inv-pane" id="invPaneExpiring">
+                {{-- ============ CẬN HẠN DÙNG (HẠN ÁP DỤNG DƯỚI 6 THÁNG) ============ --}}
+                @tab('inventory_chemical', 'expiring')
+                <div class="inv-pane {{ $activeTab === 'expiring' ? 'is-active' : '' }}" id="invPaneExpiring">
+
+                    <div class="inv-filters md-tablebar-item">
+                        <button type="button" class="inv-chip is-active" data-expiry="all"
+                            title="Còn tồn và hạn áp dụng dưới {{ $expiringSoonMonths }} tháng, kể cả đã quá hạn">
+                            <i class="fas fa-layer-group"></i> Dưới {{ $expiringSoonMonths }} tháng
+                            <span class="count">…</span>
+                        </button>
+                        @foreach ($expiringFilters as $key => $filter)
+                            <button type="button" class="inv-chip" data-expiry="{{ $key }}"
+                                title="Hạn áp dụng đến hết {{ \Carbon\Carbon::parse($filter['until'])->format('d/m/Y') }}, kể cả đã quá hạn">
+                                <i class="fas fa-hourglass-end"></i> {{ $filter['label'] }}
+                                <span class="count">…</span>
+                            </button>
+                        @endforeach
+                    </div>
 
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'invExpiringTable'])
 
                     <div class="table-responsive">
-                        <table id="invExpiringTable" class="table table-bordered table-hover w-100">
+                        <table id="invExpiringTable" class="table table-bordered table-hover w-100" data-inv-lazy>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
@@ -626,95 +265,33 @@
                                     <th>Hoá Chất</th>
                                     <th class="text-right" style="width: 125px">Tồn Cuối Kỳ</th>
                                     <th class="text-right" style="width: 125px">Tổng Tồn Theo Lô</th>
-                                    <th class="text-center" style="width: 120px">Hạn Nhà Sản Xuất</th>
+                                    <th class="text-center" style="width: 120px">Hạn Dùng</th>
                                     <th class="text-center" style="width: 120px">Hạn Nội Bộ</th>
                                     <th class="text-center" style="width: 140px">Hạn Áp Dụng</th>
                                     <th class="text-center" style="width: 115px">Trạng Thái</th>
+                                    <th class="text-center" style="width: 80px">Thao Tác</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($invExpiringSoon as $row)
-                                    <tr data-classification="{{ $invCls($row->category_id) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td>
-                                            <span class="inv-code">{{ $row->code }}</span>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                            </div>
-                                            @if ($row->batch_no)
-                                                <div class="md-sub">Lô {{ $row->batch_no }}</div>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-bold">
-                                                {{ $row->chem_name ?: '—' }}
-                                                @if ($invIsSpecial($row->category_id))
-                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
-                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            <div class="md-sub">
-                                                @if (!empty($row->category_type))
-                                                    <span class="md-tag">{{ $row->category_type }}</span>
-                                                @endif
-                                                @if ($row->supplier_name)
-                                                    <span class="{{ !empty($row->category_type) ? 'ml-1' : '' }}">· {{ $row->supplier_name }}</span>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->remaining }}">
-                                            <span class="inv-remaining">{{ $invNum($row->remaining) }}</span>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->batch_remaining }}">
-                                            <span class="inv-group-total">{{ $invNum($row->batch_remaining) }}</span>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
-                                            <div class="md-sub">{{ $row->batch_codes }} mã</div>
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->expired_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->expired_date) }}
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->internal_expired_date ?: '9999-12-31' }}">
-                                            @if ($row->internal_expired_date)
-                                                {{ $invDate($row->internal_expired_date) }}
-                                            @else
-                                                <span class="md-empty">Chưa xác định</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-center"
-                                            data-order="{{ $row->effective_expired_date ?: '9999-12-31' }}">
-                                            <div class="font-weight-bold">{{ $invDate($row->effective_expired_date) }}
-                                            </div>
-                                            @if ($row->days_to_effective_expiry < 0)
-                                                <span class="inv-countdown is-over">Quá
-                                                    {{ abs($row->days_to_effective_expiry) }} ngày</span>
-                                            @else
-                                                <span
-                                                    class="inv-countdown {{ $row->days_to_effective_expiry <= $nearExpiryDays ? 'is-near' : '' }}">Còn
-                                                    {{ $row->days_to_effective_expiry }} ngày</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-center">
-                                            <span
-                                                class="inv-badge inv-badge-{{ $row->state }}">{{ $row->state_label }}</span>
-                                        </td>
-                                    </tr>
-                                @endforeach
+                                <tr class="inv-loading-row">
+                                    <td colspan="10" class="text-center md-sub">
+                                        <i class="fas fa-circle-notch fa-spin mr-1"></i> Đang tải dữ liệu tồn kho...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ CHƯA XÁC ĐỊNH HẠN DÙNG NỘI BỘ ============ --}}
-                <div class="inv-pane" id="invPaneInternal">
+                @tab('inventory_chemical', 'internal')
+                <div class="inv-pane {{ $activeTab === 'internal' ? 'is-active' : '' }}" id="invPaneInternal">
 
                     @include('pages.shared.classificationFilter', ['clsTarget' => 'invInternalTable'])
 
                     <div class="table-responsive">
-                        <table id="invInternalTable" class="table table-bordered table-hover w-100">
+                        <table id="invInternalTable" class="table table-bordered table-hover w-100" data-inv-lazy>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
@@ -722,92 +299,220 @@
                                     <th>Hoá Chất</th>
                                     <th class="text-right" style="width: 130px">Tồn Cuối Kỳ</th>
                                     <th class="text-center" style="width: 110px">Ngày Nhập</th>
-                                    <th class="text-center" style="width: 120px">Hạn Nhà Sản Xuất</th>
+                                    <th class="text-center" style="width: 120px">Hạn Dùng</th>
                                     <th class="text-center" style="width: 130px">Hạn Dùng Mặc Định</th>
                                     <th class="text-center" style="width: 150px">Thao Tác</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($invWaitingInternal as $row)
-                                    <tr data-classification="{{ $invCls($row->category_id) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td>
-                                            <span class="inv-code">{{ $row->code }}</span>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                            </div>
-                                            @if ($row->batch_no)
-                                                <div class="md-sub">Lô {{ $row->batch_no }}</div>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-bold">
-                                                {{ $row->chem_name ?: '—' }}
-                                                @if ($invIsSpecial($row->category_id))
-                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
-                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            @if (!empty($row->category_type))
-                                                <div class="md-sub">
-                                                    <span class="md-tag">{{ $row->category_type }}</span>
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->gap }}">
-                                            <span class="inv-remaining {{ $row->remaining > 0 ? '' : 'is-zero' }}">{{ $invNum($row->gap) }}</span>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->imported_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->imported_date) }}
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->expired_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->expired_date) }}
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="md-tag">{{ $row->shelf_life_months }} tháng</span>
-                                        </td>
-                                        <td class="text-center">
-                                            @perm('inventory_chemical_internalExpiry')
-                                                <button type="button" class="btn btn-sm btn-primary btn-inv-internal"
-                                                    title="Xác định hạn dùng nội bộ cho mã xuất nhập này"
-                                                    data-row="{{ json_encode([
-                                                        'import_id' => $row->id,
-                                                        'code' => $row->code,
-                                                        'chem_name' => $row->chem_name,
-                                                        'shelf_life_months' => $row->shelf_life_months,
-                                                        'expired_date' => $row->expired_date,
-                                                        'internal_expired_date' => $row->internal_expired_date,
-                                                    ]) }}">
-                                                    <i class="fas fa-hourglass-half mr-1"></i> Xác định
-                                                </button>
-                                            @endperm
-                                        </td>
-                                    </tr>
-                                @endforeach
+                                <tr class="inv-loading-row">
+                                    <td colspan="8" class="text-center md-sub">
+                                        <i class="fas fa-circle-notch fa-spin mr-1"></i> Đang tải dữ liệu tồn kho...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
             </div>
         </div>
     </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Bảng dùng chung sắp theo cột 1 tăng dần, tồn kho cần xem mã sắp hết hạn trước
-        // (cột 11 = Hạn Dùng, sau khi thêm Vị Trí Lưu Trữ, Cân Đối, 2 cột tổng tồn, Thao Tác)
-        $('#mdTable').DataTable().order([11, 'asc']).draw();
-    });
-</script>
+@include('pages.inventory.ChemicalInventory.script')
 
 @once
     <style>
+        /* ---------- Thu gọn phần bộ lọc phía trên bảng ---------- */
+        .inv-compact .inv-period {
+            align-items: center;
+            gap: 8px 10px;
+            padding: 6px 12px;
+            margin-bottom: 8px;
+        }
+
+        .inv-compact .inv-period-field {
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .inv-compact .inv-period-field label {
+            white-space: nowrap;
+        }
+
+        .inv-compact .inv-period-field .inv-vs-select {
+            width: 130px;
+            padding: 2px 8px;
+            cursor: pointer;
+        }
+
+        .inv-compact .inv-period-field .inv-vs-select.is-on {
+            border-color: var(--primary);
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
+        }
+
+        .inv-compact .inv-period-field .form-control {
+            width: 140px;
+            height: 30px;
+            padding: 2px 8px;
+        }
+
+        .inv-compact .inv-period-apply {
+            height: 30px;
+            padding: 0 12px;
+        }
+
+        .inv-compact .inv-period-quick {
+            padding-left: 10px;
+            gap: 4px;
+        }
+
+        .inv-compact .inv-period-chip {
+            padding: 3px 10px;
+        }
+
+        .inv-compact .inv-period-note {
+            flex: 0 0 auto;
+            min-width: 0;
+            margin-left: auto;
+            cursor: help;
+        }
+
+        .inv-compact .inv-tabs {
+            margin-bottom: 8px;
+        }
+
+        .inv-compact .inv-tab {
+            padding: 6px 14px;
+        }
+
+        /* Chip trạng thái nằm đầu thanh công cụ chung (.md-tablebar) */
+        .inv-compact .md-tablebar .inv-filters {
+            order: -1;
+            gap: 4px;
+            margin: 0;
+        }
+
+        .inv-compact .md-tablebar .inv-chip {
+            gap: 5px;
+            padding: 3px 9px;
+            font-size: 0.78rem;
+        }
+
+        .inv-compact .md-tablebar .inv-chip.is-active {
+            box-shadow: none;
+        }
+
+        /*
+        | Header bảng luôn hiện khi cuộn: bảng cuộn trong khung cao vừa màn hình,
+        | tiêu đề cột dính trên cùng khung (dom 'inv-scroll' ở script.blade.php).
+        */
+        .inv-compact .table-responsive {
+            overflow: visible;
+        }
+
+        .inv-compact .inv-scroll {
+            max-height: calc(100vh - 150px);
+            overflow: auto;
+        }
+
+        .inv-compact .inv-scroll table.dataTable {
+            margin-top: 0 !important;
+        }
+
+        .inv-compact .inv-scroll thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            background: var(--primary-soft);
+        }
+
+        /* ---------- Hai bảng tồn theo mã / theo hoá chất: giao diện như Tồn Kho Vật Tư ---------- */
+        #invPaneChem #invSummaryTable thead th {
+            color: var(--primary-dark);
+            border-bottom: 2px solid var(--primary-lighter);
+        }
+
+        #invPaneChem #invSummaryTable tbody tr:hover {
+            background: var(--primary-soft);
+        }
+
+        .inv-actions {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .inv-act-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            line-height: 1;
+            border-radius: var(--border-radius-md);
+            font-size: .85rem;
+            border: 1px solid var(--primary);
+            background: #fff;
+            color: var(--primary);
+            transition: all .2s;
+        }
+
+        .inv-act-btn:hover,
+        .inv-act-btn:focus {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+            outline: none;
+        }
+
+        /* Mã âm kho: nút Cân đối tô đỏ để thấy cần xử lý */
+        .inv-act-btn.is-danger {
+            border-color: #DC2626;
+            color: #DC2626;
+        }
+
+        .inv-act-btn.is-danger:hover,
+        .inv-act-btn.is-danger:focus {
+            background: #DC2626;
+            color: #fff;
+        }
+
+        .inv-act-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            padding: 0 8px;
+            line-height: 1;
+            border-radius: var(--border-radius-md);
+            font-size: .78rem;
+            font-weight: 700;
+            border: 1px solid var(--primary-lighter);
+            background: var(--primary-soft);
+            color: var(--primary);
+            transition: all .2s;
+        }
+
+        .inv-act-count:hover,
+        .inv-act-count:focus {
+            background: var(--primary-lighter);
+            color: var(--primary-dark);
+            border-color: var(--primary);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
         .inv-threshold-alert {
             border-radius: var(--border-radius-md);
             margin-bottom: 16px;

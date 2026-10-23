@@ -42,6 +42,12 @@
         ],
     ]);
 
+    // Ô chọn định khu theo phân loại: Chờ Quyết Định (bước 1) / Loại Bỏ/Chờ Huỷ (bước 2)
+    $qrPendingLocations = collect($quarantinePendingLocations ?? []);
+    $qrRejectedLocations = collect($quarantineRejectedLocations ?? []);
+    $qrReturnLocations = collect($quarantineReturnLocations ?? []);
+    $qrLocationText = fn($loc) => $loc->code . ' — ' . implode(' / ', array_filter([$loc->warehouse_name, $loc->shelf_name, $loc->column_name, $loc->tier_name]));
+
     // Lỗi của các dòng cách ly (items, items.N.amount...) gom lại hiện dưới bảng
     $qrItemErrors = collect($qrBag->getMessages())
         ->filter(fn($messages, $key) => str_starts_with($key, 'items'))
@@ -244,12 +250,31 @@
                         <div class="md-error text-danger small">{{ $qrItemError }}</div>
                     @endforeach
 
-                    <div class="form-group mb-0 mt-3">
-                        <label>Lý do cách ly <span class="text-danger">*</span></label>
-                        <textarea name="reason" rows="2" maxlength="500" required
-                            class="form-control {{ $qrBag->has('reason') ? 'is-invalid' : '' }}"
-                            placeholder="Ví dụ: Bao bì rách, vật tư ẩm mốc, hết hạn sử dụng...">{{ old('reason') }}</textarea>
-                        @if ($qrBag->has('reason')) <div class="md-error text-danger small">{{ $qrBag->first('reason') }}</div> @endif
+                    <div class="form-row mt-3">
+                        <div class="form-group col-md-5 mb-0">
+                            <label>Định khu Chờ Quyết Định <span class="text-danger">*</span></label>
+                            <select name="pending_location_id" required {{ $qrPendingLocations->isEmpty() ? 'disabled' : '' }}
+                                class="form-control wms-zone-select {{ $qrBag->has('pending_location_id') ? 'is-invalid' : '' }}">
+                                <option value="">-- Chọn vị trí đặt vật tư cách ly --</option>
+                                @foreach ($qrPendingLocations as $loc)
+                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}"
+                                        {{ (string) old('pending_location_id', $qrPendingLocations->count() === 1 ? $loc->id : '') === (string) $loc->id ? 'selected' : '' }}>
+                                        {{ $qrLocationText($loc) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @if ($qrPendingLocations->isEmpty())
+                                <div class="md-error text-danger small">Phòng ban chưa khai định khu vật tư loại "Chờ Quyết Định" ở Dữ Liệu Gốc → Định Khu.</div>
+                            @endif
+                            @if ($qrBag->has('pending_location_id')) <div class="md-error text-danger small">{{ $qrBag->first('pending_location_id') }}</div> @endif
+                        </div>
+                        <div class="form-group col-md-7 mb-0">
+                            <label>Lý do cách ly <span class="text-danger">*</span></label>
+                            <textarea name="reason" rows="2" maxlength="500" required
+                                class="form-control {{ $qrBag->has('reason') ? 'is-invalid' : '' }}"
+                                placeholder="Ví dụ: Bao bì rách, vật tư ẩm mốc, hết hạn sử dụng...">{{ old('reason') }}</textarea>
+                            @if ($qrBag->has('reason')) <div class="md-error text-danger small">{{ $qrBag->first('reason') }}</div> @endif
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -353,7 +378,7 @@
                                             <div class="small text-muted">{{ $lot->technical_specification }}</div>
                                         @endif
                                     </td>
-                                    <td>{{ $lot->location_code ?: '—' }}</td>
+                                    <td>{{ \App\Support\ZoneType::tag($lot->location_code, $lot->location_zone_type ?? null) }}</td>
                                     <td class="text-center">{{ $expDate($lot->imported_date) }}</td>
                                     <td class="text-center">
                                         @if ($lot->expired_date)
@@ -416,6 +441,15 @@
                             <div class="input-group-append"><span class="input-group-text qr-unit">—</span></div>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label>Định khu Chờ Quyết Định <span class="text-danger">*</span></label>
+                        <select name="pending_location_id" class="form-control wms-zone-select" required>
+                            <option value="">-- Chọn vị trí đặt vật tư cách ly --</option>
+                            @foreach ($qrPendingLocations as $loc)
+                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}">{{ $qrLocationText($loc) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="form-group mb-0">
                         <label>Lý do cách ly <span class="text-danger">*</span></label>
                         <textarea name="reason" rows="2" maxlength="500" class="form-control" required></textarea>
@@ -447,6 +481,7 @@
                         <div><small>Vật tư</small><b class="qr-material">—</b></div>
                         <div><small>Mã xuất nhập</small><b class="exp-code qr-import">—</b></div>
                         <div><small>Số lượng</small><b class="qr-amount">—</b></div>
+                        <div><small>Định khu chờ quyết định</small><b class="exp-code qr-pending-location">—</b></div>
                         <div style="grid-column: 1 / -1"><small>Lý do cách ly</small><span class="qr-reason text-danger">—</span></div>
                     </div>
 
@@ -469,6 +504,36 @@
                             </label>
                         </div>
                         @if ($qrDecideBag->has('decision')) <div class="md-error text-danger small">{{ $qrDecideBag->first('decision') }}</div> @endif
+                    </div>
+
+                    <div class="form-group qr-rejected-location" style="display: none;">
+                        <label>Định khu Loại Bỏ/Chờ Huỷ <span class="text-danger">*</span></label>
+                        <select name="rejected_location_id" {{ $qrRejectedLocations->isEmpty() ? 'disabled' : '' }}
+                            class="form-control wms-zone-select {{ $qrDecideBag->has('rejected_location_id') ? 'is-invalid' : '' }}">
+                            <option value="">-- Chọn vị trí đặt vật tư chờ huỷ --</option>
+                            @foreach ($qrRejectedLocations as $loc)
+                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}"
+                                    {{ (string) old('rejected_location_id', $qrRejectedLocations->count() === 1 ? $loc->id : '') === (string) $loc->id ? 'selected' : '' }}>
+                                    {{ $qrLocationText($loc) }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @if ($qrRejectedLocations->isEmpty())
+                            <div class="md-error text-danger small">Phòng ban chưa khai định khu vật tư loại "Loại Bỏ/Chờ Huỷ" ở Dữ Liệu Gốc → Định Khu.</div>
+                        @endif
+                        @if ($qrDecideBag->has('rejected_location_id')) <div class="md-error text-danger small">{{ $qrDecideBag->first('rejected_location_id') }}</div> @endif
+                    </div>
+
+                    <div class="form-group qr-returned-location" style="display: none;">
+                        <label>Định khu trả về <span class="text-danger">*</span></label>
+                        <select name="returned_location_id"
+                            class="form-control wms-zone-select {{ $qrDecideBag->has('returned_location_id') ? 'is-invalid' : '' }}">
+                            <option value="">-- Chọn vị trí đặt lại vật tư --</option>
+                            @foreach ($qrReturnLocations as $loc)
+                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}">{{ $qrLocationText($loc) }}</option>
+                            @endforeach
+                        </select>
+                        @if ($qrDecideBag->has('returned_location_id')) <div class="md-error text-danger small">{{ $qrDecideBag->first('returned_location_id') }}</div> @endif
                     </div>
 
                     <div class="form-group">
@@ -821,16 +886,28 @@
             $m.find('[name="id"]').val(r.id);
             $m.find('[name="amount"]').val(r.amount);
             $m.find('[name="reason"]').val(r.reason || '');
+            $m.find('[name="pending_location_id"]').val(r.pending_location_id ? String(r.pending_location_id) : '').trigger('change');
             $m.find('.qr-code').text(r.code || '');
             $m.find('.qr-unit').text(r.unit || '—');
             $m.modal('show');
         });
 
         /* ---------- Bước 2: quyết định ---------- */
+        // Chọn "Loại bỏ" mới hiện + bắt buộc ô định khu Loại Bỏ/Chờ Huỷ; "Trả về kho" thì hàng về vị trí của lô
         function qrPaintChoices() {
-            $('#qrDecideModal .qr-choice').each(function () {
+            var $m = $('#qrDecideModal');
+            var remove = $m.find('[name="decision"]:checked').val() === 'remove';
+
+            $m.find('.qr-choice').each(function () {
                 $(this).toggleClass('is-checked', $(this).find('input').prop('checked'));
             });
+
+            var back = $m.find('[name="decision"]:checked').val() === 'return';
+
+            $m.find('.qr-rejected-location').toggle(remove);
+            $m.find('[name="rejected_location_id"]').prop('required', remove);
+            $m.find('.qr-returned-location').toggle(back);
+            $m.find('[name="returned_location_id"]').prop('required', back);
         }
 
         $(document).on('change', '#qrDecideModal [name="decision"]', qrPaintChoices);
@@ -844,6 +921,15 @@
             $m.find('.qr-import').text(r.import_code || '—');
             $m.find('.qr-amount').text(r.amount_text || '—');
             $m.find('.qr-reason').text(r.reason || '—');
+            $m.find('.qr-pending-location').text(r.pending_location_code || '—');
+
+            // Định khu trả về: mặc định vị trí của lô trước khi cách ly (thêm vào danh sách nếu ô đó không còn trong định khu dùng được)
+            var $back = $m.find('[name="returned_location_id"]');
+            $back.find('option.qr-lot-location').remove();
+            if (r.location_id && !$back.find('option[value="' + r.location_id + '"]').length) {
+                $back.append($('<option class="qr-lot-location">').val(r.location_id).attr('data-zone', r.location_zone_type || '').text((r.location_code || '') + ' — vị trí hiện tại của lô'));
+            }
+            $back.val(keepInput ? @json((string) old('returned_location_id')) : (r.location_id ? String(r.location_id) : '')).trigger('change');
 
             if (!keepInput) {
                 $m.find('[name="decision"]').prop('checked', false);

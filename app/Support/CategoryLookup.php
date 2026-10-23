@@ -174,6 +174,113 @@ class CategoryLookup
     }
 
     /* ==========================================================
+     |  HOẠT CHẤT (ô chọn nhiều của modal Tên Hoá Chất)
+     ========================================================== */
+
+    /**
+     * Hoạt chất đã duyệt + đang hoạt động, tìm theo tên / mã / số CAS / công thức.
+     * Kèm name + g9 (thuộc nhóm 9) để bảng % khối lượng và khoá nhóm 10 đọc được
+     * mà không cần option render sẵn.
+     */
+    public static function searchActiveIngredients(string $q, int $page): array
+    {
+        $query = DB::table('active_ingredients')
+            ->select('id', 'code', 'name', 'cas_no')
+            ->where('status_id', 1)
+            ->where('app_status', 'approved');
+
+        foreach (self::terms($q) as $term) {
+            $query->where(function ($sub) use ($term) {
+                foreach (['name', 'code', 'cas_no', 'chemical_formula'] as $column) {
+                    $sub->orWhere($column, 'like', '%'.$term.'%');
+                }
+            });
+        }
+
+        [$rows, $more] = self::paginate($query->orderBy('name', 'asc')->orderBy('id', 'asc'), $page);
+
+        $groups = ChemicalClassification::groupsForActiveIngredients($rows->pluck('id')->map(fn ($v) => (int) $v)->all());
+
+        return self::response(
+            $rows->map(fn ($row) => self::activeIngredientItem($row, $groups[(int) $row->id] ?? []))->all(),
+            $more
+        );
+    }
+
+    /** {id, text, name, g9} của một hoạt chất - cùng nhãn với ô chọn cũ ("Tên — CAS x — Nhóm 1, 9"). */
+    public static function activeIngredientItem($row, array $groups): array
+    {
+        return [
+            'id' => (int) $row->id,
+            'text' => self::activeIngredientLabel($row, $groups),
+            'name' => (string) $row->name,
+            'g9' => in_array(9, $groups, true) ? 1 : 0,
+        ];
+    }
+
+    public static function activeIngredientLabel($row, array $groups): string
+    {
+        return $row->name
+            .(! empty($row->cas_no) ? ' — CAS '.$row->cas_no : '')
+            .($groups ? ' — Nhóm '.implode(', ', $groups) : '');
+    }
+
+    /* ==========================================================
+     |  DANH MỤC HOÁ CHẤT (mã C000xx)
+     ========================================================== */
+
+    /** Phạm vi tìm của ô chọn mã hoá chất */
+    public const CHEMICAL_SCOPES = ['import', 'undeclared', 'approved'];
+
+    /**
+     * Tìm mã hoá chất theo mã / tên, theo phạm vi:
+     *  - import     : hoá chất PHÒNG đã khai (modal Nhập Hoá Chất) - như DepartmentChemical::importCategoryOptions
+     *  - undeclared : hoá chất đã duyệt mà phòng CHƯA khai (modal Khai Hoá Chất Cho Phòng)
+     *  - approved   : mọi hoá chất đã duyệt (đề nghị chuyển liên phòng ban), kèm đơn vị phòng đang dùng
+     */
+    public static function searchChemicalCategories(string $scope, int $departmentId, string $q, int $page): array
+    {
+        $query = DB::table('chemical_categories')
+            ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, 'chemical_categories.id'))
+            ->select('chemical_categories.id', 'chemical_categories.code', 'chem_names.name as chem_name', 'units.short_name as unit_short_name')
+            ->where('chemical_categories.status_id', 1)
+            ->where('chemical_categories.app_status', 'approved');
+
+        $declared = fn ($sub) => $sub->select(DB::raw(1))
+            ->from(DepartmentChemical::TABLE.' as lk_dc')
+            ->whereColumn('lk_dc.category_id', 'chemical_categories.id')
+            ->where('lk_dc.department_id', $departmentId);
+
+        if ($scope === 'import') {
+            $query->whereExists(fn ($sub) => $declared($sub)->where('lk_dc.status_id', 1));
+        } elseif ($scope === 'undeclared') {
+            $query->whereNotExists($declared);
+        }
+
+        foreach (self::terms($q) as $term) {
+            $query->where(fn ($sub) => $sub->where('chemical_categories.code', 'like', '%'.$term.'%')
+                ->orWhere('chem_names.name', 'like', '%'.$term.'%'));
+        }
+
+        [$rows, $more] = self::paginate($query->orderBy('chemical_categories.code', 'asc'), $page);
+
+        return self::response($rows->map(fn ($row) => [
+            'id' => (int) $row->id,
+            'text' => self::chemicalCategoryLabel($row, $scope === 'import'),
+            'code' => (string) $row->code,
+            'unit' => (string) ($row->unit_short_name ?? ''),
+        ])->all(), $more);
+    }
+
+    /** "C00001 - Ethanol" (+ " (ml)" ở ô Nhập Hoá Chất) - cùng nhãn với option render sẵn trước đây. */
+    public static function chemicalCategoryLabel($row, bool $withUnit = false): string
+    {
+        return $row->code.' - '.$row->chem_name
+            .($withUnit && ! empty($row->unit_short_name) ? ' ('.$row->unit_short_name.')' : '');
+    }
+
+    /* ==========================================================
      |  ĐỊNH KHU
      ========================================================== */
 
@@ -181,13 +288,29 @@ class CategoryLookup
      * Tìm định khu đang hoạt động của phòng ban, chỉ ô khai đúng loại hàng hoặc chưa khai loại
      * (dùng chung) - cùng điều kiện với DepartmentMaterial/Chemical/Standard::locationOptions().
      */
-    public static function searchLocations(string $itemType, int $departmentId, string $q, int $page): array
+    /**
+     * $zone: lọc nhanh theo phân loại định khu (chip trong ô chọn) - null = mọi phân loại,
+     * '' = chưa phân loại, còn lại là khoá của ZoneType::TYPES.
+     */
+    /**
+     * $itemType 'all': không lọc loại hàng - đúng điều kiện ô Định khu của Nhập Hoá Chất / Chất Chuẩn.
+     * $onlyZone: chỉ một phân loại cố định (modal Nhập: lô mới chỉ vào khu Biệt Trữ 'quarantine'),
+     * khác $zone là chip lọc người dùng bấm trong ô chọn.
+     */
+    public static function searchLocations(string $itemType, int $departmentId, string $q, int $page, ?string $zone = null, ?string $onlyZone = null): array
     {
         $query = self::locationQuery()
             ->where('locations.department_id', $departmentId)
             ->where('locations.status_id', 1)
-            ->where(fn ($query) => $query->whereNull('locations.item_type')
-                ->orWhere('locations.item_type', $itemType));
+            ->when($itemType !== 'all', fn ($query) => $query->where(fn ($sub) => $sub->whereNull('locations.item_type')
+                ->orWhere('locations.item_type', $itemType)))
+            ->when($onlyZone !== null && isset(ZoneType::TYPES[$onlyZone]), fn ($query) => $query->where('locations.zone_type', $onlyZone));
+
+        if ($zone === '') {
+            $query->whereNull('locations.zone_type');
+        } elseif ($zone !== null && isset(ZoneType::TYPES[$zone])) {
+            $query->where('locations.zone_type', $zone);
+        }
 
         // Gõ "kho 01 tầng 02": mỗi từ khớp một phần bất kỳ của đường dẫn định khu
         foreach (self::terms($q) as $term) {
@@ -201,7 +324,11 @@ class CategoryLookup
         [$rows, $more] = self::paginate(self::orderLocations($query), $page);
 
         return self::response(
-            $rows->map(fn ($row) => ['id' => (int) $row->id, 'text' => self::locationLabel($row)])->all(),
+            $rows->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'text' => self::locationLabel($row),
+                'zone_type' => $row->zone_type,
+            ])->all(),
             $more
         );
     }
@@ -262,6 +389,27 @@ class CategoryLookup
             ->orderBy('columns.name', 'asc')
             ->orderBy('tiers.name', 'asc')
             ->orderBy('locations.code', 'asc');
+    }
+
+    /* ==========================================================
+     |  TÊN SẢN PHẨM
+     ========================================================== */
+
+    /**
+     * Tên sản phẩm đang hoạt động - ô Mục Đích / Lý Do khi sử dụng hoá chất. id = tên vì cột
+     * purpose lưu chữ (vẫn cho gõ mục đích tự do ngoài danh sách).
+     */
+    public static function searchProductNames(string $q, int $page): array
+    {
+        $query = DB::table('product_names')->select('name')->where('status_id', 1);
+
+        foreach (self::terms($q) as $term) {
+            $query->where('name', 'like', '%'.$term.'%');
+        }
+
+        [$rows, $more] = self::paginate($query->orderBy('name', 'asc'), $page);
+
+        return self::response($rows->map(fn ($row) => ['id' => $row->name, 'text' => $row->name])->all(), $more);
     }
 
     /* ==========================================================

@@ -29,8 +29,8 @@ use Illuminate\Support\Facades\Validator;
  *
  * TRÌNH KÝ 2 BƯỚC dùng chung khai báo config/estimate.php:
  *   Nháp -> [Trình ký] -> Chờ Phó/Trưởng Phòng ký -> [Ký bước 1] -> Chờ Ban Giám Đốc ký
- *        -> [Ký bước 2] -> Đã phê duyệt. Duyệt xong phiếu TỰ đánh dấu đã tiếp nhận
- *        (reception_status = received) - không đi qua màn hình tiếp nhận nào.
+ *        -> [Ký bước 2] -> Đã phê duyệt -> Chờ tiếp nhận
+ *        (reception_status = waiting) - nhân viên cung ứng bấm Tiếp nhận ở Trang chủ / tab Đơn dự trù đã được phê duyệt.
  *   Bị từ chối ở bước nào cũng quay về "Bị từ chối", sửa lại rồi trình ký lại từ đầu.
  */
 class MaterialEstimateController extends Controller
@@ -63,6 +63,13 @@ class MaterialEstimateController extends Controller
 
     private const SIGN_PERMISSION = 'estimate_material_sign';
 
+    /** Hoàn thành / Huỷ / Hoàn tác mục dự trù đã duyệt (phía phòng đề nghị) */
+    private const TRACK_PERMISSION = 'estimate_material_tracking';
+
+    /** Gửi tin ở cột "Trao đổi" tab Theo dõi dự trù (quyền con của estimate_material_tab_tracking) */
+    private const CHAT_PERMISSION = 'estimate_material_chat';
+
+
     private const CHAT_TYPE = 'material';
 
     private const LABEL = 'phiếu dự trù vật tư';
@@ -82,6 +89,7 @@ class MaterialEstimateController extends Controller
             'name_fk' => 'material_names_id',
             'manual_name' => 'material_name',
             'purchasing_col' => 'purchasing_department',
+            'purchasing_permission' => 'estimate_material_purchasing',
         ];
     }
 
@@ -93,7 +101,10 @@ class MaterialEstimateController extends Controller
     {
         $departmentId = $this->departmentId();
 
-        $datas = DB::table(self::TABLE)
+        // Quyền con xem từng tab (cha: estimate_material_view) - tab không có quyền thì không nạp dữ liệu
+        $tabAllowed = \App\Support\PageTabs::map('estimate_material');
+
+        $datas = ! $tabAllowed['list'] ? collect() : DB::table(self::TABLE)
             ->leftJoin('deparments', self::TABLE.'.department_id', '=', 'deparments.id')
             ->select(self::TABLE.'.*', 'deparments.shortName as department_short_name')
             ->where(self::TABLE.'.department_id', $departmentId)
@@ -101,6 +112,9 @@ class MaterialEstimateController extends Controller
             ->orderBy(self::TABLE.'.month', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')
             ->get();
+
+        // Tình trạng xử lý của phiếu đã duyệt (cột "Tình Trạng")
+        $this->attachApprovedStatus($datas);
 
         // Bước ký của các phiếu đang hiện: list_id => danh sách bước theo step_no
         $signRows = $this->signRows($datas->pluck('id'));
@@ -111,20 +125,30 @@ class MaterialEstimateController extends Controller
             $row->can_sign = $row->pending_sign ? $this->canSignRow($row->pending_sign) : false;
         });
 
-        $trackedItems = self::trackedItems($departmentId);
+        // Mục do phòng đang chọn phụ trách mua (null = không phải bộ phận mua hàng)
+        $purchasingScope = $tabAllowed['tracking'] ? $this->purchasingItems($departmentId) : null;
+
+        // Theo dõi dự trù: phiếu của phòng + mục bộ phận mua hàng phụ trách (đã hẹn ngày, chưa giao)
+        $trackedItems = $tabAllowed['tracking']
+            ? self::trackedItems($departmentId, $purchasingScope ? $purchasingScope->pluck('id')->all() : [])
+            : collect();
 
         // Vật tư tồn dưới ngưỡng tối thiểu + vật tư người dùng bấm "Ghi nhớ" bên Sử Dụng Vật Tư.
         // Chỉ vật tư Cung Ứng mua - vật tư Hành Chính mua đề nghị kho VPP ở Sử Dụng Vật Tư
-        $watchlistItems = MaterialWatchlist::forEstimate($departmentId);
+        $watchlistItems = $tabAllowed['watchlist'] ? MaterialWatchlist::forEstimate($departmentId) : collect();
 
 
-        // Tab "Bộ phận mua hàng" (xác nhận huỷ 2 bên) - chỉ hiện với Cung Ứng / Hành Chánh
-        $purchasingItems = $this->purchasingItems($departmentId);
 
-        $tabs = ['list', 'tracking', 'watchlist', 'purchasing'];
+        // Tab "Đơn dự trù đã được phê duyệt" - phiếu đã duyệt của mọi phòng ban, chỉ bộ phận mua hàng
+        $approvedLists = $tabAllowed['approved'] ? $this->approvedLists($departmentId) : null;
+
+        // Tab của bộ phận mua hàng còn cần đang chọn phòng mua hàng (null = không hiện)
+        $tabAllowed['approved'] = $approvedLists !== null;
+
+        $tabs = array_keys(array_filter($tabAllowed));
         $activeTab = in_array($request->query('tab'), $tabs, true)
             ? $request->query('tab')
-            : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : 'list');
+            : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : ($tabs[0] ?? null));
 
         session()->put(['title' => 'DỰ TRÙ - DỰ TRÙ VẬT TƯ']);
 
@@ -141,7 +165,10 @@ class MaterialEstimateController extends Controller
             'watchlistItems' => $watchlistItems,
             'units' => $this->unitOptions(),
             'activeTab' => $activeTab,
-            'purchasingItems' => $purchasingItems,
+            'tabAllowed' => $tabAllowed,
+            'approvedLists' => $approvedLists,
+            'approvedSignRows' => $approvedLists ? $this->signRows($approvedLists->pluck('id')) : collect(),
+            'approvedItemCounts' => $approvedLists ? $this->itemCounts($approvedLists->pluck('id')->all()) : [],
         ]);
     }
 
@@ -151,10 +178,12 @@ class MaterialEstimateController extends Controller
             ->leftJoin('deparments', self::TABLE.'.department_id', '=', 'deparments.id')
             ->select(self::TABLE.'.*', 'deparments.name as department_name', 'deparments.shortName as department_short_name')
             ->where(self::TABLE.'.id', $request->id)
-            ->where(self::TABLE.'.department_id', $this->departmentId())
             ->first();
 
-        if (! $list) {
+        // Phiếu phòng khác: bộ phận mua hàng chỉ được mở xem (chỉ đọc) khi phiếu đã duyệt
+        $readOnly = $list && (int) $list->department_id !== $this->departmentId();
+
+        if (! $list || ($readOnly && ! $this->canViewAsPurchaser($list))) {
             return redirect()->route('pages.estimate.materialEstimate.list')
                 ->with('error', 'Không tìm thấy '.self::LABEL.' của phòng ban đang chọn!');
         }
@@ -166,13 +195,13 @@ class MaterialEstimateController extends Controller
 
         return view('pages.estimate.MaterialEstimate.detail', [
             // Ngưỡng tồn tối đa + tồn hiện tại của phòng, để khối số lượng cảnh báo dự trù quá nhiều
-            'maxStock' => \App\Support\MaxStockWarning::forMaterial($this->departmentId()),
+            'maxStock' => \App\Support\MaxStockWarning::forMaterial((int) $list->department_id),
             'list' => $list,
             'items' => self::itemsOf($list->id),
             'histories' => self::historiesOf($list->id),
             'categories' => $this->categoryOptions(),
             // Danh mục vật tư của phòng - khung "Chọn từ danh mục phòng" ở modal thêm vật tư
-            'deptCategories' => DepartmentMaterial::importCategoryOptions($this->departmentId()),
+            'deptCategories' => DepartmentMaterial::importCategoryOptions((int) $list->department_id),
             'units' => $this->unitOptions(),
             'appStatuses' => config('estimate.app_statuses'),
             'signStatuses' => config('estimate.sign_statuses'),
@@ -181,10 +210,13 @@ class MaterialEstimateController extends Controller
             'pendingSign' => $pendingSign,
             // Mốc tính cảnh báo thời gian đặt hàng: ngày BGĐ duyệt (bước ký cuối), chưa duyệt thì ngày tạo phiếu
             'approvedAt' => $list->app_status === 'approved' ? $signs->max('signed_at') : null,
-            'canSignCurrent' => $pendingSign ? $this->canSignRow($pendingSign) : false,
+            'canSignCurrent' => ! $readOnly && $pendingSign && $this->canSignRow($pendingSign),
             'signPermission' => self::SIGN_PERMISSION,
-            'canEditItems' => $this->editable($list),
-            'backRoute' => route('pages.estimate.materialEstimate.list'),
+            'canEditItems' => ! $readOnly && $this->editable($list),
+            'readOnly' => $readOnly,
+            // Mở từ tab "Đơn dự trù đã được phê duyệt": hiện cột Ngày Hẹn Đáp Ứng cho bộ phận mua hàng sửa
+            'purchaserView' => $request->query('from') === 'approved' && $this->canViewAsPurchaser($list),
+            'backRoute' => route('pages.estimate.materialEstimate.list', $request->query('from') === 'approved' ? ['tab' => 'approved'] : []),
             'estRoute' => 'pages.estimate.materialEstimate.',
         ]);
     }
@@ -512,7 +544,10 @@ class MaterialEstimateController extends Controller
             ->where('active', 1)
             ->exists();
 
-        if ((int) $attachment->department_id !== $this->departmentId() && ! $isSigner) {
+        // Bộ phận mua hàng xem được file của phiếu đã duyệt ở tab "Đơn dự trù đã được phê duyệt"
+        $isPurchaser = $this->canViewAsPurchaser(DB::table(self::TABLE)->where('id', $attachment->material_estimate_id)->first());
+
+        if ((int) $attachment->department_id !== $this->departmentId() && ! $isSigner && ! $isPurchaser) {
             abort(403, 'Bạn không có quyền xem file này.');
         }
 
@@ -762,6 +797,10 @@ class MaterialEstimateController extends Controller
      */
     public function updateItemStatus(Request $request)
     {
+        if (! user_can(self::TRACK_PERMISSION)) {
+            return redirect()->back()->with('error', 'Bạn không có quyền cập nhật trạng thái mục dự trù!');
+        }
+
         $request->validate([
             'id' => 'required|integer',
             'action' => 'required|in:complete,cancel,cancel_reject,cancel_withdraw,undo',
@@ -789,6 +828,11 @@ class MaterialEstimateController extends Controller
             $updateData = ['fulfilled_date' => now(), 'status_id' => 1];
             $logMessage = 'Đã xác nhận hoàn thành (giao hàng).';
         } else {
+            // Mục đã huỷ (đủ xác nhận của hai bên) là trạng thái cuối, không hoàn tác được
+            if ((int) $item->status_id === 0) {
+                return redirect()->back()->with('error', 'Mục '.self::ITEM_LABEL.' đã được xác nhận huỷ, không thể hoàn tác!');
+            }
+
             $updateData = ['fulfilled_date' => null, 'status_id' => 1] + $this->clearCancel();
             $logMessage = 'Đã khôi phục lại trạng thái mặt hàng.';
         }
@@ -805,24 +849,38 @@ class MaterialEstimateController extends Controller
     {
         $request->validate([
             'id' => 'required|integer',
+            'amount_id' => 'required|integer',
             'promised_date' => 'nullable|date',
             'reason' => 'nullable|string|max:500',
         ]);
 
-        [$item, $list] = $this->findItem($request->id);
+        [$item, $list] = $this->findPurchasingItem($request->id);
 
         if (! $item) {
-            return response()->json(['success' => false, 'message' => 'Không tìm thấy '.self::ITEM_LABEL.' cần cập nhật!']);
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy '.self::ITEM_LABEL.' cần cập nhật, hoặc bạn không phải bộ phận mua hàng của phiếu này!']);
         }
 
         if ($list->app_status !== 'approved') {
             return response()->json(['success' => false, 'message' => 'Phiếu chưa được duyệt nên không thể hẹn ngày!']);
         }
 
-        $oldDate = $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('d/m/Y') : 'Chưa có';
+        // Mỗi tháng dự trù của mục có một ngày hẹn riêng
+        $amount = DB::table(self::AMOUNT_TABLE)
+            ->where('id', $request->amount_id)
+            ->where('material_estimate_item_id', $item->id)
+            ->where('active', 1)
+            ->first();
+
+        if (! $amount) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy tháng dự trù cần hẹn ngày!']);
+        }
+
+        $month = \Carbon\Carbon::parse($amount->for_month_year)->format('m/Y');
+        $oldDate = $amount->promised_date ? \Carbon\Carbon::parse($amount->promised_date)->format('d/m/Y') : 'Chưa có';
         $newDate = $request->promised_date ? \Carbon\Carbon::parse($request->promised_date)->format('d/m/Y') : 'Chưa có';
 
-        if ($oldDate !== $newDate && trim((string) $request->reason) === '') {
+        // Lần hẹn đầu tiên của tháng (chưa có ngày hẹn) không bắt nhập lý do
+        if ($amount->promised_date && $oldDate !== $newDate && trim((string) $request->reason) === '') {
             return response()->json(['success' => false, 'message' => 'Vui lòng nhập lý do thay đổi ngày hẹn đáp ứng!']);
         }
 
@@ -830,9 +888,17 @@ class MaterialEstimateController extends Controller
         $reason = trim((string) $request->reason);
         $historyAdded = false;
 
-        DB::transaction(function () use ($item, $request, $oldDate, $newDate, $actor, $reason, &$historyAdded) {
-            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+        DB::transaction(function () use ($item, $amount, $request, $month, $oldDate, $newDate, $actor, $reason, &$historyAdded) {
+            DB::table(self::AMOUNT_TABLE)->where('id', $amount->id)->update([
                 'promised_date' => $request->promised_date,
+            ]);
+
+            // Ngày hẹn của mục = ngày hẹn sớm nhất trong các tháng (tab Theo dõi dự trù lọc / sắp xếp theo cột này)
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'promised_date' => DB::table(self::AMOUNT_TABLE)
+                    ->where('material_estimate_item_id', $item->id)
+                    ->where('active', 1)
+                    ->min('promised_date'),
             ]);
 
             if ($oldDate !== $newDate) {
@@ -840,7 +906,9 @@ class MaterialEstimateController extends Controller
                     'item_id' => $item->id,
                     'item_type' => self::CHAT_TYPE,
                     'user_name' => $actor,
-                    'content' => "Cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]. Lý do: {$reason}",
+                    'content' => $amount->promised_date
+                        ? "Tháng {$month}: cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]. Lý do: {$reason}"
+                        : "Tháng {$month}: hẹn ngày đáp ứng lần đầu [{$newDate}]",
                     'type' => 'history_promised_date',
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -876,7 +944,15 @@ class MaterialEstimateController extends Controller
             'content' => 'required|string|max:1000',
         ]);
 
+        if (! user_can(self::CHAT_PERMISSION)) {
+            return response()->json(['success' => false, 'message' => 'Bạn không có quyền trao đổi ở mục dự trù!']);
+        }
+
+        // Phòng đề nghị (phiếu của phòng đang chọn) hoặc bộ phận mua hàng phụ trách mục
         [$item, $list] = $this->findItem($request->item_id);
+        if (! $item) {
+            [$item, $list] = $this->findPurchasingItem($request->item_id);
+        }
 
         if (! $item) {
             return response()->json(['success' => false, 'message' => 'Không tìm thấy '.self::ITEM_LABEL]);
@@ -1026,9 +1102,10 @@ class MaterialEstimateController extends Controller
             ];
 
             if ($isLast) {
-                $payload['reception_status'] = 'received';
-                $payload['received_by'] = 'Hệ thống';
-                $payload['received_at'] = $now;
+                // Duyệt xong: chờ nhân viên cung ứng bấm Tiếp nhận (receive) - hiện ở Trang chủ
+                $payload['reception_status'] = 'waiting';
+                $payload['received_by'] = null;
+                $payload['received_at'] = null;
             }
 
             DB::table(self::TABLE)->where('id', $current->id)->update($payload);
@@ -1127,25 +1204,35 @@ class MaterialEstimateController extends Controller
      * Gom một truy vấn cho vật tư, một cho số lượng, một cho trao đổi rồi ghép trong PHP
      * để không phải hỏi DB theo từng dòng.
      */
-    public static function trackedItems(int $departmentId)
+    public static function trackedItems(int $departmentId, array $extraItemIds = [])
     {
         $items = DB::table(self::ITEM_TABLE)
             ->join(self::TABLE, self::ITEM_TABLE.'.material_estimate_id', '=', self::TABLE.'.id')
             ->leftJoin('material_categories', self::ITEM_TABLE.'.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
             ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, self::ITEM_TABLE.'.category_id'))
+            ->tap(fn ($query) => DepartmentMaterial::joinUnitOn($query, self::TABLE.'.department_id', self::ITEM_TABLE.'.category_id'))
+            ->leftJoin('deparments', self::TABLE.'.department_id', '=', 'deparments.id')
             ->select(
                 self::ITEM_TABLE.'.*',
                 self::TABLE.'.id as list_id',
                 self::TABLE.'.code as list_code',
+                self::TABLE.'.department_id as list_department_id',
+                'deparments.shortName as department_short_name',
+                'deparments.name as department_name',
                 'material_categories.technical_specification as category_technical_specification',
                 'material_categories.lead_time_days as category_lead_time_days',
                 'material_names.name as category_material_name',
                 'units.short_name as category_unit_short_name',
                 'manufacturers.name as category_manufacturer_name'
             )
-            ->where(self::TABLE.'.department_id', $departmentId)
+            // Phiếu của phòng đang chọn + mục bộ phận mua hàng (phòng đang chọn) phụ trách mua
+            ->where(function ($q) use ($departmentId, $extraItemIds) {
+                $q->where(self::TABLE.'.department_id', $departmentId);
+                if ($extraItemIds) {
+                    $q->orWhereIn(self::ITEM_TABLE.'.id', $extraItemIds);
+                }
+            })
             ->whereNotNull(self::ITEM_TABLE.'.promised_date')
             ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
             ->where(self::ITEM_TABLE.'.status_id', 1)

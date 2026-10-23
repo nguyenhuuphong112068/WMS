@@ -32,6 +32,7 @@
                     'held' => round((float) $lot->held, 4),
                     'unit' => $lot->unit_short_name ?: '',
                     'location' => $lot->location_code ?: '',
+                    'zone' => $lot->location_zone_type ?? null,
                     'expired' => $lot->expired_date ? \Carbon\Carbon::parse($lot->expired_date)->format('d/m/Y') : '',
                     'imported' => $lot->imported_date
                         ? \Carbon\Carbon::parse($lot->imported_date)->format('d/m/Y')
@@ -514,6 +515,8 @@
             }
 
             $form.find('.me-issue-sum').removeClass('is-short is-over').addClass(cls).html(text);
+            // Cho màn chứa form cập nhật theo lô đang chọn (VD cột Định Khu ở tab Chờ Cấp Phát)
+            $form.trigger('me:synced');
         }
 
         /*
@@ -685,7 +688,7 @@
                     '<td>' + lotBadges(lot) + '</td>' +
                     '<td class="text-center">' + esc(lot.expired || '—') + '</td>' +
                     '<td class="text-center">' + esc(lot.imported || '—') + '</td>' +
-                    '<td class="text-center">' + esc(lot.location || '—') + '</td>' +
+                    '<td class="text-center">' + window.wmsZoneTag(lot.location, lot.zone) + '</td>' +
                     '<td class="text-right font-weight-bold">' + num(lot.available) + ' ' + esc(lot
                         .unit) + '</td>' +
                     '<td class="text-center"></td>' +
@@ -779,6 +782,13 @@
 
             if (!chosen.length) {
                 alert('Vui lòng nhập số lượng cần lấy ở ít nhất một mã xuất nhập!');
+
+                return;
+            }
+
+            // Đề nghị liên phòng ban (data-single): mỗi mục chỉ cấp từ một mã xuất nhập
+            if (String(pickerForm.data('single')) === '1' && chosen.length > 1) {
+                alert('Đề nghị liên phòng ban chỉ cấp phát từ một mã xuất nhập cho mỗi mục. Vui lòng chỉ nhập số lượng ở một mã.');
 
                 return;
             }

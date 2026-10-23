@@ -69,7 +69,7 @@
                 @include('pages.materData.shared.classifyFilterBar')
 
                 <div class="table-responsive">
-                    <table id="mdTable" class="table table-bordered table-hover w-100">
+                    <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 60px">STT</th>
@@ -90,6 +90,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @deferredRows('mdTable')
                             @foreach ($datas as $row)
                                 @php
                                     $groups = $row->groups ?? [];
@@ -226,6 +227,7 @@
                                     </td>
                                 </tr>
                             @endforeach
+                            @enddeferredRows
                         </tbody>
                     </table>
                 </div>

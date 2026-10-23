@@ -1,4 +1,5 @@
 @include('pages.export.shared.assets')
+@php $activeTab = \App\Support\PageTabs::active('export_standard', $activeTab ?? 'book'); @endphp
 
 <style>
     /* Mã nhóm chuẩn của ống - phần nằm giữa mã ống chuẩn */
@@ -22,14 +23,19 @@
             <div class="card-body">
 
                 <div class="exp-tabs">
+                    @tab('export_standard', 'book')
                     <button type="button" class="exp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}"
                         data-pane="expPaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ sử dụng chất chuẩn
                     </button>
+                    @endtab
+                    @tab('export_standard', 'request')
                     <button type="button" class="exp-tab {{ $activeTab === 'request' ? 'is-active' : '' }}"
                         data-pane="expPaneRequest">
                         <i class="fas fa-hand-holding-medical mr-1"></i> Đề nghị cấp phát chuẩn nội bộ
                     </button>
+                    @endtab
+                    @tab('export_standard', 'transfer')
                     <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}"
                         data-pane="expPaneTransfer">
                         <i class="fas fa-people-arrows mr-1"></i> Đề nghị cấp phát chuẩn liên phòng ban
@@ -38,9 +44,11 @@
                             <span class="exp-tab-count">{{ $transferBadgeCount }}</span>
                         @endif
                     </button>
+                    @endtab
                 </div>
 
                 {{-- ============ SỔ SỬ DỤNG CHẤT CHUẨN ============ --}}
+                @tab('export_standard', 'book')
                 <div class="exp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="expPaneBook">
 
                     <div class="md-toolbar">
@@ -171,6 +179,7 @@
                         'pgUnit' => 'phiếu sử dụng',
                     ])
                 </div>
+                @endtab
 
                 {{-- ============ ĐỀ NGHỊ CẤP PHÁT CHUẨN NỘI BỘ ============ --}}
                 @include('pages.export.StandardExport.requestPane')

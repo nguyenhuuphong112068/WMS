@@ -67,11 +67,7 @@
         <label>Phòng Cố Định <span class="text-danger">*</span></label>
         <select name="department_id" class="form-control {{ $tsfErr('department_id') }}">
             <option value="">-- Chọn phòng ban --</option>
-            @foreach ($departments as $department)
-                <option value="{{ $department->id }}" {{ (string) old('department_id') === (string) $department->id ? 'selected' : '' }}>
-                    {{ $department->name }}{{ $department->company_short ? ' · ' . $department->company_short : '' }}
-                </option>
-            @endforeach
+            @include('layout.departmentOptions', ['departments' => $departments, 'selected' => old('department_id')])
         </select>
         @if ($bag->has('department_id')) <span class="md-error">{{ $bag->first('department_id') }}</span> @endif
     </div>

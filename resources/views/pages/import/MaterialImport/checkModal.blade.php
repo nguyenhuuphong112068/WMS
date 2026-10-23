@@ -126,7 +126,7 @@
                                 required>
                                 <option value="">-- Chọn vị trí lưu trữ --</option>
                                 @foreach ($locations as $loc)
-                                    <option value="{{ $loc->id }}" {{ old('location_id') == $loc->id ? 'selected' : '' }}>
+                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}" {{ old('location_id') == $loc->id ? 'selected' : '' }}>
                                         {{ $loc->code }} — {{ $loc->warehouse_name }} /
                                         {{ $loc->shelf_name }} / {{ $loc->column_name }} / {{ $loc->tier_name }}
                                     </option>

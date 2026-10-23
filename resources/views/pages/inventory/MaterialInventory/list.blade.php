@@ -6,7 +6,7 @@
 
     /*
     | Class cho badge .inv-mv (bấm mở modal "Chi tiết con số"): 0 -> mờ, cột trừ tồn
-    | (Sử Dụng / Loại Bỏ) ép đỏ, còn lại tô theo dấu.
+    | Sử Dụng ép xanh dương ('use'), Cách ly/Huỷ ép đỏ ('out'), còn lại tô theo dấu.
     */
     $mvCls = function ($value, $tone = null) {
         if ((float) $value == 0.0) {
@@ -14,6 +14,9 @@
         }
         if ($tone === 'out') {
             return 'inv-mv is-out';
+        }
+        if ($tone === 'use') {
+            return 'inv-mv is-use';
         }
         if ($tone === 'in') {
             return 'inv-mv is-in';

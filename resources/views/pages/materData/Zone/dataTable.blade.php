@@ -233,24 +233,8 @@
         box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
     }
 
-    /* ---------- Ô chọn màu trong modal ---------- */
-    .zone-color-row {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
 
-    .zone-color-input {
-        width: 46px;
-        height: 38px;
-        padding: 2px;
-        border: 1px solid #dbe6f2;
-        border-radius: var(--border-radius-md);
-        background: #fff;
-        cursor: pointer;
-    }
-
+    /* ---------- Chip màu phân loại trong modal ---------- */
     .zone-color-chip {
         display: inline-flex;
         align-items: center;
@@ -259,32 +243,6 @@
         padding: 5px 14px;
         font-size: 0.8rem;
         font-weight: 700;
-    }
-
-    .zone-swatches {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 10px;
-    }
-
-    .zone-swatch {
-        width: 24px;
-        height: 24px;
-        border-radius: 6px;
-        border: 1px solid rgba(0, 0, 0, 0.12);
-        padding: 0;
-        cursor: pointer;
-        transition: all var(--transition-fast);
-    }
-
-    .zone-swatch:hover {
-        transform: translateY(-1px);
-        box-shadow: var(--shadow-sm);
-    }
-
-    .zone-swatch.is-active {
-        box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.35);
     }
 
     .zone-parent {
@@ -460,22 +418,24 @@
                                     </p>
                                 @endunless
 
-                                <div class="zone-filter">
-                                    <label class="mb-0" for="zoneClassFilter-{{ $key }}">Phân loại:</label>
-                                    <select id="zoneClassFilter-{{ $key }}" class="sel-zone-filter"
-                                        data-type="{{ $key }}"
-                                        data-col="{{ ($meta['hasName'] ?? true) ? 3 : 2 }}">
-                                        <option value="">Tất cả phân loại</option>
-                                        @foreach ($zoneClassifications as $label)
-                                            <option value="{{ $label }}">{{ $label }}</option>
-                                        @endforeach
-                                        <option value="Chưa phân loại">Chưa phân loại</option>
-                                    </select>
-                                </div>
+                                @if (!empty($meta['hasType']))
+                                    <div class="zone-filter">
+                                        <label class="mb-0" for="zoneClassFilter-{{ $key }}">Phân loại:</label>
+                                        <select id="zoneClassFilter-{{ $key }}" class="sel-zone-filter"
+                                            data-type="{{ $key }}"
+                                            data-col="{{ ($meta['hasName'] ?? true) ? 3 : 2 }}">
+                                            <option value="">Tất cả phân loại</option>
+                                            @foreach ($zoneClassifications as $label)
+                                                <option value="{{ $label }}">{{ $label }}</option>
+                                            @endforeach
+                                            <option value="Chưa phân loại">Chưa phân loại</option>
+                                        </select>
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="table-responsive">
-                                <table id="zoneTable-{{ $key }}" class="table table-bordered table-hover w-100">
+                                <table id="zoneTable-{{ $key }}" class="table table-bordered table-hover w-100" data-deferred>
                                     <thead>
                                         <tr>
                                             <th class="text-center" style="width: 60px">STT</th>
@@ -483,7 +443,9 @@
                                             @if ($meta['hasName'] ?? true)
                                                 <th>Tên {{ $meta['label'] }}</th>
                                             @endif
-                                            <th class="text-center" style="width: 165px">Phân Loại</th>
+                                            @if (!empty($meta['hasType']))
+                                                <th class="text-center" style="width: 165px">Phân Loại</th>
+                                            @endif
                                             @foreach ($meta['cols'] as $title)
                                                 <th>{{ $title }}</th>
                                             @endforeach
@@ -494,6 +456,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
+                                        @deferredRows('zoneTable-' . $key)
                                         @foreach ($meta['rows'] as $row)
                                             <tr>
                                                 @php
@@ -508,12 +471,14 @@
                                                 @if ($meta['hasName'] ?? true)
                                                     <td class="font-weight-bold">{{ $row->name }}</td>
                                                 @endif
-                                                <td class="text-center">
-                                                    <span class="zone-chip {{ $rowClassified ? '' : 'zone-chip-none' }}"
-                                                        style="--chip: {{ $rowColor }}; --chip-text: {{ $zoneTextOn($rowColor) }}">
-                                                        <i class="{{ $zoneClassIcon($row) }}"></i>{{ $zoneClassLabel($row) }}
-                                                    </span>
-                                                </td>
+                                                @if (!empty($meta['hasType']))
+                                                    <td class="text-center">
+                                                        <span class="zone-chip {{ $rowClassified ? '' : 'zone-chip-none' }}"
+                                                            style="--chip: {{ $rowColor }}; --chip-text: {{ $zoneTextOn($rowColor) }}">
+                                                            <i class="{{ $zoneClassIcon($row) }}"></i>{{ $zoneClassLabel($row) }}
+                                                        </span>
+                                                    </td>
+                                                @endif
                                                 @foreach ($meta['cols'] as $field => $title)
                                                     <td class="zone-parent">
                                                         @if (!empty($row->$field))
@@ -549,8 +514,7 @@
                                                                     data-column="{{ $row->column_id ?? '' }}"
                                                                     data-tier="{{ $row->tier_id ?? '' }}"
                                                                     data-item-type="{{ $row->item_type ?? '' }}"
-                                                                    data-zone-type="{{ $row->zone_type ?? '' }}"
-                                                                    data-color="{{ $row->color ?? '' }}">
+                                                                    data-zone-type="{{ $row->zone_type ?? '' }}">
                                                                     <i class="fas fa-edit"></i>
                                                                 </button>
                                                             @endperm
@@ -598,6 +562,7 @@
                                                 </td>
                                             </tr>
                                         @endforeach
+                                        @enddeferredRows
                                     </tbody>
                                 </table>
                             </div>
@@ -609,6 +574,8 @@
         </div>
     </div>
 </div>
+
+@include('pages.shared.deferredRows')
 
 <script src="{{ asset('js/sweetalert2.all.min.js') }}"></script>
 
@@ -690,16 +657,7 @@
             fillSelect($(this).closest('form').find('.sel-tier'), 'tier', $(this).val(), null);
         });
 
-        /* ---------- Ô chọn màu của mục định khu ---------- */
-
-        // Màu thật sự sẽ hiển thị: màu tự chọn -> màu mặc định của phân loại -> màu chủ đạo.
-        function effectiveColor($form) {
-            var picked = ($form.find('.inp-zone-color-value').val() || '').trim();
-            if (/^#[0-9A-Fa-f]{6}$/.test(picked)) return picked.toUpperCase();
-
-            var type = $form.find('.sel-zone-type').val() || '';
-            return (zoneTypeColors[type] || zoneFallbackColor).toUpperCase();
-        }
+        /* ---------- Màu theo phân loại (mỗi phân loại một màu cố định) ---------- */
 
         // Chữ đen hay trắng thì đọc rõ trên nền màu đã chọn (cùng công thức với ZoneType::textOn).
         function textOn(hex) {
@@ -710,61 +668,50 @@
             return (0.299 * r + 0.587 * g + 0.114 * b) > 160 ? '#1F2937' : '#FFFFFF';
         }
 
-        // Vẽ lại ô màu + chip xem trước + đánh dấu ô màu gợi ý đang được chọn.
+        // Chip xem trước màu của phân loại đang chọn trong form.
         function paintColor($form) {
-            var picked = ($form.find('.inp-zone-color-value').val() || '').trim().toUpperCase();
             var type = $form.find('.sel-zone-type').val() || '';
-            var color = effectiveColor($form);
+            var color = (zoneTypeColors[type] || zoneFallbackColor).toUpperCase();
 
-            $form.find('.zone-color-input').val(color);
-
-            var $chip = $form.find('.zone-color-chip');
-            $chip.css({
+            $form.find('.zone-color-chip').css({
                 background: color,
                 color: textOn(color)
             });
-            $chip.find('.zone-color-chip-icon').attr('class', 'zone-color-chip-icon ' + (zoneTypeIcons[type] ||
+            $form.find('.zone-color-chip-icon').attr('class', 'zone-color-chip-icon ' + (zoneTypeIcons[type] ||
                 'fas fa-circle-dot'));
-            $chip.find('.zone-color-chip-text').text(
-                picked ? color : (zoneTypeLabels[type] ? 'Màu mặc định · ' + zoneTypeLabels[type] : 'Màu mặc định')
-            );
-
-            $form.find('.zone-swatch').each(function() {
-                $(this).toggleClass('is-active', $(this).data('color').toUpperCase() === picked);
-            });
-
-            $form.find('.btn-zone-color-clear').prop('disabled', !picked);
+            $form.find('.zone-color-chip-text').text(zoneTypeLabels[type] || 'Chưa phân loại');
         }
 
-        // Đặt giá trị phân loại + màu cho một form rồi vẽ lại.
-        function setZoneColor($form, type, color) {
-            $form.find('.sel-zone-type').val(type || '');
-            $form.find('.inp-zone-color-value').val(color || '');
+        function setZoneType($form, type) {
+            $form.find('.sel-zone-type').val(type || '').trigger('change.select2');
             paintColor($form);
         }
 
-        // Đổi phân loại mà chưa chọn màu riêng thì chip xem trước đổi theo màu mặc định mới.
+        // Ô chọn Phân loại hiện kèm chấm màu cố định của từng phân loại
+        function zoneOption(option) {
+            if (!option.element) return option.text;
+            var color = $(option.element).data('color');
+            return $('<span>').append(
+                $('<i class="zone-dot">').toggleClass('is-none', !color).attr('style', color ? '--dot:' + color : null),
+                document.createTextNode(option.text)
+            );
+        }
+
+        if ($.fn.select2) {
+            $('.sel-zone-type').each(function() {
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    minimumResultsForSearch: Infinity,
+                    dropdownParent: $(this).closest('.modal'),
+                    templateResult: zoneOption,
+                    templateSelection: zoneOption
+                });
+            });
+        }
+
         $(document).on('change', '.sel-zone-type', function() {
             paintColor($(this).closest('form'));
-        });
-
-        $(document).on('input change', '.zone-color-input', function() {
-            var $form = $(this).closest('form');
-            $form.find('.inp-zone-color-value').val($(this).val().toUpperCase());
-            paintColor($form);
-        });
-
-        $(document).on('click', '.zone-swatch', function() {
-            var $form = $(this).closest('form');
-            $form.find('.inp-zone-color-value').val(String($(this).data('color')).toUpperCase());
-            paintColor($form);
-        });
-
-        // Bỏ màu riêng, quay về màu mặc định của phân loại.
-        $(document).on('click', '.btn-zone-color-clear', function() {
-            var $form = $(this).closest('form');
-            $form.find('.inp-zone-color-value').val('');
-            paintColor($form);
         });
 
         /* ---------- Mở modal Thêm mới / Cập nhật ---------- */
@@ -777,8 +724,8 @@
             $form.find('.zone-error').remove();
             $form.find('.is-invalid').removeClass('is-invalid');
             syncForm($form, {});
-            // Mục mới mặc định chưa phân loại và chưa chọn màu riêng
-            setZoneColor($form, '', '');
+            // Mục mới mặc định chưa phân loại
+            setZoneType($form, '');
             $modal.modal('show');
         });
 
@@ -796,8 +743,8 @@
             $form.find('.inp-change-reason').val('');
             // Loại lưu trữ phải hiện đúng giá trị đang lưu, không thì bấm Lưu là mất loại
             $form.find('.sel-item-type').val(row.itemType || '');
-            // Phân loại + màu phải hiện đúng giá trị đang lưu, không thì bấm Lưu là mất
-            setZoneColor($form, row.zoneType || '', row.color || '');
+            // Phân loại phải hiện đúng giá trị đang lưu, không thì bấm Lưu là mất
+            setZoneType($form, row.zoneType || '');
             syncForm($form, {
                 warehouse_id: row.warehouse,
                 shelf_id: row.shelf,
@@ -837,8 +784,10 @@
             }
         };
 
+        // Dòng nạp sau bằng AJAX (data-deferred) - pages/shared/deferredRows
         zoneTypes.forEach(function(type) {
-            $('#zoneTable-' + type).DataTable(dtOptions);
+            var table = document.getElementById('zoneTable-' + type);
+            if (table) $(table).DataTable(mdDeferred.extend(table, dtOptions));
         });
 
         /* ---------- Lọc theo phân loại định khu ---------- */
@@ -926,7 +875,7 @@
             $reopenForm.find('.inp-name').val(old.name || '');
             $reopenForm.find('.inp-change-reason').val(old.change_reason || '');
             $reopenForm.find('.sel-item-type').val(old.item_type || '');
-            setZoneColor($reopenForm, old.zone_type || '', old.color || '');
+            setZoneType($reopenForm, old.zone_type || '');
             syncForm($reopenForm, {
                 warehouse_id: old.warehouse_id,
                 shelf_id: old.shelf_id,

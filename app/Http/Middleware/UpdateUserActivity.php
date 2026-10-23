@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\LoginHistory;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 class UpdateUserActivity
 {
     /** §11.10(d) - tự đăng xuất sau bấy nhiêu giây không thao tác. */
-    private const IDLE_TIMEOUT_SECONDS = 15 * 60;
+    private const IDLE_TIMEOUT_SECONDS = LoginHistory::IDLE_MINUTES * 60;
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -32,6 +33,7 @@ class UpdateUserActivity
                 $user['userName'] ?? 'NA'
             );
 
+            LoginHistory::end('timeout');
             $request->session()->flush();
 
             $message = 'Phiên làm việc đã hết hạn do không hoạt động quá '.(self::IDLE_TIMEOUT_SECONDS / 60).' phút. Vui lòng đăng nhập lại.';
@@ -48,6 +50,9 @@ class UpdateUserActivity
         session()->put('user', $user);
 
         DB::table('user_management')->where('id', $user['userId'])->update(['last_activity' => now()]);
+
+        // Thao tác cuối của phiên trong Lịch Sử Đăng Nhập (tối đa 1 lần/phút)
+        LoginHistory::touch();
 
         return $next($request);
     }

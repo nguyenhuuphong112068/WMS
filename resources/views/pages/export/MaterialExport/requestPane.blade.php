@@ -162,9 +162,16 @@
                     </td>
                     <td class="text-center">
                         <div class="md-actions">
-                            <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#reqDetailModal_{{ $req->id }}" title="Xem / Cấp phát">
-                                <i class="fas fa-list-ul"></i>
-                            </button>
+                            {{-- Người ký được bước đang chờ: Ký / Từ chối nằm trong modal chi tiết (requestDetailModal) --}}
+                            @if ($req->can_sign && user_can('export_material_approve'))
+                                <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#reqDetailModal_{{ $req->id }}" title="Xem chi tiết và ký duyệt">
+                                    <i class="fas fa-file-signature"></i>
+                                </button>
+                            @else
+                                <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#reqDetailModal_{{ $req->id }}" title="Xem / Cấp phát">
+                                    <i class="fas fa-list-ul"></i>
+                                </button>
+                            @endif
 
                             @if ($editable)
                                 <button type="button" class="btn btn-sm btn-warning" data-toggle="modal" data-target="#reqEditModal_{{ $req->id }}" title="Sửa">
@@ -185,22 +192,6 @@
                                 </form>
                             @endif
 
-                            {{-- Chỉ đúng người được chỉ định ở bước đang chờ mới thấy nút Ký / Từ chối --}}
-                            @if ($req->can_sign && user_can('export_material_approve'))
-                                @php $isLastStep = (int) $req->pending_sign->step_no >= (int) $req->sign_step_count; @endphp
-                                <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSign') }}" method="POST"
-                                    data-require-password="1"
-                                    data-title="Ký duyệt bước {{ $req->pending_sign->step_no }}/{{ $req->sign_step_count }}?"
-                                    data-text="Đề nghị {{ $req->code }} {{ $isLastStep ? 'sẽ được duyệt và kho có thể cấp phát.' : 'sẽ chuyển tới người ký bước ' . ($req->pending_sign->step_no + 1) . '.' }}">
-                                    @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
-                                    <button type="submit" class="btn btn-sm btn-success" title="Ký duyệt">
-                                        <i class="fas fa-{{ $isLastStep ? 'stamp' : 'signature' }}"></i>
-                                    </button>
-                                </form>
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-req-reject" data-id="{{ $req->id }}" data-code="{{ $req->code }}" title="Từ chối">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            @endif
                         </div>
                     </td>
                 </tr>

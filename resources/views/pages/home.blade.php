@@ -699,7 +699,7 @@
     @endif
     {{-- ============================ HẾT PHẦN TẠM ẨN ============================ --}}
 
-    {{-- ============ TRANG CHỦ — ĐỀ NGHỊ CHỜ BẠN XEM XÉT (giao diện 3D, chỉ CSS + JS thuần) ============ --}}
+    {{-- ============ TRANG CHỦ — ĐỀ NGHỊ CHỜ BẠN XEM XÉT: ma trận tổng quan + card màu theo đối tượng ============ --}}
     <style>
         .content-wrapper {
             background: var(--primary-soft);
@@ -709,7 +709,7 @@
             min-height: calc(100vh - 57px);
             display: flex;
             flex-direction: column;
-            gap: 22px;
+            gap: 20px;
             padding: 22px;
             background-color: var(--bg-neutral);
             background-image:
@@ -718,31 +718,33 @@
             background-size: 56px 56px, 56px 56px;
         }
 
+        /* Màu theo đối tượng: --c / --c-rgb dùng cho chip, viền card, icon, ô ma trận */
+        .obj-vt { --c: var(--db-group-material); --c-rgb: var(--db-group-material-rgb); }
+        .obj-hc { --c: var(--db-group-chemical); --c-rgb: var(--db-group-chemical-rgb); }
+        .obj-cc { --c: var(--db-group-standard); --c-rgb: var(--db-group-standard-rgb); }
+        .obj-dc { --c: var(--db-group-master); --c-rgb: var(--db-group-master-rgb); }
+
         /* ================= BANNER 3D ================= */
         .hero3d {
             position: relative;
             overflow: hidden;
             border-radius: 16px;
-            padding: 28px 30px 30px;
+            padding: 24px 30px 26px;
             color: #fff;
             background:
                 radial-gradient(760px 280px at 88% -30%, rgba(255, 255, 255, 0.26), transparent 62%),
-                radial-gradient(520px 260px at 0% 120%, rgba(255, 255, 255, 0.12), transparent 60%),
                 linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 42%, var(--primary-dark) 100%);
-            box-shadow:
-                0 22px 44px -22px rgba(var(--primary-rgb), 0.85),
-                inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            box-shadow: 0 22px 44px -22px rgba(var(--primary-rgb), 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.25);
             perspective: 900px;
             isolation: isolate;
         }
 
-        /* Mặt sàn kho dạng lưới phối cảnh */
         .hero3d::before {
             content: '';
             position: absolute;
             left: -25%;
             right: -25%;
-            top: 48%;
+            top: 40%;
             height: 160%;
             background-image:
                 linear-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1px),
@@ -762,13 +764,12 @@
             to { background-position: 0 54px, 0 0; }
         }
 
-        /* Thùng hàng 3D trôi nổi bên phải banner */
         .hero3d__scene {
             position: absolute;
             right: 3%;
             top: 0;
             bottom: 0;
-            width: 360px;
+            width: 340px;
             transform-style: preserve-3d;
             transform: rotateX(var(--scene-rx, 0deg)) rotateY(var(--scene-ry, 0deg));
             transition: transform 0.3s ease;
@@ -810,9 +811,9 @@
         .box3d__body > span:nth-child(5) { transform: rotateX(90deg) translateZ(calc(var(--s) / 2)); }
         .box3d__body > span:nth-child(6) { transform: rotateX(-90deg) translateZ(calc(var(--s) / 2)); }
 
-        .box3d--a { --s: 86px; right: 70px; top: 34px; }
-        .box3d--b { --s: 52px; right: 230px; top: 26px; animation-delay: -2.5s; }
-        .box3d--c { --s: 38px; right: 12px; top: 130px; animation-delay: -4s; }
+        .box3d--a { --s: 76px; right: 70px; top: 26px; }
+        .box3d--b { --s: 46px; right: 215px; top: 18px; animation-delay: -2.5s; }
+        .box3d--c { --s: 34px; right: 12px; top: 104px; animation-delay: -4s; }
         .box3d--b .box3d__body { animation-duration: 16s; animation-direction: reverse; }
         .box3d--c .box3d__body { animation-duration: 12s; }
 
@@ -826,13 +827,6 @@
             50% { transform: translate3d(0, -12px, 30px); }
         }
 
-        .hero3d__content {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            gap: 22px;
-        }
-
         .hero3d__eyebrow {
             display: inline-flex;
             align-items: center;
@@ -843,7 +837,6 @@
             border: 1px solid rgba(255, 255, 255, 0.25);
             font-size: 12.5px;
             font-weight: 600;
-            letter-spacing: 0.3px;
         }
 
         /* layout/css.blade.php ép mọi h1 in hoa + màu primary: lời chào trên nền xanh phải ghi đè */
@@ -863,133 +856,161 @@
             opacity: 0.9;
         }
 
-        /* KPI dạng phím nổi: mặt trên kính trắng, cạnh dày phía dưới */
-        .hero3d__kpis {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 18px;
-            max-width: 980px;
-        }
-
-        .kpi3d {
+        .hero3d__stats {
             display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .hero3d__stat {
+            display: inline-flex;
             align-items: center;
-            gap: 14px;
-            padding: 15px 16px;
-            border-radius: 14px;
-            background: linear-gradient(165deg, #fff 0%, var(--primary-soft) 100%);
+            gap: 8px;
+            padding: 7px 14px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.95);
             color: var(--text-main);
-            text-decoration: none;
-            transform: perspective(700px) rotateX(9deg);
-            transform-origin: center bottom;
-            box-shadow:
-                0 7px 0 0 var(--primary-lighter),
-                0 22px 26px -10px rgba(0, 0, 0, 0.38);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-
-        .kpi3d:hover {
-            color: var(--text-main);
-            text-decoration: none;
-            transform: perspective(700px) rotateX(0deg) translateY(-4px);
-            box-shadow:
-                0 10px 0 0 var(--primary-lighter),
-                0 28px 32px -12px rgba(0, 0, 0, 0.42);
-        }
-
-        .kpi3d:active {
-            transform: perspective(700px) rotateX(0deg) translateY(4px);
-            box-shadow:
-                0 3px 0 0 var(--primary-lighter),
-                0 10px 16px -8px rgba(0, 0, 0, 0.35);
-        }
-
-        .kpi3d__value {
-            font-size: 28px;
-            font-weight: 800;
-            line-height: 1.05;
-            color: var(--primary-dark);
-        }
-
-        .kpi3d__value small {
-            font-size: 15px;
-            font-weight: 700;
-        }
-
-        .kpi3d__label {
-            margin-top: 3px;
-            font-size: 12.5px;
+            font-size: 13px;
             font-weight: 600;
-            color: var(--text-muted);
+            box-shadow: 0 4px 0 var(--primary-lighter), 0 12px 18px -10px rgba(0, 0, 0, 0.4);
         }
 
-        /* ================= KHỐI ICON NỔI (dùng chung) ================= */
+        .hero3d__stat b {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary-dark);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .hero3d__stat i {
+            color: var(--primary);
+        }
+
+        /* ================= KHỐI ICON NỔI ================= */
         .gem3d {
             --gem-from: var(--primary-light);
             --gem-to: var(--primary-dark);
-            --gem-glow: rgba(var(--primary-rgb), 0.45);
-            width: 46px;
-            height: 46px;
-            flex: 0 0 46px;
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 13px;
+            border-radius: 11px;
             background: linear-gradient(145deg, var(--gem-from) 0%, var(--gem-to) 100%);
             color: #fff;
-            font-size: 18px;
+            font-size: 16px;
             box-shadow:
                 inset 0 2px 0 rgba(255, 255, 255, 0.35),
                 inset 0 -4px 0 rgba(0, 0, 0, 0.18),
-                0 8px 14px -4px var(--gem-glow);
+                0 8px 14px -6px rgba(var(--primary-rgb), 0.55);
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
         }
 
         .gem3d--sm {
-            width: 30px;
-            height: 30px;
-            flex-basis: 30px;
-            border-radius: 9px;
-            font-size: 13px;
+            width: 28px;
+            height: 28px;
+            flex-basis: 28px;
+            border-radius: 8px;
+            font-size: 12px;
         }
 
-        .gem3d--accent {
-            --gem-from: var(--accent);
-            --gem-to: var(--primary);
-            --gem-glow: rgba(var(--primary-rgb), 0.35);
+        /* Icon card mang màu đối tượng */
+        .gem3d.is-obj {
+            background: linear-gradient(145deg, rgba(var(--c-rgb), 0.72) 0%, var(--c) 100%);
+            box-shadow:
+                inset 0 2px 0 rgba(255, 255, 255, 0.35),
+                inset 0 -4px 0 rgba(0, 0, 0, 0.16),
+                0 8px 14px -6px rgba(var(--c-rgb), 0.7);
         }
 
-        .gem3d--warning {
-            --gem-from: var(--state-warning);
-            --gem-to: var(--state-warning-dark);
-            --gem-glow: rgba(var(--state-warning-rgb), 0.45);
+        /* ================= CHIP ================= */
+        .obj-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px 3px 4px;
+            border-radius: 999px;
+            border: 1px solid rgba(var(--c-rgb), 0.35);
+            background: rgba(var(--c-rgb), 0.10);
+            color: var(--c);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            line-height: 1.4;
         }
 
-        .gem3d--navy {
-            --gem-from: var(--primary);
-            --gem-to: var(--primary-dark);
+        .obj-chip__dot {
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: var(--c);
+            color: #fff;
+            font-size: 9px;
         }
 
-        /* ================= BẢNG ĐỀ NGHỊ ================= */
-        .board3d {
-            flex: 1 1 auto;
-            display: flex;
-            flex-direction: column;
+        .actor-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 9px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 700;
+            white-space: nowrap;
+            color: var(--primary-dark);
+            background: var(--primary-soft);
+        }
+
+        .actor-tag.is-dept {
+            color: var(--accent);
+            background: rgba(23, 184, 212, 0.10);
+        }
+
+        .dir-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 0 7px;
+            border-radius: 5px;
+            border: 1px dashed currentColor;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .dir-chip.is-in {
+            color: var(--state-warning-dark);
+        }
+
+        .dir-chip.is-out {
+            color: var(--primary);
+        }
+
+        /* ================= KHUNG CHUNG ================= */
+        .panel3d {
             background: #fff;
             border: 1px solid rgba(var(--primary-rgb), 0.10);
             border-radius: 16px;
             box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.06), 0 18px 40px -26px rgba(var(--primary-rgb), 0.55);
         }
 
-        .board3d__head {
+        .panel3d__head {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 12px;
-            padding: 18px 26px;
+            gap: 10px 14px;
+            padding: 16px 24px;
             border-bottom: 1px solid rgba(var(--primary-rgb), 0.08);
         }
 
-        .board3d__head h2 {
+        .panel3d__head h2 {
             margin: 0;
             font-size: 15px;
             font-weight: 700;
@@ -998,23 +1019,136 @@
             color: var(--primary);
         }
 
+        /* ================= MA TRẬN ================= */
+        .matrix-wrap {
+            overflow-x: auto;
+            padding: 6px 24px 18px;
+        }
+
+        .matrix3d {
+            width: 100%;
+            min-width: 640px;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .matrix3d th,
+        .matrix3d td {
+            padding: 9px 12px;
+            text-align: center;
+            border-bottom: 1px solid rgba(var(--primary-rgb), 0.08);
+        }
+
+        .matrix3d thead th {
+            padding-top: 12px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .matrix3d thead th:first-child,
+        .matrix3d tbody th,
+        .matrix3d tfoot th {
+            text-align: left;
+        }
+
+        .matrix3d tbody th {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-main);
+            white-space: nowrap;
+        }
+
+        .matrix3d tbody th i {
+            width: 18px;
+            margin-right: 6px;
+            color: var(--primary-light);
+            text-align: center;
+        }
+
+        .mx-cell {
+            font-size: 18px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: var(--c, var(--primary-dark));
+            border-radius: 10px;
+            transition: background 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .mx-cell[data-clickable="1"] {
+            cursor: pointer;
+        }
+
+        .mx-cell[data-clickable="1"]:hover {
+            background: rgba(var(--c-rgb, var(--primary-rgb)), 0.08);
+        }
+
+        .mx-cell.is-zero {
+            font-size: 14px;
+            font-weight: 400;
+            color: rgba(var(--primary-rgb), 0.25);
+        }
+
+        .mx-split {
+            display: inline-flex;
+            gap: 10px;
+            font-size: 15px;
+        }
+
+        .mx-split .is-in {
+            color: var(--state-warning-dark);
+        }
+
+        .mx-split .is-out {
+            color: var(--primary);
+        }
+
+        .mx-total {
+            color: var(--text-main);
+        }
+
+        .matrix3d tfoot th,
+        .matrix3d tfoot td {
+            border-bottom: 0;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .matrix3d tfoot td {
+            color: var(--c, var(--text-main));
+        }
+
+        .matrix3d tfoot td.is-zero {
+            font-weight: 400;
+            color: rgba(var(--primary-rgb), 0.25);
+        }
+
+        /* ================= NHÓM NGHIỆP VỤ + CARD ================= */
+        .board3d {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            scroll-margin-top: 70px;
+        }
+
         .board3d__body {
             flex: 1 1 auto;
             display: flex;
             flex-direction: column;
-            padding: 6px 26px 26px;
+            padding: 4px 24px 26px;
         }
 
-        .board3d__section {
+        .group3d {
             padding-top: 18px;
-            scroll-margin-top: 80px;
         }
 
-        .board3d__section-title {
+        .group3d__title {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
             font-size: 13px;
             font-weight: 700;
             letter-spacing: 0.6px;
@@ -1022,32 +1156,31 @@
             color: var(--primary-dark);
         }
 
-        .board3d__section-title::after {
+        .group3d__title::after {
             content: '';
             flex: 1;
             height: 1px;
             background: linear-gradient(90deg, rgba(var(--primary-rgb), 0.25), transparent);
         }
 
-        .board3d__section-count {
+        .group3d__count {
             padding: 2px 10px;
             border-radius: 999px;
             background: var(--primary-soft);
-            color: var(--primary-dark);
             font-size: 12px;
+            font-variant-numeric: tabular-nums;
         }
 
-        .board3d__grid {
+        .group3d__grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 22px;
+            gap: 20px;
         }
 
-        /* ================= THẺ 3D NGHIÊNG THEO CHUỘT ================= */
         .tile3d {
             perspective: 1000px;
             animation: tile-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-            animation-delay: calc(var(--i, 0) * 70ms);
+            animation-delay: calc(var(--i, 0) * 60ms);
         }
 
         @keyframes tile-in {
@@ -1062,43 +1195,33 @@
             flex-direction: column;
             background: linear-gradient(180deg, #fff 0%, var(--bg-neutral) 100%);
             border: 1px solid rgba(var(--primary-rgb), 0.12);
+            border-left: 5px solid var(--c);
             border-radius: 14px;
-            box-shadow:
-                0 1px 2px rgba(var(--primary-rgb), 0.08),
-                0 14px 26px -16px rgba(var(--primary-rgb), 0.5);
+            box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.08), 0 14px 26px -16px rgba(var(--c-rgb), 0.6);
             transform-style: preserve-3d;
             transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
             transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
 
         .tile3d:hover .tile3d__card {
-            box-shadow:
-                0 2px 4px rgba(var(--primary-rgb), 0.08),
-                0 30px 44px -20px rgba(var(--primary-rgb), 0.6);
+            box-shadow: 0 2px 4px rgba(var(--primary-rgb), 0.08), 0 30px 44px -20px rgba(var(--c-rgb), 0.65);
         }
 
-        /* Vạch màu trên đỉnh thẻ */
-        .tile3d__card::before {
-            content: '';
-            position: absolute;
-            left: 18px;
-            right: 18px;
-            top: -1px;
-            height: 3px;
-            border-radius: 0 0 4px 4px;
-            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+        /* Card được chỉ tới từ ô ma trận */
+        .tile3d.is-flash .tile3d__card {
+            animation: tile-flash 1.6s ease;
         }
 
-        .board3d__section--dept .tile3d__card::before {
-            background: linear-gradient(90deg, var(--accent), var(--primary-light));
+        @keyframes tile-flash {
+            0%, 100% { box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.08), 0 14px 26px -16px rgba(var(--c-rgb), 0.6); }
+            25%, 60% { box-shadow: 0 0 0 3px rgba(var(--c-rgb), 0.55), 0 18px 30px -14px rgba(var(--c-rgb), 0.7); }
         }
 
-        /* Vệt sáng chạy theo con trỏ */
         .tile3d__glare {
             position: absolute;
             inset: 0;
             border-radius: inherit;
-            background: radial-gradient(circle at var(--mx, 50%) var(--my, 0%), rgba(var(--primary-rgb), 0.10), transparent 58%);
+            background: radial-gradient(circle at var(--mx, 50%) var(--my, 0%), rgba(var(--c-rgb), 0.10), transparent 58%);
             opacity: 0;
             transition: opacity 0.25s ease;
             pointer-events: none;
@@ -1108,11 +1231,20 @@
             opacity: 1;
         }
 
+        .tile3d__top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 12px 16px 0;
+            transform: translateZ(20px);
+        }
+
         .tile3d__head {
             display: flex;
             align-items: center;
-            gap: 13px;
-            padding: 18px 18px 12px;
+            gap: 12px;
+            padding: 10px 16px 8px;
             color: var(--text-main);
             text-decoration: none;
             transform: translateZ(28px);
@@ -1134,7 +1266,7 @@
         .tile3d__count {
             flex: 0 0 auto;
             min-width: 42px;
-            padding: 4px 11px;
+            padding: 3px 11px;
             border-radius: 11px;
             background: linear-gradient(180deg, #fff 0%, rgba(var(--state-warning-rgb), 0.18) 100%);
             border: 1px solid rgba(var(--state-warning-rgb), 0.35);
@@ -1143,8 +1275,8 @@
             font-weight: 800;
             line-height: 1.2;
             text-align: center;
+            font-variant-numeric: tabular-nums;
             box-shadow: 0 3px 0 rgba(var(--state-warning-rgb), 0.45), 0 8px 12px -6px rgba(var(--state-warning-rgb), 0.6);
-            transform: translateZ(16px);
         }
 
         .tile3d__list {
@@ -1167,7 +1299,7 @@
         }
 
         .tile3d__list a:hover {
-            background: var(--primary-soft);
+            background: rgba(var(--c-rgb), 0.07);
             color: var(--text-main);
             text-decoration: none;
             transform: translateX(3px);
@@ -1175,12 +1307,13 @@
 
         .tile3d__line {
             display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 10px;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
         }
 
         .tile3d__code {
+            min-width: 0;
             font-size: 13px;
             font-weight: 700;
             color: var(--primary-dark);
@@ -1190,6 +1323,7 @@
         }
 
         .tile3d__ago {
+            margin-left: auto;
             flex: 0 0 auto;
             font-size: 11.5px;
             color: var(--text-muted);
@@ -1208,14 +1342,13 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 11px 18px;
+            padding: 10px 16px;
             border-top: 1px solid rgba(var(--primary-rgb), 0.08);
             font-size: 12.5px;
             font-weight: 700;
             color: var(--primary);
             text-decoration: none;
             transform: translateZ(10px);
-            transition: color 0.2s ease;
         }
 
         .tile3d__more:hover {
@@ -1223,7 +1356,7 @@
             text-decoration: none;
         }
 
-        /* ================= TRẠNG THÁI RỖNG: THÙNG HÀNG 3D ================= */
+        /* ================= TRẠNG THÁI RỖNG ================= */
         .board3d__empty {
             flex: 1 1 auto;
             display: flex;
@@ -1246,7 +1379,6 @@
             align-items: center;
             justify-content: center;
             border-color: rgba(var(--state-success-rgb), 0.55);
-            /* Thùng đặc: nền trắng lót dưới, ẩn mặt khuất để không nhìn xuyên */
             background:
                 linear-gradient(160deg, rgba(var(--state-success-rgb), 0.08), rgba(var(--state-success-rgb), 0.24)),
                 #fff;
@@ -1277,12 +1409,6 @@
             }
         }
 
-        @media (max-width: 991px) {
-            .hero3d__kpis {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-
         @media (max-width: 767px) {
             .home-page {
                 min-height: calc(100vh - 54px);
@@ -1291,7 +1417,7 @@
             }
 
             .hero3d {
-                padding: 20px 16px 22px;
+                padding: 18px 16px 20px;
             }
 
             .hero3d__scene {
@@ -1302,33 +1428,14 @@
                 font-size: 20px;
             }
 
-            .hero3d__kpis {
-                gap: 14px;
-            }
-
-            .kpi3d {
-                padding: 12px;
-                gap: 10px;
-            }
-
-            .kpi3d .gem3d {
-                width: 36px;
-                height: 36px;
-                flex-basis: 36px;
-                font-size: 15px;
-            }
-
-            .kpi3d__value {
-                font-size: 22px;
-            }
-
-            .board3d__head,
-            .board3d__body {
+            .panel3d__head,
+            .board3d__body,
+            .matrix-wrap {
                 padding-left: 14px;
                 padding-right: 14px;
             }
 
-            .board3d__grid {
+            .group3d__grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -1341,8 +1448,7 @@
                 animation: none;
             }
 
-            .tile3d__card,
-            .kpi3d {
+            .tile3d__card {
                 transition: none;
             }
         }
@@ -1350,24 +1456,41 @@
 
     @php
         // Ứng dụng để locale 'en' nên phải chỉ định 'vi' cho chữ "2 ngày trước"
-        $reviewAgo = function ($value, bool $short = false) {
+        $reviewAgo = function ($value) {
             if (!$value) {
                 return '';
             }
             try {
-                return \Carbon\Carbon::parse($value)->locale('vi')->diffForHumans(null, $short);
+                return \Carbon\Carbon::parse($value)->locale('vi')->diffForHumans();
             } catch (\Throwable $e) {
                 return '';
             }
         };
-        $signTotal = collect($reviewSections)->firstWhere('key', 'sign')['total'] ?? 0;
-        $deptTotal = collect($reviewSections)->firstWhere('key', 'dept')['total'] ?? 0;
+        // Tổng một ô ma trận khi chưa lọc (cộng cả hai phía ai phải làm)
+        $cellAll = function ($group, $object) use ($reviewMatrix) {
+            $sum = ['count' => 0, 'in' => 0, 'out' => 0];
+            foreach ($reviewMatrix[$group][$object] as $part) {
+                foreach ($sum as $k => $v) {
+                    $sum[$k] += $part[$k];
+                }
+            }
+            return $sum;
+        };
+        $signTotal = 0;
+        $deptTotal = 0;
+        foreach ($reviewMatrix as $byObject) {
+            foreach ($byObject as $byActor) {
+                $signTotal += $byActor['sign']['count'];
+                $deptTotal += $byActor['dept']['count'];
+            }
+        }
+        $objChip = fn($key) => '<span class="obj-chip obj-' . $key . '"><span class="obj-chip__dot"><i class="' . e($reviewObjects[$key]['icon']) . '"></i></span>' . e($reviewObjects[$key]['label']) . '</span>';
         $today = \Illuminate\Support\Str::ucfirst(\Carbon\Carbon::now()->locale('vi')->isoFormat('dddd, DD/MM/YYYY'));
     @endphp
 
     <div class="content-wrapper">
         <div class="home-page">
-            {{-- ============ BANNER: lời chào + KPI ============ --}}
+            {{-- ============ BANNER ============ --}}
             <section class="hero3d" id="homeHero">
                 <div class="hero3d__scene" aria-hidden="true">
                     @foreach (['a', 'b', 'c'] as $box)
@@ -1379,94 +1502,139 @@
                     @endforeach
                 </div>
 
-                <div class="hero3d__content">
-                    <div>
-                        <span class="hero3d__eyebrow"><i class="far fa-calendar-alt"></i> {{ $today }}</span>
-                        <h1 class="hero3d__title">Xin chào, {{ session('user')['fullName'] ?? 'bạn' }}</h1>
-                        <p class="hero3d__sub">
-                            {{ implode(' · ', array_filter([session('user')['selected_department'] ?? null, $companyName])) }}
-                        </p>
-                    </div>
-
-                    <div class="hero3d__kpis">
-                        <a href="#reviewBoard" class="kpi3d">
-                            <span class="gem3d gem3d--navy"><i class="fas fa-layer-group"></i></span>
-                            <span>
-                                <span class="kpi3d__value d-block">{{ $reviewTotal }}</span>
-                                <span class="kpi3d__label d-block">Tổng đề nghị chờ</span>
-                            </span>
+                <span class="hero3d__eyebrow"><i class="far fa-calendar-alt"></i> {{ $today }}</span>
+                <h1 class="hero3d__title">Xin chào, {{ session('user')['fullName'] ?? 'bạn' }}</h1>
+                <p class="hero3d__sub">
+                    {{ implode(' · ', array_filter([session('user')['selected_department'] ?? null, $companyName])) }}
+                </p>
+                <div class="hero3d__stats">
+                    <span class="hero3d__stat"><i class="fas fa-layer-group"></i><b>{{ $reviewTotal }}</b> đề nghị chờ</span>
+                    <span class="hero3d__stat"><i class="{{ $reviewActors['sign']['icon'] }}"></i><b>{{ $signTotal }}</b> {{ mb_strtolower($reviewActors['sign']['label']) }}</span>
+                    <span class="hero3d__stat"><i class="{{ $reviewActors['dept']['icon'] }}"></i><b>{{ $deptTotal }}</b> {{ mb_strtolower($reviewActors['dept']['label']) }}</span>
+                    @if ($reviewOldest)
+                        <a href="{{ $reviewOldest['url'] }}" class="hero3d__stat" title="{{ $reviewOldest['label'] }} {{ $reviewOldest['code'] }}">
+                            <i class="fas fa-hourglass-half"></i>Chờ lâu nhất <b>{{ \Carbon\Carbon::parse($reviewOldest['since'])->locale('vi')->diffForHumans(null, true) }}</b>
                         </a>
-                        <a href="{{ $signTotal ? '#review-sign' : '#reviewBoard' }}" class="kpi3d">
-                            <span class="gem3d"><i class="fas fa-signature"></i></span>
-                            <span>
-                                <span class="kpi3d__value d-block">{{ $signTotal }}</span>
-                                <span class="kpi3d__label d-block">Chờ bạn ký duyệt</span>
-                            </span>
-                        </a>
-                        <a href="{{ $deptTotal ? '#review-dept' : '#reviewBoard' }}" class="kpi3d">
-                            <span class="gem3d gem3d--accent"><i class="fas fa-people-carry"></i></span>
-                            <span>
-                                <span class="kpi3d__value d-block">{{ $deptTotal }}</span>
-                                <span class="kpi3d__label d-block">Chờ phòng ban xử lý</span>
-                            </span>
-                        </a>
-                        <a href="{{ $reviewOldest['url'] ?? '#reviewBoard' }}" class="kpi3d"
-                            @if ($reviewOldest) title="{{ $reviewOldest['label'] }} {{ $reviewOldest['code'] }}" @endif>
-                            <span class="gem3d gem3d--warning"><i class="fas fa-hourglass-half"></i></span>
-                            <span>
-                                <span class="kpi3d__value d-block">
-                                    @if ($reviewOldest)
-                                        <small>{{ $reviewAgo($reviewOldest['since'], true) }}</small>
-                                    @else
-                                        —
-                                    @endif
-                                </span>
-                                <span class="kpi3d__label d-block">Đề nghị chờ lâu nhất</span>
-                            </span>
-                        </a>
-                    </div>
+                    @endif
                 </div>
             </section>
 
-            {{-- ============ BẢNG ĐỀ NGHỊ THEO LOẠI ============ --}}
-            <section class="board3d" id="reviewBoard">
-                <div class="board3d__head">
+            @if ($reviewTotal > 0)
+                {{-- ============ MA TRẬN TỔNG QUAN: hàng = nghiệp vụ, cột = đối tượng ============ --}}
+                <section class="panel3d" id="reviewMatrix">
+                    <div class="panel3d__head">
+                        <span class="gem3d gem3d--sm"><i class="fas fa-th"></i></span>
+                        <h2>Ma trận tổng quan</h2>
+                    </div>
+
+                    <div class="matrix-wrap">
+                        <table class="matrix3d">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Nghiệp vụ</th>
+                                    @foreach ($reviewObjects as $objectKey => $object)
+                                        <th scope="col" class="obj-{{ $objectKey }}" data-col="{{ $objectKey }}">{!! $objChip($objectKey) !!}</th>
+                                    @endforeach
+                                    <th scope="col">Tổng</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($reviewGroupInfo as $groupKey => $group)
+                                    @php $rowTotal = 0; @endphp
+                                    <tr>
+                                        <th scope="row"><i class="{{ $group['icon'] }}"></i>{{ $group['label'] }}</th>
+                                        @foreach ($reviewObjects as $objectKey => $object)
+                                            @php
+                                                $cell = $cellAll($groupKey, $objectKey);
+                                                $rowTotal += $cell['count'];
+                                            @endphp
+                                            <td class="mx-cell obj-{{ $objectKey }} {{ $cell['count'] ? '' : 'is-zero' }}"
+                                                data-group="{{ $groupKey }}" data-object="{{ $objectKey }}"
+                                                data-clickable="{{ $cell['count'] ? 1 : 0 }}"
+                                                @if ($cell['count']) tabindex="0" role="button" @endif>
+                                                @if (!$cell['count'])
+                                                    –
+                                                @elseif ($group['direction'])
+                                                    <span class="mx-split">
+                                                        <span class="is-in" title="Phòng khác đề nghị phòng bạn">←{{ $cell['in'] }}</span>
+                                                        <span class="is-out" title="Phòng bạn đề nghị phòng khác">→{{ $cell['out'] }}</span>
+                                                    </span>
+                                                @else
+                                                    {{ $cell['count'] }}
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                        <td class="mx-cell mx-total {{ $rowTotal ? '' : 'is-zero' }}" data-group="{{ $groupKey }}" data-object="all"
+                                            data-clickable="{{ $rowTotal ? 1 : 0 }}" @if ($rowTotal) tabindex="0" role="button" @endif>
+                                            {{ $rowTotal ?: '–' }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th scope="row">Tổng</th>
+                                    @foreach ($reviewObjects as $objectKey => $object)
+                                        @php $colTotal = collect(array_keys($reviewGroupInfo))->sum(fn($g) => $cellAll($g, $objectKey)['count']); @endphp
+                                        <td class="obj-{{ $objectKey }} {{ $colTotal ? '' : 'is-zero' }}" data-col-total="{{ $objectKey }}">{{ $colTotal ?: '–' }}</td>
+                                    @endforeach
+                                    <td data-col-total="all">{{ $reviewTotal }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </section>
+            @endif
+
+            {{-- ============ CARD ĐỀ NGHỊ THEO NHÓM NGHIỆP VỤ ============ --}}
+            <section class="panel3d board3d" id="reviewBoard">
+                <div class="panel3d__head">
                     <span class="gem3d gem3d--sm"><i class="fas fa-file-signature"></i></span>
                     <h2>Đề Nghị Chờ Bạn Xem Xét</h2>
                 </div>
 
                 <div class="board3d__body">
-                    @forelse ($reviewSections as $section)
-                        <div class="board3d__section board3d__section--{{ $section['key'] }}" id="review-{{ $section['key'] }}">
-                            <div class="board3d__section-title">
-                                <span class="gem3d gem3d--sm {{ $section['key'] === 'dept' ? 'gem3d--accent' : '' }}">
-                                    <i class="{{ $section['icon'] }}"></i>
-                                </span>
-                                {{ $section['label'] }}
-                                <span class="board3d__section-count">{{ $section['total'] }}</span>
+                    @forelse ($reviewGroups as $group)
+                        <div class="group3d" data-group="{{ $group['key'] }}">
+                            <div class="group3d__title">
+                                <span class="gem3d gem3d--sm"><i class="{{ $group['icon'] }}"></i></span>
+                                {{ $group['label'] }}
+                                <span class="group3d__count" data-group-count>{{ $group['total'] }}</span>
                             </div>
 
-                            <div class="board3d__grid">
-                                @foreach ($section['types'] as $type)
-                                    <div class="tile3d" style="--i: {{ $loop->index }}">
+                            <div class="group3d__grid">
+                                @foreach ($group['cards'] as $card)
+                                    <div class="tile3d obj-{{ $card['object'] }}" style="--i: {{ $loop->index }}"
+                                        data-group="{{ $card['group'] }}" data-object="{{ $card['object'] }}"
+                                        data-actor="{{ $card['actor'] }}" data-count="{{ $card['count'] }}">
                                         <div class="tile3d__card">
                                             <span class="tile3d__glare"></span>
 
-                                            <a href="{{ $type['url'] }}" class="tile3d__head">
-                                                <span class="gem3d {{ $section['key'] === 'dept' ? 'gem3d--accent' : '' }}">
-                                                    <i class="{{ $type['icon'] }}"></i>
+                                            <div class="tile3d__top">
+                                                {!! $objChip($card['object']) !!}
+                                                <span class="actor-tag {{ $card['actor'] === 'dept' ? 'is-dept' : '' }}">
+                                                    <i class="{{ $reviewActors[$card['actor']]['icon'] }}"></i>
+                                                    {{ $reviewActors[$card['actor']]['short'] }}
                                                 </span>
-                                                <span class="tile3d__label">{{ $type['label'] }}</span>
-                                                <span class="tile3d__count">{{ $type['count'] }}</span>
+                                            </div>
+
+                                            <a href="{{ $card['url'] }}" class="tile3d__head">
+                                                <span class="gem3d is-obj"><i class="{{ $reviewObjects[$card['object']]['icon'] }}"></i></span>
+                                                <span class="tile3d__label">{{ $card['label'] }}</span>
+                                                <span class="tile3d__count">{{ $card['count'] }}</span>
                                             </a>
 
                                             <ul class="tile3d__list">
-                                                @foreach ($type['items'] as $item)
+                                                @foreach ($card['items'] as $item)
                                                     <li>
-                                                        <a href="{{ $item['url'] }}"
-                                                            title="{{ trim($item['code'] . ' ' . $item['title']) }}">
+                                                        <a href="{{ $item['url'] }}" title="{{ trim($item['code'] . ' ' . $item['title']) }}">
                                                             <span class="tile3d__line">
                                                                 <span class="tile3d__code">{{ $item['code'] }}</span>
+                                                                @if ($item['direction'] === 'in')
+                                                                    <span class="dir-chip is-in" title="Phòng {{ $item['partner'] }} đề nghị phòng bạn">← Từ {{ $item['partner'] ?: 'phòng khác' }}</span>
+                                                                @elseif ($item['direction'] === 'out')
+                                                                    <span class="dir-chip is-out" title="Phòng bạn đề nghị phòng {{ $item['partner'] }}">→ Đến {{ $item['partner'] ?: 'phòng khác' }}</span>
+                                                                @endif
                                                                 <span class="tile3d__ago">{{ $reviewAgo($item['since']) }}</span>
                                                             </span>
                                                             <span class="tile3d__sub">
@@ -1477,8 +1645,8 @@
                                                 @endforeach
                                             </ul>
 
-                                            <a href="{{ $type['url'] }}" class="tile3d__more">
-                                                {{ $type['count'] > count($type['items']) ? 'Xem tất cả ' . $type['count'] . ' đề nghị' : 'Mở màn hình xử lý' }}
+                                            <a href="{{ $card['url'] }}" class="tile3d__more">
+                                                {{ $card['count'] > count($card['items']) ? 'Xem tất cả ' . $card['count'] . ' đề nghị' : 'Mở màn hình xử lý' }}
                                                 <i class="fas fa-arrow-right"></i>
                                             </a>
                                         </div>
@@ -1499,15 +1667,39 @@
                             <div class="board3d__empty-text">Không có đề nghị nào đang chờ bạn xem xét</div>
                         </div>
                     @endforelse
+
                 </div>
             </section>
         </div>
     </div>
 
     <script>
-        // Hiệu ứng 3D theo con trỏ: thẻ đề nghị nghiêng + vệt sáng, cụm thùng hàng trên banner xoay nhẹ.
-        // Bỏ qua trên màn hình cảm ứng và khi người dùng bật giảm chuyển động.
         (function() {
+            /* ---------- Bấm ô ma trận: cuộn tới nhóm card tương ứng và làm nổi các card đó ---------- */
+            var tiles = Array.prototype.slice.call(document.querySelectorAll('.tile3d[data-group]'));
+
+            document.querySelectorAll('.mx-cell[data-clickable="1"]').forEach(function(td) {
+                function go() {
+                    var group = document.querySelector('.group3d[data-group="' + td.dataset.group + '"]');
+                    if (!group) return;
+                    group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    tiles.forEach(function(tile) {
+                        var hit = tile.dataset.group === td.dataset.group &&
+                            (td.dataset.object === 'all' || tile.dataset.object === td.dataset.object);
+                        tile.classList.remove('is-flash');
+                        if (hit) {
+                            void tile.offsetWidth;
+                            tile.classList.add('is-flash');
+                        }
+                    });
+                }
+                td.addEventListener('click', go);
+                td.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+                });
+            });
+
+            /* ---------- Hiệu ứng 3D theo con trỏ (bỏ qua trên cảm ứng / giảm chuyển động) ---------- */
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
                 window.matchMedia('(hover: none)').matches) {
                 return;
@@ -1515,20 +1707,17 @@
 
             var MAX_TILT = 8;
 
-            document.querySelectorAll('.tile3d').forEach(function(tile) {
+            tiles.forEach(function(tile) {
                 var card = tile.querySelector('.tile3d__card');
-
                 tile.addEventListener('mousemove', function(e) {
                     var rect = tile.getBoundingClientRect();
                     var x = (e.clientX - rect.left) / rect.width;
                     var y = (e.clientY - rect.top) / rect.height;
-
                     card.style.setProperty('--ry', ((x - 0.5) * MAX_TILT * 2).toFixed(2) + 'deg');
                     card.style.setProperty('--rx', ((0.5 - y) * MAX_TILT * 2).toFixed(2) + 'deg');
                     card.style.setProperty('--mx', (x * 100).toFixed(1) + '%');
                     card.style.setProperty('--my', (y * 100).toFixed(1) + '%');
                 });
-
                 tile.addEventListener('mouseleave', function() {
                     card.style.setProperty('--rx', '0deg');
                     card.style.setProperty('--ry', '0deg');
@@ -1537,17 +1726,12 @@
 
             var hero = document.getElementById('homeHero');
             var scene = hero ? hero.querySelector('.hero3d__scene') : null;
-
             if (hero && scene) {
                 hero.addEventListener('mousemove', function(e) {
                     var rect = hero.getBoundingClientRect();
-                    var x = (e.clientX - rect.left) / rect.width - 0.5;
-                    var y = (e.clientY - rect.top) / rect.height - 0.5;
-
-                    scene.style.setProperty('--scene-ry', (x * 24).toFixed(2) + 'deg');
-                    scene.style.setProperty('--scene-rx', (-y * 18).toFixed(2) + 'deg');
+                    scene.style.setProperty('--scene-ry', (((e.clientX - rect.left) / rect.width - 0.5) * 24).toFixed(2) + 'deg');
+                    scene.style.setProperty('--scene-rx', (-((e.clientY - rect.top) / rect.height - 0.5) * 18).toFixed(2) + 'deg');
                 });
-
                 hero.addEventListener('mouseleave', function() {
                     scene.style.setProperty('--scene-ry', '0deg');
                     scene.style.setProperty('--scene-rx', '0deg');

@@ -102,6 +102,27 @@
                                 data-title="Phiếu {{ $list->code }}">
                                 <i class="fas fa-route mr-1"></i> Theo dõi trình ký
                             </button>
+                            {{-- Bộ phận mua hàng (mở từ tab "Đơn dự trù đã được phê duyệt"): tiếp nhận phiếu vừa duyệt --}}
+                            @if ($purchaserView ?? false)
+                                @include('pages.estimate.shared.receptionAction')
+                            @endif
+
+                            {{-- Người ký được bước đang chờ: Đồng ý / Từ chối ngay trên trang chi tiết (đã bỏ khỏi dòng danh sách) --}}
+                            @if ($list->app_status === 'pending_sign' && $canSignCurrent && $pendingSign && user_can('estimate_chemical_sign'))
+                                @php $estIsLast = (int) $pendingSign->step_no >= (int) $list->sign_step_count; @endphp
+                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'signStep') }}"
+                                    method="POST" data-title="Ký duyệt bước {{ $pendingSign->step_no }}/{{ $list->sign_step_count }} phiếu {{ $list->code }}?"
+                                    data-text="{{ $estIsLast ? 'Phiếu sẽ được phê duyệt và chuyển bộ phận mua hàng tiếp nhận.' : 'Phiếu sẽ chuyển tới người ký bước ' . ($pendingSign->step_no + 1) . '.' }}">
+                                    @csrf
+                                    <input type="hidden" name="id" value="{{ $list->id }}">
+                                    <button type="submit" class="btn btn-success ml-1">
+                                        <i class="fas fa-{{ $estIsLast ? 'stamp' : 'signature' }} mr-1"></i> Đồng ý
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-outline-danger ml-1 btn-est-reject" data-id="{{ $list->id }}" data-code="{{ $list->code }}">
+                                    <i class="fas fa-times mr-1"></i> Từ chối
+                                </button>
+                            @endif
 
                             <button type="button" class="btn btn-outline-primary ml-1" data-toggle="modal"
                                 data-target="#classifyGuideModal">
@@ -129,11 +150,12 @@
                                     <th>Thông Tin Kỹ Thuật</th>
                                     <th>Mục Đích Sử Dụng</th>
                                     <th style="width: 200px">Số Lượng Dự Trù</th>
-                                    <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
-                                    <th style="width: 110px">Người Tạo</th>
-                                    @if ($canEditItems && user_can('estimate_chemical_update'))
-                                        <th class="text-center" style="width: 90px">Thao Tác</th>
+                                    <th style="width: 150px">Ngày Mong Muốn</th>
+                                    @if ($purchaserView ?? false)
+                                        <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
                                     @endif
+                                    <th style="width: 110px">Người Tạo</th>
+                                    <th class="text-center" style="width: 150px">Thao Tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -195,11 +217,6 @@
                                         </td>
                                         <td class="md-sub">
                                             <div class="mb-1">{{ $item->purpose ?: '—' }}</div>
-                                            @if ($item->expected_delivery_date)
-                                                <div class="text-primary"><i class="fas fa-calendar-alt mr-1"></i> Mong muốn giao: <b>{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</b></div>
-                                            @endif
-                                            
-                                            @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_chemical_tracking'])
                                         </td>
                                         <td>
                                             @forelse ($item->amounts as $amount)
@@ -213,50 +230,25 @@
                                                 <span class="md-empty">—</span>
                                             @endforelse
                                         </td>
-                                        <td>
-                                            @php
-                                                $daysLeftText = '';
-                                                if ($item->promised_date) {
-                                                    $promised = \Carbon\Carbon::parse($item->promised_date)->startOfDay();
-                                                    $today = \Carbon\Carbon::now()->startOfDay();
-                                                    $diff = $today->diffInDays($promised, false);
-                                                    if ($diff > 0) {
-                                                        $daysLeftText = "<span class='text-success small'>Còn {$diff} ngày</span>";
-                                                    } elseif ($diff == 0) {
-                                                        $daysLeftText = "<span class='text-warning small'>Hôm nay</span>";
-                                                    } else {
-                                                        $daysLeftText = "<span class='text-danger small'>Quá hạn " . abs($diff) . " ngày</span>";
-                                                    }
-                                                }
-                                            @endphp
-                                            @if ($list->app_status === 'approved' && user_can('estimate_chemical_tracking'))
-                                                <form action="{{ route($estRoute . 'updatePromisedDate') }}" method="POST" class="d-flex flex-column promised-date-form">
-                                                    @csrf
-                                                    <input type="hidden" name="id" value="{{ $item->id }}">
-                                                    <div class="d-flex align-items-center mb-1">
-                                                        <input type="date" name="promised_date" class="form-control form-control-sm input-promised-date flex-grow-1" value="{{ $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('Y-m-d') : '' }}" data-route="{{ route($estRoute . 'updatePromisedDate') }}">
-                                                        <button type="button" class="btn btn-sm btn-link text-info p-1 ml-1 btn-promised-date-history position-relative" data-item-id="{{ $item->id }}" data-route="{{ route($estRoute . 'getPromisedDateHistory', $item->id) }}" title="Lịch sử ngày hẹn">
-                                                            <i class="fas fa-history"></i>
-                                                            @if ($item->history_count > 0)
-                                                                <span class="badge badge-danger badge-pill position-absolute promised-date-history-badge" style="top: -5px; right: -5px; font-size: 0.6rem; padding: 2px 4px;">{{ $item->history_count }}</span>
-                                                            @endif
-                                                        </button>
-                                                    </div>
-                                                    <div class="promised-date-days-left text-center">{!! $daysLeftText !!}</div>
-                                                </form>
+                                        <td data-order="{{ $item->expected_delivery_date }}">
+                                            @if ($item->expected_delivery_date)
+                                                <div class="text-primary font-weight-bold">{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</div>
                                             @else
-                                                <div class="text-center md-sub">
-                                                    {{ $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('d/m/Y') : 'Chưa có' }}
-                                                </div>
-                                                <div class="text-center">{!! $daysLeftText !!}</div>
+                                                <span class="md-empty">—</span>
                                             @endif
                                         </td>
+                                        {{-- Ngày hẹn đáp ứng: chỉ bộ phận mua hàng sửa, khi mở phiếu từ tab "Đơn dự trù đã được phê duyệt" --}}
+                                        @if ($purchaserView ?? false)
+                                        <td>
+                                            @include('pages.estimate.shared.promisedDates', ['editable' => $list->app_status === 'approved'])
+                                        </td>
+                                        @endif
                                         <td class="md-sub">
                                             {{ $item->updated_by ?: $item->created_by ?: '—' }}
                                             <br><small>{{ $item->created_at ? \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') : '' }}</small>
                                         </td>
-                                        @if ($canEditItems && user_can('estimate_chemical_update'))
-                                            <td>
+                                        <td>
+                                            @if ($canEditItems && user_can('estimate_chemical_update'))
                                                 <div class="md-actions">
                                                     <button type="button" class="btn btn-sm btn-warning btn-est-item-edit"
                                                         title="Sửa"
@@ -290,8 +282,11 @@
                                                         </button>
                                                     </form>
                                                 </div>
-                                            </td>
-                                        @endif
+                                            @endif
+                                            {{-- Hoàn thành / Huỷ mục đã duyệt (phòng đề nghị), xác nhận huỷ (bộ phận mua hàng) --}}
+                                            @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_chemical_tracking'])
+                                            @include('pages.estimate.shared.itemChatButton', ['chatPermission' => 'estimate_chemical_chat'])
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -311,6 +306,7 @@
     @endif
 
     @include('pages.estimate.shared.historyModal')
+    @include('pages.estimate.ChemicalEstimate.reject')
 
     {{-- Nút "Chi tiết" của cảnh báo ngưỡng PL IV: các lượng đóng góp (tồn, dự trù chưa hoàn thành) --}}
     @include('pages.estimate.shared.thresholdDetailModal')

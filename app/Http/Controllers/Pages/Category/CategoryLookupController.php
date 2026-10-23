@@ -30,17 +30,31 @@ class CategoryLookupController extends Controller
         );
     }
 
-    /** ?type=material|chemical|standard&q=&page= : định khu của phòng ban đang chọn */
+    /** ?q=&page= : tên sản phẩm đang hoạt động (Dữ Liệu Gốc), id chính là tên vì nơi dùng lưu dạng chữ */
+    public function productNames(Request $request)
+    {
+        return response()->json(CategoryLookup::searchProductNames((string) $request->q, (int) $request->page));
+    }
+
+    /**
+     * ?type=material|chemical|standard|all&q=&page= : định khu của phòng ban đang chọn.
+     * type=all không lọc loại hàng; only_zone=quarantine chỉ lấy khu Biệt Trữ (modal Nhập).
+     */
     public function locations(Request $request)
     {
         $type = (string) $request->type;
         $departmentId = (int) (session('user')['selected_department_id'] ?? 0);
 
-        if (! in_array($type, CategoryLookup::ITEM_TYPES, true) || ! $departmentId) {
+        if ((! in_array($type, CategoryLookup::ITEM_TYPES, true) && $type !== 'all') || ! $departmentId) {
             return response()->json(CategoryLookup::emptyResponse(), 422);
         }
 
-        $result = CategoryLookup::searchLocations($type, $departmentId, (string) $request->q, (int) $request->page);
+        // zone_filter: chip lọc nhanh theo phân loại định khu ('__none' = chưa phân loại)
+        $zone = $request->filled('zone_filter') ? (string) $request->zone_filter : null;
+        $zone = $zone === '__none' ? '' : $zone;
+        $onlyZone = $request->filled('only_zone') ? (string) $request->only_zone : null;
+
+        $result = CategoryLookup::searchLocations($type, $departmentId, (string) $request->q, (int) $request->page, $zone, $onlyZone);
 
         // Ô Định khu của modal "Khai Hoá Chất Cho Phòng" gửi kèm hoá chất đang khai: định khu nằm
         // cùng kệ/tủ với hoá chất tương kỵ bị khoá lại, kèm câu giải thích.
@@ -72,6 +86,29 @@ class CategoryLookupController extends Controller
         }
 
         return response()->json(['checked' => true] + ChemicalCompatibility::checkPlacement($categoryId, $locationId));
+    }
+
+    /** ?q=&page= : hoạt chất đã duyệt cho ô chọn nhiều của modal Tên Hoá Chất */
+    public function activeIngredients(Request $request)
+    {
+        return response()->json(
+            CategoryLookup::searchActiveIngredients((string) $request->q, (int) $request->page)
+        );
+    }
+
+    /** ?scope=import|undeclared|approved&q=&page= : mã hoá chất theo phòng ban đang chọn */
+    public function chemicalCategories(Request $request)
+    {
+        $scope = (string) $request->scope;
+        $departmentId = (int) (session('user')['selected_department_id'] ?? 0);
+
+        if (! in_array($scope, CategoryLookup::CHEMICAL_SCOPES, true) || ! $departmentId) {
+            return response()->json(CategoryLookup::emptyResponse(), 422);
+        }
+
+        return response()->json(
+            CategoryLookup::searchChemicalCategories($scope, $departmentId, (string) $request->q, (int) $request->page)
+        );
     }
 
     /** Toàn bộ tên hoá chất cho bảng "Chọn Tên Hoá Chất Từ Dữ Liệu Gốc" - nạp khi mở bảng lần đầu */

@@ -65,10 +65,8 @@
     <td class="md-sub">
         @if ($row->location_code)
             <div class="font-weight-bold">
-                <span class="md-tag">{{ $row->location_code }}</span>
+                {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
             </div>
-            <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
-                {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
         @else
             <span class="imp-no-location">Chưa xếp vị trí</span>
         @endif

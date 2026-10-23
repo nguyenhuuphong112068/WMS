@@ -1,4 +1,5 @@
 @include('pages.import.shared.assets')
+@php $activeTab = \App\Support\PageTabs::active('import_material', $activeTab ?? 'book'); @endphp
 
 @php
     $impToday = \Carbon\Carbon::today();
@@ -10,19 +11,24 @@
             <div class="card-body">
 
                 <div class="imp-tabs">
-                    <button type="button" class="imp-tab is-active" data-pane="impPaneBook">
+                    @tab('import_material', 'book')
+                    <button type="button" class="imp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}" data-pane="impPaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ nhập vật tư
                     </button>
-                    <button type="button" class="imp-tab" data-pane="impPaneCheck">
+                    @endtab
+                    @tab('import_material', 'check')
+                    <button type="button" class="imp-tab {{ $activeTab === 'check' ? 'is-active' : '' }}" data-pane="impPaneCheck">
                         <i class="fas fa-clipboard-check mr-1"></i> Chờ kiểm tra
                         @if ($pendingCount > 0)
                             <span class="imp-tab-count">{{ $pendingCount }}</span>
                         @endif
                     </button>
+                    @endtab
                 </div>
 
                 {{-- ============ SỔ NHẬP VẬT TƯ ============ --}}
-                <div class="imp-pane is-active" id="impPaneBook">
+                @tab('import_material', 'book')
+                <div class="imp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="impPaneBook">
 
                 <div class="md-toolbar">
                     @perm('import_material_create')
@@ -31,6 +37,7 @@
                         </button>
                     @endperm
                 </div>
+                @endtab
 
                 @include('pages.shared.rangeFilter', [
                     'rfRoute' => $impRoute . 'list',
@@ -83,7 +90,8 @@
 
                 </div>
                 {{-- ============ CHỜ KIỂM TRA ============ --}}
-                <div class="imp-pane" id="impPaneCheck">
+                @tab('import_material', 'check')
+                <div class="imp-pane {{ $activeTab === 'check' ? 'is-active' : '' }}" id="impPaneCheck">
                     <div class="table-responsive">
                         <table id="mdTableCheck" class="table table-bordered table-hover w-100 md-table">
                             <thead>
@@ -140,8 +148,7 @@
                                             {{ $impDate($row->expired_date) }}</td>
                                         <td class="md-sub">
                                             @if ($row->location_code)
-                                                <span class="md-tag">{{ $row->location_code }}</span>
-                                                <div>{{ $row->warehouse_name ?: '—' }}</div>
+                                                {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                             @else
                                                 <span class="imp-no-location">Chưa định khu</span>
                                             @endif
@@ -174,6 +181,7 @@
                         </table>
                     </div>
                 </div>
+                @endtab
 
             </div>
         </div>

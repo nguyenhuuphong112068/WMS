@@ -35,15 +35,6 @@
                     <label for="zs-wh-name"><span id="zs-wh-name-label">Tên kho/phòng</span> <span class="text-danger">*</span></label>
                     <input type="text" id="zs-wh-name" class="form-control form-control-sm" maxlength="255" placeholder="VD: Kho 03">
                 </div>
-                <div class="form-group mb-0">
-                    <label for="zs-wh-zone">Phân loại định khu</label>
-                    <select id="zs-wh-zone" class="form-control form-control-sm">
-                        <option value="">Chưa phân loại</option>
-                        @foreach (\App\Support\ZoneType::TYPES as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
                 <div class="zs-panel-actions">
                     <button type="button" id="zs-wh-cancel" class="btn btn-sm btn-outline-secondary">Huỷ</button>
                     <button type="button" id="zs-wh-save" class="btn btn-sm btn-primary">
@@ -59,16 +50,24 @@
         {{-- Trình sửa một kệ/tủ --}}
         <div id="zs-editor" hidden>
             <div class="zs-legend">
-                <span><i class="zs-swatch is-busy"></i> Có lô hàng</span>
-                <span><i class="zs-swatch is-free"></i> Trống</span>
-                <span><i class="zs-swatch is-off"></i> Đang khoá</span>
-                <span><i class="zs-swatch is-new"></i> Sẽ tạo</span>
-                <span><i class="zs-swatch is-cut"></i> Sẽ khoá</span>
-                <span><i class="zs-swatch is-picked"></i> Đang chọn</span>
-                <span><i class="zs-swatch has-color"></i> Màu vị trí</span>
+                <div class="zs-view" role="group" aria-label="Tô màu ô theo">
+                    <span class="zs-view-label">Tô màu theo</span>
+                    <button type="button" class="zs-view-btn" data-view="zone"><i class="fas fa-tags mr-1"></i>Phân loại</button>
+                    <button type="button" class="zs-view-btn" data-view="status"><i class="fas fa-box mr-1"></i>Trạng thái</button>
+                </div>
+                <div id="zs-legend-zone" class="zs-legend-items"></div>
+                <div id="zs-legend-status" class="zs-legend-items">
+                    <span><i class="zs-swatch is-busy"></i> Có lô hàng</span>
+                    <span><i class="zs-swatch is-free"></i> Trống</span>
+                    <span><i class="zs-swatch is-off"></i> Đang khoá</span>
+                    <span><i class="zs-swatch is-new"></i> Sẽ tạo</span>
+                    <span><i class="zs-swatch is-cut"></i> Sẽ khoá</span>
+                    <span><i class="zs-swatch is-picked"></i> Đang chọn</span>
+                    <span><i class="zs-swatch has-color"></i> Màu phân loại</span>
+                </div>
             </div>
 
-            {{-- Sửa loại lưu trữ / màu cho các vị trí đang chọn trên lưới (chỉ khi sửa kệ đã có) --}}
+            {{-- Sửa phân loại / loại lưu trữ cho các vị trí đang chọn trên lưới (chỉ khi sửa kệ đã có) --}}
             <div id="zs-loc-bar" class="zs-loc-bar" hidden>
                 <span class="zs-loc-count"><i class="fas fa-hand-pointer mr-1"></i><b id="zs-loc-count">0</b> vị trí đang chọn</span>
                 <div class="zs-loc-field">
@@ -77,7 +76,7 @@
                         <option value="__keep">- Giữ nguyên -</option>
                         <option value="">Chưa phân loại</option>
                         @foreach (\App\Support\ZoneType::TYPES as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
+                            <option value="{{ $value }}" data-color="{{ \App\Support\ZoneType::DEFAULT_COLORS[$value] }}">{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -90,10 +89,6 @@
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
-                </div>
-                <div class="zs-loc-field">
-                    <label class="mb-0">Màu</label>
-                    <div id="zs-loc-colors" class="zs-loc-colors"></div>
                 </div>
                 <div class="zs-loc-actions">
                     <button type="button" id="zs-loc-all" class="btn btn-sm btn-outline-secondary">Chọn cả kệ</button>
@@ -112,15 +107,6 @@
                     <div class="form-group mb-0 zs-grow">
                         <label for="zs-name">Tên kệ/tủ <span class="text-danger">*</span></label>
                         <input type="text" id="zs-name" class="form-control form-control-sm zs-name-input" maxlength="255" placeholder="VD: Kệ/Tủ 05">
-                    </div>
-                    <div class="form-group mb-0">
-                        <label for="zs-item-type">Loại lưu trữ cho vị trí mới</label>
-                        <select id="zs-item-type" class="form-control form-control-sm">
-                            <option value="">Dùng chung</option>
-                            @foreach ($locationTypes as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
                     </div>
                     <div id="zs-preview" class="zs-preview" hidden></div>
                 </div>
@@ -428,27 +414,6 @@
         white-space: nowrap;
     }
 
-    .zs-tile-zone {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        margin-left: 6px;
-        padding: 1px 8px;
-        border-radius: 999px;
-        font-size: 0.72rem;
-        font-weight: 600;
-        color: #334155;
-        background: #f1f5f9;
-        vertical-align: 1px;
-    }
-
-    .zs-tile-zone i {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--zone);
-    }
-
     .zs-tile-bar {
         width: 100%;
         height: 7px;
@@ -510,6 +475,82 @@
         font-size: 0.78rem;
         color: #475569;
         margin-bottom: 14px;
+    }
+
+    .zs-legend-items {
+        display: flex;
+        gap: 6px 16px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .zs-legend-items[hidden] {
+        display: none;
+    }
+
+    .zs-view {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding-right: 14px;
+        border-right: 1px solid #e2e8f0;
+    }
+
+    .zs-view-label {
+        font-weight: 600;
+        margin-right: 4px;
+    }
+
+    .zs-view-btn {
+        border: 1px solid var(--primary-lighter);
+        background: #fff;
+        color: var(--primary);
+        border-radius: var(--border-radius-md);
+        padding: 2px 10px;
+        font-size: 0.76rem;
+        transition: all 0.2s;
+    }
+
+    .zs-view-btn:hover {
+        background: var(--primary-soft);
+    }
+
+    .zs-view-btn.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+    }
+
+    .zs-zone-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        border-radius: 999px;
+        padding: 2px 10px 2px 6px;
+        font-size: 0.76rem;
+        color: #334155;
+        transition: all 0.2s;
+    }
+
+    .zs-zone-chip .zs-swatch {
+        margin-right: 0;
+        background: var(--zt-soft);
+        border: 1.5px solid var(--zt);
+    }
+
+    .zs-zone-chip b {
+        color: var(--zt);
+    }
+
+    .zs-zone-chip.is-empty {
+        opacity: 0.55;
+    }
+
+    button.zs-zone-chip:hover {
+        border-color: var(--zt);
+        box-shadow: var(--shadow-sm);
     }
 
     .zs-swatch {
@@ -846,7 +887,7 @@
         border-color: #F87171;
     }
 
-    /* Màu riêng của vị trí: vạch màu ở đáy ô, không che màu trạng thái */
+    /* Màu phân loại của vị trí: vạch màu ở đáy ô, không che màu trạng thái */
     .zs-cell.has-color {
         box-shadow: inset 0 -4px 0 var(--loc);
     }
@@ -868,6 +909,23 @@
 
     .zs-cell.is-busy {
         color: #fff;
+    }
+
+    /* Chế độ tô theo phân loại: nền ô = màu phân loại (ô có hàng tô đậm, ô trống tô nhạt) */
+    .zs-by-zone .zs-cell.has-zone.is-free {
+        background: var(--zt-soft);
+        border-color: var(--zt);
+        color: var(--zt);
+    }
+
+    .zs-by-zone .zs-cell.has-zone.is-busy {
+        background: var(--zt);
+        border-color: var(--zt);
+        color: #fff;
+    }
+
+    .zs-by-zone .zs-cell.has-color {
+        box-shadow: none;
     }
 
     .zs-pickable .zs-cell[data-id] {
@@ -920,48 +978,9 @@
         border-radius: var(--border-radius-md);
     }
 
-    .zs-loc-colors {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .zs-loc-color {
-        width: 22px;
-        height: 22px;
-        border-radius: 6px;
-        border: 2px solid #fff;
-        box-shadow: 0 0 0 1px #cbd5e1;
-        cursor: pointer;
-        padding: 0;
-        font-size: 0.6rem;
-        color: #64748b;
-        background: #fff;
-        transition: transform 0.2s;
-    }
-
-    .zs-loc-color:hover {
-        transform: translateY(-1px);
-    }
-
-    .zs-loc-color.is-on {
-        box-shadow: 0 0 0 2px var(--primary-dark);
-    }
-
-    .zs-loc-color.is-text {
-        width: auto;
-        padding: 0 6px;
-        font-weight: 600;
-    }
-
-    .zs-loc-custom {
-        width: 28px;
-        height: 24px;
-        padding: 0;
-        border: none;
-        background: transparent;
-        cursor: pointer;
+    .zs-loc-field .select2-container {
+        width: 180px !important;
+        font-size: 0.82rem;
     }
 
     .zs-loc-actions {
@@ -1076,7 +1095,6 @@
     "apply": @json(route('pages.materData.zone.structure.apply')),
     "saveShelf": @json(route('pages.materData.zone.structure.saveShelf')),
     "saveLocations": @json(route('pages.materData.zone.structure.saveLocations')),
-    "palette": @json(\App\Support\ZoneType::PALETTE),
     "locationTypes": @json($locationTypes),
     "zoneTypes": @json(\App\Support\ZoneType::TYPES),
     "zoneColors": @json(\App\Support\ZoneType::DEFAULT_COLORS),
@@ -1118,12 +1136,10 @@
         whCancel: byId('zs-wh-cancel'),
         whCodeLabel: byId('zs-wh-code-label'),
         whNameLabel: byId('zs-wh-name-label'),
-        whZone: byId('zs-wh-zone'),
         locZone: byId('zs-loc-zone'),
         locBar: byId('zs-loc-bar'),
         locCount: byId('zs-loc-count'),
         locType: byId('zs-loc-type'),
-        locColors: byId('zs-loc-colors'),
         locAll: byId('zs-loc-all'),
         locClear: byId('zs-loc-clear'),
         locApply: byId('zs-loc-apply'),
@@ -1133,7 +1149,6 @@
         shelfTitle: byId('zs-shelf-title'),
         code: byId('zs-code'),
         name: byId('zs-name'),
-        itemType: byId('zs-item-type'),
         preview: byId('zs-preview'),
         drafts: byId('zs-drafts'),
         addShelf: byId('zs-add-shelf'),
@@ -1159,8 +1174,8 @@
         warehouses: [], shelves: [], suggest: '',
         warehouse: null, shelf: null,
         columns: [], dirty: false, editingWarehouse: null, formKind: 'warehouse',
-        // Vị trí đang chọn trên lưới (id), màu định áp ('__keep' = giữ nguyên, '' = bỏ màu riêng)
-        picked: new Set(), locColor: '__keep', painting: null,
+        // Vị trí đang chọn trên lưới (id); cellView = tô ô theo 'zone' (phân loại) hay 'status'
+        picked: new Set(), painting: null, cellView: 'zone',
         codeTimer: null, nameTouched: false,
         // Tạo kệ mới: kệ đầu + các kệ thêm bên dưới [{ code, name, nameTouched, columns }], current = kệ đang thao tác
         drafts: [], current: 0,
@@ -1261,9 +1276,6 @@
             +   '</div>'
             + '</div>'
             + '<div class="zs-tile-name">' + esc(item.name) + (off ? ' (đã khoá)' : '')
-            +   (item.zone_type && CFG.zoneTypes[item.zone_type]
-                ? '<span class="zs-tile-zone" style="--zone:' + (CFG.zoneColors[item.zone_type] || '#2E7BC4') + '"><i></i>' + esc(CFG.zoneTypes[item.zone_type]) + '</span>'
-                : '')
             + '</div>'
             + '<div class="zs-tile-bar"><span style="width:' + Math.min(100, Math.max(pct, pct > 0 ? 3 : 0)) + '%"></span></div>'
             + '<div class="zs-tile-foot">'
@@ -1418,7 +1430,6 @@
         el.whSave.innerHTML = '<i class="fas fa-save mr-1"></i> Lưu ' + what;
         el.whCode.value = item ? item.code : '';
         el.whName.value = item ? item.name : '';
-        el.whZone.value = item && item.zone_type ? item.zone_type : '';
         el.whForm.hidden = false;
         el.whCode.focus();
     }
@@ -1452,8 +1463,7 @@
         post(CFG.saveWarehouse, {
             id: state.editingWarehouse ? state.editingWarehouse.id : null,
             code: code,
-            name: name,
-            zone_type: el.whZone.value
+            name: name
         }).then(function (result) {
             el.whSave.disabled = false;
             if (!result.ok) {
@@ -1493,7 +1503,7 @@
             if (!choice.isConfirmed) return;
 
             el.whSave.disabled = true;
-            post(CFG.saveShelf, { id: shelf.id, code: code, name: name, zone_type: el.whZone.value }).then(function (result) {
+            post(CFG.saveShelf, { id: shelf.id, code: code, name: name }).then(function (result) {
                 el.whSave.disabled = false;
                 if (!result.ok) {
                     toast('error', result.data.message || 'Không lưu được kệ/tủ.');
@@ -1624,7 +1634,6 @@
         el.shelfTitle.textContent = 'Kệ/Tủ mới trong ' + state.warehouse.code;
         el.code.readOnly = false;
         el.code.value = state.suggest || '';
-        el.itemType.value = template ? el.itemType.value : '';
         state.nameTouched = false;
         syncName();
 
@@ -1664,7 +1673,6 @@
                 el.code.value = data.shelf.code;
                 el.code.readOnly = !CFG.canUpdate;
                 el.name.value = data.shelf.name;
-                el.itemType.value = '';
                 el.preview.hidden = true;
 
                 state.columns = data.columns.map(function (column) {
@@ -1737,7 +1745,6 @@
         }
     });
 
-    el.itemType.addEventListener('change', function () { setDirty(true); });
 
     // Kết quả kiểm mã lưu theo từng mã, nên kết quả về trễ của lần gõ trước không lẫn sang mã đang nhập.
     function codeTaken() {
@@ -2151,10 +2158,16 @@
             var letter = '';
 
             if (attr) {
-                extra = ' data-id="' + attr.id + '"' + (attr.shown ? ' style="--loc:' + esc(attr.shown) + '"' : '');
-                cls += (attr.shown ? ' has-color' : '') + (state.picked.has(attr.id) ? ' is-picked' : '');
+                var styles = [];
+                var zt = attr.zone_type && CFG.zoneColors[attr.zone_type];
+                if (attr.shown) styles.push('--loc:' + esc(attr.shown));
+                if (zt) styles.push('--zt:' + zt, '--zt-soft:' + soften(zt));
+                extra = ' data-id="' + attr.id + '" data-zone="' + esc(zt ? attr.zone_type : '') + '"'
+                    + (styles.length ? ' style="' + styles.join(';') + '"' : '');
+                cls += (attr.shown ? ' has-color' : '') + (zt ? ' has-zone' : '')
+                    + (state.picked.has(attr.id) ? ' is-picked' : '');
                 status += ' · ' + (CFG.zoneTypes[attr.zone_type] || 'Chưa phân loại')
-                    + ' · ' + (CFG.locationTypes[attr.item_type] || 'Dùng chung') + (attr.color ? ' · màu ' + attr.color : '');
+                    + ' · ' + (CFG.locationTypes[attr.item_type] || 'Dùng chung');
                 letter = TYPE_LETTERS[attr.item_type] || '';
             }
 
@@ -2226,6 +2239,75 @@
             + '</section>';
     }
 
+    // Màu nhạt của một mã hex để tô ô trống (rgba thay cho color-mix, chạy được trên trình duyệt cũ).
+    function soften(hex) {
+        var n = parseInt(hex.slice(1), 16);
+        return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',0.22)';
+    }
+
+    var VIEW_KEY = 'wms.zone.cellView';
+    try { state.cellView = localStorage.getItem(VIEW_KEY) === 'status' ? 'status' : 'zone'; } catch (err) { state.cellView = 'zone'; }
+
+    function applyView() {
+        el.columns.classList.toggle('zs-by-zone', state.cellView === 'zone');
+        document.querySelectorAll('.zs-view-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.view === state.cellView);
+        });
+        byId('zs-legend-zone').hidden = state.cellView !== 'zone';
+        byId('zs-legend-status').hidden = state.cellView !== 'status';
+        renderZoneLegend();
+    }
+
+    // Chú thích phân loại kèm số vị trí đang mở; bấm vào để chọn nhanh các ô thuộc phân loại đó.
+    function renderZoneLegend() {
+        var box = byId('zs-legend-zone');
+        if (state.cellView !== 'zone') return;
+
+        var counts = { '': 0 };
+        state.columns.forEach(function (column) {
+            column.tiers.forEach(function (tier) {
+                Object.keys(tier.attrs || {}).forEach(function (position) {
+                    var p = Number(position);
+                    if (column.removed || tier.removed || p > tier.max || p > tier.origMax || tier.off.has(p)) return;
+                    var type = tier.attrs[position].zone_type;
+                    type = type && CFG.zoneTypes[type] ? type : '';
+                    counts[type] = (counts[type] || 0) + 1;
+                });
+            });
+        });
+
+        var tag = state.shelf && CFG.canUpdate ? 'button' : 'span';
+        var items = Object.keys(CFG.zoneTypes).map(function (type) {
+            return { type: type, label: CFG.zoneTypes[type], color: CFG.zoneColors[type] };
+        }).concat([{ type: '', label: 'Chưa phân loại', color: '#94A3B8' }]);
+
+        box.innerHTML = items.map(function (item) {
+            var count = counts[item.type] || 0;
+            return '<' + tag + (tag === 'button' ? ' type="button" title="Chọn các vị trí ' + esc(item.label) + '"' : '')
+                + ' class="zs-zone-chip' + (count ? '' : ' is-empty') + '" data-zone="' + item.type + '"'
+                + ' style="--zt:' + item.color + ';--zt-soft:' + soften(item.color) + '">'
+                + '<i class="zs-swatch"></i>' + esc(item.label) + ' <b>' + num(count) + '</b></' + tag + '>';
+        }).join('');
+    }
+
+    document.querySelectorAll('.zs-view-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            state.cellView = btn.dataset.view;
+            try { localStorage.setItem(VIEW_KEY, state.cellView); } catch (err) {}
+            applyView();
+        });
+    });
+
+    byId('zs-legend-zone').addEventListener('click', function (event) {
+        var chip = event.target.closest('button.zs-zone-chip');
+        if (!chip) return;
+        clearPicked();
+        el.columns.querySelectorAll('.zs-cell[data-id]').forEach(function (node) {
+            if ((node.dataset.zone || '') === chip.dataset.zone && !node.classList.contains('is-off')) pick(node, true);
+        });
+        updatePicked();
+    });
+
     function renderColumns() {
         state.columns.sort(function (a, b) { return a.position - b.position; });
         el.columns.style.setProperty('--zs-cell', cellSize() + 'px');
@@ -2237,6 +2319,7 @@
                 : '');
         el.foot.hidden = !state.columns.length && !creatingMany();
         updateSummary();
+        applyView();
     }
 
     // Kéo một hàng chỉ đổi hàng đó, nên vẽ lại mình nó thay vì dựng lại cả lưới.
@@ -2490,34 +2573,6 @@
         node.classList.toggle('is-picked', on);
     }
 
-    function renderLocColors() {
-        var options = [{ value: '__keep', text: 'Giữ' }, { value: '', text: 'Bỏ màu' }]
-            .concat(CFG.palette.map(function (color) { return { value: color }; }));
-        var custom = state.locColor && state.locColor !== '__keep' && CFG.palette.indexOf(state.locColor) < 0;
-
-        el.locColors.innerHTML = options.map(function (option) {
-            var on = option.value === state.locColor ? ' is-on' : '';
-            return option.text
-                ? '<button type="button" class="zs-loc-color is-text' + on + '" data-color="' + option.value + '" title="'
-                    + (option.value ? 'Giữ nguyên màu hiện tại' : 'Bỏ màu riêng, ô theo màu phân loại') + '">' + option.text + '</button>'
-                : '<button type="button" class="zs-loc-color' + on + '" data-color="' + option.value + '" style="background:' + option.value + '" title="' + option.value + '"></button>';
-        }).join('')
-            + '<input type="color" class="zs-loc-custom' + (custom ? ' is-on' : '') + '" value="' + (custom ? state.locColor : '#7C3AED') + '" title="Chọn màu khác">';
-    }
-
-    el.locColors.addEventListener('click', function (event) {
-        var button = event.target.closest('.zs-loc-color');
-        if (!button) return;
-        state.locColor = button.dataset.color;
-        renderLocColors();
-    });
-
-    el.locColors.addEventListener('change', function (event) {
-        if (!event.target.classList.contains('zs-loc-custom')) return;
-        state.locColor = event.target.value.toUpperCase();
-        renderLocColors();
-    });
-
     // Bấm hoặc rê chuột qua các ô để chọn/bỏ chọn; ô đầu tiên quyết định đang chọn hay đang bỏ.
     el.editor.addEventListener('pointerdown', function (event) {
         var node = event.target.closest('.zs-pickable .zs-cell[data-id]');
@@ -2550,11 +2605,10 @@
     el.locApply.addEventListener('click', function () {
         var setZone = el.locZone.value !== '__keep';
         var setType = el.locType.value !== '__keep';
-        var setColor = state.locColor !== '__keep';
 
         if (!state.picked.size) return;
-        if (!setZone && !setType && !setColor) {
-            toast('warning', 'Chọn phân loại, loại lưu trữ hoặc màu cần áp cho các vị trí đang chọn.');
+        if (!setZone && !setType) {
+            toast('warning', 'Chọn phân loại hoặc loại lưu trữ cần áp cho các vị trí đang chọn.');
             return;
         }
 
@@ -2565,9 +2619,7 @@
             set_zone: setZone,
             zone_type: setZone ? el.locZone.value : null,
             set_type: setType,
-            item_type: setType ? el.locType.value : null,
-            set_color: setColor,
-            color: setColor ? state.locColor : null
+            item_type: setType ? el.locType.value : null
         }).then(function (result) {
             el.locApply.disabled = false;
             if (!result.ok) {
@@ -2594,8 +2646,26 @@
         });
     });
 
-    renderLocColors();
     updatePicked();
+
+    // Ô chọn Phân loại hiện kèm chấm màu cố định của từng phân loại
+    function zoneOption(option) {
+        if (!option.id && option.id !== '') return option.text;
+        var color = option.element && option.element.getAttribute('data-color');
+        var kind = color ? '' : (option.id === '__keep' ? ' is-keep' : ' is-none');
+        var dot = document.createElement('span');
+        dot.innerHTML = '<i class="zone-dot' + kind + '"' + (color ? ' style="--dot:' + color + '"' : '') + '></i>' + esc(option.text);
+        return dot;
+    }
+
+    if (window.jQuery && jQuery.fn.select2) {
+        jQuery(el.locZone).select2({
+            theme: 'bootstrap4',
+            minimumResultsForSearch: Infinity,
+            templateResult: zoneOption,
+            templateSelection: zoneOption
+        });
+    }
 
     function addColumn(template) {
         var highest = maxPosition(state.columns);
@@ -2680,7 +2750,6 @@
 
             post(CFG.apply, {
                 warehouse_id: state.warehouse.id,
-                item_type: el.itemType.value,
                 shelves: shelves
             }).then(function (result) {
                 el.save.disabled = false;
@@ -2771,7 +2840,6 @@
                 warehouse_id: state.warehouse.id,
                 code: code,
                 name: name,
-                item_type: el.itemType.value,
                 columns: columns
             }).then(function (result) {
                 el.save.disabled = false;

@@ -83,7 +83,7 @@
                             </div>
                         @endif
 
-                        @include('pages.materData.Zone.typeColorFields', ['bag' => $bag])
+                        @include('pages.materData.Zone.typeColorFields', ['bag' => $bag, 'withZoneType' => !empty($meta['hasType'])])
 
                         <div class="form-group mb-0">
                             <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>

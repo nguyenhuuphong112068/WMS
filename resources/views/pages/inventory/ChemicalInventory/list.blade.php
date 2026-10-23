@@ -16,23 +16,6 @@
     $invDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
 
     /*
-    | Class cho badge .inv-mv (bấm mở modal "Chi tiết con số"): 0 -> mờ, cột trừ tồn
-    | (Sử Dụng / Huỷ) ép đỏ, còn lại tô theo dấu.
-    */
-    $mvCls = function ($value, $tone = null) {
-        if ((float) $value == 0.0) {
-            return 'inv-mv is-muted';
-        }
-        if ($tone === 'out') {
-            return 'inv-mv is-out';
-        }
-        if ($tone === 'in') {
-            return 'inv-mv is-in';
-        }
-        return 'inv-mv ' . ($value > 0 ? 'is-in' : 'is-out');
-    };
-
-    /*
     |--------------------------------------------------------------------------
     | KỲ BÁO CÁO
     |--------------------------------------------------------------------------
@@ -51,8 +34,7 @@
     | "Toàn bộ" lấy từ ngày nhập xa nhất đang có nên tồn đầu kỳ bằng 0 và mọi phát
     | sinh đều nằm trong kỳ - đúng bằng cách xem tồn trước đây.
     */
-    $invEarliest = $datas->min('imported_date');
-    $invEarliest = $invEarliest ? substr((string) $invEarliest, 0, 10) : $invToday->copy()->startOfYear()->format('Y-m-d');
+    $invEarliest = $earliestImport ?: $invToday->copy()->startOfYear()->format('Y-m-d');
 
     $invPeriodPresets = collect([
         [
@@ -84,18 +66,6 @@
         ->map(fn($preset) => $preset + ['active' => $preset['from'] === $period['from'] && $preset['to'] === $period['to']])
         ->all();
 
-    /**
-     * Nhóm NĐ 24/2026 (suy tự động, mã N1..N10) của một mã danh mục -> chuỗi "N3,N9"
-     * để đưa vào data-classification cho bộ lọc Phụ lục / Nhóm hoá chất.
-     */
-    $invCls = function ($categoryId) use ($classificationCodes) {
-        return implode(',', $classificationCodes[$categoryId] ?? []);
-    };
-
-    /** Hoá chất thuộc nhóm 3..8 (Phụ lục III - kiểm soát đặc biệt). */
-    $invIsSpecial = fn($categoryId) => \App\Support\ChemicalClassification::isSpecialControl($classificationCodes[$categoryId] ?? []);
-
-
     /*
     | Cách tính từng trạng thái tồn, đưa vào tooltip của nút lọc thay vì in thành
     | một hàng chú thích riêng trên màn hình.
@@ -108,11 +78,6 @@
         'out' => 'Hết hàng: đã dùng hết, tồn bằng 0.',
         'over' => 'Âm kho: đã xuất vượt lượng nhập - bấm Cân Đối để chỉnh số lượng nhập về đúng thực tế.',
     ];
-
-    // Số mã xuất nhập theo từng trạng thái tồn, dùng cho các nút lọc nhanh
-    $invStateCounts = collect($states)
-        ->map(fn($label, $key) => $datas->where('state', $key)->count())
-        ->toArray();
 
     // Lịch sử cân đối cho JS: [import_id => [{số điều chỉnh, người, thời điểm}]]
     $invBalancingMap = $balancings
@@ -139,6 +104,7 @@
     @include('pages.inventory.ChemicalInventory.balancingHistory')
     @include('pages.inventory.ChemicalInventory.internalExpiry')
     @include('pages.inventory.ChemicalInventory.chart')
+    @include('pages.inventory.ChemicalInventory.quarantine')
     @include('pages.inventory.shared.movementDetail', [
         'movementUrl' => route('pages.inventory.chemicalInventory.movements'),
         'period' => $period,

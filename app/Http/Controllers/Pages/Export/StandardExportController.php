@@ -8,6 +8,7 @@ use App\Support\AttachmentBackup;
 use App\Support\DepartmentStandard;
 use App\Support\ListRange;
 use App\Support\StandardCode;
+use App\Support\TitleSuggestions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -69,6 +70,9 @@ class StandardExportController extends Controller
      * giữ lại các đề nghị này dù đã ngoài khoảng lọc.
      */
     private const TRANSFER_PENDING_STATUSES = ['draft', 'pending', 'partial'];
+
+    /** Trạng thái phiếu liên phòng ban CHƯA tới phòng nhận - ẩn khỏi danh sách "gửi đến". */
+    private const TRANSFER_UNSENT_STATUSES = ['draft', 'canceled'];
 
     /** Đề nghị cấp phát chuẩn của Tổ còn DỞ DANG. */
     private const REQ_PENDING_STATUSES = ['pending', 'partial'];
@@ -160,6 +164,7 @@ class StandardExportController extends Controller
                 'standard_imports.batch_no',
                 'standard_imports.expired_date as import_expired_date',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 DB::raw("CONCAT(user_management.fullName, ' (', user_management.userName, ')') as analyst_name"),
                 'purposes.name as purpose_name',
                 DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
@@ -327,6 +332,7 @@ class StandardExportController extends Controller
             'transferReceivedRange' => $transfer['receivedRange'],
             'transferReceivedPerPage' => $transfer['receivedPerPage'],
             'transferDepartments' => $this->transferDepartmentOptions($departmentId),
+            'transferTitles' => TitleSuggestions::recent(self::TRANSFER_REQUEST_TABLE, $departmentId),
             'transferOwnLocations' => $transferOwnLocations,
             'declaredCategoryIds' => $declaredCategoryIds,
             'currentDepartmentId' => $departmentId,
@@ -441,6 +447,7 @@ class StandardExportController extends Controller
                 'standard_imports.batch_no',
                 'standard_imports.expired_date as import_expired_date',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 DB::raw("CONCAT(user_management.fullName, ' (', user_management.userName, ')') as analyst_name"),
                 'purposes.name as purpose_name',
                 DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
@@ -943,6 +950,7 @@ class StandardExportController extends Controller
                     'import_code' => $import->code,
                     'batch_no' => $import->batch_no,
                     'location' => DB::table('locations')->where('id', $import->location_id)->value('code'),
+                    'location_zone' => DB::table('locations')->where('id', $import->location_id)->value('zone_type'),
                 ]
             ]);
         }
@@ -1633,6 +1641,8 @@ class StandardExportController extends Controller
                 // Hàng nhận chuyển liên phòng ban đã được kiểm tra ở lô gốc bên phòng
                 // gửi nên vào tồn ngay, không phải qua lại bước Chờ kiểm tra
                 'is_checked' => 1,
+                // is_checked = 1 thì tình trạng kiểm tra cũng là Đạt, không lọt vào tab Chờ kiểm tra
+                'check_result' => \App\Support\CheckStatus::PASSED,
                 'checked_by' => $this->actor(),
                 'checked_at' => $receivedAt,
                 'created_by' => $this->actor(),
@@ -2164,7 +2174,8 @@ class StandardExportController extends Controller
                 DepartmentStandard::shelfLifeColumn(),
                 'standard_names.name as standard_name',
                 'units.short_name as unit_short_name',
-                'locations.code as location_code'
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type'
             )
             ->where('standard_imports.department_id', $departmentId)
             ->where('standard_imports.status_id', 1)
@@ -2510,6 +2521,8 @@ class StandardExportController extends Controller
             ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.department_id', '=', 'deparments.id')
             ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
             ->where(self::TRANSFER_REQUEST_TABLE.'.to_department_id', $departmentId)
+            // Phòng nhận chỉ thấy phiếu đã gửi tới: Lưu tạm / huỷ (chỉ huỷ được khi còn Lưu tạm) là việc riêng của phòng đề nghị
+            ->whereNotIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_UNSENT_STATUSES)
             ->tap(ListRange::dateFilterKeepPending(
                 self::TRANSFER_REQUEST_TABLE.'.created_at',
                 $receivedRange,
@@ -2536,7 +2549,8 @@ class StandardExportController extends Controller
                 'standard_names.name as standard_name',
                 'manufacturers.name as manufacturer_name',
                 'purposes.name as purpose_name',
-                'locations.code as dest_location_code'
+                'locations.code as dest_location_code',
+                'locations.zone_type as dest_location_zone_type'
             )
             ->orderBy(self::TRANSFER_ITEM_TABLE.'.id')
             ->get()

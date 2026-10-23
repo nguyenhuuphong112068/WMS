@@ -16,7 +16,7 @@
         <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-paper-plane"></i> Lập Đề Nghị Vật Tư Từ Kho VPP</h5>
+                    <h5 class="modal-title"><i class="fas fa-paper-plane"></i> Lập Đề Nghị Cấp Phát VPP Đến HC</h5>
                     <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
                 </div>
 
@@ -28,7 +28,7 @@
                         <div class="form-row">
                             <div class="form-group col-md-4">
                                 <label>Tiêu Đề Đề Nghị <span class="text-danger">*</span></label>
-                                <input type="text" name="title" maxlength="255" required
+                                <input type="text" name="title" maxlength="255" required list="matTitleOptionsVpp" autocomplete="off"
                                     class="form-control {{ $vppBag->has('title') ? 'is-invalid' : '' }}"
                                     value="{{ $vppBag->any() ? old('title') : 'Đề nghị văn phòng phẩm ' . now()->format('m/Y') }}">
                                 @if ($vppBag->has('title'))

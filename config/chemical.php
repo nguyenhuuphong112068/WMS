@@ -93,12 +93,13 @@ return [
 
     /*
      | Thế nào là "gần nhau" khi xét tương kỵ: hai hoá chất cùng một cấp định khu này.
-     |   location  : cùng một vị trí (ô)       tier   : cùng tầng
-     |   column    : cùng cột                  shelf  : cùng kệ/tủ (mặc định)
+     |   location  : cùng một vị trí (ô)       tier   : cùng tầng (đang dùng)
+     |   column    : cùng cột                  shelf  : cùng kệ/tủ
      |   warehouse : cùng kho
      | Vị trí chưa gắn cấp đó (cột null) thì chỉ xét trong chính vị trí.
+     | Áp dụng chung cho việc chặn khi khai định khu và badge cảnh báo ở bảng Hoá Chất Của Phòng.
      */
-    'incompatibility_scope' => 'shelf',
+    'incompatibility_scope' => 'tier',
 
     /*
      | NGƯỠNG TỒN TRỮ - Phụ lục IV Nghị định 24/2026/NĐ-CP.

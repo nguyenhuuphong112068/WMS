@@ -687,7 +687,8 @@ class MaterialImportController extends Controller
                 'material_names.name as material_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
-                'locations.code as location_code'
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type'
             )
             ->where(self::HISTORY_TABLE.'.material_import_id', $import->id)
             ->orderBy(self::HISTORY_TABLE.'.id', 'desc')

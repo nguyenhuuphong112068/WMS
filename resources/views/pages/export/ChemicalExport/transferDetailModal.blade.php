@@ -14,11 +14,13 @@
     $expReqBadge = $expReqBadge ?? fn($status) => $expReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
     $expNum = $expNum ?? fn($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
     $expDate = $expDate ?? fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
-    // $transferSent / $transferReceived giờ là LengthAwarePaginator (đã phân trang) chứ
+    // 4 danh sách (gửi đi / gửi đến x Chờ xử lý / Đã hoàn thành) là LengthAwarePaginator chứ
     // không còn là Collection thường - phải lấy đúng danh sách bản ghi qua getCollection()
     // trước khi gộp, nếu không merge() sẽ đọc theo toArray() của paginator (mảng
     // 'current_page', 'data', 'total'...) chứ không phải danh sách phiếu.
-    $transferAll = $transferSent->getCollection()->merge($transferReceived->getCollection())->unique('id');
+    $transferAll = collect([$transferSent, $transferSentDone, $transferReceived, $transferDone])
+        ->flatMap(fn ($list) => $list->getCollection())
+        ->unique('id');
 @endphp
 
 @foreach ($transferAll as $req)
@@ -150,18 +152,12 @@
                                                 @endif
 
                                                 @if (! $iAmSource && $item->status === 'issued')
-                                                    {{-- Phòng mình (A) đang nhận: tự chọn vị trí lưu của phòng mình --}}
-                                                    <select name="dest_location_id" class="form-control input-dest-location-receive mt-1" style="height: 34px !important; min-height: 34px !important; font-size: 0.82rem;">
-                                                        <option value="">-- Chọn định khu --</option>
-                                                        @foreach ($transferOwnLocations as $loc)
-                                                            <option value="{{ $loc->id }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->shelf_name }}/{{ $loc->column_name }}/{{ $loc->tier_name }})@endif</option>
-                                                        @endforeach
-                                                    </select>
+                                                    {{-- Phòng mình (A) đang nhận: định khu chọn ở modal Xác nhận kiểm tra --}}
                                                     @if (! in_array((int) $item->category_id, $declaredCategoryIds, true))
                                                         <small class="text-danger d-block mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>Chưa khai danh mục này ở tab "Hoá Chất Của Phòng"</small>
                                                     @endif
                                                 @elseif ($item->dest_location_code)
-                                                    <span class="std-location-tag mt-1 d-block" style="width: fit-content;">{{ $item->dest_location_code }}</span>
+                                                    <div class="mt-1">{{ \App\Support\ZoneType::tag($item->dest_location_code, $item->dest_location_zone_type ?? null) }}</div>
                                                 @endif
                                             </td>
                                             <td class="align-middle text-right">
@@ -209,11 +205,24 @@
                                                 </form>
                                             @elseif (! $iAmSource && $item->status === 'issued' && (user_can('export_chemical_transfer_receive') || user_can('export_chemical_transfer_return')))
                                                 @if (user_can('export_chemical_transfer_receive'))
-                                                    <form action="{{ route('pages.export.chemicalExport.transferReceiveStore') }}" method="POST" class="d-inline form-chem-transfer-receive">
+                                                    <form action="{{ route('pages.export.chemicalExport.transferReceiveStore') }}" method="POST" class="d-inline form-chem-transfer-receive"
+                                                        data-reject-url="{{ route('pages.export.chemicalExport.transferReceiveReject') }}">
                                                         @csrf
                                                         <input type="hidden" name="item_id" value="{{ $item->id }}">
-                                                        <input type="hidden" name="dest_location_id" class="hidden-dest-location-receive" value="">
-                                                        <button type="button" class="btn btn-xs btn-success btn-trigger-chem-transfer-receive px-2 py-1 shadow-sm" title="Xác nhận đã nhận hàng">
+                                                        <button type="button" class="btn btn-xs btn-success btn-trigger-chem-transfer-receive px-2 py-1 shadow-sm"
+                                                            title="Xác nhận kiểm tra lô và nhận hàng"
+                                                            data-row="{{ json_encode([
+                                                                'code' => $item->import_code,
+                                                                'chemical' => trim(($item->chem_name ?: '—') . ' (' . $item->category_code . ')'),
+                                                                'amount' => $item->issued_amount !== null ? $expNum($item->issued_amount) . ' ' . $item->issued_unit : '—',
+                                                                'from' => $req->partner_name,
+                                                                'batch_no' => $item->source_batch_no ?: '—',
+                                                                'invoice_number' => $item->source_invoice_number ?: '—',
+                                                                'invoice_date' => $expDate($item->source_invoice_date),
+                                                                'expired_date' => $expDate($item->source_expired_date),
+                                                                // Chuyển nguyên lô thì phòng nhận tự xác định lại hạn dùng nội bộ
+                                                                'internal_expired_date' => $item->is_partial_lot ? $expDate($item->source_internal_expired_date) : 'Phòng nhận tự xác định',
+                                                            ]) }}">
                                                             <i class="fas fa-inbox mr-1"></i> Nhận
                                                         </button>
                                                     </form>
@@ -272,6 +281,37 @@
     document.addEventListener('DOMContentLoaded', function() {
         var ChemTransferToast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
 
+        /*
+        | Cấp phát / Nhận / Từ chối xong trang phải tải lại (tồn kho + trạng thái dòng đổi), nhưng
+        | MỞ LẠI đúng phiếu chi tiết vừa thao tác để người dùng xử lý tiếp các mục còn lại.
+        | Nhớ id modal ở sessionStorage (chỉ tab trình duyệt này), đọc xong xoá ngay.
+        */
+        var CHEM_TRANSFER_REOPEN = 'chemTransferReopenModal';
+
+        function chemTransferRemember($el) {
+            var id = $el.closest('.modal[id^="transferDetailModal_"]').attr('id');
+            try {
+                if (id) sessionStorage.setItem(CHEM_TRANSFER_REOPEN, id);
+            } catch (e) {}
+        }
+
+        function chemTransferReload($el) {
+            chemTransferRemember($el);
+            setTimeout(function() { location.reload(); }, 600);
+        }
+
+        (function() {
+            var id = null;
+            try {
+                id = sessionStorage.getItem(CHEM_TRANSFER_REOPEN);
+                sessionStorage.removeItem(CHEM_TRANSFER_REOPEN);
+            } catch (e) {}
+
+            if (id && document.getElementById(id)) {
+                $('#' + id).modal('show');
+            }
+        })();
+
         // Yêu cầu lý do trước khi gửi form từ chối cấp phát
         $(document).on('click', '.btn-chem-transfer-reject', function(e) {
             e.preventDefault();
@@ -296,6 +336,7 @@
                         $form.append('<input type="hidden" name="reject_note">');
                     }
                     $form.find('input[name="reject_note"]').val(result.value);
+                    chemTransferRemember($form);
                     $form.off('submit').submit();
                 }
             });
@@ -326,6 +367,7 @@
                         $form.append('<input type="hidden" name="return_note">');
                     }
                     $form.find('input[name="return_note"]').val(result.value);
+                    chemTransferRemember($form);
                     $form.off('submit').submit();
                 }
             });
@@ -337,7 +379,9 @@
             var $row = $btn.closest('.issue-row');
             var $form = $btn.closest('.form-chem-transfer-issue');
 
-            var importId = $row.find('.chem-pick-display').data('import-id');
+            // Đọc thẳng thuộc tính, KHÔNG dùng .data(): .data() cache giá trị lần đọc đầu nên chọn
+            // lại mã khác trong picker (chỉ đổi attr) vẫn gửi mã cũ lên server
+            var importId = $row.find('.chem-pick-display').attr('data-import-id');
             var issuedAmount = $row.find('.input-issue-amount').val();
             var issuedUnit = $row.find('.select-issue-unit').val();
 
@@ -375,7 +419,7 @@
                         success: function(res) {
                             if (res.success) {
                                 ChemTransferToast.fire({ icon: 'success', title: res.message });
-                                setTimeout(function() { location.reload(); }, 600);
+                                chemTransferReload($btn);
                             } else {
                                 $btn.prop('disabled', false).html('<i class="fas fa-check-circle mr-1"></i> Cấp phát');
                                 ChemTransferToast.fire({ icon: 'error', title: res.message });
@@ -390,47 +434,107 @@
             });
         });
 
+        /* ---------- NHẬN = XÁC NHẬN KIỂM TRA LÔ (modal transferReceiveCheckModal) ---------- */
+        var $crc = $('#chemReceiveCheckModal');
+        var crcForm = null; // form .form-chem-transfer-receive của mục đang nhận
+
+        function crcSync() {
+            var failed = $crc.find('[name="crc_check_result"]:checked').val() === 'failed';
+
+            $crc.find('.imp-check-opt').removeClass('is-active');
+            $crc.find('[name="crc_check_result"]:checked').closest('.imp-check-opt').addClass('is-active');
+            $crc.find('.js-crc-passed-only').toggleClass('d-none', failed);
+            $crc.find('.js-crc-hint-failed').toggleClass('d-none', !failed);
+            $crc.find('.js-crc-note-star').toggleClass('d-none', !failed);
+            $crc.find('.js-crc-submit')
+                .toggleClass('btn-success', !failed)
+                .toggleClass('btn-danger', failed)
+                .html(failed
+                    ? '<i class="fas fa-ban mr-1"></i> Ghi nhận Không đạt (từ chối nhận)'
+                    : '<i class="fas fa-clipboard-check mr-1"></i> Xác nhận Kiểm tra Đạt &amp; Nhận');
+        }
+
+        $crc.on('change', '[name="crc_check_result"]', crcSync);
+
+        // Bootstrap 4 gỡ modal-open khi đóng modal con - trả lại để phiếu chi tiết còn cuộn được
+        $crc.on('hidden.bs.modal', function() {
+            if ($('.modal.show').length) {
+                $('body').addClass('modal-open');
+            }
+        });
+
         $(document).on('click', '.btn-trigger-chem-transfer-receive', function(e) {
             e.preventDefault();
-            var $btn = $(this);
-            var $row = $btn.closest('.issue-row');
-            var $form = $btn.closest('.form-chem-transfer-receive');
+            if (!$crc.length) return;
 
-            var destLocation = $row.find('.input-dest-location-receive').val();
-            $form.find('.hidden-dest-location-receive').val(destLocation);
+            var row = $(this).data('row') || {};
+            crcForm = $(this).closest('.form-chem-transfer-receive');
 
-            Swal.fire({
-                title: 'Xác nhận đã nhận hàng?',
-                text: 'Hệ thống sẽ tạo phiếu nhập mới cho phòng mình theo đúng số lượng đã cấp phát.',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#28a745',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Đồng ý',
-                cancelButtonText: 'Huỷ'
-            }).then(function(result) {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: $form.attr('action'),
-                        type: 'POST',
-                        data: $form.serialize(),
-                        beforeSend: function() {
-                            $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Đang xử lý...');
-                        },
-                        success: function(res) {
-                            if (res.success) {
-                                ChemTransferToast.fire({ icon: 'success', title: res.message });
-                                setTimeout(function() { location.reload(); }, 600);
-                            } else {
-                                $btn.prop('disabled', false).html('<i class="fas fa-inbox mr-1"></i> Nhận');
-                                ChemTransferToast.fire({ icon: 'error', title: res.message });
-                            }
-                        },
-                        error: function() {
-                            $btn.prop('disabled', false).html('<i class="fas fa-inbox mr-1"></i> Nhận');
-                            ChemTransferToast.fire({ icon: 'error', title: 'Có lỗi xảy ra, vui lòng thử lại!' });
-                        }
-                    });
+            ['code', 'chemical', 'amount', 'from', 'batch_no', 'invoice_number', 'invoice_date', 'expired_date', 'internal_expired_date'].forEach(function(key) {
+                $crc.find('.crc-' + key.replace(/_/g, '-')).text(row[key] || '—');
+            });
+
+            $crc.find('[name="crc_check_result"][value="passed"]').prop('checked', true);
+            $crc.find('[name="check_note"]').val('');
+            $crc.find('[name="dest_location_id"]').val('').trigger('change');
+            crcSync();
+
+            // Modal con nằm trên phiếu chi tiết: nền mờ của nó phải che phiếu chi tiết
+            $crc.one('shown.bs.modal', function() {
+                $('.modal-backdrop').last().css('z-index', 1055);
+            });
+            $crc.modal('show');
+        });
+
+        $crc.on('click', '.js-crc-submit', function() {
+            if (!crcForm) return;
+
+            var failed = $crc.find('[name="crc_check_result"]:checked').val() === 'failed';
+            var note = $.trim($crc.find('[name="check_note"]').val());
+            var data = {
+                _token: crcForm.find('[name="_token"]').val(),
+                item_id: crcForm.find('[name="item_id"]').val()
+            };
+
+            if (failed) {
+                if (!note) {
+                    ChemTransferToast.fire({ icon: 'error', title: 'Vui lòng nhập kết luận kiểm tra (lý do không đạt)!' });
+                    $crc.find('[name="check_note"]').trigger('focus');
+                    return;
+                }
+                data.return_note = 'Kiểm tra không đạt: ' + note;
+            } else {
+                data.dest_location_id = $crc.find('[name="dest_location_id"]').val();
+                if (!data.dest_location_id) {
+                    ChemTransferToast.fire({ icon: 'error', title: 'Vui lòng chọn định khu vị trí lưu trữ thật!' });
+                    return;
+                }
+                data.check_note = note;
+            }
+
+            var $submit = $(this);
+            var label = $submit.html();
+
+            $.ajax({
+                url: failed ? crcForm.data('reject-url') : crcForm.attr('action'),
+                type: 'POST',
+                data: data,
+                beforeSend: function() {
+                    $submit.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Đang xử lý...');
+                },
+                success: function(res) {
+                    if (res.success) {
+                        ChemTransferToast.fire({ icon: 'success', title: res.message });
+                        // crcForm nằm trong phiếu chi tiết (modal Kiểm tra là modal con)
+                        chemTransferReload(crcForm);
+                    } else {
+                        $submit.prop('disabled', false).html(label);
+                        ChemTransferToast.fire({ icon: 'error', title: res.message });
+                    }
+                },
+                error: function() {
+                    $submit.prop('disabled', false).html(label);
+                    ChemTransferToast.fire({ icon: 'error', title: 'Có lỗi xảy ra, vui lòng thử lại!' });
                 }
             });
         });

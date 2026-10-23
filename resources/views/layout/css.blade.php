@@ -23,6 +23,103 @@
       <link rel="stylesheet" href="{{asset ('dataTable/plugins/select2/css/select2.min.css')}}">
       
       <link rel="stylesheet" href="{{asset ('dataTable/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css')}}">
+      <style>
+          /* Chấm màu phân loại định khu trong ô chọn (window.wmsZoneDot ở layout/js) */
+          .zone-dot {
+              display: inline-block;
+              flex: none;
+              width: 11px;
+              height: 11px;
+              border-radius: 50%;
+              margin-right: 8px;
+              vertical-align: -1px;
+              background: var(--dot);
+              box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 3px var(--dot);
+          }
+
+          .zone-dot.is-none {
+              background: #fff;
+              box-shadow: 0 0 0 1.5px #94A3B8;
+          }
+
+          .zone-dot.is-keep {
+              display: none;
+          }
+
+          /* Thẻ mã vị trí trong bảng dữ liệu, tô theo màu phân loại (App\Support\ZoneType::tag) */
+          .zone-tag {
+              display: inline-block;
+              padding: 2px 8px;
+              border-radius: 6px;
+              font-family: var(--font-mono, Consolas, monospace);
+              font-size: 0.8rem;
+              font-weight: 700;
+              line-height: 1.5;
+              white-space: nowrap;
+              background: var(--zt);
+              color: var(--zt-text);
+              border: 1px solid var(--zt);
+          }
+
+          .zone-tag.is-none {
+              background: var(--primary-soft);
+              color: var(--primary-dark);
+              border-color: var(--primary-lighter);
+          }
+
+          /* Hàng chip lọc nhanh theo phân loại trong dropdown ô chọn định khu */
+          .zone-filter-bar {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 5px;
+              padding: 6px 8px;
+              border-bottom: 1px solid #e2e8f0;
+              background: var(--bg-neutral, #F5F9FD);
+          }
+
+          .zone-filter-bar[hidden] {
+              display: none;
+          }
+
+          .zone-filter-chip {
+              display: inline-flex;
+              align-items: center;
+              border: 1px solid #dbe3ec;
+              background: #fff;
+              border-radius: 999px;
+              padding: 2px 10px;
+              font-size: 0.75rem;
+              line-height: 1.5;
+              color: #334155;
+              cursor: pointer;
+              transition: all 0.2s;
+          }
+
+          .zone-filter-chip .zone-dot {
+              width: 9px;
+              height: 9px;
+              margin-right: 6px;
+          }
+
+          .zone-filter-chip b {
+              margin-left: 5px;
+              font-weight: 700;
+              color: #64748b;
+          }
+
+          .zone-filter-chip:hover {
+              border-color: var(--dot, var(--primary));
+              box-shadow: var(--shadow-sm);
+          }
+
+          .zone-filter-chip.is-active {
+              border-color: var(--dot, var(--primary));
+              background: var(--primary-soft);
+              color: var(--primary-dark);
+              font-weight: 600;
+              box-shadow: 0 0 0 1px var(--dot, var(--primary)) inset;
+          }
+      </style>
       <!-- Bootstrap4 Duallistbox -->
       <link rel="stylesheet" href="{{asset ('dataTable/plugins/bootstrap4-duallistbox/bootstrap-duallistbox.min.css')}}">
       <!-- Theme style -->
@@ -66,6 +163,11 @@
                   --db-group-chemical: #E8663D;
                   --db-group-standard: #7C5CD6;
                   --db-group-master: #0E9FB8;
+                  /* Bản rgb của 4 màu đối tượng (vật tư / hoá chất / chuẩn / dùng chung) cho nền nhạt rgba() */
+                  --db-group-material-rgb: 46, 123, 196;
+                  --db-group-chemical-rgb: 232, 102, 61;
+                  --db-group-standard-rgb: 124, 92, 214;
+                  --db-group-master-rgb: 14, 159, 184;
                   --db-group-user: #16A34A;
                   --db-group-utility: #D99A0B;
                   --db-group-system: #64748B;

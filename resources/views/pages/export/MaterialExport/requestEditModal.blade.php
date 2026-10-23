@@ -16,7 +16,7 @@
                     <div class="me-req-toolbar mb-3">
                         <div class="me-field flex-grow-1" style="min-width: 280px;">
                             <label>Tiêu đề đề nghị</label>
-                            <input type="text" name="name" maxlength="255" class="form-control" value="{{ $req->name }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
+                            <input type="text" name="name" maxlength="255" class="form-control" list="matTitleOptionsRequest" autocomplete="off" value="{{ $req->name }}" placeholder="VD: Đề nghị vật tư bảo trì tháng 9...">
                         </div>
                         <div class="me-field">
                             <label>Ngày mong muốn</label>

@@ -258,86 +258,94 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
 
+            /*
+            | Gom thanh công cụ cho MỘT bảng. Màn hình dựng bảng sau khi trang đã tải
+            | (nạp JSON theo tab) gọi lại window.mdTablebar(table) ngay sau khi dựng.
+            */
+            window.mdTablebar = function(table) {
+                var $table = $(table);
+                var $wrapper = $table.closest('.dataTables_wrapper');
+
+                if (!$wrapper.length) return;
+
+                var $responsive = $wrapper.closest('.table-responsive');
+                var $anchor = $responsive.length ? $responsive : $wrapper;
+                var $container = $anchor.parent();
+
+                var $bar = $anchor.prev('.md-tablebar');
+                if (!$bar.length) {
+                    $bar = $('<div class="md-tablebar"></div>').insertBefore($anchor);
+                }
+
+                // 1. Quét mã vạch
+                var $bcs = $anchor.prevAll('.bcs-box').first();
+                if (!$bcs.length) $bcs = $container.find('.bcs-box').not($bar.find('.bcs-box')).first();
+                if ($bcs.length && !$bcs.closest('.md-tablebar').length) {
+                    $bar.append($bcs);
+                }
+
+                // 2. Nút thao tác trong .md-toolbar
+                var $toolbar = $anchor.prevAll('.md-toolbar').first();
+                if ($toolbar.length) {
+                    $bar.append($toolbar.children('button, .btn'));
+                } else {
+                    var $oldBtns = $($anchor.prevAll('button.btn, a.btn').not('.bcs-box *').get().reverse());
+                    if ($oldBtns.length) $bar.append($oldBtns);
+                }
+
+                // 3. Bộ lọc phân loại / phân nhóm
+                var $cls = $anchor.prevAll('.cls-filter').first();
+                if (!$cls.length) $cls = $container.find('.cls-filter').not($bar.find('.cls-filter')).first();
+                if ($cls.length && !$cls.closest('.md-tablebar').length) {
+                    $bar.append($cls);
+                }
+
+                var $sgr = $anchor.prevAll('.sgr-filter').first();
+                if (!$sgr.length) $sgr = $container.find('.sgr-filter').not($bar.find('.sgr-filter')).first();
+                if ($sgr.length && !$sgr.closest('.md-tablebar').length) {
+                    $bar.append($sgr);
+                }
+
+                /*
+                | 3b. Phần tử do chính view khai báo muốn nằm chung thanh công cụ
+                |
+                | View chỉ cần gắn thêm class .md-tablebar-item cho khối muốn gom
+                | (bộ lọc riêng, dải thời gian, ghi chú...) là nó tự về hàng này,
+                | không phải thêm tên class mới vào file layout mỗi lần.
+                */
+                $($anchor.prevAll('.md-tablebar-item').get().reverse()).each(function() {
+                    if (!$(this).closest('.md-tablebar').length) $bar.append(this);
+                });
+
+                if ($toolbar.length) {
+                    $bar.append($toolbar.children('.hint').not('.inv-blocking'));
+                    if (!$toolbar.children().length) $toolbar.remove();
+                }
+
+                // 4. Hiển thị & Tìm kiếm của DataTables
+                var $length = $wrapper.find('.dataTables_length');
+                var $filter = $wrapper.find('.dataTables_filter');
+                var $topRow = $length.closest('.row').add($filter.closest('.row'));
+
+                if ($length.length) $bar.append($length);
+                if ($filter.length) $bar.append($filter);
+
+                if ($topRow.length) $topRow.remove();
+
+                // Dọn dẹp các hàng row rỗng trước bảng
+                $anchor.prevAll('.row').each(function() {
+                    if (!$.trim($(this).text())) $(this).remove();
+                });
+
+                if (!$bar.children().length) $bar.remove();
+            };
+
             // Hoãn một nhịp để đợi mọi bảng DataTables dựng xong
             setTimeout(function() {
                 if (!$.fn.dataTable) return;
 
                 $($.fn.dataTable.tables()).each(function() {
-                    var $table = $(this);
-                    var $wrapper = $table.closest('.dataTables_wrapper');
-
-                    if (!$wrapper.length) return;
-
-                    var $responsive = $wrapper.closest('.table-responsive');
-                    var $anchor = $responsive.length ? $responsive : $wrapper;
-                    var $container = $anchor.parent();
-
-                    var $bar = $anchor.prev('.md-tablebar');
-                    if (!$bar.length) {
-                        $bar = $('<div class="md-tablebar"></div>').insertBefore($anchor);
-                    }
-
-                    // 1. Quét mã vạch
-                    var $bcs = $anchor.prevAll('.bcs-box').first();
-                    if (!$bcs.length) $bcs = $container.find('.bcs-box').not($bar.find('.bcs-box')).first();
-                    if ($bcs.length && !$bcs.closest('.md-tablebar').length) {
-                        $bar.append($bcs);
-                    }
-
-                    // 2. Nút thao tác trong .md-toolbar
-                    var $toolbar = $anchor.prevAll('.md-toolbar').first();
-                    if ($toolbar.length) {
-                        $bar.append($toolbar.children('button, .btn'));
-                    } else {
-                        var $oldBtns = $($anchor.prevAll('button.btn, a.btn').not('.bcs-box *').get().reverse());
-                        if ($oldBtns.length) $bar.append($oldBtns);
-                    }
-
-                    // 3. Bộ lọc phân loại / phân nhóm
-                    var $cls = $anchor.prevAll('.cls-filter').first();
-                    if (!$cls.length) $cls = $container.find('.cls-filter').not($bar.find('.cls-filter')).first();
-                    if ($cls.length && !$cls.closest('.md-tablebar').length) {
-                        $bar.append($cls);
-                    }
-
-                    var $sgr = $anchor.prevAll('.sgr-filter').first();
-                    if (!$sgr.length) $sgr = $container.find('.sgr-filter').not($bar.find('.sgr-filter')).first();
-                    if ($sgr.length && !$sgr.closest('.md-tablebar').length) {
-                        $bar.append($sgr);
-                    }
-
-                    /*
-                    | 3b. Phần tử do chính view khai báo muốn nằm chung thanh công cụ
-                    |
-                    | View chỉ cần gắn thêm class .md-tablebar-item cho khối muốn gom
-                    | (bộ lọc riêng, dải thời gian, ghi chú...) là nó tự về hàng này,
-                    | không phải thêm tên class mới vào file layout mỗi lần.
-                    */
-                    $($anchor.prevAll('.md-tablebar-item').get().reverse()).each(function() {
-                        if (!$(this).closest('.md-tablebar').length) $bar.append(this);
-                    });
-
-                    if ($toolbar.length) {
-                        $bar.append($toolbar.children('.hint').not('.inv-blocking'));
-                        if (!$toolbar.children().length) $toolbar.remove();
-                    }
-
-                    // 4. Hiển thị & Tìm kiếm của DataTables
-                    var $length = $wrapper.find('.dataTables_length');
-                    var $filter = $wrapper.find('.dataTables_filter');
-                    var $topRow = $length.closest('.row').add($filter.closest('.row'));
-
-                    if ($length.length) $bar.append($length);
-                    if ($filter.length) $bar.append($filter);
-
-                    if ($topRow.length) $topRow.remove();
-
-                    // Dọn dẹp các hàng row rỗng trước bảng
-                    $anchor.prevAll('.row').each(function() {
-                        if (!$.trim($(this).text())) $(this).remove();
-                    });
-
-                    if (!$bar.children().length) $bar.remove();
+                    window.mdTablebar(this);
                 });
             }, 50);
         });

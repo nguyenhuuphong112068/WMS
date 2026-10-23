@@ -18,6 +18,7 @@
     $vppActiveSub = $vppShowWatchlist ? $vppSubTab : 'requests';
 @endphp
 
+@tab('export_material', 'vpp')
 <div class="exp-pane {{ $activeTab === 'vpp' ? 'is-active' : '' }}" id="mePaneVpp">
 
     @if ($vppShowWatchlist)
@@ -26,7 +27,7 @@
         <ul class="nav nav-tabs vpp-subtabs" role="tablist">
             <li class="nav-item">
                 <a class="nav-link {{ $vppActiveSub === 'requests' ? 'active' : '' }}" data-toggle="tab" href="#vppSubRequests" role="tab">
-                    <i class="fas fa-list-alt mr-1"></i> Đề nghị VPP
+                    <i class="fas fa-list-alt mr-1"></i> Đề nghị cấp phát VPP đến HC
                 </a>
             </li>
             <li class="nav-item">
@@ -39,7 +40,7 @@
 
         @perm('export_material_request')
             <button type="button" class="btn btn-primary btn-sm vpp-create-btn" data-toggle="modal" data-target="#matVppRequestModal">
-                <i class="fas fa-plus mr-1"></i> Tạo đề nghị VPP
+                <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát VPP đến HC
             </button>
         @endperm
         </div>
@@ -54,13 +55,19 @@
                 'mtSent' => $vppSent,
                 'mtReceived' => $vppReceived,
                 'mtToSign' => $vppToSign,
-                'mtSentRange' => $vppSentRange,
                 'mtSentPerPage' => $vppSentPerPage,
-                'mtReceivedRange' => $vppReceivedRange,
+                'mtSentDone' => $vppSentDone,
+                'mtSentDoneRange' => $vppSentDoneRange,
+                'mtSentDonePerPage' => $vppSentDonePerPage,
                 'mtReceivedPerPage' => $vppReceivedPerPage,
-                'mtReceivedTitle' => 'Đề nghị VPP các phòng gửi đến - cần cấp phát',
-                'mtEmptySent' => 'Phòng mình chưa gửi đề nghị VPP nào.',
-                'mtEmptyReceived' => 'Chưa có phòng ban nào gửi đề nghị VPP đến phòng mình.',
+                'mtDone' => $vppDone,
+                'mtDoneRange' => $vppDoneRange,
+                'mtDonePerPage' => $vppDonePerPage,
+                'mtReceivedTitle' => 'Đề nghị cấp phát VPP các phòng gửi đến',
+                'mtEmptySent' => 'Không có đề nghị gửi đi nào đang chờ xử lý.',
+                'mtEmptySentDone' => 'Không có đề nghị đã hoàn thành trong khoảng đã lọc.',
+                'mtEmptyReceived' => 'Không còn đề nghị nào cần cấp phát.',
+                'mtEmptyDone' => 'Không có đề nghị đã hoàn thành trong khoảng đã lọc.',
                 // Chỉ phòng Hành Chính nhận đề nghị VPP
                 'mtShowReceived' => $vppIsAdminDepartment,
             ])
@@ -76,6 +83,7 @@
         @endif
     </div>
 </div>
+@endtab
 
 <style>
     .vpp-head {

@@ -54,7 +54,7 @@ class ZoneStructureController extends Controller
         $warehouses = DB::table('warehouses')
             ->where('department_id', $departmentId)
             ->orderBy('code')
-            ->get(['id', 'code', 'name', 'zone_type', 'status_id']);
+            ->get(['id', 'code', 'name', 'status_id']);
 
         $shelfCounts = DB::table('shelves')
             ->whereIn('warehouse_id', $warehouses->pluck('id'))
@@ -85,9 +85,7 @@ class ZoneStructureController extends Controller
         $validator = Validator::make($request->all(), [
             'code' => ['required', 'string', 'max:40', Rule::unique('warehouses', 'code')->ignore($id)],
             'name' => ['required', 'string', 'max:255'],
-            'zone_type' => ['nullable', Rule::in(array_keys(ZoneType::TYPES))],
         ], [
-            'zone_type.in' => 'Phân loại định khu không hợp lệ.',
             'code.required' => 'Chưa nhập mã kho/phòng.',
             'code.max' => 'Mã kho/phòng tối đa 40 ký tự.',
             'code.unique' => 'Mã kho/phòng này đã được dùng.',
@@ -100,9 +98,9 @@ class ZoneStructureController extends Controller
 
         $code = trim((string) $request->input('code'));
         $name = trim((string) $request->input('name'));
-        $zoneType = $request->input('zone_type') ?: null;
-        $fields = ['code' => 'Mã kho/phòng', 'name' => 'Tên kho/phòng', 'zone_type' => 'Phân loại định khu'];
-        $maps = ['zone_type' => ZoneType::historyMap()];
+        // Phân loại định khu khai ở từng vị trí, kho/phòng chỉ có mã + tên
+        $fields = ['code' => 'Mã kho/phòng', 'name' => 'Tên kho/phòng'];
+        $maps = [];
 
         if ($id) {
             $warehouse = DB::table('warehouses')
@@ -114,7 +112,7 @@ class ZoneStructureController extends Controller
                 return $this->fail('Không tìm thấy kho/phòng.', 404);
             }
 
-            $payload = ['code' => $code, 'name' => $name, 'zone_type' => $zoneType];
+            $payload = ['code' => $code, 'name' => $name];
             $note = DataMasterHistory::note($fields, $warehouse, $payload, $maps);
 
             if ($note === '') {
@@ -132,7 +130,6 @@ class ZoneStructureController extends Controller
             $id = DB::table('warehouses')->insertGetId([
                 'code' => $code,
                 'name' => $name,
-                'zone_type' => $zoneType,
                 'department_id' => $this->departmentId(),
                 'status_id' => 1,
                 'created_by' => $this->actor(),
@@ -164,7 +161,7 @@ class ZoneStructureController extends Controller
             ->where('department_id', $this->departmentId())
             ->where('warehouse_id', $warehouse->id)
             ->orderBy('code')
-            ->get(['id', 'code', 'name', 'zone_type', 'status_id']);
+            ->get(['id', 'code', 'name', 'status_id']);
 
         $ids = $shelves->pluck('id')->all();
 
@@ -208,12 +205,10 @@ class ZoneStructureController extends Controller
             'id' => ['required', 'integer'],
             'code' => ['required', 'string', 'max:40'],
             'name' => ['required', 'string', 'max:255'],
-            'zone_type' => ['nullable', Rule::in(array_keys(ZoneType::TYPES))],
         ], [
             'code.required' => 'Chưa nhập mã kệ/tủ.',
             'code.max' => 'Mã kệ/tủ tối đa 40 ký tự.',
             'name.required' => 'Chưa nhập tên kệ/tủ.',
-            'zone_type.in' => 'Phân loại định khu không hợp lệ.',
         ]);
 
         if ($validator->fails()) {
@@ -228,9 +223,9 @@ class ZoneStructureController extends Controller
 
         $code = trim((string) $request->input('code'));
         $name = trim((string) $request->input('name'));
-        $fields = ['code' => 'Mã kệ/tủ', 'name' => 'Tên kệ/tủ', 'zone_type' => 'Phân loại định khu'];
-        $maps = ['zone_type' => ZoneType::historyMap()];
-        $payload = ['code' => $code, 'name' => $name, 'zone_type' => $request->input('zone_type') ?: null];
+        $fields = ['code' => 'Mã kệ/tủ', 'name' => 'Tên kệ/tủ'];
+        $maps = [];
+        $payload = ['code' => $code, 'name' => $name];
         $note = DataMasterHistory::note($fields, $shelf, $payload, $maps);
 
         if ($note === '') {
@@ -266,7 +261,7 @@ class ZoneStructureController extends Controller
         ]);
     }
 
-    /** Đổi loại lưu trữ và/hoặc màu hiển thị cho các vị trí đang chọn trên lưới của một kệ. */
+    /** Đổi phân loại định khu và/hoặc loại lưu trữ cho các vị trí đang chọn trên lưới của một kệ. */
     public function saveLocations(Request $request)
     {
         if (! user_can('materData_common_update')) {
@@ -279,14 +274,11 @@ class ZoneStructureController extends Controller
             'ids.*' => ['integer'],
             'set_type' => ['boolean'],
             'item_type' => ['nullable', Rule::in(array_keys(ZoneController::LOCATION_TYPES))],
-            'set_color' => ['boolean'],
             'set_zone' => ['boolean'],
             'zone_type' => ['nullable', Rule::in(array_keys(ZoneType::TYPES))],
-            'color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ], [
             'ids.required' => 'Chưa chọn vị trí nào.',
             'item_type.in' => 'Loại lưu trữ được chọn không hợp lệ.',
-            'color.regex' => 'Màu không hợp lệ, vui lòng chọn lại.',
             'zone_type.in' => 'Phân loại định khu không hợp lệ.',
         ]);
 
@@ -307,25 +299,22 @@ class ZoneStructureController extends Controller
         if ($request->boolean('set_zone')) {
             $payload['zone_type'] = $request->input('zone_type') ?: null;
         }
-        if ($request->boolean('set_color')) {
-            $payload['color'] = ZoneType::normalize($request->input('color'));
-        }
 
         if (! $payload) {
-            return $this->fail('Chưa chọn thay đổi nào: hãy chọn phân loại, loại lưu trữ hoặc màu.');
+            return $this->fail('Chưa chọn thay đổi nào: hãy chọn phân loại hoặc loại lưu trữ.');
         }
 
         $rows = DB::table('locations')
             ->where('shelf_id', $shelf->id)
             ->whereIn('id', $request->input('ids'))
-            ->get(['id', 'code', 'zone_type', 'item_type', 'color']);
+            ->get(['id', 'code', 'zone_type', 'item_type']);
 
         if ($rows->isEmpty()) {
             return $this->fail('Không tìm thấy vị trí nào của kệ/tủ này.', 404);
         }
 
         $fields = array_intersect_key([
-            'zone_type' => 'Phân loại định khu', 'item_type' => 'Loại lưu trữ', 'color' => 'Màu hiển thị',
+            'zone_type' => 'Phân loại định khu', 'item_type' => 'Loại lưu trữ',
         ], $payload);
         $maps = [
             'item_type' => ['' => 'Dùng chung'] + ZoneController::LOCATION_TYPES,
@@ -359,9 +348,6 @@ class ZoneStructureController extends Controller
                 if (array_key_exists('item_type', $payload)) {
                     $parts[] = 'loại lưu trữ: ' . (ZoneController::LOCATION_TYPES[$payload['item_type']] ?? 'Dùng chung');
                 }
-                if (array_key_exists('color', $payload)) {
-                    $parts[] = 'màu: ' . ($payload['color'] ?: 'theo phân loại');
-                }
                 AuditTrialController::log('Cập nhật vị trí', 'locations', $shelf->id, $shelf->code,
                     $changed . ' vị trí của kệ ' . $shelf->code . ' - ' . implode(', ', $parts));
             }
@@ -371,7 +357,7 @@ class ZoneStructureController extends Controller
 
         $updated = DB::table('locations')
             ->whereIn('id', $rows->pluck('id'))
-            ->get(['id', 'zone_type', 'item_type', 'color'])
+            ->get(['id', 'zone_type', 'item_type'])
             ->map(fn ($row) => $this->cellAttrs($row));
 
         return response()->json([
@@ -381,15 +367,14 @@ class ZoneStructureController extends Controller
         ]);
     }
 
-    /** Thuộc tính hiển thị của một ô: loại lưu trữ, màu tự chọn và màu thực hiện ra (màu riêng > màu phân loại). */
+    /** Thuộc tính hiển thị của một ô: phân loại, loại lưu trữ và màu của phân loại (mỗi phân loại một màu). */
     private function cellAttrs($row): array
     {
         return [
             'id' => (int) $row->id,
             'zone_type' => $row->zone_type,
             'item_type' => $row->item_type,
-            'color' => $row->color,
-            'shown' => ($row->color || $row->zone_type) ? ZoneType::color($row->zone_type, $row->color) : null,
+            'shown' => isset(ZoneType::DEFAULT_COLORS[$row->zone_type]) ? ZoneType::color($row->zone_type) : null,
         ];
     }
 
@@ -485,7 +470,7 @@ class ZoneStructureController extends Controller
         $locations = DB::table('locations')
             ->where('shelf_id', $shelf->id)
             ->whereNotNull('position')
-            ->get(['id', 'code', 'tier_id', 'position', 'status_id', 'zone_type', 'item_type', 'color'])
+            ->get(['id', 'code', 'tier_id', 'position', 'status_id', 'zone_type', 'item_type'])
             ->groupBy('tier_id');
 
         $busy = $this->busyIds($locations->flatten()->pluck('id')->all());
@@ -555,7 +540,6 @@ class ZoneStructureController extends Controller
             'shelves' => ['nullable', 'array', 'min:1', 'max:' . self::MAX_BATCH],
             'shelves.*.code' => ['required', 'string', 'max:40'],
             'shelves.*.name' => ['required', 'string', 'max:255'],
-            'item_type' => ['nullable', Rule::in(array_keys(ZoneController::LOCATION_TYPES))],
             $grid => ['required', 'array', 'min:1', 'max:' . self::MAX_COLUMNS],
             $grid . '.*.position' => ['required', 'integer', 'min:1', 'max:99'],
             $grid . '.*.name' => ['nullable', 'string', 'max:100'],
@@ -695,7 +679,6 @@ class ZoneStructureController extends Controller
             'department_id' => $this->departmentId(),
             // Sửa kệ có sẵn thì cấp con mới đi theo kho của chính kệ đó
             'warehouse_id' => $shelf && $shelf->warehouse_id ? (int) $shelf->warehouse_id : (int) $warehouse->id,
-            'item_type' => $request->input('item_type') ?: null,
             'actor' => $this->actor(),
             'now' => now(),
         ];
@@ -990,7 +973,6 @@ class ZoneStructureController extends Controller
                 'column_id' => $columnId,
                 'tier_id' => $tierId,
                 'position' => $p,
-                'item_type' => $context['item_type'],
                 'status_id' => 1,
                 'created_by' => $context['actor'],
                 'created_at' => $context['now'],

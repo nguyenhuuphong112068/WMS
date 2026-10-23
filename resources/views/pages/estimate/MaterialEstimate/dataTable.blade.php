@@ -7,41 +7,44 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    @perm('estimate_material_create')
+                    @if ($tabAllowed['list'] && user_can('estimate_material_create'))
                         <button type="button" class="btn btn-primary btn-md-create">
                             <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
                         </button>
-                    @endperm
+                    @endif
                 </div>
 
                 <ul class="nav nav-tabs mb-3" id="estimateTabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link {{ $activeTab === 'list' ? 'active' : '' }}" id="list-tab" data-toggle="tab" href="#list" role="tab">Danh sách phiếu</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ $activeTab === 'watchlist' ? 'active' : '' }}" id="watchlist-tab" data-toggle="tab" href="#watchlist" role="tab">
-                            Danh sách vật tư cần dự trù <span class="badge badge-warning">{{ $watchlistItems->filter(fn ($item) => ! $item->in_progress)->count() }}</span>
-                        </a>
-                    </li>
-                    @if ($purchasingItems !== null)
-                        @php
-                            $purchasingPending = $purchasingItems->filter(
-                                fn($it) => $it->cancel_requester_at && !$it->cancel_purchasing_at,
-                            )->count();
-                        @endphp
+                    @if ($tabAllowed['list'])
                         <li class="nav-item">
-                            <a class="nav-link {{ $activeTab === 'purchasing' ? 'active' : '' }}" id="purchasing-tab" data-toggle="tab" href="#purchasing" role="tab">
-                                Bộ phận mua hàng
-                                @if ($purchasingPending)<span class="badge badge-danger" title="Đề nghị huỷ chờ xác nhận">{{ $purchasingPending }}</span>@endif
+                            <a class="nav-link {{ $activeTab === 'list' ? 'active' : '' }}" id="list-tab" data-toggle="tab" href="#list" role="tab">Danh sách phiếu</a>
+                        </li>
+                    @endif
+                    @if ($tabAllowed['tracking'])
+                        <li class="nav-item">
+                            <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
+                        </li>
+                    @endif
+                    @if ($tabAllowed['watchlist'])
+                        <li class="nav-item">
+                            <a class="nav-link {{ $activeTab === 'watchlist' ? 'active' : '' }}" id="watchlist-tab" data-toggle="tab" href="#watchlist" role="tab">
+                                Danh sách vật tư cần dự trù <span class="badge badge-warning">{{ $watchlistItems->filter(fn ($item) => ! $item->in_progress)->count() }}</span>
+                            </a>
+                        </li>
+                    @endif
+                    @if (($approvedLists ?? null) !== null)
+                        <li class="nav-item">
+                            <a class="nav-link {{ $activeTab === 'approved' ? 'active' : '' }}" id="approved-tab" data-toggle="tab" href="#approved" role="tab">
+                                Đơn dự trù đã được phê duyệt <span class="badge badge-success">{{ $approvedLists->count() }}</span>
+                                @if ($approvedWaiting = $approvedLists->where('reception_status', 'waiting')->count())<span class="badge badge-warning" title="Phiếu vừa duyệt chờ tiếp nhận">{{ $approvedWaiting }}</span>@endif
+                                @if ($approvedPendingCancel = $approvedLists->sum('pending_cancel_count'))<span class="badge badge-danger" title="Mục phòng đề nghị xin huỷ, chờ bộ phận mua hàng xác nhận">{{ $approvedPendingCancel }}</span>@endif
                             </a>
                         </li>
                     @endif
                 </ul>
 
                 <div class="tab-content" id="estimateTabsContent">
+                    @if ($tabAllowed['list'])
                     <div class="tab-pane fade {{ $activeTab === 'list' ? 'show active' : '' }}" id="list" role="tabpanel">
                         <div class="table-responsive">
                             <table id="mdTable" class="table table-bordered table-hover w-100">
@@ -53,6 +56,7 @@
                                 <th class="text-center" style="width: 100px">Kỳ Dự Trù</th>
                                 <th class="text-center" style="width: 95px">Vật Tư</th>
                                 <th style="width: 130px">Trạng Thái</th>
+                                <th class="text-center" style="width: 150px">Tình Trạng</th>
                                 <th style="width: 330px">Theo Dõi Trình Ký</th>
                                 <th style="width: 130px">Người Lập</th>
                                 <th class="text-center" style="width: 190px">Thao Tác</th>
@@ -111,6 +115,10 @@
                                             </div>
                                         @endif
                                     </td>
+                                    @php $estApOrder = $row->approved_status ? ['waiting' => 0, 'progress' => 1, 'completed' => 2, 'cancelled' => 3][$row->approved_status['key']] : 9; @endphp
+                                    <td class="text-center" data-order="{{ $estApOrder }}">
+                                        @include('pages.estimate.shared.approvedStatusBadge', ['apStatus' => $row->approved_status])
+                                    </td>
                                     <td>
                                         @include('pages.estimate.shared.signFlow', ['row' => $row, 'signs' => $signRows->get($row->id, collect())])
                                     </td>
@@ -121,7 +129,7 @@
                                     <td>
                                         <div class="md-actions">
                                             <a href="{{ route($estRoute . 'detail', ['id' => $row->id]) }}"
-                                                class="btn btn-sm btn-primary" title="Xem chi tiết vật tư dự trù">
+                                                class="btn btn-sm {{ $row->app_status === 'pending_sign' && $row->can_sign ? 'btn-success' : 'btn-primary' }}" title="{{ $row->app_status === 'pending_sign' && $row->can_sign ? 'Xem chi tiết và ký duyệt' : 'Xem chi tiết vật tư dự trù' }}">
                                                 <i class="fas fa-list-ul"></i>
                                             </a>
 
@@ -149,23 +157,6 @@
                                                 </button>
                                             @endif
 
-                                            @if ($row->app_status === 'pending_sign' && $row->can_sign && user_can('estimate_material_sign'))
-                                                @php $estIsLast = (int) $row->pending_sign->step_no >= (int) $row->sign_step_count; @endphp
-                                                <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'signStep') }}"
-                                                    method="POST" data-title="Ký duyệt bước {{ $row->pending_sign->step_no }}/{{ $row->sign_step_count }} phiếu {{ $row->code }}?"
-                                                    data-text="{{ $estIsLast ? 'Phiếu sẽ được phê duyệt và ghi nhận tiếp nhận.' : 'Phiếu sẽ chuyển tới người ký bước ' . ($row->pending_sign->step_no + 1) . '.' }}">
-                                                    @csrf
-                                                    <input type="hidden" name="id" value="{{ $row->id }}">
-                                                    <button type="submit" class="btn btn-sm btn-success" title="Ký duyệt bước {{ $row->pending_sign->step_no }}">
-                                                        <i class="fas fa-{{ $estIsLast ? 'stamp' : 'signature' }}"></i>
-                                                    </button>
-                                                </form>
-
-                                                <button type="button" class="btn btn-sm btn-outline-danger btn-est-reject"
-                                                    title="Từ chối" data-id="{{ $row->id }}" data-code="{{ $row->code }}">
-                                                    <i class="fas fa-times"></i>
-                                                </button>
-                                            @endif
 
                                             @if ($estEditable && user_can('estimate_material_delete'))
                                                 <form class="form-md-confirm-cancel d-inline" action="{{ route($estRoute . 'destroy') }}"
@@ -188,15 +179,25 @@
                     </table>
                         </div>
                     </div>
-                    <div class="tab-pane fade {{ $activeTab === 'tracking' ? 'show active' : '' }}" id="tracking" role="tabpanel">
-                        @include('pages.estimate.shared.trackingTable', ['items' => $trackedItems])
-                    </div>
-                    <div class="tab-pane fade {{ $activeTab === 'watchlist' ? 'show active' : '' }}" id="watchlist" role="tabpanel">
-                        @include('pages.estimate.MaterialEstimate.watchlistTable', ['items' => $watchlistItems])
-                    </div>
-                    @if ($purchasingItems !== null)
-                        <div class="tab-pane fade {{ $activeTab === 'purchasing' ? 'show active' : '' }}" id="purchasing" role="tabpanel">
-                            @include('pages.estimate.shared.purchasingPane', ['items' => $purchasingItems])
+                    @endif
+                    @if ($tabAllowed['tracking'])
+                        <div class="tab-pane fade {{ $activeTab === 'tracking' ? 'show active' : '' }}" id="tracking" role="tabpanel">
+                            @include('pages.estimate.shared.trackingTable', ['items' => $trackedItems])
+                        </div>
+                    @endif
+                    @if ($tabAllowed['watchlist'])
+                        <div class="tab-pane fade {{ $activeTab === 'watchlist' ? 'show active' : '' }}" id="watchlist" role="tabpanel">
+                            @include('pages.estimate.MaterialEstimate.watchlistTable', ['items' => $watchlistItems])
+                        </div>
+                    @endif
+                    @if (($approvedLists ?? null) !== null)
+                        <div class="tab-pane fade {{ $activeTab === 'approved' ? 'show active' : '' }}" id="approved" role="tabpanel">
+                            @include('pages.estimate.shared.approvedListsPane', [
+                                'lists' => $approvedLists,
+                                'signRows' => $approvedSignRows,
+                                'itemCounts' => $approvedItemCounts,
+                                'itemLabel' => 'Vật Tư',
+                            ])
                         </div>
                     @endif
                 </div>
@@ -208,6 +209,8 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Bảng dùng chung sắp theo cột 1, riêng dự trù cần xem kỳ gần nhất trước
-        $('#mdTable').DataTable().order([2, 'desc']).draw();
+        if ($('#mdTable').length) {
+            $('#mdTable').DataTable().order([2, 'desc']).draw();
+        }
     });
 </script>

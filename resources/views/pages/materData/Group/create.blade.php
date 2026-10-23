@@ -15,12 +15,7 @@
                         <label class="required">Phòng Ban</label>
                         <select name="department_id" class="form-control" required>
                             <option value="">-- Chọn phòng ban --</option>
-                            @foreach ($departments as $dept)
-                                <option value="{{ $dept->id }}"
-                                    {{ (old('department_id') == $dept->id || (session('user')['selected_department_id'] ?? null) == $dept->id) ? 'selected' : '' }}>
-                                    {{ $dept->name }} ({{ $dept->shortName }})
-                                </option>
-                            @endforeach
+                            @include('layout.departmentOptions', ['departments' => $departments, 'selected' => old('department_id', session('user')['selected_department_id'] ?? null)])
                         </select>
                         @error('department_id', 'createErrors')
                             <small class="text-danger">{{ $message }}</small>

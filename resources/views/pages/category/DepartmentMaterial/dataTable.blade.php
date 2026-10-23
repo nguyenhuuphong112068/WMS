@@ -3,12 +3,81 @@
 <div class="card md-card">
     <div class="card-body">
 
+        @php
+            $dmClassOptions = collect($datas)->filter(fn($r) => $r->classification_id)
+                ->unique('classification_id')->sortBy('classification_name')
+                ->pluck('classification_name', 'classification_id');
+            $dmMakerOptions = collect($datas)->filter(fn($r) => $r->manufacturer_name)
+                ->unique('manufacturer_name')->sortBy('manufacturer_name')
+                ->pluck('manufacturer_name');
+        @endphp
+
         <div class="md-toolbar">
-            @perm('category_material_dept_manage')
-                <button type="button" class="btn btn-primary btn-md-create" data-modal="#dmCreateModal">
-                    <i class="fas fa-plus mr-1"></i> Thêm mới vật tư phòng
-                </button>
-            @endperm
+            <div class="d-flex align-items-center flex-wrap" style="gap: 10px">
+                @perm('category_material_dept_manage')
+                    <button type="button" class="btn btn-primary btn-md-create" data-modal="#dmCreateModal">
+                        <i class="fas fa-plus mr-1"></i> Thêm mới vật tư phòng
+                    </button>
+                @endperm
+
+                <div class="dm-filter">
+                    <label for="dmClassFilter"><i class="fas fa-filter mr-1"></i> Phân loại</label>
+                    <select id="dmClassFilter" class="form-control form-control-sm dm-filter-select" multiple
+                        data-placeholder="Tất cả">
+                        <optgroup label="Phân loại của phòng">
+                            <option value="dept:none">Chưa phân loại</option>
+                            @foreach ($dmClassOptions as $id => $name)
+                                <option value="dept:{{ $id }}">{{ $name }}</option>
+                            @endforeach
+                        </optgroup>
+                        @foreach (\App\Support\MaterialClassification::formGroups() as $group)
+                            @php $filterKey = str_replace('classification.', '', $group['errorKey']); @endphp
+                            <optgroup label="{{ $group['label'] }}">
+                                @foreach ($group['options'] as $value => $name)
+                                    <option value="{{ $filterKey }}:{{ $value }}">{{ $name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="dm-filter">
+                    <label for="dmMakerFilter">Nhà sản xuất</label>
+                    <select id="dmMakerFilter" class="form-control form-control-sm dm-filter-select" multiple
+                        data-placeholder="Tất cả">
+                        @foreach ($dmMakerOptions as $name)
+                            <option value="{{ $name }}">{{ $name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="dm-filter">
+                    <label for="dmZoneFilter">Định khu</label>
+                    <select id="dmZoneFilter" class="form-control form-control-sm">
+                        <option value="">Tất cả</option>
+                        <option value="yes">Đã định khu</option>
+                        <option value="no">Chưa định khu</option>
+                    </select>
+                </div>
+
+                <div class="dm-filter">
+                    <label for="dmStockFilter">Ngưỡng tồn</label>
+                    <select id="dmStockFilter" class="form-control form-control-sm">
+                        <option value="">Tất cả</option>
+                        <option value="yes">Đã khai đủ</option>
+                        <option value="no">Chưa khai</option>
+                    </select>
+                </div>
+
+                <div class="dm-filter">
+                    <label for="dmStatusFilter">Sử dụng</label>
+                    <select id="dmStatusFilter" class="form-control form-control-sm">
+                        <option value="">Tất cả</option>
+                        <option value="1">Đang dùng</option>
+                        <option value="0">Đã khoá</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
         <div class="table-responsive">
@@ -32,7 +101,11 @@
                 </thead>
                 <tbody>
                     @foreach ($datas as $row)
-                        <tr>
+                        <tr data-class="dept:{{ $row->classification_id ?: 'none' }} {{ \App\Support\MaterialClassification::filterKeys($row->category_classification, $row->category_purchasing_department) }}"
+                            data-maker="{{ $row->manufacturer_name }}"
+                            data-zone="{{ $row->location_code ? 'yes' : 'no' }}"
+                            data-stock="{{ $row->min_stock !== null && $row->max_stock !== null ? 'yes' : 'no' }}"
+                            data-status="{{ $row->status_id == 1 ? '1' : '0' }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td class="font-weight-bold">{{ $row->category_code ?: '—' }}</td>
                             <td class="font-weight-bold">{{ $row->material_name ?: '—' }}</td>
@@ -81,9 +154,8 @@
                             <td class="md-sub">
                                 @if ($row->location_code)
                                     <div class="font-weight-bold">
-                                        <span class="md-tag">{{ $row->location_code }}</span>
+                                        {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                     </div>
-                                    <div>{{ $dmPath($row) }}</div>
                                 @else
                                     <span class="md-empty">Chưa định khu</span>
                                 @endif
@@ -123,6 +195,7 @@
                                                     'max_stock' => $row->max_stock,
                                                     'default_location_id' => $row->default_location_id,
                                                     'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                    'default_location_id_zone' => $row->location_zone_type ?? '',
                                                     'note' => $row->note,
                                                     'material_name' => $row->material_name,
                                                     'manufacturer_name' => $row->manufacturer_name,
@@ -157,8 +230,88 @@
     </div>
 </div>
 
+<style>
+    /* Ô lọc nhanh trên thanh công cụ của bảng vật tư phòng */
+    .dm-filter {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .dm-filter label {
+        margin: 0;
+        font-size: 0.83rem;
+        font-weight: 700;
+        color: var(--primary-dark);
+        white-space: nowrap;
+    }
+
+    .dm-filter .form-control {
+        width: auto;
+        min-width: 130px;
+    }
+
+    .dm-filter .select2-container {
+        min-width: 260px;
+        max-width: 520px;
+    }
+</style>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        /*
+         * ---------- Lọc bảng vật tư phòng ----------
+         * Chọn nhiều trong cùng một ô: HOẶC; giữa các ô: VÀ.
+         */
+        var dmWant = { cls: [], maker: [], zone: '', stock: '', status: '' };
+
+        $('.dm-filter-select').select2({
+            theme: 'bootstrap4',
+            width: 'style',
+            placeholder: 'Tất cả',
+            closeOnSelect: false,
+            allowClear: true
+        });
+
+        /*
+         * Phân loại: phân loại của phòng (dept:*) + các tiêu chí của danh mục công ty.
+         * Cùng một tiêu chí: HOẶC; khác tiêu chí: VÀ.
+         */
+        function dmMatchClass(keys) {
+            var groups = {};
+            dmWant.cls.forEach(function(value) {
+                var criterion = value.split(':')[0];
+                (groups[criterion] = groups[criterion] || []).push(value);
+            });
+
+            return Object.keys(groups).every(function(criterion) {
+                return groups[criterion].some(function(value) {
+                    return keys.indexOf(' ' + value + ' ') !== -1;
+                });
+            });
+        }
+
+        $.fn.dataTable.ext.search.push(function(settings, data, index) {
+            if (settings.nTable.id !== 'dmTable') return true;
+
+            var $tr = $(settings.aoData[index].nTr);
+            if (dmWant.cls.length && !dmMatchClass(' ' + ($tr.attr('data-class') || '') + ' ')) return false;
+            if (dmWant.maker.length && dmWant.maker.indexOf($tr.attr('data-maker') || '') === -1) return false;
+            if (dmWant.zone && $tr.attr('data-zone') !== dmWant.zone) return false;
+            if (dmWant.stock && $tr.attr('data-stock') !== dmWant.stock) return false;
+            if (dmWant.status && $tr.attr('data-status') !== dmWant.status) return false;
+            return true;
+        });
+
+        $(document).on('change', '#dmClassFilter, #dmMakerFilter, #dmZoneFilter, #dmStockFilter, #dmStatusFilter', function() {
+            dmWant.cls = $('#dmClassFilter').val() || [];
+            dmWant.maker = $('#dmMakerFilter').val() || [];
+            dmWant.zone = $('#dmZoneFilter').val() || '';
+            dmWant.stock = $('#dmStockFilter').val() || '';
+            dmWant.status = $('#dmStatusFilter').val() || '';
+            $('#dmTable').DataTable().draw();
+        });
+
         /*
          | ĐỀ NGHỊ DỰ TRÙ VẬT TƯ - hỏi số lượng cần đề nghị (theo đơn vị của phòng) + lý do
          | dự trù rồi gửi AJAX ngay. Dòng đã khoá
@@ -218,12 +371,14 @@
                     quantity: result.value.quantity,
                     note: result.value.note
                 }).done(function(res) {
+                    // Vật tư đang nằm trong phiếu chưa xong: không tự tắt để người dùng đọc mã phiếu
+                    var autoClose = res.success && !res.in_progress;
                     Swal.fire({
-                        icon: res.success ? 'success' : 'error',
+                        icon: !res.success ? 'error' : (res.in_progress ? 'info' : 'success'),
                         title: res.success ? 'Đã gửi đề nghị!' : 'Có lỗi xảy ra',
                         text: res.message || '',
-                        timer: res.success ? 1800 : undefined,
-                        showConfirmButton: !res.success
+                        timer: autoClose ? 2500 : undefined,
+                        showConfirmButton: !autoClose
                     });
                 }).fail(function() {
                     Swal.fire({ icon: 'error', title: 'Có lỗi xảy ra', text: 'Vui lòng thử lại.' });

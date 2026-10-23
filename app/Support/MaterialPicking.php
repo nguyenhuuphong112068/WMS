@@ -26,8 +26,11 @@ use Illuminate\Support\Facades\DB;
  *
  *      tồn      = amount + Σ material_balancings - Σ material_exports
  *      đang giữ = Σ material_pick_lines.suggested_amount   (đợt + dòng còn treo)
- *               + Σ material_quarantines.amount             (hàng hỏng đang cách ly)
+ *               + Σ material_calibrations (chờ QA / đạt chưa cấp - App\Support\MaterialCalibration)
  *      khả dụng = tồn - đang giữ
+ *
+ * Hàng hỏng ĐANG CÁCH LY không nằm ở phần giữ: lúc cách ly đã trừ tồn bằng material_exports
+ * type = cancel (MaterialQuarantineController::deductStock) - `quarantined` chỉ để hiển thị.
  *
  * Query Builder thuần, không Eloquent - song song với App\Support\DepartmentMaterial.
  */
@@ -46,7 +49,7 @@ class MaterialPicking
     /** Phiếu cách ly vật tư hỏng - xem App\Http\Controllers\Pages\Export\MaterialQuarantineController. */
     public const QUARANTINE_TABLE = 'material_quarantines';
 
-    /** Chỉ phiếu còn "Đang cách ly" mới giữ chỗ tồn; trả về kho thì nhả, loại bỏ thì đã trừ tồn thật. */
+    /** Trạng thái phiếu "Cách ly - Chờ quyết định" (đã trừ tồn từ lúc cách ly; trả về kho thì hoàn tồn). */
     public const QUARANTINE_HOLDING_STATUS = 'quarantined';
 
     /** Trạng thái dòng còn giữ chỗ tồn. Dòng bị bỏ (canceled) nhả ngay. */
@@ -70,6 +73,7 @@ class MaterialPicking
     {
         $held = self::heldByImport($departmentId);
         $quarantined = self::quarantinedByImport($departmentId);
+        $calibrating = MaterialCalibration::heldByImport($departmentId);
         $exported = self::sumByImport('material_exports', 'amount', $departmentId);
         $balanced = self::sumByImport('material_balancings', 'balancing_amount', $departmentId);
 
@@ -94,6 +98,7 @@ class MaterialPicking
                 'material_names.name as material_name',
                 'units.short_name as unit_short_name',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 'locations.warehouse_id',
                 'locations.shelf_id',
                 'locations.column_id',
@@ -110,13 +115,14 @@ class MaterialPicking
             ->orderBy('material_imports.imported_date', 'asc')  // 3. FIFO
             ->orderBy('material_imports.id', 'asc')
             ->get()
-            ->map(function ($lot) use ($held, $quarantined, $exported, $balanced, $today, $warningDays, $criticalDays) {
+            ->map(function ($lot) use ($held, $quarantined, $calibrating, $exported, $balanced, $today, $warningDays, $criticalDays) {
                 $lot->exported = (float) ($exported[$lot->id] ?? 0);
                 $lot->balanced = (float) ($balanced[$lot->id] ?? 0);
-                // Hàng đang CÁCH LY chờ quyết định vẫn nằm trong kho nhưng không được dùng -
-                // tính chung vào phần đang giữ để mọi màn cấp phát / chuyển đi tự chặn.
+                // Hàng đang CÁCH LY chờ quyết định: đã trừ tồn (dòng xuất cancel), chỉ để hiển thị
                 $lot->quarantined = (float) ($quarantined[$lot->id] ?? 0);
-                $lot->held = (float) ($held[$lot->id] ?? 0) + $lot->quarantined;
+                // Hàng đang gửi QA HIỆU CHUẨN / đạt chờ cấp cho đúng dòng đề nghị cũng giữ chỗ như vậy
+                $lot->calibrating = (float) ($calibrating[$lot->id] ?? 0);
+                $lot->held = (float) ($held[$lot->id] ?? 0) + $lot->calibrating;
 
                 // Tồn sổ sách - vẫn là con số màn Tồn Kho hiển thị
                 $lot->remaining = max((float) $lot->amount + $lot->balanced - $lot->exported, 0);
@@ -218,6 +224,7 @@ class MaterialPicking
             'import_code' => $lot->code,
             'location_id' => $lot->location_id ? (int) $lot->location_id : null,
             'location_code' => $lot->location_code,
+            'location_zone_type' => $lot->location_zone_type ?? null,
             'expired_date' => $lot->expired_date,
             'expiry_level' => $lot->expiry_level,
             'suggested_amount' => round($amount, 4),
@@ -292,10 +299,10 @@ class MaterialPicking
             ->pluck('total', 'import_id');
     }
 
-    /** Phần đang giữ của MỘT lô (đợt lấy hàng + hàng cách ly) - dùng khi kiểm tra ngay trước lúc ghi. */
+    /** Phần đang giữ của MỘT lô (đợt lấy hàng + hiệu chuẩn) - dùng khi kiểm tra ngay trước lúc ghi. */
     public static function heldOf(int $importId, ?int $ignoreWaveId = null): float
     {
-        return self::quarantinedOf($importId) + (float) DB::table(self::LINE_TABLE)
+        return MaterialCalibration::heldOf($importId) + (float) DB::table(self::LINE_TABLE)
             ->join(self::WAVE_TABLE, self::LINE_TABLE.'.wave_id', '=', self::WAVE_TABLE.'.id')
             ->where(self::LINE_TABLE.'.import_id', $importId)
             ->where(self::WAVE_TABLE.'.status_id', 1)
@@ -307,8 +314,8 @@ class MaterialPicking
     }
 
     /**
-     * Hàng HỎNG ĐANG CÁCH LY chờ quyết định của từng lô (bước 1 quy trình loại bỏ). Đã
-     * loại bỏ thì đã thành material_exports type = cancel nên không cộng ở đây nữa.
+     * Hàng HỎNG ĐANG CÁCH LY chờ quyết định của từng lô (bước 1 quy trình loại bỏ) - chỉ để
+     * hiển thị, tồn đã trừ bằng material_exports type = cancel từ lúc cách ly.
      *
      * @return \Illuminate\Support\Collection import_id => số lượng đang cách ly
      */

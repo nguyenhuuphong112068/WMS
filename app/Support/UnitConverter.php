@@ -83,7 +83,10 @@ class UnitConverter
      * Có đổi được giữa hai đơn vị này không, và nếu không thì vì sao.
      * Dùng để hiện thông báo cho người dùng thay vì im lặng trả về null.
      *
-     * @return array{ok: bool, reason: string}
+     * cause: nguyên nhân ngắn hiện ngay dưới chữ "Không quy đổi" ở các báo cáo (rỗng khi đổi được),
+     * reason: câu đầy đủ cho tooltip.
+     *
+     * @return array{ok: bool, reason: string, cause: string}
      */
     public static function check($fromUnit, $toUnit, ?float $density = null): array
     {
@@ -92,16 +95,17 @@ class UnitConverter
 
         if ($fromGroup === $toGroup) {
             if ($fromGroup === 'count') {
-                return ['ok' => true, 'reason' => 'Cùng nhóm đếm, chỉ đổi được khi hai đơn vị cùng quy cách.'];
+                return ['ok' => true, 'reason' => 'Cùng nhóm đếm, chỉ đổi được khi hai đơn vị cùng quy cách.', 'cause' => ''];
             }
 
-            return ['ok' => true, 'reason' => ''];
+            return ['ok' => true, 'reason' => '', 'cause' => ''];
         }
 
         if ($fromGroup === 'count' || $toGroup === 'count') {
             return [
                 'ok' => false,
                 'reason' => 'Không tự quy đổi được giữa đơn vị đếm/bao bì và đơn vị khối lượng hoặc thể tích. Cần khai báo quy cách đóng gói cho mặt hàng.',
+                'cause' => 'Đơn vị đếm/bao bì',
             ];
         }
 
@@ -109,10 +113,17 @@ class UnitConverter
             return [
                 'ok' => false,
                 'reason' => 'Đổi giữa khối lượng và thể tích cần tỉ trọng d (g/ml). Hãy khai báo tỉ trọng cho hoá chất này.',
+                'cause' => 'Thiếu tỉ trọng d (g/ml)',
             ];
         }
 
-        return ['ok' => true, 'reason' => ''];
+        return ['ok' => true, 'reason' => '', 'cause' => ''];
+    }
+
+    /** Kết quả check() khi Dữ Liệu Gốc chưa có đơn vị "kg". */
+    public static function missingKgUnit(): array
+    {
+        return ['ok' => false, 'reason' => 'Chưa có đơn vị "kg" trong Dữ Liệu Gốc nên không quy đổi được.', 'cause' => 'Chưa có đơn vị kg'];
     }
 
     /** Nhãn tiếng Việt của nhóm đơn vị. */

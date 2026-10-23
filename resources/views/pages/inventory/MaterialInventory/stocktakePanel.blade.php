@@ -179,7 +179,7 @@
                             </td>
                             <td class="md-sub">
                                 @if ($row->location_code)
-                                    <span class="md-tag">{{ $row->location_code }}</span>
+                                    {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                 @else <span class="text-muted">—</span> @endif
                             </td>
                             <td class="text-center md-sub">{{ $invDate($row->expired_date) }}</td>

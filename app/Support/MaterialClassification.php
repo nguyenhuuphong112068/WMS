@@ -227,6 +227,46 @@ class MaterialClassification
         return $parts ? implode('; ', $parts) : 'Chưa phân loại';
     }
 
+    /**
+     * Chuỗi khoá "tiêu chí:giá trị" cách nhau bởi dấu cách (kể cả purchasing_department) để
+     * gắn vào data-classification của dòng bảng, bộ lọc badge phía client đọc mà không dò chữ.
+     */
+    public static function filterKeys(?string $json, ?string $purchasing = null): string
+    {
+        $keys = collect(self::decode($json))->map(fn ($value, $key) => $key.':'.$value)->values();
+
+        if ($purchasing && isset(self::PURCHASING_DEPARTMENTS[$purchasing])) {
+            $keys->push('purchasing_department:'.$purchasing);
+        }
+
+        return $keys->implode(' ');
+    }
+
+    /**
+     * Nhóm badge lọc theo phân loại: [['label', 'icon', 'chips' => [['key', 'short', 'class']]]],
+     * cùng thứ tự với form khai báo. Nhãn chip dùng SHORT_LABELS để đứng riêng vẫn hiểu được.
+     */
+    public static function filterGroups(): array
+    {
+        return collect(self::formGroups())
+            ->map(function ($group) {
+                $criterion = str_replace('classification.', '', $group['errorKey']);
+
+                return [
+                    'label' => $group['label'],
+                    'icon' => $group['icon'],
+                    'chips' => collect($group['options'])->map(fn ($name, $value) => [
+                        'key' => $criterion.':'.$value,
+                        'short' => $criterion === 'purchasing_department'
+                            ? 'Mua: '.$name
+                            : (self::SHORT_LABELS[$criterion][$value] ?? $name),
+                        'class' => self::CHIP_CLASSES[$criterion][$value] ?? '',
+                    ])->values()->all(),
+                ];
+            })
+            ->all();
+    }
+
     /** Vật tư phải được QA hiệu chuẩn trước khi sử dụng - cấp phát xong phải báo QA. */
     public static function needsQaCalibration(?string $json): bool
     {

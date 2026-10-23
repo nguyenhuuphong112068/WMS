@@ -116,7 +116,7 @@
 
             @php($frequencyOrder = array_flip(array_keys($frequencies)))
 
-            <table id="data_table_consumption_object" class="table table-bordered table-striped">
+            <table id="data_table_consumption_object" class="table table-bordered table-striped" data-deferred>
                 <thead style="position: sticky; top: 60px; background-color: white; z-index: 1020">
                     <tr>
                         <th>STT</th>
@@ -133,6 +133,7 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @deferredRows('data_table_consumption_object')
                     @foreach ($datas as $data)
                         <tr>
                             <td>{{ $loop->iteration }} </td>
@@ -207,11 +208,14 @@
                             </td>
                         </tr>
                     @endforeach
+                    @enddeferredRows
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+
+@include('pages.shared.deferredRows')
 
 <script src="{{ asset('js/vendor/jquery-1.12.4.min.js') }}"></script>
 <script src="{{ asset('js/popper.min.js') }}"></script>
@@ -244,7 +248,8 @@
     $(document).ready(function() {
         document.body.style.overflowY = "auto";
 
-        $('.btn-edit').click(function() {
+        // Gắn qua document: dòng bảng nạp sau (data-deferred), chỉ dòng đang hiện mới có <tr>
+        $(document).on('click', '.btn-edit', function() {
             const button = $(this);
             const modal = $('#updateModal');
             // Đối tượng đồng bộ từ CAL: loại + mã + tần suất là khoá nhận diện, không cho sửa
@@ -285,7 +290,7 @@
             });
         });
 
-        $('.form-deActive').on('submit', function(e) {
+        $(document).on('submit', '.form-deActive', function(e) {
             e.preventDefault();
             const form = this;
             const name = $(form).find('button').data('name');
@@ -326,7 +331,8 @@
             });
         });
 
-        const table = $('#data_table_consumption_object').DataTable({
+        // Dòng nạp sau bằng AJAX - pages/shared/deferredRows
+        const table = $('#data_table_consumption_object').DataTable(mdDeferred.extend('#data_table_consumption_object', {
             paging: true,
             lengthChange: true,
             searching: true,
@@ -350,7 +356,7 @@
                     next: "Sau"
                 }
             }
-        });
+        }));
 
         // Lọc theo loại (cột 1) / nguồn dữ liệu (cột 2) - so khớp đúng nguyên nhãn
         const bindFilter = (selector, column) => {
