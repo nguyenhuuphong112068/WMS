@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Pages\Estimate;
 
+use App\Http\Controllers\Concerns\EstimateItemAttachments;
 use App\Http\Controllers\Concerns\EstimateItemCancel;
 use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentStandard;
+use App\Support\EstimateWatchlist;
+use App\Support\MaterialLeadTime;
 use App\Support\StandardCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +37,7 @@ use Illuminate\Validation\Rule;
  */
 class StandardEstimateController extends Controller
 {
+    use EstimateItemAttachments;
     use EstimateItemCancel;
     use EstimateSignFlow;
     use VerifiesSignature;
@@ -45,6 +49,13 @@ class StandardEstimateController extends Controller
     private const AMOUNT_TABLE = 'standard_estimate_item_amounts';
 
     private const HISTORY_TABLE = 'standard_estimate_histories';
+
+    /** File đính kèm theo từng mục - xem App\Http\Controllers\Concerns\EstimateItemAttachments. */
+    private const ATTACHMENT_TABLE = 'standard_estimate_attachments';
+
+    private const ATTACHMENT_FOLDER = 'standard_estimates';
+
+    private const ATTACHMENT_ITEM_FK = 'standard_estimate_item_id';
 
     /** Quy trình ký duyệt động - xem App\Http\Controllers\Concerns\EstimateSignFlow. */
     private const SIGN_TABLE = 'standard_estimate_signs';
@@ -131,6 +142,9 @@ class StandardEstimateController extends Controller
             : collect();
 
 
+        // Chất chuẩn của phòng đang tồn dưới ngưỡng tối thiểu - tab "Danh sách chất chuẩn cần dự trù"
+        $watchlistItems = $tabAllowed['watchlist'] ? EstimateWatchlist::forTab('standard', $departmentId) : collect();
+
         // Tab "Đơn dự trù đã được phê duyệt" - phiếu đã duyệt của mọi phòng ban, chỉ bộ phận mua hàng
         $approvedLists = $tabAllowed['approved'] ? $this->approvedLists($departmentId) : null;
 
@@ -159,6 +173,9 @@ class StandardEstimateController extends Controller
             'approvedLists' => $approvedLists,
             'approvedSignRows' => $approvedLists ? $this->signRows($approvedLists->pluck('id')) : collect(),
             'approvedItemCounts' => $approvedLists ? $this->itemCounts($approvedLists->pluck('id')->all()) : [],
+            'watchlistItems' => $watchlistItems,
+            'groups' => config('standard.groups'),
+            'units' => $this->unitOptions(),
         ]);
     }
 
@@ -204,6 +221,8 @@ class StandardEstimateController extends Controller
             'signPermission' => self::SIGN_PERMISSION,
             'canEditItems' => ! $readOnly && $this->editable($list),
             'readOnly' => $readOnly,
+            // Mốc tính cảnh báo thời gian đặt hàng: ngày BGĐ duyệt (bước ký cuối), chưa duyệt thì ngày tạo phiếu
+            'approvedAt' => $list->app_status === 'approved' ? $signs->max('signed_at') : null,
             // Mở từ tab "Đơn dự trù đã được phê duyệt": hiện cột Ngày Hẹn Đáp Ứng cho bộ phận mua hàng sửa
             'purchaserView' => $request->query('from') === 'approved' && $this->canViewAsPurchaser($list),
             'backRoute' => route('pages.estimate.standardEstimate.list', $request->query('from') === 'approved' ? ['tab' => 'approved'] : []),
@@ -215,6 +234,103 @@ class StandardEstimateController extends Controller
     public function history(Request $request)
     {
         return response()->json(['rows' => self::historiesOf((int) $request->id)]);
+    }
+
+    /**
+     * LẬP PHIẾU DỰ TRÙ TỪ TAB "DANH SÁCH CHẤT CHUẨN CẦN DỰ TRÙ"
+     *
+     * Người dùng tick chọn các chất chuẩn dưới ngưỡng tồn tối thiểu rồi khai số lượng / tháng cần
+     * dùng (và nhóm chuẩn mong muốn) cho từng dòng. Phiếu tạo ra giống phiếu lập tay: trạng thái
+     * Nháp, mỗi chất chuẩn một mục kèm ĐÚNG MỘT dòng số lượng. Lưu xong mở thẳng trang chi tiết.
+     */
+    public function watchlistEstimateStore(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules() + $this->watchlistItemRules(),
+            $this->messages() + $this->watchlistItemMessages()
+        );
+
+        $validator->after(function ($validator) use ($request, $departmentId) {
+            $items = (array) $request->input('items', []);
+            $categoryIds = [];
+
+            foreach ($items as $index => $item) {
+                $categoryIds['items.'.$index.'.category_id'] = $item['category_id'] ?? null;
+            }
+
+            foreach ($this->duplicateCategoryErrors(null, $categoryIds, 'chất chuẩn') as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+
+            foreach (EstimateWatchlist::inProgressErrors('standard', $departmentId, $items, 'chất chuẩn') as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'watchlistEstimateErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput()
+                ->with('activeTab', 'watchlist');
+        }
+
+        $items = (array) $request->input('items', []);
+
+        $result = DB::transaction(function () use ($request, $departmentId, $items) {
+            $code = $this->nextCode($departmentId);
+
+            $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
+                'code' => $code,
+                'department_id' => $departmentId,
+                'app_status' => 'draft',
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Ngày mong muốn giao tính theo thời gian đặt hàng của danh mục - xem MaterialLeadTime::defaultExpectedDate()
+            $leadDays = DB::table('standard_categories')
+                ->whereIn('id', array_map(fn ($item) => (int) $item['category_id'], $items))
+                ->pluck('lead_time_days', 'id');
+
+            foreach ($items as $item) {
+                $itemId = DB::table(self::ITEM_TABLE)->insertGetId([
+                    'standard_estimate_id' => $id,
+                    'category_id' => (int) $item['category_id'],
+                    'group_key' => $this->nullIfBlank($item['group_key'] ?? null),
+                    'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
+                    'expected_delivery_date' => MaterialLeadTime::defaultExpectedDate($leadDays[(int) $item['category_id']] ?? null),
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $this->saveAmountRows($itemId, [[
+                    'amount' => $item['amount'],
+                    'unit_id' => $item['unit_id'],
+                    'for_month_year' => $item['for_month_year'],
+                ]]);
+            }
+
+            return ['id' => $id, 'code' => $code];
+        });
+
+        AuditTrialController::log(
+            'Thêm mới',
+            self::TABLE,
+            $result['id'],
+            'NA',
+            'Lập '.self::LABEL.' '.$result['code'].' từ danh sách chất chuẩn cần dự trù ('.count($items).' mục)'
+        );
+
+        return redirect()->route(self::EST_ROUTE.'detail', ['id' => $result['id']])
+            ->with('success', 'Đã lập '.self::LABEL.' mã '.$result['code'].' với '.count($items).' chất chuẩn đã chọn!');
     }
 
     /* ==========================================================
@@ -335,13 +451,36 @@ class StandardEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không thêm mặt hàng được nữa!');
         }
 
-        $this->pruneEmptyItemRows($request);
+        // File của từng dòng đi theo chỉ số MỚI sau khi bỏ dòng trống (không dùng $request->all()
+        // vì phần file vẫn giữ chỉ số cũ)
+        $itemFiles = $this->itemFilesByIndex($request, $this->pruneEmptyItemRows($request));
 
-        $validator = Validator::make($request->all(), $this->batchItemRules(), $this->batchItemMessages());
+        $data = $request->input();
+        foreach ($itemFiles as $index => $files) {
+            $data['items'][$index]['files'] = $files;
+        }
+
+        $validator = Validator::make(
+            $data,
+            $this->batchItemRules() + self::itemFileRules(),
+            $this->batchItemMessages() + self::itemFileMessages('chất chuẩn')
+        );
 
         // Mỗi dòng phải có ít nhất một tháng có số lượng; cột nào có số thì phải chọn tháng
-        $validator->after(function ($validator) use ($request) {
+        $validator->after(function ($validator) use ($request, $list) {
             $periods = (array) $request->input('periods', []);
+            $categoryIds = [];
+
+            foreach ((array) $request->input('items', []) as $index => $line) {
+                if (($line['source'] ?? '') === 'category') {
+                    $categoryIds['items.'.$index.'.category_id'] = $line['category_id'] ?? null;
+                }
+            }
+
+            // Mỗi mã chất chuẩn chỉ một dòng trong phiếu
+            foreach ($this->duplicateCategoryErrors((int) $list->id, $categoryIds, 'chất chuẩn') as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
 
             foreach ((array) $request->input('items', []) as $index => $line) {
                 $hasAmount = false;
@@ -371,10 +510,10 @@ class StandardEstimateController extends Controller
         $periods = (array) $request->input('periods', []);
         $lines = (array) $request->input('items', []);
 
-        $itemIds = DB::transaction(function () use ($lines, $periods, $list) {
+        $itemIds = DB::transaction(function () use ($lines, $periods, $list, $itemFiles) {
             $ids = [];
 
-            foreach ($lines as $line) {
+            foreach ($lines as $index => $line) {
                 $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayloadFrom($line) + [
                     'standard_estimate_id' => $list->id,
                     'status_id' => 1,
@@ -395,6 +534,7 @@ class StandardEstimateController extends Controller
                 }
 
                 $this->saveAmountRows($itemId, $amountRows);
+                $this->storeItemFiles((int) $list->id, $itemId, $itemFiles[$index] ?? [], null);
                 $ids[] = $itemId;
             }
 
@@ -427,6 +567,19 @@ class StandardEstimateController extends Controller
         $this->pruneEmptyAmounts($request);
 
         $validator = Validator::make($request->all(), $this->itemRules(), $this->itemMessages());
+
+        // Mỗi mã chất chuẩn chỉ một dòng trong phiếu
+        $validator->after(function ($validator) use ($request, $list, $item) {
+            if ($request->input('source') !== 'category') {
+                return;
+            }
+
+            $errors = $this->duplicateCategoryErrors((int) $list->id, ['category_id' => $request->input('category_id')], 'chất chuẩn', (int) $item->id);
+
+            foreach ($errors as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'itemUpdateErrors')->withInput();
@@ -1032,9 +1185,11 @@ class StandardEstimateController extends Controller
                 'standard_categories.code as category_code',
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no as category_cas_no',
+                'standard_categories.lead_time_days as category_lead_time_days',
                 'standard_names.name as category_standard_name',
                 'units.short_name as category_unit_short_name',
-                'manufacturers.name as category_manufacturer_name'
+                'manufacturers.name as category_manufacturer_name',
+                'manufacturers.short_name as category_manufacturer_short_name'
             )
             ->where(self::ITEM_TABLE.'.standard_estimate_id', $listId)
             ->where(self::ITEM_TABLE.'.active', 1)
@@ -1071,10 +1226,14 @@ class StandardEstimateController extends Controller
             ->groupBy('item_id')
             ->map->count();
 
-        return $items->map(function ($item) use ($amounts, $chats, $historyCounts) {
+        // File đính kèm của từng chất chuẩn
+        $files = self::filesByItem($items->pluck('id')->all());
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $files) {
             $item->amounts = ($amounts[$item->id] ?? collect())->values();
             $item->chats = ($chats[$item->id] ?? collect())->values();
             $item->history_count = $historyCounts[$item->id] ?? 0;
+            $item->files = ($files[$item->id] ?? collect())->values();
             // Tên hiển thị: lấy theo danh mục, chất chuẩn ngoài danh mục thì lấy tên tự nhập
             $item->display_name = $item->category_id ? $item->category_standard_name : $item->standard_name;
             $item->group_label = $item->group_key ? StandardCode::groupLabel($item->group_key) : null;
@@ -1167,13 +1326,16 @@ class StandardEstimateController extends Controller
 
     /**
      * Modal thêm nhiều chất chuẩn: bỏ các dòng trống hoàn toàn (chưa chọn/gõ chất chuẩn, không
-     * số lượng, không thông tin) rồi đánh số lại, để lỗi validate trỏ đúng dòng đang hiện.
+     * số lượng, không thông tin, không file) rồi đánh số lại, để lỗi validate trỏ đúng dòng đang hiện.
+     *
+     * @return int[] chỉ số GỐC của các dòng còn giữ, theo thứ tự chỉ số mới
      */
-    private function pruneEmptyItemRows(Request $request): void
+    private function pruneEmptyItemRows(Request $request): array
     {
         $rows = [];
+        $kept = [];
 
-        foreach ((array) $request->input('items', []) as $line) {
+        foreach ((array) $request->input('items', []) as $origIndex => $line) {
             $line = (array) $line;
             $line['amounts'] = array_map(fn ($value) => trim((string) $value), (array) ($line['amounts'] ?? []));
 
@@ -1182,14 +1344,18 @@ class StandardEstimateController extends Controller
                 && trim((string) ($line['standard_name'] ?? '')) === ''
                 && trim((string) ($line['technical_information'] ?? '')) === ''
                 && trim((string) ($line['purpose'] ?? '')) === ''
-                && trim((string) ($line['expected_delivery_date'] ?? '')) === '';
+                && trim((string) ($line['expected_delivery_date'] ?? '')) === ''
+                && ! array_filter((array) $request->file('items.'.$origIndex.'.files', []));
 
             if (! $isBlank) {
                 $rows[] = $line;
+                $kept[] = $origIndex;
             }
         }
 
         $request->merge(['items' => $rows]);
+
+        return $kept;
     }
 
     /** Ghi lại các dòng số lượng theo tháng của một mặt hàng (form sửa 1 mặt hàng). */
@@ -1297,6 +1463,7 @@ class StandardEstimateController extends Controller
                 'standard_categories.version',
                 'standard_categories.groups',
                 'standard_categories.cas_no',
+                'standard_categories.lead_time_days',
                 'standard_names.name as standard_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
@@ -1418,6 +1585,7 @@ class StandardEstimateController extends Controller
             ],
             'technical_information' => ['nullable', 'max:1000'],
             'purpose' => ['nullable', 'max:1000'],
+            'expected_delivery_date' => ['nullable', 'date'],
             'amounts' => ['required', 'array', 'min:1'],
             'amounts.*.amount' => ['required', 'numeric', 'min:0.0001'],
             'amounts.*.unit_id' => ['required', 'exists:units,id'],
@@ -1442,6 +1610,40 @@ class StandardEstimateController extends Controller
             'technical_information' => $this->nullIfBlank($line['technical_information'] ?? null),
             'purpose' => $this->nullIfBlank($line['purpose'] ?? null),
             'expected_delivery_date' => $this->nullIfBlank($line['expected_delivery_date'] ?? null),
+        ];
+    }
+
+    /** Quy tắc cho các dòng chất chuẩn chọn từ tab "Danh sách chất chuẩn cần dự trù". */
+    private function watchlistItemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.category_id' => ['required', 'exists:standard_categories,id'],
+            'items.*.group_key' => ['nullable', Rule::in(array_keys(config('standard.groups')))],
+            'items.*.purpose' => ['nullable', 'max:1000'],
+            'items.*.amount' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.unit_id' => ['required', 'exists:units,id'],
+            'items.*.for_month_year' => ['required', 'date_format:Y-m'],
+        ];
+    }
+
+    private function watchlistItemMessages(): array
+    {
+        return [
+            'items.required' => 'Vui lòng chọn ít nhất một chất chuẩn để lập phiếu dự trù.',
+            'items.min' => 'Vui lòng chọn ít nhất một chất chuẩn để lập phiếu dự trù.',
+            'items.max' => 'Mỗi lần lập tối đa 200 chất chuẩn.',
+            'items.*.category_id.required' => 'Chất chuẩn được chọn không hợp lệ.',
+            'items.*.category_id.exists' => 'Chất chuẩn được chọn không tồn tại trong danh mục.',
+            'items.*.group_key.in' => 'Nhóm chuẩn không hợp lệ.',
+            'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'items.*.amount.required' => 'Vui lòng nhập số lượng dự trù cho mọi chất chuẩn đã chọn.',
+            'items.*.amount.numeric' => 'Số lượng dự trù phải là số.',
+            'items.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính cho mọi chất chuẩn đã chọn.',
+            'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'items.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng cho mọi chất chuẩn đã chọn.',
+            'items.*.for_month_year.date_format' => 'Tháng cần dùng không hợp lệ.',
         ];
     }
 
@@ -1511,6 +1713,7 @@ class StandardEstimateController extends Controller
             'group_key.in' => 'Nhóm chuẩn không hợp lệ.',
             'technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
             'purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
             'amounts.required' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
             'amounts.min' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
             'amounts.*.amount.required' => 'Vui lòng nhập số lượng dự trù.',

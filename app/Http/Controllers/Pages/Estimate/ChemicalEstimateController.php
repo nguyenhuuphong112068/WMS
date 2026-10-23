@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\Estimate;
 
+use App\Http\Controllers\Concerns\EstimateItemAttachments;
 use App\Http\Controllers\Concerns\EstimateItemCancel;
 use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
@@ -11,6 +12,8 @@ use App\Support\ActiveIngredientThreshold;
 use App\Support\ChemicalEstimateThreshold;
 use App\Support\CompanyContext;
 use App\Support\DepartmentChemical;
+use App\Support\EstimateWatchlist;
+use App\Support\MaterialLeadTime;
 use App\Support\MixtureHazardThreshold;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +38,7 @@ use Illuminate\Support\Facades\Validator;
  */
 class ChemicalEstimateController extends Controller
 {
+    use EstimateItemAttachments;
     use EstimateItemCancel;
     use EstimateSignFlow;
     use VerifiesSignature;
@@ -46,6 +50,13 @@ class ChemicalEstimateController extends Controller
     private const AMOUNT_TABLE = 'chemical_estimate_item_amounts';
 
     private const HISTORY_TABLE = 'chemical_estimate_histories';
+
+    /** File đính kèm theo từng mục - xem App\Http\Controllers\Concerns\EstimateItemAttachments. */
+    private const ATTACHMENT_TABLE = 'chemical_estimate_attachments';
+
+    private const ATTACHMENT_FOLDER = 'chemical_estimates';
+
+    private const ATTACHMENT_ITEM_FK = 'estimate_item_id';
 
     /** Quy trình ký duyệt động - xem App\Http\Controllers\Concerns\EstimateSignFlow. */
     private const SIGN_TABLE = 'chemical_estimate_signs';
@@ -138,6 +149,9 @@ class ChemicalEstimateController extends Controller
             : collect();
 
 
+        // Hoá chất của phòng đang tồn dưới ngưỡng tối thiểu - tab "Danh sách hoá chất cần dự trù"
+        $watchlistItems = $tabAllowed['watchlist'] ? EstimateWatchlist::forTab('chemical', $departmentId) : collect();
+
         // Tab "Đơn dự trù đã được phê duyệt" - phiếu đã duyệt của mọi phòng ban, chỉ bộ phận mua hàng
         $approvedLists = $tabAllowed['approved'] ? $this->approvedLists($departmentId) : null;
 
@@ -166,13 +180,16 @@ class ChemicalEstimateController extends Controller
             'approvedLists' => $approvedLists,
             'approvedSignRows' => $approvedLists ? $this->signRows($approvedLists->pluck('id')) : collect(),
             'approvedItemCounts' => $approvedLists ? $this->itemCounts($approvedLists->pluck('id')->all()) : [],
+            'watchlistItems' => $watchlistItems,
+            // Mã đã vượt ngưỡng PL IV (tồn + đang dự trù) thì khoá chọn ở tab cần dự trù
+            'watchlistStatus' => $watchlistItems->isNotEmpty()
+                ? ChemicalEstimateThreshold::categoryStatus(CompanyContext::resolveForDepartment($departmentId))
+                : [],
+            'units' => $this->unitOptions(),
         ]);
     }
 
-    /**
-     * Trang chi tiết một phiếu: danh sách mặt hàng + số lượng theo tháng.
-     * Dùng chung view với màn Tiếp Nhận Dự Trù, khác nhau ở quyền sửa.
-     */
+    /** Trang chi tiết một phiếu: danh sách hoá chất + số lượng theo tháng. */
     public function detail(Request $request)
     {
         $list = DB::table(self::TABLE)
@@ -194,7 +211,7 @@ class ChemicalEstimateController extends Controller
         $signs = $this->signRows([$list->id])->get($list->id, collect());
         $pendingSign = $this->pendingSign($list, $signs);
 
-        return view('pages.estimate.shared.detail', [
+        return view('pages.estimate.ChemicalEstimate.detail', [
             // Ngưỡng tồn tối đa + tồn hiện tại của phòng, để khối số lượng cảnh báo dự trù quá nhiều
             'maxStock' => \App\Support\MaxStockWarning::forChemical((int) $list->department_id),
             'list' => $list,
@@ -223,6 +240,8 @@ class ChemicalEstimateController extends Controller
             'signPermission' => self::SIGN_PERMISSION,
             'canEditItems' => ! $readOnly && $this->editable($list),
             'readOnly' => $readOnly,
+            // Mốc tính cảnh báo thời gian đặt hàng: ngày BGĐ duyệt (bước ký cuối), chưa duyệt thì ngày tạo phiếu
+            'approvedAt' => $list->app_status === 'approved' ? $signs->max('signed_at') : null,
             // Mở từ tab "Đơn dự trù đã được phê duyệt": hiện cột Ngày Hẹn Đáp Ứng cho bộ phận mua hàng sửa
             'purchaserView' => $request->query('from') === 'approved' && $this->canViewAsPurchaser($list),
             'backRoute' => route('pages.estimate.chemicalEstimate.list', $request->query('from') === 'approved' ? ['tab' => 'approved'] : []),
@@ -234,6 +253,114 @@ class ChemicalEstimateController extends Controller
     public function history(Request $request)
     {
         return response()->json(['rows' => self::historiesOf((int) $request->id)]);
+    }
+
+    /**
+     * LẬP PHIẾU DỰ TRÙ TỪ TAB "DANH SÁCH HOÁ CHẤT CẦN DỰ TRÙ"
+     *
+     * Người dùng tick chọn các hoá chất dưới ngưỡng tồn tối thiểu rồi khai số lượng / tháng cần
+     * dùng cho từng dòng. Phiếu tạo ra giống phiếu lập tay: trạng thái Nháp, mỗi hoá chất một mục
+     * kèm ĐÚNG MỘT dòng số lượng. Lưu xong mở thẳng trang chi tiết để bổ sung rồi trình ký.
+     */
+    public function watchlistEstimateStore(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $list = (object) ['department_id' => $departmentId];
+
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules() + $this->watchlistItemRules(),
+            $this->messages() + $this->watchlistItemMessages()
+        );
+
+        $validator->after(function ($validator) use ($request, $departmentId, $list) {
+            $items = (array) $request->input('items', []);
+            $categoryIds = [];
+
+            foreach ($items as $index => $item) {
+                $categoryIds['items.'.$index.'.category_id'] = $item['category_id'] ?? null;
+                $categoryId = (int) ($item['category_id'] ?? 0);
+
+                // Hoá chất nhóm 9 / 10: chặn mã đã vượt ngưỡng PL IV; khai khác đơn vị danh mục phải
+                // có hệ số quy đổi - form này không có ô hệ số nên phải dự trù đúng đơn vị danh mục
+                if ($categoryId && ($blocked = $this->blockedStatus($list, $categoryId))) {
+                    $validator->errors()->add('items.'.$index.'.category_id', 'Hoá chất dòng '.($index + 1).' đã vượt ngưỡng, không được dự trù thêm - '.$blocked->message);
+                }
+
+                if ($categoryId && ($error = $this->factorError($departmentId, $categoryId, $item['unit_id'] ?? null, null))) {
+                    $validator->errors()->add('items.'.$index.'.unit_id', 'Hoá chất dòng '.($index + 1).': '.$error.' Hãy dự trù theo đơn vị danh mục, hoặc lập phiếu rồi sửa ở trang chi tiết.');
+                }
+            }
+
+            foreach ($this->duplicateCategoryErrors(null, $categoryIds, 'hoá chất') as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+
+            foreach (EstimateWatchlist::inProgressErrors('chemical', $departmentId, $items, 'hoá chất') as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'watchlistEstimateErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput()
+                ->with('activeTab', 'watchlist');
+        }
+
+        $items = (array) $request->input('items', []);
+
+        $result = DB::transaction(function () use ($request, $departmentId, $items) {
+            $code = $this->nextCode($departmentId);
+
+            $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
+                'code' => $code,
+                'department_id' => $departmentId,
+                'app_status' => 'draft',
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Ngày mong muốn giao tính theo thời gian đặt hàng của danh mục - xem MaterialLeadTime::defaultExpectedDate()
+            $leadDays = DB::table('chemical_categories')
+                ->whereIn('id', array_map(fn ($item) => (int) $item['category_id'], $items))
+                ->pluck('lead_time_days', 'id');
+
+            foreach ($items as $item) {
+                $itemId = DB::table(self::ITEM_TABLE)->insertGetId([
+                    'estimate_list_id' => $id,
+                    'category_id' => (int) $item['category_id'],
+                    'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
+                    'expected_delivery_date' => MaterialLeadTime::defaultExpectedDate($leadDays[(int) $item['category_id']] ?? null),
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $this->saveAmountRows($itemId, [[
+                    'amount' => $item['amount'],
+                    'unit_id' => $item['unit_id'],
+                    'for_month_year' => $item['for_month_year'],
+                ]]);
+            }
+
+            return ['id' => $id, 'code' => $code];
+        });
+
+        AuditTrialController::log(
+            'Thêm mới',
+            self::TABLE,
+            $result['id'],
+            'NA',
+            'Lập '.self::LABEL.' '.$result['code'].' từ danh sách hoá chất cần dự trù ('.count($items).' mục)'
+        );
+
+        return redirect()->route(self::EST_ROUTE.'detail', ['id' => $result['id']])
+            ->with('success', 'Đã lập '.self::LABEL.' mã '.$result['code'].' với '.count($items).' hoá chất đã chọn!');
     }
 
     /* ==========================================================
@@ -355,13 +482,36 @@ class ChemicalEstimateController extends Controller
             return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không thêm mặt hàng được nữa!');
         }
 
-        $this->pruneEmptyItemRows($request);
+        // File của từng dòng đi theo chỉ số MỚI sau khi bỏ dòng trống (không dùng $request->all()
+        // vì phần file vẫn giữ chỉ số cũ)
+        $itemFiles = $this->itemFilesByIndex($request, $this->pruneEmptyItemRows($request));
 
-        $validator = Validator::make($request->all(), $this->batchItemRules(), $this->batchItemMessages());
+        $data = $request->input();
+        foreach ($itemFiles as $index => $files) {
+            $data['items'][$index]['files'] = $files;
+        }
+
+        $validator = Validator::make(
+            $data,
+            $this->batchItemRules() + self::itemFileRules(),
+            $this->batchItemMessages() + self::itemFileMessages('hoá chất')
+        );
 
         // Mỗi dòng phải có ít nhất một tháng có số lượng; cột nào có số thì phải chọn tháng
         $validator->after(function ($validator) use ($request, $list) {
             $periods = (array) $request->input('periods', []);
+            $categoryIds = [];
+
+            foreach ((array) $request->input('items', []) as $index => $line) {
+                if (($line['source'] ?? '') === 'category') {
+                    $categoryIds['items.'.$index.'.category_id'] = $line['category_id'] ?? null;
+                }
+            }
+
+            // Mỗi mã hoá chất chỉ một dòng trong phiếu
+            foreach ($this->duplicateCategoryErrors((int) $list->id, $categoryIds, 'hoá chất') as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
 
             foreach ((array) $request->input('items', []) as $index => $line) {
                 $hasAmount = false;
@@ -408,10 +558,10 @@ class ChemicalEstimateController extends Controller
         $periods = (array) $request->input('periods', []);
         $lines = (array) $request->input('items', []);
 
-        $itemIds = DB::transaction(function () use ($lines, $periods, $list) {
+        $itemIds = DB::transaction(function () use ($lines, $periods, $list, $itemFiles) {
             $ids = [];
 
-            foreach ($lines as $line) {
+            foreach ($lines as $index => $line) {
                 $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayloadFrom($line) + [
                     'estimate_list_id' => $list->id,
                     'status_id' => 1,
@@ -433,6 +583,7 @@ class ChemicalEstimateController extends Controller
                 }
 
                 $this->saveAmountRows($itemId, $amountRows);
+                $this->storeItemFiles((int) $list->id, $itemId, $itemFiles[$index] ?? [], null);
                 $ids[] = $itemId;
             }
 
@@ -485,6 +636,11 @@ class ChemicalEstimateController extends Controller
             }
 
             $categoryId = (int) $request->category_id;
+
+            // Mỗi mã hoá chất chỉ một dòng trong phiếu
+            foreach ($this->duplicateCategoryErrors((int) $list->id, ['category_id' => $categoryId], 'hoá chất', (int) $item->id) as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
 
             if ($categoryId !== (int) $item->category_id && ($blocked = $this->blockedStatus($list, $categoryId))) {
                 $validator->errors()->add('category_id', 'Đã vượt ngưỡng, không được dự trù thêm - '.$blocked->message);
@@ -1119,9 +1275,11 @@ class ChemicalEstimateController extends Controller
                 self::ITEM_TABLE.'.*',
                 'chemical_categories.code as category_code',
                 'chemical_categories.type as category_type',
+                'chemical_categories.lead_time_days as category_lead_time_days',
                 'chem_names.name as category_chem_name',
                 'units.short_name as category_unit_short_name',
-                'manufacturers.name as category_manufacturer_name'
+                'manufacturers.name as category_manufacturer_name',
+                'manufacturers.short_name as category_manufacturer_short_name'
             )
             ->where(self::ITEM_TABLE.'.estimate_list_id', $listId)
             ->where(self::ITEM_TABLE.'.active', 1)
@@ -1161,10 +1319,14 @@ class ChemicalEstimateController extends Controller
         // Mặt hàng dự trù chưa hoàn thành toàn công ty - cộng vào đối chiếu ngưỡng PL IV
         $pendingRows = ChemicalEstimateThreshold::pendingRows($companyId, ChemicalEstimateThreshold::criticalCategoryIds());
 
-        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $companyId, $departmentId, $pendingRows) {
+        // File đính kèm của từng hoá chất
+        $files = self::filesByItem($items->pluck('id')->all());
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $companyId, $departmentId, $pendingRows, $files) {
             $item->amounts = ($amounts[$item->id] ?? collect())->values();
             $item->chats = ($chats[$item->id] ?? collect())->values();
             $item->history_count = $historyCounts[$item->id] ?? 0;
+            $item->files = ($files[$item->id] ?? collect())->values();
             // Tên hiển thị: lấy theo danh mục, hoá chất ngoài danh mục thì lấy tên tự nhập
             $item->display_name = $item->category_id ? $item->category_chem_name : $item->chem_name;
             // Cảnh báo ngưỡng PL IV hiển thị thường trực cho người ký duyệt / bộ phận tiếp nhận
@@ -1591,13 +1753,16 @@ class ChemicalEstimateController extends Controller
 
     /**
      * Modal thêm nhiều mặt hàng: bỏ các dòng trống hoàn toàn (chưa chọn/gõ hoá chất, không số
-     * lượng, không thông tin) rồi đánh số lại, để lỗi validate trỏ đúng dòng đang hiện.
+     * lượng, không thông tin, không file) rồi đánh số lại, để lỗi validate trỏ đúng dòng đang hiện.
+     *
+     * @return int[] chỉ số GỐC của các dòng còn giữ, theo thứ tự chỉ số mới
      */
-    private function pruneEmptyItemRows(Request $request): void
+    private function pruneEmptyItemRows(Request $request): array
     {
         $rows = [];
+        $kept = [];
 
-        foreach ((array) $request->input('items', []) as $line) {
+        foreach ((array) $request->input('items', []) as $origIndex => $line) {
             $line = (array) $line;
             $line['amounts'] = array_map(fn ($value) => trim((string) $value), (array) ($line['amounts'] ?? []));
 
@@ -1606,14 +1771,18 @@ class ChemicalEstimateController extends Controller
                 && trim((string) ($line['chem_name'] ?? '')) === ''
                 && trim((string) ($line['technical_information'] ?? '')) === ''
                 && trim((string) ($line['purpose'] ?? '')) === ''
-                && trim((string) ($line['expected_delivery_date'] ?? '')) === '';
+                && trim((string) ($line['expected_delivery_date'] ?? '')) === ''
+                && ! array_filter((array) $request->file('items.'.$origIndex.'.files', []));
 
             if (! $isBlank) {
                 $rows[] = $line;
+                $kept[] = $origIndex;
             }
         }
 
         $request->merge(['items' => $rows]);
+
+        return $kept;
     }
 
     /** Ghi các dòng số lượng [amount, unit_id, for_month_year 'Y-m']; dòng thiếu số hoặc tháng thì bỏ qua. */
@@ -1709,6 +1878,7 @@ class ChemicalEstimateController extends Controller
             ->select(
                 'chemical_categories.id',
                 'chemical_categories.code',
+                'chemical_categories.lead_time_days',
                 'chem_names.name as chem_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
@@ -1922,6 +2092,7 @@ class ChemicalEstimateController extends Controller
             'chem_name' => ['required_if:source,manual', 'nullable', 'max:255'],
             'technical_information' => ['nullable', 'max:1000'],
             'purpose' => ['nullable', 'max:1000'],
+            'expected_delivery_date' => ['nullable', 'date'],
             'amounts' => ['required', 'array', 'min:1'],
             'amounts.*.amount' => ['required', 'numeric', 'min:0.0001'],
             'amounts.*.unit_id' => ['required', 'exists:units,id'],
@@ -1946,6 +2117,38 @@ class ChemicalEstimateController extends Controller
             'technical_information' => $this->nullIfBlank($line['technical_information'] ?? null),
             'purpose' => $this->nullIfBlank($line['purpose'] ?? null),
             'expected_delivery_date' => $this->nullIfBlank($line['expected_delivery_date'] ?? null),
+        ];
+    }
+
+    /** Quy tắc cho các dòng hoá chất chọn từ tab "Danh sách hoá chất cần dự trù". */
+    private function watchlistItemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.category_id' => ['required', 'exists:chemical_categories,id'],
+            'items.*.purpose' => ['nullable', 'max:1000'],
+            'items.*.amount' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.unit_id' => ['required', 'exists:units,id'],
+            'items.*.for_month_year' => ['required', 'date_format:Y-m'],
+        ];
+    }
+
+    private function watchlistItemMessages(): array
+    {
+        return [
+            'items.required' => 'Vui lòng chọn ít nhất một hoá chất để lập phiếu dự trù.',
+            'items.min' => 'Vui lòng chọn ít nhất một hoá chất để lập phiếu dự trù.',
+            'items.max' => 'Mỗi lần lập tối đa 200 hoá chất.',
+            'items.*.category_id.required' => 'Hoá chất được chọn không hợp lệ.',
+            'items.*.category_id.exists' => 'Hoá chất được chọn không tồn tại trong danh mục.',
+            'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'items.*.amount.required' => 'Vui lòng nhập số lượng dự trù cho mọi hoá chất đã chọn.',
+            'items.*.amount.numeric' => 'Số lượng dự trù phải là số.',
+            'items.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính cho mọi hoá chất đã chọn.',
+            'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'items.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng cho mọi hoá chất đã chọn.',
+            'items.*.for_month_year.date_format' => 'Tháng cần dùng không hợp lệ.',
         ];
     }
 
@@ -2007,6 +2210,7 @@ class ChemicalEstimateController extends Controller
             'chem_name.max' => 'Tên hoá chất tối đa 255 ký tự.',
             'technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
             'purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
             'amounts.required' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
             'amounts.min' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
             'amounts.*.amount.required' => 'Vui lòng nhập số lượng dự trù.',
