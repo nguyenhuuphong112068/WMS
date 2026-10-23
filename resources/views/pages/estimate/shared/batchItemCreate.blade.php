@@ -6,7 +6,9 @@
 | (pages/estimate/MaterialEstimate/itemCreate.blade.php), dùng chung CSS batchItemStyle.
 |
 | Mặt hàng TRONG danh mục chỉ vào bảng qua khung "Chọn từ danh mục phòng" (tên hiện cố định);
-| nút "Thêm dòng ngoài danh mục" tạo dòng gõ tên tự do.
+| nút "Thêm dòng ngoài danh mục" tạo dòng gõ tên tự do. Như Vật Tư: mỗi dòng đính kèm được file
+| (items[i][files][]) và cảnh báo "Không kịp đặt hàng" khi từ ngày tạo phiếu tới ngày mong muốn
+| giao ít hơn Thời gian đặt hàng (lead_time_days) của danh mục - App\Support\MaterialLeadTime.
 |
 | Biến vào: $list, $units, $categories (danh mục công ty - lấy tên khi render lại old input),
 |           $deptCategories (danh mục của phòng - khung chọn), $maxStock, $estRoute và
@@ -43,9 +45,9 @@
     $emiPeriods = array_values((array) old('periods', $emiDefaultPeriods)) ?: $emiDefaultPeriods;
     $emiRows = array_values((array) old('items', []));
 
-    // Số cột cố định (ngoài các cột tháng): #, tên, [nhóm chuẩn], TTKT, mục đích, ngày giao, đơn vị, thao tác
-    $emiFixedCols = $emiGroups ? 8 : 7;
-    $emiBaseWidth = ($emiGroups ? 1250 : 1100) + (is_array($emiFactorUnits) ? 50 : 0);
+    // Số cột cố định (ngoài các cột tháng): #, tên, [nhóm chuẩn], TTKT, mục đích, ngày giao, đơn vị, file, thao tác
+    $emiFixedCols = $emiGroups ? 9 : 8;
+    $emiBaseWidth = ($emiGroups ? 1360 : 1210) + (is_array($emiFactorUnits) ? 50 : 0);
 
     // Tên hiển thị của dòng danh mục: ưu tiên danh mục phòng, thiếu thì lấy danh mục chung
     $emiLabel = fn($c) => [
@@ -59,6 +61,7 @@
                 !empty($c->cas_no) ? 'CAS ' . $c->cas_no : null,
             ]),
         ),
+        'lead' => $c->lead_time_days ?? null,
     ];
     $catLabels = collect($categories ?? [])
         ->keyBy('id')
@@ -95,6 +98,7 @@
 
 <div class="modal fade md-modal" id="itemCreateModal" tabindex="-1" role="dialog"
     data-default-periods="{{ json_encode($emiDefaultPeriods) }}"
+    data-base-date="{{ \Carbon\Carbon::parse($list->created_at)->format('Y-m-d') }}"
     data-max-stock="{{ json_encode($maxStock ?? [], JSON_UNESCAPED_UNICODE) }}"
     data-threshold-url="{{ $emi['thresholdUrl'] ?? '' }}"
     data-factor-units="{{ json_encode((object) ($emiFactorUnits ?? []), JSON_UNESCAPED_UNICODE) }}"
@@ -107,7 +111,7 @@
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
-            <form action="{{ route($estRoute . 'storeItem') }}" method="POST" id="emiForm">
+            <form action="{{ route($estRoute . 'storeItem') }}" method="POST" id="emiForm" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="{{ $emi['listField'] }}" value="{{ $list->id }}">
 
@@ -173,6 +177,7 @@
                                         <th class="text-right" style="width:100px">Tồn Hiện Tại</th>
                                         <th class="text-right" style="width:100px">Tồn Tối Thiểu</th>
                                         <th class="text-right" style="width:100px">Tồn Tối Đa</th>
+                                        <th class="text-right" style="width:110px">TG Đặt Hàng</th>
                                         @if ($isChemical)
                                             <th style="width:200px">Ngưỡng PL IV</th>
                                         @endif
@@ -219,7 +224,8 @@
                                             data-low="{{ $pickLow ? 1 : 0 }}" data-search="{{ $pickSearch }}"
                                             data-name="{{ $catLabels[(string) $deptCategory->id]['name'] ?? '' }}"
                                             data-meta="{{ $catLabels[(string) $deptCategory->id]['meta'] ?? '' }}"
-                                            data-groups="{{ json_encode($pickGroups) }}">
+                                            data-groups="{{ json_encode($pickGroups) }}"
+                                            data-lead-days="{{ $deptCategory->lead_time_days ?? '' }}">
                                             <td class="text-center"><input type="checkbox" class="emi-pick"
                                                     {{ $pickBlocked ? 'disabled' : '' }}></td>
                                             <td><span class="md-tag">{{ $deptCategory->code }}</span></td>
@@ -250,6 +256,9 @@
                                                 {{ $pickNum($pickOnHand) }}</td>
                                             <td class="text-right">{{ $pickNum($deptCategory->min_stock) }}</td>
                                             <td class="text-right">{{ $pickNum($deptCategory->max_stock) }}</td>
+                                            <td class="text-right">
+                                                {{ ($deptCategory->lead_time_days ?? null) !== null ? $deptCategory->lead_time_days . ' ngày' : '—' }}
+                                            </td>
                                             @if ($isChemical)
                                                 <td>
                                                     @if ($pickBlocked)
@@ -274,12 +283,12 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="10" class="text-center text-muted py-3">Phòng chưa khai
+                                            <td colspan="13" class="text-center text-muted py-3">Phòng chưa khai
                                                 {{ $emi['itemLabel'] }} nào trong danh mục.</td>
                                         </tr>
                                     @endforelse
                                     <tr class="emi-pick-none" style="display:none">
-                                        <td colspan="10" class="text-center text-muted py-3">Không tìm thấy
+                                        <td colspan="13" class="text-center text-muted py-3">Không tìm thấy
                                             {{ $emi['itemLabel'] }} phù hợp.</td>
                                     </tr>
                                 </tbody>
@@ -310,6 +319,7 @@
                                     <th class="emi-col-date">Ngày Mong Muốn Giao</th>
                                     <th class="emi-col-unit" @if (is_array($emiFactorUnits)) style="width:170px" @endif>Đơn Vị
                                         <span class="text-danger">*</span></th>
+                                    <th class="emi-col-file">File</th>
                                     @foreach ($emiPeriods as $k => $period)
                                         <th class="emi-col-period">
                                             <div class="emi-period">
@@ -421,6 +431,7 @@
                 $(this).find('.emi-amount').each(function(k) {
                     $(this).attr('name', 'items[' + i + '][amounts][' + k + ']');
                 });
+                $(this).find('.emi-files').attr('name', 'items[' + i + '][files][]');
             });
 
             var rows = $tbody.find('.emi-row').length;
@@ -462,9 +473,12 @@
                 $row.find('.emi-mat-meta').text(data.label.meta || '');
             }
 
+            if (data.fields.source === 'category') $row.attr('data-lead-days', data.leadDays || '');
+
             $after ? $after.after($row) : $tbody.find('.emi-empty').before($row);
             applyFactor($row);
             checkMaxStock($row);
+            checkLeadTime($row);
             checkThreshold($row);
             reindex();
 
@@ -491,6 +505,7 @@
                     name: $row.find('.emi-mat-name').text(),
                     meta: $row.find('.emi-mat-meta').text()
                 },
+                leadDays: $row.attr('data-lead-days') || '',
                 amounts: $row.find('.emi-amount').map(function() {
                     return $(this).val();
                 }).get()
@@ -518,6 +533,56 @@
 
             wmsMaxStockWarn($warn, info, total);
         }
+
+        /* Cảnh báo không kịp thời gian đặt hàng: từ ngày tạo phiếu tới ngày mong muốn giao
+           ít hơn "Thời gian đặt hàng" của danh mục - cùng công thức App\Support\MaterialLeadTime */
+        function toUtcDay(value) {
+            var p = (value || '').split('-');
+            return p.length === 3 ? Date.UTC(+p[0], +p[1] - 1, +p[2]) : null;
+        }
+
+        function checkLeadTime($row) {
+            var $warn = $row.find('.emi-lead-warn');
+            var lead = parseInt($row.attr('data-lead-days'), 10);
+            var base = toUtcDay($modal.data('base-date'));
+            var expected = toUtcDay($row.find('[data-f="expected_delivery_date"]').val());
+
+            if (!lead || lead <= 0 || base === null || expected === null) {
+                $warn.hide().removeAttr('title');
+                return;
+            }
+
+            var available = Math.round((expected - base) / 86400000);
+
+            if (available >= lead) {
+                $warn.hide().removeAttr('title');
+                return;
+            }
+
+            $warn.html('<i class="fas fa-exclamation-triangle mr-1"></i>Không kịp đặt hàng')
+                .attr('title', 'Thời gian đặt hàng ' + lead +
+                    ' ngày, từ ngày tạo phiếu đến ngày mong muốn giao chỉ còn ' +
+                    available + ' ngày.')
+                .append('<br>cần ' + lead + ' ngày')
+                .show();
+        }
+
+        $form.on('change input', '[data-f="expected_delivery_date"]', function() {
+            checkLeadTime($(this).closest('.emi-row'));
+        });
+
+        // File đính kèm của từng dòng: hiện số file + tên file đã chọn
+        $form.on('change', '.emi-files', function() {
+            var names = Array.prototype.map.call(this.files || [], function(f) {
+                return f.name;
+            });
+            var $cell = $(this).closest('.emi-file-cell');
+
+            $cell.find('.emi-file-btn').toggleClass('has-files', names.length > 0)
+                .removeClass('border-danger text-danger');
+            $cell.find('.emi-file-count').text(names.length ? names.length + ' file' : 'Chọn');
+            $cell.find('.emi-file-names').text(names.join(', ')).attr('title', names.join(', '));
+        });
 
         /* Hoá chất nhóm 9 / 10 khai khác đơn vị danh mục của phòng: bắt khai hệ số quy đổi
            "1 <đơn vị dự trù> = ? <đơn vị danh mục>" - xem wmsEstFactor() ở shared/assets */
@@ -693,6 +758,7 @@
                         name: $(this).data('name'),
                         meta: $(this).data('meta')
                     },
+                    leadDays: String($(this).data('lead-days') || ''),
                     amounts: []
                 });
             });
@@ -809,6 +875,7 @@
             applyFactor($(this));
             checkMaxStock($(this));
             checkThreshold($(this));
+            checkLeadTime($(this));
         });
         reindex();
 

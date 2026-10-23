@@ -23,6 +23,11 @@
     @include('pages.estimate.StandardEstimate.create')
     @include('pages.estimate.StandardEstimate.update')
     @include('pages.estimate.StandardEstimate.reject')
+
+    {{-- Lập phiếu dự trù từ các chất chuẩn chọn ở tab "Danh sách chất chuẩn cần dự trù" --}}
+    @if ($tabAllowed['watchlist'])
+        @include('pages.estimate.shared.watchlistEstimate', ['wlKind' => 'standard'])
+    @endif
     @include('pages.estimate.shared.submitModal')
     @include('pages.estimate.shared.historyModal')
 

@@ -22,6 +22,11 @@
     @include('pages.estimate.ChemicalEstimate.create')
     @include('pages.estimate.ChemicalEstimate.update')
     @include('pages.estimate.ChemicalEstimate.reject')
+
+    {{-- Lập phiếu dự trù từ các hoá chất chọn ở tab "Danh sách hoá chất cần dự trù" --}}
+    @if ($tabAllowed['watchlist'])
+        @include('pages.estimate.shared.watchlistEstimate', ['wlKind' => 'chemical'])
+    @endif
     @include('pages.estimate.shared.submitModal')
     @include('pages.estimate.shared.historyModal')
 

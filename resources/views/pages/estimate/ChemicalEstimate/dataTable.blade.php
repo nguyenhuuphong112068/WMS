@@ -25,6 +25,13 @@
                             <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
                         </li>
                     @endif
+                    @if ($tabAllowed['watchlist'])
+                        <li class="nav-item">
+                            <a class="nav-link {{ $activeTab === 'watchlist' ? 'active' : '' }}" id="watchlist-tab" data-toggle="tab" href="#watchlist" role="tab">
+                                Danh sách hoá chất cần dự trù <span class="badge badge-warning">{{ $watchlistItems->filter(fn ($item) => ! $item->in_progress)->count() }}</span>
+                            </a>
+                        </li>
+                    @endif
                     @if (($approvedLists ?? null) !== null)
                         <li class="nav-item">
                             <a class="nav-link {{ $activeTab === 'approved' ? 'active' : '' }}" id="approved-tab" data-toggle="tab" href="#approved" role="tab">
@@ -178,6 +185,11 @@
                     <div class="tab-pane fade {{ $activeTab === 'tracking' ? 'show active' : '' }}" id="tracking" role="tabpanel">
                         @include('pages.estimate.shared.trackingTable', ['items' => $trackedItems])
                     </div>
+                    @endif
+                    @if ($tabAllowed['watchlist'])
+                        <div class="tab-pane fade {{ $activeTab === 'watchlist' ? 'show active' : '' }}" id="watchlist" role="tabpanel">
+                            @include('pages.estimate.shared.watchlistTable', ['items' => $watchlistItems, 'wlKind' => 'chemical'])
+                        </div>
                     @endif
                     @if (($approvedLists ?? null) !== null)
                         <div class="tab-pane fade {{ $activeTab === 'approved' ? 'show active' : '' }}" id="approved" role="tabpanel">

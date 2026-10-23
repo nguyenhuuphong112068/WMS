@@ -21,7 +21,7 @@
     $periodCount = $periodCount ?? 0;
     $source = ($row['source'] ?? 'manual') === 'category' ? 'category' : 'manual';
     $categoryId = (string) ($row['category_id'] ?? '');
-    $label = $catLabels[$categoryId] ?? ['name' => '', 'meta' => ''];
+    $label = $catLabels[$categoryId] ?? ['name' => '', 'meta' => '', 'lead' => ''];
     $nameField = $emi['nameField'];
     $has = fn($field) => $index !== '' && $bag->has("items.$index.$field");
     $err = fn($field) => $has($field) ? 'is-invalid' : '';
@@ -30,7 +30,7 @@
     $withFactor = is_array($emi['factorUnits'] ?? null);
 @endphp
 
-<tr class="emi-row emi-row-{{ $source }}">
+<tr class="emi-row emi-row-{{ $source }}" data-lead-days="{{ $source === 'category' ? $label['lead'] ?? '' : '' }}">
     <td class="emi-no text-center"></td>
 
     <td class="emi-material">
@@ -90,6 +90,7 @@
         <input type="date" data-f="expected_delivery_date" name="{{ $name('expected_delivery_date') }}"
             class="form-control form-control-sm {{ $err('expected_delivery_date') }}"
             value="{{ $row['expected_delivery_date'] ?? '' }}">
+        <span class="emi-lead-warn" style="display:none"></span>
     </td>
 
     <td>
@@ -112,6 +113,16 @@
                 <b class="js-factor-to"></b>
             </div>
         @endif
+    </td>
+
+    <td class="emi-file-cell">
+        <label class="btn btn-sm btn-outline-secondary emi-file-btn mb-0 {{ $has('files') ? 'border-danger text-danger' : '' }}"
+            title="Đính kèm file cho {{ $emi['itemLabel'] }} này (báo giá, COA, catalogue...)">
+            <i class="fas fa-paperclip"></i> <span class="emi-file-count">Chọn</span>
+            <input type="file" class="emi-files d-none" multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.bmp,.webp,.zip,.rar,.7z,.msg,.eml">
+        </label>
+        <div class="emi-file-names"></div>
     </td>
 
     @for ($k = 0; $k < $periodCount; $k++)
