@@ -159,10 +159,10 @@
                                                 @if (! $iAmSource && $item->status === 'issued')
                                                     {{-- Phòng mình (A) đang nhận: tự khai 4 thông tin riêng của phòng mình --}}
                                                     <div class="mt-1">
-                                                        <select name="dest_location_id" class="form-control input-dest-location-receive mb-1" style="height: 32px !important; min-height: 32px !important; font-size: 0.78rem;">
+                                                        <select name="dest_location_id" class="form-control wms-zone-select input-dest-location-receive mb-1">
                                                             <option value="">-- Định khu --</option>
                                                             @foreach ($transferOwnLocations as $loc)
-                                                                <option value="{{ $loc->id }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->shelf_name }}/{{ $loc->column_name }}/{{ $loc->tier_name }})@endif</option>
+                                                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->shelf_name }}/{{ $loc->column_name }}/{{ $loc->tier_name }})@endif</option>
                                                             @endforeach
                                                         </select>
                                                         <select name="dest_purpose_id" class="form-control input-dest-purpose-receive mb-1" style="height: 32px !important; min-height: 32px !important; font-size: 0.78rem;">
@@ -190,7 +190,7 @@
                                                         <small class="text-danger d-block mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>Chưa khai danh mục này ở tab "Chất Chuẩn Của Phòng"</small>
                                                     @endif
                                                 @elseif ($item->dest_location_code)
-                                                    <span class="std-location-tag mt-1 d-block" style="width: fit-content;">{{ $item->dest_location_code }}</span>
+                                                    <div class="mt-1">{{ \App\Support\ZoneType::tag($item->dest_location_code, $item->dest_location_zone_type ?? null) }}</div>
                                                 @endif
                                             </td>
                                             <td class="align-middle text-right">

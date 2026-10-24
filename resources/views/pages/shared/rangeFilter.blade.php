@@ -22,6 +22,7 @@
 |                   ở trình duyệt, không phân trang server thì tắt)
 | - rfQuick       : nút chọn nhanh riêng, mảng [['label' => ..., 'from' => 'Y-m-d'|'', 'to' => ...]]
 |                   - bỏ trống thì dùng bộ nút nhìn về quá khứ (30 ngày, tháng này...)
+| - rfHidden      : mảng [name => value] tham số ẩn gửi kèm (VD tab con đang mở), đè giá trị cũ trên URL
 | - rfInBar       : true = bộ lọc một hàng (nhãn nằm cạnh ô, không nằm trên) và gắn class
 |                   .md-tablebar-item để layout tự kéo vào chung thanh nút + Tìm kiếm phía
 |                   trên bảng DataTables (layout/master.blade.php). Bảng không dùng DataTables
@@ -39,6 +40,7 @@
     $rfDateLabel = $rfDateLabel ?? 'Khoảng ngày';
     $rfShowPerPage = $rfShowPerPage ?? true;
     $rfInBar = $rfInBar ?? false;
+    $rfHidden = $rfHidden ?? [];
     $rfQuick = $rfQuick ?? [
         ['label' => '30 ngày', 'from' => now()->subDays(29)->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
         ['label' => 'Tháng này', 'from' => now()->startOfMonth()->format('Y-m-d'), 'to' => now()->format('Y-m-d')],
@@ -52,7 +54,7 @@
     // chính nó, không kèm lại thì lọc bảng này sẽ xoá mất lọc của bảng kia.
     $rfBuiltIn = [$rfPrefix . 'from', $rfPrefix . 'to', $rfPrefix . 'q', $rfPrefix . 'per', $rfPrefix . 'page'];
     $rfKeep = collect(request()->query())
-        ->reject(fn($value, $key) => is_array($value) || $key === 'tab' || in_array($key, $rfBuiltIn, true) || (str_starts_with($key, $rfPrefix) && $key !== $rfPrefix . 'unissued'))
+        ->reject(fn($value, $key) => is_array($value) || $key === 'tab' || in_array($key, $rfBuiltIn, true) || array_key_exists($key, $rfHidden) || (str_starts_with($key, $rfPrefix) && $key !== $rfPrefix . 'unissued'))
         ->all();
 @endphp
 
@@ -61,7 +63,7 @@
         <input type="hidden" name="tab" value="{{ $rfTab }}">
     @endif
 
-    @foreach ($rfKeep as $rfKeepName => $rfKeepValue)
+    @foreach ($rfKeep + $rfHidden as $rfKeepName => $rfKeepValue)
         <input type="hidden" name="{{ $rfKeepName }}" value="{{ $rfKeepValue }}">
     @endforeach
 

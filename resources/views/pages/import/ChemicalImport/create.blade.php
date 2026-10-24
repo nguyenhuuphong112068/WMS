@@ -22,10 +22,12 @@
                                     <i class="fas fa-list"></i>
                                 </button>
                                 <div style="flex: 1 1 auto; min-width: 0;">
-                                    <select name="category_id" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
+                                    <select name="category_id"
+                                data-lookup-url="{{ route('pages.category.lookup.chemicalCategories', ['scope' => 'import']) }}" class="form-control imp-select {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
                                         data-threshold-url="{{ route($impRoute . 'checkThreshold') }}" required>
                                         <option value="">-- Chọn hoá chất phòng đang dùng --</option>
-                                        @foreach ($categories as $category)
+                                        {{-- Gõ tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị old() --}}
+                                @foreach ($categories->where('id', old('category_id')) as $category)
                                             <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
                                                 {{ $category->code }} - {{ $category->chem_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}
                                             </option>
@@ -107,10 +109,12 @@
                         <div class="form-group col-md-12">
                             <label>Định Khu Tạm (Biệt Trữ / Chờ Kiểm Tra)</label>
                             <select name="location_id"
+                                data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'all', 'only_zone' => 'quarantine']) }}"
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
-                                @foreach ($quarantineLocations as $location)
-                                    <option value="{{ $location->id }}"
+                                {{-- Gõ tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị old() --}}
+                                @foreach ($quarantineLocations->where('id', old('location_id')) as $location)
+                                    <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
@@ -270,9 +274,13 @@
             }
 
             if (fillLocation) {
-                $form.find('select[name="location_id"]')
-                    .val(item && item.location_id ? String(item.location_id) : '')
-                    .trigger('change');
+                var $location = $form.find('select[name="location_id"]');
+
+                // Ô định khu tìm qua AJAX: dựng option của định khu mặc định (chỉ khu Biệt Trữ)
+                if (item && item.location_id) {
+                    wmsEnsureOption($location, item.location_id, item.location_text, { zone: item.location_zone });
+                }
+                $location.val(item && item.location_id ? String(item.location_id) : '').trigger('change');
             }
 
             checkChemMaxStock($form);
@@ -289,92 +297,5 @@
     });
 </script>
 
-{{-- Modal Chọn Hoá Chất --}}
-<div class="modal fade" id="selectChemicalModal" tabindex="-1" role="dialog" style="z-index: 1060;" data-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document" style="max-width: 60%;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Chọn Hoá Chất</h5>
-                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-            </div>
-            <div class="modal-body p-2">
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover w-100" id="tableSelectChemical">
-                        <thead class="thead-light">
-                            <tr>
-                                <th style="width: 40px;" class="text-center">STT</th>
-                                <th>MÃ HOÁ CHẤT</th>
-                                <th>TÊN HOÁ CHẤT</th>
-                                <th>SỐ CAS</th>
-                                <th>NHÀ SẢN XUẤT</th>
-                                <th>TỈ TRỌNG</th>
-                                <th>BẢO QUẢN</th>
-                                <th>PHÂN LOẠI</th>
-                                <th>ĐƠN VỊ</th>
-                                <th style="width: 60px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($categories as $category)
-                                <tr>
-                                    <td class="text-center">{{ $loop->iteration }}</td>
-                                    <td><strong>{{ $category->code }}</strong></td>
-                                    <td>{{ $category->chem_name }}</td>
-                                    <td>{{ $category->cas_no ?: '—' }}</td>
-                                    <td>
-                                        <div class="md-sub">{{ $category->manufacturer_name ?: '—' }}</div>
-                                        @if ($category->manufacturer_short_name)
-                                            <span class="badge badge-light border">{{ $category->manufacturer_short_name }}</span>
-                                        @endif
-                                    </td>
-                                    <td>{{ $category->density !== null ? $category->density : '—' }}</td>
-                                    <td>{{ $category->storage_condition_name ?: '—' }}</td>
-                                    <td>
-                                        @php $catCls = ($classificationCodes ?? [])[$category->id] ?? []; @endphp
-                                        @foreach($catCls as $c)
-                                            <span class="badge badge-secondary"
-                                                title="{{ ($classificationLabels ?? [])[$c] ?? $c }}">{{ $c }}</span>
-                                        @endforeach
-                                        @if (\App\Support\ChemicalClassification::isSpecialControl($catCls))
-                                            <div class="mt-1">
-                                                <span class="badge-special-control" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
-                                                    <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
-                                                </span>
-                                            </div>
-                                        @endif
-                                    </td>
-                                    <td>{{ $category->unit_short_name }}</td>
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-primary btn-select-chemical" data-id="{{ $category->id }}">Chọn</button>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        $('#tableSelectChemical').DataTable({
-            pageLength: 10,
-            lengthChange: false,
-            language: {
-                search: "Tìm kiếm:",
-                // Phòng chưa khai hoá chất nào thì nói rõ phải khai ở đâu, đừng để bảng trống trơn
-                emptyTable: 'Phòng chưa khai hoá chất nào ở tab "Hoá Chất Của Phòng" nên chưa có gì để nhập.',
-                zeroRecords: 'Không tìm thấy hoá chất phù hợp trong danh mục của phòng.'
-            },
-            order: [[0, 'asc']]
-        });
-
-        $(document).on('click', '.btn-select-chemical', function() {
-            var id = $(this).data('id');
-            $('#createModal select[name="category_id"]').val(id).trigger('change');
-            $('#selectChemicalModal').modal('hide');
-        });
-    });
-</script>
+{{-- Modal Chọn Hoá Chất (tìm + lọc nhanh) --}}
+@include('pages.import.ChemicalImport.selectChemicalModal')

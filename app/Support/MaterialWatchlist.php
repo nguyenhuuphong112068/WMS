@@ -193,8 +193,9 @@ class MaterialWatchlist
             $rows[$key]->quantity = $r->quantity;
             $rows[$key]->source_type = $r->source_type;
             $rows[$key]->note = $r->note;
-            $rows[$key]->remembered_by = $r->created_by;
-            $rows[$key]->remembered_at = $r->created_at;
+            // Bấm đề nghị lại chỉ cập nhật dòng cũ (remember) - hiện người / ngày đề nghị lần gần nhất
+            $rows[$key]->remembered_by = $r->updated_by ?: $r->created_by;
+            $rows[$key]->remembered_at = $r->updated_at ?: $r->created_at;
             $rows[$key]->sources[] = self::SOURCE_USER;
         }
 
@@ -376,19 +377,63 @@ class MaterialWatchlist
 
         if ($existing) {
             DB::table(self::TABLE)->where('id', $existing->id)->update($payload);
-
-            return ['success' => true, 'message' => 'Vật tư đã có trong danh sách cần dự trù, đã cập nhật lại số lượng và lý do dự trù!'];
+        } else {
+            DB::table(self::TABLE)->insert($payload + [
+                'department_id' => $departmentId,
+                'category_id' => $categoryId,
+                'material_name' => $categoryId ? null : $materialName,
+                'created_by' => $actor,
+                'created_at' => now(),
+            ]);
         }
 
-        DB::table(self::TABLE)->insert($payload + [
-            'department_id' => $departmentId,
-            'category_id' => $categoryId,
-            'material_name' => $categoryId ? null : $materialName,
-            'created_by' => $actor,
-            'created_at' => now(),
-        ]);
+        return self::rememberResult($departmentId, $categoryId, $materialName, (bool) $existing);
+    }
 
-        return ['success' => true, 'message' => 'Đã gửi đề nghị dự trù vật tư!'];
+    /**
+     * Thông báo sau khi ghi nhớ: nói rõ vật tư hiện ở danh sách nào (vật tư Hành Chính mua sang
+     * "Danh sách vật tư cần đề nghị Hành Chính", còn lại "Danh sách vật tư cần dự trù" - cùng
+     * quy tắc forEstimate / forVpp) và nếu đang nằm trong phiếu chưa xong thì kèm mã phiếu, vì
+     * khi đó dòng chỉ hiện ở trạng thái "Đã lập phiếu / Đã đề nghị" chứ không ở trạng thái mặc định.
+     * in_progress = true để JS hiện hộp thoại chờ người dùng đọc thay vì toast tự tắt.
+     */
+    private static function rememberResult(int $departmentId, ?int $categoryId, ?string $materialName, bool $updated): array
+    {
+        $purchasing = $categoryId
+            ? DB::table('material_categories')->where('id', $categoryId)->value('purchasing_department')
+            : null;
+
+        $toVpp = $categoryId
+            && MaterialPurchasing::keyOf($purchasing) === MaterialVpp::PURCHASING_KEY
+            && MaterialVpp::targetDepartmentId($departmentId);
+
+        $listName = $toVpp ? '"Danh sách vật tư cần đề nghị Hành Chính"' : '"Danh sách vật tư cần dự trù"';
+        $doneState = $toVpp ? '"Đã đề nghị"' : '"Đã lập phiếu"';
+
+        $progress = self::inProgress($departmentId);
+        $refs = $categoryId
+            ? ($progress['cat'][$categoryId] ?? [])
+            : ($progress['name'][mb_strtolower(trim((string) $materialName))] ?? []);
+
+        $head = $updated
+            ? 'Vật tư đã có trong '.$listName.', đã cập nhật lại số lượng và lý do.'
+            : 'Đã gửi đề nghị, vật tư được đưa vào '.$listName.'.';
+
+        if (! $refs) {
+            return ['success' => true, 'in_progress' => false, 'message' => $head];
+        }
+
+        $codes = implode(', ', array_map(
+            fn ($ref) => $ref['label'].' '.$ref['code'].' ('.$ref['status'].')',
+            array_values($refs)
+        ));
+
+        return [
+            'success' => true,
+            'in_progress' => true,
+            'message' => $head.' Vật tư đang nằm trong '.$codes.' chưa xử lý xong nên hiện ở trạng thái '
+                .$doneState.' của danh sách, chọn trạng thái đó (hoặc Tất cả) để xem.',
+        ];
     }
 
     /** Bỏ ghi nhớ một dòng thủ công - vật tư vẫn hiện lại nếu đang tồn dưới ngưỡng tối thiểu. */
@@ -495,7 +540,7 @@ class MaterialWatchlist
                 'tab' => $isVpp ? MaterialVpp::TAB : 'transfer',
                 'id' => (int) $row->id,
                 'code' => $row->code,
-                'label' => $isVpp ? 'Đề nghị VPP' : 'Đề nghị liên phòng ban',
+                'label' => $isVpp ? 'Đề nghị cấp phát VPP đến HC' : 'Đề nghị liên phòng ban',
                 'status' => self::TRANSFER_STATUS_LABELS[$row->status] ?? $row->status,
             ]);
         }

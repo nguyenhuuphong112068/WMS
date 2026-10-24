@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\HtmlString;
+
 /**
  * PHÂN LOẠI ĐỊNH KHU & MÀU HIỂN THỊ
  *
@@ -18,7 +20,7 @@ namespace App\Support;
  *
  * Màu mặc định đi theo quy ước cảnh báo quen thuộc trong kho: xanh lá = dùng được,
  * vàng = đang giữ chờ, cam = cần quyết định, đỏ = loại bỏ, xanh dương = dự phòng.
- * Người dùng vẫn được chọn màu riêng cho từng mục, màu riêng luôn thắng màu mặc định.
+ * Mỗi phân loại gắn cố định một màu, người dùng không chọn màu riêng.
  */
 class ZoneType
 {
@@ -71,17 +73,12 @@ class ZoneType
     }
 
     /**
-     * Màu hiển thị thật sự của một mục định khu: ưu tiên màu người dùng chọn,
-     * thiếu thì lấy màu mặc định của phân loại, thiếu nốt thì dùng màu chủ đạo.
+     * Màu hiển thị của một mục định khu: MỖI PHÂN LOẠI MỘT MÀU DUY NHẤT, chưa phân loại
+     * thì dùng màu chủ đạo. Không còn màu tự chọn - tham số $color giữ lại cho các chỗ
+     * gọi cũ nhưng bị bỏ qua.
      */
     public static function color(?string $type, ?string $color = null): string
     {
-        $color = trim((string) $color);
-
-        if (self::valid($color)) {
-            return strtoupper($color);
-        }
-
         return self::DEFAULT_COLORS[$type] ?? self::FALLBACK_COLOR;
     }
 
@@ -120,6 +117,24 @@ class ZoneType
         return (0.299 * $r + 0.587 * $g + 0.114 * $b) > 160 ? '#1F2937' : '#FFFFFF';
     }
 
+    /**
+     * Thẻ mã vị trí cho các bảng dữ liệu: CHỈ hiện mã vị trí (không kèm đường dẫn kho/kệ/cột/tầng),
+     * nền tô theo màu phân loại, tooltip là tên phân loại. Không có mã thì trả $empty (đã escape).
+     * CSS .zone-tag ở layout/css.
+     */
+    public static function tag(?string $code, ?string $type, string $empty = '—'): HtmlString
+    {
+        if (! $code) {
+            return new HtmlString(e($empty));
+        }
+
+        $color = self::DEFAULT_COLORS[$type] ?? null;
+        $style = $color ? ' style="--zt:' . $color . ';--zt-text:' . self::textOn($color) . '"' : '';
+
+        return new HtmlString('<span class="zone-tag' . ($color ? '' : ' is-none') . '"' . $style
+            . ' title="' . e(self::label($type)) . '">' . e($code) . '</span>');
+    }
+
     /** Bảng tra nhãn cho lịch sử thay đổi: hiện "Dự Phòng" thay vì "reserve". */
     public static function historyMap(): array
     {
@@ -129,14 +144,14 @@ class ZoneType
     /**
      * Màu badge cho các mã tham chiếu tới một định khu ở màn hình KHÁC màn Định Khu (mã
      * xuất nhập, mã ống chuẩn, thẻ vị trí trên sơ đồ tồn kho...): chỉ tô màu khi định khu
-     * đó đã được gắn (có $locationId) VÀ đã phân loại hoặc chọn màu riêng; còn lại giữ nền
+     * đó đã được gắn (có $locationId) VÀ đã phân loại; còn lại giữ nền
      * trắng để không ngộ nhận là đã định khu - khác quy ước trên chính màn Định Khu (luôn
      * tô, kể cả bằng màu mặc định của phân loại) vì ở đây phần lớn bản ghi chưa từng gán
      * định khu nên tô đại một màu mặc định sẽ gây hiểu lầm.
      */
     public static function badge($locationId, ?string $type, ?string $color): array
     {
-        if (! $locationId || (! $type && ! self::valid($color))) {
+        if (! $locationId || ! isset(self::DEFAULT_COLORS[$type])) {
             return ['bg' => '#FFFFFF', 'text' => 'var(--primary-dark)'];
         }
 

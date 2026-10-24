@@ -1,4 +1,5 @@
 @include('pages.inventory.shared.assets')
+@php $activeTab = \App\Support\PageTabs::active('inventory_material', $activeTab ?? 'code'); @endphp
 
 <style>
     .mi-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -22,6 +23,8 @@
     .mi-badge.expired { background: #FEE2E2; color: #991B1B; }
     .mi-badge.out { background: #E2E8F0; color: #475569; }
     .mi-badge.over { background: #FCE7F3; color: #9D174D; }
+    .mi-badge.quarantine { background: #FFEDD5; color: #C2410C; }
+    .mi-badge.rejected { background: #FEE2E2; color: #B91C1C; }
 
     /* ---------- Cột THAO TÁC ---------- */
     .mi-actions { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -102,10 +105,17 @@
                 </form>
 
                 <div class="mi-tabs">
-                    <button type="button" class="mi-tab is-active" data-pane="miPaneCode"><i class="fas fa-boxes mr-1"></i>Theo mã xuất nhập</button>
-                    <button type="button" class="mi-tab" data-pane="miPaneMat"><i class="fas fa-layer-group mr-1"></i>Tồn Theo mã vật tư</button>
-                    <button type="button" class="mi-tab" data-pane="miPaneZone"><i class="fas fa-map-marked-alt mr-1"></i>Tồn kho theo vị trí</button>
-                    <button type="button" class="mi-tab" data-pane="miPaneNext">
+                    @tab('inventory_material', 'code')
+                    <button type="button" class="mi-tab {{ $activeTab === 'code' ? 'is-active' : '' }}" data-pane="miPaneCode"><i class="fas fa-boxes mr-1"></i>Theo mã xuất nhập</button>
+                    @endtab
+                    @tab('inventory_material', 'material')
+                    <button type="button" class="mi-tab {{ $activeTab === 'material' ? 'is-active' : '' }}" data-pane="miPaneMat"><i class="fas fa-layer-group mr-1"></i>Tồn Theo mã vật tư</button>
+                    @endtab
+                    @tab('inventory_material', 'zone')
+                    <button type="button" class="mi-tab {{ $activeTab === 'zone' ? 'is-active' : '' }}" data-pane="miPaneZone"><i class="fas fa-map-marked-alt mr-1"></i>Tồn kho theo vị trí</button>
+                    @endtab
+                    @tab('inventory_material', 'next')
+                    <button type="button" class="mi-tab {{ $activeTab === 'next' ? 'is-active' : '' }}" data-pane="miPaneNext">
                         <i class="fas fa-calendar-check mr-1"></i>Khả dụng {{ $forecast['month']['label'] }}
                         @if ($forecast['summary']['short'] > 0)
                             <span class="badge badge-danger ml-1">{{ $forecast['summary']['short'] }} mã không đáp ứng</span>
@@ -113,7 +123,9 @@
                             <span class="badge badge-warning ml-1">{{ $forecast['summary']['tight'] }} mã vừa đủ</span>
                         @endif
                     </button>
-                    <button type="button" class="mi-tab" data-pane="miPaneCheck">
+                    @endtab
+                    @tab('inventory_material', 'check')
+                    <button type="button" class="mi-tab {{ $activeTab === 'check' ? 'is-active' : '' }}" data-pane="miPaneCheck">
                         <i class="fas fa-clipboard-check mr-1"></i>Kiểm kê định kỳ
                         @if ($stocktake['canOpen'])
                             <span class="badge badge-warning ml-1">Chưa kiểm kê {{ $stocktake['periodLabel'] }}</span>
@@ -121,22 +133,17 @@
                             <span class="badge badge-light ml-1">{{ $stocktake['progress']['counted'] }}/{{ $stocktake['progress']['total'] }}</span>
                         @endif
                     </button>
+                    @endtab
                 </div>
 
+                @include('pages.inventory.MaterialInventory.classificationFilter')
+
                 {{-- ============ THEO MÃ XUẤT NHẬP ============ --}}
-                <div class="mi-pane is-active" id="miPaneCode">
-                    <div class="mb-2">
-                        <span class="mi-chip is-active" data-state="">Tất cả ({{ $datas->count() }})</span>
-                        @foreach ($states as $key => $lbl)
-                            @php $c = $datas->where('state', $key)->count(); @endphp
-                            @if ($c > 0)
-                                <span class="mi-chip" data-state="{{ $key }}">{{ $lbl }} ({{ $c }})</span>
-                            @endif
-                        @endforeach
-                    </div>
+                @tab('inventory_material', 'code')
+                <div class="mi-pane {{ $activeTab === 'code' ? 'is-active' : '' }}" id="miPaneCode">
 
                     <div class="table-responsive">
-                        <table id="mdTable" class="table table-bordered table-hover w-100">
+                        <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width:45px">STT</th>
@@ -148,7 +155,7 @@
                                     <th class="text-right" style="width:90px">Tồn Đầu Kỳ</th>
                                     <th class="text-right" style="width:90px">Nhập Trong Kỳ</th>
                                     <th class="text-right" style="width:90px">Sử Dụng</th>
-                                    <th class="text-right" style="width:80px">Loại Bỏ</th>
+                                    <th class="text-right" style="width:80px">Cách Ly/Huỷ</th>
                                     <th class="text-right" style="width:95px">Tồn Cuối Kỳ</th>
                                     <th class="text-right" style="width:100px">Tổng Tồn Vật Tư</th>
                                     <th class="text-center" style="width:95px">Hạn Dùng</th>
@@ -159,8 +166,9 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @deferredRows('mdTable')
                                 @foreach ($datas as $row)
-                                    <tr data-state="{{ $row->state }}">
+                                    <tr data-classification="{{ \App\Support\MaterialClassification::filterKeys($row->classification, $row->purchasing_department) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td data-order="{{ $row->code }}">
                                             <span class="inv-code font-weight-bold">{{ $row->code }}</span>
@@ -177,7 +185,7 @@
                                         </td>
                                         <td class="md-sub">
                                             @if ($row->location_code)
-                                                <span class="md-tag">{{ $row->location_code }}</span>
+                                                {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                             @else <span class="text-muted">—</span> @endif
                                         </td>
                                         <td class="text-center md-sub">{{ $row->unit_short_name ?: ($row->unit_name ?: '—') }}</td>
@@ -190,7 +198,7 @@
                                                 data-id="{{ $row->id }}" data-metric="period_in">{{ $invNum($row->period_in) }}</button>
                                         </td>
                                         <td class="text-right" data-order="{{ $row->period_used }}">
-                                            <button type="button" class="{{ $mvCls($row->period_used, 'out') }}" data-scope="import"
+                                            <button type="button" class="{{ $mvCls($row->period_used, 'use') }}" data-scope="import"
                                                 data-id="{{ $row->id }}" data-metric="period_used">{{ $invNum($row->period_used) }}</button>
                                         </td>
                                         <td class="text-right" data-order="{{ $row->period_cancelled }}">
@@ -244,15 +252,18 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                @enddeferredRows
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ THEO VẬT TƯ ============ --}}
-                <div class="mi-pane" id="miPaneMat">
+                @tab('inventory_material', 'material')
+                <div class="mi-pane {{ $activeTab === 'material' ? 'is-active' : '' }}" id="miPaneMat">
                     <div class="table-responsive">
-                        <table id="miSummaryTable" class="table table-bordered table-hover w-100 md-table">
+                        <table id="miSummaryTable" class="table table-bordered table-hover w-100 md-table" data-deferred>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width:45px">STT</th>
@@ -264,15 +275,16 @@
                                     <th class="text-right" style="width:100px">Tồn Đầu Kỳ</th>
                                     <th class="text-right" style="width:100px">Nhập Trong Kỳ</th>
                                     <th class="text-right" style="width:100px">Sử Dụng</th>
-                                    <th class="text-right" style="width:90px">Loại Bỏ</th>
+                                    <th class="text-right" style="width:90px">Cách Ly/Huỷ</th>
                                     <th class="text-right" style="width:110px">Tồn Cuối Kỳ</th>
                                     <th class="text-center" style="width:100px">Hạn Gần Nhất</th>
                                     <th class="text-center inv-chart-th" style="width:115px">Biểu Đồ</th>
                                 </tr>
                             </thead>
                             <tbody>
+                                @deferredRows('miSummaryTable')
                                 @foreach ($summaries as $s)
-                                    <tr>
+                                    <tr data-classification="{{ $s->classification_keys }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
                                         <td><span class="md-tag">{{ $s->category_code ?: '—' }}</span></td>
                                         <td>
@@ -295,7 +307,7 @@
                                                 data-id="{{ $s->category_id }}" data-metric="period_in">{{ $invNum($s->period_in) }}</button>
                                         </td>
                                         <td class="text-right" data-order="{{ $s->period_used }}">
-                                            <button type="button" class="{{ $mvCls($s->period_used, 'out') }}" data-scope="category"
+                                            <button type="button" class="{{ $mvCls($s->period_used, 'use') }}" data-scope="category"
                                                 data-id="{{ $s->category_id }}" data-metric="period_used">{{ $invNum($s->period_used) }}</button>
                                         </td>
                                         <td class="text-right" data-order="{{ $s->period_cancelled }}">
@@ -318,25 +330,33 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                @enddeferredRows
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ THEO VỊ TRÍ (SƠ ĐỒ THẺ) ============ --}}
-                <div class="mi-pane" id="miPaneZone">
+                @tab('inventory_material', 'zone')
+                <div class="mi-pane {{ $activeTab === 'zone' ? 'is-active' : '' }}" id="miPaneZone">
                     @include('pages.inventory.MaterialInventory.zoneMap')
                 </div>
+                @endtab
 
                 {{-- ============ KHẢ DỤNG THÁNG TỚI ============ --}}
-                <div class="mi-pane" id="miPaneNext">
+                @tab('inventory_material', 'next')
+                <div class="mi-pane {{ $activeTab === 'next' ? 'is-active' : '' }}" id="miPaneNext">
                     @include('pages.inventory.MaterialInventory.nextMonth')
                 </div>
+                @endtab
 
                 {{-- ============ KIỂM KÊ ĐỊNH KỲ (1 THÁNG 1 LẦN) ============ --}}
-                <div class="mi-pane" id="miPaneCheck">
+                @tab('inventory_material', 'check')
+                <div class="mi-pane {{ $activeTab === 'check' ? 'is-active' : '' }}" id="miPaneCheck">
                     @include('pages.inventory.MaterialInventory.stocktake')
                 </div>
+                @endtab
 
             </div>
         </div>
@@ -351,22 +371,9 @@
             $(this).addClass('is-active');
             $('.mi-pane').removeClass('is-active');
             $('#' + $(this).data('pane')).addClass('is-active');
+            // Badge phân loại chỉ áp cho các tab dạng bảng tồn
+            $('#miClassBar').toggle(['miPaneCode', 'miPaneMat', 'miPaneNext'].indexOf($(this).data('pane')) !== -1);
             $($.fn.dataTable.tables(true)).DataTable().columns.adjust();
-        });
-
-        // Lọc theo trạng thái
-        var miState = '';
-        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
-            if (settings.nTable.id !== 'mdTable' || miState === '') return true;
-            var tr = settings.aoData[dataIndex].nTr;
-            return tr && tr.getAttribute('data-state') === miState;
-        });
-        // Chỉ bộ lọc của tab "Theo mã xuất nhập" - tab "Khả dụng tháng tới" có bộ lọc riêng
-        $('#miPaneCode').on('click', '.mi-chip', function () {
-            $('#miPaneCode .mi-chip').removeClass('is-active');
-            $(this).addClass('is-active');
-            miState = $(this).data('state') || '';
-            if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().draw();
         });
 
         // Modal cân đối
@@ -414,6 +421,7 @@
         /* ---------- Sơ đồ tồn theo vị trí ---------- */
         var mzIndex = @json($zoneMap['index']);
         var mzState = '';
+        var mzZoneType = '*';
 
         // Lọc ô vị trí theo tình trạng + từ khoá, rồi ẩn luôn tầng/cột/kệ/kho không còn ô nào
         function mzApply() {
@@ -426,31 +434,42 @@
                     || (mzState === 'stocked' && state !== 'empty')
                     || (mzState === 'alert' && (state === 'warn' || state === 'danger'));
                 var okText = q === '' || ($(this).data('search') || '').toString().indexOf(q) >= 0;
-                $(this).css('display', okState && okText ? '' : 'none');
+                var okZone = mzZoneType === '*' || ($(this).attr('data-zone-type') || '') === mzZoneType;
+                $(this).css('display', okState && okText && okZone ? '' : 'none');
             });
 
+            // Đếm theo style.display (không dùng :visible) để kho đang thu gọn không bị coi là rỗng
+            function mzShown($els) {
+                return $els.filter(function () { return this.style.display !== 'none'; }).length;
+            }
             $('#miPaneZone .mz-tier').each(function () {
-                $(this).css('display', $(this).find('.mz-cell:visible').length ? '' : 'none');
+                $(this).css('display', mzShown($(this).find('.mz-cell[data-state]')) ? '' : 'none');
             });
             $('#miPaneZone .mz-column').each(function () {
-                $(this).css('display', $(this).find('.mz-tier:visible').length ? '' : 'none');
+                $(this).css('display', mzShown($(this).find('.mz-tier')) ? '' : 'none');
             });
             $('#miPaneZone .mz-shelf').each(function () {
-                $(this).css('display', $(this).find('.mz-column:visible').length ? '' : 'none');
+                $(this).css('display', mzShown($(this).find('.mz-column')) ? '' : 'none');
             });
             $('#miPaneZone .mz-wh').each(function () {
-                $(this).css('display', $(this).find('.mz-shelf:visible').length ? '' : 'none');
+                $(this).css('display', mzShown($(this).find('.mz-shelf')) ? '' : 'none');
             });
 
             var total = $('#miPaneZone .mz-wh').length;
-            var shown = $('#miPaneZone .mz-wh:visible').length;
+            var shown = mzShown($('#miPaneZone .mz-wh'));
             $('#miPaneZone .mz-noresult').css('display', total > 0 && shown === 0 ? 'block' : 'none');
         }
 
-        $('#miPaneZone .mz-filter').on('click', function () {
-            $('#miPaneZone .mz-filter').removeClass('is-active');
+        $('#miPaneZone .mz-filter[data-state]').on('click', function () {
+            $('#miPaneZone .mz-filter[data-state]').removeClass('is-active');
             $(this).addClass('is-active');
             mzState = $(this).data('state') || '';
+            mzApply();
+        });
+        $('#miPaneZone .mz-zt-filter').on('click', function () {
+            $('#miPaneZone .mz-zt-filter').removeClass('is-active');
+            $(this).addClass('is-active');
+            mzZoneType = $(this).attr('data-zone-type');
             mzApply();
         });
         $('#mzSearch').on('input', mzApply);

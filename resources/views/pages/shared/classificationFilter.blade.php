@@ -78,29 +78,36 @@
         document.addEventListener('DOMContentLoaded', function() {
             var clsState = {};
 
-            function clsCodesOf(tr) {
-                var raw = ($(tr).attr('data-classification') || '').trim();
+            /*
+            | Mã nhóm của một dòng: bảng nạp JSON mang sẵn chuỗi "N3,N9" ở rowData.cls
+            | (dòng chưa hiện chưa có <tr>), bảng render sẵn đọc data-classification của <tr>.
+            */
+            function clsCodesOf(rowData, tr) {
+                var raw = rowData && rowData.c && window.mdDeferred ? mdDeferred.rowAttr(rowData, tr, 'classification') :
+                    ($.isPlainObject(rowData) ? rowData.cls : $(tr).attr('data-classification'));
+                raw = String(raw || '').trim();
                 return raw ? raw.split(',') : [];
             }
 
-            $.fn.dataTable.ext.search.push(function(settings, data, index) {
+            $.fn.dataTable.ext.search.push(function(settings, data, index, rowData) {
                 var want = clsState[settings.nTable.id];
                 if (!want || want === 'all') return true;
 
-                var codes = clsCodesOf(settings.aoData[index].nTr);
+                var codes = clsCodesOf(rowData, settings.aoData[index].nTr);
                 return want === 'none' ? codes.length === 0 : codes.indexOf(want) !== -1;
             });
 
-            $('.cls-select').each(function() {
-                var id = $(this).data('target');
+            // Đếm số dòng của từng nhóm vào ô chọn. Bảng dựng sau (nạp JSON) gọi lại
+            // window.clsRefreshCounts(id) sau khi khởi tạo.
+            function clsRefreshCounts(id) {
                 if (!$.fn.dataTable.isDataTable('#' + id)) return;
 
                 var counts = {};
                 var none = 0;
                 var total = 0;
 
-                $('#' + id).DataTable().rows().nodes().to$().each(function() {
-                    var codes = clsCodesOf(this);
+                $('#' + id).DataTable().rows().every(function() {
+                    var codes = clsCodesOf(this.data(), this.node());
                     total++;
                     if (!codes.length) {
                         none++;
@@ -111,12 +118,18 @@
                     });
                 });
 
-                $(this).find('option').each(function() {
+                $('.cls-select[data-target="' + id + '"]').find('option').each(function() {
                     var value = $(this).val();
                     var count = value === 'all' ? total : (value === 'none' ? none : (counts[value] || 0));
                     $(this).text($(this).data('label') + ' (' + count + ')');
-                    if (count === 0 && value !== 'all') $(this).prop('disabled', true);
+                    $(this).prop('disabled', count === 0 && value !== 'all');
                 });
+            }
+
+            window.clsRefreshCounts = clsRefreshCounts;
+
+            $('.cls-select').each(function() {
+                clsRefreshCounts($(this).data('target'));
             });
 
             $(document).on('change', '.cls-select', function() {

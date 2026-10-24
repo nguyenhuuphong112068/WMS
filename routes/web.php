@@ -14,7 +14,8 @@
 | estimate     : nhóm menu "Dự Trù"
 | statistic    : nhóm menu "Thống Kê"
 | User        : nhóm menu "Phân Quyền"
-| AuditTrial   : nhóm menu "Audit Trail"
+| loginHistory : nhóm menu "Lịch Sử Đăng Nhập" (Toàn hệ thống / Của tôi)
+| AuditTrial   : Audit Trail (nằm trong nhóm menu "Lịch Sử Đăng Nhập")
 | database     : nhóm menu "Cơ Sở Dữ Liệu" (Quản Trị - chỉ Admin)
 | Notification : tiện ích dùng chung trên topNAV
 */
@@ -29,6 +30,7 @@ require __DIR__.'/stabilityAssessmentRoute.php';
 require __DIR__.'/estimateRoute.php';
 require __DIR__.'/statisticRoute.php';
 require __DIR__.'/UserRoute.php';
+require __DIR__.'/loginHistoryRoute.php';
 require __DIR__.'/AuditTrialRoute.php';
 require __DIR__.'/databaseRoute.php';
 require __DIR__.'/NotificationRoute.php';

@@ -168,6 +168,14 @@
                 });
             }
 
+            /**
+             * <tr> đã dựng của các dòng. Bảng deferRender chưa dựng node cho dòng chưa hiện
+             * (giá trị null) nên phải lọc bỏ trước khi thêm/bỏ class.
+             */
+            function bcsNodes(rows) {
+                return rows.nodes().toArray().filter(function(node) { return !!node; });
+            }
+
             /** Chữ thuần của một ô trong bảng, bỏ hết thẻ HTML để so cho đúng. */
             function bcsText(html) {
                 return $('<div>').html(html === null || html === undefined ? '' : html).text();
@@ -212,7 +220,7 @@
 
                     var dt = $('#' + item.id).DataTable();
 
-                    $(dt.rows().nodes()).removeClass('bcs-hit');
+                    $(bcsNodes(dt.rows())).removeClass('bcs-hit');
                     dt.column(item.column).search('').draw();
                 });
 
@@ -233,6 +241,9 @@
             function bcsFind($box) {
                 var $input = $box.find('.bcs-input');
                 var code = ($input.val() || '').trim();
+
+                // Màn hình dựng bảng theo tab (nạp JSON) cần dựng đủ các bảng trước khi tìm
+                $(document).trigger('bcs:before-find', [$box]);
 
                 bcsReset($box);
 
@@ -258,7 +269,7 @@
 
                     dt.column(item.column).search(code, false, false).draw();
 
-                    $(dt.rows(hits).nodes()).addClass('bcs-hit');
+                    $(bcsNodes(dt.rows(hits))).addClass('bcs-hit');
 
                     found.push({
                         id: item.id,

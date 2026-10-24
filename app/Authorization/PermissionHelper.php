@@ -73,6 +73,27 @@ if (! function_exists('user_permission_names')) {
             }
         }
 
+        // Quyền con (permissions.parent_id) chỉ có hiệu lực khi có cả quyền cha
+        // (vd. tab của một màn hình cần quyền xem màn hình đó)
+        static $parents = null;
+        $parents ??= \Illuminate\Support\Facades\Schema::hasColumn('permissions', 'parent_id')
+            ? DB::table('permissions as child')
+                ->join('permissions as parent', 'parent.id', '=', 'child.parent_id')
+                ->pluck('parent.name', 'child.name')
+                ->all()
+            : [];
+
+        // Lặp tới khi ổn định để quyền nhiều tầng (vd. Trao đổi -> tab Theo dõi -> Xem trang) cũng bị gỡ theo
+        do {
+            $removed = false;
+            foreach ($parents as $child => $parent) {
+                if (isset($names[$child]) && ! isset($names[$parent])) {
+                    unset($names[$child]);
+                    $removed = true;
+                }
+            }
+        } while ($removed);
+
         return $cache[$key] = $names;
     }
 }

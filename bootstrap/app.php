@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [
             \App\Http\Middleware\UpdateUserActivity::class,
+            // ?_deferred=1: trả JSON các dòng bảng thay cho trang (App\Support\DeferredRows)
+            \App\Http\Middleware\ServeDeferredRows::class,
         ]);
 
         $middleware->alias([

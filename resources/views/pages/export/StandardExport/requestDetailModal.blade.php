@@ -139,7 +139,7 @@
                                                     <small class="text-muted d-block">Lô: {{ $item->batch_no }}</small>
                                                 @endif
                                                 @if ($item->location_code)
-                                                    <span class="std-location-tag mt-1">{{ $item->location_code }}</span>
+                                                    <div class="mt-1">{{ \App\Support\ZoneType::tag($item->location_code, $item->location_zone_type ?? null) }}</div>
                                                 @endif
                                             @endif
                                         </td>
@@ -385,7 +385,7 @@
                                 // 1. Mã Ống Chuẩn
                                 let codeHtml = '<span class="exp-code font-weight-bold">' + data.import_code + '</span>';
                                 if (data.batch_no) codeHtml += '<small class="text-muted d-block">Lô: ' + data.batch_no + '</small>';
-                                if (data.location) codeHtml += '<span class="std-location-tag mt-1">' + data.location + '</span>';
+                                if (data.location) codeHtml += '<div class="mt-1">' + window.wmsZoneTag(data.location, data.location_zone) + '</div>';
                                 $row.find('td:nth-child(2)').html(codeHtml);
 
                                 // 2. SL Cấp Phát (cột số 8)
@@ -493,6 +493,7 @@
             'remaining' => (float) $imp->remaining,
             'unit' => $imp->unit_short_name ?: '',
             'location' => $imp->location_code ?: '',
+            'zone' => $imp->location_zone_type ?? null,
             'expired_date' => $imp->expired_date ? \Carbon\Carbon::parse($imp->expired_date)->format('d/m/Y') : '—',
             'expired' => (bool) $imp->expired,
             'selectable' => (bool) $imp->selectable,
@@ -622,7 +623,7 @@
                     + '<td>' + imp.batch_no + '</td>'
                     + '<td class="text-right font-weight-bold text-success">' + stdNum(imp.remaining) + '</td>'
                     + '<td class="text-center">' + (imp.unit || '—') + '</td>'
-                    + '<td>' + (imp.location || '—') + '</td>'
+                    + '<td>' + window.wmsZoneTag(imp.location, imp.zone) + '</td>'
                     + '<td class="text-center' + (imp.expired ? ' text-danger font-weight-bold' : '') + '">' + imp.expired_date + '</td>'
                     + '<td class="text-center">' + statusHtml + '</td>'
                     + '<td class="text-center">' + actionHtml + '</td>'

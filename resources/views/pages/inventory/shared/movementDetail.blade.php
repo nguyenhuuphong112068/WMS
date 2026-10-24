@@ -18,7 +18,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 1120px;" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-list-ul"></i> Chi Tiết Phát Sinh</h5>
+                <h5 class="modal-title"><i class="fas fa-list-ul"></i> Chi Tiết</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -37,7 +37,7 @@
                         <div class="imv-period">—</div>
                     </div>
                     <div>
-                        <label>Đơn Vị Tính</label>
+                        <label>Đơn Vị</label>
                         <div class="imv-unit">—</div>
                     </div>
                 </div>
@@ -101,6 +101,11 @@
             color: #B91C1C;
         }
 
+        /* Cột Sử Dụng: trừ tồn do dùng thật - xanh dương, tách khỏi đỏ của Cách ly/Huỷ */
+        .inv-mv.is-use {
+            color: var(--primary);
+        }
+
         .inv-mv.is-muted {
             color: #94A3B8;
             background: #fff;
@@ -110,6 +115,8 @@
         .inv-mv.is-in:focus,
         .inv-mv.is-out:hover,
         .inv-mv.is-out:focus,
+        .inv-mv.is-use:hover,
+        .inv-mv.is-use:focus,
         .inv-mv.is-muted:hover,
         .inv-mv.is-muted:focus {
             color: #fff;

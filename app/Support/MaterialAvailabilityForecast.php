@@ -394,6 +394,7 @@ class MaterialAvailabilityForecast
                 'material_categories.code as category_code',
                 'material_categories.technical_specification',
                 'material_categories.purchasing_department',
+                'material_categories.classification',
                 'material_categories.lead_time_days',
                 'material_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',

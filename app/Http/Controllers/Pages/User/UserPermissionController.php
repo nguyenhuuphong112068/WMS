@@ -43,12 +43,27 @@ class UserPermissionController extends Controller
                 'permissions.id',
                 'permissions.name',
                 'permissions.display_name',
+                \Illuminate\Support\Facades\Schema::hasColumn('permissions', 'parent_id')
+                    ? 'permissions.parent_id' : DB::raw('NULL as parent_id'),
                 'permission_groups.name as group_name',
                 'permission_groups.sort_order',
             )
             ->orderBy('permission_groups.sort_order', 'asc')
             ->orderBy('permissions.id', 'asc')
-            ->get()
+            ->get();
+
+        // Quyền con (parent_id) đứng ngay dưới quyền cha
+        // Đệ quy để quyền nhiều tầng (vd. Trao đổi -> tab Theo dõi -> Xem trang) cũng hiện, depth để thụt lề
+        $children = $datas->whereNotNull('parent_id')->groupBy('parent_id');
+        $withChildren = function ($permission, int $depth) use (&$withChildren, $children) {
+            $permission->depth = $depth;
+
+            return collect([$permission])->merge(
+                $children->get($permission->id, collect())->flatMap(fn ($child) => $withChildren($child, $depth + 1))
+            );
+        };
+        $datas = $datas->filter(fn ($permission) => ! $permission->parent_id || ! $datas->contains('id', $permission->parent_id))
+            ->flatMap(fn ($permission) => $withChildren($permission, $permission->parent_id ? 1 : 0))
             ->map(function ($permission) use ($fromRole, $overrides) {
                 if (array_key_exists($permission->id, $overrides)) {
                     $state = $overrides[$permission->id] ? 'deny' : 'allow';
@@ -61,6 +76,8 @@ class UserPermissionController extends Controller
                     'name' => $permission->display_name ?: $permission->name,
                     'code' => $permission->name,
                     'group_name' => $permission->group_name ?: 'Khác',
+                    'is_child' => (bool) $permission->parent_id,
+                    'depth' => $permission->depth ?? 0,
                     'from_role' => isset($fromRole[$permission->id]),
                     'state' => $state,
                 ];

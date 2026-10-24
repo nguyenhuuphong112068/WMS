@@ -1,7 +1,7 @@
 {{--
 | Phạm vi phòng ban cho từng role.
 | - Chỉ hiện hàng của role đang được chọn ở ô "Phân Quyền" (JS toggle theo class d-none).
-| - Chọn công ty = tự chọn mọi phòng ban của công ty đó; bỏ công ty = bỏ các phòng ban của nó.
+| - Chọn công ty = chỉ lọc danh sách phòng ban (tự chọn từng phòng); bỏ công ty = bỏ các phòng ban của nó.
 |   Ô công ty chỉ để lọc/chọn nhanh, không gửi lên server (suy lại từ phòng ban khi mở modal).
 | - Bỏ trống danh sách phòng ban = role đó áp dụng cho MỌI phòng ban.
 | Biến vào: $roles, $allDepartments, $scopeCompanies
@@ -33,12 +33,7 @@
                     <label class="mb-1" style="font-size: 13px">Phòng ban</label>
                     <select class="form-control select2-roledept" name="roleDept[{{ $role->id }}][]" multiple
                         data-placeholder="Mọi phòng ban">
-                        @foreach ($allDepartments as $d)
-                            <option value="{{ $d->id }}" data-company="{{ $d->company_id }}"
-                                {{ in_array((string) $d->id, $preRD, true) ? 'selected' : '' }}>
-                                {{ $d->shortName }} — {{ $d->name }}@if (!empty($d->company_short)) ({{ $d->company_short }})@endif
-                            </option>
-                        @endforeach
+                        @include('layout.departmentOptions', ['departments' => $allDepartments, 'selected' => $preRD])
                     </select>
                 </div>
             </div>

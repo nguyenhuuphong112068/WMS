@@ -76,6 +76,12 @@ class MaxStockWarning
         return self::onHand(self::SOURCES['material'], $departmentId);
     }
 
+    /** Như onHandMaterial() cho loại hàng bất kỳ: 'material' | 'chemical' | 'standard'. */
+    public static function onHandOf(string $type, int $departmentId): array
+    {
+        return self::onHand(self::SOURCES[$type], $departmentId);
+    }
+
     /**
      * [category_id => ['max_stock' => float|null, 'on_hand' => float, 'unit' => string]]
      * cho mọi mã danh mục phòng đang khai (kể cả mã chưa đặt ngưỡng - màn hình vẫn cần

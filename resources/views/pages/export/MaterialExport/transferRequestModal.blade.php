@@ -29,7 +29,7 @@
             'id' => 'matVppRequestModal',
             'table' => 'tableMatVppRows',
             'icon' => 'fas fa-paperclip',
-            'title' => 'Tạo Đề Nghị Vật Tư Từ Kho VPP',
+            'title' => 'Tạo Đề Nghị Cấp Phát VPP Đến HC',
             'placeholder' => 'VD: Đề nghị văn phòng phẩm tháng ' . now()->format('m/Y'),
             'departments' => collect([$vppTarget]),
             // Chỉ vật tư Hành Chánh mua (App\Support\MaterialVpp)
@@ -68,6 +68,7 @@
                                 Tiêu Đề Đề Nghị <span class="text-danger">*</span>
                             </label>
                             <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
+                                list="{{ $mtIsVpp ? 'matTitleOptionsVpp' : 'matTitleOptionsTransfer' }}" autocomplete="off"
                                 placeholder="{{ $mtCm['placeholder'] }}" value="{{ $mtOld('title') }}" required>
                         </div>
                         <div class="form-group mb-0">
@@ -88,11 +89,7 @@
                                     @unless ($mtIsVpp)
                                         <option value="">-- Chọn phòng ban đang giữ vật tư --</option>
                                     @endunless
-                                    @foreach ($mtCm['departments'] as $dept)
-                                        <option value="{{ $dept->id }}" {{ $mtIsVpp || $mtOld('to_department_id') == $dept->id ? 'selected' : '' }}>
-                                            {{ $dept->name }} ({{ $dept->shortName }})
-                                        </option>
-                                    @endforeach
+                                    @include('layout.departmentOptions', ['departments' => $mtCm['departments'], 'selected' => $mtIsVpp ? collect($mtCm['departments'])->pluck('id')->all() : $mtOld('to_department_id')])
                                 </select>
                             </div>
                         </div>
@@ -153,6 +150,10 @@
 </div>
 @endforeach
 
+{{-- Tiêu đề phòng mình đã từng đặt - gợi ý cho ô Tiêu Đề của modal tạo, điều chỉnh và VPP từ danh sách cần đề nghị --}}
+@include('pages.shared.titleDatalist', ['id' => 'matTitleOptionsTransfer', 'titles' => $transferTitles['transfer'] ?? []])
+@include('pages.shared.titleDatalist', ['id' => 'matTitleOptionsVpp', 'titles' => $transferTitles['vpp'] ?? []])
+
 {{-- Mẫu một dòng vật tư, dùng chung cho cả modal tạo và các modal điều chỉnh; đề nghị VPP có mẫu riêng chỉ gồm vật tư Hành Chánh mua --}}
 <template id="matTransferRowTemplate">
     @include('pages.export.MaterialExport.transferRowFields', ['idx' => '__i__', 'item' => null, 'onlyRow' => false])
@@ -198,16 +199,93 @@
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        // Chọn vật tư thì hiện mã và điền sẵn đơn vị phòng mình đang dùng cho vật tư đó
+        /*
+        | ĐVT đề nghị mặc định theo đơn vị PHÒNG CẤP PHÁT đã khai cho vật tư (Vật Tư Của Phòng
+        | của phòng nhận đề nghị), lấy qua transferDepartmentStock và nhớ theo từng phòng.
+        | Phòng cấp phát chưa khai vật tư đó thì mới dùng đơn vị phòng mình (data-unit).
+        | ĐVT người dùng tự chọn tay (data-manual) thì không bị ghi đè khi đổi phòng.
+        */
+        var matSourceUnitsUrl = "{{ route('pages.export.materialExport.transferDepartmentStock') }}";
+        var matSourceUnits = {};
+
+        function matSourceUnitsOf($form) {
+            return matSourceUnits[$form.find('select[name="to_department_id"]').val()] || {};
+        }
+
+        function matApplyRowUnit($row, units) {
+            var $unit = $row.find('.select-mat-transfer-unit');
+            var $option = $row.find('.select-mat-transfer-category option:selected');
+            var unit = (units || {})[$option.val()] || $option.data('unit') || '';
+
+            if (!$option.val() || $unit.data('manual')) {
+                return;
+            }
+
+            if (unit && $unit.find('option').filter(function () { return this.value === unit; }).length) {
+                $unit.val(unit);
+            }
+        }
+
+        function matLoadSourceUnits($form, applyRows) {
+            var deptId = $form.find('select[name="to_department_id"]').val();
+            var apply = function () {
+                if (applyRows) {
+                    $form.find('.mat-transfer-row').each(function () { matApplyRowUnit($(this), matSourceUnits[deptId]); });
+                }
+            };
+
+            if (!deptId) {
+                return;
+            }
+
+            if (matSourceUnits[deptId]) {
+                apply();
+
+                return;
+            }
+
+            $.get(matSourceUnitsUrl, { department_id: deptId }).done(function (res) {
+                var map = {};
+
+                (res.ok ? res.rows || [] : []).forEach(function (row) {
+                    if (row.unit) {
+                        map[row.id] = row.unit;
+                    }
+                });
+
+                matSourceUnits[deptId] = map;
+                apply();
+            });
+        }
+
+        // Chọn vật tư thì hiện mã và điền sẵn đơn vị phòng cấp phát đã khai cho vật tư đó
         $(document).on('change', '.select-mat-transfer-category', function() {
             var $option = $(this).find('option:selected');
             var $row = $(this).closest('tr');
-            var unit = $option.data('unit') || '';
 
             $row.find('.mat-transfer-code').text($option.data('code') || '');
+            matApplyRowUnit($row, matSourceUnitsOf($row.closest('form')));
+        });
 
-            if (unit && $row.find('select[name*="[requested_unit]"] option[value="' + unit + '"]').length) {
-                $row.find('select[name*="[requested_unit]"]').val(unit);
+        $(document).on('change', '.select-mat-transfer-unit', function() {
+            $(this).data('manual', true);
+        });
+
+        // Đổi phòng cấp phát thì điền lại ĐVT các dòng chưa chọn tay theo danh mục phòng mới
+        $(document).on('change', 'form select[name="to_department_id"]', function() {
+            var $form = $(this).closest('form');
+
+            if ($form.find('.mat-transfer-row').length) {
+                matLoadSourceUnits($form, true);
+            }
+        });
+
+        // Modal đã có sẵn phòng (đề nghị VPP, phiếu điều chỉnh) thì tải trước, không ghi đè ĐVT đã lưu
+        $(document).on('shown.bs.modal', '.md-modal', function() {
+            var $form = $(this).find('form').has('.mat-transfer-row').first();
+
+            if ($form.length) {
+                matLoadSourceUnits($form, false);
             }
         });
 

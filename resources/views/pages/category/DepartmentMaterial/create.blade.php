@@ -32,8 +32,11 @@
                             required>
                             <option value="">-- Chọn vật tư --</option>
                             @foreach ($categories as $category)
-                                <option value="{{ $category->id }}"
+                                <option value="{{ $category->id }}" data-unit="{{ $category->suggested_unit_id }}"
                                     {{ $old('category_id') == $category->id ? 'selected' : '' }}>
+                                    @if ($category->code)
+                                        [{{ $category->code }}]
+                                    @endif
                                     {{ $category->material_name }}
                                     @if ($category->manufacturer_short_name)
                                         ({{ $category->manufacturer_short_name }})
@@ -85,7 +88,8 @@
                             @if ($bag->has('unit_id'))
                                 <span class="md-error">{{ $bag->first('unit_id') }}</span>
                             @endif
-                            <small class="md-sub">Đơn vị phòng dùng để nhập / xuất và ghi tồn cho vật tư này.</small>
+                            <small class="md-sub">Đơn vị phòng dùng để nhập / xuất và ghi tồn cho vật tư này.
+                                Tự gợi ý theo đơn vị các phòng khác đã khai, có thể đổi.</small>
                         </div>
                     </div>
 
@@ -124,12 +128,12 @@
 
                         <div class="form-group col-md-6">
                             <label>Định Khu</label>
-                            <select name="default_location_id"
+                            <select name="default_location_id" data-zone-filter
                                 data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'material']) }}"
                                 class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
                                 @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}"
+                                    <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
                                         {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
@@ -183,6 +187,15 @@
                 var short = $(this).find('option:selected').data('short');
                 $(this).closest('form').find('.dm-unit-hint').text(short || 'đơn vị');
             });
+
+        /* Chọn vật tư -> gợi ý Đơn Vị Tính theo các phòng đã khai vật tư đó (người dùng vẫn đổi được) */
+        $(document).on('change', '#dmCreateModal select[name="category_id"]', function() {
+            var unitId = $(this).find('option:selected').data('unit');
+            var $unit = $(this).closest('form').find('select[name="unit_id"]');
+            if (unitId && $unit.find('option[value="' + unitId + '"]').length) {
+                $unit.val(String(unitId)).trigger('change');
+            }
+        });
     });
 </script>
 

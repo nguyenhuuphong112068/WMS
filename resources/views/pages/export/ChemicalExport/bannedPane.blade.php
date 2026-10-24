@@ -9,6 +9,7 @@
 | thao tác Sửa/Khoá phiếu vẫn thực hiện ở tab Sổ sử dụng hoá chất / màn Nhập Hoá Chất.
 --}}
 
+@tab('export_chemical', 'banned')
 <div class="exp-pane {{ $activeTab === 'banned' ? 'is-active' : '' }}" id="expPaneBanned">
 
     @include('pages.shared.rangeFilter', [
@@ -83,7 +84,7 @@
                             <span class="exp-amount">{{ $expNum($row->category_balance) }}</span>
                             <span class="md-sub">{{ $row->unit }}</span>
                         </td>
-                        <td class="md-sub">{{ $row->location_code ?: '—' }}</td>
+                        <td class="md-sub">{{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}</td>
                         <td class="md-sub">
                             @if ($row->purpose)
                                 <span class="md-note" title="{{ $row->purpose }}">{{ $row->purpose }}</span>
@@ -105,6 +106,7 @@
         'pgUnit' => 'dòng sổ',
     ])
 </div>
+@endtab
 
 @once
     <style>

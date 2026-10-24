@@ -28,7 +28,7 @@
                                     Tiêu Đề Đề Nghị <span class="text-danger">*</span>
                                 </label>
                                 <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
-                                    value="{{ $req->title }}" required>
+                                    list="stdTitleOptionsTransfer" autocomplete="off" value="{{ $req->title }}" required>
                             </div>
                             <div class="form-group mb-0">
                                 <label class="font-weight-bold" style="font-size: 0.9rem;">Ngày Mong Muốn</label>
@@ -44,15 +44,7 @@
                                 <div style="min-width: 280px;">
                                     <select name="to_department_id" class="form-control font-weight-bold" style="height: 38px !important;" required>
                                         <option value="">-- Chọn phòng ban đang giữ chuẩn --</option>
-                                        @foreach ($transferDepartments->groupBy('company_name') as $companyName => $depts)
-                                            <optgroup label="{{ $companyName ?: 'Chưa gán công ty' }}">
-                                                @foreach ($depts as $dept)
-                                                    <option value="{{ $dept->id }}" {{ $req->to_department_id == $dept->id ? 'selected' : '' }}>
-                                                        {{ $dept->name }}
-                                                    </option>
-                                                @endforeach
-                                            </optgroup>
-                                        @endforeach
+                                        @include('layout.departmentOptions', ['departments' => $transferDepartments, 'selected' => $req->to_department_id])
                                     </select>
                                 </div>
                             </div>

@@ -78,5 +78,6 @@
 @include('pages.export.StandardExport.inventoryImportPickerModal')
 @include('pages.export.StandardExport.transferRequestModal')
 @include('pages.export.StandardExport.transferRequestEditModal')
+@include('pages.shared.titleDatalist', ['id' => 'stdTitleOptionsTransfer', 'titles' => $transferTitles])
 @include('pages.export.StandardExport.transferDetailModal')
 @endsection

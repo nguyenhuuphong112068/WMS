@@ -94,12 +94,7 @@
               <select class="form-control" name="deparment" id="deparmentcreate">
                   <option value="">-- Chọn phòng ban --</option>
 
-                  @foreach ($deparments as $department)
-                      <option value="{{ $department->id }}" data-id="{{ $department->id }}"
-                          {{ old('deparment') == $department->id ? 'selected' : '' }}>
-                          {{ $department->name }}@if (!empty($department->company_name)) — {{ $department->company_name }}@endif
-                      </option>
-                  @endforeach
+                  @include('layout.departmentOptions', ['departments' => $deparments, 'selected' => old('deparment')])
               </select>
 
               @error('deparment','createErrors')

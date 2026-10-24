@@ -1,4 +1,5 @@
 @include('pages.inventory.shared.assets')
+@php $activeTab = \App\Support\PageTabs::active('inventory_standard', $activeTab ?? 'code'); @endphp
 
 @php
     /*
@@ -91,31 +92,44 @@
                 </form>
 
                 <div class="inv-tabs">
-                    <button type="button" class="inv-tab is-active" data-pane="invPaneCode">
+                    @tab('inventory_standard', 'code')
+                    <button type="button" class="inv-tab {{ $activeTab === 'code' ? 'is-active' : '' }}" data-pane="invPaneCode">
                         <i class="fas fa-barcode mr-1"></i> Theo mã ống chuẩn
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneChem">
+                    @endtab
+                    @tab('inventory_standard', 'standard')
+                    <button type="button" class="inv-tab {{ $activeTab === 'standard' ? 'is-active' : '' }}" data-pane="invPaneChem">
                         <i class="fas fa-vial-circle-check mr-1"></i> Theo chất chuẩn
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneZone">
+                    @endtab
+                    @tab('inventory_standard', 'zone')
+                    <button type="button" class="inv-tab {{ $activeTab === 'zone' ? 'is-active' : '' }}" data-pane="invPaneZone">
                         <i class="fas fa-map-location-dot mr-1"></i> Theo định khu
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneExpiring">
+                    @endtab
+                    @tab('inventory_standard', 'expiring')
+                    <button type="button" class="inv-tab {{ $activeTab === 'expiring' ? 'is-active' : '' }}" data-pane="invPaneExpiring">
                         <i class="fas fa-calendar-xmark mr-1"></i> Hạn dùng dưới {{ $expiringSoonMonths }} tháng
                         <span class="inv-tab-count">{{ $invExpiringSoon->count() }}</span>
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneInternal">
+                    @endtab
+                    @tab('inventory_standard', 'internal')
+                    <button type="button" class="inv-tab {{ $activeTab === 'internal' ? 'is-active' : '' }}" data-pane="invPaneInternal">
                         <i class="fas fa-hourglass-half mr-1"></i> Chưa có hạn nội bộ
                         <span class="inv-tab-count">{{ $invWaitingInternal->count() }}</span>
                     </button>
-                    <button type="button" class="inv-tab" data-pane="invPaneWeight">
+                    @endtab
+                    @tab('inventory_standard', 'weight')
+                    <button type="button" class="inv-tab {{ $activeTab === 'weight' ? 'is-active' : '' }}" data-pane="invPaneWeight">
                         <i class="fas fa-balance-scale mr-1"></i> Kiểm soát Khối lượng
                         <span class="inv-tab-count">{{ $invWeightControlled->count() }}</span>
                     </button>
+                    @endtab
                 </div>
 
                 {{-- ============ TỒN THEO TỪNG MÃ ỐNG CHUẨN ============ --}}
-                <div class="inv-pane is-active" id="invPaneCode">
+                @tab('inventory_standard', 'code')
+                <div class="inv-pane {{ $activeTab === 'code' ? 'is-active' : '' }}" id="invPaneCode">
 
                     <div class="inv-filters">
                         <button type="button" class="inv-chip is-active" data-state="all">
@@ -136,7 +150,6 @@
                         'scanTitle' => 'Quét mã vạch',
                         'scanTables' => [
                             ['id' => 'mdTable', 'column' => 1, 'pane' => 'invPaneCode', 'label' => 'Theo mã ống chuẩn'],
-                            ['id' => 'invZoneTable', 'column' => 2, 'pane' => 'invPaneZone', 'label' => 'Theo định khu'],
                             [
                                 'id' => 'invExpiringTable',
                                 'column' => 1,
@@ -161,7 +174,7 @@
                     @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'mdTable'])
 
                     <div class="table-responsive">
-                        <table id="mdTable" class="table table-bordered table-hover w-100">
+                        <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
@@ -196,6 +209,7 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @deferredRows('mdTable')
                                 @foreach ($datas as $row)
                                     {{-- data-groups để bộ lọc Phân nhóm chuẩn nhận ra dòng này --}}
                                     <tr data-state="{{ $row->state }}" data-groups="{{ $invGroups($row->groups) }}">
@@ -225,10 +239,8 @@
                                             data-order="{{ $row->location_code ? $row->warehouse_name . '/' . $row->shelf_name . '/' . $row->column_name . '/' . $row->tier_name . '/' . $row->location_code : 'zzz' }}">
                                             @if ($row->location_code)
                                                 <div class="font-weight-bold">
-                                                    <span class="md-tag">{{ $row->location_code }}</span>
+                                                    {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                                 </div>
-                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
-                                                    {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
                                             @else
                                                 <span class="inv-zone-none">Chưa xếp vị trí</span>
                                             @endif
@@ -368,18 +380,21 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                @enddeferredRows
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ TỒN CỘNG DỒN THEO CHẤT CHUẨN ============ --}}
-                <div class="inv-pane" id="invPaneChem">
+                @tab('inventory_standard', 'standard')
+                <div class="inv-pane {{ $activeTab === 'standard' ? 'is-active' : '' }}" id="invPaneChem">
 
                     @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'invSummaryTable'])
 
                     <div class="table-responsive">
-                        <table id="invSummaryTable" class="table table-bordered table-hover w-100">
+                        <table id="invSummaryTable" class="table table-bordered table-hover w-100" data-deferred>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
@@ -395,6 +410,7 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @deferredRows('invSummaryTable')
                                 @foreach ($summaries as $sum)
                                     <tr data-groups="{{ $invGroups($sum->groups) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
@@ -445,137 +461,75 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                @enddeferredRows
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ TỒN THEO ĐỊNH KHU ============ --}}
-                <div class="inv-pane" id="invPaneZone">
+                @tab('inventory_standard', 'zone')
+                <div class="inv-pane {{ $activeTab === 'zone' ? 'is-active' : '' }}" id="invPaneZone">
 
-                    {{-- 5 ô chọn dây chuyền: chọn cấp trên thì cấp dưới tự lọc lại --}}
-                    <div class="inv-zone-picker" data-zones="{{ json_encode($zones) }}">
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-warehouse"></i> Kho/Phòng</label>
-                            <select class="form-control inv-zone-select" data-level="warehouse">
-                                <option value="">Tất cả kho/phòng</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-layer-group"></i> Kệ/Tủ</label>
-                            <select class="form-control inv-zone-select" data-level="shelf">
-                                <option value="">Tất cả kệ/tủ</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-grip-lines-vertical"></i> Cột</label>
-                            <select class="form-control inv-zone-select" data-level="column">
-                                <option value="">Tất cả cột</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-bars"></i> Tầng</label>
-                            <select class="form-control inv-zone-select" data-level="tier">
-                                <option value="">Tất cả tầng</option>
-                            </select>
-                        </div>
-                        <div class="inv-zone-field">
-                            <label><i class="fas fa-map-pin"></i> Vị trí</label>
-                            <select class="form-control inv-zone-select" data-level="location">
-                                <option value="">Tất cả vị trí</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-outline-secondary btn-inv-zone-reset">
-                            <i class="fas fa-rotate-left mr-1"></i> Bỏ lọc
-                        </button>
-                    </div>
+                    {{-- Sơ đồ thẻ Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí như Tồn Kho Vật Tư --}}
+                    @include('pages.inventory.shared.zoneGrid', [
+                        'zgId' => 'invZoneMap',
+                        'zgItem' => 'chất chuẩn',
+                        'zgCode' => 'Ống chuẩn',
+                    ])
 
-                    <div class="inv-zone-summary">
-                        <span class="path"><i class="fas fa-location-dot mr-1"></i><span
-                                class="inv-zone-path">Toàn bộ định khu của phòng</span></span>
-                        <span class="stat"><i class="fas fa-barcode"></i> <b class="inv-zone-codes">0</b> ống
-                            chuẩn</span>
-                        <span class="stat"><i class="fas fa-vial-circle-check"></i> <b class="inv-zone-chems">0</b> chất
-                            chuẩn</span>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table id="invZoneTable" class="table table-bordered table-hover w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-center" style="width: 55px">STT</th>
-                                    <th style="width: 200px">Vị Trí</th>
-                                    <th style="width: 165px">Mã Ống Chuẩn</th>
-                                    <th>Chất Chuẩn</th>
-                                    <th class="text-right" style="width: 120px">Tồn Cuối Kỳ</th>
-                                    <th class="text-center" style="width: 115px">Hạn Áp Dụng</th>
-                                    <th class="text-center" style="width: 110px">Trạng Thái</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($datas as $row)
-                                    {{-- 4 cấp định khu để JS lọc; ống chưa xếp vị trí thì cả 4 đều rỗng --}}
-                                    <tr data-groups="{{ $invGroups($row->groups) }}"
-                                        data-warehouse="{{ $row->warehouse_id }}" data-shelf="{{ $row->shelf_id }}"
-                                        data-column="{{ $row->column_id }}" data-tier="{{ $row->tier_id }}"
-                                        data-location="{{ $row->location_id }}"
-                                        data-category="{{ $row->category_id }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td class="md-sub">
-                                            @if ($row->location_code)
-                                                <div class="font-weight-bold">
-                                                    <span class="md-tag">{{ $row->location_code }}</span>
-                                                </div>
-                                                <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
-                                                    {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
-                                            @else
-                                                <span class="inv-zone-none">Chưa xếp vị trí</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <span class="inv-code">{{ $row->code }}</span>
-                                            <div class="md-sub">
-                                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                            </div>
-                                            @if ($row->batch_no)
-                                                <div class="md-sub">Lô {{ $row->batch_no }}</div>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
-                                            @if ($row->group_code)
-                                                <div class="md-sub">
-                                                    <span class="sd-group-tag">{{ $invGroupName($row->group_code) }}</span>
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->gap }}">
-                                            <span
-                                                class="inv-remaining {{ $row->state === 'over' ? 'is-over' : ($row->remaining > 0 ? '' : 'is-zero') }}">{{ $invNum($row->gap) }}</span>
-                                            <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->effective_expired_date ?: '9999-12-31' }}">
-                                            {{ $invDate($row->effective_expired_date) }}
-                                        </td>
-                                        <td class="text-center">
-                                            <span
-                                                class="inv-badge inv-badge-{{ $row->state }}">{{ $row->state_label }}</span>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                    @php
+                        // Chỉ ống CÒN TỒN mới nằm trên sơ đồ, gọn đúng các trường thẻ + modal dùng
+                        $invZoneRows = $datas
+                            ->filter(fn($row) => $row->remaining > 0)
+                            ->map(fn($row) => [
+                                'code' => $row->code,
+                                'category_id' => (int) $row->category_id,
+                                'name' => $row->standard_name,
+                                'sub' => implode(' · ', array_filter([
+                                    $row->category_code,
+                                    $row->batch_no ? 'Lô ' . $row->batch_no : null,
+                                    $row->manufacturer_short_name,
+                                ])),
+                                'remaining' => (float) $row->remaining,
+                                'unit' => $row->unit_short_name ?: $row->unit_name,
+                                'expired' => $row->effective_expired_date,
+                                'state' => $row->state,
+                                'state_label' => $row->state_label,
+                                'location_id' => $row->location_id ? (int) $row->location_id : null,
+                                'location_code' => $row->location_code,
+                                'location_zone_type' => $row->location_zone_type,
+                                'warehouse_id' => $row->warehouse_id,
+                                'shelf_id' => $row->shelf_id,
+                                'column_id' => $row->column_id,
+                                'tier_id' => $row->tier_id,
+                                'warehouse_name' => $row->warehouse_name,
+                                'shelf_name' => $row->shelf_name,
+                                'column_name' => $row->column_name,
+                                'tier_name' => $row->tier_name,
+                            ])
+                            ->values();
+                    @endphp
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            window.invZoneGrid('#invZoneMap', {
+                                zones: @json($zones),
+                                rows: @json($invZoneRows)
+                            });
+                        });
+                    </script>
                 </div>
+                @endtab
 
                 {{-- ============ HẠN DÙNG DƯỚI 6 THÁNG ============ --}}
-                <div class="inv-pane" id="invPaneExpiring">
+                @tab('inventory_standard', 'expiring')
+                <div class="inv-pane {{ $activeTab === 'expiring' ? 'is-active' : '' }}" id="invPaneExpiring">
 
                     @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'invExpiringTable'])
 
                     <div class="table-responsive">
-                        <table id="invExpiringTable" class="table table-bordered table-hover w-100">
+                        <table id="invExpiringTable" class="table table-bordered table-hover w-100" data-deferred>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
@@ -590,6 +544,7 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @deferredRows('invExpiringTable')
                                 @foreach ($invExpiringSoon as $row)
                                     <tr data-groups="{{ $invGroups($row->groups) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
@@ -653,18 +608,21 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                @enddeferredRows
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ CHƯA XÁC ĐỊNH HẠN DÙNG NỘI BỘ ============ --}}
-                <div class="inv-pane" id="invPaneInternal">
+                @tab('inventory_standard', 'internal')
+                <div class="inv-pane {{ $activeTab === 'internal' ? 'is-active' : '' }}" id="invPaneInternal">
 
                     @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'invInternalTable'])
 
                     <div class="table-responsive">
-                        <table id="invInternalTable" class="table table-bordered table-hover w-100">
+                        <table id="invInternalTable" class="table table-bordered table-hover w-100" data-deferred>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 60px">STT</th>
@@ -678,6 +636,7 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @deferredRows('invInternalTable')
                                 @foreach ($invWaitingInternal as $row)
                                     <tr data-groups="{{ $invGroups($row->groups) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
@@ -732,18 +691,21 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                @enddeferredRows
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ KIỂM SOÁT KHỐI LƯỢNG ============ --}}
-                <div class="inv-pane" id="invPaneWeight">
+                @tab('inventory_standard', 'weight')
+                <div class="inv-pane {{ $activeTab === 'weight' ? 'is-active' : '' }}" id="invPaneWeight">
 
                     @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'invWeightTable'])
 
                     <div class="table-responsive">
-                        <table id="invWeightTable" class="table table-bordered table-hover w-100">
+                        <table id="invWeightTable" class="table table-bordered table-hover w-100" data-deferred>
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 50px">STT</th>
@@ -760,6 +722,7 @@
                                 </tr>
                             </thead>
                             <tbody>
+                                @deferredRows('invWeightTable')
                                 @foreach ($invWeightControlled as $row)
                                     <tr data-groups="{{ $invGroups($row->groups) }}">
                                         <td class="text-center">{{ $loop->iteration }}</td>
@@ -850,10 +813,12 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                @enddeferredRows
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @endtab
 
             </div>
         </div>
@@ -873,19 +838,14 @@
         var sdEmpty = {
             '#mdTable': 'Chưa có ống chuẩn nào để tính tồn kho. Hãy nhập ở màn hình Nhập Chất Chuẩn.',
             '#invSummaryTable': 'Chưa có chất chuẩn nào trong kho.',
-            '#invZoneTable': 'Chưa có ống chuẩn nào ở định khu đang chọn.',
             '#invExpiringTable': 'Không có ống chuẩn nào còn tồn mà sắp hết hạn.',
             '#invInternalTable': 'Tất cả chất chuẩn có khai báo hạn dùng mặc định đều đã xác định hạn dùng nội bộ.',
             '#invWeightTable': 'Không có ống chuẩn nào có khai báo kiểm soát khối lượng.',
         };
 
+        // Bảng nạp sau (data-deferred) giữ "Đang tải..." tới khi dòng về rồi mới dùng câu này
         Object.keys(sdEmpty).forEach(function(selector) {
-            if (!$.fn.dataTable.isDataTable(selector)) return;
-
-            var table = $(selector).DataTable();
-
-            table.settings()[0].oLanguage.sEmptyTable = sdEmpty[selector];
-            table.draw(false);
+            mdDeferred.setEmpty(selector, sdEmpty[selector]);
         });
     });
 </script>

@@ -71,17 +71,9 @@
     </button>
 </form>
 
-<div class="mb-2">
-    <span class="mi-chip is-active" data-fstate="">Tất cả ({{ $forecast['summary']['total'] }})</span>
-    @foreach ($forecast['states'] as $key => $label)
-        @if ($forecast['summary'][$key] > 0)
-            <span class="mi-chip" data-fstate="{{ $key }}">{{ $label }} ({{ $forecast['summary'][$key] }})</span>
-        @endif
-    @endforeach
-</div>
 
 <div class="table-responsive">
-    <table id="mfTable" class="table table-bordered table-hover w-100 md-table">
+    <table id="mfTable" class="table table-bordered table-hover w-100 md-table" data-deferred>
         <thead>
             <tr>
                 <th class="text-center" style="width:45px">STT</th>
@@ -109,8 +101,9 @@
             </tr>
         </thead>
         <tbody>
+            @deferredRows('mfTable')
             @forelse ($mfRows as $row)
-                <tr data-fstate="{{ $row->state }}">
+                <tr data-classification="{{ \App\Support\MaterialClassification::filterKeys($row->classification, $row->purchasing_department) }}">
                     <td class="text-center">{{ $loop->iteration }}</td>
                     <td><span class="md-tag">{{ $row->category_code ?: '—' }}</span></td>
                     <td>
@@ -168,6 +161,7 @@
                     </td>
                 </tr>
             @endforelse
+            @enddeferredRows
         </tbody>
     </table>
 </div>
@@ -180,20 +174,6 @@
 
         // Giữ nguyên thứ tự Controller đã xếp (mã không đáp ứng lên trước)
         if ($.fn.DataTable.isDataTable('#mfTable')) $('#mfTable').DataTable().order([]).draw();
-
-        /* ---------- Lọc theo trạng thái đáp ứng ---------- */
-        var mfState = '';
-        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
-            if (settings.nTable.id !== 'mfTable' || mfState === '') return true;
-            var tr = settings.aoData[dataIndex].nTr;
-            return tr && tr.getAttribute('data-fstate') === mfState;
-        });
-        $('#miPaneNext').on('click', '.mi-chip', function () {
-            $('#miPaneNext .mi-chip').removeClass('is-active');
-            $(this).addClass('is-active');
-            mfState = $(this).data('fstate') || '';
-            if ($.fn.DataTable.isDataTable('#mfTable')) $('#mfTable').DataTable().draw();
-        });
 
         /* ---------- Chi tiết nguồn nhu cầu của một mã ---------- */
         function mfSourceRows($tb, sources, empty) {

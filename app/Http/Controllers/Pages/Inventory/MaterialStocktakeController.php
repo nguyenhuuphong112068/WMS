@@ -586,6 +586,7 @@ class MaterialStocktakeController extends Controller
                 'material_name' => $row->material_name ?: '—',
                 'sub' => trim(implode(' · ', array_filter([$row->manufacturer_short_name, $row->technical_specification]))),
                 'location_code' => $row->location_code ?: '—',
+                'location_zone_type' => $row->location_zone_type ?? null,
                 'unit' => $row->unit,
                 'system_amount' => $this->number((float) $row->system_amount),
                 'actual_amount' => $row->actual_amount === null ? '—' : $this->number((float) $row->actual_amount),
@@ -641,7 +642,8 @@ class MaterialStocktakeController extends Controller
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
-                'locations.code as location_code'
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type'
             )
             ->where('material_imports.department_id', $departmentId)
             ->where('material_imports.status_id', 1)
@@ -719,6 +721,7 @@ class MaterialStocktakeController extends Controller
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 'material_imports.expired_date'
             )
             ->where('material_stocktake_items.stocktake_id', $stocktakeId)

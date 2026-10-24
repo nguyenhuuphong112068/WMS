@@ -144,9 +144,8 @@
                             <td class="md-sub">
                                 @if ($row->location_code)
                                     <div class="font-weight-bold">
-                                        <span class="md-tag">{{ $row->location_code }}</span>
+                                        {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                     </div>
-                                    <div>{{ $dsPath($row) }}</div>
                                 @else
                                     <span class="md-empty">Chưa định khu</span>
                                 @endif
@@ -188,6 +187,7 @@
                                                     'max_stock' => $row->max_stock,
                                                     'default_location_id' => $row->default_location_id,
                                                     'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                    'default_location_id_zone' => $row->location_zone_type ?? '',
                                                     'note' => $row->note,
                                                     'category_code' => $row->category_code,
                                                     'standard_name' => $row->standard_name,

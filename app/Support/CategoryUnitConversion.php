@@ -148,9 +148,26 @@ class CategoryUnitConversion
         return UnitConverter::convert(1.0, $from, $to, $density === null ? null : (float) $density);
     }
 
-    /** Ghi hệ số vừa khai; khai lại cặp đã có thì đè lên dòng đang có. */
+    /**
+     * Ghi hệ số vừa khai; khai lại cặp đã có thì đè lên dòng đang có.
+     *
+     * Mỗi cặp đơn vị chỉ giữ MỘT chiều còn hiệu lực: dòng khai theo chiều ngược (nếu có)
+     * bị tắt, nếu không factor() có thể đọc phải hệ số cũ mâu thuẫn với hệ số vừa khai.
+     */
     public static function save(string $type, int $categoryId, int $fromUnitId, int $toUnitId, float $factor, string $actor): void
     {
+        DB::table(self::TABLE)
+            ->where('category_type', $type)
+            ->where('category_id', $categoryId)
+            ->where('from_unit_id', $toUnitId)
+            ->where('to_unit_id', $fromUnitId)
+            ->where('status_id', 1)
+            ->update([
+                'status_id' => 0,
+                'updated_by' => $actor,
+                'updated_at' => now(),
+            ]);
+
         $existing = DB::table(self::TABLE)
             ->where('category_type', $type)
             ->where('category_id', $categoryId)
@@ -221,24 +238,31 @@ class CategoryUnitConversion
     }
 
     /**
-     * Ghi các hệ số vừa khai theo chiều: 1 <đơn vị của phòng đang khai> = factor <đơn vị kia>.
+     * Ghi các hệ số vừa khai. Mặc định theo chiều 1 <đơn vị của phòng đang khai> = factor
+     * <đơn vị kia>; ô nào người dùng đảo chiều ($directions[<unit_id>] = 'reverse') thì
+     * đọc là 1 <đơn vị kia> = factor <đơn vị của phòng> và lưu đúng chiều đó, không tự
+     * lấy 1/factor để khỏi sai số làm tròn (1 hộp = 3 cái).
      *
      * Bỏ qua ô để trống và ô không phải số dương - phần bắt buộc đã do missingFor() chặn.
      */
-    public static function saveDeclarations(string $type, int $categoryId, int $departmentId, ?int $unitId, array $submitted, string $actor): void
+    public static function saveDeclarations(string $type, int $categoryId, int $departmentId, ?int $unitId, array $submitted, string $actor, array $directions = []): void
     {
         if (! $unitId) {
             return;
         }
 
-        foreach ($submitted as $toUnitId => $factor) {
-            $toUnitId = (int) $toUnitId;
+        foreach ($submitted as $otherUnitId => $factor) {
+            $otherUnitId = (int) $otherUnitId;
 
-            if ($toUnitId <= 0 || $toUnitId === $unitId || ! is_numeric($factor) || (float) $factor <= 0) {
+            if ($otherUnitId <= 0 || $otherUnitId === $unitId || ! is_numeric($factor) || (float) $factor <= 0) {
                 continue;
             }
 
-            self::save($type, $categoryId, $unitId, $toUnitId, (float) $factor, $actor);
+            if (($directions[$otherUnitId] ?? null) === 'reverse') {
+                self::save($type, $categoryId, $otherUnitId, $unitId, (float) $factor, $actor);
+            } else {
+                self::save($type, $categoryId, $unitId, $otherUnitId, (float) $factor, $actor);
+            }
         }
     }
 

@@ -130,7 +130,9 @@
 
             return '<tr class="permission-row" data-permission-row="' + item.id + '"' +
                 ' data-from-role="' + (item.from_role ? 1 : 0) + '" data-state="' + item.state + '">' +
-                '<td>' + escapeHtml(item.name) +
+                '<td' + (item.is_child ? ' style="padding-left: ' + (12 + 24 * Math.max(item.depth || 1, 1)) + 'px"' : '') + '>' +
+                (item.is_child ? '<i class="fas fa-level-up-alt fa-rotate-90 mr-1" style="font-size: 11px; color: var(--primary-lighter)"></i>' : '') +
+                escapeHtml(item.name) +
                 '<div class="permission-code">' + escapeHtml(item.code) + '</div></td>' +
                 '<td class="text-center">' + (item.from_role ? 'Có' : 'Không') + '</td>' +
                 '<td>' + radios + '</td>' +

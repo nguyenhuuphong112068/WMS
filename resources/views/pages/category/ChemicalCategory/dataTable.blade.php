@@ -20,7 +20,7 @@
         @include('pages.shared.classificationFilter', ['clsTarget' => 'mdTable'])
 
         <div class="table-responsive">
-            <table id="mdTable" class="table table-bordered table-hover w-100">
+            <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 55px">STT</th>
@@ -50,6 +50,7 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @deferredRows('mdTable')
                     @foreach ($datas as $row)
                         @php
                             // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (không còn cột classification)
@@ -280,6 +281,7 @@
                             </td>
                         </tr>
                     @endforeach
+                    @enddeferredRows
                 </tbody>
             </table>
         </div>

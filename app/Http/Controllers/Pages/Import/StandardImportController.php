@@ -143,7 +143,10 @@ class StandardImportController extends Controller
         // Tồn hiện tại + ngưỡng tối đa của phòng, để modal cảnh báo khi nhập quá nhiều
         $maxStock = \App\Support\MaxStockWarning::forStandard($departmentId);
 
-        $categoryDefaults = $categories->mapWithKeys(function ($category) use ($deptStandards, $maxStock) {
+        // Khu Biệt Trữ của phòng: ô Định khu tạm của modal Nhập chỉ nhận các vị trí này (tìm qua AJAX)
+        $quarantineLocations = $this->locationOptions($departmentId, true)->keyBy('id');
+
+        $categoryDefaults = $categories->mapWithKeys(function ($category) use ($deptStandards, $maxStock, $quarantineLocations) {
             $ds = $deptStandards->get($category->id);
             $shelfLife = $ds->shelf_life_months ?? $category->shelf_life_months ?? null;
             $info = [
@@ -165,7 +168,11 @@ class StandardImportController extends Controller
             }
 
             return [$category->id => [
-                'location_id' => $ds->default_location_id ?? null,
+                // Định khu mặc định chỉ điền sẵn khi thuộc khu Biệt Trữ (ô chọn chỉ nhận khu này),
+                // kèm nhãn để JS dựng option vì ô chọn tìm qua AJAX không có sẵn danh sách
+                'location_id' => ($defaultLocation = $quarantineLocations->get($ds->default_location_id ?? 0)) ? $defaultLocation->id : null,
+                'location_text' => $defaultLocation ? \App\Support\CategoryLookup::locationLabel($defaultLocation) : null,
+                'location_zone' => $defaultLocation->zone_type ?? null,
                 'shelf_life_months' => $shelfLife,
                 // Ba khoá dưới đây để JS dựng cảnh báo vượt ngưỡng tồn tối đa
                 'max_stock' => $stock['max_stock'],
@@ -198,7 +205,7 @@ class StandardImportController extends Controller
             'suppliers' => $this->supplierOptions(),
             'locations' => $this->locationOptions($departmentId),
             // Modal Nhập chất chuẩn chỉ cho chọn vị trí Biệt Trữ/Chờ kiểm tra
-            'quarantineLocations' => $this->locationOptions($departmentId, true),
+            'quarantineLocations' => $quarantineLocations,
             // Tab "Chờ kiểm tra": ống vừa nhập, chưa cộng tồn, chờ bước Xác nhận kiểm tra
             'pendingRows' => $pendingRows,
             'pendingCount' => $pendingRows->count(),
@@ -234,7 +241,8 @@ class StandardImportController extends Controller
                 'manufacturers.name as manufacturer_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
-                'locations.code as location_code'
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type'
             )
             ->where(self::TABLE . '.id', $request->id)
             ->where(self::TABLE . '.department_id', $this->departmentId())
@@ -577,7 +585,11 @@ class StandardImportController extends Controller
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('suppliers', self::TABLE . '.supplier_id', '=', 'suppliers.id')
             ->leftJoin('locations', self::TABLE . '.location_id', '=', 'locations.id')
-            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id');
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            // Đủ 4 cấp để dựng nhãn định khu cho ô chọn tìm qua AJAX của modal Kiểm tra
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id');
 
         return DepartmentStandard::joinUnit($query, $departmentId, self::TABLE . '.category_id')
             ->select(
@@ -590,7 +602,10 @@ class StandardImportController extends Controller
                 'locations.code as location_code',
                 'locations.zone_type as location_zone_type',
                 'locations.color as location_color',
-                'warehouses.name as warehouse_name'
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where(self::TABLE . '.department_id', $departmentId)
             ->where(self::TABLE . '.status_id', 1)
@@ -1028,6 +1043,7 @@ class StandardImportController extends Controller
             ->select(
                 'locations.id',
                 'locations.code',
+                'locations.zone_type',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',

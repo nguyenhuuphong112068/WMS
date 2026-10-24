@@ -147,6 +147,8 @@ class ChemicalCategoryController extends Controller
 
             // Dữ liệu của tab Hoá Chất Của Phòng, đặt tiền tố dc để không đụng biến của tab 1
             'dcDatas' => $dcDatas,
+            // Badge "Tương kỵ cùng tầng" ở cột Định Khu: [id dòng => hoá chất tương kỵ cùng phạm vi]
+            'dcConflicts' => \App\Support\ChemicalCompatibility::conflictsByDepartmentRows($dcDatas),
             'dcCategories' => DepartmentChemical::categoryOptions($dcDatas->pluck('category_id')->all()),
             // Định khu tìm qua AJAX, chỉ dựng sẵn option của giá trị old()
             'dcLocations' => \App\Support\CategoryLookup::locationsByIds([old('default_location_id')]),

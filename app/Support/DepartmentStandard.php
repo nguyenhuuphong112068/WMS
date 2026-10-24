@@ -184,6 +184,7 @@ class DepartmentStandard
                 'units.name as unit_name',
                 'storage_conditions.name as storage_condition_name',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',

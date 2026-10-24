@@ -40,7 +40,7 @@
                                     <span class="badge badge-secondary">Chung</span>
                                 @endif
                                 @if ($data->purchasing_key)
-                                    <span class="badge badge-warning" title="Bộ phận mua hàng - tiếp nhận dự trù / đề nghị VPP của mọi công ty">
+                                    <span class="badge badge-warning" title="Bộ phận mua hàng - tiếp nhận dự trù / đề nghị cấp phát VPP đến HC của mọi công ty">
                                         <i class="fas fa-cart-shopping mr-1"></i>{{ \App\Support\MaterialClassification::purchasingLabel($data->purchasing_key) }}
                                     </span>
                                 @endif

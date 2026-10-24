@@ -9,6 +9,7 @@ use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
 use App\Support\MaterialClassification;
 use App\Support\MaterialPeriodicRequest;
+use App\Support\TitleSuggestions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -134,6 +135,11 @@ class MaterialCategoryController extends Controller
             'periodicExternalCategories' => MaterialPeriodicRequest::categoryOptions(MaterialPeriodicRequest::TYPE_EXTERNAL, $departmentId),
             'periodicUnits' => DepartmentMaterial::unitOptions(),
             'periodicDepartments' => MaterialPeriodicRequest::departmentOptions($departmentId),
+            // Tiêu đề đã đặt ở từng loại danh sách - gợi ý cho ô Tiêu Đề
+            'periodicTitles' => collect([MaterialPeriodicRequest::TYPE_INTERNAL, MaterialPeriodicRequest::TYPE_EXTERNAL, MaterialPeriodicRequest::TYPE_ESTIMATE])
+                ->mapWithKeys(fn ($type) => [$type => TitleSuggestions::recent(MaterialPeriodicRequest::LIST_TABLE, $departmentId, 'title',
+                    fn ($query) => $query->where('type', $type))])
+                ->all(),
             /*
             | Đối tượng (dữ liệu gốc) cho ô chọn của danh sách nội bộ - chỉ những đối tượng ĐANG
             | GẮN vào danh sách trên trang (kể cả đã khoá) + lựa chọn vừa gửi bị lỗi validate.

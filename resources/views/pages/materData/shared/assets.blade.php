@@ -244,6 +244,8 @@
 
 <script src="{{ asset('js/sweetalert2.all.min.js') }}"></script>
 
+@include('pages.shared.deferredRows')
+
 <script>
     var mdFlash = {
         success: @json(session('success')),
@@ -327,7 +329,7 @@
                     }
                 });
 
-                $(this).DataTable({
+                var options = {
                     autoWidth: false,
                     // Bảng có form nhập trong ô gắn data-no-responsive: dòng con của Responsive
                     // chép HTML ô sang chỗ khác, form chép sang mất sự kiện và trùng name
@@ -364,7 +366,10 @@
                             next: 'Sau'
                         }
                     }
-                });
+                };
+
+                // Bảng data-deferred: dòng nạp sau bằng AJAX (pages/shared/deferredRows)
+                $(this).DataTable(mdDeferred.is(this) ? mdDeferred.extend(this, options) : options);
             });
         };
 

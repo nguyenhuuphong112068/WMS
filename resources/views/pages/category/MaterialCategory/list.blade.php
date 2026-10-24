@@ -65,6 +65,7 @@
         in_array(session('activeTab'), ['department', 'internal', 'external', 'estimate'], true) => session('activeTab'),
         default => 'company',
     };
+    $activeTab = \App\Support\PageTabs::active('category_material', $activeTab);
 
     $tabHashes = [
         'company' => '#tabCompany',
@@ -80,6 +81,7 @@
         <div class="md-page">
 
             <ul class="nav cat-tabs" role="tablist">
+                @tab('category_material', 'company')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'company' ? 'active' : '' }}" id="tabCompanyLink" data-toggle="pill"
                         href="#tabCompany" role="tab">
@@ -88,6 +90,8 @@
                         <span class="cat-tab-count">{{ $datas->count() }}</span>
                     </a>
                 </li>
+                @endtab
+                @tab('category_material', 'department')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'department' ? 'active' : '' }}" id="tabDepartmentLink"
                         data-toggle="pill" href="#tabDepartment" role="tab">
@@ -96,6 +100,8 @@
                         <span class="cat-tab-count">{{ $dmDatas->count() }}</span>
                     </a>
                 </li>
+                @endtab
+                @tab('category_material', 'internal')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'internal' ? 'active' : '' }}" id="tabPeriodicInternalLink"
                         data-toggle="pill" href="#tabPeriodicInternal" role="tab">
@@ -104,6 +110,8 @@
                         <span class="cat-tab-count">{{ $periodicInternalLists->count() }}</span>
                     </a>
                 </li>
+                @endtab
+                @tab('category_material', 'external')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'external' ? 'active' : '' }}" id="tabPeriodicExternalLink"
                         data-toggle="pill" href="#tabPeriodicExternal" role="tab">
@@ -112,6 +120,8 @@
                         <span class="cat-tab-count">{{ $periodicExternalLists->count() }}</span>
                     </a>
                 </li>
+                @endtab
+                @tab('category_material', 'estimate')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'estimate' ? 'active' : '' }}" id="tabPeriodicEstimateLink"
                         data-toggle="pill" href="#tabPeriodicEstimate" role="tab">
@@ -120,14 +130,18 @@
                         <span class="cat-tab-count">{{ $periodicEstimateLists->count() }}</span>
                     </a>
                 </li>
+                @endtab
             </ul>
 
             <div class="tab-content">
+                @tab('category_material', 'company')
                 <div class="tab-pane fade {{ $activeTab === 'company' ? 'show active' : '' }}" id="tabCompany"
                     role="tabpanel">
                     @include('pages.category.MaterialCategory.dataTable')
                 </div>
+                @endtab
 
+                @tab('category_material', 'department')
                 <div class="tab-pane fade {{ $activeTab === 'department' ? 'show active' : '' }}" id="tabDepartment"
                     role="tabpanel">
                     @include('pages.category.DepartmentMaterial.dataTable', [
@@ -138,7 +152,9 @@
                         'mdIcon' => $dmIcon,
                     ])
                 </div>
+                @endtab
 
+                @tab('category_material', 'internal')
                 <div class="tab-pane fade {{ $activeTab === 'internal' ? 'show active' : '' }}" id="tabPeriodicInternal"
                     role="tabpanel">
                     @include('pages.category.PeriodicRequest.dataTable', [
@@ -146,7 +162,9 @@
                         'lists' => $periodicInternalLists,
                     ])
                 </div>
+                @endtab
 
+                @tab('category_material', 'external')
                 <div class="tab-pane fade {{ $activeTab === 'external' ? 'show active' : '' }}" id="tabPeriodicExternal"
                     role="tabpanel">
                     @include('pages.category.PeriodicRequest.dataTable', [
@@ -154,7 +172,9 @@
                         'lists' => $periodicExternalLists,
                     ])
                 </div>
+                @endtab
 
+                @tab('category_material', 'estimate')
                 <div class="tab-pane fade {{ $activeTab === 'estimate' ? 'show active' : '' }}" id="tabPeriodicEstimate"
                     role="tabpanel">
                     @include('pages.category.PeriodicRequest.dataTable', [
@@ -162,6 +182,7 @@
                         'lists' => $periodicEstimateLists,
                     ])
                 </div>
+                @endtab
             </div>
         </div>
     </div>
@@ -301,6 +322,7 @@
     ])
 
     @foreach (['internal' => $periodicInternalCategories, 'external' => $periodicExternalCategories, 'estimate' => $periodicExternalCategories] as $prType => $prCategories)
+        @include('pages.shared.titleDatalist', ['id' => 'prTitleOptions_' . $prType, 'titles' => $periodicTitles[$prType] ?? []])
         @include('pages.category.PeriodicRequest.create', [
             'type' => $prType,
             'categories' => $prCategories,

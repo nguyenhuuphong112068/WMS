@@ -17,13 +17,14 @@
 
                 <div class="md-filter">
                     <label for="mdClassFilter"><i class="fas fa-filter mr-1"></i> Phân loại</label>
-                    <select id="mdClassFilter" class="form-control form-control-sm">
-                        <option value="all">Tất cả</option>
+                    <select id="mdClassFilter" class="form-control form-control-sm" multiple
+                        data-placeholder="Tất cả">
                         <option value="none">Chưa phân loại</option>
-                        @foreach (MaterialClassification::CRITERIA as $key => $criterion)
-                            <optgroup label="{{ $criterion['label'] }}">
-                                @foreach ($criterion['options'] as $value => $name)
-                                    <option value="{{ $key }}:{{ $value }}">{{ $name }}</option>
+                        @foreach (MaterialClassification::formGroups() as $group)
+                            @php $filterKey = str_replace('classification.', '', $group['errorKey']); @endphp
+                            <optgroup label="{{ $group['label'] }}">
+                                @foreach ($group['options'] as $value => $name)
+                                    <option value="{{ $filterKey }}:{{ $value }}">{{ $name }}</option>
                                 @endforeach
                             </optgroup>
                         @endforeach
@@ -33,7 +34,7 @@
         </div>
 
         <div class="table-responsive">
-            <table id="mdTable" class="table table-bordered table-hover w-100">
+            <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 55px">STT</th>
@@ -54,6 +55,7 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @deferredRows('mdTable')
                     @foreach ($datas as $row)
                         @php
                             $usingDepts = $departmentsByCategory[$row->id] ?? collect();
@@ -64,7 +66,8 @@
                             // Màu nền mã theo tình trạng: khoá thắng duyệt, chưa duyệt thì vẫn vàng chờ
                             $catCodeStatus = $row->status_id == 0 ? 'locked' : ($row->app_status === 'approved' ? 'approved' : 'pending');
                         @endphp
-                        <tr data-classification="{{ $classKeys }}">
+                        <tr data-classification="{{ $classKeys }}"
+                            data-purchasing="{{ $row->purchasing_department ? 'purchasing_department:' . $row->purchasing_department : '' }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td><span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span></td>
                             <td class="font-weight-bold">{{ $row->material_name ?: '—' }}</td>
@@ -153,6 +156,7 @@
                             </td>
                         </tr>
                     @endforeach
+                    @enddeferredRows
                 </tbody>
             </table>
         </div>
@@ -179,26 +183,64 @@
         width: auto;
         min-width: 200px;
     }
+
+    .md-filter .select2-container {
+        min-width: 320px;
+        max-width: 640px;
+    }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var mdClassWant = 'all';
+        var mdClassWant = [];
 
-        /* ---------- Lọc bảng danh mục công ty theo một lựa chọn phân loại ---------- */
-        $.fn.dataTable.ext.search.push(function(settings, data, index) {
+        $('#mdClassFilter').select2({
+            theme: 'bootstrap4',
+            width: 'style',
+            placeholder: 'Tất cả',
+            closeOnSelect: false,
+            allowClear: true
+        });
+
+        /*
+         * ---------- Lọc bảng danh mục công ty theo nhiều lựa chọn phân loại ----------
+         * Cùng một tiêu chí: HOẶC (Giá thấp hoặc Giá cao); khác tiêu chí: VÀ.
+         * "Chưa phân loại" cộng thêm (HOẶC) các dòng chưa khai phân loại.
+         */
+        $.fn.dataTable.ext.search.push(function(settings, data, index, rowData) {
             if (settings.nTable.id !== 'mdTable') return true;
-            if (mdClassWant === 'all') return true;
+            if (!mdClassWant.length) return true;
 
-            var keys = ($(settings.aoData[index].nTr).attr('data-classification') || '').trim();
+            // Dòng nạp sau (data-deferred) chưa có <tr> nên đọc thuộc tính từ dữ liệu dòng
+            var tr = settings.aoData[index].nTr;
+            var classKeys = (mdDeferred.rowAttr(rowData, tr, 'classification') || '').trim();
+            var keys = ' ' + classKeys + ' ' + (mdDeferred.rowAttr(rowData, tr, 'purchasing') || '') + ' ';
 
-            if (mdClassWant === 'none') return keys === '';
+            var wantNone = false;
+            var groups = {};
+            mdClassWant.forEach(function(value) {
+                if (value === 'none') {
+                    wantNone = true;
+                    return;
+                }
+                var criterion = value.split(':')[0];
+                (groups[criterion] = groups[criterion] || []).push(value);
+            });
 
-            return (' ' + keys + ' ').indexOf(' ' + mdClassWant + ' ') !== -1;
+            if (wantNone && classKeys === '') return true;
+
+            var criteria = Object.keys(groups);
+            if (!criteria.length) return false;
+
+            return criteria.every(function(criterion) {
+                return groups[criterion].some(function(value) {
+                    return keys.indexOf(' ' + value + ' ') !== -1;
+                });
+            });
         });
 
         $(document).on('change', '#mdClassFilter', function() {
-            mdClassWant = this.value;
+            mdClassWant = $(this).val() || [];
             $('#mdTable').DataTable().draw();
         });
     });

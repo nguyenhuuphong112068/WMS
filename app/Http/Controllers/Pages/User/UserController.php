@@ -14,13 +14,11 @@ class UserController extends Controller
 {
          public function index(){
 
-                // Ô chọn Phòng Ban / Tổ giới hạn trong công ty đang làm việc (suy từ phòng ban đang chọn)
-                $companyId = \App\Support\CompanyContext::currentId();
-
+                // Ô chọn Phòng Ban / Tổ lấy mọi công ty (gom theo công ty) - quản trị tạo user cho cả NM1 lẫn NM2
                 $deparments = DB::table('deparments')
                     ->leftJoin('companies', 'deparments.company_id', '=', 'companies.id')
                     ->where('deparments.isActive', true)
-                    ->when($companyId, fn ($q) => $q->where('deparments.company_id', $companyId))
+                    ->orderBy('companies.name', 'asc')
                     ->select('deparments.*', 'companies.name as company_name', 'companies.short_name as company_short')
                     ->get();
                 $roles = DB::table('roles')->get();
@@ -47,7 +45,6 @@ class UserController extends Controller
                 $groups = DB::table('groups')
                     ->leftJoin('deparments', 'groups.department_id', '=', 'deparments.id')
                     ->where('groups.status_id', 1)
-                    ->when($companyId, fn ($q) => $q->where('deparments.company_id', $companyId))
                     ->orderBy('groups.name', 'asc')
                     ->get(['groups.id', 'groups.name', 'groups.department_id']);
 

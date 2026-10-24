@@ -991,11 +991,55 @@
         });
 
         /* ---------- Xử lý trao đổi thông tin (Chat) ---------- */
-        $('.chat-input-field').on('keypress', function(e) {
+        // Trang chi tiết: nút "Trao đổi" mượn khung chat ẩn của dòng đưa vào modal, đóng thì trả về chỗ cũ
+        // (giữ nguyên tin vừa gửi khi mở lại)
+        $(document).on('click', '.btn-est-chat', function() {
+            var $btn = $(this);
+            var $src = $('#' + $btn.data('chat-src'));
+            var $modal = $('#estChatModal');
+
+            if (!$modal.length) {
+                $modal = $(
+                    '<div class="modal fade" id="estChatModal" tabindex="-1" role="dialog">' +
+                    '<div class="modal-dialog modal-dialog-centered" role="document"><div class="modal-content">' +
+                    '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-comments mr-2"></i><span></span></h5>' +
+                    '<button type="button" class="close" data-dismiss="modal">&times;</button></div>' +
+                    '<div class="modal-body"></div></div></div></div>'
+                ).appendTo('body');
+
+                $modal.on('hidden.bs.modal', function() {
+                    var $back = $modal.data('src');
+                    if ($back) {
+                        $modal.find('.modal-body').children().appendTo($back);
+                        $modal.removeData('src');
+                    }
+                });
+            }
+
+            $modal.find('.modal-title span').text('Trao đổi - ' + ($btn.data('title') || ''));
+            $modal.find('.modal-body').empty().append($src.children());
+            $modal.data('src', $src).data('btn', $btn);
+            $modal.one('shown.bs.modal', function() {
+                var $messages = $modal.find('.est-chat-messages');
+                $messages.scrollTop($messages[0].scrollHeight);
+                $modal.find('.chat-input-field').trigger('focus');
+            }).modal('show');
+        });
+
+        // Tin mới nằm dưới cùng: cuộn sẵn xuống cuối mọi khung
+        $('.est-chat-messages').each(function() {
+            this.scrollTop = this.scrollHeight;
+        });
+
+        $(document).on('keypress', '.chat-input-field', function(e) {
             if (e.which === 13) {
                 e.preventDefault();
                 sendChat($(this));
             }
+        });
+
+        $(document).on('click', '.est-chat-send', function() {
+            sendChat($(this).closest('.est-chat').find('.chat-input-field'));
         });
 
         function sendChat($input) {
@@ -1003,27 +1047,39 @@
             var itemId = $input.data('item-id');
             var route = $input.data('route');
 
-            if (!content) return;
+            if (!content || $input.prop('disabled')) return;
 
             $input.prop('disabled', true);
 
             $.post(route, {
-                _token: $('input[name="_token"]').first().val(),
+                _token: $('meta[name="csrf-token"]').attr('content') || $('input[name="_token"]').first().val(),
                 item_id: itemId,
                 content: content
             }).done(function(res) {
                 if (res.success && res.chat) {
-                    var $container = $('#chat-messages-' + itemId);
-                    var html = '<div class="chat-message mb-2">' +
-                        '<div class="d-flex justify-content-between align-items-center">' +
-                        '<strong class="text-primary">' + res.chat.user_name + '</strong>' +
-                        '<small style="font-size: 0.7rem;">' + res.chat.created_at_formatted + '</small>' +
-                        '</div>' +
-                        '<div>' + res.chat.content + '</div>' +
-                        '</div>';
-                    $container.prepend(html);
-                    $container.scrollTop(0);
+                    // Dựng bằng .text() để nội dung người dùng gõ không bị hiểu là HTML
+                    var $messages = $input.closest('.est-chat').find('.est-chat-messages');
+                    $messages.find('.est-chat-empty').remove();
+                    $('<div class="est-chat-msg is-me">')
+                        .append($('<div class="est-chat-meta">')
+                            .append($('<b>').text(res.chat.user_name))
+                            .append(document.createTextNode(' · ' + res.chat.created_at_formatted)))
+                        .append($('<div class="est-chat-bubble">').text(res.chat.content))
+                        .appendTo($messages);
+                    $messages.scrollTop($messages[0].scrollHeight);
                     $input.val('');
+
+                    var $chatBtn = $('#estChatModal').data('btn');
+                    if ($chatBtn && $input.closest('#estChatModal').length) {
+                        var $count = $chatBtn.find('.est-chat-count');
+                        if ($count.length) {
+                            $count.text(parseInt($count.text(), 10) + 1);
+                        } else {
+                            $chatBtn.append('<span class="badge badge-info ml-1 est-chat-count">1</span>');
+                        }
+                    }
+                } else {
+                    alert(res.message || 'Không gửi được tin nhắn!');
                 }
             }).fail(function() {
                 alert('Có lỗi xảy ra khi gửi tin nhắn!');
@@ -1042,7 +1098,14 @@
             var dateVal = $input.val();
             var prevValue = $input.data('prev-value') || '';
             var route = $input.data('route');
-            var itemId = $input.closest('form').find('[name="id"]').val();
+            var itemId = $input.data('item-id');
+            var amountId = $input.data('amount-id');
+
+            // Lần hẹn đầu tiên của tháng (chưa có ngày hẹn) thì lưu luôn, không hỏi lý do
+            if (!prevValue) {
+                submitPromisedDate($input, route, itemId, amountId, dateVal, '');
+                return;
+            }
 
             Swal.fire({
                 title: 'Lý do thay đổi ngày hẹn',
@@ -1069,20 +1132,21 @@
                     $input.val(prevValue);
                     return;
                 }
-                submitPromisedDate($input, route, itemId, dateVal, result.value);
+                submitPromisedDate($input, route, itemId, amountId, dateVal, result.value);
             });
         });
 
-        function submitPromisedDate($input, route, itemId, dateVal, reason) {
+        function submitPromisedDate($input, route, itemId, amountId, dateVal, reason) {
             $.post(route, {
                 _token: $('input[name="_token"]').first().val(),
                 id: itemId,
+                amount_id: amountId,
                 promised_date: dateVal,
                 reason: reason
             }).done(function(res) {
                 if (res.success) {
                     $input.data('prev-value', dateVal);
-                    var $daysLeft = $input.closest('form').find('.promised-date-days-left');
+                    var $daysLeft = $input.closest('.promised-date-row').find('.promised-date-days-left');
                     if (dateVal) {
                         var promised = new Date(dateVal);
                         promised.setHours(0,0,0,0);
@@ -1102,7 +1166,7 @@
                     }
 
                     if (res.historyAdded) {
-                        var $btn = $input.closest('form').find('.btn-promised-date-history');
+                        var $btn = $input.closest('.promised-date-cell').find('.btn-promised-date-history');
                         var $badge = $btn.find('.promised-date-history-badge');
                         if ($badge.length) {
                             $badge.text(parseInt($badge.text()) + 1);

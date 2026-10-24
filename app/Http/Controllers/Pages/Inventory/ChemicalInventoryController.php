@@ -63,8 +63,19 @@ class ChemicalInventoryController extends Controller
     /** Hạn dùng còn dưới ngần này ngày là "Sắp hết hạn". */
     private const NEAR_EXPIRY_DAYS = 30;
 
-    /** Hạn áp dụng rơi vào trong ngần này tháng thì vào tab "Hạn dùng dưới 6 tháng". */
+    /** Hạn áp dụng rơi vào trong ngần này tháng thì vào tab "Cận Hạn Dùng". */
     private const EXPIRING_SOON_MONTHS = 6;
+
+    /**
+     * Mốc lọc nhanh trong tab "Cận Hạn Dùng": hạn áp dụng <= hôm nay + mốc (kể cả đã
+     * quá hạn). Ngày chặn tính ở server để khớp days_to_effective_expiry.
+     */
+    private const EXPIRING_FILTERS = [
+        '3m' => ['label' => '≤ 3 tháng', 'months' => 3],
+        '1m' => ['label' => '≤ 1 tháng', 'months' => 1],
+        '2w' => ['label' => '≤ 2 tuần', 'days' => 14],
+        '1w' => ['label' => '≤ 1 tuần', 'days' => 7],
+    ];
 
     /** Tồn còn dưới ngần này so với lượng nhập ban đầu là "Sắp hết". */
     private const LOW_STOCK_RATIO = 0.2;
@@ -99,27 +110,226 @@ class ChemicalInventoryController extends Controller
 
         $period = $this->period($request);
 
-        $datas = $this->stockByCode($departmentId, $period['from'], $period['to']);
+        /*
+        | Các bảng tồn KHÔNG render ở server nữa: trang chỉ trả khung, số liệu lấy qua
+        | data() rồi DataTables tự dựng dòng (deferRender) - render sẵn 1.000+ mã cho
+        | 4 tab làm trang nặng tới ~20 MB HTML.
+        |
+        | Riêng khi form Cân Đối / Hạn Nội Bộ lỗi validate thì vẫn tính tồn tại đây để
+        | modal mở lại có sẵn số của dòng cũ (chỉ xảy ra ở lượt redirect đó).
+        */
+        $errors = session('errors');
+        $reopenModal = $errors
+            && ($errors->getBag('balancingErrors')->any() || $errors->getBag('internalExpiryErrors')->any());
 
         session()->put(['title' => 'TỒN - TỒN KHO HOÁ CHẤT']);
 
         return view('pages.inventory.ChemicalInventory.list', [
-            'datas' => $datas,
-            // File đính kèm của phiếu nhập, để xem ngay trên màn hình tồn kho
-            'attachments' => $this->attachmentsFor($datas->pluck('id')),
-            'summaries' => $this->stockByChemical($datas),
-            // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (thay cột classification đã bỏ)
-            'classificationCodes' => \App\Support\ChemicalClassification::codesByCategory(),
-            'classificationLabels' => \App\Support\ChemicalClassification::labels(),
+            'datas' => $reopenModal ? $this->stockByCode($departmentId, $period['from'], $period['to']) : collect(),
+            'earliestImport' => $this->earliestImport($departmentId),
             'balancings' => $this->balancingHistory($departmentId),
-            'zones' => $this->zoneOptions($departmentId),
             'states' => self::STATES,
             'period' => $period,
             'nearExpiryDays' => self::NEAR_EXPIRY_DAYS,
             'expiringSoonMonths' => self::EXPIRING_SOON_MONTHS,
+            'expiringFilters' => $this->expiringFilters(),
+            'vsFilter' => in_array($request->input('vs'), ['yes', 'no'], true) ? $request->input('vs') : 'all',
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
             'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
+            // Nút [Cách ly] ở tab Theo mã xuất nhập / Cận hạn dùng: định khu Chờ Quyết Định của phòng
+            'quarantinePendingLocations' => \App\Http\Controllers\Pages\Export\ChemicalQuarantineController::zoneLocations(
+                $departmentId,
+                \App\Http\Controllers\Pages\Export\ChemicalQuarantineController::PENDING_ZONE
+            ),
+            // Cách ly xong quay lại đúng tab vừa bấm
+            'activeTab' => in_array(session('activeTab'), ['code', 'expiring'], true) ? session('activeTab') : null,
         ]);
+    }
+
+    /** Mốc lọc của tab "Cận Hạn Dùng" kèm ngày chặn (Y-m-d) tính từ hôm nay. */
+    private function expiringFilters(): array
+    {
+        $today = now()->startOfDay();
+
+        return collect(self::EXPIRING_FILTERS)
+            ->map(fn ($filter) => [
+                'label' => $filter['label'],
+                'until' => isset($filter['months'])
+                    ? $today->copy()->addMonthsNoOverflow($filter['months'])->format('Y-m-d')
+                    : $today->copy()->addDays($filter['days'])->format('Y-m-d'),
+            ])
+            ->all();
+    }
+
+    /**
+     * JSON cho toàn bộ các tab của màn hình tồn, theo đúng kỳ báo cáo đang xem.
+     *
+     * Một lần gọi trả đủ dòng theo mã xuất nhập + dòng cộng dồn theo hoá chất; các tab
+     * Theo định khu / Hạn dùng / Chưa có hạn nội bộ chỉ là tập con của các dòng đó nên
+     * trình duyệt tự lọc, không gọi thêm. Chỉ gửi các trường bảng thực sự hiển thị.
+     */
+    public function data(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $period = $this->period($request);
+
+        $datas = $this->stockByCode($departmentId, $period['from'], $period['to']);
+
+        // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (thay cột classification đã bỏ)
+        $codes = \App\Support\ChemicalClassification::codesByCategory();
+        $files = $this->attachmentsFor($datas->pluck('id'));
+
+        $classOf = fn ($categoryId) => $codes[$categoryId] ?? [];
+
+        return response()->json([
+            'rows' => $datas->map(fn ($row) => $this->rowPayload($row, $classOf($row->category_id), $files->get($row->id)))
+                ->values(),
+            'summaries' => $this->stockByChemical($datas)
+                ->map(fn ($sum) => $this->summaryPayload($sum, $classOf($sum->category_id)))
+                ->values(),
+            // Cộng dồn tách theo cờ Hoá chất VS cho bộ lọc VS: một hoá chất có cả mã VS lẫn
+            // không VS thì ra hai dòng, mỗi dòng chỉ cộng đúng phần mã của nó
+            'summaries_vs' => $datas
+                ->groupBy(fn ($row) => (int) $row->is_microbiological_chemicals)
+                ->flatMap(fn ($rows, $vs) => $this->stockByChemical($rows)->map(function ($sum) use ($vs) {
+                    $sum->vs = (int) $vs;
+
+                    return $sum;
+                }))
+                ->map(fn ($sum) => $this->summaryPayload($sum, $classOf($sum->category_id)))
+                ->values(),
+        ]);
+    }
+
+    /** JSON 5 cấp định khu cho bộ lọc tab Theo định khu - chỉ tải khi mở tab đó. */
+    public function zones()
+    {
+        return response()->json($this->zoneOptions($this->departmentId()));
+    }
+
+    /** Một dòng tồn theo mã xuất nhập, gọn lại đúng các trường các bảng dùng. */
+    private function rowPayload($row, array $classification, $files): array
+    {
+        return [
+            'id' => (int) $row->id,
+            'code' => $row->code,
+            'category_id' => (int) $row->category_id,
+            'category_code' => $row->category_code,
+            'category_type' => $row->category_type,
+            'chem_name' => $row->chem_name,
+            // Hoá chất VS (vi sinh) - cờ của phiếu nhập, dùng cho bộ lọc VS
+            'vs' => (int) $row->is_microbiological_chemicals,
+            'batch_no' => $row->batch_no,
+            'supplier_name' => $row->supplier_name,
+            'unit' => $row->unit_short_name ?: $row->unit_name,
+            'cls' => implode(',', $classification),
+            'special' => \App\Support\ChemicalClassification::isSpecialControl($classification),
+
+            // Định khu thực tế của lô: mã + phân loại để tô màu, 5 cấp id để lọc dây chuyền
+            'location_id' => $row->location_id ? (int) $row->location_id : null,
+            'location_code' => $row->location_code,
+            'location_zone_type' => $row->location_zone_type,
+            'location_order' => $row->location_code
+                ? $row->warehouse_name.'/'.$row->shelf_name.'/'.$row->column_name.'/'.$row->tier_name.'/'.$row->location_code
+                : 'zzz',
+            'warehouse_id' => $row->warehouse_id ? (int) $row->warehouse_id : null,
+            'shelf_id' => $row->shelf_id ? (int) $row->shelf_id : null,
+            'column_id' => $row->column_id ? (int) $row->column_id : null,
+            'tier_id' => $row->tier_id ? (int) $row->tier_id : null,
+            // Tên 4 cấp: sơ đồ thẻ vá lại nhánh của vị trí đã ngừng hoạt động mà còn hàng
+            'warehouse_name' => $row->warehouse_name,
+            'shelf_name' => $row->shelf_name,
+            'column_name' => $row->column_name,
+            'tier_name' => $row->tier_name,
+
+            // Chỉ số của kỳ
+            'opening' => $row->opening,
+            'period_imported' => $row->period_imported,
+            'imported_date' => $row->imported_date ? substr((string) $row->imported_date, 0, 10) : null,
+            'period_balanced' => $row->period_balanced,
+            'period_balancing_times' => $row->period_balancing_times,
+            'period_used' => $row->period_used,
+            'period_export_times' => $row->period_export_times,
+            'period_cancelled' => $row->period_cancelled,
+            'gap' => $row->gap,
+            'remaining' => $row->remaining,
+            'used_percent' => $row->used_percent,
+            'used_total' => $row->used + $row->cancelled,
+            'state' => $row->state,
+
+            'batch_remaining' => $row->batch_remaining,
+            'batch_codes' => $row->batch_codes,
+            'category_remaining' => $row->category_remaining,
+            'category_batches' => $row->category_batches,
+            'category_codes' => $row->category_codes,
+
+            // Hạn dùng
+            'expired_date' => $row->expired_date,
+            'days_to_expiry' => $row->days_to_expiry,
+            'internal_expired_date' => $row->internal_expired_date,
+            'shelf_life_months' => $row->shelf_life_months,
+            'effective_expired_date' => $row->effective_expired_date,
+            'days_to_effective_expiry' => $row->days_to_effective_expiry,
+            'is_expiring_soon' => (bool) $row->is_expiring_soon,
+
+            // Nút Cân Đối ghi vào dữ liệu hiện tại nên dùng số KHÔNG cắt theo kỳ
+            'imported' => $row->imported,
+            'balanced_all' => $row->balanced_all,
+            'gap_all' => $row->gap_all,
+            'balancing_limit' => $row->balancing_limit,
+            'balancing_min_input' => $row->balancing_min_input,
+            'balancing_max_input' => $row->balancing_max_input,
+            'balancing_times' => $row->balancing_times,
+
+            // File đính kèm của phiếu nhập; URL tải do JS ghép theo id
+            'files' => collect($files ?? [])->map(fn ($file) => [
+                'id' => (int) $file->id,
+                'file_name' => $file->file_name,
+                'created_by' => $file->created_by ?: '—',
+                'created_at' => $file->created_at
+                    ? \Carbon\Carbon::parse($file->created_at)->format('d/m/Y H:i')
+                    : '—',
+                'is_active' => ! isset($file->is_active) || $file->is_active ? 1 : 0,
+            ])->values(),
+        ];
+    }
+
+    /** Một dòng cộng dồn theo hoá chất, kèm nhóm phân loại cho bộ lọc Phụ lục. */
+    private function summaryPayload($sum, array $classification): array
+    {
+        return [
+            'category_id' => $sum->category_id,
+            'category_code' => $sum->category_code,
+            'chem_name' => $sum->chem_name,
+            'unit' => $sum->unit,
+            'opening' => $sum->opening,
+            'period_imported' => $sum->period_imported,
+            'period_balanced' => $sum->period_balanced,
+            'period_used' => $sum->period_used,
+            'period_cancelled' => $sum->period_cancelled,
+            'closing' => $sum->closing,
+            'code_count' => $sum->code_count,
+            'in_stock_count' => $sum->in_stock_count,
+            'nearest_expiry' => $sum->nearest_expiry,
+            'cls' => implode(',', $classification),
+            'special' => \App\Support\ChemicalClassification::isSpecialControl($classification),
+            'vs' => (int) ($sum->vs ?? 0),
+        ];
+    }
+
+    /**
+     * Ngày nhập xa nhất của phòng - mốc "Toàn bộ" của kỳ báo cáo. Truy vấn riêng một
+     * MIN() thay vì tính cả bảng tồn chỉ để lấy một ngày.
+     */
+    private function earliestImport(int $departmentId): ?string
+    {
+        $date = DB::table('chemical_imports')
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->where('is_checked', 1)
+            ->min('imported_date');
+
+        return $date ? substr((string) $date, 0, 10) : null;
     }
 
     /**
@@ -692,6 +902,7 @@ class ChemicalInventoryController extends Controller
                 'suppliers.name as supplier_name',
                 'chemical_imports.location_id',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 'locations.warehouse_id',
                 'locations.shelf_id',
                 'locations.column_id',
@@ -1023,12 +1234,18 @@ class ChemicalInventoryController extends Controller
     private function locationOptions(int $departmentId)
     {
         return DB::table('locations')
-            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type'])
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type', 'zone_type', 'color'])
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
             ->orderBy('code', 'asc')
-            ->get();
+            ->get()
+            // Màu dải đầu thẻ vị trí trên sơ đồ tab Theo định khu (inventory/shared/zoneGrid)
+            ->map(function ($loc) {
+                $loc->badge = \App\Support\ZoneType::badge($loc->id, $loc->zone_type, $loc->color);
+
+                return $loc;
+            });
     }
 
     /** Cộng dồn tồn của các mã xuất nhập về từng hoá chất trong danh mục. */

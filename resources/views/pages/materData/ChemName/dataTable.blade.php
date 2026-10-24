@@ -48,7 +48,7 @@
                 @include('pages.materData.shared.classifyFilterBar')
 
                 <div class="table-responsive">
-                    <table id="mdTable" class="table table-bordered table-hover w-100">
+                    <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 55px">STT</th>
@@ -68,6 +68,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @deferredRows('mdTable')
                             @foreach ($datas as $row)
                                 @php
                                     $cas = collect($row->active_ingredients)->pluck('cas_no')->filter()->unique()->implode(', ');
@@ -198,6 +199,10 @@
                                                 'id' => $row->id,
                                                 'name' => $row->name,
                                                 'active_ingredient_ids' => $row->active_ingredient_ids,
+                                                // Nhãn các hoạt chất đang gắn: ô chọn tìm qua AJAX không có sẵn option
+                                                'active_ingredient_options' => collect($row->active_ingredients)
+                                                    ->map(fn ($ai) => \App\Support\CategoryLookup::activeIngredientItem($ai, $ai->groups))
+                                                    ->values()->all(),
                                                 'hazard_category_ids' => $row->hazard_category_ids,
                                                 'content_percents' => (object) $row->content_percents,
                                                 // Gom vào một khoá riêng, KHÔNG để trùng tên ô tick: handler chung của
@@ -209,6 +214,7 @@
                                     </td>
                                 </tr>
                             @endforeach
+                            @enddeferredRows
                         </tbody>
                     </table>
                 </div>
@@ -258,15 +264,26 @@
                 var $sel = $modal.find('.chem-ai-select');
                 if (!$sel.length) return;
 
+                // Gõ tìm qua AJAX (data-lookup-url), không nhúng ~1.700 hoạt chất vào mỗi modal
                 $sel.select2({
                     theme: 'bootstrap4',
                     dropdownParent: $modal,
                     width: '100%',
                     placeholder: $sel.data('placeholder') || '-- Chọn --',
                     closeOnSelect: false,
+                    ajax: wmsLookupAjax($sel),
                     language: {
                         noResults: function() {
                             return 'Không tìm thấy dữ liệu phù hợp';
+                        },
+                        searching: function() {
+                            return 'Đang tìm...';
+                        },
+                        loadingMore: function() {
+                            return 'Đang tải thêm...';
+                        },
+                        errorLoading: function() {
+                            return 'Không tải được dữ liệu, vui lòng thử lại';
                         }
                     }
                 });
@@ -288,20 +305,21 @@
                     values[$(this).data('ai')] = this.value;
                 });
 
-                var $opts = $modal.find('.chem-ai-select option:selected');
+                // Hoạt chất đang chọn: option render sẵn mang data-name, kết quả tìm AJAX mang item.name
+                var items = wmsSelectedItems($modal.find('.chem-ai-select'));
                 $box.empty();
 
                 // Chỉ khai tỉ lệ % khi là HỖN HỢP: từ 2 hoạt chất trở lên.
-                if ($opts.length < 2) {
+                if (items.length < 2) {
                     $modal.find('[data-percent-section]').hide();
                     return;
                 }
 
                 $modal.find('[data-percent-section]').show();
 
-                $opts.each(function() {
-                    var id = this.value;
-                    var name = $(this).data('name') || $(this).text();
+                items.forEach(function(item) {
+                    var id = item.id;
+                    var name = item.name || item.text;
                     var val = values[id] !== undefined && values[id] !== null ? values[id] : '';
 
                     var $row = $('<div class="chem-percent-row"></div>');
@@ -327,8 +345,8 @@
             function chemHazardLock($modal) {
                 var selected = $modal.find('.chem-ai-select').val() || [];
                 var hasGroup9 = false;
-                $modal.find('.chem-ai-select option:selected').each(function() {
-                    if (String($(this).data('g9')) === '1') hasGroup9 = true;
+                wmsSelectedItems($modal.find('.chem-ai-select')).forEach(function(item) {
+                    if (String(item.g9) === '1') hasGroup9 = true;
                 });
 
                 var ok = selected.length >= 2 && hasGroup9;
@@ -374,7 +392,12 @@
 
                 $modal.find('[data-percent-rows]').attr('data-seed', JSON.stringify(row.content_percents || {}));
 
-                $modal.find('.chem-ai-select').val(aiIds).trigger('change');
+                var $aiSelect = $modal.find('.chem-ai-select');
+
+                (row.active_ingredient_options || []).forEach(function(item) {
+                    wmsEnsureOption($aiSelect, item.id, item.text, { name: item.name, g9: item.g9 });
+                });
+                $aiSelect.val(aiIds).trigger('change');
                 $modal.find('.chem-hazard-input').each(function() {
                     var on = hazIds.indexOf(String(this.value)) !== -1;
                     $(this).prop('checked', on).closest('.chem-hazard-item').toggleClass('is-checked', on);

@@ -38,7 +38,9 @@
             value="{{ $item ? (float) $item->requested_amount : '' }}" required>
     </td>
     <td>
-        <select name="items[{{ $idx }}][requested_unit]" class="form-control select-mat-transfer-unit">
+        {{-- ĐVT đã lưu coi như chọn tay: đổi phòng cấp phát không ghi đè (xem JS trong transferRequestModal) --}}
+        <select name="items[{{ $idx }}][requested_unit]" class="form-control select-mat-transfer-unit"
+            @if ($item && $item->requested_unit) data-manual="1" @endif>
             <option value="">-- ĐVT --</option>
             @foreach ($units as $u)
                 @php $uVal = $u->short_name ?: $u->name; @endphp

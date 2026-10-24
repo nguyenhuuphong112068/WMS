@@ -105,10 +105,12 @@
                         <div class="form-group col-md-3">
                             <label>Định Khu Tạm (Biệt Trữ)</label>
                             <select name="location_id"
+                                data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'all', 'only_zone' => 'quarantine']) }}"
                                 class="form-control imp-select sd-location-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chọn --</option>
-                                @foreach ($quarantineLocations as $location)
-                                    <option value="{{ $location->id }}"
+                                {{-- Gõ tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị old() --}}
+                                @foreach ($quarantineLocations->where('id', old('location_id')) as $location)
+                                    <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /
@@ -471,7 +473,11 @@
                 var previewMap = $form.find('.sd-code-preview').data('codes') || {};
                 $form.find('.sd-code-preview').val(previewMap[item.group_key] || item.group_code || '');
 
-                // Định khu gợi ý theo danh mục phòng; thủ kho vẫn đổi được
+                // Định khu gợi ý theo danh mục phòng (chỉ khu Biệt Trữ); thủ kho vẫn đổi được.
+                // Ô tìm qua AJAX nên dựng option của định khu gợi ý trước khi chọn
+                if (item.location_id) {
+                    wmsEnsureOption($form.find('.sd-location-select'), item.location_id, item.location_text, { zone: item.location_zone });
+                }
                 $form.find('.sd-location-select')
                     .val(item.location_id ? String(item.location_id) : '')
                     .trigger('change');

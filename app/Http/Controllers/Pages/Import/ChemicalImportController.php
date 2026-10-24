@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
 use App\Support\ChemicalCode;
+use App\Support\CompanyContext;
 use App\Support\DepartmentChemical;
 use App\Support\ListRange;
 use App\Support\QrCode;
@@ -135,7 +136,10 @@ class ChemicalImportController extends Controller
         // Tồn hiện tại + ngưỡng tối đa của phòng, để modal cảnh báo khi nhập quá nhiều
         $maxStock = \App\Support\MaxStockWarning::forChemical($departmentId);
 
-        $categoryDefaults = $categories->mapWithKeys(function ($category) use ($deptChemicals, $maxStock) {
+        // Khu Biệt Trữ của phòng: ô Định khu tạm của modal Nhập chỉ nhận các vị trí này (tìm qua AJAX)
+        $quarantineLocations = $this->locationOptions($departmentId, true)->keyBy('id');
+
+        $categoryDefaults = $categories->mapWithKeys(function ($category) use ($deptChemicals, $maxStock, $quarantineLocations) {
             $dc = $deptChemicals->get($category->id);
             $info = [
                 'Tên: <strong>' . htmlspecialchars($category->chem_name ?: $category->code) . '</strong>',
@@ -151,7 +155,11 @@ class ChemicalImportController extends Controller
             }
 
             return [$category->id => [
-                'location_id' => $dc->default_location_id ?? null,
+                // Định khu mặc định chỉ điền sẵn khi thuộc khu Biệt Trữ (ô chọn chỉ nhận khu này),
+                // kèm nhãn để JS dựng option vì ô chọn tìm qua AJAX không có sẵn danh sách
+                'location_id' => ($defaultLocation = $quarantineLocations->get($dc->default_location_id ?? 0)) ? $defaultLocation->id : null,
+                'location_text' => $defaultLocation ? \App\Support\CategoryLookup::locationLabel($defaultLocation) : null,
+                'location_zone' => $defaultLocation->zone_type ?? null,
                 'info_html' => implode(' | ', $info),
                 'unit' => $category->unit_short_name ?: '',
                 // Ba khoá dưới đây để JS dựng cảnh báo vượt ngưỡng tồn tối đa
@@ -181,12 +189,13 @@ class ChemicalImportController extends Controller
             'suppliers' => $this->supplierOptions(),
             'locations' => $this->locationOptions($departmentId),
             // Modal Nhập hoá chất chỉ cho chọn vị trí Biệt Trữ/Chờ kiểm tra
-            'quarantineLocations' => $this->locationOptions($departmentId, true),
+            'quarantineLocations' => $quarantineLocations,
             // Tab "Chờ kiểm tra": lô vừa nhập, chưa cộng tồn, chờ bước Xác nhận kiểm tra
             'pendingRows' => $pendingRows,
             'pendingCount' => $pendingRows->count(),
             'codePreviews' => [],
-            'report' => $this->importReport($departmentId, $from, $to),
+            // Báo cáo nhập tách Mua / Nhận chuyển cùng công ty / khác công ty - xem importReports()
+            'reports' => $this->importReports($departmentId, $from, $to),
             'reportFrom' => $from,
             'reportTo' => $to,
             'bookRange' => $bookRange,
@@ -194,10 +203,11 @@ class ChemicalImportController extends Controller
             'bookPerPage' => $bookPerPage,
             // Số lần điều chỉnh của từng phiếu, hiện thành badge ở góc nút Sửa thay vì một nút riêng
             'historyCounts' => $this->historyCounts($departmentId),
-            // Lọc xong thì trang tải lại, quay về đúng tab báo cáo thay vì tab sổ
-            'activeTab' => in_array($request->input('tab'), ['report'], true)
+            // Lọc / sang trang xong thì trang tải lại, quay về đúng tab sổ / báo cáo;
+            // mặc định mở tab "Nhập hoá chất" (lô chờ kiểm tra + nút lập phiếu nhập)
+            'activeTab' => in_array($request->input('tab'), ['book', 'report'], true)
                 ? $request->input('tab')
-                : 'book',
+                : 'check',
         ]);
     }
 
@@ -227,7 +237,8 @@ class ChemicalImportController extends Controller
                 'chem_names.name as chem_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
-                'locations.code as location_code'
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type'
             )
             ->where(self::TABLE.'.id', $request->id)
             // Chỉ in được nhãn lô của phòng ban đang chọn
@@ -317,6 +328,35 @@ class ChemicalImportController extends Controller
     }
 
     /**
+     * BÁO CÁO NHẬP chia theo nguồn hàng để số MUA không bị đếm trùng với hàng chuyển nội bộ:
+     * - purchase      : hoá chất mua (lô nhập từ nhà cung cấp)
+     * - transferSame  : nhận chuyển liên phòng ban từ phòng CÙNG công ty
+     * - transferOther : nhận chuyển từ phòng thuộc công ty khác
+     * Công ty theo App\Support\CompanyContext: phòng chưa gắn công ty tính vào công ty mặc định.
+     */
+    private function importReports(int $departmentId, string $from, string $to): array
+    {
+        $companyId = CompanyContext::resolveForDepartment($departmentId);
+        $sameDepartmentIds = DB::table('deparments')
+            ->where(fn ($query) => $query
+                ->where('company_id', $companyId)
+                ->when($companyId !== null && $companyId === CompanyContext::defaultId(), fn ($query) => $query->orWhereNull('company_id')))
+            ->pluck('id')
+            ->all() ?: [0];
+
+        return [
+            'purchase' => $this->importReport($departmentId, $from, $to),
+            'transferSame' => $this->importReport($departmentId, $from, $to, true,
+                fn ($query) => $query->whereIn('src_export.department_id', $sameDepartmentIds)),
+            // Không truy được phiếu chuyển gốc thì xếp vào "khác công ty" để không lọt số
+            'transferOther' => $this->importReport($departmentId, $from, $to, true,
+                fn ($query) => $query->where(fn ($query) => $query
+                    ->whereNotIn('src_export.department_id', $sameDepartmentIds)
+                    ->orWhereNull('src_export.department_id'))),
+        ];
+    }
+
+    /**
      * BÁO CÁO NHẬP HOÁ CHẤT THEO KHOẢNG THỜI GIAN.
      *
      * Cộng dồn các phiếu nhập còn hiệu lực trong khoảng ngày, gom theo
@@ -327,8 +367,11 @@ class ChemicalImportController extends Controller
      * Đơn vị nhóm đếm (chai, thùng...) không quy đổi tự động được, và đổi thể tích
      * sang khối lượng thì cần tỉ trọng d (g/ml) của hoá chất - thiếu thì để trống
      * kèm lý do thay vì hiện số sai.
+     *
+     * $transfer = true: chỉ lô NHẬN CHUYỂN liên phòng ban (source_export_id), kèm danh sách
+     * phòng gửi (from_departments); $scope lọc thêm theo phòng gửi (xem importReports()).
      */
-    private function importReport(int $departmentId, string $from, string $to)
+    private function importReport(int $departmentId, string $from, string $to, bool $transfer = false, ?\Closure $scope = null)
     {
         $kgUnit = DB::table('units')->where('short_name', 'kg')->first();
 
@@ -337,7 +380,16 @@ class ChemicalImportController extends Controller
             ->join('chemical_categories', self::TABLE.'.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
             ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
-            ->select(
+            ->when($transfer, fn ($query) => $query
+                ->whereNotNull(self::TABLE.'.source_export_id')
+                // Phiếu chuyển bên phòng gửi -> biết lô nhận từ phòng nào
+                ->leftJoin('chemical_exports as src_export', self::TABLE.'.source_export_id', '=', 'src_export.id')
+                ->leftJoin('deparments as src_dept', 'src_export.department_id', '=', 'src_dept.id')
+                ->addSelect(DB::raw('GROUP_CONCAT(DISTINCT src_dept.name ORDER BY src_dept.name SEPARATOR \', \') as from_departments')))
+            // Hoá chất mua = lô nhập từ nhà cung cấp, không phải nhận chuyển từ phòng khác
+            ->when(! $transfer, fn ($query) => $query->whereNull(self::TABLE.'.source_export_id'))
+            ->when($scope, $scope)
+            ->addSelect(
                 'chemical_categories.id as category_id',
                 'chemical_categories.code as category_code',
                 'chemical_categories.density',
@@ -381,10 +433,11 @@ class ChemicalImportController extends Controller
 
             $check = $kgUnit
                 ? UnitConverter::check($unit, $kgUnit, $density)
-                : ['ok' => false, 'reason' => 'Chưa có đơn vị "kg" trong Dữ Liệu Gốc nên không quy đổi được.'];
+                : UnitConverter::missingKgUnit();
 
             $row->convertible = $check['ok'];
             $row->convert_note = $check['reason'];
+            $row->convert_cause = $check['cause'];
 
             $row->total_kg = $check['ok'] && $kgUnit
                 ? UnitConverter::convert($row->total, $unit, $kgUnit, $density)
@@ -477,7 +530,7 @@ class ChemicalImportController extends Controller
             ? 'Đã tạo '.self::LABEL.' mã '.$codes[0].'!'
             : 'Đã tạo thành công '.count($codes).' lô hoá chất: '.implode(', ', $codes).'!';
 
-        $msg .= ' Lô đang ở trạng thái CHỜ KIỂM TRA, chưa cộng vào tồn kho - vào tab "Chờ kiểm tra" để xác nhận.';
+        $msg .= ' Lô đang ở trạng thái CHỜ KIỂM TRA, chưa cộng vào tồn kho - xác nhận kiểm tra ở tab "Nhập hoá chất".';
 
         $redirect = redirect()->back()->with('success', $msg);
 
@@ -871,7 +924,11 @@ class ChemicalImportController extends Controller
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
             ->leftJoin('suppliers', self::TABLE.'.supplier_id', '=', 'suppliers.id')
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
-            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id');
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            // Đủ 4 cấp để dựng nhãn định khu cho ô chọn tìm qua AJAX của modal Kiểm tra
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id');
 
         return DepartmentChemical::joinUnit($query, $departmentId, self::TABLE.'.category_id')
             ->select(
@@ -884,7 +941,10 @@ class ChemicalImportController extends Controller
                 'locations.code as location_code',
                 'locations.zone_type as location_zone_type',
                 'locations.color as location_color',
-                'warehouses.name as warehouse_name'
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
             ->where(self::TABLE.'.status_id', 1)
@@ -1266,6 +1326,7 @@ class ChemicalImportController extends Controller
             ->select(
                 'locations.id',
                 'locations.code',
+                'locations.zone_type',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',

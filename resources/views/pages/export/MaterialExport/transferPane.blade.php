@@ -13,6 +13,7 @@
 | Hai bảng gửi đi / gửi đến dựng ở transferLists (dùng chung với tab Đề nghị VPP).
 --}}
 
+@tab('export_material', 'transfer')
 <div class="exp-pane {{ $activeTab === 'transfer' ? 'is-active' : '' }}" id="mePaneTransfer">
     @include('pages.export.MaterialExport.transferLists', [
         'mtTab' => 'transfer',
@@ -21,15 +22,22 @@
         'mtSent' => $transferSent,
         'mtReceived' => $transferReceived,
         'mtToSign' => $transferToSign,
-        'mtSentRange' => $transferSentRange,
         'mtSentPerPage' => $transferSentPerPage,
-        'mtReceivedRange' => $transferReceivedRange,
+        'mtSentDone' => $transferSentDone,
+        'mtSentDoneRange' => $transferSentDoneRange,
+        'mtSentDonePerPage' => $transferSentDonePerPage,
         'mtReceivedPerPage' => $transferReceivedPerPage,
-        'mtReceivedTitle' => 'Đề nghị phòng ban khác gửi đến - cần cấp phát',
-        'mtEmptySent' => 'Phòng mình chưa gửi đề nghị liên phòng ban nào.',
-        'mtEmptyReceived' => 'Chưa có phòng ban nào gửi đề nghị đến phòng mình.',
+        'mtDone' => $transferDone,
+        'mtDoneRange' => $transferDoneRange,
+        'mtDonePerPage' => $transferDonePerPage,
+        'mtReceivedTitle' => 'Đề nghị phòng khác gửi đến',
+        'mtEmptySent' => 'Không có đề nghị gửi đi nào đang chờ xử lý.',
+        'mtEmptySentDone' => 'Không có đề nghị đã hoàn thành trong khoảng đã lọc.',
+        'mtEmptyReceived' => 'Không còn đề nghị nào cần cấp phát.',
+        'mtEmptyDone' => 'Không có đề nghị đã hoàn thành trong khoảng đã lọc.',
         'mtCreate' => ['target' => '#matTransferRequestModal', 'label' => 'Tạo đề nghị chuyển liên phòng ban'],
         // Phòng Hành Chính nhận đề nghị ở tab "Đề nghị VPP"
         'mtShowReceived' => ! $vppIsAdminDepartment,
     ])
 </div>
+@endtab

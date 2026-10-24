@@ -2,12 +2,12 @@
 | SỬ DỤNG VẬT TƯ - TAB "CÁCH LY - LOẠI BỎ - HUỶ"
 |
 | Quy trình 3 bước - xem MaterialQuarantineController:
-|   1. Cách ly chờ quyết định : hàng bị giữ chỗ, không cấp phát được; trả về kho được.
-|   2. Loại bỏ                : trừ tồn thật (sinh phiếu Loại bỏ ở Sổ sử dụng), không quay lại kho.
+|   1. Cách ly chờ quyết định : hàng dời sang khu Chờ Quyết Định, trừ tồn ngay; trả về kho thì hoàn tồn.
+|   2. Loại bỏ                : hàng dời sang khu Loại Bỏ/Chờ Huỷ, không quay lại kho.
 |   3. Huỷ                    : ghi nhận đã huỷ thực tế.
 | Nhóm "Vật tư sắp hết hạn dùng" (qstatus=expiring) không phải phiếu mà là danh sách LÔ còn tồn có
 | hạn dùng <= ngưỡng sát hạn (kể cả đã hết hạn) - tick chọn rồi đem cách ly (window.qrOpenCreate).
-| Không có nhóm "Tất cả": mở tab không chỉ rõ nhóm thì vào "Đang cách ly".
+| Không có nhóm "Tất cả": mở tab không chỉ rõ nhóm thì vào "Cách ly - Chờ quyết định".
 |
 | Dữ liệu vào: $quarantineRows (paginator), $quarantineRange, $quarantineKeyword,
 | $quarantinePerPage, $quarantineStatus, $quarantineCounts, $quarantineExpiring, $quarantineExpiringDays.
@@ -271,7 +271,7 @@
                                 <div class="md-sub small text-muted">{{ $lot->technical_specification }}</div>
                             @endif
                         </td>
-                        <td>{{ $lot->location_code ?: '—' }}</td>
+                        <td>{{ \App\Support\ZoneType::tag($lot->location_code, $lot->location_zone_type ?? null) }}</td>
                         <td class="text-center" data-order="{{ $days }}">
                             <div>{{ $expDate($lot->expired_date) }}</div>
                             @if ($days < 0)
@@ -382,6 +382,7 @@
                 <th style="width:190px">Phiếu Cách Ly</th>
                 <th>Vật Tư</th>
                 <th class="text-right" style="width:100px">Số Lượng</th>
+                <th style="width:190px">Định Khu</th>
                 <th style="width:220px">Lý Do Cách Ly</th>
                 <th style="width:220px">Quyết Định</th>
                 <th style="width:200px">Huỷ</th>
@@ -402,6 +403,11 @@
                         'amount_text' => $expNum($row->amount) . ' ' . $row->unit_short_name,
                         'unit' => $row->unit_short_name,
                         'reason' => $row->reason,
+                        'pending_location_id' => $row->pending_location_id,
+                        'pending_location_code' => $row->pending_location_code,
+                        'location_id' => $row->lot_location_id,
+                        'location_code' => $row->location_code,
+                        'location_zone_type' => $row->location_zone_type,
                     ];
                 @endphp
                 <tr>
@@ -442,15 +448,21 @@
                         @if ($row->technical_specification)
                             <div class="md-sub small text-muted">{{ $row->technical_specification }}</div>
                         @endif
-                        @if ($row->location_code || $row->expired_date)
-                            <div class="md-sub small text-muted">
-                                {{ $row->location_code ? 'Vị trí: ' . $row->location_code : '' }}
-                                {{ $row->location_code && $row->expired_date ? ' · ' : '' }}
-                                {{ $row->expired_date ? 'HSD: ' . $expDate($row->expired_date) : '' }}
-                            </div>
+                        @if ($row->expired_date)
+                            <div class="md-sub small text-muted">HSD: {{ $expDate($row->expired_date) }}</div>
                         @endif
                     </td>
                     <td class="text-right">{{ $expNum($row->amount) }} <span class="md-sub">{{ $row->unit_short_name }}</span></td>
+                    {{-- Chỉ một định khu - nơi hàng của phiếu đang thực sự nằm theo trạng thái --}}
+                    <td>
+                        @if ($row->app_status === 'quarantined')
+                            {{ \App\Support\ZoneType::tag($row->pending_location_code, $row->pending_location_zone_type) }}
+                        @elseif (in_array($row->app_status, ['removed', 'destroyed'], true))
+                            {{ \App\Support\ZoneType::tag($row->rejected_location_code, $row->rejected_location_zone_type) }}
+                        @else
+                            {{ \App\Support\ZoneType::tag($row->returned_location_code ?: $row->location_code, $row->returned_location_code ? $row->returned_location_zone_type : ($row->location_zone_type ?? null)) }}
+                        @endif
+                    </td>
                     <td class="md-sub"><span class="text-danger">{{ $row->reason }}</span></td>
                     <td class="qr-meta">
                         @if ($row->decided_at)
@@ -503,7 +515,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="{{ $qrRemovedTab ? 9 : 8 }}" class="text-center text-muted">Không có phiếu nào ở nhóm này.</td></tr>
+                <tr><td colspan="{{ $qrRemovedTab ? 10 : 9 }}" class="text-center text-muted">Không có phiếu nào ở nhóm này.</td></tr>
             @endforelse
         </tbody>
     </table>

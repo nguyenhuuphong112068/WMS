@@ -85,7 +85,7 @@
                             </div>
                         @endif
 
-                        @include('pages.materData.Zone.typeColorFields', ['bag' => $bag])
+                        @include('pages.materData.Zone.typeColorFields', ['bag' => $bag, 'withZoneType' => !empty($meta['hasType'])])
                     </div>
 
                     <div class="modal-footer">

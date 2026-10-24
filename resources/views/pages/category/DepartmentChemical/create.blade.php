@@ -28,12 +28,14 @@
                         <label>Hoá Chất <span class="text-danger">*</span></label>
                         <select name="category_id"
                             class="form-control cat-select dc-category {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
-                            data-defaults="{{ json_encode($dcDefaults) }}" required>
+                            data-defaults="{{ json_encode($dcDefaults) }}"
+                            data-lookup-url="{{ route('pages.category.lookup.chemicalCategories', ['scope' => 'undeclared']) }}"
+                            required>
                             <option value="">-- Chọn hoá chất --</option>
-                            @foreach ($categories as $category)
-                                <option value="{{ $category->id }}"
-                                    {{ $old('category_id') == $category->id ? 'selected' : '' }}>
-                                    {{ $category->code }} - {{ $category->chem_name }}
+                            {{-- Gõ tìm qua AJAX (chỉ hoá chất phòng chưa khai), chỉ dựng sẵn option của giá trị old() --}}
+                            @foreach ($categories->where('id', $old('category_id')) as $category)
+                                <option value="{{ $category->id }}" selected>
+                                    {{ \App\Support\CategoryLookup::chemicalCategoryLabel($category) }}
                                 </option>
                             @endforeach
                         </select>
@@ -141,12 +143,12 @@
                                 <i class="fas fa-th mr-1"></i> Sơ đồ tương kỵ
                             </button>
                         </div>
-                        <select name="default_location_id"
+                        <select name="default_location_id" data-zone-filter
                             data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'chemical']) }}"
                             class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
                             <option value="">-- Chưa định khu --</option>
                             @foreach ($locations as $location)
-                                <option value="{{ $location->id }}"
+                                <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
                                     {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
                                     {{ $location->warehouse_name ?: '—' }} /
                                     {{ $location->shelf_name ?: '—' }} /

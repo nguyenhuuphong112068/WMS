@@ -808,15 +808,34 @@
                     </li>
                 @endpermAny
 
-                @perm('auditTrail_view')
-                    <li class="nav-item mt-3">
-                        <a href="{{ route('pages.auditTrail.list') }}"
-                            class="nav-link {{ request()->is('auditTrail') ? 'active' : '' }}">
-                            <i class="fas fa-history"></i>
-                            <p>Lịch sữ đăng nhập</p>
-                        </a>
-                    </li>
-                @endperm
+                @php $lhOpen = request()->is('loginHistory', 'loginHistory/*', 'auditTrail'); @endphp
+                <li class="nav-item has-treeview {{ $lhOpen ? 'menu-open' : '' }}">
+                    <a href="#" class="nav-link {{ $lhOpen ? 'active' : '' }}">
+                        <i class="fas fa-history"></i>
+                        <p>Lịch Sử Đăng Nhập <i class="right fas fa-angle-left"></i></p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        @perm('login_history_view')
+                            <li class="nav-item"><a href="{{ route('pages.loginHistory.list') }}"
+                                    class="nav-link {{ request()->is('loginHistory') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon"></i>
+                                    <p>Toàn Hệ Thống</p>
+                                </a></li>
+                        @endperm
+                        <li class="nav-item"><a href="{{ route('pages.loginHistory.mine') }}"
+                                class="nav-link {{ request()->is('loginHistory/mine') ? 'active' : '' }}"><i
+                                    class="far fa-circle nav-icon"></i>
+                                <p>Của Tôi</p>
+                            </a></li>
+                        @perm('auditTrail_view')
+                            <li class="nav-item"><a href="{{ route('pages.auditTrail.list') }}"
+                                    class="nav-link {{ request()->is('auditTrail') ? 'active' : '' }}"><i
+                                        class="far fa-circle nav-icon"></i>
+                                    <p>Audit Trail</p>
+                                </a></li>
+                        @endperm
+                    </ul>
+                </li>
 
                 @if (user_has_any_role(session('user')['userId'] ?? 0, ['Admin']))
                     <li class="nav-item">

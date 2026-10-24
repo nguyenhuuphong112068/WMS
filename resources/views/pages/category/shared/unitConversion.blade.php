@@ -6,7 +6,9 @@
 | bằng đơn vị khác. Khi đó phải khai hệ số quy đổi, nếu không lúc CHUYỂN KHO hệ thống
 | không đổi được số lượng từ đơn vị phòng gửi sang đơn vị phòng nhận.
 |
-| Hệ số đọc theo chiều: 1 <đơn vị phòng đang khai> = <hệ số> <đơn vị phòng kia>.
+| Hệ số đọc theo chiều: 1 <đơn vị phòng đang khai> = <hệ số> <đơn vị phòng kia>; nút đảo
+| chiều (.cuc-swap) cho khai ngược 1 <đơn vị phòng kia> = <hệ số> <đơn vị phòng đang khai>,
+| gửi kèm conversion_dirs[<unit_id>] = 'reverse' (xem CategoryUnitConversion::saveDeclarations).
 |
 | Biến vào:
 | - $prefix     : 'ds' (chất chuẩn), 'dc' (hoá chất) hoặc 'dm' (vật tư), để không đụng
@@ -19,12 +21,13 @@
 
 <div class="cuc-box" data-prefix="{{ $prefix }}" data-units-in-use="{{ json_encode($unitsInUse) }}"
     data-conversions="{{ json_encode($conversions) }}"
-    data-old="{{ json_encode($bag->any() ? (array) old('conversions', []) : []) }}" style="display: none">
+    data-old="{{ json_encode($bag->any() ? (array) old('conversions', []) : []) }}"
+    data-old-dirs="{{ json_encode($bag->any() ? (array) old('conversion_dirs', []) : []) }}" style="display: none">
 
     <input type="hidden" class="cuc-category">
 
     <div class="cuc-head">
-        <i class="fas fa-right-left mr-1"></i>
+        <i class="fas fa-exchange-alt mr-1"></i>
         Quy Đổi Đơn Vị <span class="text-danger">*</span>
     </div>
 
@@ -96,6 +99,31 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
 
+        /* Ghi chữ hai bên ô hệ số theo chiều đang chọn: 1 <trái> = hệ số <phải> */
+        function cucPaintRow($row) {
+            var d = $row.data();
+            var reverse = d.dir === 'reverse';
+
+            $row.find('.cuc-left').text('1 ' + (reverse ? d.otherShort : d.ownShort) + ' =');
+            $row.find('.cuc-right').text(reverse ? d.ownShort : d.otherShort);
+            $row.find('.cuc-dir').val(d.dir);
+        }
+
+        /* Đảo chiều: hệ số cũ không còn đúng nghĩa nên lấy hệ số đã khai theo chiều mới (nếu có) */
+        $(document).on('click', '.cuc-swap', function() {
+            var $row = $(this).closest('.cuc-row');
+            var $box = $row.closest('.cuc-box');
+            var d = $row.data();
+            var declared = ($box.data('conversions') || {})[String($box.find('.cuc-category').val() || '')] || {};
+
+            d.dir = d.dir === 'reverse' ? 'forward' : 'reverse';
+
+            var value = declared[d.dir === 'reverse' ? d.reverseKey : d.forwardKey];
+            $row.find('input[type="number"]').val(value === undefined || value === null ? '' : value).focus();
+
+            cucPaintRow($row);
+        });
+
         /* Dựng lại danh sách ô nhập hệ số theo mã + đơn vị đang chọn của chính form đó */
         function cucRefresh($box) {
             var prefix = $box.data('prefix');
@@ -106,6 +134,7 @@
             var unitsInUse = ($box.data('units-in-use') || {})[categoryId] || [];
             var declared = ($box.data('conversions') || {})[categoryId] || {};
             var olds = $box.data('old') || {};
+            var oldDirs = $box.data('old-dirs') || {};
 
             var $list = $box.find('.cuc-list').empty();
             var $unitOption = $form.find('.' + prefix + '-unit option:selected');
@@ -119,19 +148,35 @@
                 }
 
                 var otherShort = row.unit_short_name || row.unit_name || '';
+                var forwardKey = unitId + '-' + row.unit_id;
+                var reverseKey = row.unit_id + '-' + unitId;
+
+                // Chiều mặc định: theo lần nhập vừa báo lỗi, rồi theo chiều đã khai sẵn
+                var dir = oldDirs[row.unit_id];
+                if (dir !== 'forward' && dir !== 'reverse') {
+                    dir = declared[forwardKey] === undefined && declared[reverseKey] !== undefined ?
+                        'reverse' : 'forward';
+                }
+
                 var value = olds[row.unit_id];
 
                 if (value === undefined || value === null || value === '') {
-                    value = declared[unitId + '-' + row.unit_id];
+                    value = declared[dir === 'reverse' ? reverseKey : forwardKey];
                 }
 
                 if (value === undefined || value === null) {
                     value = '';
                 }
 
-                var $row = $('<div>').addClass('cuc-row');
+                var $row = $('<div>').addClass('cuc-row').data({
+                    dir: dir,
+                    ownShort: ownShort,
+                    otherShort: otherShort,
+                    forwardKey: forwardKey,
+                    reverseKey: reverseKey
+                });
 
-                $('<span>').addClass('cuc-eq').text('1 ' + ownShort + ' =').appendTo($row);
+                $('<span>').addClass('cuc-eq cuc-left').appendTo($row);
 
                 $('<input>').attr({
                     type: 'number',
@@ -141,7 +186,20 @@
                     placeholder: 'Nhập hệ số'
                 }).addClass('form-control').val(value).appendTo($row);
 
-                $('<span>').addClass('cuc-eq').text(otherShort).appendTo($row);
+                $('<span>').addClass('cuc-eq cuc-right').appendTo($row);
+
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'conversion_dirs[' + row.unit_id + ']'
+                }).addClass('cuc-dir').appendTo($row);
+
+                $('<button>').attr({
+                    type: 'button',
+                    title: 'Đảo chiều quy đổi'
+                }).addClass('btn btn-sm btn-outline-primary cuc-swap')
+                    .html('<i class="fas fa-exchange-alt mr-1"></i>Đảo chiều').appendTo($row);
+
+                cucPaintRow($row);
 
                 $('<span>').addClass('cuc-dept')
                     .text('(phòng ' + (row.department_short || row.department_name || '') + ' đang dùng)')

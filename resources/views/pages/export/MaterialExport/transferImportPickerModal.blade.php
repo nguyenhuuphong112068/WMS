@@ -52,7 +52,7 @@
                                             <br><small class="text-muted">{{ $imp->technical_specification }}</small>
                                         @endif
                                     </td>
-                                    <td>{{ $imp->location_code ?: '—' }}</td>
+                                    <td>{{ \App\Support\ZoneType::tag($imp->location_code, $imp->location_zone_type ?? null) }}</td>
                                     <td class="text-right font-weight-bold text-success">
                                         {{ $expNum($imp->available) }} {{ $imp->unit_short_name }}
                                     </td>
@@ -134,6 +134,8 @@
             $matPickerTargetRow.find('.mat-pick-display')
                 .removeClass('is-empty')
                 .attr('data-import-id', $btn.data('import-id'))
+                // Ô đã điền sẵn mã gợi ý FEFO/FIFO: cập nhật luôn bộ nhớ .data() để nút Cấp phát đọc mã mới
+                .data('import-id', $btn.data('import-id'))
                 .html('<span class="font-weight-bold">' + $btn.data('import-code') + '</span>' +
                     '<span class="text-muted ml-1">còn ' + available + ' ' + unit + '</span>');
 

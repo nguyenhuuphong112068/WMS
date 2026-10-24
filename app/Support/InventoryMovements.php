@@ -22,18 +22,25 @@ namespace App\Support;
  */
 class InventoryMovements
 {
-    /** Nhãn mặc định của từng metric, controller ghi đè qua $opts['labels']. */
+    /**
+     * Nhãn mặc định của từng metric - viết ĐÚNG như tiêu đề cột trên bảng Tồn để cùng
+     * một con số mang cùng một tên. Màn nào đặt tên cột khác thì controller ghi đè qua
+     * $opts['labels'].
+     */
     private const LABELS = [
-        'opening' => 'Tồn đầu kỳ',
-        'period_in' => 'Nhập trong kỳ',
-        'period_balanced' => 'Cân đối trong kỳ',
-        'period_used' => 'Sử dụng trong kỳ',
-        'period_cancelled' => 'Huỷ trong kỳ',
-        'period_transferred' => 'Cấp phát liên phòng ban',
-        'closing' => 'Tồn cuối kỳ',
-        'stock_category' => 'Tổng tồn các lô',
-        'stock_batch' => 'Tổng tồn theo lô',
+        'opening' => 'Tồn Đầu Kỳ',
+        'period_in' => 'Nhập Trong Kỳ',
+        'period_balanced' => 'Cân Đối Trong Kỳ',
+        'period_used' => 'Sử Dụng Trong Kỳ',
+        'period_cancelled' => 'Huỷ Trong Kỳ',
+        'period_transferred' => 'Cấp Phát Liên Phòng Ban',
+        'closing' => 'Tồn Cuối Kỳ',
+        'stock_category' => 'Tổng Tồn Các Lô',
+        'stock_batch' => 'Tổng Tồn Theo Lô',
     ];
+
+    /** Nhãn dòng mở đầu sổ cái Tồn Cuối Kỳ - modal dựa vào đúng chuỗi này để tô nền dòng. */
+    public const OPENING_ROW = 'Tồn Đầu Kỳ';
 
     /**
      * Bộ cột hiển thị của từng metric cho một loại hàng (material | chemical | standard).
@@ -43,6 +50,9 @@ class InventoryMovements
      *
      * type: 'amount' (có màu +/-) | 'number' (số trần) | mặc định là chữ.
      * tone: 'in' (xanh) | 'out' (đỏ) | 'auto' (theo dấu, có tiền tố +/-).
+     *
+     * Cột số lượng của các metric dạng danh sách để label = null: metrics() điền đúng
+     * nhãn của metric (vd "Sử Dụng Trong Kỳ") cho khớp tên cột trên bảng Tồn.
      */
     public static function columns(string $profile): array
     {
@@ -52,19 +62,22 @@ class InventoryMovements
             default => 'Thông Tin Kỹ Thuật',
         };
 
+        // Mã của từng lô - cùng tên cột mã trên bảng Tồn của màn đó
+        $codeLabel = $profile === 'standard' ? 'Mã Ống Chuẩn' : 'Mã Xuất Nhập';
+
         $ledger = [
             ['key' => 'at_label', 'label' => 'Thời Điểm', 'align' => 'left'],
-            ['key' => 'code', 'label' => 'Chứng Từ', 'align' => 'left'],
+            ['key' => 'code', 'label' => $codeLabel, 'align' => 'left'],
             ['key' => 'kind', 'label' => 'Loại', 'align' => 'left'],
             ['key' => 'by', 'label' => 'Người Thực Hiện', 'align' => 'left'],
             ['key' => 'detail', 'label' => 'Diễn Giải', 'align' => 'left'],
             ['key' => 'in', 'label' => 'Nhập (+)', 'align' => 'right', 'type' => 'number', 'tone' => 'in'],
             ['key' => 'out', 'label' => 'Xuất (−)', 'align' => 'right', 'type' => 'number', 'tone' => 'out'],
-            ['key' => 'balance', 'label' => 'Số Dư Sau', 'align' => 'right', 'type' => 'number'],
+            ['key' => 'balance', 'label' => 'Tồn', 'align' => 'right', 'type' => 'number'],
         ];
 
         $stock = [
-            ['key' => 'code', 'label' => 'Mã Lô / Ống', 'align' => 'left'],
+            ['key' => 'code', 'label' => $codeLabel, 'align' => 'left'],
             ['key' => 'spec', 'label' => $specLabel, 'align' => 'left'],
             ['key' => 'imported_at', 'label' => 'Ngày Nhập', 'align' => 'left'],
             ['key' => 'expired_at', 'label' => 'Hạn Dùng', 'align' => 'left'],
@@ -74,55 +87,55 @@ class InventoryMovements
         $periodIn = [
             ['key' => 'at_label', 'label' => 'Thời Điểm', 'align' => 'left'],
             ['key' => 'kind', 'label' => 'Loại', 'align' => 'left'],
-            ['key' => 'code', 'label' => 'Mã Phiếu', 'align' => 'left'],
+            ['key' => 'code', 'label' => $codeLabel, 'align' => 'left'],
             ['key' => 'spec', 'label' => $specLabel, 'align' => 'left'],
             ['key' => 'by', 'label' => 'Người Nhập', 'align' => 'left'],
-            ['key' => 'amount', 'label' => 'Số Lượng', 'align' => 'right', 'type' => 'amount', 'tone' => 'auto'],
+            ['key' => 'amount', 'label' => null, 'align' => 'right', 'type' => 'amount', 'tone' => 'auto'],
         ];
 
         $balanced = [
             ['key' => 'at_label', 'label' => 'Thời Điểm', 'align' => 'left'],
-            ['key' => 'code', 'label' => 'Mã Phiếu', 'align' => 'left'],
+            ['key' => 'code', 'label' => $codeLabel, 'align' => 'left'],
             ['key' => 'by', 'label' => 'Người Cân Đối', 'align' => 'left'],
             ['key' => 'detail', 'label' => 'Ghi Chú', 'align' => 'left'],
-            ['key' => 'amount', 'label' => 'Điều Chỉnh', 'align' => 'right', 'type' => 'amount', 'tone' => 'auto'],
+            ['key' => 'amount', 'label' => null, 'align' => 'right', 'type' => 'amount', 'tone' => 'auto'],
         ];
 
         $used = match ($profile) {
             'chemical' => [
                 ['key' => 'at_label', 'label' => 'Ngày Sử Dụng', 'align' => 'left'],
-                ['key' => 'code', 'label' => 'Mã Phiếu', 'align' => 'left'],
+                ['key' => 'code', 'label' => $codeLabel, 'align' => 'left'],
                 ['key' => 'by', 'label' => 'Người Sử Dụng', 'align' => 'left'],
                 ['key' => 'purpose', 'label' => 'Mục Đích Sử Dụng', 'align' => 'left'],
                 ['key' => 'coa', 'label' => 'Số Phiếu KN', 'align' => 'left'],
-                ['key' => 'amount', 'label' => 'Số Lượng', 'align' => 'right', 'type' => 'amount', 'tone' => 'out'],
+                ['key' => 'amount', 'label' => null, 'align' => 'right', 'type' => 'amount', 'tone' => 'out'],
             ],
             default => [ // material, standard: đều đi qua phiếu đề nghị
                 ['key' => 'at_label', 'label' => 'Ngày Sử Dụng', 'align' => 'left'],
-                ['key' => 'code', 'label' => 'Mã Phiếu', 'align' => 'left'],
+                ['key' => 'code', 'label' => $codeLabel, 'align' => 'left'],
                 ['key' => 'by', 'label' => 'Người Sử Dụng', 'align' => 'left'],
                 ['key' => 'request', 'label' => 'Phiếu Đề Nghị', 'align' => 'left'],
                 ['key' => 'purpose', 'label' => $profile === 'standard' ? 'Mục Đích / Phép Thử' : 'Mục Đích Sử Dụng', 'align' => 'left'],
                 ['key' => 'coa', 'label' => 'Số Phiếu KN', 'align' => 'left'],
-                ['key' => 'amount', 'label' => 'Số Lượng', 'align' => 'right', 'type' => 'amount', 'tone' => 'out'],
+                ['key' => 'amount', 'label' => null, 'align' => 'right', 'type' => 'amount', 'tone' => 'out'],
             ],
         };
 
         $cancelled = [
             ['key' => 'at_label', 'label' => 'Ngày', 'align' => 'left'],
-            ['key' => 'code', 'label' => 'Mã Phiếu', 'align' => 'left'],
+            ['key' => 'code', 'label' => $codeLabel, 'align' => 'left'],
             ['key' => 'by', 'label' => 'Người Thực Hiện', 'align' => 'left'],
             ['key' => 'reason', 'label' => 'Lý Do Loại Bỏ', 'align' => 'left'],
             ['key' => 'coa', 'label' => 'Số Phiếu KN', 'align' => 'left'],
-            ['key' => 'amount', 'label' => 'Số Lượng', 'align' => 'right', 'type' => 'amount', 'tone' => 'out'],
+            ['key' => 'amount', 'label' => null, 'align' => 'right', 'type' => 'amount', 'tone' => 'out'],
         ];
 
         $transferred = [
             ['key' => 'at_label', 'label' => 'Ngày', 'align' => 'left'],
-            ['key' => 'code', 'label' => 'Mã Phiếu', 'align' => 'left'],
+            ['key' => 'code', 'label' => $codeLabel, 'align' => 'left'],
             ['key' => 'to_dept', 'label' => 'Phòng Nhận', 'align' => 'left'],
             ['key' => 'reason', 'label' => 'Lý Do', 'align' => 'left'],
-            ['key' => 'amount', 'label' => 'Số Lượng', 'align' => 'right', 'type' => 'amount', 'tone' => 'out'],
+            ['key' => 'amount', 'label' => null, 'align' => 'right', 'type' => 'amount', 'tone' => 'out'],
         ];
 
         return [
@@ -180,7 +193,11 @@ class InventoryMovements
         $columns = $opts['columns'] ?? [];
         $inGroups = $opts['period_in_groups'] ?? ['in', 'balanced'];
 
-        $col = fn (string $key) => $columns[$key] ?? [];
+        // Cột chưa đặt nhãn (cột số lượng) mang đúng tên của metric
+        $col = fn (string $key) => array_map(
+            fn ($c) => ($c['label'] ?? null) === null ? ['label' => $labels[$key]] + $c : $c,
+            $columns[$key] ?? []
+        );
         $out = [];
 
         $before = array_values(array_filter($events, fn ($e) => $e['phase'] === 'before'));
@@ -240,7 +257,7 @@ class InventoryMovements
         if (in_array('closing', $want, true)) {
             $balance = $openingTotal;
             $rows = [[
-                'at_label' => '', 'code' => '', 'kind' => 'Tồn đầu kỳ', 'by' => '', 'detail' => '',
+                'at_label' => '', 'code' => '', 'kind' => self::OPENING_ROW, 'by' => '', 'detail' => '',
                 'in' => $openingTotal > 0 ? $openingTotal : null,
                 'out' => $openingTotal < 0 ? round(-$openingTotal, 4) : null,
                 'amount' => $openingTotal, 'balance' => $openingTotal,

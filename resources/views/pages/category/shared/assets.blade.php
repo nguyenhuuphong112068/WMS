@@ -441,16 +441,18 @@
 
                             return $.extend({
                                 q: params.term || '',
-                                page: params.page || 1
+                                page: params.page || 1,
+                                // Chip lọc nhanh theo phân loại định khu (layout/js)
+                                zone_filter: $select.data('zoneFilter') || ''
                             }, typeof extra === 'function' ? extra($select) : {});
                         }
                     };
                     // Dòng kết quả có "warning" (ví dụ định khu tương kỵ) hiện thêm lý do màu đỏ bên dưới
                     options.templateResult = function(item) {
-                        if (!item.id || !item.warning) return item.text;
+                        if (!item.id || !item.warning) return window.wmsZoneTemplate(item);
 
                         return $('<div class="cat-opt-warn">').append(
-                            $('<div>').text(item.text),
+                            $('<div>').append(window.wmsZoneTemplate(item)),
                             $('<small>').text(item.warning)
                         );
                     };
@@ -470,7 +472,10 @@
             if (value !== '' && !$select.find('option').filter(function() {
                     return this.value === value;
                 }).length) {
-                $select.append(new Option(row[field + '_text'] || value, value, false, false));
+                var option = new Option(row[field + '_text'] || value, value, false, false);
+                // Ô Định khu: giữ chấm màu phân loại cho option dựng từ dòng đang sửa
+                if (row[field + '_zone'] !== undefined) option.setAttribute('data-zone', row[field + '_zone'] || '');
+                $select.append(option);
             }
 
             $select.val(value).trigger('change');

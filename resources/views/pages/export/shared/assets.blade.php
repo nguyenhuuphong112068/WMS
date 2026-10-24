@@ -459,10 +459,45 @@
         background: linear-gradient(135deg, #15803D, #16A34A);
     }
 
+    .exp-req-card.is-done .exp-req-card-header {
+        background: linear-gradient(135deg, #475569, #64748B);
+    }
+
     .exp-req-card-title {
         font-size: 0.92rem;
         font-weight: 700;
         letter-spacing: .3px;
+    }
+
+    /* Tab con Chờ xử lý / Đã hoàn thành trong card liên phòng ban + nút tạo đề nghị chung một hàng */
+    .mt-subhead {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .mt-subtabs {
+        flex: 1 1 auto;
+        margin-bottom: -1px;
+        border-bottom: none;
+    }
+
+    .mt-subtabs .nav-link {
+        font-weight: 700;
+        font-size: 0.88rem;
+        color: #64748b;
+        transition: color 0.2s;
+    }
+
+    .mt-subtabs .nav-link.active {
+        color: var(--primary);
+    }
+
+    .mt-subhead .mt-create-btn {
+        margin-bottom: 5px;
+        white-space: nowrap;
     }
 
     .exp-req-card-count {
@@ -496,8 +531,7 @@
     #mePickerCheckAll, .me-picker-checkbox,
     #matStockCheckAll, .mat-stock-checkbox,
     #expPickerCheckAll, .exp-picker-check,
-    #pickerCheckAll, .picker-item-checkbox,
-    #dspCheckAll, .dsp-pick {
+    #pickerCheckAll, .picker-item-checkbox {
         width: 20px;
         height: 20px;
         cursor: pointer;
@@ -507,7 +541,7 @@
 
     /* Ô chứa checkbox rộng thoáng hơn để bấm cả vùng quanh ô tick */
     .pick-check, .me-picker-checkbox, .mat-stock-checkbox,
-    .exp-picker-check, .picker-item-checkbox, .dsp-pick {
+    .exp-picker-check, .picker-item-checkbox {
         margin: 4px;
     }
 
@@ -602,6 +636,23 @@
         font-weight: 700;
         cursor: help;
         border-bottom: 1px dashed #FCD34D;
+    }
+
+    /* Nguyên nhân không quy đổi được, hiện ngay dưới chữ "Không quy đổi" */
+    .kg-na-cause {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 3px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: #FFFBEB;
+        border: 1px solid #FCD34D;
+        color: #92400E;
+        font-size: 0.7rem;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: help;
     }
 
     /* ---------- Badge số lần điều chỉnh, gắn ở góc trên bên phải nút Sửa ---------- */
@@ -784,188 +835,69 @@
         color: #B91C1C;
         border: 1px solid #FCA5A5;
     }
-
-    /* ---------- Hoá chất chờ huỷ và các đợt xin quyết định huỷ ---------- */
-    .dsp-waiting-table tbody tr.is-picked {
-        background: var(--primary-soft);
-    }
-
-    .dsp-waiting-table input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        accent-color: var(--primary);
-        cursor: pointer;
-    }
-
-    .dsp-card {
-        border: 1px solid var(--primary-soft);
-        border-radius: var(--border-radius-lg);
-        padding: 16px 18px;
-        margin-bottom: 16px;
-        background: #fff;
-        box-shadow: var(--shadow-sm);
-        transition: box-shadow var(--transition-fast);
-    }
-
-    .dsp-card:hover {
-        box-shadow: var(--shadow-md);
-    }
-
-    .dsp-card.is-locked {
-        opacity: 0.7;
-        background: #FAFAFA;
-    }
-
-    .dsp-card-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 14px;
-        flex-wrap: wrap;
-        margin-bottom: 12px;
-    }
-
-    .dsp-card-actions {
-        display: flex;
-        gap: 6px;
-        align-items: flex-start;
-        flex-wrap: wrap;
-    }
-
-    .dsp-code {
-        font-family: "Consolas", "Courier New", monospace;
-        font-weight: 700;
-        font-size: 0.98rem;
-        color: var(--primary-dark);
-    }
-
-    .dsp-status {
-        display: inline-block;
-        margin-left: 8px;
-        border-radius: 999px;
-        padding: 1px 11px;
-        font-size: 0.72rem;
-        font-weight: 700;
-        white-space: nowrap;
-    }
-
-    .dsp-status.draft {
-        background: #F1F5F9;
-        color: #475569;
-        border: 1px solid #CBD5E1;
-    }
-
-    .dsp-status.pending {
-        background: #FEF3C7;
-        color: #B45309;
-        border: 1px solid #FCD34D;
-    }
-
-    .dsp-status.approved {
-        background: #DBEAFE;
-        color: #1D4ED8;
-        border: 1px solid #93C5FD;
-    }
-
-    .dsp-status.rejected {
-        background: #FEE2E2;
-        color: #B91C1C;
-        border: 1px solid #FCA5A5;
-    }
-
-    .dsp-status.done {
-        background: #DCFCE7;
-        color: #15803D;
-        border: 1px solid #86EFAC;
-    }
-
-    .dsp-item-table {
-        margin-bottom: 8px;
-    }
-
-    .dsp-item-table thead th {
-        background: var(--primary-soft);
-        color: var(--primary);
-        font-size: 0.78rem;
-    }
-
-    .dsp-card-foot {
-        border-top: 1px dashed var(--primary-soft);
-        padding-top: 8px;
-    }
-
-    .dsp-reject {
-        background: #FEF2F2;
-        border: 1px solid #FCA5A5;
-        border-radius: var(--border-radius-md);
-        color: #B91C1C;
-        padding: 9px 12px;
-        margin-bottom: 12px;
-        font-size: 0.85rem;
-    }
-
-    .dsp-empty,
-    .dsp-empty-items {
-        border: 1px dashed var(--primary-lighter);
-        border-radius: var(--border-radius-md);
-        padding: 18px;
-        text-align: center;
-        color: #64748b;
-        font-size: 0.88rem;
-    }
-
-    .dsp-empty-items {
-        padding: 12px;
-        margin-bottom: 8px;
-    }
-
-    /* Hộp tóm tắt số phiếu đang chọn trong modal xin quyết định huỷ */
-    .dsp-picked-box {
-        background: var(--primary-soft);
-        border: 1px solid var(--primary-lighter);
-        border-radius: var(--border-radius-md);
-        padding: 11px 14px;
-        margin-bottom: 16px;
-        font-size: 0.88rem;
-        color: var(--primary-dark);
-    }
-
-    .dsp-picked-list {
-        max-height: 130px;
-        overflow-y: auto;
-    }
-
-    .dsp-picked-list div {
-        line-height: 1.6;
-    }
-
-    .dsp-section {
-        margin: 4px 0 12px;
-        padding-bottom: 6px;
-        border-bottom: 1px solid var(--primary-soft);
-        font-size: 0.92rem;
-        font-weight: 700;
-        color: var(--primary-dark);
-    }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
 
+        /*
+        | Tab con Chờ xử lý / Đã hoàn thành (card liên phòng ban): ghi lên URL để tải lại trang
+        | vẫn mở đúng tab, và căn lại cột DataTables vừa hiện (bảng dựng lúc đang ẩn bị lệch độ rộng)
+        */
+        $(document).on('shown.bs.tab', '.mt-subtabs a[data-sub-key]', function() {
+            try {
+                var url = new URL(window.location.href);
+                var value = $(this).data('sub-value');
+
+                if (value) {
+                    url.searchParams.set($(this).data('sub-key'), value);
+                } else {
+                    url.searchParams.delete($(this).data('sub-key'));
+                }
+
+                window.history.replaceState(null, '', url.toString());
+            } catch (e) {}
+
+            if ($.fn.dataTable) {
+                $($(this).attr('href')).find('table.dataTable').DataTable().columns.adjust();
+            }
+        });
+
         /* ---------- Bật tìm kiếm cho các ô chọn trong modal ---------- */
         $('.md-modal').each(function() {
             var $modal = $(this);
 
-            $modal.find('.exp-select').select2({
-                theme: 'bootstrap4',
-                dropdownParent: $modal,
-                width: '100%',
-                placeholder: '-- Chọn --',
-                language: {
-                    noResults: function() {
-                        return 'Không tìm thấy dữ liệu phù hợp';
+            $modal.find('.exp-select').each(function() {
+                var $select = $(this);
+                var options = {
+                    theme: 'bootstrap4',
+                    dropdownParent: $modal,
+                    width: '100%',
+                    placeholder: '-- Chọn --',
+                    language: {
+                        noResults: function() {
+                            return 'Không tìm thấy dữ liệu phù hợp';
+                        },
+                        searching: function() {
+                            return 'Đang tìm...';
+                        }
                     }
+                };
+
+                // Danh sách lớn đi kèm dạng JSON ([data-local-options]): tìm ngay trên mảng, chỉ dựng
+                // option của các dòng đang hiện thay vì in sẵn hàng nghìn <option>
+                var local = $select.data('local-options');
+
+                if (Array.isArray(local)) {
+                    var byId = {};
+                    local.forEach(function(item) { byId[String(item.id)] = item; });
+
+                    $select.data('localById', byId);
+                    options.placeholder = $select.find('option[value=""]').first().text().trim() || options.placeholder;
+                    options.ajax = wmsLocalLookup(local);
                 }
+
+                $select.select2(options);
             });
         });
 
@@ -1188,10 +1120,15 @@
             $form.find('[name="testing"]').val(row.testing || '');
             $form.find('[name="analyst_id"]').val(row.analyst_id || '');
 
-            // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
+            // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ. Ô tìm trên
+            // [data-local-options] chưa có option của giá trị đang dùng thì dựng từ mảng đó.
             $form.find('.exp-select').each(function() {
                 var field = $(this).attr('name');
-                $(this).val(row[field] === undefined || row[field] === null ? '' : row[field]).trigger('change');
+                var value = row[field] === undefined || row[field] === null ? '' : row[field];
+                var item = ($(this).data('localById') || {})[String(value)];
+
+                if (item) wmsEnsureOption($(this), value, item.text);
+                $(this).val(value).trigger('change');
             });
 
             // Lý do điều chỉnh chỉ dành cho lần sửa này, không lấy theo dữ liệu dòng
@@ -1349,185 +1286,6 @@
             $(this).find('[name="import_id"]').each(function() {
                 if ($(this).val()) syncImport($(this));
             });
-        });
-
-        /* ==========================================================
-        | HOÁ CHẤT CHỜ HUỶ - BƯỚC 2 CỦA NGHIỆP VỤ HUỶ BỎ
-        ========================================================== */
-
-        /** Các phiếu loại bỏ đang được tích chọn ở bảng "Hoá chất chờ huỷ". */
-        function dspPicked() {
-            return $('.dsp-pick:checked');
-        }
-
-        /** Cập nhật số đếm trên nút và bật / tắt nút Xin quyết định huỷ. */
-        function dspSync() {
-            var count = dspPicked().length;
-
-            $('.dsp-picked').text(count);
-            $('#btnDspCreate').prop('disabled', count === 0);
-
-            $('.dsp-pick').each(function() {
-                $(this).closest('tr').toggleClass('is-picked', $(this).prop('checked'));
-            });
-
-            // Ô chọn tất cả chỉ tích khi đã chọn hết
-            var all = $('.dsp-pick').length;
-            $('#dspCheckAll').prop('checked', all > 0 && count === all);
-        }
-
-        $(document).on('change', '.dsp-pick', dspSync);
-
-        $(document).on('change', '#dspCheckAll', function() {
-            $('.dsp-pick').prop('checked', $(this).prop('checked'));
-            dspSync();
-        });
-
-        dspSync();
-
-        /* ---------- Mở modal lập đợt, mang theo các phiếu đang chọn ---------- */
-        $(document).on('click', '#btnDspCreate', function() {
-            var $picked = dspPicked();
-
-            if (!$picked.length) return;
-
-            var $inputs = $('#disposalModal').find('.dsp-picked-inputs').empty();
-            var $list = $('#disposalModal').find('.dsp-picked-list').empty();
-
-            $picked.each(function() {
-                var $row = $(this).closest('tr');
-
-                $('<input>').attr({
-                    type: 'hidden',
-                    name: 'export_ids[]',
-                    value: $(this).val()
-                }).appendTo($inputs);
-
-                // Dựng bằng thao tác DOM để nội dung dữ liệu luôn được escape
-                $('<div>').text(
-                    $row.find('td').eq(2).text().trim() + ' · ' +
-                    $row.find('td').eq(3).find('.font-weight-bold').text().trim() + ' · ' +
-                    $row.find('td').eq(6).text().trim().replace(/\s+/g, ' ')
-                ).appendTo($list);
-            });
-
-            $('#disposalModal').modal('show');
-        });
-
-        /* ---------- Thêm phiếu đang chọn vào một đợt còn đang gom ---------- */
-        $(document).on('submit', '.form-dsp-add', function(e) {
-            var $picked = dspPicked();
-            var $form = $(this);
-
-            if (!$picked.length) {
-                e.preventDefault();
-
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Chưa chọn phiếu nào',
-                    text: 'Tích chọn hoá chất ở bảng "Hoá chất chờ huỷ" rồi bấm Thêm phiếu đã chọn.',
-                    confirmButtonText: 'Đã hiểu'
-                });
-
-                return;
-            }
-
-            $form.find('input[name="export_ids[]"]').remove();
-
-            $picked.each(function() {
-                $('<input>').attr({
-                    type: 'hidden',
-                    name: 'export_ids[]',
-                    value: $(this).val()
-                }).appendTo($form);
-            });
-        });
-
-        /* ---------- Sửa thông tin đợt đang gom ---------- */
-        $(document).on('click', '.btn-dsp-edit', function() {
-            var batch = $(this).data('batch') || {};
-            var $form = $('#disposalEditModal').find('form');
-
-            $('#disposalEditModal').find('.dsp-edit-code').text(batch.code || '');
-
-            $form.find('[name="id"]').val(batch.id);
-            $form.find('[name="period_month"]').val(batch.period_month);
-            $form.find('[name="period_year"]').val(batch.period_year);
-            $form.find('[name="summarized_at"]').val(batch.summarized_at || '');
-            $form.find('[name="checked_at"]').val(batch.checked_at || '');
-
-            $form.find('[name="summarized_by"]').val(batch.summarized_by || '').trigger('change');
-            $form.find('[name="chemical_staff"]').val(batch.chemical_staff || '').trigger('change');
-
-            $('#disposalEditModal').modal('show');
-        });
-
-        /* ---------- Ghi quyết định huỷ / không duyệt ---------- */
-        $(document).on('click', '.btn-dsp-decide', function() {
-            var approved = $(this).data('answer') === 'approved';
-            var $modal = $('#disposalDecideModal');
-            var $form = $modal.find('form');
-
-            $form.find('[name="id"]').val($(this).data('id'));
-            $form.find('[name="app_status"]').val($(this).data('answer'));
-
-            $modal.find('.dsp-decide-code').text($(this).data('code') || '');
-            $modal.find('.dsp-decide-heading')
-                .text(approved ? 'Quyết Định Huỷ Bỏ' : 'Không Duyệt Đợt Huỷ');
-
-            // Duyệt thì cần số quyết định và hai chữ ký, không duyệt thì chỉ cần lý do
-            $modal.find('.dsp-approve-only').toggle(approved);
-            $modal.find('.dsp-reject-only').toggle(!approved);
-            $modal.find('.dsp-note-label').text(approved ? 'Ghi Chú Khác' : 'Ghi Chú');
-
-            $form.find('.dsp-approve-only [name="decision_no"], .dsp-approve-only [name="qa_approved_by"], .dsp-approve-only [name="qa_approved_at"], .dsp-approve-only [name="director_approved_by"], .dsp-approve-only [name="director_approved_at"]')
-                .prop('required', approved);
-            $form.find('[name="reject_reason"]').prop('required', !approved);
-
-            $form.find('.dsp-decide-submit')
-                .toggleClass('btn-primary', approved)
-                .toggleClass('btn-danger', !approved)
-                .html(approved ?
-                    '<i class="fas fa-save mr-1"></i> Lưu quyết định huỷ' :
-                    '<i class="fas fa-xmark mr-1"></i> Ghi không duyệt');
-
-            $modal.modal('show');
-        });
-
-        /** Chọn "Đơn vị khác" thì mới hỏi tên đơn vị thực hiện huỷ */
-        function dspToggleExecutor() {
-            var $select = $('#disposalDecideModal').find('[name="executor_type"]');
-
-            $('#disposalDecideModal').find('.dsp-executor-other').toggle($select.val() === 'other');
-        }
-
-        $(document).on('change', '#disposalDecideModal [name="executor_type"]', dspToggleExecutor);
-        dspToggleExecutor();
-
-        /* ---------- Giao nhận phế phẩm và theo dõi huỷ ---------- */
-        $(document).on('click', '.btn-dsp-complete', function() {
-            var batch = $(this).data('batch') || {};
-            var $modal = $('#disposalCompleteModal');
-            var $form = $modal.find('form');
-
-            $modal.find('.dsp-done-code').text(batch.code || '');
-
-            ['id', 'solid_weight', 'liquid_weight', 'handover_date', 'handover_by',
-                'receive_date', 'receive_by', 'label_date', 'label_by', 'destroy_date', 'destroy_by'
-            ].forEach(function(field) {
-                $form.find('[name="' + field + '"]').val(
-                    batch[field] === undefined || batch[field] === null ? '' : batch[field]
-                );
-            });
-
-            // Gợi ý theo phần quy đổi được ở mục 1, người dùng vẫn cân thực tế rồi sửa lại
-            $modal.find('.dsp-suggest').text(
-                batch.suggest_kg > 0 ?
-                'Hệ thống quy đổi từ danh mục mục 1: ' + batch.suggest_kg + ' kg (rắn + lỏng).' :
-                ''
-            );
-
-            $modal.modal('show');
         });
     });
 </script>

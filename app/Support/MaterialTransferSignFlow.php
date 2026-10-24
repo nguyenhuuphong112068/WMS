@@ -30,7 +30,7 @@ class MaterialTransferSignFlow
     public const KIND_TRANSFER = 'transfer';
 
     public const KINDS = [
-        self::KIND_VPP => 'Đề nghị VPP (gửi Hành Chính)',
+        self::KIND_VPP => 'Đề nghị cấp phát VPP đến HC',
         self::KIND_TRANSFER => 'Đề nghị liên phòng ban khác',
     ];
 
@@ -203,13 +203,30 @@ class MaterialTransferSignFlow
     /**
      * Ký bước đang chờ (đã kiểm quyền + mật khẩu ở controller). Bước cuối -> phiếu tới phòng
      * được đề nghị ('pending'). @return bool phiếu đã ký xong toàn bộ
+     *
+     * $rejectItems (item_id => lý do): duyệt MỘT PHẦN - các mục này chuyển 'rejected' ngay (lý
+     * do ghi kèm bước ký vào reject_note), không đi tiếp; các mục còn lại vẫn qua bước sau /
+     * tới phòng được đề nghị. Controller đã chặn trường hợp từ chối hết.
      */
-    public static function sign($request, $sign, string $actor, ?string $note = null): bool
+    public static function sign($request, $sign, string $actor, ?string $note = null, array $rejectItems = []): bool
     {
         $total = (int) DB::table(self::SIGN_TABLE)->where('transfer_request_id', $request->id)->where('active', 1)->count();
         $isLast = (int) $sign->step_no >= $total;
 
-        DB::transaction(function () use ($request, $sign, $actor, $note, $isLast) {
+        DB::transaction(function () use ($request, $sign, $actor, $note, $isLast, $rejectItems) {
+            foreach ($rejectItems as $itemId => $reason) {
+                DB::table(MaterialTransferRequest::ITEM_TABLE)
+                    ->where('id', $itemId)
+                    ->where('transfer_request_id', $request->id)
+                    ->where('active', 1)
+                    ->where('status', 'draft')
+                    ->update([
+                        'status' => 'rejected',
+                        'reject_note' => 'Từ chối khi ký bước '.$sign->step_no.' ('.$actor.'): '.$reason,
+                        'updated_at' => now(),
+                    ]);
+            }
+
             DB::table(self::SIGN_TABLE)->where('id', $sign->id)->update([
                 'status' => 'signed',
                 'signed_by' => $actor,

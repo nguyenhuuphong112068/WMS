@@ -1,4 +1,5 @@
 @include('pages.import.shared.assets')
+@php $activeTab = \App\Support\PageTabs::active('import_chemical', $activeTab ?? 'check'); @endphp
 
 @php
     $impToday = \Carbon\Carbon::today();
@@ -11,32 +12,31 @@
             <div class="card-body">
 
                 <div class="imp-tabs">
-                    <button type="button" class="imp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}"
-                        data-pane="impPaneBook">
-                        <i class="fas fa-book mr-1"></i> Sổ nhập hoá chất
-                    </button>
-                    <button type="button" class="imp-tab {{ $activeTab === 'report' ? 'is-active' : '' }}"
-                        data-pane="impPaneReport">
-                        <i class="fas fa-chart-column mr-1"></i> Báo cáo nhập hoá chất
-                    </button>
-                    <button type="button" class="imp-tab" data-pane="impPaneCheck">
-                        <i class="fas fa-clipboard-check mr-1"></i> Chờ kiểm tra
+                    @tab('import_chemical', 'check')
+                    <button type="button" class="imp-tab {{ $activeTab === 'check' ? 'is-active' : '' }}" data-pane="impPaneCheck">
+                        <i class="fas fa-clipboard-check mr-1"></i> Nhập hoá chất
                         @if ($pendingCount > 0)
                             <span class="imp-tab-count">{{ $pendingCount }}</span>
                         @endif
                     </button>
+                    @endtab
+                    @tab('import_chemical', 'book')
+                    <button type="button" class="imp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}"
+                        data-pane="impPaneBook">
+                        <i class="fas fa-book mr-1"></i> Sổ nhập hoá chất
+                    </button>
+                    @endtab
+                    @tab('import_chemical', 'report')
+                    <button type="button" class="imp-tab {{ $activeTab === 'report' ? 'is-active' : '' }}"
+                        data-pane="impPaneReport">
+                        <i class="fas fa-chart-column mr-1"></i> Báo cáo nhập hoá chất
+                    </button>
+                    @endtab
                 </div>
 
                 {{-- ============ SỔ NHẬP HOÁ CHẤT ============ --}}
+                @tab('import_chemical', 'book')
                 <div class="imp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="impPaneBook">
-
-                <div class="md-toolbar">
-                    @perm('import_chemical_create')
-                        <button type="button" class="btn btn-primary btn-md-create">
-                            <i class="fas fa-plus mr-1"></i> Nhập hoá chất
-                        </button>
-                    @endperm
-                </div>
 
                 @include('pages.shared.rangeFilter', [
                     'rfRoute' => $impRoute . 'list',
@@ -127,10 +127,8 @@
                                     <td class="md-sub">
                                         @if ($row->location_code)
                                             <div class="font-weight-bold">
-                                                <span class="md-tag">{{ $row->location_code }}</span>
+                                                {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                             </div>
-                                            <div>{{ $row->warehouse_name ?: '—' }} / {{ $row->shelf_name ?: '—' }} /
-                                                {{ $row->column_name ?: '—' }} / {{ $row->tier_name ?: '—' }}</div>
                                         @else
                                             <span class="imp-no-location">Chưa xếp vị trí</span>
                                         @endif
@@ -203,6 +201,7 @@
                                                         data-row="{{ json_encode([
                                                             'id' => $row->id,
                                                             'category_id' => $row->category_id,
+                                                            'category_id_text' => \App\Support\CategoryLookup::chemicalCategoryLabel((object) ['code' => $row->category_code, 'chem_name' => $row->chem_name, 'unit_short_name' => $row->unit_short_name], true),
                                                             'amount' => $row->amount,
                                                             'imported_date' => $row->imported_date,
                                                             'imported_by' => $row->imported_by,
@@ -213,6 +212,8 @@
                                                             'batch_no' => $row->batch_no,
                                                             'supplier_id' => $row->supplier_id,
                                                             'location_id' => $row->location_id,
+                                                            'location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                            'location_id_zone' => $row->location_zone_type,
                                                             'note' => $row->note,
                                                             'attachments' => $rowAttachments->map(fn($a) => ['id' => $a->id, 'file_name' => $a->file_name])->toArray(),
                                                         ]) }}">
@@ -265,9 +266,19 @@
                     'pgUnit' => 'phiếu nhập',
                 ])
                 </div>
+                @endtab
 
-                {{-- ============ CHỜ KIỂM TRA ============ --}}
-                <div class="imp-pane" id="impPaneCheck">
+                {{-- ============ NHẬP HOÁ CHẤT (lô chờ kiểm tra) ============ --}}
+                @tab('import_chemical', 'check')
+                <div class="imp-pane {{ $activeTab === 'check' ? 'is-active' : '' }}" id="impPaneCheck">
+                    <div class="md-toolbar">
+                        @perm('import_chemical_create')
+                            <button type="button" class="btn btn-primary btn-md-create">
+                                <i class="fas fa-plus mr-1"></i> Nhập hoá chất
+                            </button>
+                        @endperm
+                    </div>
+
                     <div class="table-responsive">
                         <table id="mdTableCheck" class="table table-bordered table-hover w-100 md-table">
                             <thead>
@@ -320,8 +331,7 @@
                                             {{ $impDate($row->expired_date) }}</td>
                                         <td class="md-sub">
                                             @if ($row->location_code)
-                                                <span class="md-tag">{{ $row->location_code }}</span>
-                                                <div>{{ $row->warehouse_name ?: '—' }}</div>
+                                                {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                             @else
                                                 <span class="imp-no-location">Chưa định khu</span>
                                             @endif
@@ -343,6 +353,8 @@
                                                         'expired_date' => $row->expired_date,
                                                         'supplier_id' => $row->supplier_id,
                                                         'location_id' => $row->location_id,
+                                                        'location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                        'location_id_zone' => $row->location_zone_type,
                                                     ]) }}">
                                                     <i class="fas fa-clipboard-check mr-1"></i> Kiểm tra
                                                 </button>
@@ -354,13 +366,16 @@
                         </table>
                     </div>
                 </div>
+                @endtab
 
                 {{-- ============ BÁO CÁO NHẬP HOÁ CHẤT ============ --}}
+                @tab('import_chemical', 'report')
                 <div class="imp-pane {{ $activeTab === 'report' ? 'is-active' : '' }}" id="impPaneReport">
 
                     <form method="GET" action="{{ route($impRoute . 'list') }}" class="imp-range">
                         {{-- Lọc xong trang tải lại, cờ này đưa người dùng về đúng tab báo cáo --}}
                         <input type="hidden" name="tab" value="report">
+                        <input type="hidden" name="rsub" value="{{ request('rsub') === 'other' ? 'other' : '' }}" class="imp-rsub">
 
                         <div class="form-group">
                             <label>Từ ngày</label>
@@ -392,82 +407,76 @@
                         </div>
                     </form>
 
-                    @include('pages.shared.classificationFilter', ['clsTarget' => 'impReportTable'])
+                    @php
+                        $impTransferSame = $reports['transferSame'];
+                        $impTransferOther = $reports['transferOther'];
+                        $impTransferSub = request('rsub') === 'other' ? 'other' : 'same';
+                    @endphp
 
-                    <div class="table-responsive">
-                        <table id="impReportTable" class="table table-bordered table-hover w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-center" style="width: 60px">STT</th>
-                                    <th style="width: 120px">Mã Danh Mục</th>
-                                    <th>Hoá Chất</th>
-                                    <th class="text-center" style="width: 90px">Lượt Nhập</th>
-                                    <th class="text-center" style="width: 150px">Lần Nhập Gần Nhất</th>
-                                    <th class="text-right" style="width: 140px">Tổng Nhập</th>
-                                    <th class="text-right" style="width: 140px">Quy Đổi (Kg)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($report as $row)
-                                    <tr data-classification="{{ $impCls($row->category_id) }}">
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td><span class="imp-code">{{ $row->category_code }}</span></td>
-                                        <td>
-                                            <div class="font-weight-bold">
-                                                {{ $row->chem_name ?: '—' }}
-                                                @if ($impIsSpecial($row->category_id))
-                                                    <span class="badge-special-control ml-1" title="Hoá chất kiểm soát đặc biệt (Phụ lục III NĐ 24/2026)">
-                                                        <i class="fas fa-shield-alt"></i>Kiểm soát đặc biệt
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            <div class="md-sub">
-                                                {{ $row->supplier_count }} nhà cung cấp · đơn vị {{ $row->unit }}
-                                                @if ($row->density !== null)
-                                                    · d = {{ $impNum($row->density) }} g/ml
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td class="text-center md-sub" data-order="{{ $row->times }}">
-                                            {{ $row->times }}
-                                        </td>
-                                        <td class="text-center md-sub"
-                                            data-order="{{ $row->last_imported_date ?: '0000-00-00' }}">
-                                            {{ $impDate($row->last_imported_date) }}
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->total }}">
-                                            <span class="imp-amount">{{ $impNum($row->total) }}</span>
-                                            <span class="md-sub">{{ $row->unit }}</span>
-                                        </td>
-                                        <td class="text-right" data-order="{{ $row->total_kg ?? -1 }}">
-                                            @if ($row->total_kg !== null)
-                                                <span class="imp-kg">{{ $impNum($row->total_kg) }}</span>
-                                                <span class="md-sub">kg</span>
-                                            @else
-                                                <span class="imp-kg-na" title="{{ $row->convert_note }}">Không quy
-                                                    đổi</span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                            @if ($report->count())
-                                <tfoot>
-                                    <tr>
-                                        <th colspan="5" class="text-right">Tổng cộng quy đổi</th>
-                                        <th class="text-right md-sub">
-                                            {{ $impReportNotConvertible }} mã không quy đổi được
-                                        </th>
-                                        <th class="text-right">
-                                            <span class="imp-kg">{{ $impNum($impReportTotalKg) }}</span>
-                                            <span class="md-sub">kg</span>
-                                        </th>
-                                    </tr>
-                                </tfoot>
-                            @endif
-                        </table>
+                    {{-- Hoá chất MUA (nhập từ nhà cung cấp) - không gồm hàng nhận chuyển liên phòng ban --}}
+                    <div class="imp-report-card">
+                        <div class="imp-report-card-header">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span class="imp-report-card-title">Hoá chất mua</span>
+                            <span class="imp-report-card-count">{{ $reports['purchase']->count() }}</span>
+                        </div>
+                        <div class="imp-report-card-body">
+                            @include('pages.import.ChemicalImport.reportTable', [
+                                'rpId' => 'impReportTable',
+                                'rpRows' => $reports['purchase'],
+                                'rpTransfer' => false,
+                                'rpEmpty' => 'Không có hoá chất mua nào trong khoảng thời gian đã chọn.',
+                            ])
+                        </div>
+                    </div>
+
+                    {{-- Nhận chuyển liên phòng ban: tab con cùng công ty / khác công ty --}}
+                    <div class="imp-report-card is-transfer">
+                        <div class="imp-report-card-header">
+                            <i class="fas fa-people-arrows"></i>
+                            <span class="imp-report-card-title">Nhận chuyển liên phòng ban</span>
+                            <span class="imp-report-card-count">{{ $impTransferSame->count() + $impTransferOther->count() }}</span>
+                        </div>
+                        <div class="imp-report-card-body">
+                            <ul class="nav nav-tabs imp-subtabs" role="tablist">
+                                <li class="nav-item">
+                                    <a class="nav-link {{ $impTransferSub === 'same' ? 'active' : '' }}" data-toggle="tab" role="tab"
+                                        href="#impReportSamePane" data-sub-value="">
+                                        <i class="fas fa-building mr-1"></i> Cùng công ty
+                                        <span class="badge badge-primary">{{ $impTransferSame->count() }}</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ $impTransferSub === 'other' ? 'active' : '' }}" data-toggle="tab" role="tab"
+                                        href="#impReportOtherPane" data-sub-value="other">
+                                        <i class="fas fa-city mr-1"></i> Khác công ty
+                                        <span class="badge badge-secondary">{{ $impTransferOther->count() }}</span>
+                                    </a>
+                                </li>
+                            </ul>
+
+                            <div class="tab-content">
+                                <div class="tab-pane fade {{ $impTransferSub === 'same' ? 'show active' : '' }}" id="impReportSamePane" role="tabpanel">
+                                    @include('pages.import.ChemicalImport.reportTable', [
+                                        'rpId' => 'impReportSameTable',
+                                        'rpRows' => $impTransferSame,
+                                        'rpTransfer' => true,
+                                        'rpEmpty' => 'Không nhận chuyển hoá chất nào từ phòng cùng công ty trong khoảng thời gian đã chọn.',
+                                    ])
+                                </div>
+                                <div class="tab-pane fade {{ $impTransferSub === 'other' ? 'show active' : '' }}" id="impReportOtherPane" role="tabpanel">
+                                    @include('pages.import.ChemicalImport.reportTable', [
+                                        'rpId' => 'impReportOtherTable',
+                                        'rpRows' => $impTransferOther,
+                                        'rpTransfer' => true,
+                                        'rpEmpty' => 'Không nhận chuyển hoá chất nào từ phòng công ty khác trong khoảng thời gian đã chọn.',
+                                    ])
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+                @endtab
 
             </div>
         </div>

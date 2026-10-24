@@ -48,7 +48,7 @@
                 </div>
 
                 <div class="table-responsive border rounded">
-                    <table class="table table-sm table-bordered table-hover mb-0" style="font-size: 0.86rem;">
+                    <table class="table table-sm table-bordered table-hover mb-0" id="expPickerTable" style="font-size: 0.86rem;" data-deferred="lazy">
                         <thead class="bg-light sticky-top">
                             <tr class="text-center">
                                 <th style="width: 40px"><input type="checkbox" id="expPickerCheckAll" title="Chọn tất cả"></th>
@@ -60,6 +60,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @deferredRows('expPickerTable')
                             @forelse ($imports->where('selectable', true) as $import)
                                 <tr class="exp-picker-row"
                                     data-import-id="{{ $import->id }}"
@@ -91,7 +92,7 @@
                                         {{ $expNum($import->remaining) }} {{ $import->unit_short_name }}
                                     </td>
                                     <td class="text-center align-middle">
-                                        {{ $import->location_code ?: '—' }}
+                                        {{ \App\Support\ZoneType::tag($import->location_code, $import->location_zone_type ?? null) }}
                                     </td>
                                     <td class="text-center align-middle">
                                         {{ $import->expired_date ? $expDate($import->expired_date) : '—' }}
@@ -104,6 +105,7 @@
                                     </td>
                                 </tr>
                             @endforelse
+                            @enddeferredRows
                         </tbody>
                     </table>
                 </div>
@@ -134,8 +136,14 @@
                 'category_code' => $import->category_code,
                 'batch_no' => $import->batch_no,
                 'remaining' => round((float) $import->remaining, 4),
+                // Hạn mức còn dùng được = tồn + 5% - phần đang giữ ở Phiếu Tạm (holders: ai giữ bao nhiêu)
                 'max_issue' => round((float) $import->max_amount, 4),
+                'reserved' => round((float) $import->draft_reserved, 4),
+                'holders' => $import->draft_holders,
                 'unit' => $import->unit_short_name,
+                'location' => $import->location_code,
+                // Lô nhận lẻ từ phòng khác: không được dùng vượt tồn (không có phần +5%)
+                'partial' => !empty($import->is_partial_lot),
                 'expired_date' => $import->expired_date ? \Carbon\Carbon::parse($import->expired_date)->format('d/m/Y') : null,
                 // Hoá chất cấm: dòng trong modal Sử Dụng bắt buộc chọn Người Kiểm Tra
                 'banned' => $expBanned($import->category_id),
@@ -144,9 +152,9 @@
         ];
     });
 
-    // Danh sách người kiểm tra để dựng ô chọn cho mỗi dòng mới thêm
+    // Người kiểm tra hoá chất cấm = Quản Lý Kho Hoá Chất của phòng, dựng ô chọn cho mỗi dòng mới thêm
     $expCheckerOptionsJs = $checkers->map(function ($checker) {
-        return ['value' => $checker->fullName, 'label' => $checker->fullName];
+        return ['value' => $checker->fullName, 'label' => $checker->fullName . ' (' . $checker->userName . ')'];
     });
 @endphp
 
@@ -178,11 +186,16 @@
         });
 
         $(document).on('click', '.btn-open-exp-picker', function() {
-            $modal.find('.exp-picker-check').prop('checked', false);
             $('#expPickerCheckAll').prop('checked', false);
-            $('#expPickerSearch').val('').trigger('input');
-            updateCount();
+            $('#expPickerSearch').val('');
             $modal.modal('show');
+
+            // Danh sách lô còn tồn (~1.400 dòng) chỉ lấy ở lần mở đầu - pages/shared/deferredRows
+            mdDeferred.fillLazy('#expPickerTable', function() {
+                $modal.find('.exp-picker-check').prop('checked', false);
+                $('#expPickerSearch').trigger('input');
+                updateCount();
+            }, 'Đang tải danh sách hoá chất còn tồn...');
         });
 
         // Bootstrap 4 gỡ modal-open khi đóng modal con - trả lại để #createModal còn cuộn được

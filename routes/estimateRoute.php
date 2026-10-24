@@ -30,6 +30,9 @@ Route::prefix('/estimate')
             Route::get('detail', 'detail')->name('detail');
             Route::get('history', 'history')->name('history');
 
+            // Tab "Danh sách hoá chất cần dự trù" (tồn dưới ngưỡng tối thiểu): chọn nhiều mã rồi lập phiếu
+            Route::post('watchlistEstimateStore', 'watchlistEstimateStore')->name('watchlistEstimateStore');
+
             // Đầu phiếu
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
@@ -39,6 +42,11 @@ Route::prefix('/estimate')
             Route::post('storeItem', 'storeItem')->name('storeItem');
             Route::post('updateItem', 'updateItem')->name('updateItem');
             Route::post('deleteItem', 'deleteItem')->name('deleteItem');
+
+            // File đính kèm theo từng mục dự trù (xoá mềm)
+            Route::post('uploadAttachment', 'uploadAttachment')->name('uploadAttachment');
+            Route::get('downloadAttachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('deleteAttachment', 'deleteAttachment')->name('deleteAttachment');
 
             // Cảnh báo ngưỡng PL IV tức thời khi chọn hoá chất / nhập số lượng trong modal
             Route::get('checkThreshold', 'checkThreshold')->name('checkThreshold');
@@ -55,6 +63,8 @@ Route::prefix('/estimate')
             Route::post('updateItemStatus', 'updateItemStatus')->name('updateItemStatus');
             // Huỷ mục cần xác nhận của cả phòng đề nghị và bộ phận mua hàng
             Route::post('purchaseCancel', 'purchaseCancel')->name('purchaseCancel');
+            // Bộ phận mua hàng tiếp nhận phiếu vừa được Ban Giám Đốc duyệt (lưu người + ngày tiếp nhận)
+            Route::post('receive', 'receive')->name('receive');
             Route::post('updatePromisedDate', 'updatePromisedDate')->name('updatePromisedDate');
             Route::get('getPromisedDateHistory/{itemId}', 'getPromisedDateHistory')->name('getPromisedDateHistory');
             Route::post('storeItemChat', 'storeItemChat')->name('storeItemChat');
@@ -67,6 +77,9 @@ Route::prefix('/estimate')
             Route::get('detail', 'detail')->name('detail');
             Route::get('history', 'history')->name('history');
 
+            // Tab "Danh sách chất chuẩn cần dự trù" (tồn dưới ngưỡng tối thiểu): chọn nhiều mã rồi lập phiếu
+            Route::post('watchlistEstimateStore', 'watchlistEstimateStore')->name('watchlistEstimateStore');
+
             // Đầu phiếu
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
@@ -76,6 +89,11 @@ Route::prefix('/estimate')
             Route::post('storeItem', 'storeItem')->name('storeItem');
             Route::post('updateItem', 'updateItem')->name('updateItem');
             Route::post('deleteItem', 'deleteItem')->name('deleteItem');
+
+            // File đính kèm theo từng mục dự trù (xoá mềm)
+            Route::post('uploadAttachment', 'uploadAttachment')->name('uploadAttachment');
+            Route::get('downloadAttachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('deleteAttachment', 'deleteAttachment')->name('deleteAttachment');
 
             // Trình ký cố định 2 bước: Quản Lý Bộ Phận của phòng -> Ban Giám Đốc người lập chọn.
             // signStep ký bước đang chờ của phiếu thuộc phòng đang chọn.
@@ -87,6 +105,8 @@ Route::prefix('/estimate')
             Route::post('updateItemStatus', 'updateItemStatus')->name('updateItemStatus');
             // Huỷ mục cần xác nhận của cả phòng đề nghị và bộ phận mua hàng
             Route::post('purchaseCancel', 'purchaseCancel')->name('purchaseCancel');
+            // Bộ phận mua hàng tiếp nhận phiếu vừa được Ban Giám Đốc duyệt (lưu người + ngày tiếp nhận)
+            Route::post('receive', 'receive')->name('receive');
             Route::post('updatePromisedDate', 'updatePromisedDate')->name('updatePromisedDate');
             Route::get('getPromisedDateHistory/{itemId}', 'getPromisedDateHistory')->name('getPromisedDateHistory');
             Route::post('storeItemChat', 'storeItemChat')->name('storeItemChat');
@@ -120,6 +140,8 @@ Route::prefix('/estimate')
 
             // Huỷ mục dự trù cần xác nhận của cả phòng đề nghị và bộ phận mua hàng
             Route::post('purchaseCancel', 'purchaseCancel')->name('purchaseCancel');
+            // Bộ phận mua hàng tiếp nhận phiếu vừa được Ban Giám Đốc duyệt (lưu người + ngày tiếp nhận)
+            Route::post('receive', 'receive')->name('receive');
 
             // Trình ký cố định 2 bước: Quản Lý Bộ Phận của phòng -> Ban Giám Đốc người lập chọn.
             // signStep ký bước đang chờ của phiếu thuộc phòng đang chọn.

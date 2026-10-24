@@ -4,28 +4,26 @@
 |--------------------------------------------------------------------------
 | DỰ TRÙ - CHI TIẾT MỘT PHIẾU DỰ TRÙ CHẤT CHUẨN
 |--------------------------------------------------------------------------
-| Cùng bố cục với chi tiết dự trù hoá chất, khác ở chỗ mỗi dòng còn khai NHÓM CHUẨN
-| mong muốn để bộ phận Cung Ứng biết cần mua chuẩn chính hay chuẩn tạp.
+| Cùng bố cục với chi tiết dự trù vật tư (MaterialEstimate/detail): mã / NSX tách cột, file
+| đính kèm theo từng chất chuẩn, cảnh báo không kịp thời gian đặt hàng, tiêu đề bảng cố định.
+| Riêng chất chuẩn: mỗi dòng còn khai NHÓM CHUẨN mong muốn để bộ phận mua hàng biết cần mua
+| chuẩn chính hay chuẩn tạp; mã danh mục kèm version.
 |
 | Biến vào: $list, $items, $histories, $categories, $units, $groups, $canEditItems,
-|           $backRoute, $estRoute, $appStatuses, $signSteps, $receptionStatuses
+|           $backRoute, $estRoute, $appStatuses, $receptionStatuses, $approvedAt
 --}}
 
 @php
     $estIcon = 'fas fa-clipboard-check';
     $estNum = fn($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
-    $estStatusClass = match ($list->app_status) {
-        'approved' => 'approved',
-        'rejected' => 'rejected',
-        default => 'pending',
-    };
+    $estCanEdit = $canEditItems && user_can('estimate_standard_update');
 @endphp
 
 @section('mainContent')
     @include('pages.estimate.shared.assets')
 
     {{-- Trang này không có bảng lọc nên không kéo theo pages.shared.standardGroupFilter,
-         phải khai riêng hai thẻ nhóm chuẩn / version đang dùng ở cột Chất Chuẩn. --}}
+         phải khai riêng hai thẻ nhóm chuẩn / version đang dùng ở bảng. --}}
     <style>
         .sgr-chip {
             display: inline-block;
@@ -56,63 +54,6 @@
     <div class="content-wrapper">
         <div class="md-page">
 
-            <div class="est-info">
-                <div class="box">
-                    <label>Trạng Thái Trình Ký</label>
-                    <div class="val">
-                        <span class="md-badge {{ $estStatusClass }}">
-                            {{ $appStatuses[$list->app_status] ?? $list->app_status }}
-                        </span>
-                    </div>
-                </div>
-
-                <div class="box">
-                    <label>Người Lập Phiếu</label>
-                    <div class="val">{{ $list->updated_by ?: $list->created_by ?: '—' }}</div>
-                    <div class="md-sub">
-                        {{ $list->created_at ? \Carbon\Carbon::parse($list->created_at)->format('d/m/Y H:i') : '' }}
-                    </div>
-                </div>
-
-                @foreach ($signs as $step)
-                    @php
-                        $stepWho = $step->signer_full_name ?: ($step->user_name ?: ($step->role_names ?: '—'));
-                        $stepIsBod = (int) $step->step_no === (int) $signs->count();
-                    @endphp
-                    <div class="box">
-                        <label>Bước {{ $step->step_no }}{{ $stepIsBod ? ' - Ban Giám Đốc' : '' }}</label>
-                        <div class="val">{{ $stepWho }}</div>
-                        <div class="md-sub">
-                            @if ($step->status === 'signed')
-                                Đã ký &middot; {{ $step->signed_at ? \Carbon\Carbon::parse($step->signed_at)->format('d/m/Y H:i') : '' }}
-                            @elseif ($step->status === 'rejected')
-                                <span class="text-danger">Đã từ chối</span>
-                            @elseif ($list->app_status === 'pending_sign' && (int) $list->current_step === (int) $step->step_no)
-                                <span class="text-primary">Đang chờ ký</span>
-                            @else
-                                Chưa ký
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
-
-                <div class="box">
-                    <label>Tiếp Nhận (Cung Ứng)</label>
-                    <div class="val">
-                        @if ($list->reception_status)
-                            <span class="est-badge {{ $list->reception_status }}">
-                                {{ $receptionStatuses[$list->reception_status] ?? $list->reception_status }}
-                            </span>
-                        @else
-                            <span class="est-badge none">Chưa duyệt xong</span>
-                        @endif
-                    </div>
-                    @if ($list->received_by)
-                        <div class="md-sub">{{ $list->received_by }}</div>
-                    @endif
-                </div>
-            </div>
-
             @if ($list->app_status === 'rejected' && $list->reject_reason)
                 <div class="est-reject-note">
                     <i class="fas fa-triangle-exclamation mr-1"></i>
@@ -123,79 +64,99 @@
                 </div>
             @endif
 
-            @if ($list->reception_note)
-                <div class="md-hint mb-3">
-                    <i class="fas fa-truck-ramp-box mr-1"></i>
-                    <b>Ghi chú của bộ phận Cung Ứng:</b> {{ $list->reception_note }}
-                </div>
-            @endif
-
             <div class="card md-card">
                 <div class="card-body">
 
+                    {{-- Nút là con trực tiếp của .md-toolbar để layout gom chung một hàng với
+                         ô Hiển thị / Tìm kiếm của DataTables (.md-tablebar - layout/master.blade.php) --}}
                     <div class="md-toolbar">
-                        <div>
-                            <a href="{{ $backRoute }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left mr-1"></i> Quay lại danh sách
-                            </a>
+                        <a href="{{ $backRoute }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left mr-1"></i> Quay lại danh sách
+                        </a>
 
-                            @if ($canEditItems && user_can('estimate_standard_update'))
-                                <button type="button" class="btn btn-primary btn-est-item-create ml-1">
-                                    <i class="fas fa-plus mr-1"></i> Thêm chất chuẩn
-                                </button>
-                            @endif
-
-                            <button type="button" class="btn btn-info ml-1 btn-est-history"
-                                data-url="{{ route($estRoute . 'history', ['id' => $list->id]) }}"
-                                data-title="Phiếu {{ $list->code }}">
-                                <i class="fas fa-route mr-1"></i> Theo dõi trình ký
+                        @if ($estCanEdit)
+                            <button type="button" class="btn btn-primary btn-est-item-create">
+                                <i class="fas fa-plus mr-1"></i> Thêm chất chuẩn
                             </button>
-                        </div>
+                        @endif
 
-                        <p class="hint">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            @if ($canEditItems && user_can('estimate_standard_update'))
-                                Mỗi chất chuẩn khai được nhiều dòng số lượng cho nhiều tháng khác nhau.
-                            @else
-                                Phiếu đã trình ký nên chi tiết chỉ xem, không sửa được.
-                            @endif
-                        </p>
+                        <button type="button" class="btn btn-info btn-est-history"
+                            data-url="{{ route($estRoute . 'history', ['id' => $list->id]) }}"
+                            data-title="Phiếu {{ $list->code }}">
+                            <i class="fas fa-route mr-1"></i> Theo dõi trình ký
+                        </button>
+                        {{-- Bộ phận mua hàng (mở từ tab "Đơn dự trù đã được phê duyệt"): tiếp nhận phiếu vừa duyệt --}}
+                        @if ($purchaserView ?? false)
+                            @include('pages.estimate.shared.receptionAction')
+                        @endif
+
+                        {{-- Người ký được bước đang chờ: Đồng ý / Từ chối ngay trên trang chi tiết (đã bỏ khỏi dòng danh sách) --}}
+                        @if ($list->app_status === 'pending_sign' && $canSignCurrent && $pendingSign && user_can('estimate_standard_sign'))
+                            @php $estIsLast = (int) $pendingSign->step_no >= (int) $list->sign_step_count; @endphp
+                            <form class="form-md-confirm d-inline" data-require-password="1" action="{{ route($estRoute . 'signStep') }}"
+                                method="POST" data-title="Ký duyệt bước {{ $pendingSign->step_no }}/{{ $list->sign_step_count }} phiếu {{ $list->code }}?"
+                                data-text="{{ $estIsLast ? 'Phiếu sẽ được phê duyệt và chuyển bộ phận mua hàng tiếp nhận.' : 'Phiếu sẽ chuyển tới người ký bước ' . ($pendingSign->step_no + 1) . '.' }}">
+                                @csrf
+                                <input type="hidden" name="id" value="{{ $list->id }}">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-{{ $estIsLast ? 'stamp' : 'signature' }} mr-1"></i> Đồng ý
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-outline-danger btn-est-reject" data-id="{{ $list->id }}" data-code="{{ $list->code }}">
+                                <i class="fas fa-times mr-1"></i> Từ chối
+                            </button>
+                        @endif
                     </div>
 
-                    <div class="table-responsive">
+                    <div class="table-responsive est-detail-table">
                         <table id="mdTable" class="table table-bordered table-hover w-100">
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width: 55px">STT</th>
-                                    <th style="width: 240px">Chất Chuẩn</th>
+                                    <th style="width: 110px">Mã Chất Chuẩn</th>
+                                    <th style="width: 220px">Chất Chuẩn</th>
+                                    <th style="width: 90px">NSX</th>
                                     <th style="width: 120px">Nhóm Chuẩn</th>
                                     <th>Thông Tin Kỹ Thuật</th>
                                     <th>Mục Đích Sử Dụng</th>
                                     <th style="width: 200px">Số Lượng Dự Trù</th>
-                                    <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
-                                    <th style="width: 110px">Người Tạo</th>
-                                    @if ($canEditItems && user_can('estimate_standard_update'))
-                                        <th class="text-center" style="width: 90px">Thao Tác</th>
+                                    <th style="width: 150px">Ngày Mong Muốn</th>
+                                    @if ($purchaserView ?? false)
+                                        <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
                                     @endif
+                                    <th style="width: 110px">Người Tạo</th>
+                                    <th class="text-center" style="width: 150px">Thao Tác</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach ($items as $item)
-                                    <tr>
+                                    <tr @if ($item->status_id == 0) style="opacity: 0.6; background-color: #f8f9fa;" @endif>
                                         <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td class="text-nowrap">
+                                            @if ($item->category_id)
+                                                <div class="font-weight-bold">{{ $item->category_code ?: '—' }}</div>
+                                                <span class="sgr-version mt-1">v{{ $item->category_version }}</span>
+                                            @else
+                                                <span class="md-empty">—</span>
+                                            @endif
+                                        </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $item->display_name ?: '—' }}</div>
-                                            <div class="md-sub">
-                                                @if ($item->category_id)
-                                                    <span class="md-tag">{{ $item->category_code }}</span>
-                                                    <span class="sgr-version ml-1">v{{ $item->category_version }}</span>
-                                                    @if ($item->category_cas_no)
-                                                        <br><small>CAS: {{ $item->category_cas_no }}</small>
-                                                    @endif
-                                                @else
-                                                    <span class="est-outside">Ngoài danh mục</span>
-                                                @endif
-                                            </div>
+                                            @if ($item->category_id && $item->category_cas_no)
+                                                <div class="md-sub">CAS: {{ $item->category_cas_no }}</div>
+                                            @endif
+                                            @unless ($item->category_id)
+                                                <span class="est-outside">Ngoài danh mục</span>
+                                            @endunless
+
+                                            {{-- File đính kèm của riêng chất chuẩn này --}}
+                                            @include('pages.estimate.shared.itemFiles', [
+                                                'canAttach' => $estCanEdit,
+                                                'itemLabel' => 'chất chuẩn',
+                                            ])
+                                        </td>
+                                        <td class="md-sub">
+                                            {{ $item->category_id ? ($item->category_manufacturer_short_name ?: ($item->category_manufacturer_name ?: '—')) : '—' }}
                                         </td>
                                         <td class="md-sub">
                                             @if ($item->group_label)
@@ -207,71 +168,50 @@
                                         <td class="md-sub">{{ $item->technical_information ?: '—' }}</td>
                                         <td class="md-sub">
                                             <div class="mb-1">{{ $item->purpose ?: '—' }}</div>
-                                            @if ($item->expected_delivery_date)
-                                                <div class="text-primary"><i class="fas fa-calendar-alt mr-1"></i> Mong muốn giao: <b>{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</b></div>
-                                            @endif
-                                            
-                                            @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_standard_tracking'])
                                         </td>
                                         <td>
                                             @forelse ($item->amounts as $amount)
                                                 <span class="est-chip">
-                                                    <b>{{ $estNum($amount->amount) }}
-                                                        {{ $amount->unit_short_name ?: $amount->unit_name }}</b>
-                                                    <span>&middot;
-                                                        {{ \Carbon\Carbon::parse($amount->for_month_year)->format('m/Y') }}</span>
+                                                    <b>{{ $estNum($amount->amount) }} {{ $amount->unit_short_name ?: $amount->unit_name }}</b>
+                                                    <span>&middot; {{ \Carbon\Carbon::parse($amount->for_month_year)->format('m/Y') }}</span>
                                                 </span>
                                             @empty
                                                 <span class="md-empty">—</span>
                                             @endforelse
                                         </td>
-                                        <td>
-                                            @php
-                                                $daysLeftText = '';
-                                                if ($item->promised_date) {
-                                                    $promised = \Carbon\Carbon::parse($item->promised_date)->startOfDay();
-                                                    $today = \Carbon\Carbon::now()->startOfDay();
-                                                    $diff = $today->diffInDays($promised, false);
-                                                    if ($diff > 0) {
-                                                        $daysLeftText = "<span class='text-success small'>Còn {$diff} ngày</span>";
-                                                    } elseif ($diff == 0) {
-                                                        $daysLeftText = "<span class='text-warning small'>Hôm nay</span>";
-                                                    } else {
-                                                        $daysLeftText = "<span class='text-danger small'>Quá hạn " . abs($diff) . " ngày</span>";
-                                                    }
-                                                }
-                                            @endphp
-                                            @if ($list->app_status === 'approved' && user_can('estimate_standard_tracking'))
-                                                <form action="{{ route($estRoute . 'updatePromisedDate') }}" method="POST" class="d-flex flex-column promised-date-form">
-                                                    @csrf
-                                                    <input type="hidden" name="id" value="{{ $item->id }}">
-                                                    <div class="d-flex align-items-center mb-1">
-                                                        <input type="date" name="promised_date" class="form-control form-control-sm input-promised-date flex-grow-1" value="{{ $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('Y-m-d') : '' }}" data-route="{{ route($estRoute . 'updatePromisedDate') }}">
-                                                        <button type="button" class="btn btn-sm btn-link text-info p-1 ml-1 btn-promised-date-history position-relative" data-item-id="{{ $item->id }}" data-route="{{ route($estRoute . 'getPromisedDateHistory', $item->id) }}" title="Lịch sử ngày hẹn">
-                                                            <i class="fas fa-history"></i>
-                                                            @if ($item->history_count > 0)
-                                                                <span class="badge badge-danger badge-pill position-absolute promised-date-history-badge" style="top: -5px; right: -5px; font-size: 0.6rem; padding: 2px 4px;">{{ $item->history_count }}</span>
-                                                            @endif
-                                                        </button>
-                                                    </div>
-                                                    <div class="promised-date-days-left text-center">{!! $daysLeftText !!}</div>
-                                                </form>
+                                        <td data-order="{{ $item->expected_delivery_date }}">
+                                            @if ($item->expected_delivery_date)
+                                                <div class="text-primary font-weight-bold">{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</div>
+                                                @php
+                                                    $leadWarn = \App\Support\MaterialLeadTime::check(
+                                                        $list->created_at, $approvedAt ?? null,
+                                                        $item->expected_delivery_date, $item->category_lead_time_days
+                                                    );
+                                                @endphp
+                                                @if ($leadWarn)
+                                                    <span class="badge badge-danger mt-1 est-lead-warn" title="{{ \App\Support\MaterialLeadTime::message($leadWarn) }}">
+                                                        <i class="fas fa-exclamation-triangle mr-1"></i>Không kịp đặt hàng
+                                                        <br>cần {{ $leadWarn['lead_days'] }} ngày, còn {{ $leadWarn['available_days'] }} ngày
+                                                    </span>
+                                                @endif
                                             @else
-                                                <div class="text-center md-sub">
-                                                    {{ $item->promised_date ? \Carbon\Carbon::parse($item->promised_date)->format('d/m/Y') : 'Chưa có' }}
-                                                </div>
-                                                <div class="text-center">{!! $daysLeftText !!}</div>
+                                                <span class="md-empty">—</span>
                                             @endif
                                         </td>
+                                        {{-- Ngày hẹn đáp ứng: chỉ bộ phận mua hàng sửa, khi mở phiếu từ tab "Đơn dự trù đã được phê duyệt" --}}
+                                        @if ($purchaserView ?? false)
+                                            <td>
+                                                @include('pages.estimate.shared.promisedDates', ['editable' => $list->app_status === 'approved'])
+                                            </td>
+                                        @endif
                                         <td class="md-sub">
                                             {{ $item->updated_by ?: $item->created_by ?: '—' }}
                                             <br><small>{{ $item->created_at ? \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') : '' }}</small>
                                         </td>
-                                        @if ($canEditItems && user_can('estimate_standard_update'))
-                                            <td>
+                                        <td>
+                                            @if ($estCanEdit)
                                                 <div class="md-actions">
-                                                    <button type="button" class="btn btn-sm btn-warning btn-est-item-edit"
-                                                        title="Sửa"
+                                                    <button type="button" class="btn btn-sm btn-warning btn-est-item-edit" title="Sửa"
                                                         data-row="{{ json_encode([
                                                             'id' => $item->id,
                                                             'category_id' => $item->category_id,
@@ -279,6 +219,7 @@
                                                             'group_key' => $item->group_key,
                                                             'technical_information' => $item->technical_information,
                                                             'purpose' => $item->purpose,
+                                                            'expected_delivery_date' => $item->expected_delivery_date,
                                                             'amounts' => $item->amounts->map(fn($amount) => [
                                                                 'amount' => rtrim(rtrim(number_format((float) $amount->amount, 4, '.', ''), '0'), '.'),
                                                                 'unit_id' => $amount->unit_id,
@@ -288,10 +229,9 @@
                                                         <i class="fas fa-edit"></i>
                                                     </button>
 
-                                                    <form class="form-md-confirm d-inline"
-                                                        action="{{ route($estRoute . 'deleteItem') }}" method="POST"
+                                                    <form class="form-md-confirm d-inline" action="{{ route($estRoute . 'deleteItem') }}" method="POST"
                                                         data-title="Xoá chất chuẩn khỏi phiếu?"
-                                                        data-text="Chất chuẩn &quot;{{ $item->display_name }}&quot; và toàn bộ số lượng theo tháng của nó sẽ bị xoá khỏi phiếu {{ $list->code }}."
+                                                        data-text="Chất chuẩn &quot;{{ $item->display_name }}&quot; và toàn bộ số lượng theo tháng sẽ bị xoá khỏi phiếu {{ $list->code }}."
                                                         data-danger="1">
                                                         @csrf
                                                         <input type="hidden" name="id" value="{{ $item->id }}">
@@ -300,8 +240,11 @@
                                                         </button>
                                                     </form>
                                                 </div>
-                                            </td>
-                                        @endif
+                                            @endif
+                                            {{-- Hoàn thành / Huỷ mục đã duyệt (phòng đề nghị), xác nhận huỷ (bộ phận mua hàng) --}}
+                                            @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_standard_tracking'])
+                                            @include('pages.estimate.shared.itemChatButton', ['chatPermission' => 'estimate_standard_chat'])
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -309,8 +252,11 @@
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
+
+    @include('pages.estimate.shared.detailStickyHeader')
 @endsection
 
 @section('model')
@@ -320,4 +266,5 @@
     @endif
 
     @include('pages.estimate.shared.historyModal')
+    @include('pages.estimate.StandardEstimate.reject')
 @endsection

@@ -125,6 +125,11 @@
                                         $canIssue &&
                                         $isOwing &&
                                         in_array($it->status, ['pending', 'partial', 'issued']);
+
+                                    // Vật tư "Cần Hiệu Chuẩn Trước Khi Dùng": chỉ cấp được phần QA đã xác nhận đạt
+                                    $itCal = in_array($it->category_id, $calibrationCategoryIds ?? []);
+                                    $itCalState = $itCal ? ($calibrationStates[$it->id] ?? null) : null;
+                                    $itCalPassed = $itCalState && $itCalState['passed_total'] > 0.00005;
                                 @endphp
                                 <tr>
                                     <td>
@@ -255,7 +260,17 @@
                                             @endif
                                         @endif
 
-                                        @if ($canTopUp && user_can('export_material_issue'))
+                                        @if ($canTopUp && $itCal && !$itCalPassed)
+                                            <div class="md-sub small mt-1" style="color: #B45309;">
+                                                <i class="fas fa-ruler-combined mr-1"></i>
+                                                @if ($itCalState && $itCalState['pending'] > 0.00005)
+                                                    Đang chờ QA hiệu chuẩn (phiếu <b>{{ $itCalState['pending_code'] }}</b>) - đạt mới cấp phát được.
+                                                @else
+                                                    Vật tư cần hiệu chuẩn trước khi dùng - đề nghị hiệu chuẩn ở tab
+                                                    <a href="{{ route($expRoute . 'list', ['tab' => 'prepare']) }}"><b>Chờ Cấp Phát</b></a>, QA xác nhận đạt mới cấp phát.
+                                                @endif
+                                            </div>
+                                        @elseif ($canTopUp && user_can('export_material_issue'))
                                             @if ($hasLots)
                                                 <hr class="my-2">
                                                 <div class="font-weight-bold small mb-1"
@@ -280,7 +295,8 @@
                                                 $shortage = (float) ($plan['shortage'] ?? 0);
 
                                                 // Không có quyền điều chỉnh: khoá lô theo đề xuất, chỉ sửa được số lượng
-                                                $lotLocked = !user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::LOT_ADJUST_PERMISSION);
+                                                // Phần đạt hiệu chuẩn: khoá đúng mã xuất nhập đã hiệu chuẩn
+                                                $lotLocked = $itCalPassed || !user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::LOT_ADJUST_PERMISSION);
                                                 // Không có quyền điều chỉnh số lượng: khoá đúng số đề xuất
                                                 $amountLocked = !user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::AMOUNT_ADJUST_PERMISSION);
                                             @endphp
@@ -356,6 +372,22 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
+                {{-- Chỉ đúng người được chỉ định ở bước đang chờ mới thấy nút Đồng ý / Từ chối --}}
+                @if ($req->can_sign && user_can('export_material_approve'))
+                    @php $isLastStep = (int) $req->pending_sign->step_no >= (int) $req->sign_step_count; @endphp
+                    <button type="button" class="btn btn-outline-danger btn-req-reject" data-id="{{ $req->id }}" data-code="{{ $req->code }}">
+                        <i class="fas fa-times mr-1"></i> Từ chối
+                    </button>
+                    <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSign') }}" method="POST"
+                        data-require-password="1"
+                        data-title="Ký duyệt bước {{ $req->pending_sign->step_no }}/{{ $req->sign_step_count }}?"
+                        data-text="Đề nghị {{ $req->code }} {{ $isLastStep ? 'sẽ được duyệt và kho có thể cấp phát.' : 'sẽ chuyển tới người ký bước ' . ($req->pending_sign->step_no + 1) . '.' }}">
+                        @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-{{ $isLastStep ? 'stamp' : 'signature' }} mr-1"></i> Đồng ý
+                        </button>
+                    </form>
+                @endif
             </div>
         </div>
     </div>

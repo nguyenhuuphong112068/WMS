@@ -114,10 +114,12 @@
                         <div class="form-group col-md-4">
                             <label>Định Khu</label>
                             <select name="location_id"
+                                data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'all']) }}" data-zone-filter
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
-                                @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}"
+                                {{-- Gõ tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị old() --}}
+                                @foreach ($locations->where('id', old('location_id')) as $location)
+                                    <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
                                         {{ old('location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /

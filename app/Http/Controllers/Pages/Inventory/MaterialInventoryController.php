@@ -53,6 +53,12 @@ class MaterialInventoryController extends Controller
     /** Loại lưu trữ của định khu mà màn hình này quan tâm - xem locations.item_type. */
     private const LOCATION_TYPE = 'material';
 
+    /** Phiếu cách ly còn nằm trong kho (trạng thái MaterialQuarantineController) -> nhãn trên sơ đồ vị trí. */
+    private const QUARANTINE_STATES = [
+        'quarantined' => 'Chờ quyết định',
+        'removed' => 'Chờ huỷ',
+    ];
+
     public const STATES = [
         'in' => 'Còn hàng',
         'low' => 'Sắp hết',
@@ -79,7 +85,7 @@ class MaterialInventoryController extends Controller
             'summaries' => $this->stockByMaterial($datas),
             'balancings' => $this->balancingHistory($departmentId),
             'zones' => $zones,
-            'zoneMap' => $this->zoneMap($datas, $zones),
+            'zoneMap' => $this->zoneMap($datas, $zones, $this->quarantineZoneRows($departmentId, $period['to'])),
             // Tab KIỂM KÊ ĐỊNH KỲ - chu kỳ 1 tháng 1 lần, xem MaterialStocktakeController
             'stocktake' => MaterialStocktakeController::panel($departmentId),
             // Tab KHẢ DỤNG THÁNG TỚI - xem App\Support\MaterialAvailabilityForecast
@@ -468,8 +474,9 @@ class MaterialInventoryController extends Controller
             'lots' => $lots,
             'columns' => \App\Support\InventoryMovements::columns('material'),
             'labels' => [
-                'period_cancelled' => 'Loại bỏ trong kỳ',
-                'stock_category' => 'Tổng tồn vật tư',
+                'period_used' => 'Sử Dụng',
+                'period_cancelled' => 'Cách Ly/Huỷ',
+                'stock_category' => 'Tổng Tồn Vật Tư',
             ],
         ]);
 
@@ -523,6 +530,7 @@ class MaterialInventoryController extends Controller
                 'material_categories.technical_specification',
                 DepartmentMaterial::minStockColumn(),
                 'material_categories.classification',
+                'material_categories.purchasing_department',
                 'material_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'manufacturers.name as manufacturer_name',
@@ -781,6 +789,7 @@ class MaterialInventoryController extends Controller
                     'manufacturer_name' => $first->manufacturer_name,
                     'technical_specification' => $first->technical_specification,
                     'classification_name' => \App\Support\MaterialClassification::summary($first->classification),
+                    'classification_keys' => \App\Support\MaterialClassification::filterKeys($first->classification, $first->purchasing_department),
                     'unit' => $first->unit_short_name ?: $first->unit_name,
                     'imported' => (float) $rows->sum('imported'),
                     'balanced' => (float) $rows->sum('balanced'),
@@ -846,8 +855,12 @@ class MaterialInventoryController extends Controller
      * Chỉ đếm các mã CÒN TỒN (remaining > 0): sơ đồ trả lời "chỗ này đang có gì", mã đã
      * dùng hết không còn nằm ở đó nữa.
      */
-    private function zoneMap($datas, array $zones): array
+    private function zoneMap($datas, array $zones, $quarantineRows = null): array
     {
+        // Hàng cách ly / chờ huỷ đã trừ khỏi tồn của lô nhưng vẫn nằm vật lý ở khu Chờ Quyết
+        // Định / Loại Bỏ - đưa vào sơ đồ như một dòng tồn ở đúng vị trí đó
+        $datas = $datas->concat($quarantineRows ?? collect());
+
         $warehouses = $zones['warehouses']->keyBy('id');
         $shelves = $zones['shelves']->keyBy('id');
         $columns = $zones['columns']->keyBy('id');
@@ -1038,6 +1051,71 @@ class MaterialInventoryController extends Controller
         ];
     }
 
+    /**
+     * Hàng của phiếu cách ly CÒN MỞ (App\Http\Controllers\Pages\Export\MaterialQuarantineController)
+     * dựng thành dòng tồn cho sơ đồ vị trí: "Cách ly - Chờ quyết định" đứng ở pending_location_id,
+     * "Đã loại bỏ - chờ huỷ" đứng ở rejected_location_id. Số lượng phiếu đã trừ khỏi tồn của lô
+     * (dòng xuất cancel) nên không cộng trùng. Đã huỷ / trả về kho thì không còn nằm ở đó.
+     * Phiếu chưa gán định khu rơi vào khối "chưa xếp vị trí".
+     */
+    private function quarantineZoneRows(int $departmentId, string $to)
+    {
+        $locationOf = DB::raw("CASE WHEN material_quarantines.app_status = 'quarantined'"
+            .' THEN material_quarantines.pending_location_id ELSE material_quarantines.rejected_location_id END');
+
+        return DB::table('material_quarantines')
+            ->join('material_imports', 'material_quarantines.import_id', '=', 'material_imports.id')
+            ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'material_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
+            ->leftJoin('locations', 'locations.id', '=', $locationOf)
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            ->select(
+                'material_quarantines.code as quarantine_code',
+                'material_quarantines.app_status',
+                'material_quarantines.amount',
+                'material_imports.code',
+                'material_imports.category_id',
+                'material_imports.expired_date',
+                'material_categories.technical_specification',
+                'material_categories.classification',
+                'material_names.name as material_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                'locations.id as location_id',
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
+                'locations.color as location_color',
+                'locations.warehouse_id',
+                'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
+            ->where('material_quarantines.department_id', $departmentId)
+            ->where('material_quarantines.status_id', 1)
+            ->whereIn('material_quarantines.app_status', array_keys(self::QUARANTINE_STATES))
+            ->where('material_quarantines.created_at', '<=', $to.' 23:59:59')
+            ->get()
+            ->map(function ($row) {
+                $row->remaining = (float) $row->amount;
+                $row->state = $row->app_status === 'quarantined' ? 'quarantine' : 'rejected';
+                $row->state_label = self::QUARANTINE_STATES[$row->app_status];
+                // Mã phiếu cách ly đứng đầu dòng phụ để biết hàng này đi theo phiếu nào
+                $row->manufacturer_short_name = trim('Phiếu '.$row->quarantine_code.($row->manufacturer_short_name ? ' · '.$row->manufacturer_short_name : ''));
+
+                return $row;
+            });
+    }
+
     /** Một ô vị trí trên sơ đồ: đang chứa mã nào, cảnh báo gì, trạng thái để tô màu. */
     private function zoneNode($loc, $rows): array
     {
@@ -1064,6 +1142,8 @@ class MaterialInventoryController extends Controller
             // Màu nền của thẻ theo định khu (App\Support\ZoneType::badge()) - độc lập với
             // $state ở trên, vốn chỉ nói về tình trạng hàng đang đứng ở vị trí này.
             'zoneBadge' => \App\Support\ZoneType::badge($loc->id, $loc->zone_type ?? null, $loc->color ?? null),
+            // Loại định khu của ô - dùng cho bộ lọc "Loại định khu" trên sơ đồ ('' = chưa phân loại).
+            'zoneType' => isset(\App\Support\ZoneType::TYPES[$loc->zone_type ?? '']) ? $loc->zone_type : '',
             'stat' => [
                 'locations' => 1,
                 'filled' => $inStock->count() > 0 ? 1 : 0,

@@ -46,6 +46,7 @@
     */
     $dcHasErrors = $errors->getBag('dcCreateErrors')->any() || $errors->getBag('dcUpdateErrors')->any();
     $activeTab = session('activeTab') === 'department' || $dcHasErrors ? 'department' : 'company';
+    $activeTab = \App\Support\PageTabs::active('category_chemical', $activeTab);
 @endphp
 
 @section('mainContent')
@@ -53,6 +54,7 @@
         <div class="md-page">
 
             <ul class="nav cat-tabs" role="tablist">
+                @tab('category_chemical', 'company')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'company' ? 'active' : '' }}" id="tabCompanyLink"
                         data-toggle="pill" href="#tabCompany" role="tab">
@@ -61,6 +63,8 @@
                         <span class="cat-tab-count">{{ $datas->count() }}</span>
                     </a>
                 </li>
+                @endtab
+                @tab('category_chemical', 'department')
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'department' ? 'active' : '' }}" id="tabDepartmentLink"
                         data-toggle="pill" href="#tabDepartment" role="tab">
@@ -69,14 +73,18 @@
                         <span class="cat-tab-count">{{ $dcDatas->count() }}</span>
                     </a>
                 </li>
+                @endtab
             </ul>
 
             <div class="tab-content">
+                @tab('category_chemical', 'company')
                 <div class="tab-pane fade {{ $activeTab === 'company' ? 'show active' : '' }}" id="tabCompany"
                     role="tabpanel">
                     @include('pages.category.ChemicalCategory.dataTable')
                 </div>
+                @endtab
 
+                @tab('category_chemical', 'department')
                 <div class="tab-pane fade {{ $activeTab === 'department' ? 'show active' : '' }}" id="tabDepartment"
                     role="tabpanel">
                     @include('pages.category.DepartmentChemical.dataTable', [
@@ -89,6 +97,7 @@
                         'classificationCodes' => $classificationCodes,
                     ])
                 </div>
+                @endtab
             </div>
         </div>
     </div>

@@ -160,6 +160,71 @@ class ChemicalCompatibility
     }
 
     /**
+     * Badge cảnh báo ở bảng "Hoá Chất Của Phòng": với mỗi dòng đang hoạt động đã khai định khu,
+     * liệt kê hoá chất tương kỵ đang ở cùng phạm vi (scope) - tính một lượt cho cả bảng.
+     *
+     * @param  iterable  $rows  dòng chemical_department_categories (id, category_id, default_location_id, status_id)
+     * @return array<int, array{scope_label: string, conflicts: array}>  [id dòng => ...], chỉ dòng có tương kỵ
+     */
+    public static function conflictsByDepartmentRows(iterable $rows): array
+    {
+        $rows = collect($rows)->filter(fn ($row) => (int) $row->status_id === 1 && $row->default_location_id);
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $neighbours = self::neighbourIds($rows->pluck('default_location_id')->all());
+        $occupantsByLocation = self::occupantsByLocation(array_merge(...array_values($neighbours)), 0);
+
+        $categoryIds = $rows->pluck('category_id')->all();
+        foreach ($occupantsByLocation as $list) {
+            foreach ($list as $occupant) {
+                $categoryIds[] = $occupant->category_id;
+            }
+        }
+        $categories = self::categories($categoryIds);
+
+        $scopeLabel = self::scope()['label'];
+        $out = [];
+
+        foreach ($rows as $row) {
+            $categoryId = (int) $row->category_id;
+            $warnings = $categories[$categoryId]['warnings'] ?? [];
+
+            if (! self::comparableCodes($warnings)) {
+                continue;
+            }
+
+            $grouped = [];
+            foreach ($neighbours[(int) $row->default_location_id] ?? [] as $locationId) {
+                foreach ($occupantsByLocation[$locationId] ?? [] as $occupant) {
+                    if ($occupant->category_id !== $categoryId) {
+                        $grouped[$occupant->category_id] = true;
+                    }
+                }
+            }
+
+            $conflicts = [];
+            foreach (array_keys($grouped) as $otherId) {
+                $other = $categories[$otherId] ?? null;
+                $pairs = $other ? self::pairs($warnings, $other['warnings']) : [];
+
+                if ($pairs) {
+                    $conflicts[] = ['code' => $other['code'], 'chem_name' => $other['chem_name'], 'pairs' => $pairs];
+                }
+            }
+
+            if ($conflicts) {
+                usort($conflicts, fn ($a, $b) => strcmp($a['code'], $b['code']));
+                $out[(int) $row->id] = ['scope_label' => $scopeLabel, 'conflicts' => $conflicts];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Gắn cờ tương kỵ cho các dòng kết quả tìm định khu (Select2): dòng tương kỵ có
      * disabled = true + warning = câu giải thích, để người dùng không chọn được.
      *

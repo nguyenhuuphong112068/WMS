@@ -9,8 +9,9 @@
 | Tên route  : pages.export.<chứcNăng>.<action>
 */
 
-use App\Http\Controllers\Pages\Export\ChemicalDisposalController;
 use App\Http\Controllers\Pages\Export\ChemicalExportController;
+use App\Http\Controllers\Pages\Export\ChemicalQuarantineController;
+use App\Http\Controllers\Pages\Export\MaterialCalibrationController;
 use App\Http\Controllers\Pages\Export\MaterialExportController;
 use App\Http\Controllers\Pages\Export\MaterialQuarantineController;
 use App\Http\Controllers\Pages\Export\StandardExportController;
@@ -31,6 +32,8 @@ Route::prefix('/export')
             Route::get('history', 'history')->name('history');
             // Tra lô theo mã xuất nhập khi quét mã vạch trên nhãn, trả JSON cho form xuất
             Route::get('lookup', 'lookup')->name('lookup');
+            // Kiểm tra Số Lượng chạy ngầm khi gõ ở modal Sử Dụng Hoá Chất (tồn thật + 5%)
+            Route::get('checkAmount', 'checkAmount')->name('checkAmount');
             // Đề nghị chuyển hoá chất LIÊN PHÒNG BAN: A đề nghị -> B cấp phát (trừ tồn B) -> A nhận (tạo tồn A)
             // Danh mục + tồn kho của phòng được đề nghị, trả JSON cho picker chọn nhiều hoá chất
             Route::get('transferDepartmentStock', 'transferDepartmentStock')->name('transferDepartmentStock');
@@ -51,21 +54,15 @@ Route::prefix('/export')
         });
 
         /*
-        | HUỶ HOÁ CHẤT - bước 2 của nghiệp vụ huỷ bỏ.
-        | Màn hình nằm trong tab "Hoá chất chờ huỷ" của Sử Dụng Hoá Chất nên không có
-        | action index riêng; dữ liệu do ChemicalExportController::index() nạp sẵn.
+        | HOÁ CHẤT HỎNG - 3 bước: Cách ly chờ quyết định (bấm [Cách ly] ở Tồn Kho Hoá Chất, trừ tồn
+        | ngay, trả về kho được) -> Loại bỏ - Chờ huỷ -> Huỷ. Các bước sau nằm trong tab "Cách ly -
+        | Loại bỏ - Huỷ" của Sử Dụng Hoá Chất, dữ liệu do ChemicalExportController::index() nạp sẵn.
         */
-        Route::prefix('/chemicalDisposal')->name('chemicalDisposal.')->controller(ChemicalDisposalController::class)->group(function () {
+        Route::prefix('/chemicalQuarantine')->name('chemicalQuarantine.')->controller(ChemicalQuarantineController::class)->group(function () {
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
-            Route::post('addItems', 'addItems')->name('addItems');
-            Route::post('removeItem', 'removeItem')->name('removeItem');
-            Route::post('submit', 'submit')->name('submit');
             Route::post('decide', 'decide')->name('decide');
-            Route::post('complete', 'complete')->name('complete');
-            Route::post('deActive', 'deActive')->name('deActive');
-            // Trang in biểu mẫu QA/F/058-07, mở tab mới rồi Ctrl+P -> Lưu thành PDF
-            Route::get('print', 'print')->name('print');
+            Route::post('dispose', 'dispose')->name('dispose');
         });
 
         Route::prefix('/standardExport')->name('standardExport.')->controller(StandardExportController::class)->group(function () {
@@ -152,6 +149,17 @@ Route::prefix('/export')
             // Ký duyệt đề nghị liên phòng ban / VPP theo quy trình ở Dữ Liệu Gốc > Trình Ký Đề Nghị Liên Phòng Ban
             Route::post('transferSign', 'transferSign')->name('transferSign');
             Route::post('transferSignReject', 'transferSignReject')->name('transferSignReject');
+        });
+
+        /*
+        | HIỆU CHUẨN TRƯỚC KHI CẤP PHÁT - vật tư "Cần Hiệu Chuẩn Trước Khi Dùng": kho đề nghị hiệu chuẩn
+        | (giữ chỗ tồn) -> QA ký xác nhận Đạt / Không đạt -> phần đạt mới cấp phát được. Tab "Hiệu chuẩn"
+        | của Sử Dụng Vật Tư, dữ liệu do MaterialExportController::index() nạp sẵn.
+        */
+        Route::prefix('/materialCalibration')->name('materialCalibration.')->controller(MaterialCalibrationController::class)->group(function () {
+            Route::post('store', 'store')->name('store');
+            Route::post('confirm', 'confirm')->name('confirm');
+            Route::post('cancel', 'cancel')->name('cancel');
         });
 
         /*

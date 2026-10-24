@@ -326,7 +326,8 @@ class DepartmentMaterialController extends Controller
             $departmentId,
             (int) $request->unit_id,
             (array) $request->input('conversions', []),
-            $this->actor()
+            $this->actor(),
+            (array) $request->input('conversion_dirs', [])
         );
     }
 

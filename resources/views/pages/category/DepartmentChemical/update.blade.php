@@ -127,12 +127,12 @@
                                     <i class="fas fa-th mr-1"></i> Sơ đồ tương kỵ
                                 </button>
                             </div>
-                            <select name="default_location_id"
+                            <select name="default_location_id" data-zone-filter
                                 data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'chemical']) }}"
                                 class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
                                 @foreach ($locations as $location)
-                                    <option value="{{ $location->id }}"
+                                    <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
                                         {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
                                         {{ $location->warehouse_name ?: '—' }} /
                                         {{ $location->shelf_name ?: '—' }} /

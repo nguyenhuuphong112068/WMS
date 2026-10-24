@@ -34,6 +34,67 @@
         color: #94A3B8;
         font-weight: 500;
     }
+
+    /* Hoá chất tương kỵ đang nằm cùng phạm vi định khu (config chemical.incompatibility_scope) */
+    .dc-incompat {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        white-space: nowrap;
+        background: #FEF2F2;
+        color: #DC2626;
+        border: 1px solid #FCA5A5;
+        cursor: help;
+        transition: background 0.2s;
+    }
+
+    .dc-incompat:hover,
+    .dc-incompat.is-active {
+        background: #FEE2E2;
+        border-color: #DC2626;
+    }
+
+    .dc-incompat.is-active {
+        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.18);
+    }
+
+    /* Trạng thái đang lọc theo badge tương kỵ */
+    .dc-incompat-filter {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 6px 5px 12px;
+        border-radius: 999px;
+        border: 1px solid #FCA5A5;
+        background: #FEF2F2;
+        color: #B91C1C;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+
+    .dc-incompat-filter[hidden] {
+        display: none !important;
+    }
+
+    .dc-incompat-filter .btn {
+        border-radius: 999px;
+        padding: 1px 10px;
+        font-size: 0.75rem;
+        transition: transform 0.2s;
+    }
+
+    .dc-incompat-filter .btn:hover {
+        transform: translateY(-1px);
+    }
+
+    #dcTable tbody tr.dc-incompat-source > td {
+        background: #FEF2F2 !important;
+    }
 </style>
 
 <div class="card md-card">
@@ -50,6 +111,13 @@
                     data-target="#classifyGuideModal">
                     <i class="fas fa-info-circle mr-1"></i> Chú thích Phụ lục &amp; Nhóm
                 </button>
+                <span class="dc-incompat-filter" id="dcIncompatFilter" hidden>
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Tương kỵ với <b class="js-incompat-code"></b> (<span class="js-incompat-count"></span> mã)</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger js-incompat-clear">
+                        <i class="fas fa-times mr-1"></i>Bỏ lọc
+                    </button>
+                </span>
             </div>
 
         </div>
@@ -57,7 +125,7 @@
         @include('pages.shared.classificationFilter', ['clsTarget' => 'dcTable'])
 
         <div class="table-responsive">
-            <table id="dcTable" class="table table-bordered table-hover w-100 md-table">
+            <table id="dcTable" class="table table-bordered table-hover w-100 md-table" data-deferred>
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 55px">STT</th>
@@ -81,6 +149,7 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @deferredRows('dcTable')
                     @foreach ($datas as $row)
                         @php
                             // Nhóm NĐ 24/2026 suy tự động theo mã danh mục (không còn cột classification)
@@ -89,7 +158,7 @@
                             $shelfLife = $row->shelf_life_months ?? $row->category_shelf_life_months;
                             $storage = $row->storage_condition_name ?? $row->category_storage_condition_name;
                         @endphp
-                        <tr data-classification="{{ implode(',', $codes) }}">
+                        <tr data-classification="{{ implode(',', $codes) }}" data-cat-code="{{ $row->category_code }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td>
                                 <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
@@ -179,9 +248,24 @@
                             <td class="md-sub">
                                 @if ($row->location_code)
                                     <div class="font-weight-bold">
-                                        <span class="md-tag">{{ $row->location_code }}</span>
+                                        {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
                                     </div>
-                                    <div>{{ $dcPath($row) }}</div>
+                                    @if ($incompat = ($dcConflicts ?? [])[$row->id] ?? null)
+                                        @php
+                                            $incompatTitle = collect($incompat['conflicts'])->take(15)
+                                                ->map(fn ($c) => $c['code'] . ' ' . $c['chem_name'] . ': '
+                                                    . collect($c['pairs'])->map(fn ($p) => \App\Support\ChemicalCompatibility::shortLabel($p[0]) . ' × ' . \App\Support\ChemicalCompatibility::shortLabel($p[1]))->unique()->implode('; '))
+                                                ->implode("\n")
+                                                . (count($incompat['conflicts']) > 15 ? "\n… và " . (count($incompat['conflicts']) - 15) . ' hoá chất khác' : '');
+                                        @endphp
+                                        <span class="dc-incompat" role="button" tabindex="0"
+                                            title="{{ $incompatTitle }}&#10;(Bấm để lọc các mã liên quan)"
+                                            data-self="{{ $row->category_code }}"
+                                            data-codes="{{ collect($incompat['conflicts'])->pluck('code')->implode(',') }}">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            Tương kỵ cùng {{ mb_strtolower($incompat['scope_label']) }} ({{ count($incompat['conflicts']) }})
+                                        </span>
+                                    @endif
                                 @else
                                     <span class="md-empty">Chưa định khu</span>
                                 @endif
@@ -227,6 +311,7 @@
                                                     'storage_condition_id' => $row->storage_condition_id,
                                                     'default_location_id' => $row->default_location_id,
                                                     'default_location_id_text' => \App\Support\CategoryLookup::locationLabel($row, 'location_code'),
+                                                    'default_location_id_zone' => $row->location_zone_type ?? '',
                                                     'note' => $row->note,
                                                     'category_code' => $row->category_code,
                                                     'chem_name' => $row->chem_name,
@@ -257,8 +342,66 @@
                             </td>
                         </tr>
                     @endforeach
+                    @enddeferredRows
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+
+<script>
+    // Bấm badge "Tương kỵ cùng tầng": bảng chỉ còn mã đang xem + các mã tương kỵ với nó
+    document.addEventListener('DOMContentLoaded', function() {
+        var incompat = null; // {self: 'C00021', codes: {C00021: true, ...}}
+        var $chip = $('#dcIncompatFilter');
+
+        $.fn.dataTable.ext.search.push(function(settings, data, index, rowData) {
+            if (settings.nTable.id !== 'dcTable' || !incompat) return true;
+            // Dòng nạp sau (data-deferred) chưa có <tr> nên đọc thuộc tính từ dữ liệu dòng
+            var code = mdDeferred.rowAttr(rowData, settings.aoData[index].nTr, 'cat-code');
+            return !!incompat.codes[code];
+        });
+
+        function redraw() {
+            if (!$.fn.dataTable.isDataTable('#dcTable')) return;
+            var table = $('#dcTable').DataTable();
+            table.draw();
+
+            // Chỉ các dòng đã dựng <tr> (deferRender) - sau draw thì dòng đang lọc đều đã có
+            var nodes = table.rows().nodes().toArray().filter(Boolean);
+
+            $(nodes).removeClass('dc-incompat-source');
+            $('#dcTable .dc-incompat').removeClass('is-active');
+            if (incompat) {
+                $(nodes).filter('[data-cat-code="' + incompat.self + '"]').addClass('dc-incompat-source')
+                    .find('.dc-incompat').addClass('is-active');
+            }
+        }
+
+        function apply(self, list) {
+            if (incompat && incompat.self === self) return clear();
+            var codes = {};
+            codes[self] = true;
+            list.forEach(function(code) { if (code) codes[code] = true; });
+            incompat = { self: self, codes: codes };
+            $chip.find('.js-incompat-code').text(self);
+            $chip.find('.js-incompat-count').text(list.length);
+            $chip.prop('hidden', false);
+            redraw();
+        }
+
+        function clear() {
+            incompat = null;
+            $chip.prop('hidden', true);
+            redraw();
+        }
+
+        $(document).on('click keydown', '#dcTable .dc-incompat', function(e) {
+            if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            apply(String($(this).data('self')), String($(this).data('codes') || '').split(','));
+        });
+
+        $chip.on('click', '.js-incompat-clear', clear);
+    });
+</script>

@@ -1138,6 +1138,7 @@ class StandardInventoryController extends Controller
                 'suppliers.name as supplier_name',
                 'standard_imports.location_id',
                 'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
                 'locations.warehouse_id',
                 'locations.shelf_id',
                 'locations.column_id',
@@ -1500,12 +1501,18 @@ class StandardInventoryController extends Controller
     private function locationOptions(int $departmentId)
     {
         return DB::table('locations')
-            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type'])
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type', 'zone_type', 'color'])
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
             ->orderBy('code', 'asc')
-            ->get();
+            ->get()
+            // Màu dải đầu thẻ vị trí trên sơ đồ tab Theo định khu (inventory/shared/zoneGrid)
+            ->map(function ($loc) {
+                $loc->badge = \App\Support\ZoneType::badge($loc->id, $loc->zone_type, $loc->color);
+
+                return $loc;
+            });
     }
 
     /** Cộng dồn tồn của các mã ống chuẩn về từng chất chuẩn trong danh mục. */

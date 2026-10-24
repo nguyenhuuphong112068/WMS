@@ -30,7 +30,7 @@
                                         @foreach ($categories as $c)
                                             <option value="{{ $c->id }}"
                                                 {{ old('category_id') == $c->id ? 'selected' : '' }}>
-                                                {{ $c->material_name }} —
+                                                {{ $c->code }} - {{ $c->material_name }} —
                                                 {{ $c->manufacturer_short_name ?: $c->manufacturer_name }}
                                                 @if ($c->technical_specification)
                                                     ({{ $c->technical_specification }})
@@ -118,7 +118,7 @@
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
                                 @foreach ($quarantineLocations as $loc)
-                                    <option value="{{ $loc->id }}"
+                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}"
                                         {{ old('location_id') == $loc->id ? 'selected' : '' }}>
                                         {{ $loc->code }} — {{ $loc->warehouse_name }} /
                                         {{ $loc->shelf_name }} / {{ $loc->column_name }} / {{ $loc->tier_name }}

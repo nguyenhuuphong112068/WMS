@@ -77,7 +77,7 @@
                         @if ($isEstimate)
                             <div class="form-group col-md-7">
                                 <label>Tiêu Đề <span class="text-danger">*</span></label>
-                                <input type="text" name="title" maxlength="255" required
+                                <input type="text" name="title" maxlength="255" required list="prTitleOptions_{{ $type }}" autocomplete="off"
                                     class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
                                     value="{{ $old('title') }}" placeholder="VD: Dự trù vật tư bảo trì hằng tháng">
                             </div>
@@ -98,7 +98,7 @@
                         @elseif ($isExternal)
                             <div class="form-group col-md-7">
                                 <label>Tiêu Đề <span class="text-danger">*</span></label>
-                                <input type="text" name="title" maxlength="255" required
+                                <input type="text" name="title" maxlength="255" required list="prTitleOptions_{{ $type }}" autocomplete="off"
                                     class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
                                     value="{{ $old('title') }}" placeholder="VD: Vật tư bảo trì hằng tháng">
                             </div>
@@ -108,12 +108,7 @@
                                 <select name="to_department_id" required
                                     class="form-control cat-select {{ $bag->has('to_department_id') ? 'is-invalid' : '' }}">
                                     <option value="">-- Chọn phòng cấp phát --</option>
-                                    @foreach ($departments as $department)
-                                        <option value="{{ $department->id }}"
-                                            {{ (string) $old('to_department_id') === (string) $department->id ? 'selected' : '' }}>
-                                            {{ $department->name }}{{ $department->shortName ? ' (' . $department->shortName . ')' : '' }}
-                                        </option>
-                                    @endforeach
+                                    @include('layout.departmentOptions', ['departments' => $departments, 'selected' => $old('to_department_id')])
                                 </select>
                             </div>
                         @else
@@ -152,7 +147,7 @@
 
                             <div class="form-group col-md-7">
                                 <label>Tiêu Đề <span class="text-danger">*</span></label>
-                                <input type="text" name="title" maxlength="255" required
+                                <input type="text" name="title" maxlength="255" required list="prTitleOptions_{{ $type }}" autocomplete="off"
                                     class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
                                     value="{{ $old('title') }}" placeholder="VD: Vật tư bảo trì hằng tháng">
                             </div>

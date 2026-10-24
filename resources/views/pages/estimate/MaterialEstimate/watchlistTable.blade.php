@@ -42,7 +42,7 @@
         @if ($wlIsVpp)
             @perm('export_material_request')
                 <button type="button" class="btn btn-primary btn-sm btn-wl-vpp" disabled>
-                    <i class="fas fa-paper-plane mr-1"></i> Lập đề nghị VPP <span class="wl-count"></span>
+                    <i class="fas fa-paper-plane mr-1"></i> Lập đề nghị cấp phát VPP đến HC <span class="wl-count"></span>
                 </button>
             @endperm
         @else
@@ -177,7 +177,7 @@
                             </div>
                             <div class="md-sub">
                                 {{ $item->remembered_by ?: '—' }}
-                                <br><small>{{ $item->remembered_at ? \Carbon\Carbon::parse($item->remembered_at)->format('d/m/Y') : '' }}</small>
+                                <br><small>{{ $item->remembered_at ? \Carbon\Carbon::parse($item->remembered_at)->format('d/m/Y H:i') : '' }}</small>
                             </div>
                         @endif
                     </td>
