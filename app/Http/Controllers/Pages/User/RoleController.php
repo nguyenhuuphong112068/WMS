@@ -4,159 +4,19 @@ namespace App\Http\Controllers\Pages\User;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\PermissionMatrix;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 class RoleController extends Controller
 {
-    /**
-     * 3 model chính của kho + 1 nhóm quyền dùng chung (không gắn model nào).
-     * Thứ tự khai báo cũng là thứ tự hiển thị các băng lớn trên bảng.
-     */
-    private const MODELS = [
-        'common'   => ['label' => 'Quyền Chung', 'icon' => 'fa-layer-group'],
-        'material' => ['label' => 'Vật Tư', 'icon' => 'fa-box'],
-        'chemical' => ['label' => 'Hoá Chất', 'icon' => 'fa-flask'],
-        'standard' => ['label' => 'Chất Chuẩn', 'icon' => 'fa-vial'],
-    ];
-
     public function index()
     {
-        $roles = DB::table('roles')->orderBy('id', 'asc')->get();
-
-        // Toàn bộ quyền kèm tên nhóm chức năng (menu leftNAV)
-        $permissions = DB::table('permissions')
-            ->leftJoin('permission_groups', 'permissions.permission_group', '=', 'permission_groups.id')
-            ->select(
-                'permissions.id',
-                'permissions.name',
-                'permissions.display_name',
-                'permissions.description',
-                Schema::hasColumn('permissions', 'parent_id') ? 'permissions.parent_id' : DB::raw('NULL as parent_id'),
-                'permission_groups.name as group_name',
-                'permission_groups.sort_order',
-            )
-            ->orderBy('permission_groups.sort_order', 'asc')
-            ->orderBy('permissions.id', 'asc')
-            ->get();
-
-        // Gom quyền 2 cấp: model chính  ->  nhóm chức năng  ->  danh sách quyền
-        $tree = [];
-        foreach (self::MODELS as $key => $meta) {
-            $tree[$key] = ['label' => $meta['label'], 'icon' => $meta['icon'], 'groups' => []];
-        }
-
-        foreach ($permissions as $permission) {
-            $modelKey = $this->modelOf($permission->name);
-            $groupName = $permission->group_name ?: 'Khác';
-
-            // Nhóm "Dữ Liệu Gốc" tách tiếp theo loại dữ liệu gốc suy từ tên quyền
-            if (str_starts_with($permission->name, 'materData_')) {
-                $groupName = 'Dữ Liệu Gốc — ' . $this->materDataScopeLabel($permission->name);
-            }
-
-            $tree[$modelKey]['groups'][$groupName][] = $permission;
-        }
-
-        // Quyền con (parent_id) đứng ngay dưới quyền cha trong cùng nhóm
-        foreach ($tree as &$model) {
-            foreach ($model['groups'] as &$groupPermissions) {
-                $groupPermissions = $this->nestChildren($groupPermissions);
-            }
-        }
-        unset($model, $groupPermissions);
-
-        // Bỏ băng model không có quyền nào để bảng không lòi ra dòng trống
-        $tree = array_filter($tree, fn ($model) => !empty($model['groups']));
-
-        // Khoá "roleId-permissionId" để view tra nhanh trạng thái checkbox
-        $assigned = DB::table('role_permission')
-            ->get()
-            ->mapWithKeys(fn ($item) => [$item->role_id . '-' . $item->permission_id => true])
-            ->toArray();
-
         session()->put(['title' => 'DANH SÁCH NHÓM QUYỀN']);
 
-        return view('pages.user.role.list', [
-            'roles' => $roles,
-            'tree' => $tree,
-            'assigned' => $assigned,
-        ]);
-    }
-
-    /**
-     * Xếp quyền con ngay sau quyền cha (giữ thứ tự gốc của quyền cha), quyền con có cha
-     * nằm nhóm khác / không tồn tại thì giữ nguyên chỗ.
-     */
-    private function nestChildren(array $permissions): array
-    {
-        $ids = array_map(fn ($permission) => $permission->id, $permissions);
-        $children = [];
-
-        foreach ($permissions as $permission) {
-            if ($permission->parent_id && in_array($permission->parent_id, $ids)) {
-                $children[$permission->parent_id][] = $permission;
-            }
-        }
-
-        // Đệ quy để quyền nhiều tầng (vd. Trao đổi -> tab Theo dõi -> Xem trang) cũng hiện, depth để thụt lề
-        $ordered = [];
-        $append = function ($permission, int $depth) use (&$append, &$ordered, $children) {
-            $permission->depth = $depth;
-            $ordered[] = $permission;
-            foreach ($children[$permission->id] ?? [] as $child) {
-                $append($child, $depth + 1);
-            }
-        };
-
-        foreach ($permissions as $permission) {
-            if ($permission->parent_id && in_array($permission->parent_id, $ids)) {
-                continue;
-            }
-
-            $append($permission, 0);
-        }
-
-        return $ordered;
-    }
-
-    /**
-     * Suy ra model chính từ tên quyền.
-     * Quy ước tên quyền: <khuVực>_<model>_<hànhĐộng> (material / chemical / standard).
-     * Nhóm "Đánh Giá Hạn Dùng" (stability_*) chỉ áp dụng cho chất chuẩn.
-     */
-    private function modelOf(string $name): string
-    {
-        // Toàn bộ quyền "Dữ Liệu Gốc" nằm ở card "Quyền Chung", chia tiếp theo loại ở cấp nhóm
-        if (str_starts_with($name, 'materData_')) {
-            return 'common';
-        }
-        if (str_contains($name, '_material_') || str_starts_with($name, 'material_')) {
-            return 'material';
-        }
-        if (str_contains($name, '_chemical_') || str_starts_with($name, 'chemical_')) {
-            return 'chemical';
-        }
-        if (str_contains($name, '_standard_') || str_starts_with($name, 'standard_') || str_starts_with($name, 'stability_')) {
-            return 'standard';
-        }
-
-        return 'common';
-    }
-
-    /**
-     * Nhãn loại dữ liệu gốc, suy từ tên quyền materData_<scope>_<action>.
-     */
-    private function materDataScopeLabel(string $name): string
-    {
-        return match (true) {
-            str_contains($name, '_material_') => 'Vật Tư',
-            str_contains($name, '_chemical_') => 'Hoá Chất',
-            str_contains($name, '_standard_') => 'Chất Chuẩn',
-            default => 'Dùng Chung',
-        };
+        // roles, tree (model -> nhóm chức năng -> quyền), assigned ("roleId-permissionId")
+        return view('pages.user.role.list', PermissionMatrix::build());
     }
 
     /**

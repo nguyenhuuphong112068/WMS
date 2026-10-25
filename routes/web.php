@@ -17,6 +17,7 @@
 | loginHistory : nhóm menu "Lịch Sử Đăng Nhập" (Toàn hệ thống / Của tôi)
 | AuditTrial   : Audit Trail (nằm trong nhóm menu "Lịch Sử Đăng Nhập")
 | database     : nhóm menu "Cơ Sở Dữ Liệu" (Quản Trị - chỉ Admin)
+| userGuide    : nhóm menu "Hướng Dẫn Sử Dụng"
 | Notification : tiện ích dùng chung trên topNAV
 */
 
@@ -33,4 +34,5 @@ require __DIR__.'/UserRoute.php';
 require __DIR__.'/loginHistoryRoute.php';
 require __DIR__.'/AuditTrialRoute.php';
 require __DIR__.'/databaseRoute.php';
+require __DIR__.'/userGuideRoute.php';
 require __DIR__.'/NotificationRoute.php';

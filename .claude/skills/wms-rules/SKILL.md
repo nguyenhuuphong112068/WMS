@@ -1,6 +1,6 @@
 ---
 name: wms-rules
-description: Quy tắc bắt buộc khi code dự án WMS (Laravel Blade - Quản Lý Kho). Dùng skill này MỖI KHI tạo/sửa Controller, View Blade, Route, migration, đặt tên bảng CSDL, giao diện, màu sắc, khi thêm thư viện JS/CSS/font/icon hoặc plugin frontend, và khi tổ chức thư mục file trong dự án này. Bao gồm - chỉ dùng Query Builder trong Controller, CẤM dùng CDN vì server deploy không có internet (mọi thư viện phải tải về public/ và nạp qua asset()), quy tắc đặt tên bảng CSDL, bảng màu xanh dương nhạt, chuẩn giao diện chuyên nghiệp, cấm thêm div/p diễn giải thêm (hint/note) ở màn hình dataTable/list, và cấu trúc thư mục theo nhóm chức năng trên leftNAV.
+description: Quy tắc bắt buộc khi code dự án WMS (Laravel Blade - Quản Lý Kho). Dùng skill này MỖI KHI tạo/sửa Controller, View Blade, Route, migration, đặt tên bảng CSDL, giao diện, màu sắc, khi thêm thư viện JS/CSS/font/icon hoặc plugin frontend, và khi tổ chức thư mục file trong dự án này. Bao gồm - chỉ dùng Query Builder trong Controller, CẤM dùng CDN vì server deploy không có internet (mọi thư viện phải tải về public/ và nạp qua asset()), quy tắc đặt tên bảng CSDL, bảng màu xanh dương nhạt, chuẩn giao diện chuyên nghiệp, cấm thêm div/p diễn giải thêm (hint/note) ở màn hình dataTable/list, cấu trúc thư mục theo nhóm chức năng trên leftNAV, và BẮT BUỘC cập nhật Hướng Dẫn Sử Dụng (resources/views/pages/userGuide) ngay khi sửa bất kỳ chức năng nào người dùng nhìn thấy, kiểm tra bằng php artisan wms:user-guide-check.
 ---
 
 # Quy Tắc Chung Dự Án WMS (Quản Lý Kho)
@@ -297,3 +297,31 @@ $datas = DB::table('materials')
 - ✅ Giữ nguyên tiếng Anh cho: tên biến / hàm / class, lệnh terminal, tên route, tên cột CSDL, đoạn code, thông báo lỗi gốc của framework.
 - ✅ Thuật ngữ kỹ thuật phổ biến (controller, migration, route, view, commit...) được dùng xen trong câu tiếng Việt.
 - Tiêu đề, gạch đầu dòng, bảng trong câu trả lời cũng viết bằng tiếng Việt.
+
+---
+
+## 11. Hướng dẫn sử dụng phải luôn khớp với code
+
+Mỗi màn hình nghiệp vụ đều có nút **"?"** trên topNAV, dẫn tới đúng mục của **Hướng Dẫn Sử Dụng**
+(`resources/views/pages/userGuide/<khoá>/`). Vì vậy:
+
+**Bắt buộc:** khi tạo / sửa / xoá bất kỳ chức năng nào mà người dùng cuối nhìn thấy, cập nhật hướng dẫn **trong cùng lượt làm việc**
+theo skill `wms-user-guide`. Không chờ người dùng nhắc, không để sang "lần sau".
+
+| Thay đổi trong code | Phải sửa trong hướng dẫn |
+|---|---|
+| Thêm màn hình mới (route trên leftNAV) | Thêm mục vào `toc.php` của tài liệu cùng nhóm (`route`, `perm`, `path`) + file `sections/`. Nhóm chưa có tài liệu thì tạo tài liệu mới. Nút "?" tự nhận theo `route`. |
+| Thêm / đổi / xoá tab (`PageTabs`, id vùng nội dung) | Thêm / sửa / xoá mục tương ứng; cập nhật `'pane'` (id vùng nội dung của tab) và `'params' => ['tab' => ...]` |
+| Thêm trang con (chi tiết, lịch sử...) không tên `.list` | Khai vào `'helpRoutes'` của mục phù hợp nếu tên route không cùng nhóm với màn hình chính |
+| Đổi tên route | Sửa `'route'` / `'helpRoutes'` trong `toc.php` |
+| Đổi nhãn ô, nút, màu nút, placeholder, câu báo lỗi, `rules()` | Sửa bảng ô nhập, nút minh hoạ, bước thao tác, mục "Lỗi Thường Gặp" |
+| Đổi luồng nghiệp vụ (ký, duyệt, trạng thái, trừ / cộng tồn, công thức, giới hạn) | Sửa đoạn mô tả, các bước, callout của mọi mục nhắc tới luồng đó |
+| Thêm / đổi / xoá quyền | Sửa `'perm'` của mục và các câu "quyền ..." trong section. Bảng vai trò / ma trận quyền tự đọc CSDL, không sửa tay |
+| Xoá chức năng | Xoá mục, file section và mọi liên kết `#neo` trỏ tới nó |
+
+Cách làm:
+
+1. Tìm chỗ bị ảnh hưởng: grep tên route, tên quyền, nhãn nút / ô, câu báo lỗi trong `resources/views/pages/userGuide/`.
+2. Sửa nội dung theo code đang chạy (đọc lại controller / view, không viết theo trí nhớ), cập nhật `updated_at` của tài liệu trong `UserGuideController::GUIDES`.
+3. Chạy `php artisan wms:user-guide-check`: phải **0 lỗi**. Lệnh bắt route / quyền / file section không còn, id tab (`pane`) không còn trên màn hình, liên kết `#neo` hỏng; cảnh báo màn hình trên menu chưa có mục hướng dẫn.
+4. Trong báo cáo cuối lượt ghi rõ đã cập nhật mục hướng dẫn nào, hoặc ghi "không ảnh hưởng hướng dẫn" nếu thay đổi chỉ ở phần người dùng không thấy (refactor, tối ưu truy vấn...).
