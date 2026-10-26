@@ -49,8 +49,8 @@ class PageTabs
             'report' => 'Báo cáo nhập hoá chất',
         ]],
         'import_standard' => ['parent' => 'import_standard_view', 'tabs' => [
+            'check' => 'Nhập chất chuẩn',
             'book' => 'Sổ nhập chất chuẩn',
-            'check' => 'Chờ kiểm tra',
         ]],
 
         // ----- Sử Dụng -----
@@ -79,6 +79,7 @@ class PageTabs
             'book' => 'Sổ sử dụng chất chuẩn',
             'request' => 'Đề nghị cấp phát chuẩn nội bộ',
             'transfer' => 'Đề nghị cấp phát chuẩn liên phòng ban',
+            'quarantine' => 'Cách ly - Loại bỏ - Huỷ',
         ]],
 
         // ----- Tồn Kho -----
@@ -95,14 +96,19 @@ class PageTabs
             'zone' => 'Theo định khu',
             'expiring' => 'Cận hạn dùng',
             'internal' => 'Chưa có hạn nội bộ',
+            // Trước là màn hình riêng "Tồn - Đối Chiếu Ngưỡng" (cùng quyền xem trang)
+            'threshold' => 'Đối chiếu ngưỡng PL IV',
         ]],
-        'inventory_standard' => ['parent' => 'inventory_standard_view', 'tabs' => [
+        'inventory_standard' =>['parent' => 'inventory_standard_view', 'tabs' => [
             'code' => 'Theo mã ống chuẩn',
             'standard' => 'Theo chất chuẩn',
             'zone' => 'Theo định khu',
-            'expiring' => 'Hạn dùng sắp hết',
+            'expiring' => 'Cận hạn dùng',
             'internal' => 'Chưa có hạn nội bộ',
             'weight' => 'Kiểm soát khối lượng',
+            // Trước là nhóm menu "Đánh Giá Hạn Dùng" riêng - giữ nguyên quyền xem cũ của từng màn hình
+            'stability' => ['label' => 'Đánh giá hạn dùng CTC', 'permission' => 'stability_standard_view'],
+            'stabilityPlan' => ['label' => 'Kế hoạch đánh giá', 'permission' => 'stability_plan_view'],
         ]],
 
         // ----- Dự Trù -----

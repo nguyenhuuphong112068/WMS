@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'noi-bo', 'no' => 3, 'label' => 'Đề nghị sử dụng nội bộ'])
+
 <p>Nhật ký mọi lần vật tư rời kho của phòng: <b>Sử dụng</b> (cấp phát nội bộ), <b>Loại bỏ</b> (từ quy trình cách ly) và cấp
     phát liên phòng ban. Mỗi dòng ghi mã xuất nhập, vật tư, số lượng, mã phiếu đề nghị, mục đích, người thực hiện và thời gian.</p>
 

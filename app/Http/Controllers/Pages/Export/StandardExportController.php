@@ -18,8 +18,10 @@ use Illuminate\Validation\Rule;
 /**
  * SỬ DỤNG - SỬ DỤNG CHẤT CHUẨN
  *
- * Ghi nhận từng lần lấy chất chuẩn ra khỏi kho từ một ống chuẩn cụ thể:
- * sử dụng cho phép thử (type = export) hoặc huỷ bỏ (type = cancel).
+ * Ghi nhận từng lần lấy chất chuẩn ra khỏi kho từ một ống chuẩn cụ thể để sử dụng cho
+ * phép thử (type = export). Chất chuẩn hỏng / hết hạn KHÔNG lập phiếu "Loại bỏ" ở đây nữa
+ * mà đi quy trình Cách ly -> Loại bỏ - Chờ huỷ -> Huỷ (StandardQuarantineController): dòng
+ * type = cancel trong sổ là dòng trừ tồn do phiếu cách ly sinh ra (quarantine_id) hoặc dữ liệu cũ.
  *
  * Mã ống chuẩn không sinh mới - lấy đúng mã của phiếu nhập được xuất ra.
  * Phiếu chỉ khoá (deActive) chứ không xoá cứng; phiếu đã khoá không trừ tồn.
@@ -65,6 +67,9 @@ class StandardExportController extends Controller
         'cancel' => 'Loại bỏ',
     ];
 
+    /** Loại phiếu được chọn ở form Sử Dụng - "Loại bỏ" chỉ còn sinh từ phiếu cách ly chất chuẩn hỏng. */
+    private const FORM_TYPES = ['export'];
+
     /**
      * Trạng thái đề nghị chuyển liên phòng ban còn DỞ DANG - bộ lọc khoảng ngày luôn
      * giữ lại các đề nghị này dù đã ngoài khoảng lọc.
@@ -73,6 +78,9 @@ class StandardExportController extends Controller
 
     /** Trạng thái phiếu liên phòng ban CHƯA tới phòng nhận - ẩn khỏi danh sách "gửi đến". */
     private const TRANSFER_UNSENT_STATUSES = ['draft', 'canceled'];
+
+    /** Trạng thái phiếu liên phòng ban phòng nhận CÒN PHẢI cấp phát - tab con "Chờ xử lý" của card gửi đến. */
+    private const TRANSFER_ISSUE_STATUSES = ['pending', 'partial'];
 
     /** Đề nghị cấp phát chuẩn của Tổ còn DỞ DANG. */
     private const REQ_PENDING_STATUSES = ['pending', 'partial'];
@@ -106,8 +114,11 @@ class StandardExportController extends Controller
                 'standard_imports.batch_no as standard_batch_no',
                 'standard_imports.expired_date',
                 'standard_imports.group_code',
-                'groups.name as group_name'
+                'groups.name as group_name',
+                'quarantines.code as quarantine_code',
+                'quarantines.app_status as quarantine_status'
             )
+            ->leftJoin(StandardQuarantineController::TABLE.' as quarantines', self::TABLE.'.quarantine_id', '=', 'quarantines.id')
             ->where(self::TABLE.'.department_id', $departmentId)
             ->tap(ListRange::dateFilter(self::TABLE.'.created_at', $bookRange))
             ->tap(ListRange::search([
@@ -297,8 +308,12 @@ class StandardExportController extends Controller
 
         session()->put(['title' => 'SỬ DỤNG - SỬ DỤNG CHẤT CHUẨN']);
 
-        $activeTab = $request->input('tab');
-        if (!in_array($activeTab, ['book', 'request', 'transfer'])) {
+        // Chất chuẩn hỏng: tab "Cách ly - Loại bỏ - Huỷ" (StandardQuarantineController)
+        $quarantine = StandardQuarantineController::paneData($departmentId, $request);
+
+        // Không có ?tab= thì mở lại tab vừa thao tác (các action trả về ->with('activeTab', ...))
+        $activeTab = $request->input('tab', session('activeTab'));
+        if (!in_array($activeTab, ['book', 'request', 'transfer', 'quarantine'])) {
             $activeTab = 'book';
         }
 
@@ -319,6 +334,7 @@ class StandardExportController extends Controller
             'units' => $units,
             'checkers' => $this->checkerOptions($departmentId),
             'types' => self::TYPES,
+            'formTypes' => array_intersect_key(self::TYPES, array_flip(self::FORM_TYPES)),
             'standardGroups' => config('standard.groups'),
             'overIssuePercent' => (int) round(self::OVER_ISSUE_RATIO * 100),
             'adjustCounts' => $this->adjustCounts($departmentId),
@@ -327,10 +343,12 @@ class StandardExportController extends Controller
             'transferReceived' => $transfer['received'],
             'transferItems' => $transfer['items'],
             'transferBadgeCount' => $transfer['badgeCount'],
-            'transferSentRange' => $transfer['sentRange'],
-            'transferSentPerPage' => $transfer['sentPerPage'],
-            'transferReceivedRange' => $transfer['receivedRange'],
-            'transferReceivedPerPage' => $transfer['receivedPerPage'],
+            'transferSentDone' => $transfer['sentDone'],
+            'transferSentDoneRange' => $transfer['sentDoneRange'],
+            'transferSentDonePerPage' => $transfer['sentDonePerPage'],
+            'transferDone' => $transfer['done'],
+            'transferDoneRange' => $transfer['doneRange'],
+            'transferDonePerPage' => $transfer['donePerPage'],
             'transferDepartments' => $this->transferDepartmentOptions($departmentId),
             'transferTitles' => TitleSuggestions::recent(self::TRANSFER_REQUEST_TABLE, $departmentId),
             'transferOwnLocations' => $transferOwnLocations,
@@ -341,6 +359,16 @@ class StandardExportController extends Controller
             'bookPerPage' => $bookPerPage,
             'reqRange' => $reqRange,
             'reqPerPage' => $reqPerPage,
+            'quarantineRows' => $quarantine['rows'],
+            'quarantineRange' => $quarantine['range'],
+            'quarantineKeyword' => $quarantine['keyword'],
+            'quarantinePerPage' => $quarantine['perPage'],
+            'quarantineStatus' => $quarantine['status'],
+            'quarantineCounts' => $quarantine['counts'],
+            'quarantineBadge' => $quarantine['badge'],
+            'quarantinePendingLocations' => $quarantine['pendingLocations'],
+            'quarantineRejectedLocations' => $quarantine['rejectedLocations'],
+            'quarantineReturnLocations' => $quarantine['returnLocations'],
         ]);
     }
 
@@ -444,6 +472,7 @@ class StandardExportController extends Controller
                 'standard_names.name as standard_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
+                'units.unit_group',
                 'standard_imports.batch_no',
                 'standard_imports.expired_date as import_expired_date',
                 'locations.code as location_code',
@@ -498,6 +527,8 @@ class StandardExportController extends Controller
 
             // Chỉ hỏi khối lượng "Bì + Chuẩn" một lần: ống chưa từng xuất và chưa có số cân
             $item->is_first_use = ! $everUsed->has($item->import_id) && $item->gross_weight_before === null;
+            // Cân luôn ra khối lượng: ĐVT thể tích / đếm thì số cân ghi theo mg (App\Support\StandardWeight)
+            $item->weight_unit = \App\Support\StandardWeight::weightUnit($item->unit_group, $item->unit_short_name);
 
             return $item;
         });
@@ -1887,7 +1918,11 @@ class StandardExportController extends Controller
 
         $import = $this->findImport($request->import_id, $departmentId);
 
-        $validator = Validator::make($request->all(), $this->rules($departmentId), $this->messages());
+        $rules = $this->rules($departmentId);
+        // Lập mới chỉ được phiếu Sử dụng - chất chuẩn hỏng đi quy trình cách ly ở Tồn Kho Chất Chuẩn
+        $rules['type'] = ['required', 'in:'.implode(',', self::FORM_TYPES)];
+
+        $validator = Validator::make($request->all(), $rules, $this->messages());
         $this->checkImport($validator, $request, $import);
 
         if ($validator->fails()) {
@@ -1950,9 +1985,22 @@ class StandardExportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!');
         }
 
+        // Dòng loại bỏ sinh từ phiếu cách ly chỉ điều chỉnh qua phiếu cách ly, sửa ở đây làm tồn lệch phiếu
+        if (! empty($current->quarantine_id)) {
+            return redirect()->back()->with(
+                'error',
+                'Phiếu loại bỏ '.$current->code.' sinh từ phiếu cách ly chất chuẩn hỏng, không cập nhật được ở Sổ sử dụng. '
+                .'Điều chỉnh ở tab "Cách ly - Loại bỏ - Huỷ".'
+            );
+        }
+
         $import = $this->findImport($request->import_id, $departmentId);
 
-        $validator = Validator::make($request->all(), $this->rules($departmentId), $this->messages());
+        $rules = $this->rules($departmentId);
+        // Không đổi phiếu Sử dụng thành "Loại bỏ" được nữa; phiếu loại bỏ cũ giữ nguyên loại
+        $rules['type'] = ['required', Rule::in(array_unique(array_merge(self::FORM_TYPES, [$current->type])))];
+
+        $validator = Validator::make($request->all(), $rules, $this->messages());
         // Bỏ qua chính bản ghi đang sửa khi tính tồn, nếu không số lượng cũ bị trừ hai lần.
         // Giữ nguyên ống cũ thì không xét lại điều kiện hạn dùng / còn tồn, phiếu đã ghi rồi,
         // chỉ khi ĐỔI sang ống khác mới coi là một lần chọn mới.
@@ -2501,38 +2549,63 @@ class StandardExportController extends Controller
             ->select(self::TRANSFER_REQUEST_TABLE.'.*')
             ->orderBy(self::TRANSFER_REQUEST_TABLE.'.created_at', 'desc');
 
-        $sentRange = ListRange::of($request, 'tsent_');
-        $receivedRange = ListRange::of($request, 'trecv_');
+        /*
+        | Mỗi card (gửi đi / gửi đến) 2 tab con, mỗi tab một paginator riêng - cùng cách chia
+        | với Hoá Chất (ChemicalExportController::transferRequestsData):
+        | - Chờ xử lý   : luôn hiện đủ, không lọc ngày.
+        | - Đã hoàn thành: lọc theo ngày lập (tiền tố tsdone_ / tdone_).
+        */
+        $sentDoneRange = ListRange::of($request, 'tsdone_');
+        $doneRange = ListRange::of($request, 'tdone_');
 
-        $sent = $base()
+        $sentBase = fn () => $base()
             ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.to_department_id', '=', 'deparments.id')
             ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
-            ->where(self::TRANSFER_REQUEST_TABLE.'.department_id', $departmentId)
-            ->tap(ListRange::dateFilterKeepPending(
-                self::TRANSFER_REQUEST_TABLE.'.created_at',
-                $sentRange,
-                self::TRANSFER_REQUEST_TABLE.'.status',
-                self::TRANSFER_PENDING_STATUSES
-            ))
+            ->where(self::TRANSFER_REQUEST_TABLE.'.department_id', $departmentId);
+
+        // Phiếu gửi đi còn dở dang: chưa cấp xong HOẶC còn mục đã cấp đang chờ phòng mình nhận
+        $sentPendingWhere = fn ($query) => $query
+            ->whereIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_PENDING_STATUSES)
+            ->orWhereExists(fn ($sub) => $sub->selectRaw('1')
+                ->from(self::TRANSFER_ITEM_TABLE)
+                ->whereColumn(self::TRANSFER_ITEM_TABLE.'.transfer_request_id', self::TRANSFER_REQUEST_TABLE.'.id')
+                ->where(self::TRANSFER_ITEM_TABLE.'.active', 1)
+                ->where(self::TRANSFER_ITEM_TABLE.'.status', 'issued'));
+
+        $sent = $sentBase()
+            ->where($sentPendingWhere)
             ->paginate(ListRange::perPage($request, 'tsent_'), ['*'], ListRange::pageName('tsent_'))
             ->withQueryString();
 
-        $received = $base()
+        // Đã cấp đủ + nhận xong / từ chối / huỷ
+        $sentDone = $sentBase()
+            ->whereNot($sentPendingWhere)
+            ->tap(ListRange::dateFilter(self::TRANSFER_REQUEST_TABLE.'.created_at', $sentDoneRange))
+            ->paginate(ListRange::perPage($request, 'tsdone_'), ['*'], ListRange::pageName('tsdone_'))
+            ->withQueryString();
+
+        $receivedBase = fn () => $base()
             ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.department_id', '=', 'deparments.id')
             ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
             ->where(self::TRANSFER_REQUEST_TABLE.'.to_department_id', $departmentId)
             // Phòng nhận chỉ thấy phiếu đã gửi tới: Lưu tạm / huỷ (chỉ huỷ được khi còn Lưu tạm) là việc riêng của phòng đề nghị
-            ->whereNotIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_UNSENT_STATUSES)
-            ->tap(ListRange::dateFilterKeepPending(
-                self::TRANSFER_REQUEST_TABLE.'.created_at',
-                $receivedRange,
-                self::TRANSFER_REQUEST_TABLE.'.status',
-                self::TRANSFER_PENDING_STATUSES
-            ))
+            ->whereNotIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_UNSENT_STATUSES);
+
+        // Cần cấp phát: Chờ cấp phát / Cấp một phần
+        $received = $receivedBase()
+            ->whereIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_ISSUE_STATUSES)
             ->paginate(ListRange::perPage($request, 'trecv_'), ['*'], ListRange::pageName('trecv_'))
             ->withQueryString();
 
-        $requestIds = $sent->pluck('id')->merge($received->pluck('id'))->unique();
+        // Đã cấp đủ / từ chối
+        $done = $receivedBase()
+            ->whereNotIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_ISSUE_STATUSES)
+            ->tap(ListRange::dateFilter(self::TRANSFER_REQUEST_TABLE.'.created_at', $doneRange))
+            ->paginate(ListRange::perPage($request, 'tdone_'), ['*'], ListRange::pageName('tdone_'))
+            ->withQueryString();
+
+        $requestIds = $sent->pluck('id')->merge($sentDone->pluck('id'))
+            ->merge($received->pluck('id'))->merge($done->pluck('id'))->unique();
 
         $items = DB::table(self::TRANSFER_ITEM_TABLE)
             ->leftJoin('standard_categories', self::TRANSFER_ITEM_TABLE.'.category_id', '=', 'standard_categories.id')
@@ -2562,7 +2635,7 @@ class StandardExportController extends Controller
         */
         $pendingIssue = DB::table(self::TRANSFER_REQUEST_TABLE)
             ->where('to_department_id', $departmentId)
-            ->whereIn('status', ['pending', 'partial'])
+            ->whereIn('status', self::TRANSFER_ISSUE_STATUSES)
             ->count();
 
         $awaitingReceipt = DB::table(self::TRANSFER_ITEM_TABLE)
@@ -2579,13 +2652,15 @@ class StandardExportController extends Controller
 
         return [
             'sent' => $sent,
+            'sentDone' => $sentDone,
             'received' => $received,
+            'done' => $done,
             'items' => $items,
             'badgeCount' => $pendingIssue + $awaitingReceipt,
-            'sentRange' => $sentRange,
-            'sentPerPage' => ListRange::perPage($request, 'tsent_'),
-            'receivedRange' => $receivedRange,
-            'receivedPerPage' => ListRange::perPage($request, 'trecv_'),
+            'sentDoneRange' => $sentDoneRange,
+            'sentDonePerPage' => ListRange::perPage($request, 'tsdone_'),
+            'doneRange' => $doneRange,
+            'donePerPage' => ListRange::perPage($request, 'tdone_'),
         ];
     }
 

@@ -33,6 +33,7 @@
 
     /** Ngày hiển thị d/m/Y, trống thì gạch ngang. */
     $expDate = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—';
+    $expDateTime = fn($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y H:i') : '—';
 
     /**
      * Mã nhóm chuẩn (cột JSON standard_categories.groups) thành chuỗi "PRS,VKN"
@@ -67,6 +68,7 @@
 
 @section('model')
     @include('pages.export.StandardExport.historyModal')
+    @include('pages.export.StandardExport.quarantineModals')
     @include('pages.export.StandardExport.create')
     @include('pages.export.StandardExport.update')
     @include('pages.export.StandardExport.requestModal')

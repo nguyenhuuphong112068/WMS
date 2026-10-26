@@ -1,9 +1,9 @@
 {{--
 |--------------------------------------------------------------------------
-| ĐÁNH GIÁ HẠN DÙNG - CHẤT CHUẨN - CSS + JS dùng chung
+| ĐÁNH GIÁ HẠN DÙNG CTC - CSS + JS dùng chung
 |--------------------------------------------------------------------------
-| Được @include vào dataTable (màn hình danh sách) và detail (màn hình chi tiết một
-| phiếu) để hai trang cùng một giao diện, không lặp CSS ở hai nơi.
+| Được @include vào pane / plan (hai tab trên Tồn Kho Chất Chuẩn) và detail (trang chi
+| tiết một phiếu) để cùng một giao diện, không lặp CSS ở nhiều nơi.
 |
 | Kéo theo pages.materData.shared.assets để có sẵn: khung .md-page / .md-card, bảng
 | DataTables tiếng Việt, modal .md-modal, nút .btn-md-create / .btn-md-edit, form hỏi

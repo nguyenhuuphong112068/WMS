@@ -14,7 +14,7 @@
             </tr>
             <tr>
                 <td>Đã nhập mà không thấy trong tồn</td>
-                <td style="font-weight: 400">Ống còn <b>Chờ kiểm tra</b>. Vào tab <a href="#cho-kiem-tra">Chờ kiểm tra</a>.</td>
+                <td style="font-weight: 400">Ống còn <b>Chờ kiểm tra</b>. Vào tab <a href="#nhap-chuan">Nhập chất chuẩn</a> và xác nhận Đạt.</td>
             </tr>
             <tr>
                 <td>Không thấy ống khi ghi sử dụng</td>
@@ -26,7 +26,7 @@
             </tr>
             <tr>
                 <td>"Ống chuẩn đã hết hạn sử dụng"</td>
-                <td style="font-weight: 400">Chọn ống khác; ống hết hạn ghi phiếu <b>Loại bỏ</b>. Ống retest / check online thì cập nhật hạn mới trước.</td>
+                <td style="font-weight: 400">Chọn ống khác; ống hết hạn bấm <a href="#cach-ly">Cách ly</a> ở Tồn Kho. Ống retest / check online thì cập nhật hạn mới trước.</td>
             </tr>
             <tr>
                 <td>Không nhập được Khối lượng bì sau khi sử dụng</td>

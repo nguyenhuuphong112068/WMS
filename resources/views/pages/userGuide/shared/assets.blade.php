@@ -421,6 +421,45 @@
         font-size: 0.86rem;
     }
 
+    /* ---------- Liên kết từ một mục về sơ đồ đường đi chung (shared/flowMapLink) ---------- */
+    .ug-maplink {
+        --bc: var(--primary);
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        margin: 0 0 12px;
+        padding: 4px 12px 4px 5px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        font-size: 0.84rem;
+    }
+
+    .ug-maplink:hover {
+        color: var(--primary-dark);
+        text-decoration: none;
+        border-color: var(--primary);
+    }
+
+    .ug-maplink-no {
+        display: inline-grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--bc);
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 800;
+    }
+
+    .ug-maplink.k1 { --bc: #2E7D32; }
+    .ug-maplink.k2 { --bc: #1E5FA6; }
+    .ug-maplink.k3 { --bc: #C25E0A; }
+    .ug-maplink.k4 { --bc: #B3261E; }
+
     /* ---------- Trang danh sách hướng dẫn ---------- */
     .ug-cards {
         display: grid;

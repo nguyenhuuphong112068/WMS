@@ -4,9 +4,9 @@
 |--------------------------------------------------------------------------
 | HƯỚNG DẪN SỬ DỤNG - CHẤT CHUẨN
 |--------------------------------------------------------------------------
-| Module chất chuẩn trải trên Danh Mục, Nhập, Sử Dụng, Tồn Kho, Đánh Giá Hạn Dùng và Dự Trù.
+| Module chất chuẩn trải trên Danh Mục, Nhập, Sử Dụng, Tồn Kho (gồm Đánh giá hạn dùng CTC) và Dự Trù.
 | Mỗi mục là một file trong sections/, thường ứng với một tab (App\Support\PageTabs).
-| params['tab'] chỉ truyền cho màn hình đọc ?tab= trên URL: Sử Dụng, Dự Trù.
+| params['tab'] chỉ truyền cho màn hình đọc ?tab= trên URL: Sử Dụng, Dự Trù, Tồn Kho (2 tab đánh giá hạn dùng).
 */
 
 $approve = ['Có bước duyệt', 'is-warn'];
@@ -31,14 +31,14 @@ return [
             'keywords' => 'don vi tinh han dung sau khi mo ong nguong dinh khu'],
     ],
     'Nhập › Chất Chuẩn' => [
-        ['id' => 'nhap-chuan', 'file' => 'importBook', 'title' => 'Nhập Chất Chuẩn & Sổ Nhập', 'icon' => 'fas fa-dolly',
+        ['id' => 'nhap-chuan', 'file' => 'importCheck', 'title' => 'Nhập Chất Chuẩn & Kiểm Tra', 'icon' => 'fas fa-dolly',
+            'path' => 'Nhập › Chất Chuẩn › tab Nhập chất chuẩn',
+            'route' => 'pages.import.standardImport.list', 'pane' => 'impPaneCheck', 'perm' => 'import_standard_view', 'chips' => [$byDept],
+            'keywords' => 'ma ong chuan coa ham luong do am loai han dung kiem soat khoi luong chiet ong cho kiem tra biet tru dat khong dat'],
+        ['id' => 'so-nhap', 'file' => 'importBook', 'title' => 'Sổ Nhập Chất Chuẩn', 'icon' => 'fas fa-book',
             'path' => 'Nhập › Chất Chuẩn › tab Sổ nhập chất chuẩn',
-            'route' => 'pages.import.standardImport.list', 'pane' => 'impPaneBook', 'perm' => 'import_standard_view', 'chips' => [$byDept],
-            'keywords' => 'ma ong chuan coa ham luong do am loai han dung kiem soat khoi luong chiet ong in nhan'],
-        ['id' => 'cho-kiem-tra', 'file' => 'importCheck', 'title' => 'Chờ Kiểm Tra', 'icon' => 'fas fa-clipboard-check',
-            'path' => 'Nhập › Chất Chuẩn › tab Chờ kiểm tra',
-            'route' => 'pages.import.standardImport.list', 'pane' => 'impPaneCheck', 'perm' => 'import_standard_view',
-            'keywords' => 'biet tru dat khong dat'],
+            'route' => 'pages.import.standardImport.list', 'pane' => 'impPaneBook', 'params' => ['tab' => 'book'], 'perm' => 'import_standard_view',
+            'keywords' => 'in nhan dieu chinh khoa'],
     ],
     'Sử Dụng › Chất Chuẩn' => [
         ['id' => 'de-nghi-noi-bo', 'file' => 'request', 'title' => 'Đề Nghị & Cấp Phát Chuẩn Cho Tổ', 'icon' => 'fas fa-file-signature',
@@ -48,11 +48,15 @@ return [
         ['id' => 'so-su-dung', 'file' => 'use', 'title' => 'Ghi Sử Dụng & Sổ Sử Dụng', 'icon' => 'fas fa-book',
             'path' => 'Đề Nghị - Sử Dụng › Chất Chuẩn › tab Sổ sử dụng chất chuẩn',
             'route' => 'pages.export.standardExport.list', 'pane' => 'expPaneBook', 'params' => ['tab' => 'book'], 'perm' => 'export_standard_view',
-            'keywords' => 'phieu su dung loai bo khoi luong bi chuan san pham chi tieu'],
+            'keywords' => 'phieu su dung khoi luong bi chuan san pham chi tieu'],
         ['id' => 'lien-phong-ban', 'file' => 'transfer', 'title' => 'Đề Nghị Cấp Phát Liên Phòng Ban', 'icon' => 'fas fa-people-arrows',
             'path' => 'Đề Nghị - Sử Dụng › Chất Chuẩn › tab Đề nghị cấp phát chuẩn liên phòng ban',
             'route' => 'pages.export.standardExport.list', 'pane' => 'expPaneTransfer', 'params' => ['tab' => 'transfer'], 'perm' => 'export_standard_view',
             'keywords' => 'chuyen phong khac nhan tu choi nhan'],
+        ['id' => 'cach-ly', 'file' => 'quarantine', 'title' => 'Cách Ly - Loại Bỏ - Huỷ', 'icon' => 'fas fa-biohazard',
+            'path' => 'Đề Nghị - Sử Dụng › Chất Chuẩn › tab Cách ly - Loại bỏ - Huỷ',
+            'route' => 'pages.export.standardExport.list', 'pane' => 'expPaneQuarantine', 'params' => ['tab' => 'quarantine'], 'perm' => 'export_standard_view', 'chips' => [$sign],
+            'keywords' => 'ong hong het han loai bo cho huy tra ve kho cho quyet dinh oos'],
     ],
     'Tồn Kho › Chất Chuẩn' => [
         ['id' => 'ton-kho', 'file' => 'inventory', 'title' => 'Xem Tồn Kho & Cân Đối', 'icon' => 'fas fa-boxes',
@@ -60,22 +64,21 @@ return [
             'route' => 'pages.inventory.standardInventory.list', 'pane' => ['invPaneCode', 'invPaneChem', 'invPaneZone'], 'perm' => 'inventory_standard_view', 'chips' => [$byDept],
             'keywords' => 'ton dau ky cuoi ky am kho can doi'],
         ['id' => 'han-dung', 'file' => 'expiry', 'title' => 'Hạn Dùng: Retest, Check Online, Nội Bộ', 'icon' => 'fas fa-hourglass-half',
-            'path' => 'Tồn Kho › Chất Chuẩn › tab Hạn dùng sắp hết / Chưa có hạn nội bộ',
+            'path' => 'Tồn Kho › Chất Chuẩn › tab Cận hạn dùng / Chưa có hạn nội bộ',
             'route' => 'pages.inventory.standardInventory.list', 'pane' => ['invPaneExpiring', 'invPaneInternal'], 'perm' => 'inventory_standard_view',
             'keywords' => 'cap nhat han retest check online mo ong han noi bo'],
         ['id' => 'khoi-luong', 'file' => 'weight', 'title' => 'Kiểm Soát Khối Lượng', 'icon' => 'fas fa-balance-scale',
             'path' => 'Tồn Kho › Chất Chuẩn › tab Kiểm soát khối lượng',
             'route' => 'pages.inventory.standardInventory.list', 'pane' => 'invPaneWeight', 'perm' => 'inventory_standard_view',
             'keywords' => 'khoi luong bi gioi han sai lech bot roi bot min set nhan xet'],
-    ],
-    'Đánh Giá Hạn Dùng' => [
-        ['id' => 'danh-gia', 'file' => 'stability', 'title' => 'Đánh Giá Chuẩn Thứ Cấp', 'icon' => 'fas fa-flask',
-            'path' => 'Đánh Giá Hạn Dùng › Chuẩn Thứ Cấp',
-            'route' => 'pages.stabilityAssessment.standardStability.list', 'perm' => 'stability_standard_view',
-            'keywords' => 'phieu danh gia moc t0 t3 t6 dat khong dat dung danh gia'],
+        ['id' => 'danh-gia', 'file' => 'stability', 'title' => 'Đánh Giá Hạn Dùng CTC', 'icon' => 'fas fa-clipboard-list',
+            'path' => 'Tồn Kho › Chất Chuẩn › tab Đánh giá hạn dùng CTC',
+            'route' => 'pages.inventory.standardInventory.list', 'pane' => 'invPaneStability', 'params' => ['tab' => 'stability'],
+            'helpRoutes' => ['pages.inventory.standardStability.detail'], 'perm' => 'stability_standard_view',
+            'keywords' => 'chuan thu cap ctc phieu danh gia moc t0 t3 t6 dat khong dat dung danh gia dod'],
         ['id' => 'ke-hoach', 'file' => 'plan', 'title' => 'Kế Hoạch Đánh Giá', 'icon' => 'fas fa-calendar-alt',
-            'path' => 'Đánh Giá Hạn Dùng › Kế Hoạch Đánh Giá',
-            'route' => 'pages.stabilityAssessment.assessmentPlan.list', 'perm' => 'stability_plan_view',
+            'path' => 'Tồn Kho › Chất Chuẩn › tab Kế hoạch đánh giá',
+            'route' => 'pages.inventory.standardInventory.list', 'pane' => 'invPanePlan', 'params' => ['tab' => 'stabilityPlan'], 'perm' => 'stability_plan_view',
             'keywords' => 'den han qua han sap den han'],
     ],
     'Dự Trù › Chất Chuẩn' => [

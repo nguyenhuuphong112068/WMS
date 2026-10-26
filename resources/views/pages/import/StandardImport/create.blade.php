@@ -348,8 +348,8 @@
                                         <i class="fas fa-clipboard-list mr-1 text-success"></i> Lô đánh giá hạn dùng
                                     </label>
                                 </div>
-                                <small class="md-sub d-block mt-2">Chỉ ống được tick mới chọn được ở màn
-                                    <b>Đánh Giá Hạn Dùng</b>.</small>
+                                <small class="md-sub d-block mt-2">Chỉ ống được tick mới lập được phiếu ở tab
+                                    <b>Đánh giá hạn dùng CTC</b> của Tồn Kho Chất Chuẩn.</small>
                             </div>
                         </div>
                     </div>

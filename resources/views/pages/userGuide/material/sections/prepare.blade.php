@@ -1,3 +1,6 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'noi-bo', 'no' => 3, 'label' => 'Đề nghị sử dụng nội bộ'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'lien-phong-ban', 'no' => 2, 'label' => 'Đề nghị liên phòng ban'])
+
 <p>Nơi <b>kho</b> làm việc: liệt kê các dòng đề nghị đã duyệt (nội bộ, và liên phòng ban gửi tới phòng mình) còn phải cấp.
     Cấp phát là <b>xuất kho</b>: tồn bị trừ ngay và hệ thống tự ghi vào <a href="#so-cap-phat">Sổ cấp phát</a>.</p>
 

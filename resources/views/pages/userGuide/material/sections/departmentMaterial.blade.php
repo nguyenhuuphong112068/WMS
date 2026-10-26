@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+
 <p>Mỗi phòng tự khai <b>những vật tư phòng mình dùng</b> và <b>cách dùng riêng</b>: đơn vị tính, ngưỡng tồn, chỗ để.
     Chỉ vật tư đã khai ở tab này mới <b>nhập kho</b> và <b>đề nghị nội bộ</b> được ở phòng.</p>
 

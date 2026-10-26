@@ -6,13 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Support\ActiveIngredientThreshold;
 use App\Support\CompanyContext;
 use App\Support\MixtureHazardThreshold;
+use App\Support\PageTabs;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
  * TỒN - ĐỐI CHIẾU NGƯỠNG PHỤ LỤC IV NĐ 24/2026/NĐ-CP
  *
- * Màn hình CHỈ ĐỌC. Phạm vi cộng tồn gói trong CÔNG TY của phòng ban đang chọn
+ * Tab "Đối chiếu ngưỡng PL IV" của màn hình Tồn Kho Hoá Chất (nạp qua pane()), CHỈ ĐỌC.
+ * Phạm vi cộng tồn gói trong CÔNG TY của phòng ban đang chọn
  * (App\Support\CompanyContext::currentId()) - chỉ các phòng ban thuộc công ty đó:
  *   - NHÓM 9 (PL IV Bảng A): từng hoạt chất được danh mục hoá chất tham chiếu - tổng tồn
  *     quy ra kg (× % hàm lượng) so với active_ingredients.threshold_kg.
@@ -26,10 +28,25 @@ use Illuminate\Support\Facades\DB;
  */
 class ThresholdReconciliationController extends Controller
 {
+    /** Màn hình riêng cũ - nay là tab "Đối chiếu ngưỡng PL IV" của Tồn Kho Hoá Chất. */
     public function index()
     {
-        session()->put(['title' => 'TỒN - ĐỐI CHIẾU NGƯỠNG']);
+        return redirect()->route('pages.inventory.chemicalInventory.list', ['tab' => 'threshold']);
+    }
 
+    /**
+     * HTML nội dung tab "Đối chiếu ngưỡng PL IV" - tab nạp bằng AJAX ở lần mở đầu tiên để
+     * phần tính ngưỡng toàn công ty không làm chậm các tab tồn còn lại.
+     */
+    public function pane()
+    {
+        abort_unless(PageTabs::can('inventory_chemical', 'threshold'), 403);
+
+        return view('pages.inventory.ThresholdReconciliation.pane', $this->tabData());
+    }
+
+    private function tabData(): array
+    {
         // Phạm vi đối chiếu gói trong công ty của phòng ban đang chọn: chỉ cộng tồn của
         // các phòng ban thuộc công ty này.
         $companyId = CompanyContext::currentId();
@@ -148,7 +165,7 @@ class ThresholdReconciliationController extends Controller
                 ? ActiveIngredientThreshold::LEVEL_WARN
                 : ActiveIngredientThreshold::LEVEL_OK);
 
-        return view('pages.inventory.ThresholdReconciliation.list', [
+        return [
             'rows' => $rows,
             'companyName' => CompanyContext::name($companyId),
             'summary' => [
@@ -200,7 +217,7 @@ class ThresholdReconciliationController extends Controller
                 })
                 ->orderBy('name')
                 ->pluck('name'),
-        ]);
+        ];
     }
 
     /**

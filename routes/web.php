@@ -10,7 +10,6 @@
 | import       : nhóm menu "Nhập"
 | export       : nhóm menu "Sử Dụng"
 | inventory    : nhóm menu "Tồn"
-| stabilityAssessment : nhóm menu "Đánh Giá Hạn Dùng"
 | estimate     : nhóm menu "Dự Trù"
 | statistic    : nhóm menu "Thống Kê"
 | User        : nhóm menu "Phân Quyền"
@@ -27,7 +26,6 @@ require __DIR__.'/categoryRoute.php';
 require __DIR__.'/importRoute.php';
 require __DIR__.'/exportRoute.php';
 require __DIR__.'/inventoryRoute.php';
-require __DIR__.'/stabilityAssessmentRoute.php';
 require __DIR__.'/estimateRoute.php';
 require __DIR__.'/statisticRoute.php';
 require __DIR__.'/UserRoute.php';

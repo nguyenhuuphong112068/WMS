@@ -16,6 +16,8 @@ $byDept = ['Theo phòng ban đang chọn', ''];
 return [
     'Bắt đầu' => [
         ['id' => 'tong-quan', 'file' => 'overview', 'title' => 'Tổng Quan & Vòng Đời Vật Tư', 'icon' => 'fas fa-compass'],
+        ['id' => 'so-do-chung', 'file' => 'flowMap', 'title' => 'Sơ Đồ Đường Đi Phiếu Vật Tư', 'icon' => 'fas fa-project-diagram',
+            'keywords' => 'ban do bieu do luong quy trinh duong di trang thai phieu du tru de nghi lien phong ban vpp cach ly ton kho tang giam'],
         ['id' => 'khai-niem-chung', 'file' => 'concepts', 'title' => 'Khái Niệm & Thao Tác Chung', 'icon' => 'fas fa-hand-pointer',
             'keywords' => 'ma xuat nhap qr ton kha dung fefo fifo mat khau ky dien tu tab'],
         ['id' => 'phan-quyen', 'file' => 'permissions', 'title' => 'Quyền Truy Cập', 'icon' => 'fas fa-user-shield'],

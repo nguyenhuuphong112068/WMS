@@ -33,6 +33,8 @@
             </div>
         </div>
 
+        @include('pages.category.shared.approvalFilter', ['apfTarget' => 'mdTable'])
+
         <div class="table-responsive">
             <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                 <thead>
@@ -67,6 +69,7 @@
                             $catCodeStatus = $row->status_id == 0 ? 'locked' : ($row->app_status === 'approved' ? 'approved' : 'pending');
                         @endphp
                         <tr data-classification="{{ $classKeys }}"
+                            data-approval="{{ $row->status_id == 0 ? 'locked' : ($row->app_status ?: 'pending') }}"
                             data-purchasing="{{ $row->purchasing_department ? 'purchasing_department:' . $row->purchasing_department : '' }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td><span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span></td>

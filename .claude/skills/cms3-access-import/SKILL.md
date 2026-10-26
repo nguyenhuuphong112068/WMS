@@ -18,6 +18,10 @@ Script nằm ở `.claude/skills/cms3-access-import/scripts/`. Thư mục dữ l
 | 2 | `php scripts/2_categories.php <D> [--dry]` | manufacturers, chemical_categories, units, warehouses→locations, chemical_department_categories |
 | 3 | `php scripts/3_stock.php <D> [--dry]` | suppliers, chemical_imports (+ histories) |
 | 4 | `php scripts/4_review.php <D>` | không - CSV rà soát |
+| 5 | `php scripts/5_compare.php <D>` rồi `python scripts/5_compare_xlsx.py <D> "%USERPROFILE%\Desktop\DoiChieu_DanhMucHoaChat_WMS_CMS3.xlsx"` | không - Excel đối chiếu mã C ↔ mã H (mỗi mã H 1 dòng, so Tên/CAS/NSX/Loại/Trạng thái/Nhóm/Cảnh báo/ĐVT-hạn dùng-định khu QC1, QC2) + sheet mã nghi ngờ (bước 4) + hoạt chất tạo mới |
+
+- Excel có công thức (COUNTIF, SUMPRODUCT): máy này không có LibreOffice (recalc.py của skill xlsx lỗi AF_UNIX trên Windows) → tính lại bằng Excel 2016 qua COM: `$x=New-Object -ComObject Excel.Application; $wb=$x.Workbooks.Open($f); $x.CalculateFull(); $wb.Save(); $x.Quit()`, rồi kiểm lỗi bằng openpyxl `data_only=True`.
+- Gọi `export_access.ps1 -Departments QC1,QC2` qua `-File` thì mảng đến thành 1 chuỗi → script đã tự tách (lỗi cũ: "JOIN expression not supported").
 
 - **Luôn chạy `--dry` trước** (cả transaction rollback), đọc số liệu + CSV báo cáo, rồi mới chạy thật.
 - **Sao lưu trước khi chạy thật**: `C:\xampp\mysql\bin\mysqldump.exe -uroot wms chem_names chem_name_active_ingredient chem_name_mixture_hazard_category active_ingredients active_ingredient_classifications manufacturers units chemical_categories chemical_category_histories chemical_department_categories warehouses shelves columns tiers locations chemical_imports chemical_import_histories suppliers datamaster_histories > <D>\backup.sql`

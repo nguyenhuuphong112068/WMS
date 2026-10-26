@@ -6,6 +6,6 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Người kiểm tra hoá chất cấm phải có vai trò <b>Quản Lý Kho Hoá Chất</b> trong phòng. Màn hình
-        <b>Ngưỡng Tồn Trữ PL IV</b> hiện với người có quyền Xem Tồn Kho Hoá Chất.</div>
+    <div>Người kiểm tra hoá chất cấm phải có vai trò <b>Quản Lý Kho Hoá Chất</b> trong phòng. Tab
+        <b>Đối chiếu ngưỡng PL IV</b> của Tồn Kho Hoá Chất hiện với người có quyền xem tab đó (quyền con của Xem Tồn Kho Hoá Chất).</div>
 </div>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
 use App\Support\DepartmentStandard;
+use App\Support\StandardWeight;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -55,8 +56,19 @@ class StandardInventoryController extends Controller
     /** Hạn dùng còn dưới ngần này ngày là "Sắp hết hạn". */
     private const NEAR_EXPIRY_DAYS = 30;
 
-    /** Hạn áp dụng rơi vào trong ngần này tháng thì vào tab "Sắp hết hạn". */
+    /** Hạn áp dụng rơi vào trong ngần này tháng thì vào tab "Cận Hạn Dùng". */
     private const EXPIRING_SOON_MONTHS = 6;
+
+    /**
+     * Mốc lọc nhanh trong tab "Cận Hạn Dùng" (như Tồn Kho Hoá Chất): hạn áp dụng <= hôm
+     * nay + mốc (kể cả đã quá hạn). Ngày chặn tính ở server để khớp days_to_effective_expiry.
+     */
+    private const EXPIRING_FILTERS = [
+        '3m' => ['label' => '≤ 3 tháng', 'months' => 3],
+        '1m' => ['label' => '≤ 1 tháng', 'months' => 1],
+        '2w' => ['label' => '≤ 2 tuần', 'days' => 14],
+        '1w' => ['label' => '≤ 1 tuần', 'days' => 7],
+    ];
 
     /** Tồn còn dưới ngần này so với lượng nhập ban đầu là "Sắp hết". */
     private const LOW_STOCK_RATIO = 0.2;
@@ -104,6 +116,12 @@ class StandardInventoryController extends Controller
 
         $datas = $this->stockByCode($departmentId, $period['from'], $period['to']);
 
+        // Hai tab Đánh giá hạn dùng CTC / Kế hoạch đánh giá (trước là nhóm menu riêng) - chỉ truy vấn khi được xem tab
+        $stabilityController = app(StandardStabilityController::class);
+        $stability = \App\Support\PageTabs::can('inventory_standard', 'stability')
+            ? $stabilityController->tabData($departmentId)
+            : null;
+
         session()->put(['title' => 'TỒN - TỒN KHO CHẤT CHUẨN']);
 
         return view('pages.inventory.StandardInventory.list', [
@@ -119,9 +137,41 @@ class StandardInventoryController extends Controller
             'period' => $period,
             'nearExpiryDays' => self::NEAR_EXPIRY_DAYS,
             'expiringSoonMonths' => self::EXPIRING_SOON_MONTHS,
+            'expiringFilters' => $this->expiringFilters(),
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
             'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
+            // Nút [Cách ly] (bước 1 quy trình chất chuẩn hỏng): tồn HÔM NAY của từng ống + định khu Chờ Quyết Định
+            'quarantineRemaining' => \App\Http\Controllers\Pages\Export\StandardQuarantineController::remainingMap($departmentId),
+            'quarantinePendingLocations' => \App\Http\Controllers\Pages\Export\StandardQuarantineController::zoneLocations(
+                $departmentId,
+                \App\Http\Controllers\Pages\Export\StandardQuarantineController::PENDING_ZONE
+            ),
+            'stability' => $stability,
+            // Phiếu đánh giá còn hiệu lực theo ống, gắn nhãn tiến độ trên bảng "Theo mã ống chuẩn"
+            'stabilityByImport' => $stability ? StandardStabilityController::byImport($stability['datas']) : [],
+            'stabilityPlan' => \App\Support\PageTabs::can('inventory_standard', 'stabilityPlan')
+                ? $stabilityController->planData($request, $departmentId)
+                : null,
+            // Cách ly xong quay lại đúng tab đã bấm (Theo mã ống chuẩn / Cận Hạn Dùng)
+            'activeTab' => array_key_exists((string) $request->input('tab', session('activeTab')), \App\Support\PageTabs::PAGES['inventory_standard']['tabs'])
+                ? (string) $request->input('tab', session('activeTab'))
+                : null,
         ]);
+    }
+
+    /** Mốc lọc của tab "Cận Hạn Dùng" kèm ngày chặn (Y-m-d) tính từ hôm nay. */
+    private function expiringFilters(): array
+    {
+        $today = now()->startOfDay();
+
+        return collect(self::EXPIRING_FILTERS)
+            ->map(fn ($filter) => [
+                'label' => $filter['label'],
+                'until' => isset($filter['months'])
+                    ? $today->copy()->addMonthsNoOverflow($filter['months'])->format('Y-m-d')
+                    : $today->copy()->addDays($filter['days'])->format('Y-m-d'),
+            ])
+            ->all();
     }
 
     /**
@@ -1109,6 +1159,7 @@ class StandardInventoryController extends Controller
                 'standard_imports.code',
                 'standard_imports.category_id',
                 'standard_imports.group_code',
+                'standard_imports.stability_batch',
                 'standard_imports.amount',
                 'standard_imports.imported_date',
                 'standard_imports.expired_date',
@@ -1129,12 +1180,15 @@ class StandardInventoryController extends Controller
                 'standard_categories.version as category_version',
                 'standard_categories.cas_no',
                 'standard_categories.groups',
+                'standard_categories.density',
                 DepartmentStandard::shelfLifeColumn(),
                 DepartmentStandard::minStockColumn(),
                 'standard_names.name as standard_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
+                'units.unit_group',
+                'units.factor_to_base as unit_factor',
                 'suppliers.name as supplier_name',
                 'standard_imports.location_id',
                 'locations.code as location_code',
@@ -1244,38 +1298,24 @@ class StandardInventoryController extends Controller
                 $row->shelf_life_months = (int) ($row->shelf_life_months ?? 0);
                 $row->can_internal_expiry = $row->shelf_life_months > 0;
 
+                // KSKL - công thức ở App\Support\StandardWeight: KL thực = Bì+Chuẩn - Bì sau dùng,
+                // độ lệch chỉ tính khi đã cân bì sau dùng (ống đang dùng dở thì chưa có KL thực)
                 $row->ghkl = 0;
-                $row->deviation = 0;
+                $row->deviation = null;
+                $row->weight_actual = null;
+                $row->weight_status = null;
+                $row->weight_unit = StandardWeight::weightUnit($row->unit_group, $row->unit_short_name);
                 if ($row->weight_controlled) {
-                    $quicach = $row->imported;
-                    $unit = strtolower(trim($row->unit_short_name ?: $row->unit_name));
-                    if ($unit === 'g' || $unit === 'ml') {
-                        $quicach *= 1000;
-                    }
+                    $row->ghkl = StandardWeight::limit($row->standard_form, (float) $row->imported, $row->unit_group, $row->unit_factor);
 
-                    if ($row->standard_form === 'Dạng Bột Rời') {
-                        if ($quicach < 10) $row->ghkl = 50;
-                        elseif ($quicach <= 100) $row->ghkl = 60;
-                        else $row->ghkl = 70;
-                    } elseif ($row->standard_form === 'Dạng Bột Mịn') {
-                        if ($quicach < 10) $row->ghkl = 20;
-                        elseif ($quicach <= 100) $row->ghkl = 30;
-                        else $row->ghkl = 50;
-                    } elseif ($row->standard_form === 'Dạng Sệt') {
-                        if ($quicach < 10) $row->ghkl = 10;
-                        elseif ($quicach <= 100) $row->ghkl = 20;
-                        else $row->ghkl = 50;
-                    }
-
-                    $klThuc = $row->imported;
-                    $soLuongXuat = $row->used;
-                    if ($unit === 'g' || $unit === 'ml') {
-                        $klThuc *= 1000;
-                        $soLuongXuat *= 1000;
-                    }
-                    if ($soLuongXuat != 0) {
-                        $row->deviation = round(abs(($klThuc - $soLuongXuat) / $soLuongXuat) * 100, 1);
-                    }
+                    [$row->weight_actual, $row->weight_status] = StandardWeight::actual(
+                        $row->gross_weight_before,
+                        $row->tare_weight_after,
+                        $row->unit_group,
+                        $row->unit_factor,
+                        $row->density
+                    );
+                    $row->deviation = StandardWeight::deviation($row->weight_actual, (float) $row->used);
                 }
 
                 /*

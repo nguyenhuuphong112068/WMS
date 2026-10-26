@@ -2,7 +2,7 @@
     $bag = $errors->getBag('updateErrors');
 @endphp
 
-<div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
+<div class="modal fade md-modal" id="ssaUpdateModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
@@ -69,7 +69,7 @@
 @if ($bag->any())
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            $('#updateModal').modal('show');
+            $('#ssaUpdateModal').modal('show');
         });
     </script>
 @endif

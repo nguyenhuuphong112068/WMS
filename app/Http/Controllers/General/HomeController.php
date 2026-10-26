@@ -438,6 +438,7 @@ class HomeController extends Controller
         'material_calibration' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Chờ QA hiệu chuẩn'],
         'material_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Vật tư hỏng chờ quyết định'],
         'chemical_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Hoá chất hỏng chờ quyết định'],
+        'standard_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Chất chuẩn hỏng chờ quyết định'],
         'category' => ['group' => 'data', 'actor' => 'sign', 'label' => 'Danh mục chờ duyệt'],
         'master_data' => ['group' => 'data', 'actor' => 'sign', 'label' => 'Dữ liệu gốc chờ duyệt'],
     ];
@@ -520,6 +521,7 @@ class HomeController extends Controller
             $this->transferSignReviews(),
             $this->quarantineReviews(),
             $this->chemicalQuarantineReviews(),
+            $this->standardQuarantineReviews(),
             $this->calibrationReviews(),
             $this->categoryReviews(),
             $this->masterDataReviews(),
@@ -947,6 +949,42 @@ class HomeController extends Controller
         return $rows;
     }
 
+    /** Phiếu cách ly chất chuẩn hỏng của phòng chưa có quyết định Loại bỏ / Trả về kho. */
+    private function standardQuarantineReviews(): array
+    {
+        $departmentId = $this->departmentId();
+
+        if ($departmentId <= 0 || ! user_can('export_standard_quarantine_decide')) {
+            return [];
+        }
+
+        $records = DB::table('standard_quarantines as q')
+            ->leftJoin('standard_imports as i', 'q.import_id', '=', 'i.id')
+            ->leftJoin('standard_categories as c', 'i.category_id', '=', 'c.id')
+            ->leftJoin('standard_names as n', 'c.chem_names_id', '=', 'n.id')
+            ->select('q.id', 'q.code', 'q.created_at', 'i.code as import_code', 'n.name as standard_name')
+            ->where('q.department_id', $departmentId)
+            ->where('q.status_id', 1)
+            ->where('q.app_status', 'quarantined')
+            ->get();
+
+        $rows = [];
+
+        foreach ($records as $record) {
+            $rows[] = $this->reviewRow(
+                'standard_quarantine',
+                'cc',
+                $record->code,
+                $record->standard_name,
+                $record->import_code,
+                $record->created_at,
+                route('pages.export.standardExport.list', ['tab' => 'quarantine', 'qstatus' => 'quarantined'])
+            );
+        }
+
+        return $rows;
+    }
+
     /**
      * Phiếu đề nghị hiệu chuẩn vật tư chờ QA xác nhận (App\Support\MaterialCalibration): mọi phòng QA
      * người dùng vào được và có quyền xác nhận ở đó; bấm phiếu tự chuyển sang phòng QA.
@@ -1032,7 +1070,7 @@ class HomeController extends Controller
                     $record->item_name,
                     null,
                     $record->updated_at ?: $record->created_at,
-                    route($route)
+                    route($route, ['app_status' => 'pending'])
                 );
             }
         }

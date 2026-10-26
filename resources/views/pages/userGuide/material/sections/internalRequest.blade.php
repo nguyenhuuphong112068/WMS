@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'noi-bo', 'no' => 3, 'label' => 'Đề nghị sử dụng nội bộ'])
+
 <p>Vật tư <b>bắt buộc</b> phải có đề nghị được ký duyệt trước khi kho cấp phát. Đề nghị nội bộ chia 3 tab theo nguồn gốc:</p>
 <ul>
     <li><b>Đề Nghị Theo Định Kỳ</b>: hệ thống tự tạo từ <a href="#danh-sach-chu-ky">danh sách nội bộ theo chu kỳ</a>; không lập tay ở tab này.</li>

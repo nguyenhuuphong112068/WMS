@@ -2,8 +2,11 @@
 |--------------------------------------------------------------------------
 | TỒN - Ô "HẠN DÙNG" CỦA MỘT ỐNG CHUẨN
 |--------------------------------------------------------------------------
-| Dùng chung cho tab "Theo mã ống chuẩn", "Hạn dùng dưới N tháng" và "Chưa có
-| hạn nội bộ". Nhận: ['row' => $row, 'countdown' => true|false].
+| Dùng chung cho tab "Theo mã ống chuẩn", "Cận Hạn Dùng" và "Chưa có
+| hạn nội bộ". Nhận: ['row' => $row, 'countdown' => true|false, 'inline' => true|false].
+|
+| inline = true (tab "Theo mã ống chuẩn"): gọn một dòng như Tồn Kho Hoá Chất - số ngày
+| còn / quá hạn để ở tooltip, ngày tô đỏ khi đã quá hạn.
 |
 | - check online -> badge cam "Check online"
 | - retest       -> ngày retest + badge xanh "Retest"
@@ -15,6 +18,10 @@
 --}}
 @php
     $showCountdown = $countdown ?? true;
+    $inlineMode = $inline ?? false;
+    $expDays = $row->days_to_expiry !== null && $row->remaining > 0 ? (int) $row->days_to_expiry : null;
+    $expTitle = $expDays === null ? '' : ($expDays < 0 ? 'Quá ' . abs($expDays) . ' ngày' : 'Còn ' . $expDays . ' ngày');
+    $expDateCls = $expDays !== null && $expDays < 0 ? 'text-danger font-weight-bold' : '';
     $expCount = $invExpiryUpdateCount[$row->id] ?? 0;
     $expRow = [
         'import_id' => $row->id,
@@ -43,6 +50,20 @@
             <i class="fas fa-globe"></i> Check online
         </span>
     @endperm
+@elseif ($inlineMode)
+    <span class="{{ $expDateCls }}" @if ($expTitle) title="{{ $expTitle }}" @endif>{{ $invDate($row->expired_date) }}</span>
+    @if ($invIsRetest($row))
+        @perm('inventory_standard_expiryUpdate')
+            <span class="badge badge-info inv-expiry-badge ml-1" role="button"
+                title="Hạn retest do NSX công bố. Bấm để cập nhật sau khi kiểm nghiệm lại."
+                data-row="{{ json_encode($expRow) }}">
+                Retest
+                @if ($expCount > 0)<span class="inv-expiry-count">{{ $expCount }}</span>@endif
+            </span>
+        @else
+            <span class="badge badge-info ml-1" title="Hạn retest do NSX công bố">Retest</span>
+        @endperm
+    @endif
 @elseif ($invIsRetest($row))
     <div class="font-weight-bold">{{ $invDate($row->expired_date) }}</div>
     @perm('inventory_standard_expiryUpdate')

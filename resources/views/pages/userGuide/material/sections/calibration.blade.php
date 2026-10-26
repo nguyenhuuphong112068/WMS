@@ -1,3 +1,6 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'noi-bo', 'no' => 3, 'label' => 'Đề nghị sử dụng nội bộ'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'cach-ly', 'no' => 4, 'label' => 'Cách ly - Loại bỏ - Huỷ'])
+
 <p>Dành cho vật tư có phân loại <b>Cần Hiệu Chuẩn Trước Khi Dùng = Có</b>. Chỉ phần đã được <b>QA xác nhận Đạt</b> mới cấp
     phát được, đúng mã xuất nhập đã hiệu chuẩn và cho đúng dòng đề nghị đó.</p>
 

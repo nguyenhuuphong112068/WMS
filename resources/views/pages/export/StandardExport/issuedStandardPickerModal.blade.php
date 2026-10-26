@@ -100,7 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 product_name: $btn.data('product') || '',
                 testing: $btn.data('testing') || '',
                 weight_controlled: $btn.data('weight-controlled'),
-                is_first_use: $btn.data('first-use')
+                is_first_use: $btn.data('first-use'),
+                weight_unit: $btn.data('weight-unit')
             });
         }
 

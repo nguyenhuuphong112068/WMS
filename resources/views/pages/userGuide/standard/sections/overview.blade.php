@@ -14,7 +14,7 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">2</span>
         <b>Nhập kho</b>
-        <a href="#nhap-chuan">Nhập ống</a> → <a href="#cho-kiem-tra">kiểm tra Đạt</a> mới vào tồn
+        <a href="#nhap-chuan">Nhập ống</a> → <a href="#nhap-chuan">kiểm tra Đạt</a> mới vào tồn
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">3</span>

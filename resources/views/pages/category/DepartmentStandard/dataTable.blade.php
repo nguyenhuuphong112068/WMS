@@ -51,7 +51,7 @@
         @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'dsTable'])
 
         <div class="table-responsive">
-            <table id="dsTable" class="table table-bordered table-hover w-100 md-table">
+            <table id="dsTable" class="table table-bordered table-hover w-100 md-table" data-deferred>
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 55px">STT</th>
@@ -71,6 +71,7 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @deferredRows('dsTable')
                     @foreach ($datas as $row)
                         @php
                             $dsCodes = $sdGroupsOf($row->groups);
@@ -218,6 +219,7 @@
                             </td>
                         </tr>
                     @endforeach
+                    @enddeferredRows
                 </tbody>
             </table>
         </div>

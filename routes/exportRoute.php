@@ -15,6 +15,7 @@ use App\Http\Controllers\Pages\Export\MaterialCalibrationController;
 use App\Http\Controllers\Pages\Export\MaterialExportController;
 use App\Http\Controllers\Pages\Export\MaterialQuarantineController;
 use App\Http\Controllers\Pages\Export\StandardExportController;
+use App\Http\Controllers\Pages\Export\StandardQuarantineController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
 
@@ -59,6 +60,18 @@ Route::prefix('/export')
         | Loại bỏ - Huỷ" của Sử Dụng Hoá Chất, dữ liệu do ChemicalExportController::index() nạp sẵn.
         */
         Route::prefix('/chemicalQuarantine')->name('chemicalQuarantine.')->controller(ChemicalQuarantineController::class)->group(function () {
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('decide', 'decide')->name('decide');
+            Route::post('dispose', 'dispose')->name('dispose');
+        });
+
+        /*
+        | CHẤT CHUẨN HỎNG - 3 bước như hoá chất: Cách ly chờ quyết định (bấm [Cách ly] ở Tồn Kho Chất
+        | Chuẩn, trừ tồn ngay, trả về kho được) -> Loại bỏ - Chờ huỷ -> Huỷ. Các bước sau nằm trong tab
+        | "Cách ly - Loại bỏ - Huỷ" của Sử Dụng Chất Chuẩn, dữ liệu do StandardExportController::index() nạp sẵn.
+        */
+        Route::prefix('/standardQuarantine')->name('standardQuarantine.')->controller(StandardQuarantineController::class)->group(function () {
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('decide', 'decide')->name('decide');

@@ -615,7 +615,7 @@
                             {{-- Đánh giá hạn dùng: mốc chưa làm, đã quá hạn hoặc đến hạn trong ít ngày tới --}}
                             <div class="tab-pane fade" id="tabAssessment" role="tabpanel">
                                 @forelse ($assessmentAlerts as $item)
-                                    <a href="{{ route('pages.stabilityAssessment.standardStability.detail', ['id' => $item['list_id']]) }}"
+                                    <a href="{{ route('pages.inventory.standardStability.detail', ['id' => $item['list_id']]) }}"
                                         class="dash-item">
                                         <div class="item-icon"><i class="{{ $item['icon'] }}"></i></div>
                                         <div class="item-body">
@@ -658,7 +658,7 @@
                                 đánh giá: {{ $assessDueDays }} ngày
                             </span>
                             <a class="dash-link js-foot-link" data-tab="#tabAssessment"
-                                href="{{ route('pages.stabilityAssessment.assessmentPlan.list') }}" style="display: none">
+                                href="{{ route('pages.inventory.standardInventory.list', ['tab' => 'stabilityPlan']) }}" style="display: none">
                                 Mở Kế Hoạch Đánh Giá <i class="fas fa-arrow-right ml-1"></i>
                             </a>
                             <a class="dash-link js-foot-link" data-tab="#tabExpiry,#tabLowStock"

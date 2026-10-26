@@ -4,9 +4,9 @@
 |--------------------------------------------------------------------------
 | HƯỚNG DẪN SỬ DỤNG - HOÁ CHẤT
 |--------------------------------------------------------------------------
-| Module hoá chất trải trên Danh Mục, Nhập, Sử Dụng, Tồn Kho (kèm Ngưỡng Tồn Trữ PL IV) và
+| Module hoá chất trải trên Danh Mục, Nhập, Sử Dụng, Tồn Kho (kèm tab Đối chiếu ngưỡng PL IV) và
 | Dự Trù. Mỗi mục là một file trong sections/, thường ứng với một tab (App\Support\PageTabs).
-| params['tab'] chỉ truyền cho màn hình đọc ?tab= trên URL: Nhập, Sử Dụng, Dự Trù.
+| params['tab'] chỉ truyền cho màn hình đọc ?tab= trên URL: Nhập, Sử Dụng, Dự Trù, Tồn Kho.
 */
 
 $approve = ['Có bước duyệt', 'is-warn'];
@@ -80,8 +80,8 @@ return [
             'route' => 'pages.inventory.chemicalInventory.list', 'pane' => ['invPaneExpiring', 'invPaneInternal'], 'perm' => 'inventory_chemical_view',
             'keywords' => 'mo nap han ap dung het han'],
         ['id' => 'nguong-pl-iv', 'file' => 'threshold', 'title' => 'Ngưỡng Tồn Trữ PL IV', 'icon' => 'fas fa-exclamation-triangle',
-            'path' => 'Tồn Kho › Ngưỡng Tồn Trữ PL IV',
-            'route' => 'pages.inventory.thresholdReconciliation.list', 'perm' => 'inventory_chemical_view', 'chips' => [$byCompany],
+            'path' => 'Tồn Kho › Hoá Chất › tab Đối chiếu ngưỡng PL IV',
+            'route' => 'pages.inventory.chemicalInventory.list', 'pane' => 'invPaneThreshold', 'params' => ['tab' => 'threshold'], 'perm' => 'inventory_chemical_view', 'chips' => [$byCompany],
             'keywords' => 'phu luc iv bang a bang b nhom 9 nhom 10 ke hoach phong ngua ung pho su co'],
     ],
     'Dự Trù › Hoá Chất' => [

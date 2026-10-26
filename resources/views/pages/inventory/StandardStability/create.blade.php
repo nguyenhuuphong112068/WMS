@@ -37,7 +37,7 @@
         ->implode('');
 @endphp
 
-<div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
+<div class="modal fade md-modal" id="ssaCreateModal" tabindex="-1" role="dialog">
     {{-- Form cao nên không dùng modal-dialog-centered: căn giữa mà nội dung dài hơn màn
          hình thì phần trên bị cắt, không kéo lên xem lại được. --}}
     <div class="modal-dialog ssa-modal-wide" role="document">
@@ -267,7 +267,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var $modal = $('#createModal');
+        var $modal = $('#ssaCreateModal');
         var $body = $modal.find('.ssa-items-body');
         var critOptions = @json($ssaCriteriaOptions);
 
@@ -447,6 +447,15 @@
             previewDues();
         });
 
+        /*
+        | Nút "Lập phiếu" trên dòng ống chuẩn của bảng Tồn Kho mang sẵn data-import-id: chọn
+        | luôn ống đó (chạy sau JS dùng chung của .btn-md-create - đã reset form và mở modal).
+        */
+        $(document).on('click', '.btn-md-create[data-modal="#ssaCreateModal"]', function() {
+            $modal.find('.ssa-import-select').val(String($(this).data('import-id') || '')).trigger('change');
+            previewImport();
+        });
+
         initCriteria($body);
         previewImport();
         previewDues();
@@ -456,7 +465,7 @@
 @if ($bag->any())
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            $('#createModal').modal('show');
+            $('#ssaCreateModal').modal('show');
         });
     </script>
 @endif

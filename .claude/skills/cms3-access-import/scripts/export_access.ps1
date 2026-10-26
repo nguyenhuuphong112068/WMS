@@ -23,6 +23,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Gọi qua -File thì "QC1,QC2" đến dưới dạng 1 chuỗi -> tách lại
+$Departments = @($Departments | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $copy = Join-Path $OutDir 'CMS_copy.accdb'
 Copy-Item $Source $copy -Force

@@ -20,7 +20,8 @@
                         <div class="form-group col-md-3">
                             <label class="required font-weight-bold text-primary">Loại Phiếu</label>
                             <div class="exp-types mt-1">
-                                @foreach ($types as $value => $label)
+                                {{-- Chỉ còn "Sử dụng": chất chuẩn hỏng đi quy trình Cách ly ở Tồn Kho Chất Chuẩn --}}
+                                @foreach ($formTypes as $value => $label)
                                     <label class="exp-type {{ old('type', 'export') == $value ? 'is-checked' : '' }}">
                                         <input type="radio" name="type" class="radio-exp-type"
                                             value="{{ $value }}"
@@ -201,7 +202,7 @@
                                     class="form-control js-decimal {{ $bag->has('gross_weight_before') ? 'is-invalid' : '' }}"
                                     value="{{ old('gross_weight_before') }}" placeholder="Cân trước khi dùng">
                                 <div class="input-group-append">
-                                    <span class="input-group-text exp-unit-name bg-light">---</span>
+                                    <span class="input-group-text exp-weight-unit bg-light">---</span>
                                 </div>
                             </div>
                             @if ($bag->has('gross_weight_before'))
@@ -401,6 +402,8 @@
 
             $('#createModal .exp-remaining').text(data.remaining !== undefined ? data.remaining : '—');
             $('#createModal .exp-unit-name').text(data.unit || '');
+            // Số cân luôn là khối lượng: chuẩn ĐVT ml cân theo mg (App\Support\StandardWeight)
+            $('#createModal .exp-weight-unit').text(data.weight_unit || data.unit || '');
             
             $('#create_import_placeholder').addClass('d-none');
             $('#create_import_display').removeClass('d-none');
@@ -623,6 +626,7 @@
                                 data-return-standard="${item.return_standard == 1 || item.return_standard === true ? 1 : 0}"
                                 data-weight-controlled="${item.weight_controlled == 1 ? 1 : 0}"
                                 data-first-use="${item.is_first_use ? 1 : 0}"
+                                data-weight-unit="${item.weight_unit || item.unit_short_name || ''}"
                                 data-expired="${item.import_expired_date ? item.import_expired_date.substring(0,10) : ''}">
                                 Chọn
                             </button>
@@ -672,7 +676,8 @@
                         product_name: item.product_name || '',
                         testing: criteria,
                         weight_controlled: item.weight_controlled,
-                        is_first_use: item.is_first_use
+                        is_first_use: item.is_first_use,
+                        weight_unit: item.weight_unit
                     });
                 }
             });

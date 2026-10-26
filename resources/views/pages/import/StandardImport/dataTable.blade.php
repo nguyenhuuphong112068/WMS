@@ -1,5 +1,5 @@
 @include('pages.import.shared.assets')
-@php $activeTab = \App\Support\PageTabs::active('import_standard', $activeTab ?? 'book'); @endphp
+@php $activeTab = \App\Support\PageTabs::active('import_standard', $activeTab ?? 'check'); @endphp
 
 @php
     $impToday = \Carbon\Carbon::today();
@@ -37,18 +37,18 @@
             <div class="card-body">
 
                 <div class="imp-tabs">
+                    @tab('import_standard', 'check')
+                    <button type="button" class="imp-tab {{ $activeTab === 'check' ? 'is-active' : '' }}" data-pane="impPaneCheck">
+                        <i class="fas fa-clipboard-check mr-1"></i> Nhập chất chuẩn
+                        @if ($pendingCount > 0)
+                            <span class="imp-tab-count">{{ $pendingCount }}</span>
+                        @endif
+                    </button>
+                    @endtab
                     @tab('import_standard', 'book')
                     <button type="button" class="imp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}"
                         data-pane="impPaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ nhập chất chuẩn
-                    </button>
-                    @endtab
-                    @tab('import_standard', 'check')
-                    <button type="button" class="imp-tab {{ $activeTab === 'check' ? 'is-active' : '' }}" data-pane="impPaneCheck">
-                        <i class="fas fa-clipboard-check mr-1"></i> Chờ kiểm tra
-                        @if ($pendingCount > 0)
-                            <span class="imp-tab-count">{{ $pendingCount }}</span>
-                        @endif
                     </button>
                     @endtab
                 </div>
@@ -56,14 +56,6 @@
                 {{-- ============ SỔ NHẬP CHẤT CHUẨN ============ --}}
                 @tab('import_standard', 'book')
                 <div class="imp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="impPaneBook">
-
-                    <div class="md-toolbar">
-                        @perm('import_standard_create')
-                            <button type="button" class="btn btn-primary btn-md-create">
-                                <i class="fas fa-plus mr-1"></i> Nhập chất chuẩn
-                            </button>
-                        @endperm
-                    </div>
 
                     @include('pages.shared.rangeFilter', [
                         'rfRoute' => $impRoute . 'list',
@@ -356,9 +348,17 @@
                 </div>
                 @endtab
 
-                {{-- ============ CHỜ KIỂM TRA ============ --}}
+                {{-- ============ NHẬP CHẤT CHUẨN (ống chờ kiểm tra) ============ --}}
                 @tab('import_standard', 'check')
                 <div class="imp-pane {{ $activeTab === 'check' ? 'is-active' : '' }}" id="impPaneCheck">
+                    <div class="md-toolbar">
+                        @perm('import_standard_create')
+                            <button type="button" class="btn btn-primary btn-md-create">
+                                <i class="fas fa-plus mr-1"></i> Nhập chất chuẩn
+                            </button>
+                        @endperm
+                    </div>
+
                     <div class="table-responsive">
                         <table id="mdTableCheck" class="table table-bordered table-hover w-100 md-table">
                             <thead>

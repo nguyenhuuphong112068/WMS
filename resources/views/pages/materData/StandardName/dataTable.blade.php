@@ -15,7 +15,7 @@
                 </div>
 
                 <div class="table-responsive">
-                    <table id="mdTable" class="table table-bordered table-hover w-100">
+                    <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 60px">STT</th>
@@ -30,6 +30,7 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @deferredRows('mdTable')
                             @foreach ($datas as $row)
                                 <tr>
                                     <td class="text-center">{{ $loop->iteration }}</td>
@@ -78,6 +79,7 @@
                                     </td>
                                 </tr>
                             @endforeach
+                            @enddeferredRows
                         </tbody>
                     </table>
                 </div>

@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'lien-phong-ban', 'no' => 2, 'label' => 'Đề nghị liên phòng ban'])
+
 <p>Phòng <b>A</b> (đang thiếu) xin vật tư từ kho của phòng <b>B</b> (đang giữ hàng). Hàng không mất đi mà chuyển từ tồn
     của B sang tồn của A.</p>
 

@@ -2,11 +2,14 @@
     để phát hiện hao hụt bất thường.</p>
 
 <ol class="ug-steps">
-    <li>Lần dùng đầu tiên, nhập <b>Khối lượng Bì + Chuẩn trước khi dùng</b> trên phiếu sử dụng.</li>
-    <li>Khi ống đã dùng xong, ở tab <b>Kiểm soát khối lượng</b> nhập <b>Khối lượng bì sau khi sử dụng</b> (không được lớn hơn Bì + Chuẩn).
-        Cặp số này dùng để đối chiếu lượng chuẩn thực đã lấy ra.</li>
-    <li>Hệ thống tính <b>sai lệch (%)</b> = |lượng nhập − tổng lượng đã ghi sử dụng| / tổng lượng đã ghi sử dụng × 100, và so với giới hạn
-        của dạng chuẩn ở bảng dưới.</li>
+    <li>Lần dùng đầu tiên, nhập <b>Khối lượng Bì + Chuẩn trước khi dùng</b> trên phiếu sử dụng. Số cân luôn là khối lượng:
+        chuẩn có ĐVT khối lượng (mg, g) cân theo đúng ĐVT đó, chuẩn có ĐVT thể tích (ml) cân theo <b>mg</b>.</li>
+    <li>Khi ống đã dùng xong, ở tab <b>Kiểm soát khối lượng</b> nhập <b>Khối lượng bì sau khi sử dụng</b> (không được lớn hơn Bì + Chuẩn).</li>
+    <li>Hệ thống tính <b>KL thực</b> = Bì + Chuẩn − Bì sau khi sử dụng (chuẩn ĐVT ml: KL thực = chênh lệch (mg) / 1000 / tỷ trọng d,
+        d khai ở Danh Mục Chất Chuẩn), rồi <b>sai lệch (%)</b> = |KL thực − tổng lượng đã ghi sử dụng| / tổng lượng đã ghi sử dụng × 100,
+        so với giới hạn của dạng chuẩn ở bảng dưới.</li>
+    <li>Chưa đủ số liệu thì cột Kết quả ghi rõ lý do thay vì tính: <i>Chưa sử dụng</i>, <i>Chưa cân Bì + Chuẩn</i>,
+        <i>Đang sử dụng - chưa cân bì sau dùng</i> (ống đang dùng dở), <i>Thiếu tỉ trọng d</i> (chuẩn ĐVT ml chưa khai tỷ trọng).</li>
     <li>Ống vượt giới hạn: ghi <b>Nhận xét ngoài giới hạn cho phép</b> (quyền <i>Nhận xét chuẩn ngoài giới hạn</i>).</li>
 </ol>
 

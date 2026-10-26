@@ -141,8 +141,10 @@ class ChemicalInventoryController extends Controller
                 $departmentId,
                 \App\Http\Controllers\Pages\Export\ChemicalQuarantineController::PENDING_ZONE
             ),
-            // Cách ly xong quay lại đúng tab vừa bấm
-            'activeTab' => in_array(session('activeTab'), ['code', 'expiring'], true) ? session('activeTab') : null,
+            // Cách ly xong quay lại đúng tab vừa bấm; ?tab=threshold từ link cũ "Ngưỡng Tồn Trữ PL IV"
+            'activeTab' => array_key_exists((string) $request->input('tab', session('activeTab')), \App\Support\PageTabs::PAGES['inventory_chemical']['tabs'])
+                ? (string) $request->input('tab', session('activeTab'))
+                : null,
         ]);
     }
 

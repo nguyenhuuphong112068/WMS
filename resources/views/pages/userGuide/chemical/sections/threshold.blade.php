@@ -1,6 +1,7 @@
 <p>Đối chiếu khối lượng tồn trữ <b>toàn công ty</b> với ngưỡng của <b>Phụ lục IV Nghị định 24/2026/NĐ-CP</b>, để biết cơ sở có phải
-    xây dựng <b>Kế hoạch phòng ngừa, ứng phó sự cố hoá chất</b> hay không. Màn hình chỉ để xem; phạm vi cộng tồn là mọi phòng ban thuộc
-    công ty của phòng đang chọn.</p>
+    xây dựng <b>Kế hoạch phòng ngừa, ứng phó sự cố hoá chất</b> hay không. Nằm ở tab <b>Đối chiếu ngưỡng PL IV</b> của màn hình <b>Tồn Kho › Hoá Chất</b>; tab chỉ để xem, phạm vi cộng tồn là
+    mọi phòng ban thuộc công ty của phòng đang chọn. Số liệu luôn tính đến hiện tại nên khi mở tab này ô <b>Kỳ báo cáo</b> và lọc
+    <b>Hoá chất VS</b> được ẩn đi.</p>
 
 <div class="table-responsive">
     <table class="table table-bordered ug-table">

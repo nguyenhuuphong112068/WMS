@@ -17,5 +17,5 @@
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>Bản ghi mới ở trạng thái <b>Chờ duyệt</b>; duyệt phải nhập lại mật khẩu. Sửa bản ghi đã duyệt sẽ đưa về Chờ duyệt. Sửa và Khoá
-        bắt buộc ghi lý do. <b>Đơn vị tính</b> khai ở tab Chất chuẩn của phòng.</div>
+        bắt buộc ghi lý do. <b>Đơn vị tính</b> khai ở tab Chất chuẩn của phòng. Bộ lọc <b>Trạng thái duyệt</b> trên bảng thu gọn danh sách theo Chờ duyệt / Đã duyệt / Từ chối / Đã khoá; bấm thẻ <b>Danh mục chờ duyệt</b> ở Trang chủ sẽ mở sẵn bộ lọc <b>Chờ duyệt</b>.</div>
 </div>

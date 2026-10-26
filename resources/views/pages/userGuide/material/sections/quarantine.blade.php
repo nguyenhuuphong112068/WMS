@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'cach-ly', 'no' => 4, 'label' => 'Cách ly - Loại bỏ - Huỷ'])
+
 <p>Xử lý vật tư <b>hỏng, ẩm mốc, rách bao bì, hết hạn</b> theo 3 bước. Từ bước 1 hàng đã bị trừ tồn nên không ai cấp phát
     hay chuyển đi được nữa.</p>
 

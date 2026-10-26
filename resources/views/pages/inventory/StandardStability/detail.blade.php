@@ -17,7 +17,7 @@
 --}}
 
 @php
-    $ssaRoute = 'pages.stabilityAssessment.standardStability.';
+    $ssaRoute = 'pages.inventory.standardStability.';
     $ssaLabel = 'phiếu đánh giá hạn dùng';
     $ssaIcon = 'fas fa-clipboard-list';
 
@@ -48,7 +48,7 @@
 @endphp
 
 @section('mainContent')
-    @include('pages.stabilityAssessment.StandardStability.assets')
+    @include('pages.inventory.StandardStability.assets')
 
     <div class="content-wrapper">
         <div class="md-page">
@@ -151,7 +151,7 @@
 
                     <div class="md-toolbar">
                         <div>
-                            <a href="{{ route($ssaRoute . 'list') }}" class="btn btn-secondary">
+                            <a href="{{ route('pages.inventory.standardInventory.list', ['tab' => 'stability']) }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left mr-1"></i> Danh sách phiếu
                             </a>
 
@@ -389,9 +389,9 @@
 @endsection
 
 @section('model')
-    @include('pages.stabilityAssessment.StandardStability.itemCreate')
-    @include('pages.stabilityAssessment.StandardStability.itemUpdate')
-    @include('pages.stabilityAssessment.StandardStability.assess')
-    @include('pages.stabilityAssessment.StandardStability.issue')
-    @include('pages.stabilityAssessment.StandardStability.history')
+    @include('pages.inventory.StandardStability.itemCreate')
+    @include('pages.inventory.StandardStability.itemUpdate')
+    @include('pages.inventory.StandardStability.assess')
+    @include('pages.inventory.StandardStability.issue')
+    @include('pages.inventory.StandardStability.history')
 @endsection

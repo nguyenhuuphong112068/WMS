@@ -45,6 +45,15 @@
                         @endif
                     </button>
                     @endtab
+                    @tab('export_standard', 'quarantine')
+                    <button type="button" class="exp-tab {{ $activeTab === 'quarantine' ? 'is-active' : '' }}"
+                        data-pane="expPaneQuarantine">
+                        <i class="fas fa-biohazard mr-1"></i> Cách ly - Loại bỏ - Huỷ
+                        @if ($quarantineBadge)
+                            <span class="exp-tab-count">{{ $quarantineBadge }}</span>
+                        @endif
+                    </button>
+                    @endtab
                 </div>
 
                 {{-- ============ SỔ SỬ DỤNG CHẤT CHUẨN ============ --}}
@@ -136,6 +145,12 @@
                                         <td class="md-sub">
                                             @if ($row->type === 'cancel')
                                                 <div class="text-danger small font-weight-bold"><i class="fas fa-ban mr-1"></i> Lý do: {{ $row->reason ?: '—' }}</div>
+                                                @if ($row->quarantine_code)
+                                                    <span class="{{ in_array($row->quarantine_status, ['destroyed', 'returned'], true) ? 'exp-received' : 'exp-pending' }}"
+                                                        title="Phiếu cách ly {{ $row->quarantine_code }} - xem tab Cách ly - Loại bỏ - Huỷ">
+                                                        {{ \App\Http\Controllers\Pages\Export\StandardQuarantineController::STATUSES[$row->quarantine_status] ?? $row->quarantine_status }}
+                                                    </span>
+                                                @endif
                                             @else
                                                 @if ($row->product_name)
                                                     <div class="font-weight-bold text-dark">{{ $row->product_name }}</div>
@@ -186,6 +201,13 @@
 
                 {{-- ============ ĐỀ NGHỊ CẤP PHÁT CHUẨN LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.StandardExport.transferPane')
+
+                {{-- ============ CHẤT CHUẨN HỎNG: CÁCH LY - LOẠI BỎ - HUỶ ============ --}}
+                @tab('export_standard', 'quarantine')
+                <div class="exp-pane {{ $activeTab === 'quarantine' ? 'is-active' : '' }}" id="expPaneQuarantine">
+                    @include('pages.export.StandardExport.quarantinePane')
+                </div>
+                @endtab
 
             </div>
         </div>

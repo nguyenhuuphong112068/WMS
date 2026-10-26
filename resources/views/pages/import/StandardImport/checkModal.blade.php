@@ -1,7 +1,7 @@
 {{--
 | Modal XÁC NHẬN KIỂM TRA một ống chuẩn đang "Chờ kiểm tra".
 |
-| Mở bằng nút .btn-imp-check ở tab "Chờ kiểm tra" (dataTable.blade.php), dữ liệu dòng
+| Mở bằng nút .btn-imp-check ở tab "Nhập chất chuẩn" (dataTable.blade.php), dữ liệu dòng
 | truyền qua data-row. Đây là bước duy nhất đưa ống ra khỏi khu Biệt Trữ: bổ sung thông
 | tin lần nhập đầu còn thiếu + định khu vị trí lưu trữ thật, sau đó ống mới được cộng
 | vào tồn kho và mới được đề nghị / sử dụng.

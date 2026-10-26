@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+
 <p>Phòng lập <b>phiếu dự trù</b> để đề nghị bộ phận <b>Cung Ứng</b> mua vật tư cho một hoặc nhiều tháng. Phiếu phải được
     ký đủ 2 bước mới chuyển tới Cung Ứng.</p>
 

@@ -598,16 +598,9 @@
                             @endperm
                             @perm('inventory_standard_view')
                                 <li class="nav-item"><a href="{{ route('pages.inventory.standardInventory.list') }}"
-                                        class="nav-link {{ request()->is('inventory/standardInventory') ? 'active' : '' }}"><i
+                                        class="nav-link {{ request()->is('inventory/standardInventory') || request()->is('inventory/standardStability*') ? 'active' : '' }}"><i
                                             class="fas fa-vials nav-icon"></i>
                                         <p>Chất Chuẩn</p>
-                                    </a></li>
-                            @endperm
-                            @perm('inventory_chemical_view')
-                                <li class="nav-item"><a href="{{ route('pages.inventory.thresholdReconciliation.list') }}"
-                                        class="nav-link {{ request()->is('inventory/thresholdReconciliation') ? 'active' : '' }}"><i
-                                            class="fas fa-tachometer-alt nav-icon"></i>
-                                        <p>Ngưỡng Tồn Trữ PL IV</p>
                                     </a></li>
                             @endperm
                         </ul>
@@ -668,36 +661,6 @@
                                         class="nav-link {{ request()->is('statistic/materialIssue') ? 'active' : '' }}"><i
                                             class="fas fa-cubes nav-icon"></i>
                                         <p>Vật Tư</p>
-                                    </a></li>
-                            @endperm
-                        </ul>
-                    </li>
-                @endpermAny
-
-                <!-- Droplist Menu Đánh Giá Hạn Dùng  -->
-                @permAny(['stability_standard_view', 'stability_plan_view'])
-                    <li class="nav-item has-treeview {{ request()->is('stabilityAssessment/*') ? 'menu-open' : '' }}">
-                        <a href="#" class="nav-link {{ request()->is('stabilityAssessment/*') ? 'active' : '' }}">
-                            <i class="fas fa-clipboard-list"></i>
-                            <p>
-                                Đánh Giá Hạn Dùng
-                                <i class="right fas fa-angle-left"></i>
-                            </p>
-                        </a>
-                        <ul class="nav nav-treeview">
-                            @perm('stability_standard_view')
-                                <li class="nav-item"><a
-                                        href="{{ route('pages.stabilityAssessment.standardStability.list') }}"
-                                        class="nav-link {{ request()->is('stabilityAssessment/standardStability*') ? 'active' : '' }}"><i
-                                            class="fas fa-vial nav-icon"></i>
-                                        <p>Chuẩn Thứ Cấp</p>
-                                    </a></li>
-                            @endperm
-                            @perm('stability_plan_view')
-                                <li class="nav-item"><a href="{{ route('pages.stabilityAssessment.assessmentPlan.list') }}"
-                                        class="nav-link {{ request()->is('stabilityAssessment/assessmentPlan*') ? 'active' : '' }}"><i
-                                            class="fas fa-calendar-check nav-icon"></i>
-                                        <p>Kế Hoạch Đánh Giá</p>
                                     </a></li>
                             @endperm
                         </ul>

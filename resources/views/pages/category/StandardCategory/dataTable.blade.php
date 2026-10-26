@@ -12,9 +12,10 @@
         </div>
 
         @include('pages.shared.standardGroupFilter', ['sgrTarget' => 'mdTable'])
+        @include('pages.category.shared.approvalFilter', ['apfTarget' => 'mdTable'])
 
         <div class="table-responsive">
-            <table id="mdTable" class="table table-bordered table-hover w-100">
+            <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 55px">STT</th>
@@ -37,6 +38,7 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @deferredRows('mdTable')
                     @foreach ($datas as $row)
                         @php
                             $sdCodes = $sdGroupsOf($row->groups);
@@ -45,7 +47,8 @@
                             $catCodeStatus = $row->status_id == 0 ? 'locked' : ($row->app_status === 'approved' ? 'approved' : 'pending');
                         @endphp
                         {{-- data-groups để bộ lọc Phân nhóm chuẩn nhận ra dòng này --}}
-                        <tr data-groups="{{ implode(',', $sdCodes) }}">
+                        <tr data-groups="{{ implode(',', $sdCodes) }}"
+                            data-approval="{{ $row->status_id == 0 ? 'locked' : ($row->app_status ?: 'pending') }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td><span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span></td>
                             <td>
@@ -156,6 +159,7 @@
                             </td>
                         </tr>
                     @endforeach
+                    @enddeferredRows
                 </tbody>
             </table>
         </div>

@@ -206,14 +206,16 @@ class StandardImportController extends Controller
             'locations' => $this->locationOptions($departmentId),
             // Modal Nhập chất chuẩn chỉ cho chọn vị trí Biệt Trữ/Chờ kiểm tra
             'quarantineLocations' => $quarantineLocations,
-            // Tab "Chờ kiểm tra": ống vừa nhập, chưa cộng tồn, chờ bước Xác nhận kiểm tra
+            // Tab "Nhập chất chuẩn": ống vừa nhập, chưa cộng tồn, chờ bước Xác nhận kiểm tra
             'pendingRows' => $pendingRows,
             'pendingCount' => $pendingRows->count(),
             'purposes' => $purposes,
             'groups' => config('standard.groups'),
             'codePreviews' => StandardCode::previews($departmentId, $this->departmentShortName(), now()->format('Y-m-d')),
             'historyCounts' => $this->historyCounts($departmentId),
-            'activeTab' => 'book',
+            // Lọc / sang trang sổ nhập xong thì trang tải lại, quay về đúng tab sổ;
+            // mặc định mở tab "Nhập chất chuẩn" (ống chờ kiểm tra + nút lập phiếu nhập)
+            'activeTab' => $request->input('tab') === 'book' ? 'book' : 'check',
             'bookRange' => $bookRange,
             'bookKeyword' => $bookKeyword,
             'bookPerPage' => $bookPerPage,
@@ -312,7 +314,7 @@ class StandardImportController extends Controller
                     'imported_by' => $this->actor(),
                     'status_id' => 1,
                     // Nhập lần đầu luôn ở trạng thái "Chờ kiểm tra" - chỉ cộng vào tồn
-                    // kho, được đề nghị/sử dụng sau khi xác nhận ở tab "Chờ kiểm tra"
+                    // kho, được đề nghị/sử dụng sau khi xác nhận ở tab "Nhập chất chuẩn"
                     'is_checked' => 0,
                     'checked_by' => null,
                     'checked_at' => null,
@@ -346,6 +348,8 @@ class StandardImportController extends Controller
         $msg = count($createdCodes) === 1
             ? 'Đã tạo ' . self::LABEL . ' mã ống chuẩn ' . $createdCodes[0] . '!'
             : 'Đã tạo thành công ' . count($createdCodes) . ' ống chuẩn: ' . implode(', ', $createdCodes) . '!';
+
+        $msg .= ' Ống đang ở trạng thái CHỜ KIỂM TRA, chưa cộng vào tồn kho - xác nhận kiểm tra ở tab "Nhập chất chuẩn".';
 
         return redirect()->back()->with('success', $msg);
     }

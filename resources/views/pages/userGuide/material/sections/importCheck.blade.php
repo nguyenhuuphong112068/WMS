@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+
 <p>Danh sách các lô vừa nhập, đang nằm trong khu Biệt Trữ chờ kiểm tra. Kiểm tra xong, lô mới được vào tồn và được đề
     nghị, cấp phát.</p>
 

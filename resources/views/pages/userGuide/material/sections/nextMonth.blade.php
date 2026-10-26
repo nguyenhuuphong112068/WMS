@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+
 <p>Trả lời câu hỏi: <b>tồn hiện có của phòng có đủ cho nhu cầu theo chu kỳ của tháng tới không, thiếu bao nhiêu?</b>
     Mục đích là để kịp lập dự trù trước khi hết hàng.</p>
 

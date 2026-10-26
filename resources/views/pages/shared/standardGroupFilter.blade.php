@@ -90,29 +90,33 @@
         document.addEventListener('DOMContentLoaded', function() {
             var sgrState = {};
 
-            function sgrCodesOf(tr) {
-                var raw = ($(tr).attr('data-groups') || '').trim();
+            /*
+            | Mã nhóm của một dòng: bảng data-deferred (dòng nạp sau, chưa hiện thì chưa có <tr>)
+            | đọc từ JSON qua mdDeferred.rowAttr, bảng render sẵn đọc data-groups của <tr>.
+            */
+            function sgrCodesOf(rowData, tr) {
+                var raw = window.mdDeferred ? mdDeferred.rowAttr(rowData, tr, 'groups') : $(tr).attr('data-groups');
+                raw = String(raw || '').trim();
                 return raw ? raw.split(',') : [];
             }
 
-            $.fn.dataTable.ext.search.push(function(settings, data, index) {
+            $.fn.dataTable.ext.search.push(function(settings, data, index, rowData) {
                 var want = sgrState[settings.nTable.id];
                 if (!want || want === 'all') return true;
 
-                var codes = sgrCodesOf(settings.aoData[index].nTr);
+                var codes = sgrCodesOf(rowData, settings.aoData[index].nTr);
                 return want === 'none' ? codes.length === 0 : codes.indexOf(want) !== -1;
             });
 
-            $('.sgr-select').each(function() {
-                var id = $(this).data('target');
+            function sgrRefreshCounts(id) {
                 if (!$.fn.dataTable.isDataTable('#' + id)) return;
 
                 var counts = {};
                 var none = 0;
                 var total = 0;
 
-                $('#' + id).DataTable().rows().nodes().to$().each(function() {
-                    var codes = sgrCodesOf(this);
+                $('#' + id).DataTable().rows().every(function() {
+                    var codes = sgrCodesOf(this.data(), this.node());
                     total++;
                     if (!codes.length) {
                         none++;
@@ -123,12 +127,21 @@
                     });
                 });
 
-                $(this).find('option').each(function() {
+                $('.sgr-select[data-target="' + id + '"]').find('option').each(function() {
                     var value = $(this).val();
                     var count = value === 'all' ? total : (value === 'none' ? none : (counts[value] || 0));
                     $(this).text($(this).data('label') + ' (' + count + ')');
-                    if (count === 0 && value !== 'all') $(this).prop('disabled', true);
+                    $(this).prop('disabled', count === 0 && value !== 'all');
                 });
+            }
+
+            $('.sgr-select').each(function() {
+                sgrRefreshCounts($(this).data('target'));
+            });
+
+            // Bảng data-deferred: dòng về sau DOMContentLoaded -> đếm lại
+            $(document).on('md:rows-loaded', 'table', function() {
+                if ($('.sgr-select[data-target="' + this.id + '"]').length) sgrRefreshCounts(this.id);
             });
 
             $(document).on('change', '.sgr-select', function() {

@@ -177,17 +177,24 @@
                 cls: ''
             };
 
-            function listOf(tr, attr) {
-                var raw = ($(tr).attr(attr) || '').trim();
+            function attrOf(dim) {
+                return dim === 'cls' ? 'classification' : dim;
+            }
+
+            // Bảng nạp dòng trễ (data-deferred): <tr> chưa dựng thì đọc data-* từ JSON qua mdDeferred.rowAttr
+            function listOf(rowData, tr, dim) {
+                var name = attrOf(dim);
+                var raw = window.mdDeferred ? mdDeferred.rowAttr(rowData, tr, name) :
+                    (tr ? tr.getAttribute('data-' + name) : '');
+                raw = String(raw || '').trim();
                 return raw ? raw.split(',') : [];
             }
 
-            function rowMatches(tr) {
+            function rowMatches(rowData, tr) {
                 for (var dim in want) {
                     var v = want[dim];
                     if (!v) continue;
-                    var attr = dim === 'cls' ? 'data-classification' : 'data-' + dim;
-                    var list = listOf(tr, attr);
+                    var list = listOf(rowData, tr, dim);
                     if (v === '__none') {
                         if (list.length) return false;
                     } else if (list.indexOf(v) === -1) {
@@ -197,40 +204,41 @@
                 return true;
             }
 
-            $.fn.dataTable.ext.search.push(function(settings, data, index) {
+            $.fn.dataTable.ext.search.push(function(settings, data, index, rowData) {
                 if (settings.nTable.id !== TABLE_ID) return true;
                 if (!want.apx && !want.grp && !want.tbl && !want.cls) return true;
-                return rowMatches(settings.aoData[index].nTr);
+                return rowMatches(rowData, settings.aoData[index].nTr);
             });
 
             // Đếm số dòng cho từng lựa chọn (dựa trên toàn bộ dữ liệu, không theo lọc hiện tại)
-            var rows = dt.rows().nodes().to$();
-
             function refreshCounts() {
+                var aoData = dt.settings()[0].aoData;
+                var rows = dt.rows().indexes().toArray().map(function(i) {
+                    return { data: aoData[i]._aData, tr: aoData[i].nTr };
+                });
+
                 $('.ai-f-select').each(function() {
                     var dim = $(this).data('dim');
-                    var attr = dim === 'cls' ? 'data-classification' : 'data-' + dim;
-                    var $sel = $(this);
-                    $sel.find('option').each(function() {
+                    $(this).find('option').each(function() {
                         var val = $(this).val();
-                        var n;
-                        if (val === '') {
-                            n = rows.length;
-                        } else if (val === '__none') {
-                            n = rows.filter(function() {
-                                return listOf(this, attr).length === 0;
+                        var n = rows.length;
+                        if (val === '__none') {
+                            n = rows.filter(function(r) {
+                                return listOf(r.data, r.tr, dim).length === 0;
                             }).length;
-                        } else {
-                            n = rows.filter(function() {
-                                return listOf(this, attr).indexOf(val) !== -1;
+                        } else if (val !== '') {
+                            n = rows.filter(function(r) {
+                                return listOf(r.data, r.tr, dim).indexOf(val) !== -1;
                             }).length;
                         }
                         $(this).text($(this).data('label') + ' (' + n + ')');
-                        if (val !== '' && n === 0) $(this).prop('disabled', true);
+                        $(this).prop('disabled', val !== '' && n === 0);
                     });
                 });
             }
-            refreshCounts();
+
+            if (!window.mdDeferred || mdDeferred.loaded('#' + TABLE_ID)) refreshCounts();
+            $('#' + TABLE_ID).on('md:rows-loaded', refreshCounts);
 
             $('.ai-f-select').on('change', function() {
                 want[$(this).data('dim')] = $(this).val();

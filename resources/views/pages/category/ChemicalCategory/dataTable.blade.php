@@ -18,6 +18,7 @@
         </div>
 
         @include('pages.shared.classificationFilter', ['clsTarget' => 'mdTable'])
+        @include('pages.category.shared.approvalFilter', ['apfTarget' => 'mdTable'])
 
         <div class="table-responsive">
             <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
@@ -63,7 +64,8 @@
                             $catCodeStatus = $row->status_id == 0 ? 'locked' : ($row->app_status === 'approved' ? 'approved' : 'pending');
                         @endphp
                         {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
-                        <tr data-classification="{{ implode(',', $codes) }}">
+                        <tr data-classification="{{ implode(',', $codes) }}"
+                            data-approval="{{ $row->status_id == 0 ? 'locked' : ($row->app_status ?: 'pending') }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td>
                                 <span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span>

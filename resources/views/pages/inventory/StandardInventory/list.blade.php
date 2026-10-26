@@ -6,7 +6,8 @@
     | TỒN - TỒN KHO CHẤT CHUẨN
     |--------------------------------------------------------------------------
     | Khai báo tại đây để dataTable và các modal cùng đọc một nguồn.
-    | Màn hình chỉ đọc phần tồn, chỉ ghi dữ liệu qua nút Cân Đối và Hạn Nội Bộ.
+    | Màn hình chỉ đọc phần tồn, chỉ ghi dữ liệu qua nút Cân Đối, Hạn Nội Bộ và Cách ly.
+    | Hai tab Đánh giá hạn dùng CTC / Kế hoạch đánh giá dùng view của inventory/StandardStability.
     */
 
     /** Bỏ số 0 thừa ở phần thập phân: 12.5000 -> 12.5, 12.0000 -> 12 */
@@ -17,7 +18,7 @@
 
     /*
     | Class cho badge .inv-mv (bấm mở modal "Chi tiết con số"): 0 -> mờ, cột trừ tồn
-    | (Sử Dụng / Huỷ / Chuyển) ép đỏ, còn lại tô theo dấu.
+    | (Huỷ / Chuyển) ép đỏ, Sử Dụng ép xanh dương, còn lại tô theo dấu - như Tồn Kho Hoá Chất.
     */
     $mvCls = function ($value, $tone = null) {
         if ((float) $value == 0.0) {
@@ -28,6 +29,9 @@
         }
         if ($tone === 'in') {
             return 'inv-mv is-in';
+        }
+        if ($tone === 'use') {
+            return 'inv-mv is-use';
         }
         return 'inv-mv ' . ($value > 0 ? 'is-in' : 'is-out');
     };
@@ -142,6 +146,37 @@
                 ->values(),
         )
         ->toArray();
+
+    /*
+    | TAB ĐÁNH GIÁ HẠN DÙNG CTC: biến của danh sách phiếu (StandardStabilityController::tabData)
+    | kèm các hàm hiển thị, gom một mảng để @include tab và modal Lập / Sửa phiếu - tên biến
+    | trong các view đó ($datas, $imports...) không đụng biến của bảng tồn.
+    */
+    $ssaView = null;
+
+    if ($stability) {
+        $ssaShortByCode = collect($stability['groups'])->mapWithKeys(fn($group) => [$group['code'] => $group['short']])->all();
+
+        $ssaView = $stability + [
+            'ssaRoute' => 'pages.inventory.standardStability.',
+            'ssaLabel' => 'phiếu đánh giá hạn dùng',
+            'ssaIcon' => 'fas fa-clipboard-list',
+            'ssaDate' => $invDate,
+            /** Trạng thái phiếu -> lớp CSS của thẻ .ssa-badge. */
+            'ssaStatusClass' => fn($status) => match ($status) {
+                'Đang Đánh Giá' => 'running',
+                'Hoàn Thành' => 'done',
+                'Dừng Đánh Giá' => 'stopped',
+                'Huỷ' => 'cancelled',
+                default => 'initial',
+            },
+            'ssaGroupName' => fn($code) => $ssaShortByCode[$code] ?? ($code ?: '—'),
+            // Số phiếu theo từng trạng thái, dùng cho các nút lọc nhanh
+            'ssaStatusCounts' => collect($stability['statuses'])
+                ->mapWithKeys(fn($status) => [$status => $stability['datas']->where('status', $status)->count()])
+                ->all(),
+        ];
+    }
 @endphp
 
 @section('mainContent')
@@ -150,6 +185,7 @@
 
 @section('model')
     @include('pages.inventory.StandardInventory.balancing')
+    @include('pages.inventory.StandardInventory.quarantine')
     @include('pages.inventory.StandardInventory.balancingHistory')
     @include('pages.inventory.StandardInventory.internalExpiry')
     @include('pages.inventory.StandardInventory.weightRemarkModal')
@@ -160,4 +196,12 @@
         'period' => $period,
     ])
     @include('pages.shared.attachmentListModal')
+    @if ($ssaView)
+        @if (user_can('stability_standard_create'))
+            @include('pages.inventory.StandardStability.create', $ssaView)
+        @endif
+        @if (user_can('stability_standard_update'))
+            @include('pages.inventory.StandardStability.update', $ssaView)
+        @endif
+    @endif
 @endsection

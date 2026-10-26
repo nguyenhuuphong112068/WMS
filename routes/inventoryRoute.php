@@ -16,12 +16,20 @@
 | Riêng "materialStocktake" là tab KIỂM KÊ ĐỊNH KỲ nằm trong màn hình Tồn Kho Vật Tư
 | (chu kỳ 1 tháng 1 lần) nên không có index - dữ liệu của tab do
 | MaterialInventoryController::index() lấy qua MaterialStocktakeController::panel().
+|
+| "standardStability" là hai tab ĐÁNH GIÁ HẠN DÙNG CTC / KẾ HOẠCH ĐÁNH GIÁ của màn hình
+| Tồn Kho Chất Chuẩn (dữ liệu do StandardInventoryController::index() lấy qua
+| StandardStabilityController::tabData() / planData()): index chỉ chuyển sang tab, còn
+| lại là trang chi tiết một phiếu + các hành động ghi. Phiếu không xoá cứng nên dùng
+| "cancel" (chuyển "Huỷ") thay cho deActive; "resume" mở lại phiếu đã ngưng; mốc chưa có
+| kết quả thì xoá được (deleteItem). Mọi thay đổi ghi standard_stability_assessment_histories.
 */
 
 use App\Http\Controllers\Pages\Inventory\ChemicalInventoryController;
 use App\Http\Controllers\Pages\Inventory\MaterialInventoryController;
 use App\Http\Controllers\Pages\Inventory\MaterialStocktakeController;
 use App\Http\Controllers\Pages\Inventory\StandardInventoryController;
+use App\Http\Controllers\Pages\Inventory\StandardStabilityController;
 use App\Http\Controllers\Pages\Inventory\ThresholdReconciliationController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -46,6 +54,24 @@ Route::prefix('/inventory')
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
             Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
+        });
+
+        Route::prefix('/standardStability')->name('standardStability.')->controller(StandardStabilityController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('detail', 'detail')->name('detail');
+
+            // Đầu phiếu
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('cancel', 'cancel')->name('cancel');
+            Route::post('resume', 'resume')->name('resume');
+
+            // Mốc đánh giá
+            Route::post('storeItem', 'storeItem')->name('storeItem');
+            Route::post('updateItem', 'updateItem')->name('updateItem');
+            Route::post('deleteItem', 'deleteItem')->name('deleteItem');
+            Route::post('assess', 'assess')->name('assess');
+            Route::post('issueTestings', 'issueTestings')->name('issueTestings');
         });
 
         Route::prefix('/standardInventory')->name('standardInventory.')->controller(StandardInventoryController::class)->group(function () {
@@ -78,10 +104,12 @@ Route::prefix('/inventory')
             Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
         });
 
-        // Đối chiếu ngưỡng tồn trữ Phụ lục IV NĐ 24/2026/NĐ-CP - màn hình chỉ đọc, số liệu
-        // cộng trong phạm vi các phòng ban thuộc công ty của phòng ban đang chọn.
+        // Tab "Đối chiếu ngưỡng PL IV" của Tồn Kho Hoá Chất - chỉ đọc, số liệu cộng trong phạm
+        // vi các phòng ban thuộc công ty của phòng ban đang chọn. index chỉ chuyển sang tab,
+        // pane trả HTML nội dung tab (nạp AJAX khi mở tab lần đầu).
         Route::prefix('/thresholdReconciliation')->name('thresholdReconciliation.')->controller(ThresholdReconciliationController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            Route::get('pane', 'pane')->name('pane');
             // Dữ liệu JSON cho modal "Chi tiết đối chiếu Ngưỡng Tồn Trữ PL IV"
             Route::get('thresholdDetail', 'thresholdDetail')->name('thresholdDetail');
         });

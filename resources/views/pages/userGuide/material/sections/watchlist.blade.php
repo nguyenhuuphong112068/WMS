@@ -1,3 +1,5 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+
 <p>Tập trung mọi vật tư <b>đang cần mua</b> vào một chỗ, để lập phiếu dự trù chỉ bằng vài cú tick. Vật tư vào danh sách
     từ 3 nguồn (lọc được theo cột <b>Nguồn</b>):</p>
 <ol>

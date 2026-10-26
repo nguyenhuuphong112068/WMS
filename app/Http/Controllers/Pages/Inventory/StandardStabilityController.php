@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Pages\StabilityAssessment;
+namespace App\Http\Controllers\Pages\Inventory;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
@@ -9,7 +9,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * ĐÁNH GIÁ HẠN DÙNG - CHẤT CHUẨN
+ * TỒN KHO CHẤT CHUẨN - ĐÁNH GIÁ HẠN DÙNG CHUẨN THỨ CẤP (CTC)
+ *
+ * Không còn là một nhóm menu riêng: danh sách phiếu và kế hoạch đánh giá là hai tab
+ * "Đánh giá hạn dùng CTC" / "Kế hoạch đánh giá" của màn hình Tồn Kho Chất Chuẩn
+ * (StandardInventoryController::index lấy dữ liệu qua tabData() / planData()). Controller
+ * này giữ trang chi tiết một phiếu và mọi hành động ghi; index() chỉ chuyển sang tab.
  *
  * Chất chuẩn để lâu thì hàm lượng đổi theo thời gian, nên ống chuẩn đang tồn được lập
  * một PHIẾU ĐÁNH GIÁ HẠN DÙNG (standard_stability_assessment_list) để theo dõi độ ổn
@@ -131,14 +136,27 @@ class StandardStabilityController extends Controller
 
     public const AFTER_STOP = 'stop';
 
+    /** Kế hoạch đánh giá xem tối đa ngần này tháng, chặn gõ tay khoảng vài chục năm làm bảng phình ra. */
+    private const PLAN_MAX_MONTHS = 60;
+
     /* ==========================================================
-     |  DANH SÁCH PHIẾU ĐÁNH GIÁ CỦA PHÒNG BAN
+     |  DANH SÁCH PHIẾU - TAB "ĐÁNH GIÁ HẠN DÙNG CTC" CỦA TỒN KHO
      ========================================================== */
 
+    /** Đường dẫn cũ / nút "Quay lại" của trang chi tiết: mở thẳng tab trên Tồn Kho Chất Chuẩn. */
     public function index()
     {
-        $departmentId = $this->departmentId();
+        return redirect()->route('pages.inventory.standardInventory.list', ['tab' => 'stability']);
+    }
 
+    /**
+     * Dữ liệu tab "Đánh giá hạn dùng CTC" (danh sách phiếu + modal lập / sửa phiếu).
+     *
+     * Trả về mảng biến đưa thẳng vào @include của tab, tên biến giữ như màn hình riêng
+     * trước đây nên view không phải đổi.
+     */
+    public function tabData(int $departmentId): array
+    {
         $datas = $this->listQuery($departmentId)
             ->orderByDesc(self::TABLE.'.start_date')
             ->orderByDesc(self::TABLE.'.id')
@@ -164,9 +182,7 @@ class StandardStabilityController extends Controller
             return $row;
         });
 
-        session()->put(['title' => 'ĐÁNH GIÁ HẠN DÙNG - CHẤT CHUẨN']);
-
-        return view('pages.stabilityAssessment.StandardStability.list', [
+        return [
             'datas' => $datas,
             'imports' => $this->importOptions($departmentId),
             'statuses' => [self::STATUS_INITIAL, self::STATUS_RUNNING, self::STATUS_DONE, self::STATUS_STOPPED, self::STATUS_CANCELLED],
@@ -179,7 +195,170 @@ class StandardStabilityController extends Controller
             // Nhóm chuẩn duy nhất phải đánh giá hạn dùng, để view viết đúng câu hướng dẫn
             'assessGroupName' => $this->groupName(),
             'assessGroupCode' => $this->groupCode(),
-        ]);
+        ];
+    }
+
+    /**
+     * Phiếu còn hiệu lực (chưa Huỷ) theo từng ống chuẩn, để bảng "Theo mã ống chuẩn" của
+     * Tồn Kho gắn nhãn tiến độ đánh giá ngay trên dòng ống: [import_id => phiếu].
+     */
+    public static function byImport($datas): array
+    {
+        return collect($datas)
+            ->where('status', '!=', self::STATUS_CANCELLED)
+            ->keyBy('import_id')
+            ->all();
+    }
+
+    /* ==========================================================
+     |  KẾ HOẠCH ĐÁNH GIÁ - TAB "KẾ HOẠCH ĐÁNH GIÁ" CỦA TỒN KHO
+     ========================================================== */
+
+    /**
+     * Xem ngược lại theo THỜI GIAN: gom MỌI MỐC của mọi phiếu còn hiệu lực trong phòng
+     * ban, có ngày đến hạn nằm trong khoảng plan_from - plan_to, để biết kỳ tới phải kiểm
+     * những ống chuẩn nào. Chỉ đọc - ghi kết quả ở trang chi tiết phiếu.
+     *
+     * Tham số khoảng là plan_from / plan_to (không phải from_date / to_date) vì cùng trang
+     * với Kỳ báo cáo của tồn kho.
+     */
+    public function planData(Request $request, int $departmentId): array
+    {
+        $period = $this->planPeriod($request);
+
+        $datas = DB::table(self::ITEM_TABLE)
+            ->join(self::TABLE, self::ITEM_TABLE.'.'.self::ITEM_FK, '=', self::TABLE.'.id')
+            ->join('standard_imports', self::TABLE.'.import_id', '=', 'standard_imports.id')
+            ->leftJoin('standard_categories', 'standard_imports.category_id', '=', 'standard_categories.id')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->select(
+                self::ITEM_TABLE.'.*',
+                self::TABLE.'.id as list_id',
+                self::TABLE.'.start_date',
+                self::TABLE.'.assessment_period',
+                self::TABLE.'.status as list_status',
+                'standard_imports.code as import_code',
+                'standard_imports.group_code',
+                'standard_imports.batch_no',
+                'standard_imports.expired_date',
+                'standard_imports.internal_expired_date',
+                'standard_categories.code as category_code',
+                'standard_categories.version as category_version',
+                'standard_names.name as standard_name',
+                'manufacturers.short_name as manufacturer_short_name'
+            )
+            ->where('standard_imports.department_id', $departmentId)
+            // Phiếu đã huỷ hoặc đã ngưng thì các mốc còn lại không thực hiện nữa
+            ->whereNotIn(self::TABLE.'.status', [self::STATUS_CANCELLED, self::STATUS_STOPPED])
+            ->whereNotNull(self::ITEM_TABLE.'.due_date')
+            ->whereBetween(self::ITEM_TABLE.'.due_date', [$period['from'], $period['to']])
+            ->orderBy(self::ITEM_TABLE.'.due_date', 'asc')
+            ->orderBy('standard_imports.code', 'asc')
+            ->orderBy(self::ITEM_TABLE.'.timepoint', 'asc')
+            ->get()
+            ->map(function ($row) {
+                $today = now()->startOfDay();
+                $due = \Carbon\Carbon::parse($row->due_date)->startOfDay();
+
+                $row->testing_list = $this->testingList($row->testings);
+                $row->days_to_due = (int) $today->diffInDays($due, false);
+                $row->state = $this->itemState($row);
+                $row->state_label = self::ITEM_STATES[$row->state];
+                $row->month_key = $due->format('Y-m');
+
+                return $row;
+            });
+
+        // Bỏ 'stopped': phiếu đã ngưng không vào kế hoạch nên chip đó luôn bằng 0
+        $itemStates = array_diff_key(self::ITEM_STATES, ['stopped' => null]);
+
+        return [
+            'datas' => $datas,
+            'period' => $period,
+            // Số mốc của từng tháng trong khoảng, vẽ thành dải thời gian trên đầu bảng
+            'months' => $this->planMonths($period, $datas),
+            'stateCounts' => collect($itemStates)->map(fn ($label, $state) => $datas->where('state', $state)->count())->all(),
+            'itemStates' => $itemStates,
+            'dueSoonDays' => self::DUE_SOON_DAYS,
+            'groups' => config('standard.groups'),
+        ];
+    }
+
+    /**
+     * DẢI THỜI GIAN - mỗi tháng trong khoảng đang xem là một mốc kèm số việc phải làm,
+     * kể cả tháng không có mốc nào để nhìn ra quãng trống trong kế hoạch.
+     */
+    private function planMonths(array $period, $datas): array
+    {
+        $cursor = \Carbon\Carbon::parse($period['from'])->startOfMonth();
+        $last = \Carbon\Carbon::parse($period['to'])->startOfMonth();
+        $thisMonth = now()->format('Y-m');
+
+        $months = [];
+
+        while ($cursor->lte($last)) {
+            $key = $cursor->format('Y-m');
+            $rows = $datas->where('month_key', $key);
+
+            $months[] = [
+                'key' => $key,
+                'label' => 'T'.$cursor->format('n').'/'.$cursor->format('Y'),
+                'total' => $rows->count(),
+                'overdue' => $rows->where('state', 'overdue')->count(),
+                'due' => $rows->where('state', 'due')->count(),
+                'done' => $rows->where('state', 'done')->count(),
+                'is_current' => $key === $thisMonth,
+            ];
+
+            $cursor->addMonthNoOverflow();
+        }
+
+        return $months;
+    }
+
+    /**
+     * Khoảng xem của kế hoạch. Mặc định từ đầu tháng này đến hết 3 tháng nữa: kế hoạch
+     * là để nhìn về phía trước. Ngày không đọc được thì lấy mặc định, chọn ngược thì đảo
+     * lại, dài quá PLAN_MAX_MONTHS tháng thì cắt.
+     */
+    private function planPeriod(Request $request): array
+    {
+        $parse = function ($value) {
+            if (! is_string($value) || trim($value) === '') {
+                return null;
+            }
+
+            try {
+                return \Carbon\Carbon::parse($value)->startOfDay();
+            } catch (\Throwable $e) {
+                return null;
+            }
+        };
+
+        $today = now()->startOfDay();
+
+        $from = $parse($request->query('plan_from')) ?: $today->copy()->startOfMonth();
+        $to = $parse($request->query('plan_to')) ?: $today->copy()->addMonthsNoOverflow(3)->endOfMonth();
+
+        if ($from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $limit = $from->copy()->addMonthsNoOverflow(self::PLAN_MAX_MONTHS)->endOfMonth();
+        $clamped = $to->gt($limit);
+
+        if ($clamped) {
+            $to = $limit;
+        }
+
+        return [
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+            'days' => (int) $from->diffInDays($to) + 1,
+            'clamped' => $clamped,
+            'max_months' => self::PLAN_MAX_MONTHS,
+        ];
     }
 
     /** Trang chi tiết một phiếu: thông tin ống chuẩn + các mốc đánh giá. */
@@ -190,7 +369,7 @@ class StandardStabilityController extends Controller
             ->first();
 
         if (! $list) {
-            return redirect()->route('pages.stabilityAssessment.standardStability.list')
+            return redirect()->route('pages.inventory.standardInventory.list', ['tab' => 'stability'])
                 ->with('error', 'Không tìm thấy '.self::LABEL.' của phòng ban đang chọn!');
         }
 
@@ -198,7 +377,7 @@ class StandardStabilityController extends Controller
 
         $stopped = $list->status === self::STATUS_STOPPED;
 
-        return view('pages.stabilityAssessment.StandardStability.detail', [
+        return view('pages.inventory.StandardStability.detail', [
             'list' => $list,
             'items' => $this->itemsOf($list->id, $stopped),
             'itemStates' => self::ITEM_STATES,
@@ -279,7 +458,7 @@ class StandardStabilityController extends Controller
         });
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'createErrors')->withInput()->with('activeTab', 'stability');
         }
 
         $startDate = substr((string) $request->start_date, 0, 10);
@@ -341,7 +520,7 @@ class StandardStabilityController extends Controller
             'Lập '.self::LABEL.' cho ống chuẩn '.$import->code.' với '.count($rows).' '.self::ITEM_LABEL
         );
 
-        return redirect()->route('pages.stabilityAssessment.standardStability.detail', ['id' => $id])
+        return redirect()->route('pages.inventory.standardStability.detail', ['id' => $id])
             ->with('success', $rows
                 ? 'Đã lập '.self::LABEL.' cho ống chuẩn '.$import->code.' kèm '.count($rows).' '.self::ITEM_LABEL.'!'
                 : 'Đã lập '.self::LABEL.' cho ống chuẩn '.$import->code.'! Hãy khai các mốc đánh giá.');
@@ -359,17 +538,17 @@ class StandardStabilityController extends Controller
         $current = $this->findOwn($request->id);
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!')->with('activeTab', 'stability');
         }
 
         if (! $this->editable($current)) {
-            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không sửa được nữa!');
+            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không sửa được nữa!')->with('activeTab', 'stability');
         }
 
         $validator = Validator::make($request->all(), $this->rules(false), $this->messages());
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'updateErrors')->withInput()->with('activeTab', 'stability');
         }
 
         $startDate = substr((string) $request->start_date, 0, 10);
@@ -422,7 +601,7 @@ class StandardStabilityController extends Controller
             'Bắt đầu '.$startDate.', chu kỳ '.$request->assessment_period.' tháng'
         );
 
-        return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
+        return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!')->with('activeTab', 'stability');
     }
 
     /**
@@ -436,7 +615,7 @@ class StandardStabilityController extends Controller
         $current = $this->findOwn($request->id);
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!')->with('activeTab', 'stability');
         }
 
         if ($current->status !== self::STATUS_CANCELLED) {
@@ -474,7 +653,7 @@ class StandardStabilityController extends Controller
             $newStatus === self::STATUS_CANCELLED
                 ? 'Đã huỷ '.self::LABEL.'!'
                 : 'Đã mở lại '.self::LABEL.', trạng thái hiện tại: '.$newStatus.'.'
-        );
+        )->with('activeTab', 'stability');
     }
 
     /* ==========================================================
@@ -486,11 +665,11 @@ class StandardStabilityController extends Controller
         $list = $this->findOwn($request->{self::ITEM_FK});
 
         if (! $list) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần khai mốc đánh giá!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần khai mốc đánh giá!')->with('activeTab', 'stability');
         }
 
         if (! $this->editable($list)) {
-            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không thêm mốc đánh giá được nữa!');
+            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không thêm mốc đánh giá được nữa!')->with('activeTab', 'stability');
         }
 
         $validator = Validator::make($request->all(), $this->itemRules(), $this->itemMessages());
@@ -499,7 +678,7 @@ class StandardStabilityController extends Controller
         $this->checkDuplicateTimepoint($validator, $list->id, (int) $request->timepoint);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'itemCreateErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'itemCreateErrors')->withInput()->with('activeTab', 'stability');
         }
 
         $payload = $this->itemPayload($request, $list);
@@ -520,7 +699,7 @@ class StandardStabilityController extends Controller
 
         AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $id, 'NA', 'Thêm '.self::ITEM_LABEL.' T'.(int) $request->timepoint.' vào phiếu #'.$list->id);
 
-        return redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu!');
+        return redirect()->back()->with('success', 'Đã thêm '.self::ITEM_LABEL.' vào phiếu!')->with('activeTab', 'stability');
     }
 
     public function updateItem(Request $request)
@@ -528,15 +707,15 @@ class StandardStabilityController extends Controller
         [$item, $list] = $this->findItem($request->id);
 
         if (! $item) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần cập nhật!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần cập nhật!')->with('activeTab', 'stability');
         }
 
         if (! $this->editable($list)) {
-            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không sửa mốc đánh giá được nữa!');
+            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không sửa mốc đánh giá được nữa!')->with('activeTab', 'stability');
         }
 
         if ($item->status !== self::ITEM_INITIAL) {
-            return redirect()->back()->with('error', 'Mốc đánh giá đã có kết quả nên không sửa được nữa!');
+            return redirect()->back()->with('error', 'Mốc đánh giá đã có kết quả nên không sửa được nữa!')->with('activeTab', 'stability');
         }
 
         $validator = Validator::make($request->all(), $this->itemRules(), $this->itemMessages());
@@ -545,7 +724,7 @@ class StandardStabilityController extends Controller
         $this->checkDuplicateTimepoint($validator, $list->id, (int) $request->timepoint, $item->id);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'itemUpdateErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'itemUpdateErrors')->withInput()->with('activeTab', 'stability');
         }
 
         $payload = $this->itemPayload($request, $list, $item);
@@ -568,7 +747,7 @@ class StandardStabilityController extends Controller
 
         AuditTrialController::log('Cập nhật', self::ITEM_TABLE, $item->id, $item->name.' (T'.$item->timepoint.')', $request->name.' (T'.(int) $request->timepoint.')');
 
-        return redirect()->back()->with('success', 'Cập nhật '.self::ITEM_LABEL.' thành công!');
+        return redirect()->back()->with('success', 'Cập nhật '.self::ITEM_LABEL.' thành công!')->with('activeTab', 'stability');
     }
 
     /**
@@ -583,15 +762,15 @@ class StandardStabilityController extends Controller
         [$item, $list] = $this->findItem($request->id);
 
         if (! $item) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần xoá!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần xoá!')->with('activeTab', 'stability');
         }
 
         if (! $this->editable($list)) {
-            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không xoá mốc đánh giá được nữa!');
+            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không xoá mốc đánh giá được nữa!')->with('activeTab', 'stability');
         }
 
         if ($item->status !== self::ITEM_INITIAL) {
-            return redirect()->back()->with('error', 'Mốc đánh giá đã có kết quả nên không xoá được!');
+            return redirect()->back()->with('error', 'Mốc đánh giá đã có kết quả nên không xoá được!')->with('activeTab', 'stability');
         }
 
         DB::transaction(function () use ($item, $list) {
@@ -610,7 +789,7 @@ class StandardStabilityController extends Controller
 
         AuditTrialController::log('Xoá', self::ITEM_TABLE, $item->id, $item->name.' (T'.$item->timepoint.')', 'Xoá khỏi phiếu #'.$list->id);
 
-        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu!');
+        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu!')->with('activeTab', 'stability');
     }
 
     /**
@@ -633,13 +812,13 @@ class StandardStabilityController extends Controller
         [$item, $list] = $this->findItem($request->id);
 
         if (! $item) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần ghi kết quả!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần ghi kết quả!')->with('activeTab', 'stability');
         }
 
         if (! $this->running($list)) {
             return redirect()->back()->with('error', $list->status === self::STATUS_STOPPED
                 ? 'Phiếu đã ngưng đánh giá, hãy mở lại phiếu trước khi ghi thêm kết quả!'
-                : 'Phiếu đã huỷ nên không ghi kết quả được nữa!');
+                : 'Phiếu đã huỷ nên không ghi kết quả được nữa!')->with('activeTab', 'stability');
         }
 
         $validator = Validator::make($request->all(), [
@@ -682,7 +861,7 @@ class StandardStabilityController extends Controller
         });
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'assessErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'assessErrors')->withInput()->with('activeTab', 'stability');
         }
 
         $failed = $request->status === self::ITEM_FAILED;
@@ -754,10 +933,10 @@ class StandardStabilityController extends Controller
         if ($stop) {
             return redirect()->back()->with('success', $failed
                 ? 'Mốc '.$item->name.' Không Đạt - phiếu đã ngưng đánh giá, '.$remaining.' mốc còn lại sẽ không thực hiện!'
-                : 'Đã ghi kết quả mốc '.$item->name.' và ngưng đánh giá, '.$remaining.' mốc còn lại sẽ không thực hiện!');
+                : 'Đã ghi kết quả mốc '.$item->name.' và ngưng đánh giá, '.$remaining.' mốc còn lại sẽ không thực hiện!')->with('activeTab', 'stability');
         }
 
-        return redirect()->back()->with('success', 'Đã ghi kết quả đánh giá cho mốc '.$item->name.'!');
+        return redirect()->back()->with('success', 'Đã ghi kết quả đánh giá cho mốc '.$item->name.'!')->with('activeTab', 'stability');
     }
 
     /**
@@ -771,11 +950,11 @@ class StandardStabilityController extends Controller
         $current = $this->findOwn($request->id);
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần mở lại!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần mở lại!')->with('activeTab', 'stability');
         }
 
         if ($current->status !== self::STATUS_STOPPED) {
-            return redirect()->back()->with('error', 'Phiếu này không ở trạng thái ngưng đánh giá!');
+            return redirect()->back()->with('error', 'Phiếu này không ở trạng thái ngưng đánh giá!')->with('activeTab', 'stability');
         }
 
         $newStatus = $this->statusFromItems($current->id);
@@ -800,7 +979,7 @@ class StandardStabilityController extends Controller
 
         AuditTrialController::log('Mở lại', self::TABLE, $current->id, 'status: '.$current->status, 'status: '.$newStatus);
 
-        return redirect()->back()->with('success', 'Đã mở lại phiếu, trạng thái hiện tại: '.$newStatus.'.');
+        return redirect()->back()->with('success', 'Đã mở lại phiếu, trạng thái hiện tại: '.$newStatus.'.')->with('activeTab', 'stability');
     }
 
     /**
@@ -818,19 +997,19 @@ class StandardStabilityController extends Controller
         [$item, $list] = $this->findItem($request->id);
 
         if (! $item) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần cấp phát chuẩn!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần cấp phát chuẩn!')->with('activeTab', 'stability');
         }
 
         if (! $this->running($list)) {
             return redirect()->back()->with('error', $list->status === self::STATUS_STOPPED
                 ? 'Phiếu đã ngưng đánh giá nên không ghi cấp phát chuẩn được nữa!'
-                : 'Phiếu đã huỷ nên không ghi cấp phát chuẩn được nữa!');
+                : 'Phiếu đã huỷ nên không ghi cấp phát chuẩn được nữa!')->with('activeTab', 'stability');
         }
 
         $current = $this->testingList($item->testings);
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Mốc này chưa chọn chỉ tiêu kiểm nào để cấp phát chuẩn!');
+            return redirect()->back()->with('error', 'Mốc này chưa chọn chỉ tiêu kiểm nào để cấp phát chuẩn!')->with('activeTab', 'stability');
         }
 
         $issued = array_map('strval', (array) $request->input('issued', []));
@@ -845,7 +1024,7 @@ class StandardStabilityController extends Controller
         }
 
         if ($validator->errors()->isNotEmpty()) {
-            return redirect()->back()->withErrors($validator, 'issueErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'issueErrors')->withInput()->with('activeTab', 'stability');
         }
 
         $updated = [];
@@ -861,7 +1040,7 @@ class StandardStabilityController extends Controller
         $json = json_encode($updated, JSON_UNESCAPED_UNICODE);
 
         if (strlen($json) > self::TESTINGS_LENGTH) {
-            return redirect()->back()->with('error', 'Ghi chú cấp phát quá dài, hãy viết ngắn lại!');
+            return redirect()->back()->with('error', 'Ghi chú cấp phát quá dài, hãy viết ngắn lại!')->with('activeTab', 'stability');
         }
 
         DB::transaction(function () use ($item, $list, $current, $updated, $json) {
@@ -892,7 +1071,7 @@ class StandardStabilityController extends Controller
         );
 
         return redirect()->back()->with('success', 'Đã ghi cấp phát chuẩn cho mốc '.$item->name.': '
-            .$count.'/'.count($updated).' chỉ tiêu đã cấp phát.');
+            .$count.'/'.count($updated).' chỉ tiêu đã cấp phát.')->with('activeTab', 'stability');
     }
 
     /* ==========================================================

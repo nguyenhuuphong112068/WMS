@@ -39,6 +39,13 @@
     </div>
 </div>
 
+<div class="ug-callout">
+    <i class="fas fa-project-diagram"></i>
+    <div>Muốn xem phiếu đi qua những trang nào, ở trạng thái nào và tồn kho tăng giảm lúc nào, mở
+        <a href="#so-do-chung">Sơ đồ đường đi phiếu vật tư</a>. Mỗi mục bên dưới cũng có nút
+        <b>Trên sơ đồ chung</b> dẫn về đúng hàng của bước đó.</div>
+</div>
+
 <h3>Các nhánh phụ</h3>
 <ul>
     <li><a href="#lien-phong-ban">Đề nghị liên phòng ban</a>: xin vật tư từ kho của phòng khác.</li>

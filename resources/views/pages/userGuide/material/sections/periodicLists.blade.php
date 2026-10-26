@@ -1,3 +1,7 @@
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'noi-bo', 'no' => 3, 'label' => 'Đề nghị sử dụng nội bộ'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'lien-phong-ban', 'no' => 2, 'label' => 'Đề nghị liên phòng ban'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+
 <p>Lập sẵn một danh sách vật tư dùng đều đặn. Đến ngày đã hẹn, hệ thống <b>tự tạo</b> một phiếu ở trạng thái
     <b>Lưu tạm / Nháp</b> để bạn kiểm tra lại rồi gửi đi. Có 3 tab:</p>
 
