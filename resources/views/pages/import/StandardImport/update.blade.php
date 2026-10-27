@@ -47,8 +47,7 @@
                                 @foreach ($categories as $category)
                                     <option value="{{ $category->id }}"
                                         {{ old('category_id') == $category->id ? 'selected' : '' }}>
-                                        {{ $category->code }} - {{ $category->standard_name }}
-                                        (v{{ $category->version }}{{ $category->unit_short_name ? ', ' . $category->unit_short_name : '' }})
+                                        {{ $category->code }} - {{ $category->standard_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}
                                     </option>
                                 @endforeach
                             </select>
@@ -234,6 +233,11 @@
                                         khối lượng
                                     </label>
                                 </div>
+                                {{-- Lý do ô bị khoá: ĐVT của phòng không phải mg / ml có tỉ trọng d --}}
+                                <small class="md-sub d-block mt-2 sd-up-weight-block" style="display:none;"></small>
+                                @if ($bag->has('weight_controlled'))
+                                    <span class="md-error d-block mt-1">{{ $bag->first('weight_controlled') }}</span>
+                                @endif
 
                                 <div class="sd-up-standard-form-box mt-2 pt-2 border-top" style="display:none;">
                                     <label class="small font-weight-bold mb-1 text-primary d-block">Dạng Chuẩn <span
@@ -395,6 +399,25 @@
             var catId = $(this).val();
             var defaultsMap = $(this).data('defaults') || {};
             var item = defaultsMap[catId] || null;
+
+            // Kiểm soát khối lượng chỉ tick được khi ĐVT là mg, hoặc ml đã khai tỉ trọng d.
+            // Phiếu cũ đã tick sẵn mà giữ nguyên chất chuẩn thì vẫn để tick (server cũng cho lưu)
+            var orig = $upModal.data('origWeight') || {};
+            var legacy = !!orig.weight_controlled && String(orig.category_id) === String(catId);
+            var block = item ? (item.weight_block || '') : '';
+            var blocked = (!item || block !== '') && !legacy;
+            var $chk = $upModal.find('.sd-up-weight-ctrl');
+
+            if (blocked && $chk.is(':checked')) {
+                $chk.prop('checked', false).trigger('change');
+            }
+
+            $chk.prop('disabled', blocked);
+            $chk.closest('.custom-checkbox').attr('title', blocked ? (block || 'Chọn chất chuẩn trước') : '');
+            $upModal.find('.sd-up-weight-block')
+                .html(blocked && block ? '<i class="fas fa-lock mr-1"></i>' + $('<span>').text(block).html() : '')
+                .toggle(blocked && block !== '');
+
             var shelfLife = (item && item.shelf_life_months) ? parseInt(item.shelf_life_months, 10) : 0;
             var $optReEval = $upModal.find('#upExpTypeReEvaluation');
             var $lblReEval = $upModal.find('#upLabelExpTypeReEvaluation');
@@ -454,6 +477,7 @@
 
             // Checkbox kiểm soát khối lượng & Dạng chuẩn
             var isWeightCtrl = !!row.weight_controlled;
+            $upModal.data('origWeight', { category_id: row.category_id, weight_controlled: isWeightCtrl });
             $upModal.find('.sd-up-weight-ctrl').prop('checked', isWeightCtrl);
             if (isWeightCtrl) {
                 $upModal.find('.sd-up-standard-form-box').show();

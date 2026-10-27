@@ -13,6 +13,11 @@
                     chưa có nhóm chuẩn.</td>
             </tr>
             <tr>
+                <td>Không tìm thấy chất chuẩn khi lập đề nghị cấp phát cho Tổ, hoặc báo "Chất chuẩn chưa được khai ở Danh Mục › Chất Chuẩn Của Phòng"</td>
+                <td style="font-weight: 400">Đề nghị cho Tổ chỉ chọn được chuẩn phòng đã khai ở <a href="#chuan-cua-phong">Chất Chuẩn Của Phòng</a>.
+                    Khai chuẩn cho phòng trước, hoặc xin từ phòng khác qua <a href="#lien-phong-ban">đề nghị liên phòng ban</a>.</td>
+            </tr>
+            <tr>
                 <td>Đã nhập mà không thấy trong tồn</td>
                 <td style="font-weight: 400">Ống còn <b>Chờ kiểm tra</b>. Vào tab <a href="#nhap-chuan">Nhập chất chuẩn</a> và xác nhận Đạt.</td>
             </tr>

@@ -7,7 +7,7 @@
 | Cùng bố cục với chi tiết dự trù vật tư (MaterialEstimate/detail): mã / NSX tách cột, file
 | đính kèm theo từng chất chuẩn, cảnh báo không kịp thời gian đặt hàng, tiêu đề bảng cố định.
 | Riêng chất chuẩn: mỗi dòng còn khai NHÓM CHUẨN mong muốn để bộ phận mua hàng biết cần mua
-| chuẩn chính hay chuẩn tạp; mã danh mục kèm version.
+| chuẩn chính hay chuẩn tạp.
 |
 | Biến vào: $list, $items, $histories, $categories, $units, $groups, $canEditItems,
 |           $backRoute, $estRoute, $appStatuses, $receptionStatuses, $approvedAt
@@ -23,7 +23,7 @@
     @include('pages.estimate.shared.assets')
 
     {{-- Trang này không có bảng lọc nên không kéo theo pages.shared.standardGroupFilter,
-         phải khai riêng hai thẻ nhóm chuẩn / version đang dùng ở bảng. --}}
+         phải khai riêng thẻ nhóm chuẩn đang dùng ở bảng. --}}
     <style>
         .sgr-chip {
             display: inline-block;
@@ -35,18 +35,6 @@
             font-size: 0.74rem;
             font-weight: 700;
             letter-spacing: 0.3px;
-            white-space: nowrap;
-        }
-
-        .sgr-version {
-            display: inline-block;
-            background: #EDE9FE;
-            color: #5B21B6;
-            border: 1px solid #C4B5FD;
-            border-radius: 999px;
-            padding: 1px 9px;
-            font-size: 0.72rem;
-            font-weight: 700;
             white-space: nowrap;
         }
     </style>
@@ -135,7 +123,6 @@
                                         <td class="text-nowrap">
                                             @if ($item->category_id)
                                                 <div class="font-weight-bold">{{ $item->category_code ?: '—' }}</div>
-                                                <span class="sgr-version mt-1">v{{ $item->category_version }}</span>
                                             @else
                                                 <span class="md-empty">—</span>
                                             @endif

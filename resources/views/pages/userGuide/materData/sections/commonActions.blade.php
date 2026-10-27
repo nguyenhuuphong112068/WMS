@@ -55,6 +55,17 @@
     </table>
 </div>
 
+<div class="ug-callout">
+    <i class="fas fa-lightbulb"></i>
+    <div>
+        <b>Sửa, Duyệt, Từ chối, Khoá / Mở khoá</b> (và Xoá ở Định Khu) lưu ngay tại chỗ, <b>không tải lại trang</b>.
+        Bấm <b>Lưu thay đổi</b> hoặc <b>Đồng ý</b> xong, cửa sổ tự đóng, hệ thống báo <i>"Thành công!"</i> và bảng tự
+        cập nhật dòng vừa đổi. Ô Tìm kiếm, bộ lọc, tab, trang đang xem và vị trí cuộn được giữ nguyên để bạn làm tiếp
+        dòng kế bên. Nếu nhập sai, lỗi hiện màu đỏ ngay dưới ô trong cửa sổ Sửa và cửa sổ vẫn mở để sửa tiếp.
+        Riêng <b>Thêm mới</b> vẫn tải lại trang như cũ.
+    </div>
+</div>
+
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>

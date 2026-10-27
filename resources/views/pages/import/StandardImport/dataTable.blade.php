@@ -100,7 +100,7 @@
                                     <th style="width: 150px">Tình Trạng</th>
                                     <th class="text-center" style="width: 65px" title="File hồ sơ đính kèm"><i
                                             class="fas fa-paperclip"></i></th>
-                                    <th class="text-center" style="width: 135px">Thao Tác</th>
+                                    <th class="text-center" style="width: 80px">Thao Tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -136,7 +136,6 @@
                                                 style="--chip: {{ $rowCodeBadge['bg'] }}; --chip-text: {{ $rowCodeBadge['text'] }}">{{ $row->code }}</div>
                                             <div class="mt-1">
                                                 <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                                                <span class="sgr-version ml-1">Ver {{ $row->category_version }}</span>
                                             </div>
                                         </td>
                                         <td>
@@ -306,32 +305,6 @@
                                                             data-title="{{ $row->code }} - {{ $row->standard_name }}">{{ $impAdjust }}</button>
                                                     @endif
                                                 </span>
-
-                                                <a class="btn btn-sm btn-outline-secondary" target="_blank"
-                                                    title="In nhãn dán ống chuẩn (mã vạch Code 128)"
-                                                    @perm('import_standard_label')
-                                                        href="{{ route($impRoute . 'label', ['id' => $row->id]) }}">
-                                                        <i class="fas fa-tag"></i>
-                                                    </a>
-                                                @endperm
-
-                                                @perm('import_standard_delete')
-                                                    <form class="form-md-confirm d-inline"
-                                                        action="{{ route($impRoute . 'deActive') }}" method="POST"
-                                                        data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $impLabel }}?"
-                                                        data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, ống chuẩn &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
-                                                        data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                        @csrf
-                                                        <input type="hidden" name="id"
-                                                            value="{{ $row->id }}">
-                                                        <button type="submit"
-                                                            class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                            title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                            <i
-                                                                class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                        </button>
-                                                    </form>
-                                                @endperm
                                             </div>
                                         </td>
                                     </tr>

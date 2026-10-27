@@ -421,6 +421,9 @@
 
             document.body.appendChild(proxy);
             proxy.submit();
+
+            // Gửi ngầm (layout/softSubmit) thì trang ở lại: gỡ form tạm, dữ liệu đã đọc xong lúc submit()
+            if (window.wmsSoft && window.wmsSoft.handles(proxy)) proxy.remove();
         }
 
         /*

@@ -43,18 +43,31 @@
                     <div class="form-row">
                         <div class="form-group col-md-8">
                             <label>Ống Chuẩn <span class="text-danger">*</span></label>
+                            @php
+                                /*
+                                | Nhãn cần số tồn controller vừa tính nên không tìm ở server: cả danh sách đi
+                                | theo [data-local-options] dạng JSON, ô chọn tìm ngay trên mảng này
+                                | (window.wmsLocalLookup, export/shared/assets) và chỉ dựng option của dòng
+                                | đang hiện, không in sẵn hàng nghìn <option>.
+                                */
+                                $expImportOptions = $imports->map(fn($import) => [
+                                    'id' => $import->id,
+                                    'text' => $import->code . ' - ' . $import->standard_name
+                                        . ($import->batch_no ? ' - Lô ' . $import->batch_no : '')
+                                        . ' (còn ' . $expNum($import->remaining) . ' ' . $import->unit_short_name . ')'
+                                        . ($import->selectable ? '' : ' - không còn xuất được'),
+                                ])->values();
+                                $expOldImport = $expImportOptions->firstWhere('id', old('import_id'));
+                            @endphp
                             <select name="import_id"
                                 class="form-control exp-select {{ $bag->has('import_id') ? 'is-invalid' : '' }}"
                                 data-imports="{{ json_encode($expImportMap) }}" data-over="{{ $expOverRatio }}"
+                                data-local-options="{{ json_encode($expImportOptions) }}"
                                 required>
                                 <option value="">-- Chọn ống chuẩn --</option>
-                                @foreach ($imports as $import)
-                                    <option value="{{ $import->id }}"
-                                        {{ old('import_id') == $import->id ? 'selected' : '' }}>
-                                        {{ $import->code }} - {{ $import->standard_name }} (v{{ $import->category_version }}){{ $import->batch_no ? ' - Lô ' . $import->batch_no : '' }}
-                                        (còn {{ $expNum($import->remaining) }} {{ $import->unit_short_name }}){{ $import->selectable ? '' : ' - không còn xuất được' }}
-                                    </option>
-                                @endforeach
+                                @if ($expOldImport)
+                                    <option value="{{ $expOldImport['id'] }}" selected>{{ $expOldImport['text'] }}</option>
+                                @endif
                             </select>
                             @if ($bag->has('import_id'))
                                 <span class="md-error">{{ $bag->first('import_id') }}</span>

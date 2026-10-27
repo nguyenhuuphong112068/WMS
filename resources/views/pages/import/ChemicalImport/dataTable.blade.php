@@ -236,22 +236,6 @@
                                                     <i class="fas fa-tag"></i>
                                                 </a>
                                                 @endperm
-
-                                            @perm('import_chemical_delete')
-                                                <form class="form-md-confirm d-inline" action="{{ route($impRoute . 'deActive') }}"
-                                                    method="POST"
-                                                    data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $impLabel }}?"
-                                                    data-text="{{ $row->status_id == 1 ? 'Sau khi khoá' : 'Sau khi mở khoá' }}, phiếu &quot;{{ $row->code }}&quot; {{ $row->status_id == 1 ? 'sẽ không còn được tính vào tồn kho.' : 'sẽ được tính vào tồn kho trở lại.' }}"
-                                                    data-danger="{{ $row->status_id == 1 ? '1' : '' }}">
-                                                    @csrf
-                                                    <input type="hidden" name="id" value="{{ $row->id }}">
-                                                    <button type="submit"
-                                                        class="btn btn-sm btn-{{ $row->status_id == 1 ? 'secondary' : 'primary' }}"
-                                                        title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }}">
-                                                        <i class="fas fa-{{ $row->status_id == 1 ? 'lock' : 'unlock' }}"></i>
-                                                    </button>
-                                                </form>
-                                            @endperm
                                         </div>
                                     </td>
                                 </tr>

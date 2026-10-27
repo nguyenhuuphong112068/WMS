@@ -24,7 +24,7 @@
                 </div>
 
                 <div class="table-responsive bg-white rounded shadow-sm border" style="max-height: 60vh;">
-                    <table class="table table-hover table-bordered mb-0" id="inventoryImportPickerTable" style="font-size: 0.88rem;">
+                    <table class="table table-hover table-bordered mb-0" id="inventoryImportPickerTable" style="font-size: 0.88rem;" data-deferred="lazy">
                         <thead class="bg-light text-center">
                             <tr>
                                 <th style="width: 50px">STT</th>
@@ -37,12 +37,14 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {{-- Hàng nghìn ống chỉ lấy ở lần mở đầu - pages/shared/deferredRows --}}
+                            @deferredRows('inventoryImportPickerTable')
                             @php $stt = 1; @endphp
                             @forelse ($availableImports as $imp)
                             <tr class="inv-import-row">
                                 <td class="text-center">{{ $stt++ }}</td>
                                 <td class="font-weight-bold">{{ $imp->code }}</td>
-                                <td>{{ $imp->standard_name }} <br><small class="text-muted">v{{ $imp->category_version }}</small></td>
+                                <td>{{ $imp->standard_name }}</td>
                                 <td>{{ $imp->batch_no ?: '—' }}</td>
                                 <td class="text-right font-weight-bold text-success">{{ $expNum($imp->remaining) }} {{ $imp->unit_short_name }}</td>
                                 <td>
@@ -83,6 +85,7 @@
                                 <td colspan="7" class="text-center text-muted py-4">Không có ống chuẩn nào trong kho.</td>
                             </tr>
                             @endforelse
+                            @enddeferredRows
                         </tbody>
                     </table>
                 </div>
@@ -97,6 +100,13 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Modal mở bằng data-toggle (create.blade.php) - dòng nạp ở lần mở đầu
+    $('#inventoryImportPickerModal').on('show.bs.modal', function() {
+        mdDeferred.fillLazy('#inventoryImportPickerTable', function() {
+            $('#searchInventoryImport').trigger('keyup');
+        }, 'Đang tải danh sách ống chuẩn...');
+    });
+
     $('#searchInventoryImport').on('keyup', function() {
         var value = $(this).val().toLowerCase();
         $('#inventoryImportPickerTable tbody tr.inv-import-row').filter(function() {

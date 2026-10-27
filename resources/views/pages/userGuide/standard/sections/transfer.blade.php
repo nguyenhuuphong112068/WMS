@@ -1,6 +1,7 @@
 <p>Phòng <b>A</b> xin chất chuẩn từ kho của phòng <b>B</b>, theo đúng 3 bước như hoá chất và <b>không có bước ký</b>:</p>
 <ol class="ug-steps">
-    <li><b>A lập đề nghị</b>: chọn phòng được đề nghị, thêm chuẩn, số lượng, ngày mong muốn. Bấm
+    <li><b>A lập đề nghị</b>: chọn phòng được đề nghị, thêm chuẩn (gõ mã, tên hoặc nhà sản xuất để tìm; đơn vị tự điền theo
+        đơn vị phòng mình khai), số lượng, ngày mong muốn. Bấm
         <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-save mr-1"></i> Lưu</span> hoặc
         <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-paper-plane mr-1"></i> Gửi đề nghị</span>.</li>
     <li><b>B cấp phát</b>: chọn ống trong kho của B và số lượng, hoặc từ chối từng mục. Tồn của B bị trừ ngay, mục chuyển sang chờ nhận.</li>

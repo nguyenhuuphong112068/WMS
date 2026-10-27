@@ -973,6 +973,11 @@
             background: rgba(23, 184, 212, 0.10);
         }
 
+        .actor-tag.is-me {
+            color: var(--state-success);
+            background: rgba(var(--state-success-rgb), 0.10);
+        }
+
         .dir-chip {
             display: inline-flex;
             align-items: center;
@@ -1178,13 +1183,12 @@
         }
 
         .tile3d {
-            perspective: 1000px;
             animation: tile-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
             animation-delay: calc(var(--i, 0) * 60ms);
         }
 
         @keyframes tile-in {
-            from { opacity: 0; transform: translateY(22px) rotateX(16deg); }
+            from { opacity: 0; transform: translateY(22px); }
             to { opacity: 1; transform: none; }
         }
 
@@ -1198,9 +1202,7 @@
             border-left: 5px solid var(--c);
             border-radius: 14px;
             box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.08), 0 14px 26px -16px rgba(var(--c-rgb), 0.6);
-            transform-style: preserve-3d;
-            transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
+            transition: box-shadow 0.25s ease;
         }
 
         .tile3d:hover .tile3d__card {
@@ -1237,7 +1239,6 @@
             justify-content: space-between;
             gap: 8px;
             padding: 12px 16px 0;
-            transform: translateZ(20px);
         }
 
         .tile3d__head {
@@ -1247,7 +1248,6 @@
             padding: 10px 16px 8px;
             color: var(--text-main);
             text-decoration: none;
-            transform: translateZ(28px);
         }
 
         .tile3d__head:hover {
@@ -1284,7 +1284,6 @@
             margin: 0;
             padding: 0 10px 10px;
             flex: 1;
-            transform: translateZ(14px);
         }
 
         .tile3d__list a {
@@ -1348,7 +1347,6 @@
             font-weight: 700;
             color: var(--primary);
             text-decoration: none;
-            transform: translateZ(10px);
         }
 
         .tile3d__more:hover {
@@ -1478,10 +1476,12 @@
         };
         $signTotal = 0;
         $deptTotal = 0;
+        $meTotal = 0;
         foreach ($reviewMatrix as $byObject) {
             foreach ($byObject as $byActor) {
                 $signTotal += $byActor['sign']['count'];
                 $deptTotal += $byActor['dept']['count'];
+                $meTotal += $byActor['me']['count'];
             }
         }
         $objChip = fn($key) => '<span class="obj-chip obj-' . $key . '"><span class="obj-chip__dot"><i class="' . e($reviewObjects[$key]['icon']) . '"></i></span>' . e($reviewObjects[$key]['label']) . '</span>';
@@ -1511,6 +1511,9 @@
                     <span class="hero3d__stat"><i class="fas fa-layer-group"></i><b>{{ $reviewTotal }}</b> đề nghị chờ</span>
                     <span class="hero3d__stat"><i class="{{ $reviewActors['sign']['icon'] }}"></i><b>{{ $signTotal }}</b> {{ mb_strtolower($reviewActors['sign']['label']) }}</span>
                     <span class="hero3d__stat"><i class="{{ $reviewActors['dept']['icon'] }}"></i><b>{{ $deptTotal }}</b> {{ mb_strtolower($reviewActors['dept']['label']) }}</span>
+                    @if ($meTotal > 0)
+                        <span class="hero3d__stat"><i class="{{ $reviewActors['me']['icon'] }}"></i><b>{{ $meTotal }}</b> {{ mb_strtolower($reviewActors['me']['label']) }}</span>
+                    @endif
                     @if ($reviewOldest)
                         <a href="{{ $reviewOldest['url'] }}" class="hero3d__stat" title="{{ $reviewOldest['label'] }} {{ $reviewOldest['code'] }}">
                             <i class="fas fa-hourglass-half"></i>Chờ lâu nhất <b>{{ \Carbon\Carbon::parse($reviewOldest['since'])->locale('vi')->diffForHumans(null, true) }}</b>
@@ -1612,7 +1615,7 @@
 
                                             <div class="tile3d__top">
                                                 {!! $objChip($card['object']) !!}
-                                                <span class="actor-tag {{ $card['actor'] === 'dept' ? 'is-dept' : '' }}">
+                                                <span class="actor-tag {{ $card['actor'] === 'sign' ? '' : 'is-' . $card['actor'] }}">
                                                     <i class="{{ $reviewActors[$card['actor']]['icon'] }}"></i>
                                                     {{ $reviewActors[$card['actor']]['short'] }}
                                                 </span>
@@ -1699,28 +1702,18 @@
                 });
             });
 
-            /* ---------- Hiệu ứng 3D theo con trỏ (bỏ qua trên cảm ứng / giảm chuyển động) ---------- */
+            /* ---------- Vệt sáng theo con trỏ trên card (bỏ qua trên cảm ứng / giảm chuyển động) ---------- */
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
                 window.matchMedia('(hover: none)').matches) {
                 return;
             }
 
-            var MAX_TILT = 8;
-
             tiles.forEach(function(tile) {
                 var card = tile.querySelector('.tile3d__card');
                 tile.addEventListener('mousemove', function(e) {
                     var rect = tile.getBoundingClientRect();
-                    var x = (e.clientX - rect.left) / rect.width;
-                    var y = (e.clientY - rect.top) / rect.height;
-                    card.style.setProperty('--ry', ((x - 0.5) * MAX_TILT * 2).toFixed(2) + 'deg');
-                    card.style.setProperty('--rx', ((0.5 - y) * MAX_TILT * 2).toFixed(2) + 'deg');
-                    card.style.setProperty('--mx', (x * 100).toFixed(1) + '%');
-                    card.style.setProperty('--my', (y * 100).toFixed(1) + '%');
-                });
-                tile.addEventListener('mouseleave', function() {
-                    card.style.setProperty('--rx', '0deg');
-                    card.style.setProperty('--ry', '0deg');
+                    card.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width * 100).toFixed(1) + '%');
+                    card.style.setProperty('--my', ((e.clientY - rect.top) / rect.height * 100).toFixed(1) + '%');
                 });
             });
 

@@ -20,6 +20,30 @@ namespace App\Support;
  */
 class StandardWeight
 {
+    /**
+     * Lý do ống KHÔNG được tick "Chuẩn có cần kiểm soát khối lượng", null khi được tick.
+     *
+     * Chỉ ĐVT của phòng là mg, hoặc ml đã khai tỉ trọng d ở Danh Mục Chất Chuẩn (để
+     * quy số cân mg ra ml) mới so được KL thực với lượng đã ghi sử dụng.
+     */
+    public static function controlBlock(?string $unitShort, $density): ?string
+    {
+        $unit = mb_strtolower(trim((string) $unitShort));
+
+        if ($unit === 'mg') {
+            return null;
+        }
+
+        if ($unit === 'ml') {
+            return (float) $density > 0
+                ? null
+                : 'Chất chuẩn ĐVT ml chưa khai tỉ trọng d ở Danh Mục Chất Chuẩn nên chưa kiểm soát khối lượng được.';
+        }
+
+        return 'Chỉ kiểm soát khối lượng được khi ĐVT của phòng là mg, hoặc ml đã khai tỉ trọng d'
+            .' (ĐVT hiện tại: '.($unit === '' ? 'chưa thiết lập' : trim((string) $unitShort)).').';
+    }
+
     /** Đơn vị ghi số cân của ống: ĐVT khối lượng thì chính nó, còn lại cân theo mg. */
     public static function weightUnit(?string $unitGroup, ?string $unitShort): string
     {

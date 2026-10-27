@@ -37,7 +37,7 @@
 
                 {{-- Table of Standards --}}
                 <div class="table-responsive border rounded" style="max-height: 58vh; overflow-y: auto;">
-                    <table class="table table-sm table-bordered table-hover mb-0" id="pickerStandardsTable" style="font-size: 0.88rem;">
+                    <table class="table table-sm table-bordered table-hover mb-0" id="pickerStandardsTable" style="font-size: 0.88rem;" data-deferred="lazy">
                         <thead class="bg-light sticky-top">
                             <tr class="text-center">
                                 <th style="width: 40px">
@@ -54,6 +54,8 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {{-- ~3.800 dòng chỉ lấy ở lần mở đầu - pages/shared/deferredRows --}}
+                            @deferredRows('pickerStandardsTable')
                             @forelse ($departmentStandardInventory ?? [] as $std)
                                 @php
                                     $hasStock = (float)$std->total_remaining > 0;
@@ -62,7 +64,6 @@
                                 <tr class="picker-row {{ $hasStock ? 'has-stock' : 'no-stock' }}"
                                     data-category-id="{{ $std->id }}"
                                     data-code="{{ $std->code }}"
-                                    data-version="{{ $std->version }}"
                                     data-name="{{ $std->standard_name }}"
                                     data-specification="{{ $std->specification ?: '' }}"
                                     data-manufacturer-id="{{ $std->manufacturer_id ?: '' }}"
@@ -77,7 +78,7 @@
                                     </td>
                                     <td class="text-center align-middle text-muted picker-stt">{{ $loop->iteration }}</td>
                                     <td class="text-center align-middle">
-                                        <span class="badge badge-secondary px-2 py-1">{{ $std->code }} v{{ $std->version }}</span>
+                                        <span class="badge badge-secondary px-2 py-1">{{ $std->code }}</span>
                                     </td>
                                     <td class="align-middle font-weight-bold text-dark">{{ $std->standard_name }}</td>
                                     <td class="text-center align-middle">{{ $std->specification ?: '—' }}</td>
@@ -100,6 +101,7 @@
                                     <td colspan="9" class="text-center text-muted py-4">Chưa có danh mục chất chuẩn nào trong phòng ban này.</td>
                                 </tr>
                             @endforelse
+                            @enddeferredRows
                         </tbody>
                     </table>
                 </div>
@@ -133,8 +135,8 @@
             $('#pickerCheckAll').prop('checked', false);
             $('.picker-item-checkbox').prop('checked', false);
             updatePickerSelectedCount();
-            applyPickerFilter();
             $('#stdInventoryPickerModal').modal('show');
+            mdDeferred.fillLazy('#pickerStandardsTable', applyPickerFilter, 'Đang tải danh mục chất chuẩn...');
         });
 
         // Filter & Search handler
@@ -229,8 +231,10 @@
                             $(this).select2('destroy');
                         }
                     });
+                    destroyAnalystSelect2($tbody);
 
                     var $newRow = $firstRow.clone();
+                    $newRow.find('option[data-legacy-analyst]').remove();
                     $newRow.find('select, input, textarea').each(function() {
                         var name = $(this).attr('name');
                         if (name) {
@@ -238,12 +242,14 @@
                         }
                         $(this).val(null);
                     });
+                    stdCleanCategoryClone($newRow);
                     $tbody.append($newRow);
                     $rowToPopulate = $newRow;
                 }
 
                 // Fill data into row
-                $rowToPopulate.find('.select-req-category').val(catId);
+                // Ô chất chuẩn tìm qua AJAX (StandardExport/categorySelect): tạo option rồi mới chọn
+                stdSetCategory($rowToPopulate.find('.select-req-category'), catId, catName + ' (' + code + ')', { code: code, unit: unit });
                 $rowToPopulate.find('.cell-specification').text(spec || '—');
                 $rowToPopulate.find('.input-req-specification').val(spec);
                 $rowToPopulate.find('.cell-supplier').text(mfgName || '—');
@@ -276,6 +282,9 @@
                     });
                 }
             });
+            initAnalystSelect2($tbody);
+            stdInitCategorySelect($tbody);
+            $tbody.find('.select-req-category').trigger('change.select2');
 
             // Close picker modal
             $('#stdInventoryPickerModal').modal('hide');

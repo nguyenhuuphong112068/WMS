@@ -111,6 +111,21 @@ class CategoryLookupController extends Controller
         );
     }
 
+    /** ?scope=department|all&q=&page= : mã chất chuẩn kèm đơn vị phòng ban đang chọn (đề nghị cấp phát chuẩn) */
+    public function standardCategories(Request $request)
+    {
+        $scope = (string) $request->scope;
+        $departmentId = (int) (session('user')['selected_department_id'] ?? 0);
+
+        if (! in_array($scope, CategoryLookup::STANDARD_SCOPES, true) || ! $departmentId) {
+            return response()->json(CategoryLookup::emptyResponse(), 422);
+        }
+
+        return response()->json(
+            CategoryLookup::searchStandardCategories($scope, $departmentId, (string) $request->q, (int) $request->page)
+        );
+    }
+
     /** Toàn bộ tên hoá chất cho bảng "Chọn Tên Hoá Chất Từ Dữ Liệu Gốc" - nạp khi mở bảng lần đầu */
     public function chemicalNames()
     {

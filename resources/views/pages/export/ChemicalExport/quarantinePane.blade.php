@@ -193,12 +193,6 @@
     </div>
 
     <div class="qr-actions">
-        @perm('inventory_chemical_view')
-            <a href="{{ route('pages.inventory.chemicalInventory.list') }}" class="btn btn-outline-danger"
-                title="Bấm [Cách ly] trên từng mã xuất nhập ở Tồn Kho Hoá Chất">
-                <i class="fas fa-biohazard mr-1"></i> Cách ly từ Tồn Kho
-            </a>
-        @endperm
         @if ($qrRemovedTab)
             @perm('export_chemical_quarantine')
                 <button type="button" class="btn btn-outline-danger" id="qrDisposeSelected" disabled>

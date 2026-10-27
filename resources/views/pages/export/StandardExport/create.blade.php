@@ -12,60 +12,29 @@
                 @csrf
                 <input type="hidden" name="request_item_id" id="create_request_item_id"
                     value="{{ old('request_item_id') }}">
+                {{-- Lập mới chỉ có phiếu Sử dụng - chất chuẩn hỏng đi quy trình Cách ly ở Tồn Kho Chất Chuẩn --}}
+                <input type="hidden" name="type" value="export">
 
                 <div class="modal-body">
 
-                    {{-- BƯỚC 1: Chọn Loại Phiếu, Tổ & Nút Chọn Chuẩn --}}
-                    <div class="form-row bg-light pt-3 pb-2 px-3 rounded mb-3 border align-items-center">
-                        <div class="form-group col-md-3">
-                            <label class="required font-weight-bold text-primary">Loại Phiếu</label>
-                            <div class="exp-types mt-1">
-                                {{-- Chỉ còn "Sử dụng": chất chuẩn hỏng đi quy trình Cách ly ở Tồn Kho Chất Chuẩn --}}
-                                @foreach ($formTypes as $value => $label)
-                                    <label class="exp-type {{ old('type', 'export') == $value ? 'is-checked' : '' }}">
-                                        <input type="radio" name="type" class="radio-exp-type"
-                                            value="{{ $value }}"
-                                            {{ old('type', 'export') == $value ? 'checked' : '' }}>
-                                        <span>{{ $label }}</span>
-                                    </label>
-                                @endforeach
-                            </div>
-                            @if ($bag->has('type'))
-                                <span class="md-error">{{ $bag->first('type') }}</span>
-                            @endif
-                        </div>
-
+                    {{-- BƯỚC 1: Tổ / phiếu đề nghị / KNV của ống bấm [Sử dụng] ở tab "Sử dụng chuẩn" - không đổi trong form --}}
+                    @php $createGroup = old('group_id') ? $groups->firstWhere('id', (int) old('group_id')) : null; @endphp
+                    <input type="hidden" name="group_id" id="create_group_id" value="{{ old('group_id') }}">
+                    <div class="form-row bg-light pt-3 pb-1 px-3 rounded mb-3 border">
                         <div class="form-group col-md-4">
-                            <label class="required font-weight-bold text-primary"><i class="fas fa-users mr-1"></i> Tổ Sử Dụng</label>
-                            <select name="group_id" id="create_group_id"
-                                class="form-control font-weight-bold {{ $bag->has('group_id') ? 'is-invalid' : '' }}"
-                                required>
-                                <option value="">-- Chọn Tổ của bạn --</option>
-                                @foreach ($groups as $g)
-                                    <option value="{{ $g->id }}"
-                                        {{ old('group_id') == $g->id ? 'selected' : '' }}>
-                                        {{ $g->name }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <label class="font-weight-bold text-primary"><i class="fas fa-users mr-1"></i> Tổ Sử Dụng</label>
+                            <div class="font-weight-bold text-dark" id="create_group_name">{{ $createGroup->name ?? '—' }}</div>
                             @if ($bag->has('group_id'))
                                 <span class="md-error">{{ $bag->first('group_id') }}</span>
                             @endif
                         </div>
-
-                        <div class="form-group col-md-5 pt-4" id="btn-group-pick-standard">
-                            <!-- Nút hiển thị khi Loại = Sử dụng -->
-                            <button type="button" class="btn btn-outline-primary shadow-sm font-weight-bold w-100"
-                                id="btnOpenIssuedPicker" style="height: 38px;">
-                                <i class="fas fa-list-check mr-1"></i> Chọn ống chuẩn từ <b>Danh sách đã cấp phát</b>
-                            </button>
-
-                            <!-- Nút hiển thị khi Loại = Loại bỏ -->
-                            <button type="button" class="btn btn-outline-danger shadow-sm font-weight-bold w-100 d-none"
-                                id="btnOpenInventoryPicker" data-toggle="modal"
-                                data-target="#inventoryImportPickerModal" style="height: 38px;">
-                                <i class="fas fa-boxes mr-1"></i> Chọn ống chuẩn từ <b>Tồn kho của phòng (để loại bỏ)</b>
-                            </button>
+                        <div class="form-group col-md-4">
+                            <label class="font-weight-bold text-primary"><i class="fas fa-file-invoice mr-1"></i> Phiếu Đề Nghị</label>
+                            <div class="font-weight-bold text-dark" id="create_request_code">—</div>
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label class="font-weight-bold text-primary"><i class="fas fa-user mr-1"></i> KNV</label>
+                            <div class="text-dark" id="create_analyst_name">—</div>
                         </div>
                     </div>
 
@@ -78,7 +47,7 @@
 
                         <div id="create_import_placeholder" class="p-4 bg-light text-center">
                             <i class="fas fa-flask text-muted fa-2x mb-2 d-block opacity-50"></i>
-                            <span class="text-muted font-weight-500">Chưa chọn ống chuẩn. Vui lòng bấm nút <b>"Chọn ống chuẩn từ Danh sách đã cấp phát"</b> ở trên.</span>
+                            <span class="text-muted font-weight-500">Chưa chọn ống chuẩn. Bấm <b>[Sử dụng]</b> trên ống chuẩn ở tab <b>Sử dụng chuẩn</b>.</span>
                         </div>
                         
                         <div id="create_import_display" class="d-none p-3">
@@ -187,6 +156,15 @@
                                     <span class="input-group-text exp-unit-name bg-light">---</span>
                                 </div>
                             </div>
+                            {{-- Badge cảnh báo tức thời: vượt số lượng cấp phát (cùng ĐVT) / làm tồn âm --}}
+                            <div id="create_amount_warnings" class="d-none mt-1">
+                                <span class="amt-warn d-none" id="create_warn_issued">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i><span class="amt-warn__text"></span>
+                                </span>
+                                <span class="amt-warn is-danger d-none" id="create_warn_negative">
+                                    <i class="fas fa-arrow-down mr-1"></i><span class="amt-warn__text"></span>
+                                </span>
+                            </div>
                             @if ($bag->has('amount'))
                                 <span class="md-error d-block">{{ $bag->first('amount') }}</span>
                             @endif
@@ -247,17 +225,6 @@
                                 <span class="md-error">{{ $bag->first('testing') }}</span>
                             @endif
                         </div>
-
-                        {{-- Lý do loại bỏ (khi Loại = Loại bỏ) --}}
-                        <div class="form-group col-md-9 exp-cancel-col d-none" id="group_cancel_reason">
-                            <label class="required font-weight-bold text-danger">Lý Do Loại Bỏ</label>
-                            <input type="text" name="reason" id="create_reason" maxlength="500"
-                                class="form-control {{ $bag->has('reason') ? 'is-invalid' : '' }}"
-                                placeholder="Ví dụ: Hết hạn sử dụng, hỏng bao bì, tạp chất, do OOS, BCSL..." value="{{ old('reason') }}">
-                            @if ($bag->has('reason'))
-                                <span class="md-error">{{ $bag->first('reason') }}</span>
-                            @endif
-                        </div>
                     </div>
 
                 </div>
@@ -309,6 +276,46 @@
         line-height: 1.5;
         border-radius: 0.25rem;
     }
+    /* Badge cảnh báo dưới ô Số Lượng Xuất */
+    #create_amount_warnings {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    #create_amount_warnings.d-none {
+        display: none !important;
+    }
+    .amt-warn {
+        display: inline-flex;
+        align-items: center;
+        align-self: flex-start;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        line-height: 1.5;
+        color: #92400E;
+        background: #FEF3C7;
+        border: 1px solid #FCD34D;
+        animation: amt-warn-in 0.2s ease-out;
+    }
+    .amt-warn.is-danger {
+        color: #991B1B;
+        background: #FEE2E2;
+        border-color: #FCA5A5;
+    }
+    #create_amount.is-warning {
+        border-color: #F59E0B;
+        box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.2);
+    }
+    #create_amount.is-danger-soft {
+        border-color: #EF4444;
+        box-shadow: 0 0 0 0.15rem rgba(239, 68, 68, 0.2);
+    }
+    @keyframes amt-warn-in {
+        from { opacity: 0; transform: translateY(-3px); }
+        to { opacity: 1; transform: none; }
+    }
 </style>
 
 {{-- Modal quét camera dùng chung - đặt ngoài #createModal để không lồng modal trong modal --}}
@@ -332,11 +339,19 @@
             if (data.req_item_id) {
                 $('#create_request_item_id').val(data.req_item_id);
             }
+            if (data.group_id) {
+                $('#create_group_id').val(data.group_id);
+                $('#create_group_name').text(data.group_name || '—');
+            }
+            $('#create_request_code').text(data.request_code || '—');
+            $('#create_analyst_name').text(data.analyst_name || '—');
 
             // Lưu thông tin số lượng để kiểm tra cảnh báo khi submit
             $('#create_import_id')
                 .data('requested-amount', data.requested_amount !== undefined ? data.requested_amount : '')
                 .data('remaining', data.remaining !== undefined ? data.remaining : 0)
+                .data('issued-amount', (data.issued_amount !== undefined && data.issued_amount !== null) ? data.issued_amount : '')
+                .data('issued-unit', data.issued_unit || data.unit || '')
                 .data('unit', data.unit || '')
                 .data('weight-controlled', data.weight_controlled == 1 ? 1 : 0)
                 .data('first-use', data.is_first_use == 1 ? 1 : 0);
@@ -417,18 +432,55 @@
 
             // Reset trạng thái xác nhận Swal
             $('#createModal form').data('swal-confirmed', false);
+            updateAmountWarnings();
         };
+
+        function fmtNum(n) {
+            return parseFloat(n.toFixed(4)).toString();
+        }
+
+        /*
+        | Badge cảnh báo tức thời dưới ô Số Lượng Xuất (không chặn lưu - lúc Lưu vẫn hỏi xác nhận):
+        |  - Vượt số lượng kho đã cấp: chỉ so khi ĐVT cấp phát trùng ĐVT xuất.
+        |  - Làm tồn âm: số lượng xuất > tồn còn lại của ống.
+        */
+        function updateAmountWarnings() {
+            var $imp = $('#create_import_id');
+            var raw = String($('#create_amount').val() || '').replace(',', '.');
+            var amount = parseFloat(raw);
+            var unit = $imp.data('unit') || '';
+            var issuedRaw = $imp.data('issued-amount');
+            var issued = (issuedRaw !== '' && issuedRaw !== undefined && issuedRaw !== null) ? parseFloat(issuedRaw) : null;
+            var issuedUnit = String($imp.data('issued-unit') || unit).trim().toLowerCase();
+            var remainingRaw = $imp.data('remaining');
+            var remaining = (remainingRaw !== '' && remainingRaw !== undefined && remainingRaw !== null) ? parseFloat(remainingRaw) : null;
+
+            var overIssued = !isNaN(amount) && amount > 0 && issued !== null && !isNaN(issued)
+                && issuedUnit === String(unit).trim().toLowerCase()
+                && amount - issued > 0.00005;
+            var negative = !isNaN(amount) && amount > 0 && remaining !== null && !isNaN(remaining)
+                && amount - remaining > 0.00005;
+
+            $('#create_warn_issued').toggleClass('d-none', !overIssued).find('.amt-warn__text')
+                .text(overIssued ? 'Vượt số lượng cấp phát (' + fmtNum(issued) + ' ' + unit + ') thêm ' + fmtNum(amount - issued) + ' ' + unit : '');
+            $('#create_warn_negative').toggleClass('d-none', !negative).find('.amt-warn__text')
+                .text(negative ? 'Tồn âm sau xuất: -' + fmtNum(amount - remaining) + ' ' + unit + ' (tồn còn ' + fmtNum(remaining) + ' ' + unit + ')' : '');
+            $('#create_amount_warnings').toggleClass('d-none', !(overIssued || negative));
+            $('#create_amount')
+                .toggleClass('is-danger-soft', negative)
+                .toggleClass('is-warning', overIssued && !negative);
+        }
+
+        $('#create_amount').on('input change keyup', updateAmountWarnings);
 
         /*
         | Ống chuẩn có kiểm soát khối lượng, ở lần SỬ DỤNG đầu tiên phải cân và ghi lại
-        | khối lượng "Bì + Chuẩn". Phiếu loại bỏ không phải là một lần sử dụng nên không hỏi.
+        | khối lượng "Bì + Chuẩn".
         */
         function toggleGrossWeight() {
             var $col = $('#col_gross_weight');
             var wasVisible = !$col.hasClass('d-none');
-            var type = $('.radio-exp-type:checked').val();
-            var need = type === 'export'
-                && $('#create_import_id').data('weight-controlled') == 1
+            var need = $('#create_import_id').data('weight-controlled') == 1
                 && $('#create_import_id').data('first-use') == 1;
 
             $col.toggleClass('d-none', !need);
@@ -440,29 +492,7 @@
             }
         }
 
-        // Toggle buttons and fields based on type
-        $('.radio-exp-type').on('change', function() {
-            let type = $(this).val();
-            if (type === 'export') {
-                $('#btnOpenIssuedPicker').removeClass('d-none');
-                $('#btnOpenInventoryPicker').addClass('d-none');
-                $('.exp-usage-col').removeClass('d-none');
-                $('.exp-cancel-col').addClass('d-none');
-            } else if (type === 'cancel') {
-                $('#btnOpenIssuedPicker').addClass('d-none');
-                $('#btnOpenInventoryPicker').removeClass('d-none');
-                $('.exp-usage-col').addClass('d-none');
-                $('.exp-cancel-col').removeClass('d-none');
-            } else {
-                $('#btnOpenIssuedPicker').addClass('d-none');
-                $('#btnOpenInventoryPicker').removeClass('d-none');
-                $('.exp-usage-col').removeClass('d-none');
-                $('.exp-cancel-col').addClass('d-none');
-            }
-
-            toggleGrossWeight();
-        });
-        $('.radio-exp-type:checked').trigger('change');
+        toggleGrossWeight();
 
         // Reset trạng thái confirmed khi thay đổi số lượng hoặc ống chuẩn
         $('#create_amount, #create_import_id').on('input change', function() {
@@ -481,12 +511,11 @@
             var requestedAmount = (rawReq !== '' && rawReq !== undefined && rawReq !== null) ? parseFloat(rawReq) : null;
             var remaining = parseFloat($('#create_import_id').data('remaining')) || 0;
             var unit = $('#create_import_id').data('unit') || $form.find('.exp-unit-name').first().text() || '';
-            var type = $form.find('.radio-exp-type:checked').val();
 
             var warnings = [];
 
-            // Cảnh báo 1: Số lượng xuất khác số lượng đề nghị (chỉ áp dụng cho loại sử dụng)
-            if (type === 'export' && requestedAmount !== null && requestedAmount > 0 && Math.abs(enteredAmount - requestedAmount) > 0.00005) {
+            // Cảnh báo 1: Số lượng xuất khác số lượng đề nghị
+            if (requestedAmount !== null && requestedAmount > 0 && Math.abs(enteredAmount - requestedAmount) > 0.00005) {
                 warnings.push(`Số lượng xuất (<b>${enteredAmount} ${unit}</b>) khác với số lượng đề nghị (<b>${requestedAmount} ${unit}</b>).`);
             }
 
@@ -532,113 +561,18 @@
             }
         });
 
-        // Handle opening Issued Picker
-        $('#btnOpenIssuedPicker').on('click', function() {
-            var groupId = $('#create_group_id').val();
-            if (!groupId) {
-                alert('Vui lòng chọn Tổ Sử Dụng trước khi chọn chuẩn.');
-                return;
-            }
+        // Nút [Sử dụng] trên từng ống ở tab "Sử dụng chuẩn": mở form với Tổ + ống đã chọn sẵn
+        $(document).on('click', '.btn-use-issued-std', function() {
+            var data = $(this).data('std') || {};
+            var $form = $('#formStdCreate');
 
-            var $tbody = $('#issuedStandardPickerTable tbody');
-            $tbody.html(
-                '<tr><td colspan="15" class="text-center"><i class="fas fa-spinner fa-spin mr-1"></i> Đang tải...</td></tr>'
-                );
-            $('#issuedStandardPickerModal').modal('show');
+            // Xoá số liệu và lỗi của lần mở trước (kể cả lỗi kiểm tra do server trả về)
+            $form.find('#create_amount, #create_gross_weight, #create_product_name, #create_batch_no, #create_testing, #create_request_item_id').val('');
+            $form.find('.md-error').remove();
+            $form.find('.is-invalid').removeClass('is-invalid');
 
-            $.get('{{ route('pages.export.standardExport.getIssuedStandards') }}', {
-                group_id: groupId
-            }, function(res) {
-                var standards = res.standards || [];
-                if (standards.length === 0) {
-                    $tbody.html(
-                        '<tr><td colspan="15" class="text-center text-danger">Tổ của bạn chưa có ống chuẩn nào được cấp phát, hoặc tất cả đã được lập phiếu sử dụng.</td></tr>'
-                        );
-                    return;
-                }
-
-                var html = '';
-                standards.forEach(function(item, index) {
-                    let returnBadge = (item.return_standard == 1 || item.return_standard === true) ?
-                        '<span class="badge badge-warning text-dark border border-warning font-weight-bold" title="Trả lại chuẩn sau khi dùng"><i class="fas fa-undo-alt mr-1"></i> Có</span>' :
-                        '<span class="text-muted">—</span>';
-
-                    let criteriaHtml = '';
-                    if (item.criteria_names) {
-                        try {
-                            let criteria = JSON.parse(item.criteria_names);
-                            criteriaHtml = Array.isArray(criteria) ? criteria.join(', ') : criteria;
-                        } catch (e) {
-                            criteriaHtml = item.criteria_names;
-                        }
-                    }
-
-                    let expiredDisplay = '—';
-                    if (item.expiry_type === 'check online' || item.expiry_type === 'undetermined' || item.expiry_type === 'unlimited') {
-                        expiredDisplay = '<span class="badge badge-warning font-weight-bold"><i class="fas fa-globe mr-1"></i> Check online</span>';
-                    } else if (item.import_expired_date) {
-                        expiredDisplay = formatStdDate(item.import_expired_date);
-                    }
-
-                    html += `<tr>
-                        <td class="text-center">${index + 1}</td>
-                        <td>
-                            <div class="exp-code font-weight-bold">${item.import_code}</div>
-                            ${item.batch_no ? '<small class="text-muted d-block">Lô: ' + item.batch_no + '</small>' : ''}
-                            ${item.location_code ? '<div class="mt-1">' + window.wmsZoneTag(item.location_code, item.location_zone_type) + '</div>' : ''}
-                        </td>
-                        <td><b>${item.standard_name}</b> <span class="badge badge-dark">v${item.category_version}</span></td>
-                        <td>${item.specification || '—'}</td>
-                        <td>${item.supplier_name || '—'}</td>
-                        <td>${item.purpose_name || '—'}</td>
-                        <td class="text-right">${item.requested_amount || '—'}</td>
-                        <td class="text-right text-success font-weight-bold">
-                            ${item.issued_amount || '—'}
-                            <small class="d-block text-muted">Bởi: ${item.issued_by || ''}</small>
-                            <small class="d-block text-muted" style="font-size:0.75rem">${item.issued_at ? item.issued_at.substring(0,10) : ''}</small>
-                        </td>
-                        <td class="text-center">${item.unit_short_name || '—'}</td>
-                        <td class="text-center">${returnBadge}</td>
-                        <td>${item.product_name || '—'}</td>
-                        <td>${criteriaHtml || '—'}</td>
-                        <td>${item.analyst_name || '—'}</td>
-                        <td>${item.note || '—'}</td>
-                        <td class="text-center">
-                            <button type="button" class="btn btn-sm btn-primary btn-select-issued-std" 
-                                data-import-id="${item.import_id}"
-                                data-import-code="${item.import_code}"
-                                data-req-item-id="${item.id}"
-                                data-product="${item.product_name || ''}"
-                                data-testing="${criteriaHtml || ''}"
-                                data-std-name="${item.standard_name}"
-                                data-remaining="${item.actual_remaining}"
-                                data-requested-amount="${item.requested_amount || item.issued_amount || ''}"
-                                data-unit="${item.unit_short_name}"
-                                data-category-code="${item.category_code || ''}"
-                                data-supplier="${item.supplier_name || ''}"
-                                data-spec="${item.specification || ''}"
-                                data-batch="${item.batch_no || ''}"
-                                data-potency="${item.potency || ''}"
-                                data-moisture="${item.moisture || ''}"
-                                data-other="${item.standard_form || ''}"
-                                data-attachments='${JSON.stringify(item.attachments || [])}'
-                                data-expiry-type="${item.expiry_type || ''}"
-                                data-return-standard="${item.return_standard == 1 || item.return_standard === true ? 1 : 0}"
-                                data-weight-controlled="${item.weight_controlled == 1 ? 1 : 0}"
-                                data-first-use="${item.is_first_use ? 1 : 0}"
-                                data-weight-unit="${item.weight_unit || item.unit_short_name || ''}"
-                                data-expired="${item.import_expired_date ? item.import_expired_date.substring(0,10) : ''}">
-                                Chọn
-                            </button>
-                        </td>
-                    </tr>`;
-                });
-                $tbody.html(html);
-            }).fail(function() {
-                $tbody.html(
-                    '<tr><td colspan="15" class="text-center text-danger">Lỗi khi tải dữ liệu.</td></tr>'
-                    );
-            });
+            window.populateStandardDisplay(data);
+            $('#createModal').modal('show');
         });
 
         function loadIssuedStandards(groupId, selectedImportId) {
@@ -647,20 +581,15 @@
                 var standards = res.standards || [];
                 var item = standards.find(s => s.import_id == selectedImportId);
                 if (item) {
-                    let criteria = item.criteria_names || '';
-                    if (criteria) {
-                        try {
-                            let parsed = JSON.parse(criteria);
-                            criteria = Array.isArray(parsed) ? parsed.join(', ') : parsed;
-                        } catch(e) {}
-                    }
                     window.populateStandardDisplay({
                         import_id: item.import_id,
                         import_code: item.import_code,
                         req_item_id: item.id,
                         std_name: item.standard_name,
-                        remaining: item.issued_amount,
+                        remaining: item.actual_remaining,
                         requested_amount: item.requested_amount || item.issued_amount || '',
+                        issued_amount: item.issued_amount,
+                        issued_unit: item.issued_unit || item.unit_short_name,
                         unit: item.unit_short_name,
                         category_code: item.category_code || '',
                         supplier: item.supplier_name || '—',
@@ -674,10 +603,14 @@
                         expired: item.import_expired_date ? item.import_expired_date.substring(0,10) : '',
                         return_standard: item.return_standard,
                         product_name: item.product_name || '',
-                        testing: criteria,
+                        testing: item.test_criteria || '',
                         weight_controlled: item.weight_controlled,
                         is_first_use: item.is_first_use,
-                        weight_unit: item.weight_unit
+                        weight_unit: item.weight_unit,
+                        group_id: item.group_id,
+                        group_name: item.group_name,
+                        request_code: item.request_code,
+                        analyst_name: item.analyst_name
                     });
                 }
             });

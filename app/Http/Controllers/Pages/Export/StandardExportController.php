@@ -134,27 +134,45 @@ class StandardExportController extends Controller
             ->paginate($bookPerPage, ['*'], ListRange::pageName('book_'))
             ->withQueryString();
 
-        // Danh sách Đề nghị cấp phát chuẩn của các Tổ: lọc theo ngày lập nhưng luôn giữ
-        // các đề nghị còn dở dang (chưa cấp xong) dù đã ngoài khoảng lọc.
+        /*
+        | Đề nghị cấp phát chuẩn của các Tổ - 3 tab con, mỗi tab một paginator riêng:
+        | - Chưa gửi  (Lưu tạm)                    : luôn hiện đủ, không lọc ngày (rdraft_).
+        | - Chờ xử lý (Chờ cấp phát / Cấp một phần): luôn hiện đủ, không lọc ngày (rpend_).
+        | - Đã xử lý  (Đã cấp đủ / Từ chối / Đã huỷ): lọc theo ngày lập (req_).
+        | Tab con đang mở giữ trên URL (rsub = draft | done, trống = Chờ xử lý).
+        */
         $reqRange = ListRange::of($request, 'req_');
         $reqPerPage = ListRange::perPage($request, 'req_');
 
-        $requests = DB::table('standard_request_lists')
+        $reqBase = fn () => DB::table('standard_request_lists')
             ->leftJoin('groups', 'standard_request_lists.group_id', '=', 'groups.id')
             ->select(
                 'standard_request_lists.*',
                 'groups.name as group_name'
             )
             ->where('standard_request_lists.department_id', $departmentId)
-            ->tap(ListRange::dateFilterKeepPending(
-                'standard_request_lists.created_at',
-                $reqRange,
-                'standard_request_lists.status',
-                self::REQ_PENDING_STATUSES
-            ))
-            ->orderBy('standard_request_lists.created_at', 'desc')
+            ->orderBy('standard_request_lists.created_at', 'desc');
+
+        $reqDraft = $reqBase()
+            ->where('standard_request_lists.status', 'draft')
+            ->paginate(ListRange::perPage($request, 'rdraft_'), ['*'], ListRange::pageName('rdraft_'))
+            ->withQueryString();
+
+        $reqPending = $reqBase()
+            ->whereIn('standard_request_lists.status', self::REQ_PENDING_STATUSES)
+            ->paginate(ListRange::perPage($request, 'rpend_'), ['*'], ListRange::pageName('rpend_'))
+            ->withQueryString();
+
+        $reqDone = $reqBase()
+            ->whereNotIn('standard_request_lists.status', array_merge(['draft'], self::REQ_PENDING_STATUSES))
+            ->tap(ListRange::dateFilter('standard_request_lists.created_at', $reqRange))
             ->paginate($reqPerPage, ['*'], ListRange::pageName('req_'))
             ->withQueryString();
+
+        // Modal chi tiết / sửa dựng cho mọi phiếu đang hiện ở cả 3 tab con
+        $requests = collect($reqDraft->items())
+            ->merge($reqPending->items())
+            ->merge($reqDone->items());
 
         $requestItems = DB::table('standard_request_items')
             ->leftJoin('standard_request_lists', 'standard_request_items.request_list_id', '=', 'standard_request_lists.id')
@@ -183,8 +201,23 @@ class StandardExportController extends Controller
             // Chỉ lấy dòng của đúng những đề nghị đang hiển thị trên trang (đã phân trang
             // ở trên), không kéo toàn bộ lịch sử của phòng ban về nữa.
             ->whereIn('standard_request_items.request_list_id', $requests->pluck('id'))
+            ->get();
+
+        $usedExports = DB::table(self::TABLE)
+            ->whereIn('request_item_id', $requestItems->pluck('id'))
+            ->where('type', 'export')
+            ->select('id', 'request_item_id', 'amount', 'created_by', 'created_at')
             ->get()
-            ->groupBy('request_list_id');
+            ->keyBy('request_item_id');
+
+        $requestItems = $requestItems->map(function ($item) use ($usedExports) {
+            $exp = $usedExports->get($item->id);
+            $item->is_used = ($item->status === 'used') || ($exp !== null);
+            $item->used_by = $exp ? $exp->created_by : null;
+            $item->used_at = $exp ? $exp->created_at : null;
+            $item->used_amount = $exp ? (float) $exp->amount : null;
+            return $item;
+        })->groupBy('request_list_id');
 
         $groups = DB::table('groups')
             ->where('department_id', $departmentId)
@@ -197,10 +230,7 @@ class StandardExportController extends Controller
             ->orderBy('name')
             ->get();
 
-        $analysts = DB::table('user_management')
-            ->where('isActive', 1)
-            ->orderBy('fullName')
-            ->get();
+        $analysts = $this->analystOptions($departmentId);
 
         $packagingSpecs = DB::table('packaging_specifications')
             ->where('status_id', 1)
@@ -222,6 +252,10 @@ class StandardExportController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Chất chuẩn phòng mình đã khai ở tab "Chất Chuẩn Của Phòng": phạm vi của picker bên dưới,
+        // và dùng để cảnh báo trên bảng liên phòng ban khi có mục "chờ nhận" mà phòng chưa khai.
+        $declaredCategoryIds = $this->declaredCategoryIds($departmentId);
+
         $standardCategories = DB::table('standard_categories')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
             ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
@@ -237,6 +271,8 @@ class StandardExportController extends Controller
                 'units.name as unit_name'
             )
             ->where('standard_categories.status_id', 1)
+            // "Danh mục chuẩn tồn của phòng" chỉ gồm chuẩn phòng đã khai ở Chất Chuẩn Của Phòng
+            ->whereIn('standard_categories.id', $declaredCategoryIds)
             ->orderBy('standard_names.name')
             ->get();
 
@@ -252,7 +288,10 @@ class StandardExportController extends Controller
                 ];
             });
 
-        $departmentStandardInventory = $standardCategories->map(function ($cat) use ($inventoryByCategory) {
+        // Tên chỉ tiêu tra một lần cho cả danh mục (trước đây mỗi chất chuẩn còn tồn một truy vấn)
+        $purposeNames = DB::table('purposes')->pluck('name', 'id');
+
+        $departmentStandardInventory = $standardCategories->map(function ($cat) use ($inventoryByCategory, $purposeNames) {
             $inv = $inventoryByCategory[$cat->id] ?? null;
             $latest = $inv['latest_import'] ?? null;
             $unitName = $cat->unit_short_name ?: $cat->unit_name;
@@ -274,7 +313,8 @@ class StandardExportController extends Controller
                     }
                     if (!empty($ids)) {
                         $purId = (int) $ids[0];
-                        $criteriaNames = DB::table('purposes')->whereIn('id', $ids)->pluck('name')->toArray();
+                        $criteriaNames = collect($ids)->map(fn ($id) => $purposeNames[$id] ?? null)
+                            ->filter()->unique()->values()->all();
                         $purName = implode(', ', $criteriaNames);
                     }
                 }
@@ -298,14 +338,6 @@ class StandardExportController extends Controller
         // chọn hộ vị trí như cơ chế cũ, giờ luôn là phòng đang đăng nhập tự chọn cho mình.
         $transferOwnLocations = DepartmentStandard::locationOptions($departmentId);
 
-        // Chất chuẩn phòng mình đã khai ở tab "Chất Chuẩn Của Phòng" - dùng để cảnh báo ngay
-        // trên bảng khi có mục đang "chờ nhận" mà phòng mình chưa khai.
-        $declaredCategoryIds = DB::table(DepartmentStandard::TABLE)
-            ->where('department_id', $departmentId)
-            ->where('status_id', 1)
-            ->pluck('category_id')
-            ->all();
-
         session()->put(['title' => 'SỬ DỤNG - SỬ DỤNG CHẤT CHUẨN']);
 
         // Chất chuẩn hỏng: tab "Cách ly - Loại bỏ - Huỷ" (StandardQuarantineController)
@@ -313,19 +345,21 @@ class StandardExportController extends Controller
 
         // Không có ?tab= thì mở lại tab vừa thao tác (các action trả về ->with('activeTab', ...))
         $activeTab = $request->input('tab', session('activeTab'));
-        if (!in_array($activeTab, ['book', 'request', 'transfer', 'quarantine'])) {
-            $activeTab = 'book';
+        if (!in_array($activeTab, ['use', 'book', 'request', 'transfer', 'quarantine'])) {
+            $activeTab = 'use';
         }
 
         return view('pages.export.StandardExport.list', [
             'datas' => $datas,
             'requests' => $requests,
+            'reqDraft' => $reqDraft,
+            'reqPending' => $reqPending,
+            'reqDone' => $reqDone,
             'requestItems' => $requestItems,
             'groups' => $groups,
             'productNames' => $productNames,
             'analysts' => $analysts,
             'packagingSpecs' => $packagingSpecs,
-            'standardCategories' => $standardCategories,
             'departmentStandardInventory' => $departmentStandardInventory,
             'availableImports' => $availableImports,
             'imports' => $availableImports,
@@ -334,11 +368,12 @@ class StandardExportController extends Controller
             'units' => $units,
             'checkers' => $this->checkerOptions($departmentId),
             'types' => self::TYPES,
-            'formTypes' => array_intersect_key(self::TYPES, array_flip(self::FORM_TYPES)),
             'standardGroups' => config('standard.groups'),
             'overIssuePercent' => (int) round(self::OVER_ISSUE_RATIO * 100),
             'adjustCounts' => $this->adjustCounts($departmentId),
             'activeTab' => $activeTab,
+            // Tab "Sử dụng chuẩn": ống đã cấp cho các Tổ, chưa lập phiếu sử dụng
+            'issuedStandards' => $this->issuedStandards($departmentId),
             'transferSent' => $transfer['sent'],
             'transferReceived' => $transfer['received'],
             'transferItems' => $transfer['items'],
@@ -439,15 +474,23 @@ class StandardExportController extends Controller
     public function getIssuedStandards(Request $request)
     {
         $groupId = (int) $request->group_id;
-        $departmentId = $this->departmentId();
 
         if (!$groupId) {
             return response()->json(['standards' => []]);
         }
 
-        // Các request_items đã được cấp phát cho tổ này
+        return response()->json(['standards' => $this->issuedStandards($this->departmentId(), $groupId)]);
+    }
+
+    /**
+     * Ống chuẩn kho đã cấp phát cho các Tổ của phòng mà CHƯA lập phiếu sử dụng - nguồn của
+     * tab "Sử dụng chuẩn" (mọi tổ, $groupId = null) và của getIssuedStandards (một tổ).
+     */
+    private function issuedStandards(int $departmentId, ?int $groupId = null)
+    {
         $issuedItems = DB::table('standard_request_items')
             ->join('standard_request_lists', 'standard_request_items.request_list_id', '=', 'standard_request_lists.id')
+            ->leftJoin('groups', 'standard_request_lists.group_id', '=', 'groups.id')
             ->leftJoin('standard_imports', 'standard_request_items.import_id', '=', 'standard_imports.id')
             ->leftJoin('locations', 'standard_imports.location_id', '=', 'locations.id')
             ->leftJoin('standard_categories', 'standard_request_items.category_id', '=', 'standard_categories.id')
@@ -479,10 +522,13 @@ class StandardExportController extends Controller
                 'locations.zone_type as location_zone_type',
                 DB::raw("CONCAT(user_management.fullName, ' (', user_management.userName, ')') as analyst_name"),
                 'purposes.name as purpose_name',
-                DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name')
+                DB::raw('COALESCE(suppliers.name, manufacturers.name) as supplier_name'),
+                'standard_request_lists.code as request_code',
+                'standard_request_lists.group_id',
+                'groups.name as group_name'
             )
             ->where('standard_request_lists.department_id', $departmentId)
-            ->where('standard_request_lists.group_id', $groupId)
+            ->when($groupId, fn ($query) => $query->where('standard_request_lists.group_id', $groupId))
             ->where('standard_request_items.active', 1)
             ->where('standard_request_items.status', 'issued')
             ->whereNotNull('standard_request_items.import_id')
@@ -533,7 +579,7 @@ class StandardExportController extends Controller
             return $item;
         });
 
-        return response()->json(['standards' => $issuedItems]);
+        return $issuedItems;
     }
 
     /**
@@ -615,7 +661,8 @@ class StandardExportController extends Controller
         $validator = Validator::make($request->all(), [
             'group_id' => ['required', 'exists:groups,id'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.category_id' => ['required', 'exists:standard_categories,id'],
+            // Chỉ chuẩn phòng đã khai: chuẩn chưa khai thì kho phòng không có ống nào để cấp
+            'items.*.category_id' => ['required', 'exists:standard_categories,id', Rule::in($this->declaredCategoryIds($departmentId))],
             'items.*.import_id' => ['nullable'],
             'items.*.specification' => ['nullable', 'string', 'max:100'],
             'items.*.supplier_id' => ['nullable'],
@@ -624,7 +671,7 @@ class StandardExportController extends Controller
             'items.*.purpose_id' => ['nullable'],
             'items.*.product_name' => ['nullable', 'string', 'max:255'],
             'items.*.test_criteria' => ['nullable'],
-            'items.*.analyst_id' => ['nullable'],
+            'items.*.analyst_id' => ['nullable', Rule::in($this->analystOptions($departmentId)->pluck('id')->all())],
             'items.*.note' => ['nullable', 'string', 'max:500'],
             'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
@@ -636,6 +683,8 @@ class StandardExportController extends Controller
             'items.*.category_id.required' => 'Vui lòng chọn chất chuẩn.',
             'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',
             'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
+            'items.*.analyst_id.in' => 'Kiểm nghiệm viên phải là người thuộc bộ phận.',
+            'items.*.category_id.in' => 'Chất chuẩn chưa được khai ở Danh Mục › Chất Chuẩn Của Phòng.',
         ]);
 
         if ($validator->fails()) {
@@ -715,7 +764,8 @@ class StandardExportController extends Controller
             ? 'Đã lưu tạm đề nghị cấp phát chuẩn ' . $code . '! Bạn có thể gửi đề nghị khi sẵn sàng.'
             : 'Đã gửi đề nghị cấp phát chuẩn ' . $code . ' thành công!';
 
-        return redirect()->route('pages.export.standardExport.list', ['tab' => 'request'])
+        // Lưu tạm mở tab con "Chưa gửi", gửi luôn mở "Chờ xử lý"
+        return redirect()->route('pages.export.standardExport.list', ['tab' => 'request', 'rsub' => $isDraft ? 'draft' : null])
             ->with('success', $msg);
     }
 
@@ -736,11 +786,30 @@ class StandardExportController extends Controller
             return redirect()->back()->with('error', 'Chỉ có thể điều chỉnh phiếu đề nghị đang ở trạng thái Lưu tạm!');
         }
 
+        // KNV đã chọn từ trước (nay đã chuyển bộ phận) vẫn được giữ nguyên khi lưu lại phiếu
+        $analystIds = $this->analystOptions($departmentId)->pluck('id')
+            ->merge(DB::table('standard_request_items')
+                ->where('request_list_id', $req->id)
+                ->where('active', 1)
+                ->whereNotNull('analyst_id')
+                ->pluck('analyst_id'))
+            ->unique()
+            ->all();
+
+        // Như KNV: chất chuẩn phiếu nháp đã chọn từ trước (nay phòng đã bỏ khai) vẫn lưu lại được
+        $categoryIds = collect($this->declaredCategoryIds($departmentId))
+            ->merge(DB::table('standard_request_items')
+                ->where('request_list_id', $req->id)
+                ->where('active', 1)
+                ->pluck('category_id'))
+            ->unique()
+            ->all();
+
         $validator = Validator::make($request->all(), [
             'request_list_id' => ['required', 'exists:standard_request_lists,id'],
             'group_id' => ['required', 'exists:groups,id'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.category_id' => ['required', 'exists:standard_categories,id'],
+            'items.*.category_id' => ['required', 'exists:standard_categories,id', Rule::in($categoryIds)],
             'items.*.import_id' => ['nullable'],
             'items.*.specification' => ['nullable', 'string', 'max:100'],
             'items.*.supplier_id' => ['nullable'],
@@ -749,7 +818,7 @@ class StandardExportController extends Controller
             'items.*.purpose_id' => ['nullable'],
             'items.*.product_name' => ['nullable', 'string', 'max:255'],
             'items.*.test_criteria' => ['nullable'],
-            'items.*.analyst_id' => ['nullable'],
+            'items.*.analyst_id' => ['nullable', Rule::in($analystIds)],
             'items.*.note' => ['nullable', 'string', 'max:500'],
             'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
@@ -761,6 +830,8 @@ class StandardExportController extends Controller
             'items.*.category_id.required' => 'Vui lòng chọn chất chuẩn.',
             'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',
             'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
+            'items.*.analyst_id.in' => 'Kiểm nghiệm viên phải là người thuộc bộ phận.',
+            'items.*.category_id.in' => 'Chất chuẩn chưa được khai ở Danh Mục › Chất Chuẩn Của Phòng.',
         ]);
 
         if ($validator->fails()) {
@@ -826,7 +897,7 @@ class StandardExportController extends Controller
             ? 'Đã cập nhật lưu tạm đề nghị ' . $req->code . ' thành công!'
             : 'Đã cập nhật và gửi đề nghị ' . $req->code . ' thành công!';
 
-        return redirect()->route('pages.export.standardExport.list', ['tab' => 'request'])
+        return redirect()->route('pages.export.standardExport.list', ['tab' => 'request', 'rsub' => $isDraft ? 'draft' : null])
             ->with('success', $msg);
     }
 
@@ -907,12 +978,41 @@ class StandardExportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!');
         }
 
-        $import = DB::table('standard_imports')->where('id', $request->import_id)->where('department_id', $departmentId)->first();
+        // Cấp phát chạy ngầm trong modal: chặn bấm lại trên dòng đã được người khác xử lý
+        if ($item->status !== 'pending') {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Mục này đã được xử lý, vui lòng tải lại trang!']);
+            }
+            return redirect()->back()->with('error', 'Mục này đã được xử lý, vui lòng tải lại trang!');
+        }
+
+        // findImport kèm shelf_life_months theo phòng để kiểm tra hạn dùng nội bộ bên dưới
+        $import = $this->findImport($request->import_id, $departmentId);
         if (!$import) {
             if ($request->ajax()) {
                 return response()->json(['success' => false, 'message' => 'Không tìm thấy ống chuẩn trong kho phòng ban này!']);
             }
             return redirect()->back()->with('error', 'Không tìm thấy ống chuẩn trong kho phòng ban này!');
+        }
+
+        // Cùng đơn vị với ống chuẩn thì SL cấp phát không được vượt tồn còn lại của ống
+        $issuedUnit = $this->nullIfBlank($request->issued_unit ?? $item->requested_unit);
+        $tubeUnit = DepartmentStandard::joinUnit(DB::table('standard_imports'), $departmentId, 'standard_imports.category_id')
+            ->where('standard_imports.id', $import->id)
+            ->select('units.short_name', 'units.name')
+            ->first();
+        $sameUnit = $issuedUnit !== null && $tubeUnit && collect([$tubeUnit->short_name, $tubeUnit->name])
+            ->filter()
+            ->contains(fn ($unit) => mb_strtolower(trim($unit)) === mb_strtolower(trim($issuedUnit)));
+        $remaining = $this->remaining($import);
+
+        if ($sameUnit && (float) $request->issued_amount > $remaining + self::EPSILON) {
+            $message = 'Ống chuẩn ' . $import->code . ' chỉ còn ' . $this->number($remaining) . ' ' . $issuedUnit
+                . ', không đủ để cấp phát ' . $this->number((float) $request->issued_amount) . ' ' . $issuedUnit . '!';
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $message]);
+            }
+            return redirect()->back()->with('error', $message);
         }
 
         // Thời điểm cấp phát luôn là lúc bấm Cấp Phát, không nhận giá trị từ form
@@ -982,7 +1082,9 @@ class StandardExportController extends Controller
                     'batch_no' => $import->batch_no,
                     'location' => DB::table('locations')->where('id', $import->location_id)->value('code'),
                     'location_zone' => DB::table('locations')->where('id', $import->location_id)->value('zone_type'),
-                ]
+                ],
+                'request_list_id' => (int) $item->request_list_id,
+                'list_status' => $newListStatus,
             ]);
         }
 
@@ -1052,7 +1154,17 @@ class StandardExportController extends Controller
     {
         $item = DB::table('standard_request_items')->where('id', $request->item_id)->where('active', 1)->first();
         if (!$item) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Không tìm thấy mục đề nghị!']);
+            }
             return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!');
+        }
+
+        if ($item->status !== 'pending') {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Mục này đã được xử lý, vui lòng tải lại trang!']);
+            }
+            return redirect()->back()->with('error', 'Mục này đã được xử lý, vui lòng tải lại trang!');
         }
 
         DB::table('standard_request_items')->where('id', $item->id)->update([
@@ -1081,8 +1193,129 @@ class StandardExportController extends Controller
             'Từ chối cấp phát' . ($request->filled('note') ? ': ' . $request->note : '')
         );
 
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã từ chối mục đề nghị cấp phát.',
+                'request_list_id' => (int) $item->request_list_id,
+                'list_status' => $newListStatus,
+            ]);
+        }
+
         return redirect()->route('pages.export.standardExport.list', ['tab' => 'request'])
             ->with('success', 'Đã từ chối mục đề nghị cấp phát.');
+    }
+
+    /**
+     * BỎ MỤC ĐÃ CẤP PHÁT NHƯNG KHÔNG SỬ DỤNG
+     */
+    public function requestUnuse(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), [
+            'item_id' => ['required', 'exists:standard_request_items,id'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ], [
+            'item_id.required' => 'Không tìm thấy mục đề nghị cần bỏ.',
+        ]);
+
+        if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => $validator->errors()->first()]);
+            }
+            return redirect()->back()->with('error', $validator->errors()->first());
+        }
+
+        $item = DB::table('standard_request_items')->where('id', $request->item_id)->where('active', 1)->first();
+        if (!$item) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Không tìm thấy mục đề nghị!']);
+            }
+            return redirect()->back()->with('error', 'Không tìm thấy mục đề nghị!');
+        }
+
+        $reqList = DB::table('standard_request_lists')
+            ->where('id', $item->request_list_id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (!$reqList) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Không tìm thấy phiếu đề nghị thuộc phòng ban này!']);
+            }
+            return redirect()->back()->with('error', 'Không tìm thấy phiếu đề nghị thuộc phòng ban này!');
+        }
+
+        if ($item->status !== 'issued') {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Chỉ có thể bỏ mục đã cấp phát và chưa sử dụng!']);
+            }
+            return redirect()->back()->with('error', 'Chỉ có thể bỏ mục đã cấp phát và chưa sử dụng!');
+        }
+
+        // Kiểm tra xem đã có phiếu sử dụng tương ứng chưa
+        $alreadyUsed = DB::table(self::TABLE)
+            ->where('request_item_id', $item->id)
+            ->where('type', 'export')
+            ->exists();
+
+        if ($alreadyUsed) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Ống chuẩn này đã được lập phiếu sử dụng, không thể bỏ!']);
+            }
+            return redirect()->back()->with('error', 'Ống chuẩn này đã được lập phiếu sử dụng, không thể bỏ!');
+        }
+
+        $note = $this->nullIfBlank($request->note);
+        $newNote = $item->note;
+        if ($note) {
+            $newNote = $item->note ? ($item->note . ' [Không dùng: ' . $note . ']') : ('Không dùng: ' . $note);
+        }
+
+        DB::table('standard_request_items')->where('id', $item->id)->update([
+            'status' => 'unused',
+            'note' => $newNote,
+            'updated_at' => now(),
+        ]);
+
+        $allItems = DB::table('standard_request_items')->where('request_list_id', $item->request_list_id)->where('active', 1)->get();
+        $pendingCount = $allItems->where('status', 'pending')->count();
+        $issuedCount = $allItems->where('status', 'issued')->count();
+        $usedCount = $allItems->where('status', 'used')->count();
+        $unusedCount = $allItems->where('status', 'unused')->count();
+
+        $newListStatus = $pendingCount === 0
+            ? (($issuedCount > 0 || $usedCount > 0 || $unusedCount > 0) ? 'completed' : 'rejected')
+            : ($issuedCount > 0 ? 'partial' : 'pending');
+
+        DB::table('standard_request_lists')->where('id', $item->request_list_id)->update([
+            'status' => $newListStatus,
+            'updated_by' => $this->actor(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Không sử dụng',
+            'standard_request_items',
+            $item->id,
+            $item->status,
+            'Không sử dụng ống chuẩn ' . ($item->import_code ?: $item->id) . ' đã cấp phát' . ($note ? ': ' . $note : '')
+        );
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã xác nhận không sử dụng ống chuẩn ' . ($item->import_code ?: '') . ' thành công!',
+                'item_id' => (int) $item->id,
+                'import_code' => $item->import_code,
+                'request_list_id' => (int) $item->request_list_id,
+                'list_status' => $newListStatus,
+            ]);
+        }
+
+        return redirect()->back()
+            ->with('success', 'Đã xác nhận không sử dụng ống chuẩn ' . ($item->import_code ?: '') . ' thành công!');
     }
 
     /*
@@ -1390,18 +1623,25 @@ class StandardExportController extends Controller
         // Tồn của từng ống trong kho phòng B, gom theo danh mục chất chuẩn
         $lots = $this->importOptions($departmentId)->groupBy('category_id');
 
-        $rows = DepartmentStandard::importCategoryOptions($departmentId)->map(function ($category) use ($lots) {
+        // Đơn vị PHÒNG MÌNH khai cho từng chất chuẩn - điền sẵn ĐVT khi picker đưa chuẩn vào dòng
+        // đề nghị (ô chất chuẩn giờ tìm qua AJAX, không còn option render sẵn mang data-unit)
+        $ownUnits = DepartmentStandard::joinUnit(DB::table('standard_categories'), $this->departmentId(), 'standard_categories.id')
+            ->whereNotNull('units.id')
+            ->select('standard_categories.id', DB::raw("COALESCE(NULLIF(units.short_name, ''), units.name) as unit"))
+            ->pluck('unit', 'id');
+
+        $rows = DepartmentStandard::importCategoryOptions($departmentId)->map(function ($category) use ($lots, $ownUnits) {
             $group = $lots->get($category->id, collect());
 
             return [
                 'id' => (int) $category->id,
                 'code' => $category->code,
-                'version' => $category->version,
                 'name' => $category->standard_name,
                 'cas_no' => $category->name_cas_no,
                 'manufacturer_name' => $category->manufacturer_name ?: $category->manufacturer_short_name,
                 'storage_condition_name' => $category->storage_condition_name,
                 'unit' => $category->unit_short_name ?: $category->unit_name,
+                'own_unit' => (string) ($ownUnits[$category->id] ?? ''),
                 'remaining' => (float) $group->sum('remaining'),
                 'lots' => (int) $group->where('remaining', '>', self::EPSILON)->count(),
             ];
@@ -1926,7 +2166,7 @@ class StandardExportController extends Controller
         $this->checkImport($validator, $request, $import);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'createErrors')->withInput()->with('activeTab', 'use');
         }
 
         $id = DB::table(self::TABLE)->insertGetId($this->payload($request, $import) + [
@@ -1937,6 +2177,15 @@ class StandardExportController extends Controller
         ]);
 
         $this->logHistory($id, 'Thêm mới');
+
+        if ($request->filled('request_item_id')) {
+            DB::table('standard_request_items')
+                ->where('id', (int) $request->request_item_id)
+                ->update([
+                    'status' => 'used',
+                    'updated_at' => now(),
+                ]);
+        }
 
         /*
         | Số cân "Bì + Chuẩn" gắn với ỐNG chứ không gắn với phiếu, nên ghi thẳng vào
@@ -1969,7 +2218,9 @@ class StandardExportController extends Controller
             self::TYPES[$request->type].' chất chuẩn, mã ống chuẩn: '.$import->code.', số lượng: '.$request->amount
         );
 
-        return redirect()->back()->with('success', 'Đã ghi nhận '.self::LABEL.' cho ống chuẩn '.$import->code.'!');
+        // Phiếu sử dụng chỉ lập từ tab "Sử dụng chuẩn": lưu xong quay lại tab đó dùng tiếp ống khác
+        return redirect()->route('pages.export.standardExport.list', ['tab' => 'use'])
+            ->with('success', 'Đã ghi nhận '.self::LABEL.' cho ống chuẩn '.$import->code.'!');
     }
 
     public function update(Request $request)
@@ -2264,6 +2515,16 @@ class StandardExportController extends Controller
 
 
 
+    /** Chất chuẩn phòng đã khai (đang hoạt động) ở Danh Mục › Chất Chuẩn Của Phòng. */
+    private function declaredCategoryIds(int $departmentId): array
+    {
+        return DB::table(DepartmentStandard::TABLE)
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->pluck('category_id')
+            ->all();
+    }
+
     /** Người kiểm tra: user đang hoạt động của phòng ban đang chọn. */
     private function checkerOptions(int $departmentId)
     {
@@ -2273,6 +2534,25 @@ class StandardExportController extends Controller
             ->where('user_management.deparment_id', $departmentId)
             ->where('user_management.isActive', 1)
             ->orderBy('user_management.fullName', 'asc')
+            ->get();
+    }
+
+    /**
+     * Kiểm nghiệm viên chọn được trên đề nghị cấp phát cho tổ: user đang hoạt động thuộc bộ phận -
+     * phòng ban chính (user_management.deparment_id) hoặc là thành viên một tổ của phòng (user_group).
+     */
+    private function analystOptions(int $departmentId)
+    {
+        $groupMembers = DB::table('user_group')
+            ->join('groups', 'user_group.group_id', '=', 'groups.id')
+            ->where('groups.department_id', $departmentId)
+            ->pluck('user_group.user_id');
+
+        return DB::table('user_management')
+            ->select('id', 'userName', 'fullName')
+            ->where('isActive', 1)
+            ->where(fn ($query) => $query->where('deparment_id', $departmentId)->orWhereIn('id', $groupMembers))
+            ->orderBy('fullName', 'asc')
             ->get();
     }
 

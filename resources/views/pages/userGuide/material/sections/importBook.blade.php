@@ -38,8 +38,6 @@
         được. Số nhỏ ở góc nút là số lần đã điều chỉnh, bấm vào để xem lịch sử.</li>
     <li><span class="btn btn-sm btn-outline-secondary ug-ui"><i class="fas fa-qrcode"></i></span> <b>In nhãn</b>: in nhãn dán lô
         có mã QR, chọn số nhãn cần in (tối đa 100). Mỗi lần in được ghi vào Audit Trail.</li>
-    <li><span class="btn btn-sm btn-secondary ug-ui"><i class="fas fa-lock"></i></span> <b>Khoá / Mở khoá</b>: phiếu nhập
-        không xoá cứng, chỉ khoá (huỷ) để mã lô không bị cấp lại.</li>
 </ul>
 <p class="mb-0">Cột <b>Tình Trạng</b>: <span class="badge badge-warning">Chờ kiểm tra</span>
     <span class="badge badge-success">Kiểm tra Đạt</span> <span class="badge badge-danger">Không đạt</span>.

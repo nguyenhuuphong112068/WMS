@@ -89,6 +89,13 @@
                                 height: 28px !important;
                                 margin-top: 3px !important;
                             }
+                            #tableReqRows .select2-container--bootstrap4 .select2-selection--single {
+                                height: 38px !important;
+                                font-size: 0.9rem !important;
+                            }
+                            #tableReqRows .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+                                line-height: 36px !important;
+                            }
                         </style>
                         <table class="table table-bordered mb-0" id="tableReqRows" style="font-size: 0.9rem;">
                             <thead class="bg-light">
@@ -113,13 +120,10 @@
                                         <span class="text-muted small font-italic">(Cấp sau)</span>
                                     </td>
                                     <td>
-                                        <select name="items[0][category_id]" class="form-control select-req-category" required>
+                                        {{-- Gõ tìm qua AJAX - StandardExport/categorySelect --}}
+                                        <select name="items[0][category_id]" class="form-control select-req-category js-std-category"
+                                            data-lookup-url="{{ route('pages.category.lookup.standardCategories', ['scope' => 'department']) }}" required>
                                             <option value="">-- Chọn chất chuẩn --</option>
-                                            @foreach ($standardCategories as $cat)
-                                                <option value="{{ $cat->id }}" data-unit="{{ $cat->unit_short_name ?: $cat->unit_name }}">
-                                                    {{ $cat->standard_name }} ({{ $cat->code }} v{{ $cat->version }})
-                                                </option>
-                                            @endforeach
                                         </select>
                                     </td>
                                     <td class="align-middle text-center" style="background-color: #f8fafc;">
@@ -157,7 +161,7 @@
                                         </select>
                                     </td>
                                     <td>
-                                        <select name="items[0][analyst_id]" class="form-control">
+                                        <select name="items[0][analyst_id]" class="form-control select2-analyst">
                                             <option value="">-- KNV --</option>
                                             @foreach ($analysts as $an)
                                                 <option value="{{ $an->id }}">{{ $an->fullName }} ({{ $an->userName }})</option>
@@ -235,8 +239,34 @@
             });
         }
 
+        /*
+        | Ô Kiểm Nghiệm Viên: select2 có ô tìm kiếm (danh sách chỉ gồm người thuộc bộ phận).
+        | Dùng chung cho modal tạo, modal điều chỉnh và picker "Danh mục chuẩn tồn của phòng";
+        | dòng mới nhân bản phải gọi destroyAnalystSelect2 trước khi clone.
+        */
+        window.initAnalystSelect2 = function($context) {
+            $context.find('.select2-analyst').each(function() {
+                if (!$(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2({
+                        theme: 'bootstrap4',
+                        width: '100%',
+                        dropdownAutoWidth: true,
+                        placeholder: '-- KNV --',
+                        allowClear: true,
+                        dropdownParent: $(this).closest('.modal'),
+                        language: { noResults: function() { return 'Không tìm thấy KNV thuộc bộ phận'; } }
+                    });
+                }
+            });
+        };
+
+        window.destroyAnalystSelect2 = function($context) {
+            $context.find('.select2-analyst.select2-hidden-accessible').select2('destroy');
+        };
+
         $('#requestModal').on('shown.bs.modal', function() {
             initCriteriaSelect2($(this));
+            initAnalystSelect2($(this));
         });
 
         // Click handler for Lưu vs Gửi đề nghị
@@ -254,7 +284,7 @@
         $(document).on('change', '.select-req-category', function() {
             var $row = $(this).closest('tr');
             var categoryId = $(this).val();
-            var unit = $(this).find('option:selected').data('unit') || '';
+            var unit = (wmsSelectedItems($(this))[0] || {}).unit || '';
 
             if (categoryId) {
                 $.ajax({
@@ -303,6 +333,7 @@
                     $(this).select2('destroy');
                 }
             });
+            destroyAnalystSelect2($tbody);
 
             var $newRow = $firstRow.clone();
 
@@ -313,6 +344,7 @@
                 }
                 $(this).val(null);
             });
+            stdCleanCategoryClone($newRow);
 
             $newRow.find('.cell-specification').text('—');
             $newRow.find('.cell-supplier').text('—');
@@ -325,6 +357,8 @@
 
             // Re-init select2 on all rows
             initCriteriaSelect2($tbody);
+            initAnalystSelect2($tbody);
+            stdInitCategorySelect($newRow);
         });
 
         $(document).on('click', '.btn-remove-req-row', function() {

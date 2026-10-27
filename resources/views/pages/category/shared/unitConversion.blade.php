@@ -19,7 +19,7 @@
 | - $label      : 'chất chuẩn', 'hoá chất' hoặc 'vật tư', chỉ dùng trong câu chữ
 --}}
 
-<div class="cuc-box" data-prefix="{{ $prefix }}" data-units-in-use="{{ json_encode($unitsInUse) }}"
+<div class="cuc-box" data-soft-sync="cuc-{{ $prefix }}" data-prefix="{{ $prefix }}" data-units-in-use="{{ json_encode($unitsInUse) }}"
     data-conversions="{{ json_encode($conversions) }}"
     data-old="{{ json_encode($bag->any() ? (array) old('conversions', []) : []) }}"
     data-old-dirs="{{ json_encode($bag->any() ? (array) old('conversion_dirs', []) : []) }}" style="display: none">

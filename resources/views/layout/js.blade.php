@@ -550,3 +550,8 @@
                         });
                 })(window.jQuery);
         </script>
+
+        {{-- Sửa / Khoá / Duyệt / Từ chối ở Dữ Liệu Gốc + Danh Mục: gửi ngầm, giữ bộ lọc & vị trí cuộn --}}
+        @if (request()->routeIs('pages.materData.*', 'pages.category.*'))
+                @include('layout.softSubmit')
+        @endif

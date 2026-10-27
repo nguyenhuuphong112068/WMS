@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Pages\Import;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
-use App\Support\Barcode128;
 use App\Support\DepartmentStandard;
 use App\Support\ListRange;
 use App\Support\StandardCode;
+use App\Support\StandardWeight;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -182,6 +182,8 @@ class StandardImportController extends Controller
                 'group_code' => $category->default_group_code,
                 'info_html' => implode(' | ', $info),
                 'unit_short_name' => $category->unit_short_name,
+                // Khác null = không được tick "Chuẩn có cần kiểm soát khối lượng" (lý do hiện cạnh ô)
+                'weight_block' => StandardWeight::controlBlock($category->unit_short_name, $category->density),
             ]];
         })->toArray();
 
@@ -222,46 +224,6 @@ class StandardImportController extends Controller
         ]);
     }
 
-    /**
-     * IN NHÃN DÁN ỐNG CHUẨN.
-     */
-    public function label(Request $request)
-    {
-        $row = DB::table(self::TABLE)
-            ->leftJoin('standard_categories', self::TABLE . '.category_id', '=', 'standard_categories.id')
-            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
-            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->tap(fn($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), self::TABLE . '.category_id'))
-            ->leftJoin('locations', self::TABLE . '.location_id', '=', 'locations.id')
-            ->select(
-                self::TABLE . '.*',
-                'standard_categories.code as category_code',
-                'standard_categories.version as category_version',
-                'standard_categories.cas_no',
-                'standard_names.name as standard_name',
-                'manufacturers.short_name as manufacturer_short_name',
-                'manufacturers.name as manufacturer_name',
-                'units.short_name as unit_short_name',
-                'units.name as unit_name',
-                'locations.code as location_code',
-                'locations.zone_type as location_zone_type'
-            )
-            ->where(self::TABLE . '.id', $request->id)
-            ->where(self::TABLE . '.department_id', $this->departmentId())
-            ->first();
-
-        if (! $row) {
-            abort(404, 'Không tìm thấy phiếu nhập chất chuẩn cần in nhãn.');
-        }
-
-        return view('pages.import.StandardImport.label', [
-            'import' => $row,
-            'label' => config('standard.label'),
-            'groupLabel' => StandardCode::groupLabel($this->groupKeyOf($row->group_code)),
-            'barcode' => Barcode128::svg($row->code),
-        ]);
-    }
-
     public function store(Request $request)
     {
         $departmentId = $this->departmentId();
@@ -269,6 +231,7 @@ class StandardImportController extends Controller
         $validator = Validator::make($request->all(), $this->rules($departmentId, true), $this->messages());
 
         $this->checkGroup($validator, $request);
+        $this->checkWeightControl($validator, $request, $departmentId);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
@@ -383,6 +346,7 @@ class StandardImportController extends Controller
         $validator = Validator::make($request->all(), $rules, $messages);
 
         $this->checkGroup($validator, $request);
+        $this->checkWeightControl($validator, $request, $departmentId, $current);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
@@ -794,49 +758,6 @@ class StandardImportController extends Controller
         return response()->json(['success' => true, 'is_active' => $newActive]);
     }
 
-    public function deActive(Request $request)
-    {
-        $current = DB::table(self::TABLE)
-            ->where('id', $request->id)
-            ->where('department_id', $this->departmentId())
-            ->first();
-
-        if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần thay đổi trạng thái!');
-        }
-
-        $newStatus = $current->status_id == 1 ? 0 : 1;
-        $action = $newStatus == 1 ? 'Mở khoá' : 'Khoá';
-
-        DB::transaction(function () use ($current, $newStatus, $action) {
-            DB::table(self::TABLE)->where('id', $current->id)->update([
-                'status_id' => $newStatus,
-                'updated_by' => $this->actor(),
-                'updated_at' => now(),
-            ]);
-
-            $this->writeHistory(
-                (int) $current->id,
-                $action,
-                'Trạng thái: ' . ($current->status_id == 1 ? 'Hiệu lực' : 'Đã khoá')
-                    . ' -> ' . ($newStatus == 1 ? 'Hiệu lực' : 'Đã khoá')
-            );
-        });
-
-        AuditTrialController::log(
-            $action,
-            self::TABLE,
-            $current->id,
-            'status_id: ' . $current->status_id,
-            'status_id: ' . $newStatus
-        );
-
-        return redirect()->back()->with(
-            'success',
-            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ') . self::LABEL . ' ' . $current->code . '!'
-        );
-    }
-
 
 
     private function writeHistory(int $id, string $action, ?string $note, ?string $reason = null): void
@@ -1101,6 +1022,46 @@ class StandardImportController extends Controller
                     'group_key',
                     'Nhóm chuẩn không nằm trong các nhóm đã khai cho chất chuẩn này.'
                 );
+            }
+        });
+    }
+
+    /**
+     * "Chuẩn có cần kiểm soát khối lượng" chỉ tick được khi ĐVT của phòng là mg, hoặc
+     * ml đã khai tỉ trọng d - xem StandardWeight::controlBlock().
+     *
+     * Phiếu cũ đã tick sẵn mà vẫn giữ nguyên chất chuẩn thì cho lưu tiếp, để điều chỉnh
+     * thông tin khác không bị chặn vì dữ liệu nạp từ trước khi có quy tắc này.
+     */
+    private function checkWeightControl($validator, Request $request, int $departmentId, $current = null): void
+    {
+        $validator->after(function ($validator) use ($request, $departmentId, $current) {
+            if (! $request->boolean('weight_controlled')) {
+                return;
+            }
+
+            if ($current && $current->weight_controlled && (int) $current->category_id === (int) $request->category_id) {
+                return;
+            }
+
+            $category = DB::table('standard_categories')
+                ->leftJoin('standard_department_categories', function ($join) use ($departmentId) {
+                    $join->on('standard_department_categories.category_id', '=', 'standard_categories.id')
+                        ->where('standard_department_categories.department_id', '=', $departmentId);
+                })
+                ->leftJoin('units', 'standard_department_categories.unit_id', '=', 'units.id')
+                ->select('standard_categories.density', 'units.short_name as unit_short_name')
+                ->where('standard_categories.id', $request->category_id)
+                ->first();
+
+            if (! $category) {
+                return;
+            }
+
+            $block = StandardWeight::controlBlock($category->unit_short_name, $category->density);
+
+            if ($block !== null) {
+                $validator->errors()->add('weight_controlled', $block);
             }
         });
     }

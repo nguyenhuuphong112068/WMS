@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * MÃ ỐNG CHUẨN - một chỗ duy nhất định nghĩa cách sinh mã.
  *
- *      deparments.shortName + mã nhóm chuẩn + yy + mm + số thứ tự (4 chữ số)
- *      QC1              +   VKN         + 26 + 01 + 0036   ->  QC1VKN26010036
+ *      prefix(deparments.shortName) + mã nhóm chuẩn + yy + mm + số thứ tự (4 chữ số)
+ *      QC1 (QC-B1)                  +   VKN         + 26 + 01 + 0036   ->  QC1VKN26010036
  *
  * - Số thứ tự đếm trong NĂM, riêng cho từng cặp (phòng ban, nhóm chuẩn). Sang năm
  *   mới bắt đầu lại từ 0001, còn trong năm thì tháng nào cũng đếm tiếp.
@@ -33,11 +33,20 @@ class StandardCode
      */
     public static function build(string $shortName, string $groupCode, int $year, int $month, int $seq): string
     {
-        return $shortName
+        return self::prefix($shortName)
             .$groupCode
             .substr(str_pad((string) $year, 4, '0', STR_PAD_LEFT), -2)
             .str_pad((string) $month, 2, '0', STR_PAD_LEFT)
             .str_pad((string) $seq, self::SEQ_LENGTH, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Phần đầu mã ống chuẩn suy từ deparments.shortName: phòng tách theo toà nhà
+     * bỏ "-B" cho khớp mã cũ SMS 2.0, ví dụ QC-B1 -> QC1, QC-B2 -> QC2.
+     */
+    public static function prefix(string $shortName): string
+    {
+        return preg_replace('/^(.+)-B(\d+)$/i', '$1$2', trim($shortName));
     }
 
     /**

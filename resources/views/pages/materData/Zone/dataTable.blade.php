@@ -388,7 +388,7 @@
                         <a class="nav-link {{ $loop->first ? 'active' : '' }}" data-toggle="pill"
                             data-tab="{{ $key }}" href="#zonePane-{{ $key }}" role="tab">
                             <i class="{{ $meta['icon'] }}"></i> {{ $meta['label'] }}
-                            <span class="count">{{ $meta['rows']->count() }}</span>
+                            <span class="count" id="zoneCount-{{ $key }}" data-soft-refresh>{{ $meta['rows']->count() }}</span>
                         </a>
                     </li>
                 @endforeach
@@ -579,9 +579,25 @@
 
 <script src="{{ asset('js/sweetalert2.all.min.js') }}"></script>
 
+{{-- Khối JSON (data-soft-refresh) để lưu ngầm xong (layout/softSubmit) lấy lại được bản mới --}}
+<script type="application/json" id="zoneCascadeData" data-soft-refresh>@json($zoneCascade)</script>
+
 <script>
     // Dữ liệu cấp cha để đổ động cho các ô chọn trong modal (Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng).
-    var zoneData = @json($zoneCascade);
+    function zoneReadCascade() {
+        try {
+            return JSON.parse(document.getElementById('zoneCascadeData').textContent) || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    var zoneData = zoneReadCascade();
+
+    // Sửa / khoá / xoá xong (không tải lại trang): ô chọn cấp cha dùng danh sách mới
+    document.addEventListener('wms:soft-refreshed', function() {
+        zoneData = zoneReadCascade();
+    });
 
     var zoneTypes = @json(array_keys($zoneMeta));
 

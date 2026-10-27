@@ -25,6 +25,11 @@
 <p>Mỗi màn hình vật tư chia thành nhiều tab. Bạn chỉ thấy những tab được cấp quyền. Số nhỏ bên cạnh tên tab là số việc
     đang chờ xử lý trong tab đó.</p>
 
+<h3>Sửa, duyệt, khoá ở Danh Mục không tải lại trang</h3>
+<p>Ở Danh Mục Vật Tư (tab Công Ty, Vật Tư Của Phòng và các danh sách theo chu kỳ), <b>Sửa</b>, <b>Duyệt</b> và
+    <b>Khoá / Mở khoá</b> lưu ngay tại chỗ: bảng tự cập nhật dòng vừa đổi, giữ nguyên tab, ô tìm kiếm, bộ lọc, trang
+    đang xem và vị trí cuộn. Lỗi nhập hiện ngay dưới ô trong cửa sổ Sửa. <b>Thêm mới</b> vẫn tải lại trang.</p>
+
 <h3>Ngày thao tác do hệ thống ghi</h3>
 <p class="mb-0">Ngày nhập, ngày cấp phát, ngày ký... là thời điểm bạn bấm nút, hệ thống tự ghi và không sửa được. Các
     ngày thuộc chứng từ hoặc kế hoạch như <i>Hạn sử dụng</i>, <i>Ngày ký hoá đơn</i>, <i>Ngày mong muốn</i> thì nhập tay.</p>

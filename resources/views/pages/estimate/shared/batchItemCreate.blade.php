@@ -56,7 +56,6 @@
             ' · ',
             array_filter([
                 $c->code ?? null,
-                isset($c->version) ? 'v' . $c->version : null,
                 $c->manufacturer_short_name ?? ($c->manufacturer_name ?? null),
                 !empty($c->cas_no) ? 'CAS ' . $c->cas_no : null,
             ]),

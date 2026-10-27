@@ -34,7 +34,6 @@ Route::prefix('/import')
             // Xác nhận kiểm tra lô đang "Chờ kiểm tra": bổ sung thông tin còn thiếu,
             // định khu lại vị trí thật, từ đó lô mới được cộng vào tồn kho
             Route::post('confirmCheck', 'confirmCheck')->name('confirmCheck');
-            Route::post('deActive', 'deActive')->name('deActive');
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
             // Đổi trạng thái Đang sử dụng / Ngưng sử dụng của một file đính kèm
@@ -45,14 +44,11 @@ Route::prefix('/import')
         Route::prefix('/standardImport')->name('standardImport.')->controller(StandardImportController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::post('store', 'store')->name('store');
-            // Trang in nhãn dán ống chuẩn (mã vạch Code 128), mở tab mới rồi bấm In
-            Route::get('label', 'label')->name('label');
             Route::get('history', 'history')->name('history');
             Route::post('update', 'update')->name('update');
             // Xác nhận kiểm tra lô đang "Chờ kiểm tra": bổ sung thông tin còn thiếu,
             // định khu lại vị trí thật, từ đó lô mới được cộng vào tồn kho
             Route::post('confirmCheck', 'confirmCheck')->name('confirmCheck');
-            Route::post('deActive', 'deActive')->name('deActive');
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
             // Đổi trạng thái Đang sử dụng / Ngưng sử dụng của một file đính kèm
@@ -72,7 +68,6 @@ Route::prefix('/import')
             // Xác nhận kiểm tra lô đang "Chờ kiểm tra": bổ sung thông tin còn thiếu,
             // định khu lại vị trí thật, từ đó lô mới được cộng vào tồn kho
             Route::post('confirmCheck', 'confirmCheck')->name('confirmCheck');
-            Route::post('deActive', 'deActive')->name('deActive');
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
             // Đổi trạng thái Đang sử dụng / Ngưng sử dụng của một file đính kèm

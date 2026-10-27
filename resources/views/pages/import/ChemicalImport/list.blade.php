@@ -9,7 +9,6 @@
     */
 
     $impRoute = 'pages.import.chemicalImport.';
-    $impLabel = 'phiếu nhập hoá chất';
     $impIcon = 'fas fa-flask';
 
     /** Bỏ số 0 thừa ở phần thập phân: 12.5000 -> 12.5, 12.0000 -> 12 */

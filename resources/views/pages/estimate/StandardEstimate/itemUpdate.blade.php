@@ -49,8 +49,7 @@
                             @foreach ($categories as $category)
                                 <option value="{{ $category->id }}"
                                     {{ old('category_id') == $category->id ? 'selected' : '' }}>
-                                    {{ $category->code }} - {{ $category->standard_name }}
-                                    (v{{ $category->version }}{{ $category->unit_short_name ? ', ' . $category->unit_short_name : '' }})
+                                    {{ $category->code }} - {{ $category->standard_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}
                                 </option>
                             @endforeach
                         </select>

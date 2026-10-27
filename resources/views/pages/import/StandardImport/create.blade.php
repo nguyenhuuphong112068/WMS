@@ -42,7 +42,8 @@
                                             <option value="{{ $category->id }}"
                                                 {{ old('category_id') == $category->id ? 'selected' : '' }}>
                                                 {{ $category->code }} - {{ $category->standard_name }}
-                                                (v{{ $category->version }}{{ $category->unit_short_name ? ', ' . $category->unit_short_name : '' }}{{ $category->manufacturer_short_name ? ', ' . $category->manufacturer_short_name : '' }})
+                                                @php $optMeta = implode(', ', array_filter([$category->unit_short_name, $category->manufacturer_short_name])); @endphp
+                                                {{ $optMeta !== '' ? '(' . $optMeta . ')' : '' }}
                                             </option>
                                         @endforeach
                                     </select>
@@ -299,6 +300,11 @@
                                         khối lượng
                                     </label>
                                 </div>
+                                {{-- Lý do ô bị khoá: ĐVT của phòng không phải mg / ml có tỉ trọng d --}}
+                                <small class="md-sub d-block mt-2 sd-weight-block" style="display:none;"></small>
+                                @if ($bag->has('weight_controlled'))
+                                    <span class="md-error d-block mt-1">{{ $bag->first('weight_controlled') }}</span>
+                                @endif
 
                                 {{-- Dạng chuẩn chỉ hiện khi tick chọn kiểm soát khối lượng --}}
                                 <div class="sd-standard-form-box mt-2 pt-2 border-top"
@@ -449,12 +455,32 @@
             checkStdMaxStock($(this).closest('form'));
         });
 
+        // "Chuẩn có cần kiểm soát khối lượng" chỉ tick được khi ĐVT của phòng là mg,
+        // hoặc ml đã khai tỉ trọng d (item.weight_block = lý do bị khoá, null = được tick)
+        function syncWeightControl($form, item) {
+            var block = item ? (item.weight_block || '') : '';
+            var blocked = !item || block !== '';
+            var $chk = $form.find('.sd-weight-ctrl');
+
+            if (blocked && $chk.is(':checked')) {
+                $chk.prop('checked', false).trigger('change');
+            }
+
+            $chk.prop('disabled', blocked);
+            $chk.closest('.custom-checkbox').attr('title', blocked ? (block || 'Chọn chất chuẩn trước') : '');
+            $form.find('.sd-weight-block')
+                .html(block ? '<i class="fas fa-lock mr-1"></i>' + $('<span>').text(block).html() : '')
+                .toggle(block !== '');
+        }
+
         // Tự động đồng bộ khi chọn chất chuẩn
         function syncCategoryDetails($form) {
             var $cat = $form.find('.sd-category');
             var catId = $cat.val();
             var defaultsMap = $cat.data('defaults') || {};
             var item = defaultsMap[catId] || null;
+
+            syncWeightControl($form, item);
 
             if (item) {
                 if (item.info_html) {
@@ -552,92 +578,4 @@
     </script>
 @endif
 
-{{-- Modal Chọn Chất Chuẩn --}}
-<div class="modal fade" id="selectStandardModal" tabindex="-1" role="dialog" style="z-index: 1060;"
-    data-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document" style="max-width: 60%;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Chọn Chất Chuẩn</h5>
-                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-            </div>
-            <div class="modal-body p-2">
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover w-100" id="tableSelectStandard">
-                        <thead class="thead-light">
-                            <tr>
-                                <th style="width: 40px;" class="text-center">STT</th>
-                                <th>MÃ CHUẨN</th>
-                                <th>TÊN CHẤT CHUẨN</th>
-                                <th>SỐ CAS</th>
-                                <th>NGUỒN GỐC / NSX</th>
-                                <th>TỶ TRỌNG</th>
-                                <th>ĐIỀU KIỆN BẢO QUẢN</th>
-                                <th>VERSION</th>
-                                <th>PHÂN NHÓM CHUẨN</th>
-                                <th style="width: 60px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($categories as $category)
-                                <tr>
-                                    <td class="text-center">{{ $loop->iteration }}</td>
-                                    <td><strong>{{ $category->code }}</strong></td>
-                                    <td>{{ $category->standard_name }}</td>
-                                    <td>{{ $category->name_cas_no ?: '—' }}</td>
-                                    <td>
-                                        <div class="md-sub">{{ $category->manufacturer_name ?: '—' }}</div>
-                                        @if ($category->manufacturer_short_name)
-                                            <span
-                                                class="badge badge-light border">{{ $category->manufacturer_short_name }}</span>
-                                        @endif
-                                    </td>
-                                    <td>{{ $category->density !== null ? $category->density : '—' }}</td>
-                                    <td>{{ $category->storage_condition_name ?: '—' }}</td>
-                                    <td class="text-center"><span
-                                            class="badge badge-pill badge-light border">v{{ $category->version }}</span>
-                                    </td>
-                                    <td>
-                                        @if ($category->groups)
-                                            @foreach (json_decode($category->groups) as $g)
-                                                <span class="badge badge-primary">{{ $g }}</span>
-                                            @endforeach
-                                        @endif
-                                    </td>
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-primary btn-select-standard"
-                                            data-id="{{ $category->id }}">Chọn</button>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var $dt = $('#tableSelectStandard').DataTable({
-            pageLength: 10,
-            lengthChange: false,
-            language: {
-                search: "Tìm kiếm:",
-                // Phòng chưa khai chất chuẩn nào thì nói rõ phải khai ở đâu, đừng để bảng trống trơn
-                emptyTable: 'Phòng chưa khai chất chuẩn nào ở tab "Chất Chuẩn Của Phòng" nên chưa có gì để nhập.',
-                zeroRecords: 'Không tìm thấy chất chuẩn phù hợp trong danh mục của phòng.'
-            },
-            order: [
-                [0, 'asc']
-            ]
-        });
-
-        $(document).on('click', '.btn-select-standard', function() {
-            var id = $(this).data('id');
-            $('#createModal select[name="category_id"]').val(id).trigger('change');
-            $('#selectStandardModal').modal('hide');
-        });
-    });
-</script>
+@include('pages.import.StandardImport.selectStandardModal')

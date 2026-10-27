@@ -9,7 +9,6 @@
     */
 
     $impRoute = 'pages.import.materialImport.';
-    $impLabel = 'phiếu nhập vật tư';
     $impIcon = 'fas fa-box-open';
 
     /** Bỏ số 0 thừa ở phần thập phân: 12.5000 -> 12.5, 12.0000 -> 12 */

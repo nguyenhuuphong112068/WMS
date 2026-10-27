@@ -70,9 +70,6 @@
                         <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
                         <div class="md-sub">
                             <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
-                            @if ($row->category_version)
-                                <span class="ml-1">v{{ $row->category_version }}</span>
-                            @endif
                             @if ($row->manufacturer_short_name)
                                 <span class="ml-1">· {{ $row->manufacturer_short_name }}</span>
                             @endif

@@ -34,6 +34,8 @@ Route::prefix('/category')
             // Hoạt chất (modal Tên Hoá Chất) và mã hoá chất (modal Nhập / Khai cho phòng / Đề nghị chuyển)
             Route::get('activeIngredients', 'activeIngredients')->name('activeIngredients');
             Route::get('chemicalCategories', 'chemicalCategories')->name('chemicalCategories');
+            // Mã chất chuẩn (đề nghị cấp phát chuẩn cho Tổ / liên phòng ban - Sử Dụng Chuẩn)
+            Route::get('standardCategories', 'standardCategories')->name('standardCategories');
             // Tương kỵ khi đặt hoá chất vào định khu (Sơ đồ lưu trữ GHS) - modal Khai Hoá Chất Cho Phòng
             Route::get('chemicalCompatibility', 'chemicalCompatibility')->name('chemicalCompatibility');
             // Tên sản phẩm (Dữ Liệu Gốc) - ô Mục Đích / Lý Do của modal Sử Dụng Hoá Chất

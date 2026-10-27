@@ -25,5 +25,11 @@
     cháy với chất oxy hoá) vào <b>cùng một tầng</b> của kệ/tủ. Hoá chất chưa khai cảnh báo an toàn thì không xét được.</p>
 
 <h3>Ký điện tử bằng mật khẩu</h3>
-<p class="mb-0">Các thao tác <span class="ug-chip is-warn">Ký bằng mật khẩu</span> (duyệt danh mục, xác nhận khai báo cổng quốc gia,
+<p>Các thao tác <span class="ug-chip is-warn">Ký bằng mật khẩu</span> (duyệt danh mục, xác nhận khai báo cổng quốc gia,
     quyết định loại bỏ, huỷ, ký dự trù) bắt buộc nhập lại mật khẩu đăng nhập (21 CFR Part 11).</p>
+
+<h3>Sửa, duyệt, khoá ở Danh Mục không tải lại trang</h3>
+<p class="mb-0">Ở Danh Mục Hoá Chất (tab Công Ty và Hoá Chất Của Phòng), <b>Sửa</b>, <b>Duyệt</b>, <b>Xác nhận khai báo
+    cổng</b> và <b>Khoá / Mở khoá</b> lưu ngay tại chỗ: bảng tự cập nhật dòng vừa đổi, giữ nguyên tab, ô tìm kiếm, bộ lọc,
+    trang đang xem và vị trí cuộn. Sai mật khẩu ký hoặc nhập sai thì hệ thống báo lỗi, trang vẫn giữ nguyên.
+    <b>Thêm mới</b> vẫn tải lại trang.</p>

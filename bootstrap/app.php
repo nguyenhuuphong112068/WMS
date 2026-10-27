@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\UpdateUserActivity::class,
             // ?_deferred=1: trả JSON các dòng bảng thay cho trang (App\Support\DeferredRows)
             \App\Http\Middleware\ServeDeferredRows::class,
+            // Header X-WMS-Soft: form gửi ngầm, đổi redirect()->back() thành JSON (layout/softSubmit)
+            \App\Http\Middleware\SoftSubmit::class,
         ]);
 
         $middleware->alias([

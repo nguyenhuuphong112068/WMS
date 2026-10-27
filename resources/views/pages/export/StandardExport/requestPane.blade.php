@@ -5,6 +5,12 @@
 | 1. Tổ tạo phiếu đề nghị cấp phát (chọn chuẩn, qui cách, SL, sản phẩm, chỉ tiêu, KNV, ghi chú)
 | 2. Thủ kho / Quản lý kho cấp phát ống chuẩn cụ thể (mã ống, định khu, SL cấp, ĐVT)
 | 3. Nhân viên thuộc tổ chỉ được sử dụng các chuẩn đã được cấp phát cho tổ mình.
+|
+| 3 tab con, mỗi tab một paginator riêng (StandardExportController::index):
+| - Chưa gửi : Lưu tạm - luôn hiện đủ.
+| - Chờ xử lý: Chờ cấp phát / Cấp một phần - luôn hiện đủ (tab mặc định).
+| - Đã xử lý : Đã cấp đủ / Từ chối / Đã huỷ - lọc theo ngày lập.
+| Tab con đang mở giữ trên URL (rsub = draft | done). CSS + JS tab con ở pages/export/shared/assets.
 --}}
 
 @php
@@ -18,6 +24,25 @@
         'canceled' => ['label' => 'Đã huỷ', 'class' => 'rejected'],
     ];
     $stdReqBadge = fn($status) => $stdReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
+
+    $reqSub = in_array(request('rsub'), ['draft', 'done'], true) ? request('rsub') : 'pending';
+    $reqSubs = [
+        'draft' => [
+            'label' => 'Chưa gửi', 'icon' => 'fa-file-alt', 'badge' => 'badge-secondary',
+            'list' => $reqDraft, 'value' => 'draft', 'pane' => 'stdReqSubDraft',
+            'empty' => 'Không có đề nghị nào đang lưu tạm.',
+        ],
+        'pending' => [
+            'label' => 'Chờ xử lý', 'icon' => 'fa-hourglass-half', 'badge' => 'badge-warning',
+            'list' => $reqPending, 'value' => '', 'pane' => 'stdReqSubPending',
+            'empty' => 'Không còn đề nghị nào chờ cấp phát.',
+        ],
+        'done' => [
+            'label' => 'Đã xử lý', 'icon' => 'fa-check-double', 'badge' => 'badge-success',
+            'list' => $reqDone, 'value' => 'done', 'pane' => 'stdReqSubDone',
+            'empty' => 'Không có đề nghị đã xử lý trong khoảng đã lọc.',
+        ],
+    ];
 @endphp
 
 <style>
@@ -61,18 +86,43 @@
         @endperm
     </div>
 
-    @include('pages.shared.rangeFilter', [
-        'rfRoute' => $expRoute . 'list',
-        'rfTab' => 'request',
-        'rfPrefix' => 'req_',
-        'rfRange' => $reqRange,
-        'rfPerPage' => $reqPerPage,
-        'rfSearch' => false,
-        'rfDateLabel' => 'Ngày lập',
-    ])
+    <div class="mt-subhead">
+        <ul class="nav nav-tabs mt-subtabs" role="tablist">
+            @foreach ($reqSubs as $subKey => $sub)
+                <li class="nav-item">
+                    <a class="nav-link {{ $reqSub === $subKey ? 'active' : '' }}" data-toggle="tab" role="tab"
+                        href="#{{ $sub['pane'] }}" data-sub-key="rsub" data-sub-value="{{ $sub['value'] }}">
+                        <i class="fas {{ $sub['icon'] }} mr-1"></i> {{ $sub['label'] }}
+                        <span class="badge {{ $sub['badge'] }} std-req-sub-count" data-sub="{{ $subKey }}">{{ $sub['list']->total() }}</span>
+                    </a>
+                </li>
+            @endforeach
+        </ul>
+    </div>
+
+    <div class="tab-content">
+    @foreach ($reqSubs as $subKey => $sub)
+        @php
+            $reqList = $sub['list'];
+        @endphp
+        <div class="tab-pane fade {{ $reqSub === $subKey ? 'show active' : '' }}" id="{{ $sub['pane'] }}" role="tabpanel">
+
+    @if ($subKey === 'done')
+        @include('pages.shared.rangeFilter', [
+            'rfRoute' => $expRoute . 'list',
+            'rfTab' => 'request',
+            'rfPrefix' => 'req_',
+            'rfRange' => $reqRange,
+            'rfPerPage' => $reqPerPage,
+            'rfSearch' => false,
+            'rfDateLabel' => 'Ngày lập',
+            'rfInBar' => true,
+            'rfHidden' => ['rsub' => 'done'],
+        ])
+    @endif
 
     <div class="table-responsive">
-        <table id="stdRequestTable" class="table table-bordered table-hover w-100 exp-req-table">
+        <table id="{{ $sub['pane'] }}Table" class="table table-bordered table-hover w-100 exp-req-table std-req-list-table">
             <thead>
                 <tr class="text-center">
                     <th style="width: 50px">STT</th>
@@ -87,12 +137,12 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse ($requests as $req)
+                @forelse ($reqList as $req)
                     @php
                         $items = $requestItems[$req->id] ?? collect();
                     @endphp
-                    <tr>
-                        <td class="text-center align-middle">{{ $requests->firstItem() + $loop->index }}</td>
+                    <tr data-req-id="{{ $req->id }}" data-status="{{ $req->status }}">
+                        <td class="text-center align-middle">{{ $reqList->firstItem() + $loop->index }}</td>
                         <td class="align-middle">
                             <span class="exp-code font-weight-bold">{{ $req->code }}</span>
                             @if ($req->note)
@@ -110,7 +160,7 @@
                             </span>
                         </td>
                         <td class="text-center align-middle">
-                            <span class="exp-req-badge {{ $stdReqBadge($req->status)['class'] }}">
+                            <span class="exp-req-badge std-req-status {{ $stdReqBadge($req->status)['class'] }}">
                                 {{ $stdReqBadge($req->status)['label'] }}
                             </span>
                         </td>
@@ -133,7 +183,7 @@
                                     </button>
                                 </form>
                             @elseif (in_array($req->status, ['pending', 'partial']) && user_can('export_standard_issue'))
-                                <button type="button" class="btn btn-sm btn-success px-2 py-1 shadow-sm mr-1"
+                                <button type="button" class="btn btn-sm btn-success btn-std-req-issue px-2 py-1 shadow-sm mr-1"
                                     data-toggle="modal"
                                     data-target="#requestDetailModal_{{ $req->id }}"
                                     title="Cấp phát chuẩn cho phiếu này">
@@ -150,17 +200,25 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">Chưa có phiếu đề nghị cấp phát chuẩn nào.</td>
+                        <td colspan="9" class="text-center text-muted py-4">{{ $sub['empty'] }}</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
+    @php
+        // Sang trang ở tab con nào thì mở lại đúng tab con đó
+        $reqList->appends(['rsub' => $sub['value'] ?: null]);
+    @endphp
     @include('pages.shared.paginator', [
-        'pgItems' => $requests,
+        'pgItems' => $reqList,
         'pgTab' => 'request',
         'pgUnit' => 'đề nghị',
     ])
+
+        </div>
+    @endforeach
+    </div>
 </div>
 @endtab

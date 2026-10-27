@@ -232,6 +232,9 @@ class CategoryLookup
     /** Phạm vi tìm của ô chọn mã hoá chất */
     public const CHEMICAL_SCOPES = ['import', 'undeclared', 'approved'];
 
+    /** Phạm vi ô chọn mã chất chuẩn - xem searchStandardCategories() */
+    public const STANDARD_SCOPES = ['department', 'all'];
+
     /**
      * Tìm mã hoá chất theo mã / tên, theo phạm vi:
      *  - import     : hoá chất PHÒNG đã khai (modal Nhập Hoá Chất) - như DepartmentChemical::importCategoryOptions
@@ -278,6 +281,68 @@ class CategoryLookup
     {
         return $row->code.' - '.$row->chem_name
             .($withUnit && ! empty($row->unit_short_name) ? ' ('.$row->unit_short_name.')' : '');
+    }
+
+    /* ==========================================================
+     |  MÃ CHẤT CHUẨN
+     ========================================================== */
+
+    /**
+     * Tìm chất chuẩn đang hoạt động theo mã / tên / nhà sản xuất - ô Chất Chuẩn của đề nghị cấp
+     * phát chuẩn ở Sử Dụng Chuẩn, kèm đơn vị phòng đang chọn và nhà sản xuất để phân biệt các chất
+     * chuẩn trùng tên. Phạm vi:
+     *  - department : chuẩn PHÒNG đã khai ở Chất Chuẩn Của Phòng (đề nghị cấp phát cho Tổ - kho
+     *                 phòng chỉ có ống của chuẩn đã khai)
+     *  - all        : mọi chất chuẩn (đề nghị liên phòng ban - A khai chuẩn trước khi nhận là được)
+     */
+    public static function searchStandardCategories(string $scope, int $departmentId, string $q, int $page): array
+    {
+        $query = DB::table('standard_categories')
+            ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $departmentId, 'standard_categories.id'))
+            ->select(
+                'standard_categories.id',
+                'standard_categories.code',
+                'standard_names.name as standard_name',
+                'manufacturers.name as manufacturer_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name'
+            )
+            ->where('standard_categories.status_id', 1);
+
+        if ($scope === 'department') {
+            $query->whereExists(fn ($sub) => $sub->select(DB::raw(1))
+                ->from(DepartmentStandard::TABLE.' as lk_ds')
+                ->whereColumn('lk_ds.category_id', 'standard_categories.id')
+                ->where('lk_ds.department_id', $departmentId)
+                ->where('lk_ds.status_id', 1));
+        }
+
+        foreach (self::terms($q) as $term) {
+            $query->where(fn ($sub) => $sub->where('standard_categories.code', 'like', '%'.$term.'%')
+                ->orWhere('standard_names.name', 'like', '%'.$term.'%')
+                ->orWhere('manufacturers.name', 'like', '%'.$term.'%'));
+        }
+
+        [$rows, $more] = self::paginate(
+            $query->orderBy('standard_names.name', 'asc')->orderBy('standard_categories.code', 'asc'),
+            $page
+        );
+
+        return self::response($rows->map(fn ($row) => [
+            'id' => (int) $row->id,
+            'text' => self::standardCategoryLabel($row),
+            'code' => (string) $row->code,
+            'unit' => (string) ($row->unit_short_name ?: ($row->unit_name ?? '')),
+            'manufacturer' => (string) ($row->manufacturer_name ?? ''),
+        ])->all(), $more);
+    }
+
+    /** "Ibuprofen (S00020)" - cùng nhãn với option render sẵn trước đây. */
+    public static function standardCategoryLabel($row): string
+    {
+        return $row->standard_name.' ('.$row->code.')';
     }
 
     /* ==========================================================

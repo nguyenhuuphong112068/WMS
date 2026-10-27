@@ -133,7 +133,7 @@
 
             rows.forEach(function (row, index) {
                 var unit = row.unit || '';
-                var code = row.code + (row.version ? ' v' + row.version : '');
+                var code = row.code;
                 var stockCell = row.remaining > 0
                     ? '<span class="badge badge-success font-weight-bold px-2 py-1" style="font-size: 0.85rem;">' +
                         num(row.remaining) + ' ' + esc(unit) + '</span>' +
@@ -145,6 +145,7 @@
                         ' data-category-id="' + row.id + '"' +
                         ' data-code="' + esc(code) + '"' +
                         ' data-name="' + esc(row.name) + '"' +
+                        ' data-own-unit="' + esc(row.own_unit) + '"' +
                         ' data-cas="' + esc(row.cas_no) + '"' +
                         ' data-manufacturer-name="' + esc(row.manufacturer_name) + '"' +
                         ' data-stock="' + row.remaining + '">' +
@@ -258,7 +259,11 @@
                     $row = window.stdAddTransferRow($tbody);
                 }
 
-                $row.find('.select-transfer-category').val(catId).trigger('change');
+                // Ô chất chuẩn tìm qua AJAX (StandardExport/categorySelect): tạo option rồi mới chọn
+                stdSetCategory($row.find('.select-transfer-category'), catId,
+                    $(this).data('name') + ' (' + $(this).data('code') + ')',
+                    { code: $(this).data('code'), unit: $(this).data('own-unit') || '' });
+                $row.find('.select-transfer-category').trigger('change');
             });
 
             $('#stdStockPickerModal').modal('hide');

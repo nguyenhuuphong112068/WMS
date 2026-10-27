@@ -94,6 +94,7 @@ Route::prefix('/export')
             Route::post('issueStore', 'issueStore')->name('issueStore');
             Route::post('issueDraftStore', 'issueDraftStore')->name('issueDraftStore');
             Route::post('requestReject', 'requestReject')->name('requestReject');
+            Route::post('requestUnuse', 'requestUnuse')->name('requestUnuse');
             Route::post('requestDestroy', 'requestDestroy')->name('requestDestroy');
             Route::get('getIssuedStandards', 'getIssuedStandards')->name('getIssuedStandards');
             Route::get('getCategoryInfo', 'getCategoryInfo')->name('getCategoryInfo');

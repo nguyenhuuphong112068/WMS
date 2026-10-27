@@ -96,6 +96,13 @@
                                     height: 28px !important;
                                     margin-top: 3px !important;
                                 }
+                                .table-edit-req-rows .select2-container--bootstrap4 .select2-selection--single {
+                                    height: 38px !important;
+                                    font-size: 0.9rem !important;
+                                }
+                                .table-edit-req-rows .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+                                    line-height: 36px !important;
+                                }
                             </style>
                             <table class="table table-bordered mb-0 table-edit-req-rows" style="font-size: 0.9rem;">
                                 <thead class="bg-light">
@@ -124,13 +131,15 @@
                                                         <span class="text-muted small font-italic">(Cấp sau)</span>
                                                     </td>
                                                     <td>
-                                                        <select name="items[{{ $idx }}][category_id]" class="form-control select-req-category" required>
+                                                        {{-- Gõ tìm qua AJAX, chỉ render chất chuẩn đang chọn - StandardExport/categorySelect --}}
+                                                        <select name="items[{{ $idx }}][category_id]" class="form-control select-req-category js-std-category"
+                                                            data-lookup-url="{{ route('pages.category.lookup.standardCategories', ['scope' => 'department']) }}" required>
                                                             <option value="">-- Chọn chất chuẩn --</option>
-                                                            @foreach ($standardCategories as $cat)
-                                                                <option value="{{ $cat->id }}" data-unit="{{ $cat->unit_short_name ?: $cat->unit_name }}" {{ $item->category_id == $cat->id ? 'selected' : '' }}>
-                                                                    {{ $cat->standard_name }} ({{ $cat->code }} v{{ $cat->version }})
+                                                            @if ($item->category_id)
+                                                                <option value="{{ $item->category_id }}" data-code="{{ $item->category_code }}" selected>
+                                                                    {{ $item->standard_name }} ({{ $item->category_code }})
                                                                 </option>
-                                                            @endforeach
+                                                            @endif
                                                         </select>
                                                     </td>
                                                     <td class="align-middle text-center" style="background-color: #f8fafc;">
@@ -168,8 +177,11 @@
                                                         </select>
                                                     </td>
                                                     <td>
-                                                        <select name="items[{{ $idx }}][analyst_id]" class="form-control">
+                                                        <select name="items[{{ $idx }}][analyst_id]" class="form-control select2-analyst">
                                                             <option value="">-- KNV --</option>
+                                                            @if ($item->analyst_id && !$analysts->contains('id', $item->analyst_id))
+                                                                <option value="{{ $item->analyst_id }}" data-legacy-analyst selected>{{ $item->analyst_name }}</option>
+                                                            @endif
                                                             @foreach ($analysts as $an)
                                                                 <option value="{{ $an->id }}" {{ $item->analyst_id == $an->id ? 'selected' : '' }}>{{ $an->fullName }} ({{ $an->userName }})</option>
                                                             @endforeach
@@ -191,13 +203,9 @@
                                                         <span class="text-muted small font-italic">(Cấp sau)</span>
                                                     </td>
                                                     <td>
-                                                        <select name="items[0][category_id]" class="form-control form-control-sm select-req-category" required>
+                                                        <select name="items[0][category_id]" class="form-control form-control-sm select-req-category js-std-category"
+                                                            data-lookup-url="{{ route('pages.category.lookup.standardCategories', ['scope' => 'department']) }}" required>
                                                             <option value="">-- Chọn chất chuẩn --</option>
-                                                            @foreach ($standardCategories as $cat)
-                                                                <option value="{{ $cat->id }}" data-unit="{{ $cat->unit_short_name ?: $cat->unit_name }}">
-                                                                    {{ $cat->standard_name }} ({{ $cat->code }} v{{ $cat->version }})
-                                                                </option>
-                                                            @endforeach
                                                         </select>
                                                     </td>
                                                     <td class="align-middle text-center" style="background-color: #f8fafc;">
@@ -235,7 +243,7 @@
                                                         </select>
                                                     </td>
                                                     <td>
-                                                        <select name="items[0][analyst_id]" class="form-control form-control-sm">
+                                                        <select name="items[0][analyst_id]" class="form-control form-control-sm select2-analyst">
                                                             <option value="">-- KNV --</option>
                                                             @foreach ($analysts as $an)
                                                                 <option value="{{ $an->id }}">{{ $an->fullName }} ({{ $an->userName }})</option>
@@ -287,6 +295,7 @@
 
         $('[id^="requestEditModal_"]').on('shown.bs.modal', function() {
             initCriteriaEditSelect2($(this));
+            initAnalystSelect2($(this));
         });
 
         // Set action type on edit form
@@ -309,8 +318,10 @@
                     $(this).select2('destroy');
                 }
             });
+            destroyAnalystSelect2($tbody);
 
             var $newRow = $firstRow.clone();
+            $newRow.find('option[data-legacy-analyst]').remove();
 
             $newRow.find('select, input, textarea').each(function() {
                 var name = $(this).attr('name');
@@ -319,6 +330,7 @@
                 }
                 $(this).val(null);
             });
+            stdCleanCategoryClone($newRow);
 
             $newRow.find('.cell-specification').text('—');
             $newRow.find('.cell-supplier').text('—');
@@ -331,6 +343,8 @@
             $tbody.find('.btn-remove-edit-req-row').prop('disabled', false);
 
             initCriteriaEditSelect2($tbody);
+            initAnalystSelect2($tbody);
+            stdInitCategorySelect($newRow);
         });
 
         // Remove row in edit modal

@@ -67,19 +67,20 @@
 @endsection
 
 @section('model')
+    @include('pages.export.StandardExport.categorySelect')
     @include('pages.export.StandardExport.historyModal')
     @include('pages.export.StandardExport.quarantineModals')
     @include('pages.export.StandardExport.create')
     @include('pages.export.StandardExport.update')
     @include('pages.export.StandardExport.requestModal')
     @include('pages.export.StandardExport.requestEditModal')
-    @include('pages.export.StandardExport.issueModal')
+    {{-- issueModal (cấp phát ống cho Tổ) bỏ include: nút .btn-std-issue mở nó đã gỡ, cấp phát làm trong requestDetailModal --}}
     @include('pages.export.StandardExport.requestDetailModal')
     @include('pages.export.StandardExport.inventoryPickerModal')
-@include('pages.export.StandardExport.issuedStandardPickerModal')
 @include('pages.export.StandardExport.inventoryImportPickerModal')
 @include('pages.export.StandardExport.transferRequestModal')
 @include('pages.export.StandardExport.transferRequestEditModal')
 @include('pages.shared.titleDatalist', ['id' => 'stdTitleOptionsTransfer', 'titles' => $transferTitles])
 @include('pages.export.StandardExport.transferDetailModal')
+
 @endsection

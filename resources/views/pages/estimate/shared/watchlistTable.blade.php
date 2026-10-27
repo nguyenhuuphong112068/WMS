@@ -74,7 +74,7 @@
                 @endphp
                 <tr data-category-id="{{ $item->category_id }}"
                     data-name="{{ $item->name }}"
-                    data-meta="{{ implode(' · ', array_filter([$item->code, $wlIsChemical ? null : ($item->version ? 'v' . $item->version : null), $item->manufacturer_short_name ?: $item->manufacturer_name])) }}"
+                    data-meta="{{ implode(' · ', array_filter([$item->code, $item->manufacturer_short_name ?: $item->manufacturer_name])) }}"
                     data-unit-id="{{ $item->unit_id }}"
                     data-quantity="{{ $wlSuggest > 0 ? $wlNum($wlSuggest) : '' }}"
                     data-groups="{{ json_encode($wlItemGroups) }}"
@@ -95,8 +95,6 @@
                         <div class="font-weight-bold">{{ $item->code ?: '—' }}</div>
                         @if ($wlIsChemical && $item->type)
                             <div class="md-sub">{{ $item->type }}</div>
-                        @elseif (! $wlIsChemical && $item->version)
-                            <div class="md-sub">v{{ $item->version }}</div>
                         @endif
                     </td>
                     <td>

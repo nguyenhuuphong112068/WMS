@@ -117,8 +117,11 @@
                 return !!col && col.mData === 'c.0.h';
             }
 
-            /** Đổ dòng vào bảng đã khởi tạo; dòng colspan "Chưa có ..." thành lời nhắn bảng rỗng */
-            function fill(api, rows, failed) {
+            /**
+             * Đổ dòng vào bảng đã khởi tạo; dòng colspan "Chưa có ..." thành lời nhắn bảng rỗng.
+             * keepPage: nạp lại sau khi lưu ngầm - giữ trang đang xem, ô tìm kiếm, sắp xếp.
+             */
+            function fill(api, rows, failed, keepPage) {
                 var table = api.table().node();
 
                 if (!isDeferredApi(api)) {
@@ -143,7 +146,7 @@
                 api.settings()[0].oLanguage.sEmptyTable = failed ? FAILED :
                     (empty || $(table).data('md-empty') || 'Không có dữ liệu.');
 
-                api.clear().rows.add(data).draw();
+                api.clear().rows.add(data).draw(keepPage ? false : true);
 
                 $(table).attr('data-deferred-loaded', '1').trigger('md:rows-loaded', [api]);
 
@@ -315,6 +318,36 @@
                             return '<td' + attrs(a) + '>' + cell.h + '</td>';
                         }).join('') + '</tr>';
                     }).join('');
+                },
+
+                /**
+                 * Lấy lại dòng của các bảng data-deferred (không lazy) - dùng sau khi lưu ngầm
+                 * (layout/softSubmit). Bảng đã khởi tạo giữ nguyên trang / tìm kiếm / sắp xếp;
+                 * bảng chưa khởi tạo (tab chưa mở) nhận dòng mới lúc khởi tạo.
+                 * around(fn): bọc lúc đổ dòng (giữ vị trí cuộn trang). Trả jQuery promise.
+                 */
+                refresh: function(ids, around) {
+                    ids = (ids || []).filter(function(id) {
+                        var table = document.getElementById(id);
+                        return table && $(table).is('[data-deferred]') && !$(table).is('[data-deferred="lazy"]');
+                    });
+
+                    if (!ids.length) return $.Deferred().resolve().promise();
+
+                    return request(ids).then(function(res) {
+                        var tables = (res && res.tables) || {};
+
+                        (around || function(fn) { fn(); })(function() { ids.forEach(function(id) {
+                            var table = document.getElementById(id);
+                            var rows = tables[id] || [];
+
+                            if ($.fn.dataTable.isDataTable(table)) {
+                                fill($(table).DataTable(), rows, false, true);
+                            } else {
+                                pending[id] = { rows: rows, failed: false };
+                            }
+                        }); });
+                    });
                 },
 
                 /** Dòng đã về chưa (để JS màn hình biết chạy ngay hay chờ md:rows-loaded) */

@@ -36,19 +36,4 @@ return [
         'CHC' => ['no' => 6, 'name' => 'Chuẩn Hoá Chất', 'short' => 'CHC', 'code' => 'CHC'],
         'CNL' => ['no' => 7, 'name' => 'Chuẩn Nguyên Liệu', 'short' => 'CNL', 'code' => 'CNL'],
     ],
-
-    /*
-     | NHÃN DÁN ỐNG CHUẨN - in từ màn hình Nhập Chất Chuẩn.
-     |
-     | Ống chuẩn nhỏ hơn chai hoá chất nên khổ nhãn cũng nhỏ hơn. Đổi khổ nhãn thì
-     | sửa ở đây, trang in tự co giãn theo.
-     */
-    'label' => [
-        'sop_no' => 'QC-SOP-031',
-        'form_no' => 'QC/F/106-03',
-        'width_mm' => 50,
-        'height_mm' => 30,
-        // Độ phân giải đầu in Zebra (ZD421: bản 203 hoặc 300 dpi - xem tem dưới đáy máy).
-        'dpi' => 300,
-    ],
 ];

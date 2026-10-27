@@ -9,7 +9,6 @@
     */
 
     $impRoute = 'pages.import.standardImport.';
-    $impLabel = 'phiếu nhập chất chuẩn';
     $impIcon = 'fas fa-vial-circle-check';
 
     /** Bỏ số 0 thừa ở phần thập phân: 12.5000 -> 12.5, 12.0000 -> 12 */

@@ -76,6 +76,7 @@ class PageTabs
             'report' => 'Báo cáo theo khoảng thời gian',
         ]],
         'export_standard' => ['parent' => 'export_standard_view', 'tabs' => [
+            'use' => 'Sử dụng chuẩn',
             'book' => 'Sổ sử dụng chất chuẩn',
             'request' => 'Đề nghị cấp phát chuẩn nội bộ',
             'transfer' => 'Đề nghị cấp phát chuẩn liên phòng ban',

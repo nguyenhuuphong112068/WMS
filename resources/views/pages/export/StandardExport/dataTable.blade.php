@@ -1,5 +1,5 @@
 @include('pages.export.shared.assets')
-@php $activeTab = \App\Support\PageTabs::active('export_standard', $activeTab ?? 'book'); @endphp
+@php $activeTab = \App\Support\PageTabs::active('export_standard', $activeTab ?? 'use'); @endphp
 
 <style>
     /* Mã nhóm chuẩn của ống - phần nằm giữa mã ống chuẩn */
@@ -23,6 +23,15 @@
             <div class="card-body">
 
                 <div class="exp-tabs">
+                    @tab('export_standard', 'use')
+                    <button type="button" class="exp-tab {{ $activeTab === 'use' ? 'is-active' : '' }}"
+                        data-pane="expPaneUse">
+                        <i class="fas fa-vial mr-1"></i> Sử dụng chuẩn
+                        @if ($issuedStandards->count())
+                            <span class="exp-tab-count">{{ $issuedStandards->count() }}</span>
+                        @endif
+                    </button>
+                    @endtab
                     @tab('export_standard', 'book')
                     <button type="button" class="exp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}"
                         data-pane="expPaneBook">
@@ -60,14 +69,7 @@
                 @tab('export_standard', 'book')
                 <div class="exp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="expPaneBook">
 
-                    <div class="md-toolbar">
-                        @perm('export_standard_issue')
-                            <button type="button" class="btn btn-primary btn-md-create">
-                                <i class="fas fa-plus mr-1"></i> Sử dụng chất chuẩn
-                            </button>
-                        @endperm
-                    </div>
-
+                    {{-- Lập phiếu sử dụng ở tab "Sử dụng chuẩn" (nút [Sử dụng] trên từng ống đã cấp) --}}
                     @include('pages.shared.rangeFilter', [
                         'rfRoute' => $expRoute . 'list',
                         'rfTab' => 'book',
@@ -195,6 +197,9 @@
                     ])
                 </div>
                 @endtab
+
+                {{-- ============ SỬ DỤNG CHUẨN: ỐNG ĐÃ CẤP CHO TỔ, CHỜ LẬP PHIẾU SỬ DỤNG ============ --}}
+                @include('pages.export.StandardExport.usePane')
 
                 {{-- ============ ĐỀ NGHỊ CẤP PHÁT CHUẨN NỘI BỘ ============ --}}
                 @include('pages.export.StandardExport.requestPane')

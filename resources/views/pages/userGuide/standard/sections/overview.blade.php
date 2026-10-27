@@ -24,7 +24,7 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">4</span>
         <b>Mở ống, sử dụng</b>
-        <a href="#han-dung">Xác định hạn nội bộ</a> → <a href="#so-su-dung">ghi sử dụng</a>, trừ tồn
+        <a href="#han-dung">Xác định hạn nội bộ</a> → <a href="#su-dung-chuan">ghi sử dụng</a>, trừ tồn
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">5</span>

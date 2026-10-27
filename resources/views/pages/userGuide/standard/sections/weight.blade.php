@@ -1,5 +1,6 @@
 <p>Với ống tick <b>Chuẩn có cần kiểm soát khối lượng</b>, hệ thống so lượng chuẩn thực có trong ống với tổng lượng đã ghi sử dụng,
-    để phát hiện hao hụt bất thường.</p>
+    để phát hiện hao hụt bất thường. Ô này chỉ tick được khi ĐVT của phòng là <b>mg</b>, hoặc <b>ml</b> đã khai tỉ trọng d
+    ở Danh Mục Chất Chuẩn (để quy số cân mg ra ml).</p>
 
 <ol class="ug-steps">
     <li>Lần dùng đầu tiên, nhập <b>Khối lượng Bì + Chuẩn trước khi dùng</b> trên phiếu sử dụng. Số cân luôn là khối lượng:

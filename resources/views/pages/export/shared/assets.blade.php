@@ -429,6 +429,13 @@
         border: 1px solid #93C5FD;
     }
 
+    /* Đã sử dụng chất chuẩn */
+    .exp-req-badge.used {
+        background: #EDE9FE;
+        color: #6D28D9;
+        border: 1px solid #C4B5FD;
+    }
+
     /* ---------- Card thu gọn/mở rộng: đề nghị đã gửi đi / gửi đến liên phòng ban ---------- */
     .exp-req-card {
         border: none;

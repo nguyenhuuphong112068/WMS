@@ -113,7 +113,8 @@
 <script>
     $(document).ready(function() {
         document.body.style.overflowY = "auto";
-        $('.btn-edit').click(function() {
+        // Gắn qua document: dòng bảng được nạp lại sau khi lưu ngầm (layout/softSubmit)
+        $(document).on('click', '.btn-edit', function() {
             const button = $(this);
             const modal = $('#updateModal');
 
@@ -123,7 +124,7 @@
             modal.find('[name="change_reason"]').val('');
         });
 
-        $('.form-deActive').on('submit', function(e) {
+        $(document).on('submit', '.form-deActive', function(e) {
             e.preventDefault();
             const form = this;
             const name = $(form).find('button').data('name');

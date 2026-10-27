@@ -396,6 +396,8 @@ class HomeController extends Controller
     private const REVIEW_ACTORS = [
         'sign' => ['label' => 'Chờ bạn ký duyệt', 'short' => 'Bạn ký duyệt', 'icon' => 'fas fa-signature'],
         'dept' => ['label' => 'Chờ phòng ban xử lý', 'short' => 'Phòng xử lý', 'icon' => 'fas fa-people-carry'],
+        // Báo cho riêng người đăng nhập (vd kiểm nghiệm viên được kho cấp chuẩn), không phải ký / duyệt
+        'me' => ['label' => 'Đã cấp cho bạn', 'short' => 'Cấp cho bạn', 'icon' => 'fas fa-user-check'],
     ];
 
     /**
@@ -429,6 +431,7 @@ class HomeController extends Controller
         'estimate_cancel' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Đề nghị huỷ mục dự trù'],
         'material_request' => ['group' => 'internal', 'actor' => 'sign', 'label' => 'Ký đề nghị cấp phát'],
         'issue_pending' => ['group' => 'internal', 'actor' => 'dept', 'label' => 'Chờ kho cấp'],
+        'issued_to_me' => ['group' => 'internal', 'actor' => 'me', 'label' => 'Chuẩn đã cấp cho bạn'],
         'transfer_sign' => ['group' => 'transfer', 'actor' => 'sign', 'label' => 'Ký đề nghị liên phòng ban'],
         'transfer_issue' => ['group' => 'transfer', 'actor' => 'dept', 'label' => 'Chờ phòng bạn cấp phát'],
         'transfer_receipt' => ['group' => 'transfer', 'actor' => 'dept', 'label' => 'Hàng đã cấp, chờ bạn nhận'],
@@ -528,6 +531,7 @@ class HomeController extends Controller
             $this->transferIssueReviews(),
             $this->transferReceiptReviews(),
             $this->issuePendingReviews(),
+            $this->standardIssuedToMeReviews(),
             $this->estimateCancelReviews(),
             $this->estimateReceptionReviews()
         );
@@ -586,9 +590,9 @@ class HomeController extends Controller
 
                 $items = $card['items'];
                 $card['count'] = count($items);
-                // "Chờ bạn ký duyệt" liệt kê ĐỦ từng phiếu (trang chủ là nơi duy nhất gom phiếu chờ ký
-                // của mọi phòng); việc của phòng chỉ xem trước
-                $card['items'] = $card['actor'] === 'sign' ? $items : array_slice($items, 0, self::REVIEW_PREVIEW);
+                // "Chờ bạn ký duyệt" / "Đã cấp cho bạn" liệt kê ĐỦ từng dòng (trang chủ là nơi duy nhất
+                // gom việc của riêng mình ở mọi phòng); việc của phòng chỉ xem trước
+                $card['items'] = in_array($card['actor'], ['sign', 'me'], true) ? $items : array_slice($items, 0, self::REVIEW_PREVIEW);
                 // Bấm vào thẻ: mở màn hình của đề nghị chờ lâu nhất
                 $card['url'] = $items[0]['url'];
                 $groupCards[] = $card;
@@ -1320,6 +1324,67 @@ class HomeController extends Controller
                     route('pages.export.standardExport.list', ['tab' => 'request'])
                 );
             }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Ống chuẩn kho đã cấp phát cho người đang đăng nhập - là KNV của dòng đề nghị - mà chưa
+     * lập phiếu sử dụng. Cùng điều kiện danh sách "chuẩn đã cấp cho tổ" ở form Sử Dụng
+     * (StandardExportController::getIssuedStandards): lập phiếu sử dụng từ ống đó là tự hết.
+     *
+     * Không lọc phòng đang chọn: báo đích danh KNV, phiếu ở phòng khác thì link đổi phòng
+     * (signUrl) rồi mở tab "Sử dụng chuẩn" và tô sáng đúng ống (?use_item=<id dòng đề nghị>).
+     */
+    private function standardIssuedToMeReviews(): array
+    {
+        $userId = $this->userId();
+
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $records = DB::table('standard_request_items as i')
+            ->join('standard_request_lists as r', 'i.request_list_id', '=', 'r.id')
+            ->leftJoin('standard_categories as c', 'i.category_id', '=', 'c.id')
+            ->leftJoin('standard_names as n', 'c.chem_names_id', '=', 'n.id')
+            ->select(
+                'i.id', 'i.import_code', 'i.issued_amount', 'i.issued_unit', 'i.issued_at', 'i.return_standard',
+                'r.code as list_code', 'r.department_id',
+                'c.code as category_code', 'n.name as standard_name'
+            )
+            ->where('i.analyst_id', $userId)
+            ->where('i.active', 1)
+            ->where('i.status', 'issued')
+            ->whereNotNull('i.import_id')
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')
+                ->from('standard_exports as e')
+                ->whereColumn('e.request_item_id', 'i.id')
+                ->where('e.type', 'export'))
+            ->get();
+
+        $rows = [];
+
+        foreach ($records as $record) {
+            $amount = rtrim(rtrim(number_format((float) $record->issued_amount, 4, '.', ','), '0'), '.');
+
+            $rows[] = $this->reviewRow(
+                'issued_to_me',
+                'cc',
+                $record->import_code,
+                trim($record->standard_name.($record->category_code ? ' ('.$record->category_code.')' : '')),
+                $this->joinMeta([
+                    'SL '.trim($amount.' '.$record->issued_unit),
+                    'Phiếu '.$record->list_code,
+                    $record->return_standard ? 'Trả lại chuẩn sau khi dùng' : null,
+                ]),
+                $record->issued_at,
+                $this->signUrl((int) $record->department_id, 'pages.export.standardExport.list', [
+                    'tab' => 'use',
+                    'use_item' => $record->id,
+                ])
+            );
         }
 
         return $rows;

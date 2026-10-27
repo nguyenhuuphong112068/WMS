@@ -232,7 +232,6 @@ class MaterialImportController extends Controller
             'impDate' => fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '—',
             'impToday' => \Carbon\Carbon::today(),
             'impRoute' => 'pages.import.materialImport.',
-            'impLabel' => self::LABEL,
         ])->render();
     }
 
@@ -814,43 +813,6 @@ class MaterialImportController extends Controller
         );
 
         return response()->json(['success' => true, 'is_active' => $newActive]);
-    }
-
-    public function deActive(Request $request)
-    {
-        $current = DB::table(self::TABLE)
-            ->where('id', $request->id)
-            ->where('department_id', $this->departmentId())
-            ->first();
-
-        if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần thay đổi trạng thái!');
-        }
-
-        $newStatus = $current->status_id == 1 ? 0 : 1;
-        $action = $newStatus == 1 ? 'Mở khoá' : 'Khoá';
-
-        DB::transaction(function () use ($current, $newStatus, $action) {
-            DB::table(self::TABLE)->where('id', $current->id)->update([
-                'status_id' => $newStatus,
-                'updated_by' => $this->actor(),
-                'updated_at' => now(),
-            ]);
-
-            $this->writeHistory(
-                (int) $current->id,
-                $action,
-                'Trạng thái: '.($current->status_id == 1 ? 'Hiệu lực' : 'Đã khoá')
-                .' -> '.($newStatus == 1 ? 'Hiệu lực' : 'Đã khoá')
-            );
-        });
-
-        AuditTrialController::log($action, self::TABLE, $current->id, 'status_id: '.$current->status_id, 'status_id: '.$newStatus);
-
-        return redirect()->back()->with(
-            'success',
-            ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ').self::LABEL.' '.$current->code.'!'
-        );
     }
 
     /* ==========================================================

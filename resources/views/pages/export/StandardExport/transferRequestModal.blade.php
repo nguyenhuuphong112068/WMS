@@ -85,13 +85,10 @@
                                         <span class="badge badge-secondary px-2 py-1 std-transfer-code" style="font-size: 0.82rem;"></span>
                                     </td>
                                     <td>
-                                        <select name="items[0][category_id]" class="form-control select-transfer-category" required>
+                                        {{-- Gõ tìm qua AJAX (kèm đơn vị phòng mình) - StandardExport/categorySelect --}}
+                                        <select name="items[0][category_id]" class="form-control select-transfer-category js-std-category"
+                                            data-lookup-url="{{ route('pages.category.lookup.standardCategories', ['scope' => 'all']) }}" required>
                                             <option value="">-- Chọn chất chuẩn --</option>
-                                            @foreach ($standardCategories as $cat)
-                                                <option value="{{ $cat->id }}" data-code="{{ $cat->code }} v{{ $cat->version }}" data-unit="{{ $cat->unit_short_name ?: $cat->unit_name }}">
-                                                    {{ $cat->code }} v{{ $cat->version }} - {{ $cat->standard_name }}
-                                                </option>
-                                            @endforeach
                                         </select>
                                     </td>
                                     <td>
@@ -172,10 +169,12 @@
             $(this).val(null);
         });
 
+        window.stdCleanCategoryClone($newRow);
         $newRow.find('.std-transfer-code').text('');
         $tbody.attr('data-next-idx', next + 1);
         $tbody.append($newRow);
         $tbody.find('.btn-remove-transfer-row').prop('disabled', $tbody.children('tr').length <= 1);
+        window.stdInitCategorySelect($newRow);
 
         return $tbody.children('tr').last();
     };
@@ -191,13 +190,14 @@
             this.style.height = (this.scrollHeight) + 'px';
         });
 
-        // Chọn chất chuẩn thì hiện mã và điền sẵn đơn vị phòng mình đang dùng cho chuẩn đó
+        // Chọn chất chuẩn thì hiện mã và điền sẵn đơn vị phòng mình đang dùng cho chuẩn đó.
+        // Kết quả tìm AJAX mang sẵn code/unit; option render sẵn / do picker tạo mang data-code/data-unit.
         $(document).on('change', '.select-transfer-category', function() {
-            var $option = $(this).find('option:selected');
+            var item = wmsSelectedItems($(this))[0] || {};
             var $row = $(this).closest('tr');
-            var unit = $option.data('unit') || '';
+            var unit = item.unit || '';
 
-            $row.find('.std-transfer-code').text($option.data('code') || '');
+            $row.find('.std-transfer-code').text(item.code || '');
 
             if (unit && $row.find('select[name*="[requested_unit]"] option[value="' + unit + '"]').length) {
                 $row.find('select[name*="[requested_unit]"]').val(unit);

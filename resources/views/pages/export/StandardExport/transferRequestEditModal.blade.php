@@ -77,23 +77,22 @@
                                     @for ($idx = 0; $idx < max($rows->count(), 1); $idx++)
                                         @php
                                             $item = $rows->get($idx);
-                                            $itemCat = $item ? $standardCategories->firstWhere('id', $item->category_id) : null;
-                                            $itemCode = $itemCat ? $itemCat->code.' v'.$itemCat->version : null;
+                                            $itemCode = $item->category_code ?? null;
                                         @endphp
                                         <tr class="transfer-row">
                                             <td class="text-center">
                                                 <span class="badge badge-secondary px-2 py-1 std-transfer-code" style="font-size: 0.82rem;">{{ $itemCode }}</span>
                                             </td>
                                             <td>
-                                                <select name="items[{{ $idx }}][category_id]" class="form-control select-transfer-category" required>
+                                                {{-- Gõ tìm qua AJAX, chỉ render chất chuẩn đang chọn - StandardExport/categorySelect --}}
+                                                <select name="items[{{ $idx }}][category_id]" class="form-control select-transfer-category js-std-category"
+                                                    data-lookup-url="{{ route('pages.category.lookup.standardCategories', ['scope' => 'all']) }}" required>
                                                     <option value="">-- Chọn chất chuẩn --</option>
-                                                    @foreach ($standardCategories as $cat)
-                                                        <option value="{{ $cat->id }}" data-code="{{ $cat->code }} v{{ $cat->version }}"
-                                                            data-unit="{{ $cat->unit_short_name ?: $cat->unit_name }}"
-                                                            {{ $item && $item->category_id == $cat->id ? 'selected' : '' }}>
-                                                            {{ $cat->code }} v{{ $cat->version }} - {{ $cat->standard_name }}
+                                                    @if ($item && $item->category_id)
+                                                        <option value="{{ $item->category_id }}" data-code="{{ $item->category_code }}" selected>
+                                                            {{ $item->standard_name }} ({{ $item->category_code }})
                                                         </option>
-                                                    @endforeach
+                                                    @endif
                                                 </select>
                                             </td>
                                             <td>
