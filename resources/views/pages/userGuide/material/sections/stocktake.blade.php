@@ -1,5 +1,6 @@
 <p>Đếm thực tế toàn bộ kho vật tư của phòng <b>mỗi quý một lần</b> (Q1: tháng 1-3, Q2: 4-6, Q3: 7-9, Q4: 10-12), rồi
     đưa tồn sổ sách về đúng số thực đếm. Kỳ kiểm kê là quý hiện tại, hệ thống tự xác định.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/kiem-ke.png', 'caption' => 'Màn hình Tồn Kho › Vật Tư › tab Kiểm kê định kỳ'])
 
 <ol class="ug-steps">
     <li>Bấm <b>Mở Phiếu</b>. Hệ thống chụp lại <b>tồn sổ sách</b> của mọi mã xuất nhập còn số dư tại thời điểm mở.</li>

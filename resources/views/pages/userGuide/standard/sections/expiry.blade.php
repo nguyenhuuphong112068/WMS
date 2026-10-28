@@ -4,6 +4,7 @@
     <span class="ug-key">≤ 3 tháng</span> <span class="ug-key">≤ 1 tháng</span> <span class="ug-key">≤ 2 tuần</span>
     <span class="ug-key">≤ 1 tuần</span> (mỗi mốc kèm số ống). Từ đây có thể bấm
     <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-biohazard"></i></span> để <a href="#cach-ly">cách ly</a> ống đã hoặc sắp hết hạn.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/han-dung.png', 'caption' => 'Màn hình Tồn Kho › Chất Chuẩn › tab Cận hạn dùng / Chưa có hạn nội bộ'])
 
 <h3>Tab "Chưa có hạn nội bộ"</h3>
 <p>Ống của chuẩn có hạn dùng mặc định nhưng <b>chưa xác định hạn nội bộ</b>. Các ống này chưa cấp phát và chưa dùng được. Bấm

@@ -23,7 +23,7 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">Bước 3</span>
         <b>Tên hàng</b>
-        <a href="#hoat-chat">Hoạt Chất</a> → <a href="#hoa-chat">Hoá Chất</a>;
+        <a href="#hoat-chat">Đơn Chất</a> → <a href="#hoa-chat">Hoá Chất</a>;
         <a href="#ten-chuan">Tên Chuẩn</a>; <a href="#ten-vat-tu">Tên Vật Tư</a>
     </div>
     <div class="ug-flow-step">

@@ -32,6 +32,9 @@ return [
         ['id' => 'the-de-nghi', 'file' => 'homeCards', 'title' => 'Đề Nghị Chờ Bạn Xem Xét', 'icon' => 'fas fa-file-signature',
             'path' => 'Trang chủ › Đề nghị chờ bạn xem xét',
             'keywords' => 'the de nghi cho ky duyet cho phong ban xu ly da cap cho ban tu chuyen phong'],
+        ['id' => 'thong-bao', 'file' => 'homeNotifications', 'title' => 'Thông Báo - Lịch Sử Đề Nghị', 'icon' => 'fas fa-bell',
+            'path' => 'Thanh trên cùng › Chuông thông báo',
+            'keywords' => 'thong bao chuong lich su de nghi dang cho da xu ly chua doc doc het rightnav'],
     ],
     'Bảo mật - 21 CFR Part 11' => [
         ['id' => 'cfr-part-11', 'file' => 'cfr', 'title' => 'Tuân Thủ 21 CFR Part 11', 'icon' => 'fas fa-shield-alt',

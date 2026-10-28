@@ -238,6 +238,7 @@
     @include('pages.shared.storageChartModal')
     @include('pages.category.ChemicalCategory.create')
     @include('pages.category.ChemicalCategory.update')
+    @include('pages.category.shared.leadTimeModal')
     @include('pages.category.shared.historyModal')
 
     {{-- Bảng chọn "Tên Hoá Chất" từ dữ liệu gốc (dùng chung modal Thêm + Cập nhật) --}}

@@ -16,7 +16,7 @@
             <tr>
                 <td>Nhóm 9 · Bảng A</td>
                 <td style="font-weight: 400">Từng <b>hoạt chất</b>: tổng tồn quy ra kg × % hàm lượng hoạt chất, so với ngưỡng của hoạt chất
-                    (khai ở Dữ Liệu Gốc › Hoạt Chất). Chất thuộc <b>mục gộp</b> được cộng chung vào ngưỡng của mục gộp.</td>
+                    (khai ở Dữ Liệu Gốc › Đơn Chất). Chất thuộc <b>mục gộp</b> được cộng chung vào ngưỡng của mục gộp.</td>
             </tr>
             <tr>
                 <td>Nhóm 10 · Bảng B</td>

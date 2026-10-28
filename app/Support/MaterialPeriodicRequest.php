@@ -1392,7 +1392,7 @@ class MaterialPeriodicRequest
                     ? route('pages.estimate.materialEstimate.detail', ['id' => $result['id']], false)
                     : route('pages.export.materialExport.list', ['tab' => $isExternal ? MaterialVpp::tabFor((int) $list->to_department_id) : 'periodic'], false),
                 'created_at' => now(),
-            ]);
+            ] + ReviewHistory::classify('vt', $isEstimate ? 'estimate' : ($isExternal ? (MaterialVpp::tabFor((int) $list->to_department_id) === MaterialVpp::TAB ? 'vpp' : 'transfer') : 'internal')));
 
             DB::table('notification_recipients')->insert([
                 'notification_id' => $notificationId,

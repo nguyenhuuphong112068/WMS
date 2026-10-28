@@ -7,7 +7,7 @@
 | giữ nguyên: bộ lọc, ô tìm kiếm, trang đang xem, sắp xếp, tab, vị trí cuộn.
 |
 | Không phải sửa từng màn hình:
-|   - Form POST có action kết thúc bằng /update, /deActive, /approve, /reject,
+|   - Form POST có action kết thúc bằng /update, /updateLeadTime, /deActive, /approve, /reject,
 |     /declarePortal, /destroy được nhận ra theo URL (kể cả form tạm của hộp xác nhận
 |     mdConfirmSubmit và form.submit() gọi từ JS của màn hình).
 |   - Controller giữ nguyên redirect()->back()->with(...); middleware SoftSubmit đổi
@@ -27,7 +27,7 @@
     (function($) {
         if (!$ || !window.fetch || !window.FormData || !window.DOMParser) return;
 
-        var ACTIONS = /\/(update|deActive|approve|reject|declarePortal|destroy)\/?$/;
+        var ACTIONS = /\/(update|updateLeadTime|deActive|approve|reject|declarePortal|destroy)\/?$/;
         var nativeSubmit = HTMLFormElement.prototype.submit;
 
         function actionUrl(form) {

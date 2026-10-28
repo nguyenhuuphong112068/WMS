@@ -1024,6 +1024,27 @@
             color: var(--primary);
         }
 
+        /* Mở thanh Thông báo - lịch sử của chính các đề nghị trên trang này */
+        .history-btn {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border: 1px solid rgba(var(--primary-rgb), 0.25);
+            border-radius: var(--border-radius-md);
+            background: var(--primary-soft);
+            color: var(--primary);
+            font-size: 12.5px;
+            font-weight: 700;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .history-btn:hover {
+            background: rgba(var(--primary-rgb), 0.16);
+            transform: translateY(-1px);
+        }
+
         /* ================= MA TRẬN ================= */
         .matrix-wrap {
             overflow-x: auto;
@@ -1594,6 +1615,9 @@
                 <div class="panel3d__head">
                     <span class="gem3d gem3d--sm"><i class="fas fa-file-signature"></i></span>
                     <h2>Đề Nghị Chờ Bạn Xem Xét</h2>
+                    <button type="button" class="history-btn" onclick="openNotificationDrawer('all')">
+                        <i class="fas fa-history"></i> Lịch sử thông báo
+                    </button>
                 </div>
 
                 <div class="board3d__body">
@@ -1630,7 +1654,7 @@
                                             <ul class="tile3d__list">
                                                 @foreach ($card['items'] as $item)
                                                     <li>
-                                                        <a href="{{ $item['url'] }}" title="{{ trim($item['code'] . ' ' . $item['title']) }}">
+                                                        <a href="{{ $item['url'] }}" title="{{ trim($item['code'] . ' ' . $item['title']) }}" data-review-key="{{ $item['key'] }}">
                                                             <span class="tile3d__line">
                                                                 <span class="tile3d__code">{{ $item['code'] }}</span>
                                                                 @if ($item['direction'] === 'in')

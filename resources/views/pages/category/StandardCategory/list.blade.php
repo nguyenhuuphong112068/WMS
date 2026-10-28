@@ -210,6 +210,7 @@
 @section('model')
     @include('pages.category.StandardCategory.create')
     @include('pages.category.StandardCategory.update')
+    @include('pages.category.shared.leadTimeModal')
     @include('pages.category.shared.historyModal')
 
     @include('pages.category.DepartmentStandard.create', [

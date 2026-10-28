@@ -259,7 +259,7 @@
 @endonce
 
 {{--
-| Modal chọn nhanh hoạt chất từ dữ liệu gốc "Tên Hoạt Chất".
+| Modal chọn nhanh hoạt chất từ dữ liệu gốc "Đơn Chất".
 | Dòng lấy từ $activeIngredients nhưng nạp sau (data-deferred="lazy") ở lần mở đầu tiên; ô select
 | ở trên tìm qua AJAX nên khi xác nhận, hoạt chất chưa có option được dựng từ data-label của dòng.
 | Dùng chung cho cả modal Thêm mới và Cập nhật - nút .chem-ai-picker-open cho biết
@@ -301,7 +301,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        <i class="fas fa-atom"></i> Dữ Liệu Gốc — Tên Hoạt Chất
+                        <i class="fas fa-atom"></i> Dữ Liệu Gốc — Đơn Chất
                     </h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
@@ -414,7 +414,7 @@
                                 @empty
                                     <tr>
                                         <td colspan="6" class="text-center text-muted py-4">
-                                            Chưa có hoạt chất nào được duyệt trong <b>Dữ Liệu Gốc → Tên Hoạt Chất</b>.
+                                            Chưa có hoạt chất nào được duyệt trong <b>Dữ Liệu Gốc → Đơn Chất</b>.
                                         </td>
                                     </tr>
                                 @endforelse

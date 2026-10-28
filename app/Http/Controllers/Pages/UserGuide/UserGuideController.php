@@ -45,19 +45,19 @@ class UserGuideController extends Controller
             'title' => 'Vật Tư',
             'icon' => 'fas fa-cubes',
             'summary' => 'Trọn vòng đời vật tư: danh mục, nhập và kiểm tra, đề nghị - ký duyệt - cấp phát, liên phòng ban và VPP, tồn kho - kiểm kê, dự trù và thống kê, kèm sơ đồ đường đi phiếu.',
-            'updated_at' => '2026-10-27',
+            'updated_at' => '2026-10-28',
         ],
         'chemical' => [
             'title' => 'Hoá Chất',
             'icon' => 'fas fa-flask',
             'summary' => 'Danh mục và phân loại NĐ 24/2026, tương kỵ lưu trữ, nhập - kiểm tra, sử dụng và hoá chất cấm, liên phòng ban, cách ly, tồn kho - hạn dùng nội bộ, ngưỡng tồn trữ PL IV và dự trù.',
-            'updated_at' => '2026-10-27',
+            'updated_at' => '2026-10-28',
         ],
         'standard' => [
             'title' => 'Chất Chuẩn',
             'icon' => 'fas fa-vial',
             'summary' => 'Mã ống chuẩn theo nhóm, nhập - kiểm tra, cấp phát cho tổ và ghi sử dụng, liên phòng ban, cách ly - loại bỏ - huỷ, hạn dùng retest / check online / nội bộ, kiểm soát khối lượng, đánh giá hạn dùng chuẩn thứ cấp và dự trù.',
-            'updated_at' => '2026-10-27',
+            'updated_at' => '2026-10-28',
         ],
     ];
 

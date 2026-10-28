@@ -16,7 +16,7 @@
             <tr><td><i class="fas fa-exchange-alt"></i> Liên phòng ban</td><td style="font-weight: 400">Ký đề nghị liên phòng ban, chờ phòng bạn cấp phát, hàng đã cấp chờ bạn nhận.</td></tr>
             <tr><td><i class="fas fa-paperclip"></i> Văn phòng phẩm</td><td style="font-weight: 400">Ký đề nghị VPP, chờ phòng bạn cấp VPP, VPP đã cấp chờ bạn nhận.</td></tr>
             <tr><td><i class="fas fa-shield-alt"></i> KS chất lượng / hàng hỏng</td><td style="font-weight: 400">Vật tư chờ QA hiệu chuẩn; vật tư, hoá chất, chất chuẩn hỏng chờ quyết định.</td></tr>
-            <tr><td><i class="fas fa-check-double"></i> Phê duyệt dữ liệu</td><td style="font-weight: 400">Danh mục chờ duyệt, dữ liệu gốc chờ duyệt.</td></tr>
+            <tr><td><i class="fas fa-check-double"></i> Phê duyệt dữ liệu</td><td style="font-weight: 400">Danh mục chờ duyệt, mã mới chờ khai thời gian đặt hàng, dữ liệu gốc chờ duyệt.</td></tr>
         </tbody>
     </table>
 </div>

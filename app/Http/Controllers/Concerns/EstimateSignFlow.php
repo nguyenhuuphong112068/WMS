@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Http\Controllers\General\NotificationController;
 use App\Support\EstimateSigner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -201,50 +200,6 @@ trait EstimateSignFlow
         }
 
         return $fullName !== '' ? $fullName.' ('.$userName.')' : $userName;
-    }
-
-    /* ==========================================================
-     |  THÔNG BÁO TIẾN TRÌNH KÝ
-     ========================================================== */
-
-    /**
-     * Báo cho người ký ở bước $stepNo của phiếu rằng "tới lượt bạn ký". Gọi khi trình ký
-     * (bước 1) và sau mỗi lần ký xong (bước kế tiếp) để đi LẦN LƯỢT qua từng người trong
-     * quy trình. Bước không gắn user_id (luồng cũ ký theo vai trò) thì bỏ qua; người gửi
-     * tự bị NotificationController loại khỏi danh sách nhận.
-     */
-    protected function notifyPendingSigner(int $listId, string $code, int $stepNo): void
-    {
-        $rows = DB::table(self::SIGN_TABLE)
-            ->where(self::ESTIMATE_FK, $listId)
-            ->where('active', 1)
-            ->get(['step_no', 'user_id', 'role_names']);
-
-        $target = $rows->firstWhere('step_no', $stepNo);
-
-        if (! $target) {
-            return;
-        }
-
-        // Bước theo vai trò: báo cho mọi người ký được bước đó của phòng lập phiếu
-        $userIds = $target->user_id
-            ? [(int) $target->user_id]
-            : (EstimateSigner::isScopedStep($target)
-                ? EstimateSigner::signersOf($target, (int) DB::table(self::TABLE)->where('id', $listId)->value('department_id'))->pluck('id')->map(fn ($id) => (int) $id)->all()
-                : []);
-
-        if (! $userIds) {
-            return;
-        }
-
-        NotificationController::sendNotification(
-            'Phiếu '.$code.' đang chờ bạn ký duyệt (bước '.$stepNo.'/'.$rows->count().').',
-            'Trình ký',
-            $listId,
-            $userIds,
-            [],
-            route(self::EST_ROUTE.'list')
-        );
     }
 
     /* ==========================================================

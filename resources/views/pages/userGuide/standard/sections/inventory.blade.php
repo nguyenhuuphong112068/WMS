@@ -1,5 +1,6 @@
 <p>Tồn <b>tính tự động</b> từ phiếu nhập, cân đối, phiếu sử dụng và phần <a href="#cach-ly">cách ly / loại bỏ</a> (cột Huỷ trong kỳ). Chọn <b>Từ ngày - Đến ngày</b> (mặc định trọn tháng
     hiện tại) để xem Tồn Đầu Kỳ, Nhập, Sử Dụng, Huỷ trong kỳ và Tồn Cuối Kỳ.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/ton-kho.png', 'caption' => 'Màn hình Tồn Kho › Chất Chuẩn › tab Theo mã ống chuẩn / Theo chất chuẩn / Theo định khu'])
 
 <ul>
     <li><b>Theo mã ống chuẩn</b>: mỗi ống một dòng gọn như Tồn Kho Hoá Chất - cột <b>Đơn Vị</b> riêng, các ô số chỉ hiện con số

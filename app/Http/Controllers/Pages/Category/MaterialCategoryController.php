@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\RequiresChangeReason;
+use App\Http\Controllers\Concerns\UpdatesCategoryLeadTime;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
@@ -39,10 +40,14 @@ class MaterialCategoryController extends Controller
 {
     use RequiresChangeReason;
     use VerifiesSignature;
+    use UpdatesCategoryLeadTime;
 
     private const TABLE = 'material_categories';
     private const HISTORY_TABLE = 'material_category_histories';
     private const LABEL = 'danh mục vật tư công ty';
+
+    /** Quyền điều chỉnh Thời gian đặt hàng - xem UpdatesCategoryLeadTime */
+    private const LEAD_TIME_PERMISSION = 'category_material_lead_time';
 
     /** Tiền tố mã danh mục sinh tự động: M00001, M00002... */
     private const CODE_PREFIX = 'M';
@@ -89,6 +94,8 @@ class MaterialCategoryController extends Controller
         $periodicLists = MaterialPeriodicRequest::listsOfDepartment($departmentId);
 
         return view('pages.category.MaterialCategory.list', [
+            // Vào từ thẻ trang chủ "Mã mới chờ khai thời gian đặt hàng": mở sẵn hộp thoại điều chỉnh
+            'leadTimeOpen' => $this->leadTimeOpen(),
             'datas' => $datas,
             // Ô Tên vật tư tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị vừa gửi bị lỗi
             // validate; dòng đang sửa gửi kèm nhãn qua material_names_id_text.
@@ -169,6 +176,9 @@ class MaterialCategoryController extends Controller
             return DB::table(self::TABLE)->insertGetId($this->payload($request) + [
                 'code' => $this->nextCode(),
                 'app_status' => 'pending',
+                // Modal Thêm không có ô Thời gian đặt hàng: báo người có quyền vào khai (thẻ trang chủ),
+                // trừ vật tư Hành Chánh - không cần thời gian đặt hàng
+                'lead_time_pending' => $this->leadTimeApplies($request->purchasing_department) ? 1 : 0,
                 'status_id' => 1,
                 'created_by' => $this->actor(),
                 'created_at' => now(),
@@ -206,6 +216,8 @@ class MaterialCategoryController extends Controller
         }
 
         $payload = $this->payload($request);
+        // Thời gian đặt hàng chỉ sửa qua updateLeadTime() (quyền riêng), ở đây giữ nguyên giá trị cũ
+        $payload['lead_time_days'] = $current->lead_time_days;
         $note = $this->changeNote($current, $payload);
 
         if ($note === '') {
@@ -213,6 +225,10 @@ class MaterialCategoryController extends Controller
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
+            // Đổi sang Hành Chánh thì thôi chờ khai; đổi về Cung Ứng mà chưa có số ngày thì báo khai lại
+            'lead_time_pending' => $this->leadTimeApplies($payload['purchasing_department'])
+                ? (int) ($current->lead_time_pending || $current->lead_time_days === null)
+                : 0,
             // Sửa nội dung thì phải duyệt lại từ đầu
             'app_status' => 'pending',
             'approved_by' => null,
@@ -541,8 +557,15 @@ class MaterialCategoryController extends Controller
             'purchasing_department' => isset(MaterialClassification::PURCHASING_DEPARTMENTS[(string) $request->purchasing_department])
                 ? $request->purchasing_department
                 : null,
-            'lead_time_days' => MaterialClassification::leadTimeValue($request->lead_time_days),
+            // Không nhận từ form: người có quyền khai sau qua updateLeadTime(), update() giữ giá trị cũ
+            'lead_time_days' => null,
         ];
+    }
+
+    /** Vật tư Hành Chánh mua (kho VPP) không cần thời gian đặt hàng - xem UpdatesCategoryLeadTime. */
+    private function leadTimeApplies(?string $purchasing): bool
+    {
+        return $purchasing !== MaterialClassification::PURCHASING_ADMIN;
     }
 
     private function messages(): array

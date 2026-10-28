@@ -2,6 +2,7 @@
 <p>Liệt kê các lô có <b>hạn áp dụng</b> rơi vào trong <b>6 tháng</b> tới, kể cả lô đã quá hạn. Lọc nhanh theo mốc
     <span class="ug-key">≤ 3 tháng</span> <span class="ug-key">≤ 1 tháng</span> <span class="ug-key">≤ 2 tuần</span>
     <span class="ug-key">≤ 1 tuần</span>. Từ đây có thể bấm <b>Cách ly</b> lô đã hoặc sắp hết hạn để đưa vào <a href="#cach-ly">quy trình huỷ</a>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/han-dung.png', 'caption' => 'Màn hình Tồn Kho › Hoá Chất › tab Cận hạn dùng / Chưa có hạn nội bộ'])
 
 <h3>Tab "Chưa có hạn nội bộ"</h3>
 <p>Các lô của hoá chất có <b>hạn dùng mặc định</b> (khai ở danh mục hoặc Hoá Chất Của Phòng) nhưng <b>chưa xác định hạn dùng nội bộ</b>.

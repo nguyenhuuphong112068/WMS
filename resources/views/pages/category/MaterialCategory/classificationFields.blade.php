@@ -1,5 +1,5 @@
 {{--
-| Khối khai PHÂN LOẠI + THỜI GIAN ĐẶT HÀNG của Danh Mục Vật Tư Công Ty.
+| Khối khai PHÂN LOẠI của Danh Mục Vật Tư Công Ty.
 | Dùng chung cho modal Thêm mới và modal Cập nhật.
 |
 | 6 tiêu chí, mỗi tiêu chí chọn đúng một giá trị (radio) và đều bắt buộc. Bộ Phận Mua Hàng
@@ -10,7 +10,9 @@
 | - $bag        : bag lỗi của form đang dựng
 | - $selected   : [tiêu chí => giá trị] đang chọn (modal Cập nhật đổ lại bằng JS)
 | - $purchasing : mã bộ phận mua hàng đang chọn
-| - $leadTime   : số ngày đặt hàng đang khai
+|
+| THỜI GIAN ĐẶT HÀNG không khai ở đây: người có quyền category_material_lead_time khai sau bằng
+| nút riêng ở cột bảng (UpdatesCategoryLeadTime); vật tư Hành Chánh không cần khai.
 --}}
 
 @php
@@ -18,7 +20,6 @@
 
     $selected = $selected ?? [];
     $purchasing = $purchasing ?? null;
-    $leadTime = $leadTime ?? null;
     $groups = MaterialClassification::formGroups($selected, $purchasing);
 @endphp
 
@@ -47,22 +48,3 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="form-group">
-            <label>Thời Gian Đặt Hàng</label>
-            <div class="input-group">
-                <input type="text" inputmode="numeric" name="lead_time_days"
-                    class="form-control {{ $bag->has('lead_time_days') ? 'is-invalid' : '' }}"
-                    value="{{ $leadTime }}" placeholder="Ví dụ: 30">
-                <div class="input-group-append">
-                    <span class="input-group-text">ngày</span>
-                </div>
-            </div>
-            @if ($bag->has('lead_time_days'))
-                <span class="md-error">{{ $bag->first('lead_time_days') }}</span>
-            @endif
-            <small class="md-sub">Số ngày từ lúc đặt hàng tới lúc hàng về công ty.</small>
-        </div>
-    </div>
-</div>

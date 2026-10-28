@@ -116,7 +116,6 @@
                                 'bag' => $bag,
                                 'selected' => $oldClassification,
                                 'purchasing' => $bag->any() ? old('purchasing_department') : null,
-                                'leadTime' => $bag->any() ? old('lead_time_days') : null,
                             ])
                         </div>
                     </div>

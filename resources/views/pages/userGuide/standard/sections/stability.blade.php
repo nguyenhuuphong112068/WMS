@@ -1,5 +1,6 @@
 <p>Chất chuẩn để lâu thì hàm lượng thay đổi. Tab <b>Đánh giá hạn dùng CTC</b> trên màn hình <b>Tồn Kho › Chất Chuẩn</b> lập
     <b>phiếu đánh giá hạn dùng</b> cho từng ống <b>chuẩn thứ cấp (CTC)</b> để theo dõi độ ổn định qua các <b>mốc</b> (T0, T3, T6...).</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/danh-gia.png', 'caption' => 'Màn hình Tồn Kho › Chất Chuẩn › tab Đánh giá hạn dùng CTC'])
 
 <h3>Lập phiếu đánh giá</h3>
 <ol class="ug-steps">

@@ -1,5 +1,6 @@
 <p>Tab đầu tiên của màn Nhập: tạo phiếu nhập và kiểm tra các <b>ống chuẩn</b> vừa nhập. Ống mới luôn ở trạng thái
     <span class="badge badge-warning">Chờ kiểm tra</span>, nằm trong khu Biệt Trữ và <b>chưa cộng vào tồn</b>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/nhap-chuan.png', 'caption' => 'Màn hình Nhập › Chất Chuẩn › tab Nhập chất chuẩn'])
 
 <h3>Nhập ống chuẩn</h3>
 <ol class="ug-steps">
@@ -13,6 +14,8 @@
     <li>Điền thông tin lô và chọn <b>loại hạn dùng</b> (xem bảng dưới), đính kèm CoA, rồi <b>Lưu</b>. Ngày Nhập và Người Nhập do
         hệ thống tự ghi, không sửa được.</li>
 </ol>
+
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/nhap-chuan-form.png', 'caption' => 'Hộp thoại thêm mới - Nhập Chất Chuẩn & Kiểm Tra'])
 
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Chỉ Tiêu Kiểm', false, 'Một hoặc nhiều chỉ tiêu ống chuẩn này dùng cho.'],

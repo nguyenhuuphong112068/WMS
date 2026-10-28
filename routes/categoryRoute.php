@@ -50,6 +50,8 @@ Route::prefix('/category')
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
+            // Điều chỉnh Thời gian đặt hàng - quyền riêng, không đưa về Chờ duyệt (UpdatesCategoryLeadTime)
+            Route::post('updateLeadTime', 'updateLeadTime')->name('updateLeadTime');
         });
 
         // Cấu hình riêng của từng phòng ban cho vật tư dùng chung - không có bước duyệt,
@@ -92,6 +94,8 @@ Route::prefix('/category')
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
+            // Điều chỉnh Thời gian đặt hàng - quyền riêng, không đưa về Chờ duyệt (UpdatesCategoryLeadTime)
+            Route::post('updateLeadTime', 'updateLeadTime')->name('updateLeadTime');
             // Xác nhận "Đã khai báo trên Cổng thông tin quốc gia" - chỉ một lần, không gỡ lại được
             Route::post('declarePortal', 'declarePortal')->name('declarePortal');
         });
@@ -115,6 +119,8 @@ Route::prefix('/category')
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
             Route::post('approve', 'approve')->name('approve');
+            // Điều chỉnh Thời gian đặt hàng - quyền riêng, không đưa về Chờ duyệt (UpdatesCategoryLeadTime)
+            Route::post('updateLeadTime', 'updateLeadTime')->name('updateLeadTime');
         });
 
         // Cấu hình riêng của từng phòng ban cho chất chuẩn dùng chung - không có bước duyệt.

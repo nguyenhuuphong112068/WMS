@@ -1,6 +1,7 @@
 <p>Tab <b>Kế hoạch đánh giá</b> trên màn hình <b>Tồn Kho › Chất Chuẩn</b> xem <b>theo thời gian</b>: gom mọi mốc đánh giá của mọi
     phiếu còn hiệu lực trong phòng, xếp theo ngày đến hạn trong khoảng <b>Từ ngày - Đến ngày</b> của tab (riêng, không dùng Kỳ báo cáo
     của tồn kho), để biết kỳ tới phải kiểm những ống nào.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/ke-hoach.png', 'caption' => 'Màn hình Tồn Kho › Chất Chuẩn › tab Kế hoạch đánh giá'])
 <ul>
     <li>Mặc định xem từ đầu tháng này đến hết 3 tháng tới; bấm mốc nhanh <b>Tháng này</b>, <b>Quý này</b>, <b>3 / 6 tháng tới</b>,
         <b>Năm nay</b>, <b>Đã quá hạn</b>. Khoảng dài quá 60 tháng tự cắt lại.</li>

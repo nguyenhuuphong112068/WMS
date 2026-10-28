@@ -369,8 +369,6 @@ class MaterialCalibrationController extends Controller
             'Phiếu '.$code.' cho đề nghị '.$req->code.': '.$this->number($total).' '.($unit ?: '').' từ mã xuất nhập '.$codes
         );
 
-        $this->notifyQa($departmentId, $code, $req->code, $lots->first()->material_name ?? '', $total, $unit, $codes);
-
         return $this->prepBack($request, 'success', 'Đã gửi QA hiệu chuẩn '.$this->number($total).' '.($unit ?: '')
             .' (phiếu '.$code.'). Phần này được giữ chỗ, QA xác nhận đạt mới cấp phát được.');
     }
@@ -608,32 +606,6 @@ class MaterialCalibrationController extends Controller
      |  HỖ TRỢ
      ========================================================== */
 
-    /** Báo cho người có quyền xác nhận ở các phòng QA phụ trách phòng đề nghị. */
-    private function notifyQa(int $departmentId, string $code, string $reqCode, string $material, float $amount, ?string $unit, string $lotCodes): void
-    {
-        $userIds = [];
-
-        foreach (MaterialCalibration::qaDepartmentIdsFor($departmentId) as $qaDepartmentId) {
-            $userIds = array_merge($userIds, users_with_permission(MaterialCalibration::CONFIRM_PERMISSION, $qaDepartmentId));
-        }
-
-        $userIds = array_values(array_unique($userIds));
-
-        if (! $userIds) {
-            return;
-        }
-
-        NotificationController::sendNotification(
-            'Phòng '.$this->departmentName($departmentId).' đề nghị hiệu chuẩn '.$material.': '.$this->number($amount).' '.($unit ?: '')
-                .' (mã xuất nhập '.$lotCodes.', phiếu '.$code.') trước khi cấp phát cho đề nghị '.$reqCode.'.',
-            'Đề nghị hiệu chuẩn vật tư',
-            null,
-            $userIds,
-            [],
-            route('pages.export.materialExport.list', ['tab' => 'calibration'])
-        );
-    }
-
     /** Báo kết quả cho người cấp phát của phòng đề nghị. */
     private function notifyDepartment(int $departmentId, string $message, string $tab): void
     {
@@ -649,7 +621,9 @@ class MaterialCalibrationController extends Controller
             null,
             $userIds,
             [],
-            route('pages.export.materialExport.list', ['tab' => $tab])
+            route('pages.export.materialExport.list', ['tab' => $tab]),
+            'vt',
+            'quality'
         );
     }
 

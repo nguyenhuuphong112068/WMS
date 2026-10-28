@@ -306,7 +306,7 @@
                                 Chưa có mã danh mục hoá chất nào phân loại Nhóm 9 / Nhóm 10 / hoá chất cấm kèm
                                 hoạt chất Phụ lục IV. Vào "Danh Mục › Hoá Chất" để phân loại, "Dữ Liệu Gốc › Tên
                                 Hoá Chất"
-                                để gắn hoạt chất, và "Dữ Liệu Gốc › Tên Hoạt Chất" để khai ngưỡng.
+                                để gắn hoạt chất, và "Dữ Liệu Gốc › Đơn Chất" để khai ngưỡng.
                             </td>
                         </tr>
                     @endforelse

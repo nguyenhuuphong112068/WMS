@@ -294,6 +294,7 @@
 @section('model')
     @include('pages.category.MaterialCategory.create')
     @include('pages.category.MaterialCategory.update')
+    @include('pages.category.shared.leadTimeModal')
     @include('pages.category.shared.historyModal')
 
     @include('pages.category.DepartmentMaterial.create', [

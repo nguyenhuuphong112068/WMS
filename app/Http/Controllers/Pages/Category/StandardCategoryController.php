@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\RequiresChangeReason;
+use App\Http\Controllers\Concerns\UpdatesCategoryLeadTime;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
@@ -37,12 +38,16 @@ class StandardCategoryController extends Controller
 {
     use RequiresChangeReason;
     use VerifiesSignature;
+    use UpdatesCategoryLeadTime;
 
     private const TABLE = 'standard_categories';
 
     private const HISTORY_TABLE = 'standard_category_histories';
 
     private const LABEL = 'danh mục chất chuẩn công ty';
+
+    /** Quyền điều chỉnh Thời gian đặt hàng - xem UpdatesCategoryLeadTime */
+    private const LEAD_TIME_PERMISSION = 'category_standard_lead_time';
 
     /** Tiền tố mã chất chuẩn sinh tự động: S00001, S00002... */
     private const CODE_PREFIX = 'S';
@@ -93,6 +98,8 @@ class StandardCategoryController extends Controller
         $dsDatas = DepartmentStandard::rowsOfDepartment($departmentId);
 
         return view('pages.category.StandardCategory.list', [
+            // Vào từ thẻ trang chủ "Mã mới chờ khai thời gian đặt hàng": mở sẵn hộp thoại điều chỉnh
+            'leadTimeOpen' => $this->leadTimeOpen(),
             'datas' => $datas,
             // Ô Tên chất chuẩn tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị vừa gửi bị
             // lỗi validate; dòng đang sửa gửi kèm nhãn qua chem_names_id_text.
@@ -147,6 +154,8 @@ class StandardCategoryController extends Controller
                 'code' => $this->nextCode(),
                 'version' => $version,
                 'app_status' => 'pending',
+                // Báo người có quyền vào khai thời gian đặt hàng (thẻ trang chủ)
+                'lead_time_pending' => $this->leadTimePendingOnCreate($request),
                 'status_id' => 1,
                 'created_by' => $this->actor(),
                 'created_at' => now(),
@@ -184,6 +193,8 @@ class StandardCategoryController extends Controller
         }
 
         $payload = $this->payload($request);
+        // Thời gian đặt hàng chỉ sửa qua updateLeadTime() (quyền riêng), ở đây giữ nguyên giá trị cũ
+        $payload['lead_time_days'] = $current->lead_time_days;
         $note = $this->changeNote($current, $payload);
 
         if ($note === '') {

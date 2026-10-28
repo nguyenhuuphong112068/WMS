@@ -1013,9 +1013,6 @@ class ChemicalEstimateController extends Controller
 
         AuditTrialController::log('Trình ký', self::TABLE, $current->id, 'app_status: '.$current->app_status, 'app_status: pending_sign, '.$stepCount.' bước ký');
 
-        // Bắt đầu quy trình: báo cho người ký bước 1 (các bước sau được báo lần lượt khi ký xong bước trước).
-        $this->notifyPendingSigner($current->id, $current->code, 1);
-
         return redirect()->back()->with('success', 'Đã trình ký phiếu '.$current->code.' qua '.$stepCount.' bước duyệt!');
     }
 
@@ -1083,11 +1080,6 @@ class ChemicalEstimateController extends Controller
         self::writeHistory($current->id, 'Ký duyệt', (string) $stepNo, $current->app_status, $isLast ? 'approved' : 'pending_sign', $this->nullIfBlank($request->note));
 
         AuditTrialController::log('Ký duyệt', self::TABLE, $current->id, 'Bước '.$stepNo.'/'.$stepCount, 'app_status: '.($isLast ? 'approved' : 'pending_sign'));
-
-        // Ký xong: chuyển lượt cho người ký bước kế tiếp (bước cuối thì không còn ai để báo).
-        if (! $isLast) {
-            $this->notifyPendingSigner($current->id, $current->code, $stepNo + 1);
-        }
 
         return redirect()->back()->with(
             'success',

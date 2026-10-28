@@ -51,7 +51,7 @@
             <tr>
                 <td>Phân loại NĐ 24/2026 hiện sai</td>
                 <td style="font-weight: 400">Phân loại tự suy từ Dữ Liệu Gốc. Kiểm tra hoạt chất thành phần, % khối lượng và nhóm nguy hại ở
-                    <b>Dữ Liệu Gốc › Hoá Chất / Hoạt Chất</b>.</td>
+                    <b>Dữ Liệu Gốc › Hoá Chất / Đơn Chất</b>.</td>
             </tr>
             <tr>
                 <td>"Chỉ được cân đối tối đa 5% số lượng nhập"</td>

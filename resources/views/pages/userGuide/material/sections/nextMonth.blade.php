@@ -2,6 +2,7 @@
 
 <p>Trả lời câu hỏi: <b>tồn hiện có của phòng có đủ cho nhu cầu theo chu kỳ của tháng tới không, thiếu bao nhiêu?</b>
     Mục đích là để kịp lập dự trù trước khi hết hàng.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/kha-dung-thang-toi.png', 'caption' => 'Màn hình Tồn Kho › Vật Tư › tab Khả dụng tháng tới'])
 
 <div class="ug-callout">
     <i class="fas fa-calculator"></i>

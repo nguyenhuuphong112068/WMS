@@ -101,14 +101,8 @@
                             <td class="md-sub">
                                 {{ MaterialClassification::purchasingLabel($row->purchasing_department) ?: '—' }}
                             </td>
-                            <td class="text-center" data-order="{{ $row->lead_time_days ?? -1 }}">
-                                @if ($row->lead_time_days !== null)
-                                    <span class="font-weight-bold">{{ $row->lead_time_days }}</span>
-                                    <span class="md-sub">ngày</span>
-                                @else
-                                    <span class="md-empty">—</span>
-                                @endif
-                            </td>
+                            @include('pages.category.shared.leadTimeCell', ['row' => $row, 'permPrefix' => 'category_material_',
+                                'applies' => $row->purchasing_department !== MaterialClassification::PURCHASING_ADMIN])
                             <td>
                                 @if ($usingDepts->count())
                                     <div class="cat-chips">

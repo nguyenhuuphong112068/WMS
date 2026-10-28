@@ -3,7 +3,7 @@
     |--------------------------------------------------------------------------
     | Chú thích ý nghĩa 4 Phụ lục + 10 nhóm phân loại NĐ 24/2026/NĐ-CP
     |--------------------------------------------------------------------------
-    | Dùng chung cho: Tên Hoạt Chất, Tên Hoá Chất, Danh Mục Hoá Chất.
+    | Dùng chung cho: Đơn Chất, Tên Hoá Chất, Danh Mục Hoá Chất.
     | Mở bằng: <button data-toggle="modal" data-target="#classifyGuideModal">.
     | Nội dung theo cột "GHI CHÚ" của biểu mẫu Nghị định; nhãn 10 nhóm lấy thẳng
     | từ App\Support\ChemicalClassification::GROUPS để luôn khớp với dữ liệu.

@@ -1,7 +1,10 @@
 <p>Mỗi phòng khai <b>những chất chuẩn phòng mình dùng</b> và cách dùng riêng. Chỉ chuẩn đã khai ở đây mới <b>nhập kho</b> được ở
     phòng. Ô nào để trống thì lấy theo mặc định của danh mục.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/chuan-cua-phong.png', 'caption' => 'Màn hình Danh Mục › Chất Chuẩn › tab Chất chuẩn của phòng'])
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/chuan-cua-phong-form.png', 'caption' => 'Hộp thoại thêm mới - Chất Chuẩn Của Phòng'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Chất Chuẩn', true, 'Chọn từ danh mục công ty (đã duyệt). Mỗi phòng khai một chất chuẩn <b>một lần</b>.'],
     ['Đơn Vị Tính', true, 'Đơn vị phòng dùng để nhập, xuất và ghi tồn (mg, g, ml, ống...).'],

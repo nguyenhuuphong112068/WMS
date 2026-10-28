@@ -1,5 +1,6 @@
 <p>Người trong tổ chỉ được thấy và dùng những ống chuẩn đã được <b>cấp phát cho tổ mình</b>. Vì vậy tổ phải đề nghị trước, kho
     cấp ống cho tổ, rồi mới <a href="#su-dung-chuan">ghi sử dụng</a>. Đề nghị chuẩn nội bộ <b>không có bước ký duyệt</b>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/de-nghi-noi-bo.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Chất Chuẩn › tab Đề nghị cấp phát chuẩn nội bộ'])
 
 <p>Danh sách đề nghị chia 3 tab con, số trên mỗi tab là số phiếu đang có:</p>
 <div class="table-responsive">

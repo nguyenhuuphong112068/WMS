@@ -1,10 +1,10 @@
 <p>Danh mục <b>chất hoá học tinh khiết</b> (hoạt chất) kèm phân loại theo <b>Nghị định 24/2026/NĐ-CP</b>.
     Tên hoá chất (có thể là hỗn hợp) ở màn hình <a href="#hoa-chat">Hoá Chất</a> được ghép từ các hoạt chất này,
     nên cần khai hoạt chất trước.</p>
-@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/hoat-chat.png', 'caption' => 'Màn hình Hoạt Chất'])
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/hoat-chat.png', 'caption' => 'Màn hình Đơn Chất'])
 
 <h3>Các ô nhập</h3>
-@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/hoat-chat-form.png', 'caption' => 'Hộp thoại thêm mới - Hoạt Chất'])
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/hoat-chat-form.png', 'caption' => 'Hộp thoại thêm mới - Đơn Chất'])
 
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Tên khoa học (IUPAC)', true, 'Tên danh pháp chuẩn. Không trùng.'],

@@ -195,8 +195,6 @@ class MaterialTransferSignFlow
                 ->where('active', 1)->update(['status' => 'draft', 'updated_at' => now()]);
         });
 
-        self::notifyStep($requestId, 1);
-
         return ['status' => self::STATUS_PENDING_SIGN, 'error' => null, 'steps' => count($steps)];
     }
 
@@ -247,10 +245,6 @@ class MaterialTransferSignFlow
             }
         });
 
-        if (! $isLast) {
-            self::notifyStep((int) $request->id, (int) $sign->step_no + 1);
-        }
-
         return $isLast;
     }
 
@@ -291,30 +285,6 @@ class MaterialTransferSignFlow
 
         DB::table(MaterialTransferRequest::ITEM_TABLE)->where('transfer_request_id', $requestId)
             ->where('active', 1)->where('status', 'draft')->update(['status' => 'pending', 'updated_at' => now()]);
-    }
-
-    /** Báo những người ký được bước $stepNo của phiếu. */
-    private static function notifyStep(int $requestId, int $stepNo): void
-    {
-        $request = DB::table(MaterialTransferRequest::TABLE)->where('id', $requestId)->first();
-        $sign = DB::table(self::SIGN_TABLE)->where('transfer_request_id', $requestId)->where('active', 1)->where('step_no', $stepNo)->first();
-
-        if (! $request || ! $sign) {
-            return;
-        }
-
-        $userIds = self::signersOf($sign)->pluck('id')->map(fn ($id) => (int) $id)->all();
-
-        if ($userIds) {
-            \App\Http\Controllers\General\NotificationController::sendNotification(
-                'Đề nghị '.$request->code.' đang chờ bạn ký duyệt (bước '.$stepNo.').',
-                'Trình ký',
-                $requestId,
-                $userIds,
-                [],
-                route('pages.export.materialExport.list', ['tab' => MaterialVpp::tabFor((int) $request->to_department_id)])
-            );
-        }
     }
 
     /** Câu báo sau khi gửi, theo kết quả start(). */

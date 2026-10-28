@@ -40,7 +40,7 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Dữ liệu nền khai ở menu Dữ Liệu Gốc: <b>Hoạt Chất</b>, <b>Nhóm Nguy Hại Bảng B</b>, <b>Hoá Chất</b> (tên),
+    <div>Dữ liệu nền khai ở menu Dữ Liệu Gốc: <b>Đơn Chất</b>, <b>Nhóm Nguy Hại Bảng B</b>, <b>Hoá Chất</b> (tên),
         Nhà Sản Xuất, Nhà Cung Cấp, Đơn Vị Tính, Điều Kiện Bảo Quản, Định Khu. Xem
         <a href="{{ route('pages.userGuide.show', 'materData') }}">Hướng dẫn Dữ Liệu Gốc</a>. Đề nghị, ký duyệt và dự trù nói chung
         giống module vật tư, xem thêm <a href="{{ route('pages.userGuide.show', 'material') }}">Hướng dẫn Vật Tư</a>.</div>

@@ -17,7 +17,7 @@
             </tr>
             <tr>
                 <td>Hoá chất</td>
-                <td>Hoạt Chất, Nhóm Nguy Hại Bảng B, Hoá Chất</td>
+                <td>Đơn Chất, Nhóm Nguy Hại Bảng B, Hoá Chất</td>
             </tr>
             <tr>
                 <td>Chất chuẩn</td>

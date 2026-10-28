@@ -1,4 +1,5 @@
 <p>Phòng <b>A</b> xin chất chuẩn từ kho của phòng <b>B</b>, theo đúng 3 bước như hoá chất và <b>không có bước ký</b>:</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/lien-phong-ban.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Chất Chuẩn › tab Đề nghị cấp phát chuẩn liên phòng ban'])
 <ol class="ug-steps">
     <li><b>A lập đề nghị</b>: chọn phòng được đề nghị, thêm chuẩn (gõ mã, tên hoặc nhà sản xuất để tìm; đơn vị tự điền theo
         đơn vị phòng mình khai), số lượng, ngày mong muốn. Bấm

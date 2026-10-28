@@ -3,7 +3,7 @@
     |--------------------------------------------------------------------------
     | Bộ lọc NĐ 24/2026: Phụ lục / Nhóm / Bảng / Phân loại  (dùng chung)
     |--------------------------------------------------------------------------
-    | Dùng cho màn Tên Hoạt Chất và Tên Hoá Chất (bảng id="mdTable").
+    | Dùng cho màn Đơn Chất và Tên Hoá Chất (bảng id="mdTable").
     | Lọc phía trình duyệt qua $.fn.dataTable.ext.search, đọc data-* trên từng <tr>:
     |   data-apx  = danh sách phụ lục   (vd "I,II,IV")
     |   data-grp  = danh sách "nhóm"    (vd "1,2")

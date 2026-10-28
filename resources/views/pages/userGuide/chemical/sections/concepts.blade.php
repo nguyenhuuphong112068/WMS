@@ -3,7 +3,7 @@
     QR trên nhãn. Khi sử dụng, chỉ cần quét mã này. Phiếu sử dụng dùng lại đúng mã của lô, không sinh mã mới.</p>
 
 <h3>Phân loại theo Nghị định 24/2026</h3>
-<p>Phân loại <b>không khai tay</b> ở danh mục mà hệ thống <b>tự suy</b> từ <b>Dữ Liệu Gốc › Hoạt Chất</b> và
+<p>Phân loại <b>không khai tay</b> ở danh mục mà hệ thống <b>tự suy</b> từ <b>Dữ Liệu Gốc › Đơn Chất</b> và
     <b>Dữ Liệu Gốc › Hoá Chất</b>. Nhãn <span class="ug-chip"><i class="fas fa-shield-alt"></i> Kiểm soát đặc biệt</span> đánh dấu
     hoá chất thuộc Phụ lục III. Hoá chất thuộc <b>nhóm 11 - Hoá chất cấm (Luật Đầu tư 2025)</b> bắt buộc có người kiểm tra mỗi lần
     sử dụng và có <a href="#hoa-chat-cam">sổ theo dõi riêng</a>.</p>

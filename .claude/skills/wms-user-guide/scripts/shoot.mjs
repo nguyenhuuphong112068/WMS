@@ -93,6 +93,10 @@ for (const shot of plan) {
     if (shot.probe) console.log('probe', shot.name, JSON.stringify(await evaluate(shot.probe)));
     for (const sel of shot.highlight || []) await evaluate(`document.querySelectorAll(${JSON.stringify(sel)}).forEach(e => e.classList.add('ug-hl'))`);
 
+    // Không chụp ngoài khung nhìn được (xem ghi chú captureBeyondViewport) nên cuộn vùng cần chụp lên đầu
+    await evaluate(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(shot.clip || 'body')})].find(x => x.getClientRects().length);
+        if (e && e.getBoundingClientRect().bottom > innerHeight) e.scrollIntoView({ block: 'start' }); })()`);
+    await sleep(400);
     const rect = await evaluate(`(() => {
         const els = [...document.querySelectorAll(${JSON.stringify(shot.clip || 'body')})].filter(e => e.getClientRects().length);
         if (!els.length) return null;

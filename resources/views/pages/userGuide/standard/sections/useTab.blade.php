@@ -2,6 +2,7 @@
     chọn ống cấp cho tổ trước đây: mã ống (lô, định khu), chất chuẩn, tổ + mã phiếu đề nghị, qui cách, nhà sản xuất, mục đích, số lượng
     đề nghị / đã cấp (người cấp, thời điểm cấp), ĐVT, trả chuẩn, sản phẩm, chỉ tiêu, KNV, ghi chú. Số trên nút tab là số ống đang chờ sử dụng.
     Dòng có KNV là chính bạn hiện thêm nhãn <b>Bạn</b>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/su-dung-chuan.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Chất Chuẩn › tab Sử dụng chuẩn'])
 
 <h3>Ghi phiếu sử dụng</h3>
 <ol class="ug-steps">

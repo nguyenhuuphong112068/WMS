@@ -531,10 +531,6 @@ class MaterialExportController extends Controller
             'Đề nghị '.$code.' ('.count($request->items).' mục, '.$stepCount.' bước ký)'
         );
 
-        if (! $isDraft) {
-            $this->notifySubmitted($this->findRequest($listId), $stepCount);
-        }
-
         return redirect()->route('pages.export.materialExport.list', ['tab' => $type])->with(
             'success',
             $isDraft ? 'Đã lưu tạm đề nghị '.$code.'!' : $this->submitMessage($code, $stepCount)
@@ -610,10 +606,6 @@ class MaterialExportController extends Controller
             ($isDraft ? 'Lưu tạm' : 'Trình ký lại').', '.$stepCount.' bước ký'
         );
 
-        if (! $isDraft) {
-            $this->notifySubmitted($this->findRequest($req->id), $stepCount);
-        }
-
         return redirect()->route('pages.export.materialExport.list', ['tab' => $req->type])->with(
             'success',
             $isDraft ? 'Đã lưu đề nghị '.$req->code.'!' : $this->submitMessage($req->code, $stepCount, true)
@@ -667,8 +659,6 @@ class MaterialExportController extends Controller
             $req->code,
             'app_status: '.$flow['app_status'].', '.$stepCount.' bước ký'
         );
-
-        $this->notifySubmitted($this->findRequest($req->id), $stepCount);
 
         return redirect()->back()
             ->with('success', $this->submitMessage($req->code, $stepCount))
@@ -742,10 +732,7 @@ class MaterialExportController extends Controller
         $fresh = DB::table(self::REQ_LIST)->where('id', $req->id)->first();
 
         if ($isLast) {
-            $this->notifyIssuers($fresh);
             $this->notifyCreator($fresh, 'Đề nghị cấp phát vật tư '.$req->code.' đã được ký duyệt đủ '.$stepCount.' bước, chờ kho cấp phát.', 'Đã duyệt');
-        } else {
-            $this->notifyStep($fresh, $stepNo + 1, $stepCount);
         }
 
         return redirect()->back()->with(
@@ -1192,72 +1179,10 @@ class MaterialExportController extends Controller
     {
         return $this->findRequest($request->request_list_id);
     }
-    /* ---------- Thông báo cho người phải xử lý tiếp ---------- */
-
-    /** Sau khi trình ký: báo người ký bước 1, hoặc báo thẳng người cấp phát khi 0 bước. */
-    private function notifySubmitted($req, int $stepCount): void
-    {
-        if (! $req) {
-            return;
-        }
-
-        if ($stepCount > 0) {
-            $this->notifyStep($req, 1, $stepCount);
-
-            return;
-        }
-
-        $this->notifyIssuers($req);
-    }
-
-    /** Báo cho người ký của một bước rằng đã tới lượt mình. */
-    private function notifyStep($req, int $stepNo, int $stepCount): void
-    {
-        $sign = DB::table(self::REQ_SIGN)
-            ->where('request_list_id', $req->id)
-            ->where('active', 1)
-            ->where('step_no', $stepNo)
-            ->first();
-
-        if (! $sign) {
-            return;
-        }
-
-        // Bước giao cho nhiều người thì báo cho tất cả - ai ký trước cũng được
-        $userIds = DB::table(self::REQ_CANDIDATE)
-            ->where('sign_id', $sign->id)
-            ->where('active', 1)
-            ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        // Phiếu cũ khai theo role chứ không đích danh ai thì không có người để báo
-        if (! $userIds && $sign->user_id) {
-            $userIds = [(int) $sign->user_id];
-        }
-
-        if (! $userIds) {
-            return;
-        }
-
-        $this->notify(
-            'Đề nghị cấp phát vật tư '.$req->code.' đang chờ bạn ký duyệt (bước '.$stepNo.'/'.$stepCount.').',
-            'Chờ ký duyệt',
-            $req,
-            $userIds
-        );
-    }
-
-    /** Báo cho người cấp phát của phòng rằng có phiếu đã duyệt, chờ xuất kho. */
-    private function notifyIssuers($req): void
-    {
-        $this->notify(
-            'Đề nghị cấp phát vật tư '.$req->code.' đã được duyệt, chờ kho cấp phát.',
-            'Chờ cấp phát',
-            $req,
-            users_with_permission('export_material_issue', (int) $req->department_id)
-        );
-    }
+    /* ---------- Thông báo kết quả cho người lập ----------
+     | Việc "chờ bạn ký / chờ kho cấp" không gửi chuông nữa: trang chủ tự ghi vào lịch sử
+     | thông báo (App\Support\ReviewHistory), gửi thêm sẽ thành hai dòng cho một việc.
+     */
 
     private function notifyCreator($req, string $message, string $activityType): void
     {
@@ -1282,7 +1207,9 @@ class MaterialExportController extends Controller
             (int) $req->id,
             $userIds,
             [],
-            route('pages.export.materialExport.list', ['tab' => $req->type ?? 'regular'])
+            route('pages.export.materialExport.list', ['tab' => $req->type ?? 'regular']),
+            'vt',
+            'internal'
         );
     }
 

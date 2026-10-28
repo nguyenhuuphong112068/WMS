@@ -1,5 +1,6 @@
 <p>Xử lý ống chuẩn <b>hỏng, hết hạn, nhiễm bẩn, có kết quả OOS</b> theo 3 bước. Từ bước 1 ống đã bị trừ tồn nên không cấp phát hay ghi
     sử dụng được nữa. Phiếu Sử dụng không còn loại <b>Loại bỏ</b>: mọi ống hỏng đều đi đường này.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/cach-ly.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Chất Chuẩn › tab Cách ly - Loại bỏ - Huỷ'])
 
 <ol class="ug-steps">
     <li><b>Cách ly</b>: mở <b>Tồn Kho Chất Chuẩn</b> (tab Theo mã ống chuẩn hoặc Cận hạn dùng), bấm

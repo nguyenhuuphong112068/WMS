@@ -9,6 +9,7 @@ use App\Support\EstimateSigner;
 use App\Support\MaterialPurchasing;
 use App\Support\MaterialTransferSignFlow;
 use App\Support\MaterialVpp;
+use App\Support\ReviewHistory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -128,6 +129,13 @@ class HomeController extends Controller
         $lowStockAlerts = $this->lowStockAlerts($lots);
         $approvals = $this->reviewRows();
         $assessmentAlerts = $this->assessmentAlerts($departmentId);
+
+        // Thanh Thông báo là lịch sử của chính các đề nghị đang hiện ở đây
+        try {
+            ReviewHistory::sync($approvals);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         session()->put(['title' => 'TRANG CHỦ']);
 
@@ -393,7 +401,7 @@ class HomeController extends Controller
     private const REVIEW_PREVIEW = 5;
 
     /** Ai phải làm: chờ chính người đăng nhập ký / duyệt, hoặc chờ phòng ban đang chọn xử lý. */
-    private const REVIEW_ACTORS = [
+    public const REVIEW_ACTORS = [
         'sign' => ['label' => 'Chờ bạn ký duyệt', 'short' => 'Bạn ký duyệt', 'icon' => 'fas fa-signature'],
         'dept' => ['label' => 'Chờ phòng ban xử lý', 'short' => 'Phòng xử lý', 'icon' => 'fas fa-people-carry'],
         // Báo cho riêng người đăng nhập (vd kiểm nghiệm viên được kho cấp chuẩn), không phải ký / duyệt
@@ -404,7 +412,7 @@ class HomeController extends Controller
      * Đối tượng của đề nghị - mỗi đối tượng một màu cố định (biến --db-group-<color> ở layout/css.blade.php).
      * 'dc' = dữ liệu dùng chung không thuộc riêng loại hàng nào (đơn vị tính, nhà sản xuất...).
      */
-    private const REVIEW_OBJECTS = [
+    public const REVIEW_OBJECTS = [
         'vt' => ['label' => 'Vật tư', 'icon' => 'fas fa-boxes', 'color' => 'material'],
         'hc' => ['label' => 'Hoá chất', 'icon' => 'fas fa-flask', 'color' => 'chemical'],
         'cc' => ['label' => 'Chất chuẩn', 'icon' => 'fas fa-vial', 'color' => 'standard'],
@@ -415,7 +423,7 @@ class HomeController extends Controller
      * Nhóm nghiệp vụ = hàng của ma trận tổng quan và nhóm card, theo thứ tự hiển thị.
      * direction: đề nghị đi giữa hai phòng - ô ma trận tách ← nhận / → gửi.
      */
-    private const REVIEW_GROUPS = [
+    public const REVIEW_GROUPS = [
         'estimate' => ['label' => 'Dự trù', 'icon' => 'fas fa-file-invoice', 'direction' => false],
         'internal' => ['label' => 'Đề nghị nội bộ', 'icon' => 'fas fa-clipboard-list', 'direction' => false],
         'transfer' => ['label' => 'Liên phòng ban', 'icon' => 'fas fa-exchange-alt', 'direction' => true],
@@ -425,7 +433,7 @@ class HomeController extends Controller
     ];
 
     /** Loại đề nghị: thuộc nhóm nghiệp vụ nào, ai phải làm. Card = một loại × một đối tượng. */
-    private const REVIEW_TYPES = [
+    public const REVIEW_TYPES = [
         'estimate_sign' => ['group' => 'estimate', 'actor' => 'sign', 'label' => 'Ký dự trù'],
         'estimate_reception' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Dự trù mới chờ tiếp nhận'],
         'estimate_cancel' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Đề nghị huỷ mục dự trù'],
@@ -443,6 +451,7 @@ class HomeController extends Controller
         'chemical_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Hoá chất hỏng chờ quyết định'],
         'standard_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Chất chuẩn hỏng chờ quyết định'],
         'category' => ['group' => 'data', 'actor' => 'sign', 'label' => 'Danh mục chờ duyệt'],
+        'category_lead_time' => ['group' => 'data', 'actor' => 'sign', 'label' => 'Mã mới chờ khai thời gian đặt hàng'],
         'master_data' => ['group' => 'data', 'actor' => 'sign', 'label' => 'Dữ liệu gốc chờ duyệt'],
     ];
 
@@ -511,6 +520,12 @@ class HomeController extends Controller
 
     private bool $companyDepartmentIdsLoaded = false;
 
+    /** Đề nghị đang chờ người đăng nhập - thanh Thông báo đồng bộ lịch sử từ đây (ReviewHistory). */
+    public function pendingReviews(): array
+    {
+        return $this->reviewRows();
+    }
+
     /**
      * Mọi đề nghị đang chờ người đang đăng nhập, gộp phẳng một danh sách.
      *
@@ -527,6 +542,7 @@ class HomeController extends Controller
             $this->standardQuarantineReviews(),
             $this->calibrationReviews(),
             $this->categoryReviews(),
+            $this->leadTimeReviews(),
             $this->masterDataReviews(),
             $this->transferIssueReviews(),
             $this->transferReceiptReviews(),
@@ -645,7 +661,7 @@ class HomeController extends Controller
     {
         $info = self::REVIEW_TYPES[$type];
 
-        return [
+        $row = [
             'type' => $type,
             'object' => $object,
             'group' => $info['group'],
@@ -663,6 +679,11 @@ class HomeController extends Controller
             'status_label' => $meta ?: $info['label'],
             'waiting_me' => $info['actor'] === 'sign',
         ];
+
+        // Khoá của dòng tương ứng trong lịch sử thông báo - bấm dòng trên thẻ thì đánh dấu đã đọc
+        $row['key'] = ReviewHistory::key($row);
+
+        return $row;
     }
 
     /* ---------- Chờ bạn ký duyệt ---------- */
@@ -1075,6 +1096,49 @@ class HomeController extends Controller
                     null,
                     $record->updated_at ?: $record->created_at,
                     route($route, ['app_status' => 'pending'])
+                );
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Mã danh mục công ty mới tạo, chờ người có quyền category_*_lead_time khai / xác nhận thời
+     * gian đặt hàng (cờ lead_time_pending - UpdatesCategoryLeadTime). Không lọc theo phòng ban
+     * như danh mục chờ duyệt; bấm dòng mở màn hình danh mục với hộp thoại điều chỉnh mở sẵn.
+     */
+    private function leadTimeReviews(): array
+    {
+        $tables = [
+            ['chemical_categories', 'chem_names', 'chem_names_id', 'category_chemical_lead_time', 'hc', 'pages.category.chemicalCategory.list'],
+            ['standard_categories', 'standard_names', 'chem_names_id', 'category_standard_lead_time', 'cc', 'pages.category.standardCategory.list'],
+            ['material_categories', 'material_names', 'material_names_id', 'category_material_lead_time', 'vt', 'pages.category.materialCategory.list'],
+        ];
+
+        $rows = [];
+
+        foreach ($tables as [$table, $names, $nameKey, $permission, $object, $route]) {
+            if (! user_can($permission)) {
+                continue;
+            }
+
+            $records = DB::table($table.' as c')
+                ->leftJoin($names.' as n', 'c.'.$nameKey, '=', 'n.id')
+                ->select('c.id', 'c.code', 'c.created_by', 'c.created_at', 'n.name as item_name')
+                ->where('c.status_id', 1)
+                ->where('c.lead_time_pending', 1)
+                ->get();
+
+            foreach ($records as $record) {
+                $rows[] = $this->reviewRow(
+                    'category_lead_time',
+                    $object,
+                    $record->code,
+                    $record->item_name,
+                    $record->created_by ? 'Tạo bởi '.$record->created_by : null,
+                    $record->created_at,
+                    route($route, ['lead_time' => $record->id])
                 );
             }
         }

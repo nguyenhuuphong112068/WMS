@@ -30,7 +30,8 @@
     <li>Người ký <b>không do người lập chọn</b>. Hệ thống tự xếp các bước theo
         <b>Dữ Liệu Gốc › Trình Ký Đề Nghị CP Vật Tư</b>, dựa vào phân loại của các vật tư trong phiếu. Không vai trò nào
         phải ký thì đề nghị được <b>duyệt thẳng</b> và chuyển sang kho.</li>
-    <li>Ký lần lượt từng bước. Người đến lượt ký nhận thông báo, mở đề nghị và bấm
+    <li>Ký lần lượt từng bước. Người đến lượt ký thấy đề nghị trên Trang chủ (thẻ "Ký đề nghị cấp phát") và
+        trong thanh Thông báo, mở đề nghị và bấm
         <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-signature mr-1"></i> Đồng ý</span> hoặc
         <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-times mr-1"></i> Từ chối</span>, rồi nhập lại mật khẩu.
         Từ chối bắt buộc ghi lý do.</li>

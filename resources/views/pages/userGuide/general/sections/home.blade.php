@@ -54,8 +54,8 @@
             </tr>
             <tr>
                 <td><span class="ug-key"><i class="far fa-bell"></i></span></td>
-                <td style="font-weight: 400">Thông báo gửi cho bạn. Số trên chuông là số thông báo chưa đọc, tự cập nhật mỗi phút.
-                    Bấm một thông báo để đánh dấu đã đọc và mở phiếu liên quan.</td>
+                <td style="font-weight: 400">Mở thanh <a href="#thong-bao">Thông báo</a> - lịch sử các đề nghị đã hiện ở Trang chủ
+                    và thông báo kết quả. Số trên chuông là số dòng chưa đọc, tự cập nhật mỗi phút.</td>
             </tr>
             <tr>
                 <td>Họ tên / vai trò</td>

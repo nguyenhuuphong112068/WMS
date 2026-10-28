@@ -20,6 +20,9 @@
 <p>Bấm vào một phiếu để mở thẳng trang hoặc hộp thoại chi tiết của phiếu đó. Nút <b>Đồng ý</b> / <b>Từ chối</b> ký duyệt nằm trong
     chi tiết phiếu, không nằm trên dòng danh sách. Ký duyệt phải nhập lại mật khẩu đăng nhập.</p>
 
+<p>Mỗi phiếu trên thẻ đồng thời là một dòng trong thanh <a href="#thong-bao">Thông báo</a>. Nút
+    <span class="ug-chip"><i class="fas fa-history"></i> Lịch sử thông báo</span> ở đầu khối mở thanh đó để xem lại cả các phiếu đã xử lý.</p>
+
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
     <div>Phiếu chờ bạn ký thuộc phòng ban khác phòng đang chọn (thường gặp với Ban Giám Đốc, Quản lý nhiều phòng): bấm vào phiếu,
@@ -54,7 +57,8 @@
             <tr><td style="font-weight: 400">Vật tư hỏng chờ quyết định</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td style="font-weight: 400">Hoá chất hỏng chờ quyết định</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td style="font-weight: 400">Chất chuẩn hỏng chờ quyết định</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
-            <tr><td rowspan="2">Phê duyệt dữ liệu</td><td style="font-weight: 400">Danh mục chờ duyệt</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
+            <tr><td rowspan="3">Phê duyệt dữ liệu</td><td style="font-weight: 400">Danh mục chờ duyệt</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
+            <tr><td style="font-weight: 400">Mã mới chờ khai thời gian đặt hàng</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td style="font-weight: 400">Dữ liệu gốc chờ duyệt</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
         </tbody>
     </table>

@@ -44,76 +44,175 @@
             font-weight: bold;
         }
 
+        #notification-drawer-header h3 {
+            color: var(--primary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .notif-head-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .notif-head-actions .btn-link {
+            font-size: 12px;
+            color: var(--primary);
+            padding: 2px 6px;
+        }
+
         .notif-tabs {
             display: flex;
-            padding: 0 20px;
+            padding: 0 12px;
             border-bottom: 1px solid #eee;
         }
 
         .notif-tab {
-            padding: 10px 15px;
+            padding: 10px 12px;
             cursor: pointer;
             color: #666;
             border-bottom: 2px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+            white-space: nowrap;
         }
 
         .notif-tab.active {
-            color: #28a745;
-            border-bottom-color: #28a745;
+            color: var(--primary);
+            border-bottom-color: var(--primary);
             font-weight: bold;
+        }
+
+        .notif-tab__count {
+            display: inline-block;
+            min-width: 18px;
+            padding: 0 5px;
+            margin-left: 3px;
+            border-radius: 9px;
+            background: var(--primary-soft);
+            color: var(--primary);
+            font-size: 11px;
+            text-align: center;
         }
 
         #notification-drawer-items {
             flex: 1;
             overflow-y: auto;
-            padding: 10px 0;
+            padding: 0 0 10px;
         }
 
         .notif-date-group {
-            padding: 10px 20px;
-            background: #f8f9fa;
-            font-size: 12px;
+            padding: 8px 20px;
+            background: var(--bg-neutral);
+            font-size: 11px;
             font-weight: bold;
             color: #888;
             text-transform: uppercase;
+            position: sticky;
+            top: 0;
+            z-index: 1;
         }
 
+        /* Mỗi dòng mang màu đối tượng như thẻ trang chủ (VT/HC/CC/DC) */
         .notif-item {
-            padding: 15px 20px;
-            display: flex;
-            gap: 15px;
+            --c: var(--primary);
+            --c-rgb: var(--primary-rgb);
+            padding: 12px 20px 12px 17px;
+            border-left: 3px solid var(--c);
             cursor: pointer;
             transition: background 0.2s;
             position: relative;
         }
 
+        .notif-item + .notif-item {
+            border-top: 1px solid #f1f3f6;
+        }
+
         .notif-item:hover {
-            background: #f0f7f2;
+            background: rgba(var(--c-rgb), 0.06);
         }
 
         .notif-item.unread {
-            background: #f3fcf5;
+            background: rgba(var(--c-rgb), 0.08);
         }
 
-        .notif-content {
-            flex: 1;
+        .notif-item.is-resolved {
+            border-left-color: #cbd5e1;
         }
+
+        .notif-item.obj-vt { --c: var(--db-group-material); --c-rgb: var(--db-group-material-rgb); }
+        .notif-item.obj-hc { --c: var(--db-group-chemical); --c-rgb: var(--db-group-chemical-rgb); }
+        .notif-item.obj-cc { --c: var(--db-group-standard); --c-rgb: var(--db-group-standard-rgb); }
+        .notif-item.obj-dc { --c: var(--db-group-master); --c-rgb: var(--db-group-master-rgb); }
+
+        .notif-top {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 5px;
+            padding-right: 16px;
+        }
+
+        .notif-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 1px 8px 1px 3px;
+            border-radius: 999px;
+            border: 1px solid rgba(var(--c-rgb), 0.35);
+            background: rgba(var(--c-rgb), 0.10);
+            color: var(--c);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .notif-chip i {
+            width: 15px;
+            height: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: var(--c);
+            color: #fff;
+            font-size: 8px;
+        }
+
+        .notif-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 1px 7px;
+            border-radius: 5px;
+            font-size: 10.5px;
+            font-weight: 700;
+            white-space: nowrap;
+            color: var(--primary-dark);
+            background: var(--primary-soft);
+        }
+
+        .notif-tag.is-dept { color: var(--accent); background: rgba(23, 184, 212, 0.10); }
+        .notif-tag.is-me { color: var(--state-success); background: rgba(var(--state-success-rgb), 0.10); }
+        .notif-tag.is-info { color: #64748B; background: #F1F5F9; }
+        .notif-tag.is-pending { color: #B45309; background: rgba(245, 158, 11, 0.12); }
+        .notif-tag.is-done { color: var(--state-success); background: rgba(var(--state-success-rgb), 0.10); }
 
         .notif-title {
-            font-size: 14px;
-            margin-bottom: 5px;
-        }
-
-        .notif-title b {
-            color: #333;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 2px;
         }
 
         .notif-message {
-            font-size: 13px;
+            font-size: 12.5px;
             color: #666;
-            border-left: 3px solid #ddd;
-            padding-left: 10px;
-            margin: 5px 0;
+            margin: 2px 0 4px;
+            word-break: break-word;
         }
 
         .notif-time {
@@ -121,15 +220,34 @@
             color: #999;
         }
 
+        .notif-item.is-resolved .notif-title,
+        .notif-item.is-resolved .notif-message {
+            color: #94a3b8;
+        }
+
         .unread-indicator {
-            width: 10px;
-            height: 10px;
-            background: #007bff;
+            width: 9px;
+            height: 9px;
+            background: var(--c);
             border-radius: 50%;
             position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
+            right: 16px;
+            top: 16px;
+        }
+
+        .notif-more {
+            display: block;
+            width: 100%;
+            border: 0;
+            background: none;
+            color: #666;
+            font-size: 13px;
+            padding: 12px;
+            transition: color 0.2s;
+        }
+
+        .notif-more:hover:not(:disabled) {
+            color: var(--primary);
         }
 
         #notification-overlay {
@@ -191,19 +309,25 @@
         <div id="notification-drawer">
             <div id="notification-drawer-header">
                 <h3>Thông báo</h3>
-                <button type="button" class="btn btn-sm btn-light" id="close-notif-drawer">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="notif-head-actions">
+                    <button type="button" class="btn btn-link" id="notif-read-all" title="Đánh dấu tất cả đã đọc">
+                        <i class="fas fa-check-double"></i> Đọc hết
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light" id="close-notif-drawer">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
             <div class="notif-tabs">
                 <div class="notif-tab active" data-tab="all">Tất cả</div>
-                <div class="notif-tab" data-tab="unread">Chưa đọc</div>
+                <div class="notif-tab" data-tab="pending">Đang chờ <span class="notif-tab__count" id="notif-count-pending">0</span></div>
+                <div class="notif-tab" data-tab="unread">Chưa đọc <span class="notif-tab__count" id="notif-count-unread">0</span></div>
             </div>
             <div id="notification-drawer-items">
                 <!-- Items will be loaded here -->
             </div>
-            <div class="p-3 text-center border-top">
-                <a href="#" style="color: #666; font-size: 13px;">Xem thêm thông báo cũ hơn</a>
+            <div class="text-center border-top">
+                <button type="button" class="notif-more" id="notif-more">Xem thêm thông báo cũ hơn</button>
             </div>
         </div>
 
@@ -645,60 +769,142 @@
                 toggleDrawer($('#notification-drawer').hasClass('open') ? false : true);
             });
 
-            function loadNotifications() {
-                $.get("{{ route('notifications.list') }}", function(data) {
-                    let unreadCount = data.filter(n => n.is_read == 0).length;
-                    if (unreadCount > 0) {
-                        $('#notif-badge-navbar').text(unreadCount).show();
+            /*
+             * Thanh Thông báo = lịch sử các đề nghị đã hiện ở trang chủ (Đang chờ → Đã xử lý)
+             * + thông báo kết quả. Phân loại, màu, nhãn lấy đúng bộ HomeController::REVIEW_*.
+             */
+            var notifObjects = @json(\App\Http\Controllers\General\HomeController::REVIEW_OBJECTS);
+            var notifGroups = @json(\App\Http\Controllers\General\HomeController::REVIEW_GROUPS);
+            var notifActors = @json(\App\Http\Controllers\General\HomeController::REVIEW_ACTORS);
+            var notifState = { tab: 'all', items: [], hasMore: false };
+
+            function notifEsc(text) {
+                return $('<div>').text(text == null ? '' : String(text)).html();
+            }
+
+            function notifItemHtml(n) {
+                var object = notifObjects[n.review_object] ? n.review_object : null;
+                var group = notifGroups[n.review_group] || null;
+                var actor = n.actor && notifActors[n.actor] ? notifActors[n.actor] : null;
+                var isReview = !!n.review_type;
+                var resolved = isReview && n.resolved_at;
+                var top = '';
+
+                if (object) {
+                    top += '<span class="notif-chip"><i class="' + notifEsc(notifObjects[object].icon) + '"></i>' + notifEsc(notifObjects[object].label) + '</span>';
+                }
+                if (group) {
+                    top += '<span class="notif-tag is-info"><i class="' + notifEsc(group.icon) + '"></i>' + notifEsc(group.label) + '</span>';
+                }
+                if (actor) {
+                    top += '<span class="notif-tag ' + (n.actor === 'sign' ? '' : 'is-' + n.actor) + '"><i class="' + notifEsc(actor.icon) + '"></i>' + notifEsc(actor.short) + '</span>';
+                } else {
+                    top += '<span class="notif-tag is-info"><i class="fas fa-bell"></i>' + notifEsc(n.sender_name) + '</span>';
+                }
+                if (isReview) {
+                    top += resolved
+                        ? '<span class="notif-tag is-done"><i class="fas fa-check"></i>Đã xử lý ' + moment(n.resolved_at).format('HH:mm DD/MM') + '</span>'
+                        : '<span class="notif-tag is-pending"><i class="fas fa-hourglass-half"></i>Đang chờ</span>';
+                }
+
+                return '<div class="notif-item' + (object ? ' obj-' + object : '') + (n.is_read == 0 ? ' unread' : '') + (resolved ? ' is-resolved' : '') + '"'
+                    + ' data-id="' + n.id + '" data-url="' + notifEsc(n.url || '') + '">'
+                    + '<div class="notif-top">' + top + '</div>'
+                    + '<div class="notif-title">' + notifEsc(n.activity_type) + '</div>'
+                    + '<div class="notif-message">' + notifEsc(n.message) + '</div>'
+                    + '<div class="notif-time">' + moment(n.created_at).format('HH:mm DD/MM/YYYY') + '</div>'
+                    + (n.is_read == 0 ? '<div class="unread-indicator"></div>' : '')
+                    + '</div>';
+            }
+
+            function renderNotifications() {
+                var html = '';
+                var lastDate = null;
+
+                if (notifState.items.length === 0) {
+                    html = '<div class="text-center p-5 text-muted">' + (notifState.tab === 'pending' ? 'Không có đề nghị nào đang chờ' : 'Không có thông báo') + '</div>';
+                }
+
+                notifState.items.forEach(function(n) {
+                    var dateLabel = moment(n.created_at).calendar(null, {
+                        sameDay: '[Hôm nay]',
+                        lastDay: '[Hôm qua]',
+                        lastWeek: 'DD/MM/YYYY',
+                        sameElse: 'DD/MM/YYYY'
+                    });
+                    if (dateLabel !== lastDate) {
+                        html += '<div class="notif-date-group">' + dateLabel + '</div>';
+                        lastDate = dateLabel;
+                    }
+                    html += notifItemHtml(n);
+                });
+
+                $('#notification-drawer-items').html(html);
+                $('#notif-more').toggle(notifState.hasMore).prop('disabled', false).text('Xem thêm thông báo cũ hơn');
+            }
+
+            function loadNotifications(append) {
+                var params = {};
+                if (notifState.tab !== 'all') params.filter = notifState.tab;
+                if (append && notifState.items.length) params.before = notifState.items[notifState.items.length - 1].recipient_id;
+
+                $.get("{{ route('notifications.list') }}", params, function(data) {
+                    if (data.unread > 0) {
+                        $('#notif-badge-navbar').text(data.unread).show();
                     } else {
                         $('#notif-badge-navbar').hide();
                     }
+                    $('#notif-count-unread').text(data.unread);
+                    $('#notif-count-pending').text(data.pending);
 
-                    let html = '';
-                    if (data.length === 0) {
-                        html = '<div class="text-center p-5 text-muted">Không có thông báo mới</div>';
-                    } else {
-                        // Nhóm theo ngày
-                        let groups = {};
-                        data.forEach(n => {
-                            let dateLabel = moment(n.created_at).calendar(null, {
-                                sameDay: '[Hôm nay]',
-                                lastDay: '[Hôm qua]',
-                                lastWeek: 'DD/MM/YYYY',
-                                sameElse: 'DD/MM/YYYY'
-                            });
-                            if (!groups[dateLabel]) groups[dateLabel] = [];
-                            groups[dateLabel].push(n);
-                        });
-
-                        for (let date in groups) {
-                            html += `<div class="notif-date-group">${date}</div>`;
-                            groups[date].forEach(n => {
-                                let isUnread = n.is_read == 0 ? 'unread' : '';
-                                html += `
-                                    <div class="notif-item ${isUnread}" onclick="markNotificationRead(${n.id}, '${n.url}')">
-                                        <div class="notif-content">
-                                            <div class="notif-title"><b>${n.sender_name}</b> đã ${n.activity_type}</div>
-                                            <div class="notif-message">${n.message}</div>
-                                            <div class="notif-time">${moment(n.created_at).format('HH:mm DD/MM/YYYY')}</div>
-                                        </div>
-                                        ${n.is_read == 0 ? '<div class="unread-indicator"></div>' : ''}
-                                    </div>
-                                `;
-                            });
-                        }
-                    }
-                    $('#notification-drawer-items').html(html);
-                    $('#notification-items').html(html); // Dự phòng cho các mẫu cũ
+                    notifState.items = append ? notifState.items.concat(data.items) : data.items;
+                    notifState.hasMore = data.has_more;
+                    renderNotifications();
                 });
             }
+
+            $('.notif-tab').on('click', function() {
+                $('.notif-tab').removeClass('active');
+                $(this).addClass('active');
+                notifState.tab = $(this).data('tab');
+                loadNotifications(false);
+            });
+
+            $('#notif-more').on('click', function() {
+                $(this).prop('disabled', true).text('Đang tải...');
+                loadNotifications(true);
+            });
+
+            $('#notif-read-all').on('click', function() {
+                $.post("{{ route('notifications.markAsRead') }}", { _token: "{{ csrf_token() }}", all: 1 }, function() {
+                    loadNotifications(false);
+                });
+            });
+
+            $('#notification-drawer-items').on('click', '.notif-item', function() {
+                markNotificationRead($(this).data('id'), $(this).data('url'));
+            });
+
+            // Trang chủ: bấm một dòng trên thẻ thì dòng tương ứng trong lịch sử thành đã đọc
+            // (sendBeacon để lệnh không bị huỷ khi trình duyệt chuyển trang ngay sau cú bấm)
+            $(document).on('click', '[data-review-key]', function() {
+                var form = new FormData();
+                form.append('_token', "{{ csrf_token() }}");
+                form.append('review_key', $(this).data('review-key'));
+                navigator.sendBeacon("{{ route('notifications.markAsRead') }}", form);
+            });
+
+            window.openNotificationDrawer = function(tab) {
+                if (tab) $('.notif-tab[data-tab="' + tab + '"]').trigger('click');
+                toggleDrawer(true);
+            };
 
             window.markNotificationRead = function(id, targetUrl) {
                 $.post("{{ route('notifications.markAsRead') }}", {
                     _token: "{{ csrf_token() }}",
                     notification_id: id
                 }, function() {
-                    loadNotifications();
+                    loadNotifications(false);
 
                     // ĐIỀU HƯỚNG ĐỘNG TỪ DATABASE
                     if (targetUrl && targetUrl !== 'null' && targetUrl !== 'undefined') {
@@ -707,8 +913,8 @@
                 });
             };
 
-            loadNotifications();
-            setInterval(loadNotifications, 60000);
+            loadNotifications(false);
+            setInterval(function() { loadNotifications(false); }, 60000);
         })();
     </script>
 </body>

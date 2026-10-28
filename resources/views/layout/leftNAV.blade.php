@@ -555,7 +555,7 @@
             ['productName', 'Tên Sản Phẩm', 'fas fa-pills', 'materData_common_view'],
         ],
         'Hoá chất' => [
-            ['activeIngredient', 'Hoạt Chất', 'fas fa-atom', 'materData_chemical_view'],
+            ['activeIngredient', 'Đơn Chất', 'fas fa-atom', 'materData_chemical_view'],
             ['mixtureHazardCategory', 'Nhóm Nguy Hại Bảng B', 'fas fa-exclamation-triangle', 'materData_chemical_view'],
             ['chemName', 'Hoá Chất', 'fas fa-flask', 'materData_chemical_view'],
         ],

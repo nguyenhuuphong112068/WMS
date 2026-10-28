@@ -45,9 +45,9 @@ return [
             'route' => 'pages.materData.productName.list', 'perm' => 'materData_common_view'],
     ],
     'Hoá chất' => [
-        ['id' => 'hoat-chat', 'file' => 'activeIngredient', 'title' => 'Hoạt Chất', 'icon' => 'fas fa-atom',
+        ['id' => 'hoat-chat', 'file' => 'activeIngredient', 'title' => 'Đơn Chất', 'icon' => 'fas fa-atom',
             'route' => 'pages.materData.activeIngredient.list', 'perm' => 'materData_chemical_view', 'chips' => [$approve],
-            'keywords' => 'cas nghi dinh 24 phu luc nhom 9 nguong ton tru muc gop'],
+            'keywords' => 'hoat chat don chat cas nghi dinh 24 phu luc nhom 9 nguong ton tru muc gop'],
         ['id' => 'nhom-nguy-hai-bang-b', 'file' => 'mixtureHazardCategory', 'title' => 'Nhóm Nguy Hại Bảng B', 'icon' => 'fas fa-exclamation-triangle',
             'route' => 'pages.materData.mixtureHazardCategory.list', 'perm' => 'materData_chemical_view', 'chips' => [$approve],
             'keywords' => 'ghs phu luc iv bang b nguong'],
