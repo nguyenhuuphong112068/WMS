@@ -3,7 +3,8 @@
     <!-- Left navbar links -->
     <ul class="navbar-nav align-items-center">
         <li class="nav-item">
-            <a class="nav-link" data-widget="pushmenu" href="#" role="button" style="color: var(--primary);">
+            <a class="nav-link" id="wms-nav-toggle" href="#" role="button" title="Ghim / bỏ ghim menu"
+                style="color: var(--primary);">
                 <i class="fas fa-bars"></i>
             </a>
         </li>

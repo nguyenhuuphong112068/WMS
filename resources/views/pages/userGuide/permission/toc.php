@@ -14,6 +14,9 @@ return [
     'Bắt đầu' => [
         ['id' => 'tong-quan', 'file' => 'overview', 'title' => 'Cách Hệ Thống Phân Quyền', 'icon' => 'fas fa-sitemap',
             'keywords' => 'nhom quyen vai tro phong ban quyen cha quyen con admin'],
+        ['id' => 'menu-trai', 'file' => 'menu', 'title' => 'Thanh Menu Bên Trái', 'icon' => 'fas fa-bars',
+            'route' => 'pages.home',
+            'keywords' => 'menu cot icon bang con ghim tim man hinh ctrl k doi phong ban chuyen bo phan'],
         ['id' => 'thiet-lap', 'file' => 'setup', 'title' => 'Thiết Lập Phân Quyền', 'icon' => 'fas fa-tools',
             'path' => 'Quản Trị › Phân Quyền › User / Nhóm Quyền',
             'route' => 'pages.user.user.list', 'perm' => 'user_view',

@@ -53,6 +53,6 @@
     <li><span class="ug-chip is-warn">Có bước duyệt</span> - bản ghi mới thêm hoặc vừa sửa ở trạng thái
         <b>Chờ duyệt</b>; chỉ khi <b>Đã duyệt</b> mới được chọn ở các màn hình nghiệp vụ.</li>
     <li><span class="ug-chip">Theo phòng ban đang chọn</span> - màn hình chỉ làm việc trên phòng ban đang chọn ở
-        thanh trên cùng. Muốn khai cho phòng khác, đổi phòng ban trước rồi mới thao tác.</li>
+        ô cuối cột menu bên trái. Muốn khai cho phòng khác, đổi phòng ban trước rồi mới thao tác.</li>
     <li>Các màn hình còn lại: thêm là dùng được ngay, không cần duyệt.</li>
 </ul>

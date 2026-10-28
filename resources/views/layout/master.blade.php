@@ -176,7 +176,7 @@
 
 </head>
 
-<body class="hold-transition sidebar-mini layout-navbar-fixed layout-fixed @yield('bodyClass')">
+<body class="hold-transition layout-navbar-fixed layout-fixed @yield('bodyClass')">
 
     <!-- General wrapper -->
     <div class="wrapper">

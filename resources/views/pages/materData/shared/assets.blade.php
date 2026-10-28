@@ -24,7 +24,7 @@
 
 <style>
     .md-page {
-        padding: 24px 24px 40px;
+        padding: 6px 6px 12px;
     }
 
     /* ---------- Thanh công cụ ---------- */
@@ -51,7 +51,7 @@
     }
 
     .md-card .card-body {
-        padding: 20px;
+        padding: 12px;
     }
 
     #mdTable thead th,

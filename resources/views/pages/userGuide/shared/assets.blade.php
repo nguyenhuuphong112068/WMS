@@ -706,7 +706,8 @@
     }
 
     @media print {
-        .main-sidebar,
+        .wms-rail,
+        .wms-panel,
         .main-header,
         .ug-toc,
         .ug-top,
@@ -715,7 +716,7 @@
             display: none !important;
         }
 
-        .content-wrapper {
+        body .content-wrapper {
             margin-left: 0 !important;
         }
 

@@ -26,13 +26,13 @@ class UserGuideController extends Controller
             'title' => 'Phân Quyền',
             'icon' => 'fas fa-user-shield',
             'summary' => 'Cách hệ thống phân quyền theo nhóm quyền và phòng ban, cách thiết lập cho người dùng, các vai trò hiện có và bảng phân quyền chung của toàn hệ thống.',
-            'updated_at' => '2026-10-24',
+            'updated_at' => '2026-10-28',
         ],
         'materData' => [
             'title' => 'Dữ Liệu Gốc',
             'icon' => 'fas fa-database',
             'summary' => 'Khai báo tổ chức, danh mục dùng chung, hoá chất - chất chuẩn - vật tư, định khu kho và khởi tạo dữ liệu ban đầu.',
-            'updated_at' => '2026-10-26',
+            'updated_at' => '2026-10-28',
         ],
         'material' => [
             'title' => 'Vật Tư',
