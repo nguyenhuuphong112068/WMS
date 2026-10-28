@@ -426,8 +426,39 @@
                 return false;
             }
 
+            /*
+            | Cột TÊN Vật tư / Hoá chất / Chất chuẩn là thông tin chính của bảng nên
+            | luôn giữ bề rộng tối thiểu (.md-col-name trong layout/css.blade.php),
+            | dù tiêu đề có nhiều tầng, bảng có data-no-fit hay không dùng DataTables.
+            | Nhận theo chữ tiêu đề: "Vật Tư", "Tên Hoá Chất", "Chất Chuẩn",
+            | "Tên Chuẩn", "Mặt Hàng", "Vật tư (danh mục)"... - không nhận "Mã Vật Tư",
+            | "Tổng Tồn Vật Tư". Cột nào muốn bỏ qua thì gắn data-no-name lên <th>.
+            */
+            var NAME_HEAD = /^(ten )?(vat tu|hoa chat|chat chuan|mat hang)( .*)?$|^ten chuan$/;
+
+            function headKey(th) {
+                var s = $(th).text().toLowerCase();
+                if (s.normalize) s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+                return $.trim(s.replace(/đ/g, 'd').replace(/\s+/g, ' '));
+            }
+
+            function markNameColumns(table) {
+                $(table).children('thead').children('tr').children('th').each(function () {
+                    if ($(this).is('[data-no-name]')) return;
+                    if (NAME_HEAD.test(headKey(this))) $(this).addClass('md-col-name');
+                });
+            }
+
+            window.mdMarkNameColumns = function (root) {
+                $(root || document).find('table').addBack('table').each(function () {
+                    markNameColumns(this);
+                });
+            };
+
             function fitOneTable(table) {
                 var $table = $(table);
+
+                markNameColumns(table);
 
                 if ($table.is('[data-no-fit]')) return;
                 if ($table.data('mdFitApplied')) return;
@@ -487,13 +518,13 @@
                 }
 
                 // Cả bảng toàn cột ngắn: không có cột nào để nhận chỗ dư, để nguyên
-                if (!hasLong) return;
+                if (!hasLong && !$heads.filter('.md-col-name').length) return;
 
                 var fitCols = [];
                 var flexCols = [];
 
                 $heads.each(function (i) {
-                    if (lens[i] > FIT_MAX) {
+                    if (lens[i] > FIT_MAX || $(this).hasClass('md-col-name')) {
                         flexCols.push(idx[i]);
                         $(this).addClass('md-col-flex');
                         return;
@@ -550,6 +581,7 @@
             function schedule() {
                 clearTimeout(pending);
                 pending = setTimeout(function () {
+                    window.mdMarkNameColumns();
                     window.mdFitColumns();
                 }, 60);
             }
@@ -557,6 +589,9 @@
             // Bảng dựng sau (tab nạp bằng AJAX, modal...) cũng được tính
             $(document).on('init.dt', schedule);
             $(document).ready(schedule);
+
+            // Bảng thường (không DataTables) nạp bằng AJAX vẫn cần cột tên đủ rộng
+            $(document).ajaxComplete(schedule);
         })();
     </script>
 

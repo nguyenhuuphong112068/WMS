@@ -422,6 +422,20 @@
                   word-break: break-word;
             }
 
+            /* Cột TÊN Vật tư / Hoá chất / Chất chuẩn (JS ở layout/master.blade.php
+               gắn .md-col-name theo chữ tiêu đề): thông tin chính của bảng nên luôn
+               đủ rộng để đọc tên trên 1-2 dòng, thắng cả width đặt cứng trong blade.
+               Màn hình hẹp thì .table-responsive cuộn ngang thay vì bóp cột tên. */
+            table th.md-col-name {
+                  min-width: 240px !important;
+            }
+
+            @media (max-width: 767.98px) {
+                  table th.md-col-name {
+                        min-width: 180px !important;
+                  }
+            }
+
 
             /* ----------------------------------------------------------------
                Thanh công cụ gộp ngay trên bảng

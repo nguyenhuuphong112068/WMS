@@ -78,7 +78,7 @@
         border: 0;
         border-radius: 10px;
         background: none;
-        color: var(--text-muted);
+        color: var(--text-main);
         font-size: 10.5px;
         font-weight: 600;
         line-height: 1.15;
@@ -88,8 +88,8 @@
     }
 
     .wms-rbtn i {
-        font-size: 17px;
-        color: var(--primary-lighter);
+        font-size: 18px;
+        color: var(--primary);
         transition: color var(--transition-fast);
     }
 
@@ -100,7 +100,7 @@
     }
 
     .wms-rbtn:hover i {
-        color: var(--primary);
+        color: var(--primary-dark);
     }
 
     .wms-rbtn:focus-visible,
@@ -113,11 +113,11 @@
 
     /* màn hình hiện tại thuộc mục này */
     .wms-rbtn.is-current {
-        color: var(--primary);
+        color: var(--primary-dark);
     }
 
     .wms-rbtn.is-current i {
-        color: var(--primary);
+        color: var(--primary-dark);
     }
 
     .wms-rbtn.is-current::before {
@@ -138,7 +138,7 @@
     }
 
     .wms-rbtn.is-open i {
-        color: var(--primary);
+        color: var(--primary-dark);
     }
 
     .wms-rail-sep {
@@ -268,8 +268,8 @@
     .wms-link i {
         width: 18px;
         text-align: center;
-        font-size: 0.85rem;
-        color: var(--primary-lighter);
+        font-size: 0.9rem;
+        color: var(--primary);
         flex-shrink: 0;
         transition: color var(--transition-fast);
     }
@@ -282,7 +282,7 @@
 
     .wms-link:hover i,
     .wms-link.active i {
-        color: var(--primary);
+        color: var(--primary-dark);
     }
 
     .wms-link.active {
@@ -412,7 +412,7 @@
     .wms-cmd-row i {
         width: 18px;
         text-align: center;
-        color: var(--primary-lighter);
+        color: var(--primary);
     }
 
     .wms-cmd-row small {
