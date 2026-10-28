@@ -474,6 +474,44 @@
             var needPassword = String($(form).data('require-password') || '') === '1';
             var needReason = String($(form).data('require-reason') || '') === '1';
 
+            // Ô mật khẩu Swal không nằm trong <form> nên khi chọn tài khoản đã lưu,
+            // Chrome điền userName vào ô chữ gần nhất trên trang (ô Tìm kiếm DataTables).
+            // Trong lúc hộp ký mở: khoá chỉ đọc các ô chữ ngoài hộp + đặt ô userName ẩn
+            // ngay trước ô mật khẩu để Chrome điền vào đó; đóng hộp thì khôi phục.
+            var pageInputs = $('input').filter(function() {
+                var type = (this.getAttribute('type') || 'text').toLowerCase();
+                return ['text', 'search', 'email'].indexOf(type) !== -1 && !this.readOnly;
+            }).map(function() {
+                return { el: this, val: this.value };
+            }).get();
+            var lockPageInputs = function() {
+                pageInputs.forEach(function(s) { s.el.readOnly = true; });
+
+                var input = Swal.getInput();
+                if (input && !input.previousElementSibling?.classList.contains('md-sign-username')) {
+                    var decoy = document.createElement('input');
+                    decoy.type = 'text';
+                    decoy.className = 'md-sign-username';
+                    decoy.autocomplete = 'username';
+                    decoy.tabIndex = -1;
+                    decoy.setAttribute('aria-hidden', 'true');
+                    decoy.style.cssText = 'position:absolute;left:0;top:0;width:1px;height:1px;' +
+                        'opacity:0;border:0;padding:0;pointer-events:none;';
+                    input.insertAdjacentElement('beforebegin', decoy);
+                }
+
+                mdAddPasswordEye();
+            };
+            var unlockPageInputs = function() {
+                pageInputs.forEach(function(s) {
+                    s.el.readOnly = false;
+                    if (s.el.value !== s.val) {
+                        s.el.value = s.val;
+                        $(s.el).trigger('input');
+                    }
+                });
+            };
+
             Swal.fire({
                 title: $(form).data('title'),
                 text: $(form).data('text'),
@@ -485,12 +523,13 @@
                 inputPlaceholder: needPassword ? 'Mật khẩu đăng nhập' :
                     (needReason ? 'Nêu rõ lý do khoá / mở khoá bản ghi này' : undefined),
                 inputAttributes: needPassword ? {
-                    autocomplete: 'current-password',
+                    autocomplete: 'new-password',
                     autocapitalize: 'off'
                 } : (needReason ? {
                     maxlength: '500'
                 } : undefined),
-                didOpen: needPassword ? mdAddPasswordEye : undefined,
+                didOpen: needPassword ? lockPageInputs : undefined,
+                didClose: needPassword ? unlockPageInputs : undefined,
                 confirmButtonColor: $(form).data('danger') ? '#DC2626' : '#2E7BC4',
                 cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Đồng ý',

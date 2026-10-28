@@ -22,6 +22,13 @@ class UserGuideController extends Controller
 {
     /** Khoá => thông tin hiển thị. Khoá chính là tham số {guide} trên route và tên thư mục view. */
     public const GUIDES = [
+        // Đứng đầu: nút "?" ở Trang chủ dẫn tới mục Trang chủ của tài liệu này trước mục menu của Phân Quyền
+        'general' => [
+            'title' => 'Bắt Đầu & Bảo Mật',
+            'icon' => 'fas fa-shield-alt',
+            'summary' => 'Đăng nhập, đổi mật khẩu, khoá tài khoản và hết phiên; các chức năng của Trang chủ; Lịch Sử Đăng Nhập, Audit Trail và cách hệ thống đáp ứng 21 CFR Part 11.',
+            'updated_at' => '2026-10-28',
+        ],
         'permission' => [
             'title' => 'Phân Quyền',
             'icon' => 'fas fa-user-shield',

@@ -696,6 +696,7 @@
         'id' => 'userGuide', 'label' => 'Hướng Dẫn Sử Dụng', 'short' => 'Hướng dẫn', 'icon' => 'fas fa-book-open', 'bottom' => true,
         'items' => [
             ['label' => 'Tất Cả Hướng Dẫn', 'url' => route('pages.userGuide.list'), 'icon' => 'fas fa-th-large', 'active' => request()->is('userGuide')],
+            ['label' => 'Bắt Đầu & Bảo Mật', 'url' => route('pages.userGuide.show', 'general'), 'icon' => 'fas fa-shield-alt', 'active' => request()->is('userGuide/general')],
             ['label' => 'Phân Quyền', 'url' => route('pages.userGuide.show', 'permission'), 'icon' => 'fas fa-user-shield', 'active' => request()->is('userGuide/permission')],
             ['label' => 'Dữ Liệu Gốc', 'url' => route('pages.userGuide.show', 'materData'), 'icon' => 'fas fa-database', 'active' => request()->is('userGuide/materData')],
             ['label' => 'Vật Tư', 'url' => route('pages.userGuide.show', 'material'), 'icon' => 'fas fa-cubes', 'active' => request()->is('userGuide/material')],
