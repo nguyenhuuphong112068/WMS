@@ -2,6 +2,7 @@
 
 <p>Phòng lập <b>phiếu dự trù</b> để đề nghị bộ phận <b>Cung Ứng</b> mua vật tư cho một hoặc nhiều tháng. Phiếu phải được
     ký đủ 2 bước mới chuyển tới Cung Ứng.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/du-tru.png', 'caption' => 'Màn hình Dự Trù › Vật Tư › tab Danh sách phiếu'])
 
 <h3>Lập phiếu</h3>
 <ol class="ug-steps">

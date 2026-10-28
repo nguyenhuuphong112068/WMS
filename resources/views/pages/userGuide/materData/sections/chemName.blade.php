@@ -1,6 +1,7 @@
 <p>Tên gọi của hoá chất đúng như trên nhãn hoặc tên thương mại, ví dụ <i>Acetonitrile HPLC</i>. Một tên hoá chất
     có thể là <b>đơn chất</b> (1 hoạt chất) hoặc <b>hỗn hợp</b> (từ 2 hoạt chất trở lên). Danh mục hoá chất công ty và
     phiếu nhập, xuất đều chọn từ danh sách này.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/hoa-chat.png', 'caption' => 'Màn hình Hoá Chất'])
 
 <h3>Các bước khai báo</h3>
 <ol class="ug-steps">

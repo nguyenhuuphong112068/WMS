@@ -1,5 +1,6 @@
 <p>Nhật ký mọi lần hoá chất rời kho của phòng: <b>Sử dụng</b>, <b>Loại bỏ</b> (sinh từ phiếu cách ly) và chuyển cho phòng khác.
     Mỗi dòng ghi mã xuất nhập, hoá chất, số lượng, ngày sử dụng, người sử dụng, người kiểm tra và mục đích.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/so-su-dung.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Hoá Chất › tab Sổ sử dụng hoá chất'])
 
 <h3>Sửa một dòng</h3>
 @include('pages.userGuide.shared.fields', ['fields' => [

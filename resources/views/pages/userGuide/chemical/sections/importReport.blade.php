@@ -1,5 +1,6 @@
 <p>Tổng hợp lượng hoá chất nhập vào phòng trong một khoảng thời gian. Chọn từ ngày - đến ngày rồi bấm
     <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-filter mr-1"></i> Xem báo cáo</span>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/bao-cao-nhap.png', 'caption' => 'Màn hình Nhập › Hoá Chất › tab Báo cáo nhập hoá chất'])
 <ul>
     <li><b>Hoá chất mua</b>: số lượt nhập, lần nhập gần nhất, tổng nhập và tổng quy đổi ra <b>kg</b> của từng mã danh mục.</li>
     <li><b>Hoá chất nhận chuyển</b>: tách hai tab con <b>Cùng công ty</b> và <b>Khác công ty</b> theo phòng gửi, với số lượt nhận và

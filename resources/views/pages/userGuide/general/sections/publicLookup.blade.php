@@ -7,6 +7,13 @@
     ['Tên hoặc mã hoá chất', false, 'Bỏ trống để xem toàn bộ hoá chất còn tồn của phòng.'],
 ]])
 
+<ol class="ug-steps">
+    <li>Bấm liên kết tra cứu dưới khung đăng nhập.</li>
+    <li>Chọn <b>Phòng ban</b>, gõ tên hoặc mã hoá chất (hoặc bỏ trống), bấm <b>Tra cứu</b>.</li>
+    <li>Xem số liệu tổng (kho, kệ/tủ, vị trí có hàng, mã lô, hoá chất) và các thẻ vị trí bên dưới; bấm một thẻ để xem chi tiết lô.</li>
+</ol>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/public-lookup.png', 'caption' => 'Kết quả tra cứu toàn bộ hoá chất của một phòng'])
+
 <p>Kết quả hiện thành từng thẻ theo <b>vị trí</b> (Kho / Phòng / Kệ-Tủ / Vị trí), mỗi thẻ liệt kê hoá chất và số lượng tồn tính
     đến hiện tại. Chỉ hiện lô còn tồn. Ô <b>Lọc nhanh trong kết quả</b> lọc tiếp theo vị trí, kệ/tủ hoặc tên hoá chất.</p>
 

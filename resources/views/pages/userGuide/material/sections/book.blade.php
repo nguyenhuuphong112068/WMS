@@ -2,6 +2,7 @@
 
 <p>Nhật ký mọi lần vật tư rời kho của phòng: <b>Sử dụng</b> (cấp phát nội bộ), <b>Loại bỏ</b> (từ quy trình cách ly) và cấp
     phát liên phòng ban. Mỗi dòng ghi mã xuất nhập, vật tư, số lượng, mã phiếu đề nghị, mục đích, người thực hiện và thời gian.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/so-cap-phat.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Vật Tư › tab Sổ cấp phát'])
 
 <p>Sổ được ghi <b>tự động</b> khi kho cấp phát. Không có chỗ lập phiếu sử dụng bằng tay, để tránh trừ tồn hai lần.</p>
 

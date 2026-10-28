@@ -1,6 +1,7 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
 
 <p>Sau khi phiếu dự trù được phê duyệt, phòng đề nghị và bộ phận mua hàng cùng theo dõi tới khi hàng về.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/theo-doi-du-tru.png', 'caption' => 'Màn hình Dự Trù › Vật Tư › tab Theo dõi dự trù / Đơn dự trù đã được phê duyệt'])
 
 <h3>Tab "Đơn dự trù đã được phê duyệt": dành cho bộ phận mua hàng</h3>
 <p>Chỉ hiện với người đang chọn đúng phòng mua hàng và có quyền <b>Tiếp Nhận Xử Lý Dự Trù Vật Tư</b>.</p>

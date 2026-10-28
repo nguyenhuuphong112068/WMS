@@ -1,6 +1,6 @@
 ---
 name: wms-user-guide
-description: Đọc mã nguồn các màn hình của dự án WMS rồi viết trang Hướng Dẫn Sử Dụng tích hợp ngay trong ứng dụng (menu "Hướng Dẫn Sử Dụng" trên leftNAV, route /userGuide/{nhóm}). Dùng khi người dùng muốn viết / bổ sung / cập nhật hướng dẫn sử dụng, tài liệu thao tác, help, manual cho một nhóm menu (Dữ Liệu Gốc, Danh Mục, Nhập, Sử Dụng, Tồn, Dự Trù, Thống Kê, Phân Quyền...) hoặc cho một màn hình cụ thể, hoặc khi một màn hình vừa đổi nghiệp vụ và hướng dẫn cần sửa theo (bắt buộc theo quy tắc 11 của wms-rules: mọi thay đổi chức năng người dùng thấy đều phải cập nhật hướng dẫn và chạy php artisan wms:user-guide-check). Gồm cấu trúc file, cách đọc controller/view để lấy đúng nghiệp vụ, khuôn nội dung từng mục, cách kiểm tra render và chụp màn hình offline.
+description: Đọc mã nguồn các màn hình của dự án WMS rồi viết trang Hướng Dẫn Sử Dụng tích hợp ngay trong ứng dụng (menu "Hướng Dẫn Sử Dụng" trên leftNAV, route /userGuide/{nhóm}). Dùng khi người dùng muốn viết / bổ sung / cập nhật hướng dẫn sử dụng, tài liệu thao tác, help, manual cho một nhóm menu (Dữ Liệu Gốc, Danh Mục, Nhập, Sử Dụng, Tồn, Dự Trù, Thống Kê, Phân Quyền...) hoặc cho một màn hình cụ thể, hoặc khi một màn hình vừa đổi nghiệp vụ và hướng dẫn cần sửa theo (bắt buộc theo quy tắc 11 của wms-rules: mọi thay đổi chức năng người dùng thấy đều phải cập nhật hướng dẫn và chạy php artisan wms:user-guide-check). Gồm cấu trúc file, cách đọc controller/view để lấy đúng nghiệp vụ, khuôn nội dung từng mục, cách kiểm tra render và chụp màn hình offline. Gồm cả công cụ chụp ảnh màn hình thật cho từng mục (scripts/plan.php, shoot.mjs, compress.py, insert.php) và quy tắc BẮT BUỘC chụp lại ảnh khi giao diện màn hình thay đổi.
 ---
 
 # Viết Hướng Dẫn Sử Dụng tích hợp trong WMS
@@ -96,6 +96,10 @@ grep -o "<label[^>]*>[^<]*\|<small[^>]*>[^<]*\|placeholder=\"[^\"]*\"" resources
 </div>
 ```
 
+- Ảnh chụp màn hình thật: mỗi mục có màn hình (có `route`) phải có ít nhất ảnh màn hình; mục có bảng "Các ô nhập" có thêm
+  ảnh hộp thoại Thêm. Chèn bằng `@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/<khoá>/<id>.png', 'caption' => '...'])`
+  (`'width' => 340` cho ảnh hẹp như form đăng nhập; bấm ảnh để phóng to). Ảnh màn hình đặt ngay sau đoạn mở đầu, ảnh
+  hộp thoại đặt ngay trên bảng ô nhập hoặc trong bước "bấm Thêm". Cách chụp xem mục 7.
 - Nút minh hoạ: dùng đúng class Bootstrap của màn hình thật cộng thêm `ug-ui`, ví dụ `<span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span>`.
 - Phím / mã: `<span class="ug-key">Ctrl</span>`; chip: `<span class="ug-chip is-warn">Chờ duyệt</span>`.
 - Liên kết chéo giữa các mục bằng `href="#id"`.
@@ -120,3 +124,41 @@ grep -o "<label[^>]*>[^<]*\|<small[^>]*>[^<]*\|placeholder=\"[^\"]*\"" resources
    - **Xoá các file `public/__ug_*`** và tắt server sau khi xong.
 4. `grep -rIn "cdn\.\|googleapis\|jsdelivr\|unpkg\|cloudflare" resources/views/pages/userGuide` phải rỗng.
 5. Cập nhật `updated_at` của tài liệu trong `GUIDES`.
+
+## 7. Ảnh chụp màn hình (BẮT BUỘC chụp lại khi giao diện đổi)
+
+Ảnh nằm ở `public/img/userGuide/<khoá>/`: `<id>.png` (màn hình, mở đúng tab) và `<id>-form.png` (hộp thoại Thêm của tab đó),
+`<id>` là id mục trong `toc.php`. Ảnh chụp từ ứng dụng thật nên **cũ ngay khi giao diện đổi**:
+
+- Sửa bố cục, cột bảng, nút, tab, ô nhập / nhãn trong hộp thoại, màu... của một màn hình thì **chụp lại ảnh các mục dùng màn
+  hình đó trong cùng lượt làm việc**, xem lại ảnh rồi mới chép đè. Thêm màn hình / tab mới thì chụp ảnh cho mục mới.
+- `php artisan wms:user-guide-check` báo lỗi khi ảnh được chèn mà không có file, cảnh báo "màn hình chưa có ảnh chụp" và
+  "giao diện đã sửa sau khi chụp ảnh" (controller hoặc view của màn hình có ngày sửa mới hơn ảnh). Không để tồn các cảnh báo
+  ảnh do chính thay đổi của mình gây ra.
+
+Công cụ (`.claude/skills/wms-user-guide/scripts/`, cần ứng dụng đang chạy ở `http://127.0.0.1:8000`, Chrome, Node >= 22, Python + Pillow):
+
+```bash
+cd .claude/skills/wms-user-guide/scripts
+php plan.php <khoá> [id1,id2]  > "$TMP/plan.json"     # kế hoạch chụp từ toc.php (bỏ id = cả tài liệu)
+node shoot.mjs "$TMP/plan.json" "$TMP/shots"           # chụp; in 'MISSING' khi không thấy vùng cắt
+python compress.py "$TMP/shots" <khoá>                 # nén 256 màu, chép vào public/img/userGuide/<khoá>/
+php insert.php <khoá> [--dry]                          # chèn ảnh chưa có vào section (<id>.png sau đoạn mở đầu, <id>-form.png trên bảng ô nhập)
+```
+
+- `mint.php` tạo sẵn phiên đăng nhập (session database + cookie mã hoá) nên **không đăng nhập thật**: không ghi Lịch Sử Đăng
+  Nhập / Audit Trail. Mặc định tài khoản `Admin`, phòng ban theo `GUIDE_DEPARTMENT` trong `plan.php` (phòng nhiều dữ liệu:
+  Vật Tư = 4, Hoá Chất / Chất Chuẩn = QC-B1 (20)).
+- Mặc định: mở URL của `route` + `params`, bấm link tab theo `pane`, chờ bảng tải ngầm xong, cắt `.content-wrapper` cao tối đa
+  640px; nếu section có bảng ô nhập thì bấm nút "Thêm..." trong tab đang hiện và cắt `.modal.show .modal-content`.
+- Màn hình trống ở phòng mặc định thì khai `'shotDept' => <id phòng>` cho mục trong `toc.php`.
+- Mục cần cách chụp khác thì khai trong `toc.php`: `'shots' => false` (không chụp) hoặc `'shots' => [['name' => '<id>-x', 'js' => '...', 'clip' => '...', 'highlight' => ['.btn-x'], 'maxHeight' => 900, 'user' => '10014', 'dept' => 20, 'flash' => [...]], ...]`.
+  Trong `js` có sẵn `__ug.tab([...id])`, `__ug.clickCreate()`; `highlight` viền đỏ phần tử cần chỉ.
+- **Luôn xem lại ảnh** trước khi chép (ghép nhiều ảnh thu nhỏ thành một tấm để soát nhanh): bảng còn "Đang tải dữ liệu...",
+  hộp thoại sai, tab sai, bảng trống vì phòng ban không có dữ liệu.
+- Bẫy: không dùng `captureBeyondViewport` (nới khung nhìn lúc chụp làm DataTables responsive ẩn hết cột - đã đặt khung nhìn
+  cao 1800px); giữ menu trái ở trạng thái ghim (bỏ ghim cũng làm bảng thu cột); bề rộng 1600px; một lệnh `js` lỗi / Promise
+  treo bị bỏ qua sau 20 giây.
+- Dữ liệu trên ảnh là dữ liệu thật của CSDL đang chạy: chỉ dùng tài khoản demo, không chụp màn hình chứa mật khẩu / thông tin
+  cá nhân nhạy cảm.
+

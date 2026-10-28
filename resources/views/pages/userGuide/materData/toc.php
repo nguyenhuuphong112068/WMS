@@ -64,9 +64,9 @@ return [
     'Vật tư' => [
         ['id' => 'ten-vat-tu', 'file' => 'materialName', 'title' => 'Tên Vật Tư', 'icon' => 'fas fa-cubes',
             'route' => 'pages.materData.materialName.list', 'perm' => 'materData_material_view', 'chips' => [$approve]],
-        ['id' => 'phan-loai', 'file' => 'departmentClassification', 'title' => 'Phân Loại', 'icon' => 'fas fa-tags',
+        ['id' => 'phan-loai', 'file' => 'departmentClassification', 'shotDept' => 4, 'title' => 'Phân Loại', 'icon' => 'fas fa-tags',
             'route' => 'pages.materData.departmentClassification.list', 'perm' => 'materData_material_view', 'chips' => [$byDept]],
-        ['id' => 'trinh-ky-cap-phat', 'file' => 'materialSignFlow', 'title' => 'Trình Ký Đề Nghị CP Vật Tư', 'icon' => 'fas fa-file-signature',
+        ['id' => 'trinh-ky-cap-phat', 'file' => 'materialSignFlow', 'shotDept' => 4, 'title' => 'Trình Ký Đề Nghị CP Vật Tư', 'icon' => 'fas fa-file-signature',
             'route' => 'pages.materData.materialSignFlow.list', 'perm' => 'materData_material_view', 'chips' => [$byDept],
             'keywords' => 'cap ky nguoi ky vai tro dieu kien'],
         ['id' => 'trinh-ky-lien-phong-ban', 'file' => 'transferSignFlow', 'title' => 'Trình Ký Đề Nghị Liên Phòng Ban', 'icon' => 'fas fa-route',

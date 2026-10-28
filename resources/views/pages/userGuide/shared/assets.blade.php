@@ -373,6 +373,65 @@
         vertical-align: 1px;
     }
 
+    /* Ảnh chụp màn hình thật (shared/shot.blade.php), bấm để phóng to */
+    .ug-shot {
+        margin: 10px 0 16px;
+        text-align: center;
+    }
+
+    .ug-shot img {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid var(--border-soft, #dbe6f3);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(var(--primary-rgb), 0.10);
+        cursor: zoom-in;
+    }
+
+    .ug-shot figcaption {
+        margin-top: 6px;
+        font-size: 0.8rem;
+        color: #6c7a8a;
+        font-style: italic;
+    }
+
+    .ug-shot-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        justify-content: center;
+        align-items: flex-start;
+    }
+
+    .ug-shot-row .ug-shot {
+        flex: 1 1 260px;
+        max-width: 340px;
+        margin: 0;
+    }
+
+    .ug-lightbox {
+        position: fixed;
+        inset: 0;
+        z-index: 3000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(15, 30, 50, 0.82);
+        cursor: zoom-out;
+    }
+
+    .ug-lightbox.show {
+        display: flex;
+    }
+
+    .ug-lightbox img {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 8px;
+        background: #fff;
+    }
+
     .ug-key {
         display: inline-block;
         padding: 0 7px;
@@ -739,6 +798,26 @@
             });
             topBtn.addEventListener('click', function() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+
+        /* Bấm ảnh chụp màn hình để xem cỡ thật; bấm lần nữa hoặc Esc để đóng */
+        var shots = document.querySelectorAll('.ug-shot img');
+        if (shots.length) {
+            var box = document.createElement('div');
+            box.className = 'ug-lightbox';
+            box.innerHTML = '<img alt="">';
+            document.body.appendChild(box);
+            shots.forEach(function(img) {
+                img.addEventListener('click', function() {
+                    box.firstChild.src = img.src;
+                    box.firstChild.alt = img.alt;
+                    box.classList.add('show');
+                });
+            });
+            box.addEventListener('click', function() { box.classList.remove('show'); });
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') box.classList.remove('show');
             });
         }
 

@@ -2,6 +2,7 @@
     File gồm nhiều sheet liên kết, chia theo nhóm: <i>Tổ chức</i>, <i>Dữ liệu gốc dùng chung</i>,
     <i>Tên vật tư / hoá chất / chất chuẩn</i>, <i>Danh mục công ty</i>, <i>Định khu kho</i>,
     <i>Khai báo hàng của phòng</i>, <i>Tồn đầu kỳ</i>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/khoi-tao-du-lieu.png', 'caption' => 'Màn hình Khởi Tạo Dữ Liệu'])
 
 <h3>Các bước</h3>
 <ol class="ug-steps">

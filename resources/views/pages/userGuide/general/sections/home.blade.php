@@ -3,6 +3,7 @@
     <b>phòng ban đang chọn</b>; đổi phòng ban thì trang chủ đổi theo.</p>
 
 <h3>Bố cục</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/home-hero.png', 'caption' => 'Lời chào và hàng số liệu tóm tắt đầu Trang chủ'])
 <div class="table-responsive">
     <table class="table table-bordered ug-table">
         <thead>
@@ -33,6 +34,7 @@
 </div>
 
 <h3>Thanh trên cùng (mọi màn hình)</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/home-topnav.png', 'caption' => 'Thanh trên cùng: nút hướng dẫn và chuông thông báo (khung đỏ)'])
 <div class="table-responsive">
     <table class="table table-bordered ug-table">
         <thead>

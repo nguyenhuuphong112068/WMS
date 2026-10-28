@@ -2,6 +2,7 @@
 
 <p>Xử lý vật tư <b>hỏng, ẩm mốc, rách bao bì, hết hạn</b> theo 3 bước. Từ bước 1 hàng đã bị trừ tồn nên không ai cấp phát
     hay chuyển đi được nữa.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/cach-ly.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Vật Tư › tab Cách ly - Loại bỏ - Huỷ'])
 
 <ol class="ug-steps">
     <li><b>Cách ly</b>: bấm <span class="btn btn-sm btn-danger ug-ui"><i class="fas fa-biohazard mr-1"></i> Cách ly vật tư hỏng</span>,

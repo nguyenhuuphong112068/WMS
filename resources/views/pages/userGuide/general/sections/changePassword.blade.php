@@ -32,6 +32,8 @@
 </div>
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/change-password.png', 'caption' => 'Khung Đổi Mật Khẩu khi đăng nhập lần đầu', 'width' => 340])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Tên tài khoản', true, 'Tự điền sẵn khi hệ thống buộc đổi.'],
     ['Mật khẩu hiện tại', true, 'Mật khẩu đang dùng, hoặc mật khẩu tạm quản trị viên vừa cấp.'],

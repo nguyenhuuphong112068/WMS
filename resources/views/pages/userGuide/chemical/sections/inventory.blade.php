@@ -1,5 +1,6 @@
 <p>Tồn được <b>tính tự động</b> từ phiếu nhập, cân đối và các lần xuất. Chọn <b>Từ ngày - Đến ngày</b> (mặc định trọn tháng hiện tại)
     để xem theo kỳ: Tồn Đầu Kỳ, Nhập / Cân Đối / Sử Dụng / Huỷ Trong Kỳ, Tồn Cuối Kỳ.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/ton-kho.png', 'caption' => 'Màn hình Tồn Kho › Hoá Chất › tab Theo mã xuất nhập / Theo hoá chất / Theo định khu'])
 
 <h3>Ba tab xem tồn</h3>
 <div class="table-responsive">

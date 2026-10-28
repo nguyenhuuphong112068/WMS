@@ -3,6 +3,7 @@
 
 <p>Dành cho vật tư có phân loại <b>Cần Hiệu Chuẩn Trước Khi Dùng = Có</b>. Chỉ phần đã được <b>QA xác nhận Đạt</b> mới cấp
     phát được, đúng mã xuất nhập đã hiệu chuẩn và cho đúng dòng đề nghị đó.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/hieu-chuan.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Vật Tư › tab Xác nhận hiệu chuẩn'])
 
 <h3>Quy trình 3 bước</h3>
 <ol class="ug-steps">

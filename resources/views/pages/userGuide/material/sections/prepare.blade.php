@@ -3,6 +3,7 @@
 
 <p>Nơi <b>kho</b> làm việc: liệt kê các dòng đề nghị đã duyệt (nội bộ, và liên phòng ban gửi tới phòng mình) còn phải cấp.
     Cấp phát là <b>xuất kho</b>: tồn bị trừ ngay và hệ thống tự ghi vào <a href="#so-cap-phat">Sổ cấp phát</a>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/cho-cap-phat.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Vật Tư › tab Chờ cấp phát'])
 
 <h3>Cấp phát</h3>
 <ol class="ug-steps">

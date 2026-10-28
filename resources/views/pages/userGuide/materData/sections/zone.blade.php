@@ -2,6 +2,7 @@
     <span class="ug-key">Kho/Phòng</span> → <span class="ug-key">Kệ/Tủ</span> → <span class="ug-key">Cột</span> →
     <span class="ug-key">Tầng</span> → <span class="ug-key">Vị Trí</span>.
     Khi nhập hàng, mỗi lô được đặt vào một <b>vị trí</b>. Nhãn in và màn hình Tồn đều hiện theo mã vị trí.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/dinh-khu.png', 'caption' => 'Màn hình Định Khu'])
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>

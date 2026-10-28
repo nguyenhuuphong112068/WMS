@@ -1,5 +1,6 @@
 <p>Tab đầu tiên của màn Nhập: tạo phiếu nhập và kiểm tra các lô vừa nhập. Lô mới luôn ở trạng thái
     <span class="badge badge-warning">Chờ kiểm tra</span>, nằm trong khu Biệt Trữ và <b>chưa cộng vào tồn</b>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/nhap-hoa-chat.png', 'caption' => 'Màn hình Nhập › Hoá Chất › tab Nhập hoá chất'])
 
 <h3>Tạo phiếu nhập</h3>
 <ol class="ug-steps">

@@ -1,6 +1,9 @@
 <p>Danh sách tên trạng thái dùng chung của hệ thống.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/trang-thai.png', 'caption' => 'Màn hình Trạng Thái'])
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/trang-thai-form.png', 'caption' => 'Hộp thoại thêm mới - Trạng Thái'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Tên Trạng Thái', true, 'Không trùng.'],
 ]])

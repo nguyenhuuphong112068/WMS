@@ -9,6 +9,8 @@
     <li>Dùng ô tìm kiếm của bảng để lọc theo tên người dùng, hoạt động hoặc nội dung.</li>
 </ol>
 
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/audit-trail.png', 'caption' => 'Màn hình Audit Trail'])
+
 <h3>Các cột</h3>
 <div class="table-responsive">
     <table class="table table-bordered ug-table">

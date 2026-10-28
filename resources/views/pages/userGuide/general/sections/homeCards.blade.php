@@ -2,6 +2,7 @@
     đối tượng</b>, ví dụ "Ký dự trù" của Hoá chất, mang màu của đối tượng đó.</p>
 
 <h3>Đọc một thẻ</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/home-cards.png', 'caption' => 'Thẻ đề nghị nhóm Phê duyệt dữ liệu, màu theo đối tượng Vật tư / Hoá chất / Chất chuẩn'])
 <ol class="ug-steps">
     <li>Góc trên: chip đối tượng và nhãn <b>ai phải làm</b>:
         <span class="ug-chip"><i class="fas fa-signature"></i> Bạn ký duyệt</span> việc chờ chính bạn ký;

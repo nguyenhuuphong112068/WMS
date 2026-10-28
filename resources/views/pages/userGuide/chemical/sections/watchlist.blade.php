@@ -1,5 +1,6 @@
 <p>Các hoá chất của phòng đang có tồn <b>dưới Ngưỡng Tồn Tối Thiểu</b> đã khai ở <a href="#hoa-chat-cua-phong">Hoá Chất Của Phòng</a>.
     Tồn tính đúng như màn Tồn Kho. Khác vật tư, danh sách hoá chất chỉ có nguồn này.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/can-du-tru.png', 'caption' => 'Màn hình Dự Trù › Hoá Chất › tab Danh sách hoá chất cần dự trù'])
 
 <ol class="ug-steps">
     <li>Tick chọn các hoá chất cần mua.</li>

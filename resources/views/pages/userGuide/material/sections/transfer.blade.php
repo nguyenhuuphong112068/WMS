@@ -2,6 +2,7 @@
 
 <p>Phòng <b>A</b> (đang thiếu) xin vật tư từ kho của phòng <b>B</b> (đang giữ hàng). Hàng không mất đi mà chuyển từ tồn
     của B sang tồn của A.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/lien-phong-ban.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Vật Tư › tab Đề nghị liên phòng ban - Phòng ban khác'])
 
 <h3>Ba bước</h3>
 <ol class="ug-steps">

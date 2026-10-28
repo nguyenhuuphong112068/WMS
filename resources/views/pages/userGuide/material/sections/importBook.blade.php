@@ -3,6 +3,7 @@
 <p>Ghi nhận từng lô vật tư nhập vào kho của phòng đang chọn. Mỗi lô có một <b>mã xuất nhập</b> riêng. Lô mới nhập
     luôn ở trạng thái <span class="badge badge-warning">Chờ kiểm tra</span> và <b>chưa cộng vào tồn</b> cho tới khi
     <a href="#cho-kiem-tra">kiểm tra Đạt</a>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/nhap-vat-tu.png', 'caption' => 'Màn hình Nhập › Vật Tư › tab Sổ nhập vật tư'])
 
 <h3>Tạo phiếu nhập</h3>
 <ol class="ug-steps">
@@ -13,6 +14,8 @@
         mỗi lô một mã.</li>
     <li>Điền thông tin chứng từ nếu có, chọn <b>Định Khu Tạm</b> trong khu Biệt Trữ, đính kèm hồ sơ rồi bấm <b>Lưu</b>.</li>
 </ol>
+
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/nhap-vat-tu-form.png', 'caption' => 'Hộp thoại thêm mới - Nhập Vật Tư & Sổ Nhập'])
 
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Vật tư', true, 'Chỉ vật tư đã khai ở Vật Tư Của Phòng và đang hoạt động.'],

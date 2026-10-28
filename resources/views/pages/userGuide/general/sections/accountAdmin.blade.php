@@ -1,6 +1,7 @@
 <p>Phần này dành cho quản trị viên. Cách gán vai trò, phòng ban và quyền riêng xem ở
     <a href="{{ route('pages.userGuide.show', 'permission') }}#thiet-lap">Thiết Lập Phân Quyền</a>; ở đây chỉ nói các thao tác liên quan
     tới bảo mật tài khoản trên màn hình <b>Quản Trị › Phân Quyền › User</b>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/user-actions.png', 'caption' => 'Cột Reset Pass và Deactive trên màn hình User (khung đỏ)'])
 
 <div class="table-responsive">
     <table class="table table-bordered ug-table">
@@ -35,6 +36,15 @@
         </tbody>
     </table>
 </div>
+
+<h3>Reset mật khẩu</h3>
+<ol class="ug-steps">
+    <li>Bấm <span class="btn btn-sm btn-secondary ug-ui"><i class="fas fa-key"></i></span> ở cột <b>Reset Pass</b> của người cần reset.</li>
+    <li>Nhập <b>Mật Khẩu Tạm</b> và <b>Xác Nhận Mật Khẩu Tạm</b>, bấm <b>Reset Mật Khẩu</b>.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/user-reset.png', 'caption' => 'Hộp thoại Reset Mật Khẩu', 'width' => 340])
+    </li>
+    <li>Báo mật khẩu tạm cho người dùng; họ đăng nhập bằng mật khẩu này và được yêu cầu <a href="#doi-mat-khau">đổi ngay</a>.</li>
+</ol>
 
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>

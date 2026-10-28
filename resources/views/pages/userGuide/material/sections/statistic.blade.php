@@ -1,5 +1,6 @@
 <p>Trong một khoảng thời gian, mỗi <b>đối tượng</b> (thiết bị, máy) đã tiêu thụ những vật tư nào, bao nhiêu và cho mục đích gì.
     Màn hình chỉ để xem, luôn trong phạm vi phòng đang chọn.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/thong-ke.png', 'caption' => 'Màn hình Thống Kê › Vật Tư'])
 
 <ol class="ug-steps">
     <li>Chọn <b>Từ ngày cấp</b> - <b>Đến ngày</b>, lọc theo <b>Loại đối tượng</b> hoặc gõ tìm một <b>Đối tượng</b> cụ thể nếu cần.</li>

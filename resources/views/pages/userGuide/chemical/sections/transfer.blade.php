@@ -1,5 +1,6 @@
 <p>Phòng <b>A</b> (đang thiếu) xin hoá chất từ kho của phòng <b>B</b>. Hàng chuyển từ tồn của B sang tồn của A.
     Đề nghị hoá chất liên phòng ban <b>không có bước ký duyệt</b>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/lien-phong-ban.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Hoá Chất › tab Đề nghị chuyển liên phòng ban'])
 
 <ol class="ug-steps">
     <li><b>A lập đề nghị</b>: bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Tạo đề nghị chuyển liên phòng ban</span>,

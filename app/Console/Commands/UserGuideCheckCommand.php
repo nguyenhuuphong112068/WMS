@@ -21,7 +21,9 @@ use Illuminate\Support\Facades\Route;
  *  - 'pane' (id vùng nội dung của tab) không còn trong view nào;
  *  - liên kết #neo trong section trỏ tới mục không có (cùng tài liệu hoặc tài liệu khác);
  *  - trùng id mục trong một tài liệu.
- * Cảnh báo: màn hình có trên leftNAV nhưng nút "?" chưa dẫn tới mục hướng dẫn nào.
+ *  - ảnh chụp màn hình (shared/shot) không còn file.
+ * Cảnh báo: màn hình có trên leftNAV nhưng nút "?" chưa dẫn tới mục hướng dẫn nào; mục có màn hình
+ * nhưng chưa có ảnh chụp; controller / view của màn hình sửa sau lần chụp ảnh (phải chụp lại).
  */
 class UserGuideCheckCommand extends Command
 {
@@ -30,6 +32,8 @@ class UserGuideCheckCommand extends Command
     protected $description = 'Kiểm tra mục lục, liên kết, tab và quyền của Hướng Dẫn Sử Dụng còn khớp với route / view / quyền hiện tại';
 
     private array $errors = [];
+
+    private array $shotWarnings = [];
 
     public function handle(): int
     {
@@ -87,6 +91,7 @@ class UserGuideCheckCommand extends Command
                     }
                     if (File::exists($section)) {
                         $this->checkAnchors($where, $guide, File::get($section), $anchors);
+                        $this->checkShots($where, $guide, $item, File::get($section));
                     }
                 }
             }
@@ -105,6 +110,9 @@ class UserGuideCheckCommand extends Command
         foreach ($uncovered as $route) {
             $this->warn("  ! Màn hình '$route' trên menu chưa có mục hướng dẫn (nút \"?\" mở danh sách hướng dẫn)");
         }
+        foreach ($this->shotWarnings as $warning) {
+            $this->warn('  ! ' . $warning);
+        }
 
         if ($this->errors) {
             $this->error(count($this->errors) . ' lỗi trên ' . count($guides) . " tài liệu / $items mục.");
@@ -112,9 +120,67 @@ class UserGuideCheckCommand extends Command
             return self::FAILURE;
         }
 
-        $this->info('Hướng dẫn khớp với mã nguồn: ' . count($guides) . " tài liệu, $items mục, " . count($uncovered) . ' cảnh báo.');
+        $this->info('Hướng dẫn khớp với mã nguồn: ' . count($guides) . " tài liệu, $items mục, " . (count($uncovered) + count($this->shotWarnings)) . ' cảnh báo.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Ảnh chụp màn hình (shared/shot): ảnh phải tồn tại; mục có màn hình mà chưa có ảnh, hoặc view /
+     * controller của màn hình được sửa SAU lần chụp ảnh thì cảnh báo để chụp lại
+     * (.claude/skills/wms-user-guide/scripts: php plan.php <tài liệu> <id> rồi node shoot.mjs).
+     */
+    private function checkShots(string $where, string $guide, array $item, string $source): void
+    {
+        preg_match_all("/shared\.shot',\s*\['src'\s*=>\s*'([^']+)'/", $source, $m);
+        $images = [];
+        foreach ($m[1] as $src) {
+            if (!File::exists(public_path($src))) {
+                $this->addError("$where: thiếu ảnh chụp public/$src");
+            } else {
+                $images[] = public_path($src);
+            }
+        }
+
+        if (empty($item['route']) || ($item['shots'] ?? null) === false || in_array($guide, ['permission'], true)) {
+            return;
+        }
+        if (!$images) {
+            $this->shotWarnings[] = "$where: màn hình chưa có ảnh chụp minh hoạ";
+
+            return;
+        }
+
+        $shotAt = min(array_map('filemtime', $images));
+        $changed = array_filter($this->screenSources($item['route']), fn ($file) => filemtime($file) > $shotAt);
+        if ($changed) {
+            $this->shotWarnings[] = "$where: giao diện đã sửa sau khi chụp ảnh (" . implode(', ', array_map(
+                fn ($file) => str_replace([base_path() . DIRECTORY_SEPARATOR, '\\'], ['', '/'], $file),
+                array_slice(array_values($changed), 0, 2)
+            )) . ') - chụp lại ảnh';
+        }
+    }
+
+    /** Controller + các view mà action của route trả về (view('pages.x.y.list') -> thư mục pages/x/y). */
+    private function screenSources(string $routeName): array
+    {
+        $route = Route::getRoutes()->getByName($routeName);
+        $controller = $route ? ltrim(explode('@', (string) $route->getActionName())[0], '\\') : null;
+        if (!$controller || !class_exists($controller)) {
+            return [];
+        }
+
+        $file = (new \ReflectionClass($controller))->getFileName();
+        $files = [$file];
+        preg_match_all("/view\(\s*'([\w.]+)'/", File::get($file), $m);
+        foreach (array_unique($m[1]) as $view) {
+            $dir = resource_path('views/' . str_replace('.', '/', preg_replace('/\.[^.]+$/', '', $view)));
+            if (str_starts_with($view, 'pages.') && File::isDirectory($dir)) {
+                $files = array_merge($files, File::glob($dir . '/*.blade.php'));
+            }
+        }
+
+        return array_unique($files);
     }
 
     /** href="#neo" (cùng tài liệu) và route('pages.userGuide.show', 'khoá') }}#neo (tài liệu khác) */

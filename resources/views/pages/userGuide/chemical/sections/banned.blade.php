@@ -1,5 +1,6 @@
 <p>Sổ theo dõi riêng cho hoá chất thuộc <b>nhóm 11 - Hoá chất cấm theo Luật Đầu tư 2025 (số 143/2025/QH15)</b>. Tab chỉ để xem,
     tra cứu và in, ghi giống một cuốn sổ giấy.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/hoa-chat-cam.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Hoá Chất › tab Hoá chất cấm'])
 
 <ul>
     <li>Mỗi dòng là <b>một lần nhập hoặc một lần xuất / sử dụng</b>, xếp theo thời gian tăng dần.</li>

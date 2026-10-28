@@ -4,6 +4,7 @@
 
 <p>Lập sẵn một danh sách vật tư dùng đều đặn. Đến ngày đã hẹn, hệ thống <b>tự tạo</b> một phiếu ở trạng thái
     <b>Lưu tạm / Nháp</b> để bạn kiểm tra lại rồi gửi đi. Có 3 tab:</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/danh-sach-chu-ky.png', 'caption' => 'Màn hình Danh Mục › Vật Tư › 3 tab DS ... theo chu kỳ'])
 
 <div class="table-responsive">
     <table class="table table-bordered ug-table">
@@ -34,6 +35,8 @@
 </div>
 
 <h3>Các ô nhập chính</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/danh-sach-chu-ky-form.png', 'caption' => 'Hộp thoại thêm mới - Danh Sách Theo Chu Kỳ'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Tiêu Đề', true, 'Ví dụ: <i>Vật tư bảo trì hằng tháng</i>.'],
     ['Chu Kỳ', true, 'Hằng tuần, Hằng tháng, 2 tháng/lần, Hằng quý, 6 tháng/lần, Theo số năm, Theo số ngày. Danh sách nội bộ không chọn chu kỳ mà chọn <b>Tần Suất Đề Nghị</b> (hằng ngày ... 7 năm/lần).'],

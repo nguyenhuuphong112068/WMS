@@ -1,5 +1,6 @@
 <p>Ma trận cho biết ngay việc đang dồn ở đâu. <b>Hàng</b> là nhóm nghiệp vụ, <b>cột</b> là đối tượng, mỗi ô là số đề nghị đang
     chờ. Cột và hàng <b>Tổng</b> cộng dồn.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/home-matrix.png', 'caption' => 'Ma trận tổng quan của Trưởng Bộ Phận QC1: 23 mục Phê duyệt dữ liệu chờ ký'])
 
 <div class="table-responsive">
     <table class="table table-bordered ug-table">

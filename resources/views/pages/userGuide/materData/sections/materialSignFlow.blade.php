@@ -1,7 +1,10 @@
 <p>Khai báo trước <b>ai phải ký</b> đề nghị cấp phát vật tư của phòng. Mỗi dòng là một <b>vai trò</b> nhận trình
     ký. Khi người dùng lập đề nghị cấp phát vật tư, hệ thống dựa vào bảng này để tự xếp các bước ký.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/trinh-ky-cap-phat.png', 'caption' => 'Màn hình Trình Ký Đề Nghị CP Vật Tư'])
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/trinh-ky-cap-phat-form.png', 'caption' => 'Hộp thoại thêm mới - Trình Ký Đề Nghị CP Vật Tư'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Vai Trò Nhận Trình Ký', true, 'Mỗi vai trò chỉ khai <b>một lần</b> trong phòng (kể cả dòng đã khoá, muốn dùng lại thì mở khoá).'],
     ['Cấp Ký', true, 'Số thứ tự từ 1 đến 50. Phiếu được ký lần lượt <b>từ cấp nhỏ tới cấp lớn</b>; 1 là cấp ký đầu tiên.'],

@@ -1,5 +1,6 @@
 <p>Báo cáo các dòng đề nghị <b>không cấp kịp ngày mong muốn</b>, để tìm ra khâu gây chậm. Chọn <b>Tháng lập đề nghị</b> để xem.
     Báo cáo xét cả đề nghị nội bộ, đề nghị liên phòng ban và VPP mà phòng gửi đi hoặc được gửi tới.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/cap-phat-tre.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Vật Tư › tab Ghi nhận cấp phát trễ'])
 
 <p>Một dòng bị tính là <b>trễ</b> khi ngày cấp đủ, hoặc hôm nay nếu tới giờ vẫn chưa cấp đủ, rơi sau ngày mong muốn. Nguyên
     nhân do hệ thống tự suy ra; một dòng có thể có nhiều nguyên nhân:</p>

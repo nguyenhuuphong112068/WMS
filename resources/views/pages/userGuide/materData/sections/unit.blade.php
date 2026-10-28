@@ -1,7 +1,10 @@
 <p>Khai báo các đơn vị tính (g, kg, ml, L, chai, hộp...) cùng hệ số quy đổi về <b>đơn vị gốc</b> của nhóm.
     Nhờ hệ số này, hệ thống cộng tồn và đối chiếu ngưỡng đúng dù mỗi lần nhập dùng một đơn vị khác nhau.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/don-vi-tinh.png', 'caption' => 'Màn hình Đơn Vị Tính'])
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/don-vi-tinh-form.png', 'caption' => 'Hộp thoại thêm mới - Đơn Vị Tính'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Ký Hiệu', true, 'Ký hiệu ngắn, ví dụ <span class="ug-key">kg</span>, <span class="ug-key">mL</span>. Không trùng.'],
     ['Tên Đơn Vị Tính', true, 'Tên đầy đủ, ví dụ <i>Kilogram</i>. Không trùng.'],

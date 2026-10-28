@@ -1,5 +1,6 @@
 <p>Ghi nhận mỗi lần lấy hoá chất ra dùng. <b>Không cần đề nghị và ký duyệt</b>: lưu là trừ tồn ngay và ghi vào
     <a href="#so-su-dung">Sổ sử dụng</a>. Tab này còn chứa <b>Phiếu Tạm</b>, nơi gom các dòng đã chọn nhưng chưa ghi thật.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/su-dung.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Hoá Chất › tab Sử Dụng Hoá Chất'])
 
 <h3>Ghi phiếu sử dụng</h3>
 <ol class="ug-steps">

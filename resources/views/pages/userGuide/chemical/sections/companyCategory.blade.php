@@ -1,7 +1,10 @@
 <p>Mô tả <b>bản chất</b> của hoá chất, dùng chung toàn công ty. Mỗi dòng gắn <b>một tên hoá chất</b> với <b>một nhà sản xuất</b>.
     Các phòng chỉ khai và dùng được hoá chất đã có ở đây và <b>Đã duyệt</b>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/danh-muc-cong-ty.png', 'caption' => 'Màn hình Danh Mục › Hoá Chất › tab Danh mục hoá chất công ty'])
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/danh-muc-cong-ty-form.png', 'caption' => 'Hộp thoại thêm mới - Danh Mục Hoá Chất Công Ty'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Mã Danh Mục', false, 'Hệ thống tự sinh khi lưu.'],
     ['Loại', false, 'Gõ hoặc chọn gợi ý: ' . implode(', ', config('chemical.types')) . '.'],

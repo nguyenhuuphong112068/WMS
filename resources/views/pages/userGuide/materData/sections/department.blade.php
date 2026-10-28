@@ -1,7 +1,10 @@
 <p>Khai báo các phòng ban của từng công ty. Phòng ban là đơn vị sở hữu kho, danh mục hàng của phòng, tồn kho
     và phiếu nghiệp vụ. Người dùng chọn phòng ban đang làm việc ở thanh trên cùng.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/phong-ban.png', 'caption' => 'Màn hình Phòng Ban'])
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/phong-ban-form.png', 'caption' => 'Hộp thoại thêm mới - Phòng Ban'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Công Ty', true, 'Công ty mà phòng ban trực thuộc. Phải khai <a href="#cong-ty">Công Ty</a> trước.'],
     ['Tên Viết Tắt', true, 'Ví dụ: <span class="ug-key">QC1</span>, <span class="ug-key">AD</span>. Không trùng <b>trong cùng một công ty</b>.'],

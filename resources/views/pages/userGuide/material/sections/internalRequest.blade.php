@@ -1,6 +1,7 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'noi-bo', 'no' => 3, 'label' => 'Đề nghị sử dụng nội bộ'])
 
 <p>Vật tư <b>bắt buộc</b> phải có đề nghị được ký duyệt trước khi kho cấp phát. Đề nghị nội bộ chia 3 tab theo nguồn gốc:</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/de-nghi-noi-bo.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Vật Tư › 3 tab Đề nghị nội bộ'])
 <ul>
     <li><b>Đề Nghị Theo Định Kỳ</b>: hệ thống tự tạo từ <a href="#danh-sach-chu-ky">danh sách nội bộ theo chu kỳ</a>; không lập tay ở tab này.</li>
     <li><b>Đề Nghị Theo ĐG Rủi Ro</b>: đề nghị theo kết quả đánh giá rủi ro, lập tay.</li>

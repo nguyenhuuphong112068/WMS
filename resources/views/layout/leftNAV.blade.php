@@ -735,11 +735,6 @@
         <img src="{{ asset('img/iconstella.svg') }}" alt="WMS">
     </a>
 
-    <button type="button" class="wms-rbtn" data-wms-cmd title="Tìm màn hình (Ctrl K)">
-        <i class="fas fa-search"></i>Tìm
-    </button>
-    <div class="wms-rail-sep"></div>
-
     @foreach ($navModules as $m)
         @if (!empty($m['bottom']))
             <div class="wms-rail-grow"></div>
@@ -1008,7 +1003,6 @@
             cmd.hidden = true;
         }
 
-        rail.querySelector('[data-wms-cmd]').addEventListener('click', openCmd);
         cmd.addEventListener('click', function(e) {
             if (e.target === cmd) closeCmd();
         });

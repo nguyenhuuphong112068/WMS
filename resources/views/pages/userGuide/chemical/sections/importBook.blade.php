@@ -1,6 +1,7 @@
 <p>Toàn bộ các lô đã nhập của phòng (kể cả lô nhận chuyển từ phòng khác), kèm tình trạng kiểm tra:
     <span class="badge badge-warning">Chờ kiểm tra</span> <span class="badge badge-success">Kiểm tra Đạt</span>
     <span class="badge badge-danger">Không đạt</span>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/so-nhap.png', 'caption' => 'Màn hình Nhập › Hoá Chất › tab Sổ nhập hoá chất'])
 
 <h3>Các nút trên dòng</h3>
 <ul>

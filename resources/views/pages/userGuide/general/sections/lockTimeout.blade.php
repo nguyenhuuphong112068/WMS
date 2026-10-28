@@ -5,7 +5,9 @@
 <ol class="ug-steps">
     <li>Mỗi lần nhập sai, hệ thống báo số lần sai, ví dụ <i>"PassWord Không Chính Xác... (sai 2/5 lần)"</i>.</li>
     <li>Sai liên tiếp <b>5 lần</b>: tài khoản bị khoá <b>15 phút</b>. Trong thời gian này nhập đúng mật khẩu cũng không vào được,
-        hệ thống báo còn bao nhiêu phút.</li>
+        hệ thống báo còn bao nhiêu phút.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/login-locked.png', 'caption' => 'Tài khoản bị khoá 15 phút sau 5 lần sai', 'width' => 340])
+    </li>
     <li>Hết 15 phút tài khoản tự mở. Cần vào gấp thì nhờ quản trị viên <a href="#quan-tri-tai-khoan">reset mật khẩu</a>, việc này
         mở khoá ngay.</li>
     <li>Đăng nhập đúng một lần là bộ đếm số lần sai về 0.</li>
@@ -14,6 +16,7 @@
 <h3>Tự đăng xuất khi không thao tác</h3>
 <p>Không có thao tác nào (mở trang, bấm lọc, lưu...) trong <b>15 phút</b>, phiên làm việc tự kết thúc. Lần bấm tiếp theo sẽ đưa
     bạn về trang đăng nhập với thông báo <i>"Phiên làm việc đã hết hạn do không hoạt động quá 15 phút."</i></p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/login-timeout.png', 'caption' => 'Thông báo hết phiên trên trang đăng nhập', 'width' => 340])
 
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>

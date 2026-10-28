@@ -1,5 +1,6 @@
 <p>Tồn được <b>tính tự động</b> từ phiếu nhập, cân đối và các lần xuất. Không có chỗ nhập tồn bằng tay. Chọn
     <b>Từ ngày - Đến ngày</b> (mặc định trọn tháng hiện tại) để xem theo kỳ.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/ton-kho.png', 'caption' => 'Màn hình Tồn Kho › Vật Tư › tab Theo mã xuất nhập / Tồn theo mã vật tư / Tồn kho theo vị trí'])
 
 <h3>Ba tab xem tồn</h3>
 <div class="table-responsive">

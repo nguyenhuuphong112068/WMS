@@ -1,5 +1,6 @@
 <p>Phòng lập <b>phiếu dự trù</b> để đề nghị bộ phận <b>Cung Ứng</b> mua hoá chất cho một hoặc nhiều tháng. Cách làm giống
     <a href="{{ route('pages.userGuide.show', 'material') }}#du-tru">dự trù vật tư</a>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/du-tru.png', 'caption' => 'Màn hình Dự Trù › Hoá Chất › tab Danh sách phiếu'])
 
 <h3>Lập phiếu</h3>
 <ol class="ug-steps">

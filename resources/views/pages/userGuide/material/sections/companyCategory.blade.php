@@ -1,7 +1,10 @@
 <p>Mô tả <b>bản chất</b> của vật tư, dùng chung cho toàn công ty. Mỗi dòng là một tổ hợp <b>Tên vật tư + Nhà sản
     xuất</b>. Các phòng chỉ khai và dùng được vật tư đã có ở đây và đã <b>Đã duyệt</b>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/danh-muc-cong-ty.png', 'caption' => 'Màn hình Danh Mục › Vật Tư › tab Danh mục vật tư công ty'])
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/danh-muc-cong-ty-form.png', 'caption' => 'Hộp thoại thêm mới - Danh Mục Vật Tư Công Ty'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Mã Vật Tư', false, 'Hệ thống tự sinh khi lưu, dạng <span class="ug-key">M00001</span>.'],
     ['Tên Vật Tư', true, 'Chọn từ <b>Dữ Liệu Gốc › Tên Vật Tư</b> (đã duyệt).'],

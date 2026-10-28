@@ -1,4 +1,5 @@
 <p>Xử lý hoá chất <b>hỏng, hết hạn, biến chất</b> theo 3 bước. Từ bước 1 hàng đã bị trừ tồn nên không dùng hay chuyển đi được nữa.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/cach-ly.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Hoá Chất › tab Cách ly - Loại bỏ - Huỷ'])
 
 <ol class="ug-steps">
     <li><b>Cách ly</b>: mở <b>Tồn Kho Hoá Chất</b> (tab Theo mã xuất nhập hoặc Cận hạn dùng), bấm nút <b>Cách ly</b> trên lô, nhập

@@ -1,5 +1,6 @@
 <p>Sau khi phiếu dự trù được phê duyệt, phòng đề nghị và bộ phận mua hàng cùng theo dõi tới khi hàng về. Luồng giống hệt
     <a href="{{ route('pages.userGuide.show', 'material') }}#theo-doi-du-tru">dự trù vật tư</a>.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/theo-doi-du-tru.png', 'caption' => 'Màn hình Dự Trù › Hoá Chất › tab Theo dõi dự trù / Đơn dự trù đã được phê duyệt'])
 
 <ul>
     <li><b>Đơn dự trù đã được phê duyệt</b> (bộ phận mua hàng, quyền <i>Tiếp Nhận Xử Lý Dự Trù Hoá Chất</i>): bấm <b>Tiếp nhận</b>

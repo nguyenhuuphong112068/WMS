@@ -2,6 +2,7 @@
 
 <p>Danh sách các lô vừa nhập, đang nằm trong khu Biệt Trữ chờ kiểm tra. Kiểm tra xong, lô mới được vào tồn và được đề
     nghị, cấp phát.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/cho-kiem-tra.png', 'caption' => 'Màn hình Nhập › Vật Tư › tab Chờ kiểm tra'])
 
 <h3>Xác nhận kiểm tra</h3>
 <ol class="ug-steps">

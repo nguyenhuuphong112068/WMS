@@ -2,6 +2,7 @@
     xây dựng <b>Kế hoạch phòng ngừa, ứng phó sự cố hoá chất</b> hay không. Nằm ở tab <b>Đối chiếu ngưỡng PL IV</b> của màn hình <b>Tồn Kho › Hoá Chất</b>; tab chỉ để xem, phạm vi cộng tồn là
     mọi phòng ban thuộc công ty của phòng đang chọn. Số liệu luôn tính đến hiện tại nên khi mở tab này ô <b>Kỳ báo cáo</b> và lọc
     <b>Hoá chất VS</b> được ẩn đi.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/nguong-pl-iv.png', 'caption' => 'Màn hình Tồn Kho › Hoá Chất › tab Đối chiếu ngưỡng PL IV'])
 
 <div class="table-responsive">
     <table class="table table-bordered ug-table">

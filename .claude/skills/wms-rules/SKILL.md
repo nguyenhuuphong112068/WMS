@@ -318,10 +318,12 @@ theo skill `wms-user-guide`. Không chờ người dùng nhắc, không để sa
 | Đổi luồng nghiệp vụ (ký, duyệt, trạng thái, trừ / cộng tồn, công thức, giới hạn) | Sửa đoạn mô tả, các bước, callout của mọi mục nhắc tới luồng đó |
 | Thêm / đổi / xoá quyền | Sửa `'perm'` của mục và các câu "quyền ..." trong section. Bảng vai trò / ma trận quyền tự đọc CSDL, không sửa tay |
 | Xoá chức năng | Xoá mục, file section và mọi liên kết `#neo` trỏ tới nó |
+| Đổi **giao diện** màn hình (bố cục, cột bảng, nút, tab, ô nhập trong hộp thoại, màu, nhãn) | **Chụp lại ảnh minh hoạ** của các mục dùng màn hình đó (`public/img/userGuide/<khoá>/<id>.png`, `<id>-form.png`) bằng công cụ trong skill `wms-user-guide` (mục 6), xem lại ảnh rồi mới chép đè |
+| Thêm màn hình / tab mới | Chụp ảnh cho mục mới và chèn `@include('pages.userGuide.shared.shot', ...)` vào section |
 
 Cách làm:
 
 1. Tìm chỗ bị ảnh hưởng: grep tên route, tên quyền, nhãn nút / ô, câu báo lỗi trong `resources/views/pages/userGuide/`.
 2. Sửa nội dung theo code đang chạy (đọc lại controller / view, không viết theo trí nhớ), cập nhật `updated_at` của tài liệu trong `UserGuideController::GUIDES`.
-3. Chạy `php artisan wms:user-guide-check`: phải **0 lỗi**. Lệnh bắt route / quyền / file section không còn, id tab (`pane`) không còn trên màn hình, liên kết `#neo` hỏng; cảnh báo màn hình trên menu chưa có mục hướng dẫn.
+3. Chạy `php artisan wms:user-guide-check`: phải **0 lỗi**. Lệnh bắt route / quyền / file section không còn, id tab (`pane`) không còn trên màn hình, liên kết `#neo` hỏng, ảnh chụp không còn file; cảnh báo màn hình trên menu chưa có mục hướng dẫn, mục chưa có ảnh chụp, và **"giao diện đã sửa sau khi chụp ảnh"** (controller / view của màn hình mới hơn ảnh). Gặp cảnh báo ảnh cũ do chính thay đổi của mình thì **chụp lại trong cùng lượt** (chỉ một lệnh cho các mục bị ảnh hưởng), kể cả khi thay đổi không làm khác hình ảnh - chụp lại cũng xoá luôn cảnh báo.
 4. Trong báo cáo cuối lượt ghi rõ đã cập nhật mục hướng dẫn nào, hoặc ghi "không ảnh hưởng hướng dẫn" nếu thay đổi chỉ ở phần người dùng không thấy (refactor, tối ưu truy vấn...).

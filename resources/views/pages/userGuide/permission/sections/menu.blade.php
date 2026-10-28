@@ -37,7 +37,7 @@
     <i class="fas fa-bars"></i> để mở.</p>
 
 <h3>Tìm màn hình</h3>
-<p>Bấm <b>Tìm</b> đầu cột icon hoặc nhấn <kbd>Ctrl</kbd> + <kbd>K</kbd>, gõ tên màn hình (gõ không dấu cũng được, ví dụ
+<p>Nhấn <kbd>Ctrl</kbd> + <kbd>K</kbd> ở bất kỳ màn hình nào, gõ tên màn hình (gõ không dấu cũng được, ví dụ
     <i>ton hoa chat</i>), dùng <kbd>↑</kbd> <kbd>↓</kbd> để chọn rồi <kbd>Enter</kbd> để mở. Chỉ tìm được màn hình bạn có quyền xem.</p>
 
 <h3>Đổi phòng ban</h3>

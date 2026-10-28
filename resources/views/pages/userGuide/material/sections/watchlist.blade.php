@@ -2,6 +2,7 @@
 
 <p>Tập trung mọi vật tư <b>đang cần mua</b> vào một chỗ, để lập phiếu dự trù chỉ bằng vài cú tick. Vật tư vào danh sách
     từ 3 nguồn (lọc được theo cột <b>Nguồn</b>):</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/can-du-tru.png', 'caption' => 'Màn hình Dự Trù › Vật Tư › tab Danh sách vật tư cần dự trù'])
 <ol>
     <li><b>Dưới ngưỡng tối thiểu</b>: tồn của phòng đang dưới <b>Ngưỡng Tồn Tối Thiểu</b> khai ở Vật Tư Của Phòng. Tự động.</li>
     <li><b>Người dùng đề nghị</b>: người dùng bấm <b>Đề nghị dự trù vật tư</b> (bắt buộc nhập lý do) trên dòng đề nghị cấp phát

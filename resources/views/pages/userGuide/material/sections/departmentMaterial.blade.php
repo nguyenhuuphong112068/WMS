@@ -2,8 +2,11 @@
 
 <p>Mỗi phòng tự khai <b>những vật tư phòng mình dùng</b> và <b>cách dùng riêng</b>: đơn vị tính, ngưỡng tồn, chỗ để.
     Chỉ vật tư đã khai ở tab này mới <b>nhập kho</b> và <b>đề nghị nội bộ</b> được ở phòng.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/vat-tu-cua-phong.png', 'caption' => 'Màn hình Danh Mục › Vật Tư › tab Vật tư của phòng'])
 
 <h3>Các ô nhập</h3>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/vat-tu-cua-phong-form.png', 'caption' => 'Hộp thoại thêm mới - Vật Tư Của Phòng'])
+
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Vật Tư', true, 'Chọn từ danh mục công ty (chỉ vật tư đã duyệt). Mỗi phòng khai một vật tư <b>một lần</b>.'],
     ['Phân Loại Của Phòng', false, 'Bộ nhóm riêng của phòng, khai ở <b>Dữ Liệu Gốc › Phân Loại</b>.'],

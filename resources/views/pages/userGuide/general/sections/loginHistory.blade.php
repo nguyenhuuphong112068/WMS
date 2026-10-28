@@ -5,6 +5,7 @@
 <p>Lịch sử đăng nhập của chính bạn, phiên đang dùng được đánh dấu. Nếu trong 30 ngày qua có lần nhập sai mật khẩu vào tài khoản
     của bạn, đầu trang hiện cảnh báo vàng kèm số lần. Bạn không nhớ đã nhập sai thì có thể người khác đang thử mật khẩu:
     <a href="#doi-mat-khau">đổi mật khẩu</a> ngay và báo quản trị viên.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/login-history-mine.png', 'caption' => 'Lịch Sử Đăng Nhập Của Tôi'])
 
 <h3>Toàn Hệ Thống (cần quyền)</h3>
 <p>Dành cho quản trị viên, QA. Đầu trang là số lượt đăng nhập thành công hôm nay (kèm số người), số lượt không vào được hôm nay, số phiên đang mở và
@@ -21,6 +22,8 @@
 <p>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-filter"></i> Lọc</span> để áp dụng,
     <span class="btn btn-sm btn-secondary ug-ui">Xoá lọc</span> để về mặc định, nút
     <span class="btn btn-sm btn-outline-success ug-ui"><i class="fas fa-file-excel"></i></span> để xuất Excel đúng bộ lọc đang chọn.</p>
+
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/login-history-list.png', 'caption' => 'Lịch Sử Đăng Nhập Toàn Hệ Thống, lọc theo một tài khoản'])
 
 <h3>Cột Kết thúc phiên</h3>
 <div class="table-responsive">

@@ -2,6 +2,7 @@
 
 <p>Xin <b>văn phòng phẩm</b> từ kho VPP của phòng <b>Hành Chánh</b>. Thực chất đây là một
     <a href="#lien-phong-ban">đề nghị liên phòng ban</a> gửi tới Hành Chánh, nên các bước cấp phát và nhận hàng giống hệt.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/de-nghi-vpp.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Vật Tư › tab Đề nghị liên phòng ban - VPP đến HC'])
 
 <h3>Hai tab con</h3>
 <ul>
