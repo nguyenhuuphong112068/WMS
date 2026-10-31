@@ -127,8 +127,9 @@ return [
         'media_width_mm' => 60,
         'media_height_mm' => 40,
         // Cạnh phần MÃ QR (mm, chưa tính vùng trắng). QR Model 2, mức sửa lỗi Q,
-        // nằm ở góc dưới bên phải nhãn, giữa QR có logo Stella.
-        'qr_size_mm' => 16,
+        // nằm ở góc dưới bên phải nhãn, giữa QR có logo Stella. 12mm như nhãn hoá chất
+        // (đã quét ổn) để nhường chỗ cho bảng thông tin.
+        'qr_size_mm' => 12,
         // Độ phân giải đầu in Zebra (ZD421: bản 203 hoặc 300 dpi - xem tem dưới đáy máy).
         // Dùng để render nhãn ra ảnh đúng số chấm khi in thẳng bằng ZPL.
         'dpi' => 300,

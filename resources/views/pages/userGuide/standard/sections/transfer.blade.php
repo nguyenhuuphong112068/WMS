@@ -4,7 +4,9 @@
     <li><b>A lập đề nghị</b>: chọn phòng được đề nghị, thêm chuẩn (gõ mã, tên hoặc nhà sản xuất để tìm; đơn vị tự điền theo
         đơn vị phòng mình khai), số lượng, ngày mong muốn. Bấm
         <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-save mr-1"></i> Lưu</span> hoặc
-        <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-paper-plane mr-1"></i> Gửi đề nghị</span>.</li>
+        <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-paper-plane mr-1"></i> Gửi đề nghị</span>.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/lien-phong-ban-tao.png', 'caption' => 'Hộp thoại Tạo Đề Nghị Cấp Phát Chuẩn Liên Phòng Ban'])
+    </li>
     <li><b>B cấp phát</b>: chọn ống trong kho của B và số lượng, hoặc từ chối từng mục. Tồn của B bị trừ ngay, mục chuyển sang chờ nhận.</li>
     <li><b>A nhận</b>: bước nhận cũng là bước kiểm tra; chọn định khu thật của A và có thể đánh dấu <b>chiết ống trước khi dùng</b> cho
         ống nhận về. Ống mới vào tồn của A ngay. Không đạt thì <b>Từ chối nhận</b>, tồn tự hoàn lại cho B.</li>

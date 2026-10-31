@@ -54,6 +54,13 @@
             height: 100%;
         }
 
+        .idt-template-form {
+            display: flex;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
         .idt-sheet-groups {
             display: flex;
             flex-wrap: wrap;
@@ -138,12 +145,42 @@
                                 @endforeach
                             </div>
                         </div>
-                        <div class="text-right">
-                            <a href="{{ route('pages.materData.initialData.template') }}" class="btn btn-primary"
+                        <form action="{{ route('pages.materData.initialData.template') }}" method="GET" class="idt-template-form">
+                            <div class="form-group mb-0">
+                                <label for="idtStage">Giai đoạn</label>
+                                <select name="stage" id="idtStage" class="form-control"
+                                    title="Nạp lần lượt: 1 Tổ chức → 2 Người dùng / 3 Dữ liệu gốc & danh mục → 4 Tồn đầu kỳ. Giai đoạn 1, 2 là một file chung cho mọi phòng ban. File giai đoạn sau lấy dữ liệu giai đoạn trước theo hệ thống lúc tải">
+                                    <option value="">Cả 3 giai đoạn</option>
+                                    @foreach (\App\Support\InitialData\InitialDataSchema::STAGES as $no => $label)
+                                        <option value="{{ $no }}">{{ $no }}. {{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label for="idtModule">Module</label>
+                                <select name="module" id="idtModule" class="form-control"
+                                    title="File riêng một module: chỉ gồm sheet dùng chung + sheet của module đó">
+                                    <option value="">Cả 3 module</option>
+                                    @foreach (\App\Support\InitialData\InitialDataSchema::MODULES as $key => $label)
+                                        <option value="{{ $key }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group mb-0 flex-grow-1">
+                                <label for="idtDepartment">Phạm vi file</label>
+                                <select name="department_id" id="idtDepartment" class="form-control"
+                                    title="File của một phòng: chỉ điền sẵn và chỉ cho khai dữ liệu của phòng đó - gửi song song cho nhiều phòng điền">
+                                    <option value="">Toàn hệ thống (Admin)</option>
+                                    @foreach ($departments as $department)
+                                        <option value="{{ $department->id }}">{{ $department->shortName }} - {{ $department->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary"
                                 title="Tải file mẫu mới nhất: {{ count(\App\Support\InitialData\InitialDataSchema::sheets()) }} sheet dữ liệu liên kết + sheet hướng dẫn">
                                 <i class="fas fa-download mr-1"></i> Tải file mẫu
-                            </a>
-                        </div>
+                            </button>
+                        </form>
                     </div>
                 </div>
 

@@ -26,6 +26,7 @@
     @include('pages.import.MaterialImport.create')
     @include('pages.import.MaterialImport.update')
     @include('pages.import.MaterialImport.checkModal')
+    @include('pages.import.MaterialImport.purposeObjectModal')
     @include('pages.import.MaterialImport.historyModal')
     @include('pages.shared.attachmentListModal')
 @endsection

@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Support\InitialData\InitialDataImporter;
+use App\Support\InitialData\InitialDataSchema;
 use App\Support\InitialData\InitialDataTemplate;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * KHỞI TẠO DỮ LIỆU BAN ĐẦU TỪ DÒNG LỆNH
@@ -21,6 +23,9 @@ class InitialDataCommand extends Command
     protected $signature = 'wms:initial-data
         {action : template | check | import}
         {file? : file Excel (template: nơi lưu file mẫu; check/import: file đã điền)}
+        {--department= : (template) tên viết tắt phòng ban - tạo file riêng của phòng đó}
+        {--stage= : (template) 1 | 2 | 3 - tạo file chỉ thu thập một giai đoạn}
+        {--module= : (template) material | chemical | standard - tạo file chỉ thu thập một module}
         {--password= : mật khẩu khởi tạo chung cho tài khoản mới ở sheet Người dùng}
         {--actor=Khởi tạo dữ liệu (CLI) : tên người thực hiện ghi vào lịch sử}';
 
@@ -33,7 +38,28 @@ class InitialDataCommand extends Command
 
         if ($action === 'template') {
             $path = $file ?: storage_path('app/initial-data/Mau_Khoi_Tao_Du_Lieu_WMS.xlsx');
-            InitialDataTemplate::save($path);
+            $departmentId = null;
+            if ($this->option('department')) {
+                $departmentId = DB::table('deparments')->where('shortName', $this->option('department'))->value('id');
+                if (! $departmentId) {
+                    $this->error('Không có phòng ban: '.$this->option('department'));
+
+                    return self::INVALID;
+                }
+            }
+            $module = $this->option('module') ?: null;
+            if ($module !== null && ! isset(InitialDataSchema::MODULES[$module])) {
+                $this->error('Module phải là: '.implode(', ', array_keys(InitialDataSchema::MODULES)));
+
+                return self::INVALID;
+            }
+            $stage = $this->option('stage') ? (int) $this->option('stage') : null;
+            if ($stage !== null && ! isset(InitialDataSchema::STAGES[$stage])) {
+                $this->error('Giai đoạn phải là: '.implode(', ', array_keys(InitialDataSchema::STAGES)));
+
+                return self::INVALID;
+            }
+            InitialDataTemplate::save($path, $departmentId, $module, $stage);
             $this->info('Đã tạo file mẫu: '.$path);
 
             return self::SUCCESS;

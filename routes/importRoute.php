@@ -58,6 +58,8 @@ Route::prefix('/import')
 
         Route::prefix('/materialImport')->name('materialImport.')->controller(MaterialImportController::class)->group(function () {
             Route::get('', 'index')->name('list');
+            // Modal chọn Đối Tượng (1 hoặc nhiều) để điền vào ô Mục đích sử dụng
+            Route::get('purposeObjects', 'purposeObjects')->name('purposeObjects');
             Route::post('store', 'store')->name('store');
             // Trang in nhãn dán lô vật tư (mã QR), mở tab mới rồi bấm In
             Route::get('label', 'label')->name('label');

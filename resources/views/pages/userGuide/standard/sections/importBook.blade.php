@@ -6,3 +6,4 @@
 <p class="mb-0"><span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span> Điều chỉnh (số nhỏ ở góc nút là số lần đã
     sửa, bấm để xem lịch sử). Sổ nhập không có nút in nhãn và không khoá được phiếu: ống nhập sai thì điều chỉnh lại thông tin,
     ống hỏng thì đưa qua <b>Cách ly</b> ở Tồn Kho Chất Chuẩn.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/so-nhap-sua.png', 'caption' => 'Hộp thoại Điều Chỉnh Phiếu Nhập Chất Chuẩn (nút Sửa)'])

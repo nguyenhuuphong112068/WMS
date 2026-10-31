@@ -39,7 +39,7 @@ class UserGuideController extends Controller
             'title' => 'Dữ Liệu Gốc',
             'icon' => 'fas fa-database',
             'summary' => 'Khai báo tổ chức, danh mục dùng chung, hoá chất - chất chuẩn - vật tư, định khu kho và khởi tạo dữ liệu ban đầu.',
-            'updated_at' => '2026-10-28',
+            'updated_at' => '2026-10-31',
         ],
         'material' => [
             'title' => 'Vật Tư',
@@ -57,7 +57,7 @@ class UserGuideController extends Controller
             'title' => 'Chất Chuẩn',
             'icon' => 'fas fa-vial',
             'summary' => 'Mã ống chuẩn theo nhóm, nhập - kiểm tra, cấp phát cho tổ và ghi sử dụng, liên phòng ban, cách ly - loại bỏ - huỷ, hạn dùng retest / check online / nội bộ, kiểm soát khối lượng, đánh giá hạn dùng chuẩn thứ cấp và dự trù.',
-            'updated_at' => '2026-10-28',
+            'updated_at' => '2026-10-30',
         ],
     ];
 

@@ -6,7 +6,9 @@
 <ol class="ug-steps">
     <li>Lần dùng đầu tiên, nhập <b>Khối lượng Bì + Chuẩn trước khi dùng</b> trên phiếu sử dụng. Số cân luôn là khối lượng:
         chuẩn có ĐVT khối lượng (mg, g) cân theo đúng ĐVT đó, chuẩn có ĐVT thể tích (ml) cân theo <b>mg</b>.</li>
-    <li>Khi ống đã dùng xong, ở tab <b>Kiểm soát khối lượng</b> nhập <b>Khối lượng bì sau khi sử dụng</b> (không được lớn hơn Bì + Chuẩn).</li>
+    <li>Khi ống đã dùng xong, ở tab <b>Kiểm soát khối lượng</b> nhập <b>Khối lượng bì sau khi sử dụng</b> (không được lớn hơn Bì + Chuẩn).
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/khoi-luong-tare.png', 'caption' => 'Hộp thoại Khối lượng bì sau khi sử dụng', 'width' => 420])
+    </li>
     <li>Hệ thống tính <b>KL thực</b> = Bì + Chuẩn − Bì sau khi sử dụng (chuẩn ĐVT ml: KL thực = chênh lệch (mg) / 1000 / tỷ trọng d,
         d khai ở Danh Mục Chất Chuẩn), rồi <b>sai lệch (%)</b> = |KL thực − tổng lượng đã ghi sử dụng| / tổng lượng đã ghi sử dụng × 100,
         so với giới hạn của dạng chuẩn ở bảng dưới.</li>

@@ -25,7 +25,8 @@
     ['Số lô, Số hoá đơn, Ngày ký hoá đơn', false, 'Thông tin chứng từ; có thể bổ sung lúc kiểm tra.'],
     ['Định Khu Tạm (Biệt Trữ / Chờ Kiểm Tra)', false, 'Chỉ chọn được vị trí có phân loại <b>Biệt Trữ</b>. Vị trí thật chọn ở bước kiểm tra.'],
     ['Tài liệu đính kèm', false, 'Hoá đơn, phiếu giao hàng, CoA... tối đa 10MB mỗi file.'],
-    ['Mục đích sử dụng, Ghi chú', false, 'Tối đa 500 ký tự.'],
+    ['Mục đích sử dụng', false, 'Tối đa 500 ký tự. Bấm nút <i class="fas fa-crosshairs"></i> cạnh ô để mở danh sách <b>Đối Tượng</b>, chọn 1 hoặc nhiều đối tượng rồi bấm <b>Điền vào mục đích</b>: hệ thống điền Tên (Mã) của các đối tượng vào ô. Mặc định chỉ hiện đối tượng đã gắn với vật tư này (danh sách đề nghị theo chu kỳ, đề nghị cấp phát của phòng); đổi sang <b>Tất cả đối tượng</b> để tìm thêm.'],
+    ['Ghi chú', false, 'Tối đa 500 ký tự.'],
 ]])
 
 <div class="ug-callout">
@@ -40,7 +41,7 @@
         Không đổi gì thì hệ thống không ghi nhận. Lô chưa kiểm tra vẫn chỉ được đặt trong khu Biệt Trữ. Ngày nhập không sửa
         được. Số nhỏ ở góc nút là số lần đã điều chỉnh, bấm vào để xem lịch sử.</li>
     <li><span class="btn btn-sm btn-outline-secondary ug-ui"><i class="fas fa-qrcode"></i></span> <b>In nhãn</b>: in nhãn dán lô
-        có mã QR, chọn số nhãn cần in (tối đa 100). Mỗi lần in được ghi vào Audit Trail.</li>
+        có mã QR (tên vật tư, vị trí, người nhập, ngày nhập, hạn dùng, mục đích sử dụng), chọn số nhãn cần in (tối đa 100). Mỗi lần in được ghi vào Audit Trail.</li>
 </ul>
 <p class="mb-0">Cột <b>Tình Trạng</b>: <span class="badge badge-warning">Chờ kiểm tra</span>
     <span class="badge badge-success">Kiểm tra Đạt</span> <span class="badge badge-danger">Không đạt</span>.

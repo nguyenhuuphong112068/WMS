@@ -152,6 +152,7 @@ php insert.php <khoá> [--dry]                          # chèn ảnh chưa có 
 - Mặc định: mở URL của `route` + `params`, bấm link tab theo `pane`, chờ bảng tải ngầm xong, cắt `.content-wrapper` cao tối đa
   640px; nếu section có bảng ô nhập thì bấm nút "Thêm..." trong tab đang hiện và cắt `.modal.show .modal-content`.
 - Màn hình trống ở phòng mặc định thì khai `'shotDept' => <id phòng>` cho mục trong `toc.php`.
+- Ảnh **từng bước** (hộp thoại mở từ nút trên dòng, trang chi tiết...) khai `'extraShots' => [[...], ...]` trong `toc.php` (cộng thêm vào ảnh mặc định, mẫu: `standard/toc.php`), dùng `__ug.click('.btn-x')` để bấm nút - nút trong cột thu gọn / menu thao tác vẫn bấm được. Ảnh từng bước chèn tay vào đúng `<li>` của bước (insert.php chỉ chèn `<id>.png` và `<id>-form.png`).
 - Mục cần cách chụp khác thì khai trong `toc.php`: `'shots' => false` (không chụp) hoặc `'shots' => [['name' => '<id>-x', 'js' => '...', 'clip' => '...', 'highlight' => ['.btn-x'], 'maxHeight' => 900, 'user' => '10014', 'dept' => 20, 'flash' => [...]], ...]`.
   Trong `js` có sẵn `__ug.tab([...id])`, `__ug.clickCreate()`; `highlight` viền đỏ phần tử cần chỉ.
 - **Luôn xem lại ảnh** trước khi chép (ghép nhiều ảnh thu nhỏ thành một tấm để soát nhanh): bảng còn "Đang tải dữ liệu...",

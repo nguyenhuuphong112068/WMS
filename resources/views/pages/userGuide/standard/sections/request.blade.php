@@ -20,7 +20,9 @@
 
 <h3>Tổ lập đề nghị</h3>
 <ol class="ug-steps">
-    <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát chuẩn</span>.</li>
+    <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát chuẩn</span>.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/de-nghi-noi-bo-tao.png', 'caption' => 'Hộp thoại Tạo Đề Nghị Cấp Phát Chuẩn Cho Tổ'])
+    </li>
     <li>Thêm từng dòng: chất chuẩn, số lượng đề nghị, đơn vị, tên sản phẩm, chỉ tiêu, kiểm nghiệm viên, ghi chú; nhập ngày mong muốn.
         Ô <b>Chất Chuẩn</b> chỉ gồm chuẩn phòng đã khai ở <a href="#chuan-cua-phong">Chất Chuẩn Của Phòng</a> (kho phòng chỉ có ống
         của các chuẩn này); gõ mã, tên hoặc nhà sản xuất để tìm, mỗi kết quả hiện nhà sản xuất ngay dưới tên để phân biệt các chuẩn

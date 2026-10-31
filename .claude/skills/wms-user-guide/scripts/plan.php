@@ -9,7 +9,8 @@
  *   - <id>-form.png : hộp thoại "Thêm..." của tab đó, chỉ khi section có bảng "Các ô nhập".
  * Mục trong toc.php có thể khai 'shots' => false (không chụp) hoặc 'shots' => [[...], ...] để thay
  * kế hoạch mặc định (khoá: name, url, js, clip, highlight, maxHeight, width, user, dept, flash);
- * 'shotDept' => <id phòng ban> để chụp ở phòng có dữ liệu cho màn hình đó.
+ * 'shotDept' => <id phòng ban> để chụp ở phòng có dữ liệu cho màn hình đó;
+ * 'extraShots' => [[...], ...] thêm ảnh từng bước (cùng khoá như 'shots'), giữ nguyên ảnh mặc định.
  */
 require __DIR__.'/../../../../vendor/autoload.php';
 $app = require __DIR__.'/../../../../bootstrap/app.php';
@@ -42,6 +43,8 @@ foreach (App\Support\UserGuideLinks::groups($guide) as $items) {
                 $shots[] = ['name' => $item['id'].'-form', 'js' => '__ug.clickCreate()', 'clip' => '.modal.show .modal-content', 'maxHeight' => 1400, 'pad' => 0];
             }
         }
+        // 'extraShots': ảnh từng bước (hộp thoại mở từ nút trên dòng...) cộng thêm vào kế hoạch mặc định
+        $shots = array_merge($shots, $item['extraShots'] ?? []);
         foreach ($shots as $shot) {
             $shot['name'] = $shot['name'] ?? $item['id'];
             $plan[] = $shot + $base;

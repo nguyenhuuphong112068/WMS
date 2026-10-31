@@ -161,6 +161,7 @@
                                                         'id' => $row->id,
                                                         'code' => $row->code,
                                                         'material_name' => $row->material_name,
+                                                        'category_id' => $row->category_id,
                                                         'amount_label' => $pendingAmount,
                                                         'imported_date_label' => $impDate($row->imported_date),
                                                         'location_label' => $pendingLocation,

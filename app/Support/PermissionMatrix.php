@@ -163,6 +163,8 @@ class PermissionMatrix
     public static function materDataScopeLabel(string $name): string
     {
         return match (true) {
+            // Màn Trình Ký Đề Nghị Liên Phòng Ban có bộ quyền riêng (materData_transferSign_*)
+            str_contains($name, '_transferSign_') => 'Trình Ký Liên Phòng Ban',
             str_contains($name, '_material_') => 'Vật Tư',
             str_contains($name, '_chemical_') => 'Hoá Chất',
             str_contains($name, '_standard_') => 'Chất Chuẩn',
@@ -266,7 +268,7 @@ class PermissionMatrix
     private static function shortLabel(string $label): string
     {
         $short = preg_replace(
-            '/\s+(Dữ Liệu Gốc (Vật Tư|Hoá Chất|Chất Chuẩn|Dùng Chung)|Vật Tư Chung|Vật Tư|Hoá Chất|Hóa Chất|Chất Chuẩn Chung|Chất Chuẩn)$/u',
+            '/\s+(Dữ Liệu Gốc (Vật Tư|Hoá Chất|Chất Chuẩn|Dùng Chung)|Liên Phòng Ban|Vật Tư Chung|Vật Tư|Hoá Chất|Hóa Chất|Chất Chuẩn Chung|Chất Chuẩn)$/u',
             '',
             $label
         );

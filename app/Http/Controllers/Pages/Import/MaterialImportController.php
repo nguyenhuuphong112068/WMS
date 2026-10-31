@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Pages\Import;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Http\Controllers\Pages\MaterData\ConsumptionObjectController;
 use App\Support\AttachmentBackup;
 use App\Support\DepartmentMaterial;
 use App\Support\ListRange;
 use App\Support\MaterialCode;
+use App\Support\MaterialPeriodicRequest;
 use App\Support\QrCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -358,6 +360,88 @@ class MaterialImportController extends Controller
             'ok' => true,
             'copies' => $copies,
             'printedAt' => $printedAt->format('d/m/Y H:i:s'),
+        ]);
+    }
+
+    /**
+     * Modal "Đối Tượng" cạnh ô Mục đích sử dụng (purposeObjectModal.blade.php): tìm đối tượng
+     * (dữ liệu gốc consumption_objects) theo trang 50 dòng để chọn 1 hoặc nhiều, điền tên + mã
+     * vào ô Mục đích.
+     *
+     * Đối tượng "đã gắn với vật tư" = đối tượng của danh sách đề nghị nội bộ theo chu kỳ có vật
+     * tư này, hoặc đã được chọn ở dòng đề nghị cấp phát vật tư này - cùng phòng đang chọn.
+     * scope=linked chỉ lấy các đối tượng đó; scope=all lấy cả danh mục, đối tượng đã gắn đứng đầu.
+     */
+    public function purposeObjects(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $categoryId = (int) $request->category_id;
+        $q = trim((string) $request->q);
+        $offset = max(0, (int) $request->offset);
+        $limit = 50;
+
+        $linkedIds = $categoryId
+            ? DB::table(MaterialPeriodicRequest::ITEM_TABLE.' as item')
+                ->join(MaterialPeriodicRequest::LIST_TABLE.' as list', 'item.periodic_request_list_id', '=', 'list.id')
+                ->where('list.department_id', $departmentId)
+                ->where('list.type', MaterialPeriodicRequest::TYPE_INTERNAL)
+                ->where('item.active', 1)
+                ->where('item.category_id', $categoryId)
+                ->whereNotNull('list.consumption_object_id')
+                ->pluck('list.consumption_object_id')
+                ->merge(DB::table('material_request_items')
+                    ->join('material_request_lists', 'material_request_items.request_list_id', '=', 'material_request_lists.id')
+                    ->where('material_request_lists.department_id', $departmentId)
+                    ->where('material_request_items.category_id', $categoryId)
+                    ->whereNotNull('material_request_items.consumption_object_id')
+                    ->pluck('material_request_items.consumption_object_id'))
+                ->map(fn ($id) => (int) $id)->unique()->values()->all()
+            : [];
+
+        $linkedOnly = $request->scope === 'linked';
+
+        $query = DB::table('consumption_objects')
+            ->where('status_id', 1)
+            ->when($linkedOnly, fn ($query) => $query->whereIn('id', $linkedIds ?: [0]))
+            ->when($request->type, fn ($query) => $query->where('type', $request->type))
+            ->when($q !== '', fn ($query) => $query->where(function ($sub) use ($q) {
+                $sub->where('code', 'like', '%'.$q.'%')
+                    ->orWhere('name', 'like', '%'.$q.'%')
+                    ->orWhere('location', 'like', '%'.$q.'%');
+            }));
+
+        $total = (clone $query)->count();
+
+        $rows = $query
+            ->select('id', 'type', 'code', 'name', 'location', 'frequency')
+            ->when(! $linkedOnly && $linkedIds, fn ($query) => $query->orderByRaw(
+                'CASE WHEN id IN ('.implode(',', $linkedIds).') THEN 0 ELSE 1 END'
+            ))
+            ->orderBy('type')
+            ->orderBy('code')
+            ->orderBy('frequency')
+            ->orderBy('id')
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
+
+        $typeLabels = ConsumptionObjectController::typeLabels();
+        $nextOffset = $offset + $rows->count();
+
+        return response()->json([
+            'items' => $rows->map(fn ($object) => [
+                'id' => (int) $object->id,
+                'code' => $object->code,
+                'name' => $object->name,
+                'type_label' => $typeLabels[$object->type] ?? $object->type,
+                'location' => $object->location,
+                'frequency_label' => ConsumptionObjectController::frequencyLabel($object->frequency),
+                'linked' => in_array((int) $object->id, $linkedIds, true),
+            ])->values(),
+            'total' => $total,
+            'linked_count' => count($linkedIds),
+            'more' => $nextOffset < $total,
+            'next_offset' => $nextOffset,
         ]);
     }
 

@@ -7,7 +7,9 @@
         <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-biohazard"></i></span> ở cột Thao Tác của ống, nhập
         <b>Số lượng cách ly</b> (không vượt tồn hiện tại), chọn <b>Định khu Chờ Quyết Định</b> và ghi <b>Lý do cách ly</b>. Nút
         <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-biohazard mr-1"></i> Cách ly từ Tồn Kho</span> ở tab này dẫn thẳng sang đó.
-        Khi còn chờ quyết định, bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span> để sửa số lượng, lý do, định khu.</li>
+        Khi còn chờ quyết định, bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span> để sửa số lượng, lý do, định khu.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/cach-ly-tu-ton-kho.png', 'caption' => 'Hộp thoại Cách ly chất chuẩn chờ quyết định (mở từ Tồn Kho)', 'width' => 560])
+    </li>
     <li><b>Quyết định</b> <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-gavel"></i></span> (quyền <i>Quyết Định Loại Bỏ Chất Chuẩn Hỏng</i>),
         ghi căn cứ và nhập lại mật khẩu:
         <ul>

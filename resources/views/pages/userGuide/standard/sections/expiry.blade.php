@@ -10,10 +10,13 @@
 <p>Ống của chuẩn có hạn dùng mặc định nhưng <b>chưa xác định hạn nội bộ</b>. Các ống này chưa cấp phát và chưa dùng được. Bấm
     <b>Xác định hạn dùng nội bộ</b>, chọn ngày mở ống; hệ thống tính <b>Hạn Dùng Nội Bộ Sau Khi Xác Định</b> = ngày mở ống + số tháng hạn dùng,
     không vượt hạn nhà sản xuất.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/han-dung-noi-bo.png', 'caption' => 'Hộp thoại Xác Định Hạn Dùng Nội Bộ'])
 
 <h3>Cập nhật hạn retest / check online</h3>
 <p>Ống có loại hạn <b>Cần Retest định kỳ</b> hoặc <b>Check online</b> hiện badge trên bảng tồn. Sau mỗi lần retest hoặc tra cứu trực tuyến,
     bấm badge và chọn một trong ba hướng:</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/han-dung-cap-nhat.png', 'caption' => 'Hộp thoại Cập Nhật Hạn Dùng (bấm badge loại hạn trên bảng tồn)', 'width' => 640])
+
 <ul>
     <li><b>Tiếp tục Retest định kỳ</b>: nhập <b>hạn retest mới</b> (và chu kỳ retest nếu đổi).</li>
     <li><b>Tiếp tục Check online</b>: hạn dùng để trống.</li>

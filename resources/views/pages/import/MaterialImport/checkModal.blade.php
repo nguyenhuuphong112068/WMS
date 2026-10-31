@@ -140,9 +140,15 @@
 
                     <div class="form-group">
                         <label>Mục đích sử dụng</label>
-                        <textarea name="purpose" rows="2" maxlength="500"
-                            class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}"
-                            placeholder="Mục đích sử dụng...">{{ old('purpose') }}</textarea>
+                        <div class="d-flex align-items-start">
+                            <button type="button" class="btn btn-outline-info mr-2 mi-open-purpose-objects" style="flex-shrink: 0;"
+                                title="Chọn đối tượng để điền vào mục đích">
+                                <i class="fas fa-crosshairs"></i>
+                            </button>
+                            <textarea name="purpose" rows="2" maxlength="500"
+                                class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}"
+                                placeholder="Mục đích sử dụng...">{{ old('purpose') }}</textarea>
+                        </div>
                         @if ($bag->has('purpose'))
                             <div class="md-error text-danger small">{{ $bag->first('purpose') }}</div>
                         @endif
@@ -180,6 +186,8 @@
             $form.find('[name="invoice_date"]').val(dateValue(row.invoice_date));
             $form.find('[name="expired_date"]').val(dateValue(row.expired_date));
             $form.find('[name="purpose"]').val(row.purpose || '');
+            // Form kiểm tra không có ô vật tư - modal Đối Tượng lấy vật tư từ đây
+            $form.data('categoryId', row.category_id || '');
             // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
             $form.find('[name="location_id"]').val(row.location_id || '').trigger('change');
 

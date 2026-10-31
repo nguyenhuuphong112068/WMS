@@ -22,7 +22,9 @@
     (<b>Điều Chỉnh Thời Gian Đặt Hàng</b>) thấy nút <span class="ug-key"><i class="fas fa-pen"></i></span> ngay trong cột
     <b>Thời Gian Đặt Hàng</b> của bảng - không cần quyền Sửa danh mục.</p>
 <ol>
-    <li>Bấm nút <span class="ug-key"><i class="fas fa-pen"></i></span> ở dòng cần đổi.</li>
+    <li>Bấm nút <span class="ug-key"><i class="fas fa-pen"></i></span> ở dòng cần đổi.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/danh-muc-thoi-gian-dat-hang.png', 'caption' => 'Hộp thoại Điều Chỉnh Thời Gian Đặt Hàng', 'width' => 420])
+    </li>
     <li>Nhập số ngày mới (số nguyên, để trống nếu chưa xác định) và <b>Lý Do Điều Chỉnh</b> (bắt buộc).</li>
     <li>Bấm <b>Lưu thay đổi</b>. Bản ghi <b>giữ nguyên trạng thái duyệt</b>, thay đổi được ghi vào Lịch sử thay đổi và Audit Trail.</li>
 </ol>

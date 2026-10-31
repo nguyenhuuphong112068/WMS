@@ -92,8 +92,14 @@
 
                     <div class="form-group">
                         <label>Mục đích sử dụng</label>
-                        <textarea name="purpose" rows="2" maxlength="500"
-                            class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}"></textarea>
+                        <div class="d-flex align-items-start">
+                            <button type="button" class="btn btn-outline-info mr-2 mi-open-purpose-objects" style="flex-shrink: 0;"
+                                title="Chọn đối tượng để điền vào mục đích">
+                                <i class="fas fa-crosshairs"></i>
+                            </button>
+                            <textarea name="purpose" rows="2" maxlength="500"
+                                class="form-control {{ $bag->has('purpose') ? 'is-invalid' : '' }}"></textarea>
+                        </div>
                         @if ($bag->has('purpose')) <div class="md-error text-danger small">{{ $bag->first('purpose') }}</div> @endif
                     </div>
 

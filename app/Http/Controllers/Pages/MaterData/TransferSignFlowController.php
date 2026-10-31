@@ -36,8 +36,16 @@ class TransferSignFlowController extends Controller
         'department_id' => 'Phòng cố định',
     ];
 
+    /** Bộ quyền riêng của màn này: materData_transferSign_view / create / update / deActive. */
+    private function authorize(string $action): void
+    {
+        abort_unless(user_can('materData_transferSign_'.$action), 403, 'Bạn không có quyền này ở màn Trình Ký Đề Nghị Liên Phòng Ban.');
+    }
+
     public function index()
     {
+        $this->authorize('view');
+
         $datas = DB::table(self::TABLE)
             ->leftJoin('companies', 'companies.id', '=', self::TABLE.'.company_id')
             ->leftJoin('roles', 'roles.id', '=', self::TABLE.'.role_id')
@@ -73,6 +81,8 @@ class TransferSignFlowController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create');
+
         $validator = $this->validator($request);
 
         if ($validator->fails()) {
@@ -94,6 +104,8 @@ class TransferSignFlowController extends Controller
 
     public function update(Request $request)
     {
+        $this->authorize('update');
+
         $current = DB::table(self::TABLE)->where('id', $request->id)->first();
 
         if (! $current) {
@@ -126,6 +138,8 @@ class TransferSignFlowController extends Controller
 
     public function deActive(Request $request)
     {
+        $this->authorize('deActive');
+
         $current = DB::table(self::TABLE)->where('id', $request->id)->first();
 
         if (! $current) {
@@ -165,6 +179,8 @@ class TransferSignFlowController extends Controller
 
     public function history(Request $request)
     {
+        $this->authorize('view');
+
         return response()->json(['rows' => DataMasterHistory::rows(self::TABLE, (int) $request->id)]);
     }
 

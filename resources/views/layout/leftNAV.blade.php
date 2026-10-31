@@ -567,7 +567,7 @@
             ['materialName', 'Tên Vật Tư', 'fas fa-cubes', 'materData_material_view'],
             ['departmentClassification', 'Phân Loại', 'fas fa-tags', 'materData_material_view'],
             ['materialSignFlow', 'Trình Ký Đề Nghị CP Vật Tư', 'fas fa-file-signature', 'materData_material_view'],
-            ['transferSignFlow', 'Trình Ký Đề Nghị Liên Phòng Ban', 'fas fa-route', 'materData_material_view'],
+            ['transferSignFlow', 'Trình Ký Đề Nghị Liên Phòng Ban', 'fas fa-route', 'materData_transferSign_view'],
         ],
         'Kho & đối tượng' => [
             ['zone', 'Định Khu', 'fas fa-sitemap', 'materData_common_view'],

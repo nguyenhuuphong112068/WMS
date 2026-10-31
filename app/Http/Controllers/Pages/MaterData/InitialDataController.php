@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Pages\MaterData;
 
 use App\Http\Controllers\Controller;
 use App\Support\InitialData\InitialDataImporter;
+use App\Support\InitialData\InitialDataSchema;
 use App\Support\InitialData\InitialDataTemplate;
 use App\Support\Signer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 /**
  * KHỞI TẠO DỮ LIỆU BAN ĐẦU
@@ -30,18 +33,49 @@ class InitialDataController extends Controller
 
         return view('pages.materData.InitialData.list', [
             'report' => session('initialDataReport'),
+            'departments' => DB::table('deparments')->where('isActive', 1)->orderBy('shortName')->get(['id', 'shortName', 'name']),
         ]);
     }
 
-    /** Sinh file mẫu mới nhất (danh sách vai trò, đơn vị, hoạt chất lấy theo DB hiện tại). */
-    public function template()
+    /**
+     * Sinh file mẫu mới nhất theo dữ liệu đang có. Chọn phòng ban = file riêng của phòng đó
+     * (gửi song song cho nhiều phòng điền, nạp về lần lượt); chọn module = file chỉ thu thập
+     * Vật tư / Hoá chất / Chất chuẩn; chọn giai đoạn = file chỉ thu thập dữ liệu gốc / danh mục /
+     * tồn đầu kỳ.
+     */
+    public function template(Request $request)
     {
         $this->authorizeAdmin();
 
-        $path = storage_path('app/initial-data/'.now()->format('YmdHis').'_'.self::FILE_NAME);
-        InitialDataTemplate::save($path);
+        $department = $request->filled('department_id')
+            ? DB::table('deparments')->where('id', $request->integer('department_id'))->where('isActive', 1)->first(['id', 'shortName'])
+            : null;
+        abort_if($request->filled('department_id') && ! $department, 404, 'Không tìm thấy phòng ban.');
 
-        return response()->download($path, self::FILE_NAME)->deleteFileAfterSend(true);
+        $module = $request->filled('module') ? (string) $request->input('module') : null;
+        abort_if($module !== null && ! isset(InitialDataSchema::MODULES[$module]), 404, 'Không có module này.');
+
+        $stage = $request->filled('stage') ? $request->integer('stage') : null;
+        abort_if($stage !== null && ! isset(InitialDataSchema::STAGES[$stage]), 404, 'Không có giai đoạn này.');
+
+        // Giai đoạn Tổ chức / Người dùng: một file chung cho mọi phòng ban, không chia phòng / module
+        if (in_array($stage, InitialDataSchema::SHARED_STAGES, true)) {
+            $department = null;
+            $module = null;
+        }
+
+        // VD: Mau_Khoi_Tao_Du_Lieu_WMS_GD3_HoaChat_QC1.xlsx
+        $suffix = collect([
+            $stage ? 'GD'.$stage : null,
+            $module ? Str::studly(Str::ascii(InitialDataSchema::MODULES[$module])) : null,
+            $department ? preg_replace('/[^A-Za-z0-9_-]+/', '-', $department->shortName) : null,
+        ])->filter()->map(fn ($part) => '_'.$part)->implode('');
+        $fileName = str_replace('.xlsx', $suffix.'.xlsx', self::FILE_NAME);
+
+        $path = storage_path('app/initial-data/'.now()->format('YmdHis').'_'.$fileName);
+        InitialDataTemplate::save($path, $department?->id, $module, $stage);
+
+        return response()->download($path, $fileName)->deleteFileAfterSend(true);
     }
 
     /** Kiểm tra (mode = check, không ghi DB) hoặc nạp thật (mode = import). */

@@ -70,7 +70,7 @@ return [
             'route' => 'pages.materData.materialSignFlow.list', 'perm' => 'materData_material_view', 'chips' => [$byDept],
             'keywords' => 'cap ky nguoi ky vai tro dieu kien'],
         ['id' => 'trinh-ky-lien-phong-ban', 'file' => 'transferSignFlow', 'title' => 'Trình Ký Đề Nghị Liên Phòng Ban', 'icon' => 'fas fa-route',
-            'route' => 'pages.materData.transferSignFlow.list', 'perm' => 'materData_material_view',
+            'route' => 'pages.materData.transferSignFlow.list', 'perm' => 'materData_transferSign_view',
             'keywords' => 'vpp van phong pham hanh chanh buoc ky'],
     ],
     'Kho & đối tượng' => [

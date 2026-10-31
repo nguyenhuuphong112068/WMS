@@ -31,6 +31,7 @@ class GroupController extends Controller
     {
         // Chỉ phòng ban thuộc công ty đang làm việc (suy từ phòng ban đang chọn)
         $companyId = \App\Support\CompanyContext::currentId();
+        $ownDeptId = $this->ownDepartmentId();
 
         $datas = DB::table(self::TABLE)
             ->leftJoin('deparments', self::TABLE . '.department_id', '=', 'deparments.id')
@@ -40,12 +41,14 @@ class GroupController extends Controller
                 'deparments.shortName as department_short'
             )
             ->when($companyId, fn ($q) => $q->where('deparments.company_id', $companyId))
+            ->when($ownDeptId, fn ($q) => $q->where(self::TABLE . '.department_id', $ownDeptId))
             ->orderBy(self::TABLE . '.name', 'asc')
             ->get();
 
         $departments = DB::table('deparments')
             ->where('isActive', 1)
             ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->when($ownDeptId, fn ($q) => $q->where('id', $ownDeptId))
             ->orderBy('name', 'asc')
             ->get();
 
@@ -65,6 +68,10 @@ class GroupController extends Controller
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
+        }
+
+        if ($stop = $this->guardOwnDepartment((int) $request->department_id)) {
+            return $stop;
         }
 
         $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
@@ -87,6 +94,10 @@ class GroupController extends Controller
 
         if (!$current) {
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần cập nhật!');
+        }
+
+        if ($stop = $this->guardOwnDepartment((int) $current->department_id) ?: $this->guardOwnDepartment((int) $request->department_id)) {
+            return $stop;
         }
 
         $validator = Validator::make(
@@ -124,6 +135,10 @@ class GroupController extends Controller
 
         if (!$current) {
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần thay đổi trạng thái!');
+        }
+
+        if ($stop = $this->guardOwnDepartment((int) $current->department_id)) {
+            return $stop;
         }
 
         if ($stop = $this->guardChangeReason($request)) {
@@ -168,6 +183,32 @@ class GroupController extends Controller
         return response()->json([
             'rows' => DataMasterHistory::rows(self::TABLE, (int) $request->id),
         ]);
+    }
+
+    /**
+     * Phòng ban nghiệp vụ (deparments.is_general = 1) chỉ làm việc với tổ của chính phòng đang chọn.
+     * Phòng ban chung (is_general = 0: BOD...) trả null = xem mọi phòng trong công ty.
+     */
+    private function ownDepartmentId(): ?int
+    {
+        $deptId = session('user')['selected_department_id'] ?? null;
+
+        if (!$deptId) {
+            return null;
+        }
+
+        return (int) DB::table('deparments')->where('id', $deptId)->value('is_general') === 1 ? (int) $deptId : null;
+    }
+
+    private function guardOwnDepartment(int $departmentId)
+    {
+        $ownDeptId = $this->ownDepartmentId();
+
+        if ($ownDeptId && $departmentId !== $ownDeptId) {
+            return redirect()->back()->with('error', 'Chỉ được thao tác với tổ của phòng ban đang làm việc.')->withInput();
+        }
+
+        return null;
     }
 
     private function actor(): string

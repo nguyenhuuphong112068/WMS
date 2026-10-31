@@ -4,6 +4,9 @@ namespace App\Support\InitialData;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Support\MaterialClassification;
+use App\Support\StandardCode;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\NamedRange;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -11,6 +14,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Style\Protection;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
@@ -23,6 +27,9 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  *
  * Ô chọn tham chiếu dùng Name dạng OFFSET + COUNTA nên danh sách co giãn theo số dòng khách
  * hàng đã điền, không hiện hàng nghìn dòng trống.
+ *
+ * Dữ liệu gốc / danh mục / định khu đang có trong hệ thống được điền sẵn ở đầu từng sheet làm
+ * nguồn chọn cho các sheet sau; các dòng này và cột Mã DM tự sinh bị khoá (bảo vệ sheet).
  */
 class InitialDataTemplate
 {
@@ -41,6 +48,27 @@ class InitialDataTemplate
 
     private const DANGER = 'DC2626';
 
+    /** Nền dòng điền sẵn từ hệ thống (khoá, chỉ để chọn lại). */
+    private const PREFILL_FILL = 'EEF2F6';
+
+    /** Dòng cuối có công thức / ô chọn của từng sheet (= số dòng điền sẵn + MAX_ROWS). */
+    private static array $lastRows = [];
+
+    /** Số dòng điền sẵn của từng sheet dữ liệu. */
+    private static array $prefillCounts = [];
+
+    /** Phòng ban của file riêng (id, shortName); null = file toàn hệ thống. */
+    private static ?object $department = null;
+
+    /** Module của file riêng (material / chemical / standard); null = file đủ 3 module. */
+    private static ?string $module = null;
+
+    /** Giai đoạn của file riêng (InitialDataSchema::STAGES); null = file đủ 3 giai đoạn. */
+    private static ?int $stage = null;
+
+    /** Sheet có trong file: [key => 'edit' | 'source'] (xem InitialDataSchema::fileSheets). */
+    private static array $roles = [];
+
     /** Màu tab theo nhóm sheet, để khách hàng nhìn thanh tab là biết đang ở phần nào. */
     private const GROUP_TAB_COLORS = [
         'Tổ chức' => '1F5E9E',
@@ -52,22 +80,46 @@ class InitialDataTemplate
         'Tồn đầu kỳ' => '16A34A',
     ];
 
-    public static function save(string $path): void
+    /**
+     * @param  int|null  $departmentId  file riêng của một phòng ban (gửi song song cho nhiều phòng
+     *                                  điền): chỉ điền sẵn + chỉ cho khai dữ liệu của phòng đó
+     * @param  string|null  $module  file thu thập riêng một module (InitialDataSchema::MODULES):
+     *                               chỉ gồm sheet dùng chung + sheet của module đó
+     * @param  int|null  $stage  file thu thập riêng một giai đoạn (InitialDataSchema::STAGES): sheet
+     *                           giai đoạn trước cần làm nguồn ô chọn được kèm theo dạng ẩn + khoá
+     */
+    public static function save(string $path, ?int $departmentId = null, ?string $module = null, ?int $stage = null): void
     {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(0);
+
         $dir = dirname($path);
 
         if (! is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
 
-        $writer = new Xlsx(self::build());
+        $writer = new Xlsx(self::build($departmentId, $module, $stage));
         // Giữ nguyên công thức để Excel tự tính lúc mở, không tính trước bằng PHP
         $writer->setPreCalculateFormulas(false);
         $writer->save($path);
     }
 
-    public static function build(): Spreadsheet
+    public static function build(?int $departmentId = null, ?string $module = null, ?int $stage = null): Spreadsheet
     {
+        // Giai đoạn Tổ chức / Người dùng là một file chung cho mọi phòng ban: bỏ qua phòng ban, module
+        $shared = in_array($stage, InitialDataSchema::SHARED_STAGES, true);
+        $module = $shared ? null : $module;
+
+        self::$module = $module;
+        self::$stage = $stage;
+        self::$roles = InitialDataSchema::fileSheets($module, $stage);
+        self::$lastRows = [];
+        self::$prefillCounts = [];
+        self::$department = $departmentId && ! $shared
+            ? DB::table('deparments')->where('id', $departmentId)->first(['id', 'shortName'])
+            : null;
+
         $book = new Spreadsheet();
         $book->getProperties()
             ->setCreator('WMS')
@@ -84,22 +136,44 @@ class InitialDataTemplate
         $lists->setTitle(InitialDataSchema::LIST_SHEET);
         self::buildListSheet($book, $lists);
 
-        foreach (InitialDataSchema::sheets() as $key => $sheet) {
+        foreach (array_intersect_key(InitialDataSchema::sheets(), self::$roles) as $key => $sheet) {
             $ws = $book->createSheet();
             $ws->setTitle($sheet['title']);
             self::buildDataSheet($ws, $key, $sheet);
+            if (self::hidden($key)) {
+                $ws->setSheetState(Worksheet::SHEETSTATE_VERYHIDDEN);
+            }
         }
 
-        foreach (InitialDataSchema::referenceSheets() as $key => $sheet) {
+        foreach (self::referenceSheets() as $key => $sheet) {
             $ws = $book->createSheet();
             $ws->setTitle($sheet['title']);
             self::buildReferenceSheet($ws, $key, $sheet);
         }
 
+        // Bộ nhập đọc số dòng điền sẵn để bỏ qua đúng các dòng đó
+        $row = InitialDataSchema::PREFILL_CELL_ROW;
+        $lists->setCellValue('A'.($row - 1), 'PREFILL');
+        foreach (self::$prefillCounts as $key => $count) {
+            $lists->setCellValueExplicit('A'.$row++, $key.':'.$count, DataType::TYPE_STRING);
+        }
+        if (self::$department) {
+            $lists->setCellValueExplicit('A'.$row++, InitialDataSchema::SCOPE_KEY.':'.self::$department->shortName, DataType::TYPE_STRING);
+        }
+        if ($module) {
+            $lists->setCellValueExplicit('A'.$row++, InitialDataSchema::MODULE_KEY.':'.$module, DataType::TYPE_STRING);
+        }
+        if ($stage) {
+            $lists->setCellValueExplicit('A'.$row, InitialDataSchema::STAGE_KEY.':'.$stage, DataType::TYPE_STRING);
+        }
+
         self::defineRefNames($book);
 
-        foreach (InitialDataSchema::sheets() as $key => $sheet) {
-            self::addValidations($book->getSheetByName($sheet['title']), $sheet);
+        // Sheet ẩn đã khoá toàn bộ, không cần ô chọn
+        foreach (array_intersect_key(InitialDataSchema::sheets(), self::$roles) as $key => $sheet) {
+            if (! self::hidden($key)) {
+                self::addValidations($book->getSheetByName($sheet['title']), $key, $sheet);
+            }
         }
 
         self::buildGuide($guide);
@@ -110,6 +184,37 @@ class InitialDataTemplate
         $book->setActiveSheetIndex(0);
 
         return $book;
+    }
+
+    /** Sheet chỉ Admin khai, trong file của phòng ban: ẩn + khoá. */
+    private static function adminOnly(string $key): bool
+    {
+        return self::$department !== null && in_array($key, InitialDataSchema::ADMIN_ONLY_SHEETS, true);
+    }
+
+    /**
+     * Sheet ẩn hẳn + khoá: sheet giai đoạn trước chỉ làm nguồn ô chọn, hoặc sheet chỉ Admin khai
+     * trong file của phòng ban.
+     */
+    private static function hidden(string $key): bool
+    {
+        return (self::$roles[$key] ?? null) === 'source' || self::adminOnly($key);
+    }
+
+    /** Sheet nhập được và hiện ra trong file. */
+    private static function visibleSheets(): array
+    {
+        return array_filter(
+            array_intersect_key(InitialDataSchema::sheets(), self::$roles),
+            fn ($key) => ! self::hidden($key),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    /** Sheet tra cứu có trong file (theo module, giai đoạn). */
+    private static function referenceSheets(): array
+    {
+        return array_intersect_key(InitialDataSchema::referenceSheets(), self::$roles);
     }
 
     // ------------------------------------------------------------------ SHEET HƯỚNG DẪN
@@ -132,7 +237,27 @@ class InitialDataTemplate
         $ws->mergeCells('A2:D2');
         $ws->getStyle('A2')->getFont()->setItalic(true)->getColor()->setRGB(self::MUTED);
 
-        $row = 4;
+        $row = 3;
+        $scope = [];
+        if (self::$stage) {
+            $scope[] = 'GIAI ĐOẠN '.self::$stage.' - '.mb_strtoupper(InitialDataSchema::STAGES[self::$stage])
+                .(self::$stage > 1 ? '. Dữ liệu giai đoạn trước lấy theo hệ thống lúc tải file (thiếu thì bổ sung trên hệ thống rồi tải lại file).' : '.')
+                .(in_array(self::$stage, InitialDataSchema::SHARED_STAGES, true) ? ' File dùng chung cho mọi phòng ban.' : '');
+        }
+        if (self::$module) {
+            $scope[] = 'FILE MODULE '.mb_strtoupper(InitialDataSchema::MODULES[self::$module]).' - chỉ gồm sheet dùng chung và sheet '.InitialDataSchema::MODULES[self::$module].'.';
+        }
+        if (self::$department) {
+            $scope[] = 'FILE RIÊNG CỦA PHÒNG '.self::$department->shortName.' - chỉ khai dữ liệu của phòng '.self::$department->shortName
+                .'. Công ty, Phòng ban, Vai trò do Admin khai ở file toàn hệ thống.';
+        }
+        foreach ($scope as $text) {
+            $ws->setCellValue('A'.$row, $text);
+            $ws->mergeCells('A'.$row.':D'.$row);
+            $ws->getStyle('A'.$row)->getFont()->setBold(true)->getColor()->setRGB(self::DANGER);
+            $row++;
+        }
+        $row++;
         $row = self::guideHeading($ws, $row, 'A. CÁCH ĐIỀN FILE');
 
         $rules = [
@@ -143,14 +268,51 @@ class InitialDataTemplate
             'Ô có danh sách chọn: nên chọn từ danh sách thay vì gõ tay để tránh sai chính tả. Có thể dán (paste) giá trị nhưng phải trùng khớp chính xác.',
             'Ngày ghi theo dạng dd/mm/yyyy (VD: 31/12/2027). Số thập phân dùng dấu chấm hoặc theo định dạng số của Excel.',
             'Cột nhiều giá trị (Cảnh báo an toàn, Phân nhóm chuẩn, Mục đích sử dụng): ghi các mã / tên cách nhau bằng dấu phẩy hoặc chấm phẩy.',
-            'Mã danh mục (sheet 19, 20, 21) do người điền tự đánh số theo mẫu M00001 / C00001 / S00001, không trùng. Các sheet 27-33 chọn lại theo mã này.',
-            'Sheet nào không có dữ liệu thì để trống, hệ thống bỏ qua. Dữ liệu đã có sẵn trong hệ thống (trùng tên / mã) được giữ nguyên, không ghi đè.',
-            'Sheet "Vai trò" và "Đơn vị tính" đã điền sẵn dữ liệu hệ thống đang có - giữ lại để chọn, có thể bổ sung thêm dòng.',
+            'Mã danh mục (sheet 19, 20, 21) KHÔNG nhập tay: file tự sinh M00001 / C00001 / S00001 nối tiếp mã đang có ngay khi điền Tên. Các sheet 27-33 chọn lại theo mã này. Lúc nạp, nếu mã đã bị dùng trong lúc bạn điền file, hệ thống cấp mã kế tiếp và báo trong kết quả.',
+            'Dòng NỀN XÁM ở đầu mỗi sheet là dữ liệu đang có trong hệ thống (dữ liệu gốc, danh mục, định khu), đã khoá - chỉ để chọn lại ở các sheet sau. Bổ sung dữ liệu mới ở các dòng trắng bên dưới.',
+            'Sheet nào không có dữ liệu mới thì để trống, hệ thống bỏ qua. Dòng mới trùng dữ liệu đã có (trùng tên / tổ hợp) được giữ nguyên, không ghi đè.',
+            'Nhiều phòng ban điền file cùng lúc: mỗi phòng một file riêng. Tên hàng / danh mục mà phòng khác cũng thêm thì phòng nạp sau được dùng lại bản đã có; Mã DM được cấp lại theo thứ tự nạp, các sheet sau trong file vẫn trỏ đúng danh mục đã khai.',
         ];
-        foreach ($rules as $i => $text) {
+        $visible = self::visibleSheets();
+        $hasCategories = (bool) array_intersect_key($visible, array_flip(['material_cats', 'chemical_cats', 'standard_cats']));
+        if (! $hasCategories) {
+            unset($rules[7]);
+        }
+        foreach (array_values($rules) as $i => $text) {
             $row = self::guideLine($ws, $row, ($i + 1).'.', $text);
         }
 
+        if (array_intersect_key($visible, array_flip(['stock_materials', 'stock_chemicals', 'stock_standards']))) {
+            $row = self::stockGuide($ws, $row);
+        }
+
+        $row++;
+        $row = self::guideHeading($ws, $row, 'C. DANH SÁCH SHEET');
+        $row = self::guideSheetList($ws, $row, $visible);
+
+        $lists = InitialDataSchema::lists();
+        $multi = [];
+        if (isset($visible['chemical_cats'])) {
+            $multi[] = 'Cảnh báo an toàn (sheet 20): '.implode('; ', array_keys($lists['safety_warning']));
+        }
+        if (isset($visible['standard_cats']) || isset($visible['stock_standards'])) {
+            $multi[] = 'Phân nhóm chuẩn (sheet 21, 33): '.implode('; ', array_keys($lists['standard_group']));
+        }
+        if ($multi) {
+            $row++;
+            $row = self::guideHeading($ws, $row, 'D. MÃ DÙNG CHO CỘT NHIỀU GIÁ TRỊ');
+            foreach ($multi as $text) {
+                $row = self::guideLine($ws, $row, '', $text);
+            }
+            $row = self::guideLine($ws, $row, '', 'Chỉ cần ghi phần mã đứng trước dấu " - ", VD: "TOXIC, CORROSIVE" hoặc "PRS, IMPRS".');
+        }
+
+        $ws->getStyle('A4:D'.$row)->getFont()->getColor()->setRGB(self::TEXT_MAIN);
+        $ws->freezePane('A4');
+    }
+
+    private static function stockGuide(Worksheet $ws, int $row): int
+    {
         $row++;
         $row = self::guideHeading($ws, $row, 'B. TỒN ĐẦU KỲ (SHEET 31 - 33)');
         $stockRules = [
@@ -165,8 +327,11 @@ class InitialDataTemplate
             $row = self::guideLine($ws, $row, ($i + 1).'.', $text);
         }
 
-        $row++;
-        $row = self::guideHeading($ws, $row, 'C. DANH SÁCH SHEET');
+        return $row;
+    }
+
+    private static function guideSheetList(Worksheet $ws, int $row, array $visible): int
+    {
         foreach (['STT', 'Sheet', 'Nhóm', 'Nội dung'] as $i => $label) {
             $ws->setCellValue(InitialDataSchema::letter($i).$row, $label);
         }
@@ -174,7 +339,8 @@ class InitialDataTemplate
         $row++;
 
         $no = 1;
-        foreach (InitialDataSchema::sheets() as $sheet) {
+        $firstListRow = $row;
+        foreach ($visible as $sheet) {
             $ws->setCellValue('A'.$row, $no++);
             $ws->setCellValue('B'.$row, $sheet['title']);
             $ws->getCell('B'.$row)->getHyperlink()->setUrl("sheet://'".$sheet['title']."'!A5");
@@ -185,7 +351,7 @@ class InitialDataTemplate
             $ws->getStyle('C'.$row)->getFont()->getColor()->setRGB(self::GROUP_TAB_COLORS[$sheet['group']] ?? self::TEXT_MAIN);
             $row++;
         }
-        foreach (InitialDataSchema::referenceSheets() as $sheet) {
+        foreach (self::referenceSheets() as $sheet) {
             $ws->setCellValue('A'.$row, '—');
             $ws->setCellValue('B'.$row, $sheet['title']);
             $ws->setCellValue('C'.$row, 'Tra cứu (chỉ đọc)');
@@ -193,18 +359,10 @@ class InitialDataTemplate
             $ws->getStyle('A'.$row.':D'.$row)->getAlignment()->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
             $row++;
         }
-        $ws->getStyle('A'.($row - count(InitialDataSchema::sheets()) - 2).':D'.($row - 1))
+        $ws->getStyle('A'.$firstListRow.':D'.($row - 1))
             ->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('D6E4F2');
 
-        $row++;
-        $row = self::guideHeading($ws, $row, 'D. MÃ DÙNG CHO CỘT NHIỀU GIÁ TRỊ');
-        $lists = InitialDataSchema::lists();
-        $row = self::guideLine($ws, $row, '', 'Cảnh báo an toàn (sheet 20): '.implode('; ', array_keys($lists['safety_warning'])));
-        $row = self::guideLine($ws, $row, '', 'Phân nhóm chuẩn (sheet 21, 33): '.implode('; ', array_keys($lists['standard_group'])));
-        $row = self::guideLine($ws, $row, '', 'Chỉ cần ghi phần mã đứng trước dấu " - ", VD: "TOXIC, CORROSIVE" hoặc "PRS, IMPRS".');
-
-        $ws->getStyle('A4:D'.$row)->getFont()->getColor()->setRGB(self::TEXT_MAIN);
-        $ws->freezePane('A4');
+        return $row;
     }
 
     private static function guideHeading(Worksheet $ws, int $row, string $text): int
@@ -236,8 +394,12 @@ class InitialDataTemplate
     {
         $columns = $sheet['columns'];
         $last = InitialDataSchema::letter(count($columns) - 1);
-        $maxRow = InitialDataSchema::MAX_ROWS;
         $first = InitialDataSchema::FIRST_DATA_ROW;
+        $prefill = self::prefill($key);
+        $newRow = $first + count($prefill);
+        $maxRow = $newRow + InitialDataSchema::MAX_ROWS - 1;
+        self::$prefillCounts[$key] = count($prefill);
+        self::$lastRows[$key] = $maxRow;
 
         $ws->getTabColor()->setRGB(self::GROUP_TAB_COLORS[$sheet['group']] ?? self::PRIMARY);
 
@@ -261,7 +423,7 @@ class InitialDataTemplate
                 'int' => '0',
                 'num' => '#,##0.####',
                 'date' => 'dd/mm/yyyy',
-                'calc' => null,
+                'calc', 'auto' => null,
                 // Mã như "001" phải giữ nguyên số 0 đầu: ép định dạng chữ
                 default => NumberFormat::FORMAT_TEXT,
             };
@@ -276,13 +438,22 @@ class InitialDataTemplate
             self::styleHeader(
                 $ws,
                 $letter.InitialDataSchema::HEADER_ROW,
-                ! empty($col['req']) ? self::PRIMARY_DARK : ($col['type'] === 'calc' ? self::MUTED : self::PRIMARY_LIGHT)
+                ! empty($col['req']) ? self::PRIMARY_DARK : (in_array($col['type'], ['calc', 'auto'], true) ? self::MUTED : self::PRIMARY_LIGHT)
             );
 
             if ($col['type'] === 'calc') {
                 for ($r = $first; $r <= $maxRow; $r++) {
                     $ws->setCellValue($letter.$r, str_replace('{r}', (string) $r, $col['formula']));
                 }
+            }
+
+            if ($col['type'] === 'auto') {
+                // Mã mới = số lớn nhất đang có + thứ tự dòng đã điền tên (cột B) tính từ dòng mới đầu tiên
+                $base = InitialDataSchema::maxCodeNumber($sheet['table'], $col['prefix']);
+                for ($r = $newRow; $r <= $maxRow; $r++) {
+                    $ws->setCellValue($letter.$r, '=IF(B'.$r.'="","","'.$col['prefix'].'"&TEXT('.$base.'+COUNTA(B$'.$newRow.':B'.$r.'),"00000"))');
+                }
+                $ws->getStyle($letter.$newRow.':'.$letter.$maxRow)->getFont()->setBold(true)->getColor()->setRGB(self::PRIMARY_DARK);
             }
 
             if (! empty($col['hidden'])) {
@@ -300,17 +471,62 @@ class InitialDataTemplate
         $ws->freezePane('B'.$first);
         $ws->setAutoFilter('A'.InitialDataSchema::HEADER_ROW.':'.$last.InitialDataSchema::HEADER_ROW);
 
-        foreach (self::prefill($key) as $offset => $values) {
+        $rows = array_merge($prefill, $prefill ? [] : self::seedRows($key));
+        foreach ($rows as $offset => $values) {
             foreach ($values as $i => $value) {
+                if ($value === null || $value === '' || $columns[$i]['type'] === 'calc') {
+                    continue;
+                }
                 $ws->setCellValueExplicit(
                     InitialDataSchema::letter($i).($first + $offset),
                     $value,
-                    is_numeric($value) && $columns[$i]['type'] === 'num'
-                        ? \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC
-                        : \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                    is_numeric($value) && in_array($columns[$i]['type'], ['num', 'int'], true)
+                        ? DataType::TYPE_NUMERIC
+                        : DataType::TYPE_STRING
                 );
             }
         }
+
+        self::protect($ws, $columns, $prefill ? $newRow - 1 : null, $last, self::hidden($key));
+    }
+
+    /**
+     * Khoá dòng điền sẵn từ hệ thống + cột Mã DM tự sinh / cột công thức. Vùng nhập mới mở khoá
+     * theo style của cả cột (không tạo hàng nghìn ô). $readOnly = khoá cả sheet (sheet chỉ Admin
+     * khai, trong file của phòng ban).
+     */
+    private static function protect(Worksheet $ws, array $columns, ?int $lastPrefillRow, string $last, bool $readOnly = false): void
+    {
+        $hasAuto = collect($columns)->contains(fn ($c) => $c['type'] === 'auto');
+        if ($lastPrefillRow === null && ! $hasAuto && ! $readOnly) {
+            return;
+        }
+
+        foreach ($columns as $i => $col) {
+            if (! $readOnly && ! in_array($col['type'], ['calc', 'auto'], true)) {
+                $letter = InitialDataSchema::letter($i);
+                $ws->getStyle($letter.':'.$letter)->getProtection()->setLocked(Protection::PROTECTION_UNPROTECTED);
+            }
+        }
+
+        // Tiêu đề, gợi ý và dòng điền sẵn khoá lại (ghi đè style cột)
+        $ws->getStyle('A1:'.$last.($lastPrefillRow ?? InitialDataSchema::HINT_ROW))
+            ->getProtection()->setLocked(Protection::PROTECTION_PROTECTED);
+
+        if ($lastPrefillRow !== null) {
+            $range = 'A'.InitialDataSchema::FIRST_DATA_ROW.':'.$last.$lastPrefillRow;
+            $ws->getStyle($range)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB(self::PREFILL_FILL);
+            $ws->getStyle($range)->getFont()->getColor()->setRGB(self::MUTED);
+        }
+
+        // Vẫn cho lọc, chỉnh độ rộng cột / cao dòng và xoá dòng mới điền nhầm
+        $ws->getProtection()
+            ->setSheet(true)
+            ->setAutoFilter(false)
+            ->setSort(false)
+            ->setFormatColumns(false)
+            ->setFormatRows(false)
+            ->setDeleteRows(false);
     }
 
     private static function styleHeader(Worksheet $ws, string $range, string $fill): void
@@ -323,33 +539,156 @@ class InitialDataTemplate
     }
 
     /**
-     * Dữ liệu điền sẵn: các dòng hệ thống đang có mà khách hàng cần chọn lại.
+     * Dữ liệu điền sẵn: dữ liệu gốc / danh mục / định khu hệ thống đang có, làm nguồn chọn
+     * cho các sheet sau. Bộ nhập bỏ qua các dòng này (đã có trong DB).
      *
-     * @return array<int, array<int, string>> dòng => [giá trị theo thứ tự cột]
+     * Riêng "Đơn vị tính" khi DB còn trống thì ghi bộ đơn vị chuẩn vào vùng nhập mới (chưa có
+     * trong DB nên bộ nhập phải nạp), xem seedRows().
+     *
+     * @return array<int, array<int, string|null>> dòng => [giá trị theo thứ tự cột]
      */
     private static function prefill(string $key): array
     {
-        if ($key === 'roles' && Schema::hasTable('roles')) {
-            return DB::table('roles')->orderBy('id')->get()
-                ->map(fn ($r) => [(string) $r->name, (string) ($r->description ?? '')])
-                ->all();
+        $table = InitialDataSchema::sheets()[$key]['table'];
+        if (! Schema::hasTable($table)) {
+            return [];
         }
 
-        if ($key === 'units') {
-            $groupLabels = array_flip(InitialDataSchema::lists()['unit_group']);
-            $rows = Schema::hasTable('units')
-                ? DB::table('units')->where('status_id', 1)->orderBy('unit_group')->orderBy('factor_to_base')->get()
-                    ->map(fn ($u) => [(string) $u->short_name, (string) $u->name, $groupLabels[$u->unit_group] ?? '', self::number($u->factor_to_base)])
-                    ->all()
-                : [];
+        $lists = InitialDataSchema::lists();
+        $label = fn (string $list, $value) => array_flip($lists[$list])[$value] ?? null;
+        $dept = fn () => DB::table('deparments')->pluck('shortName', 'id');
+        $code = fn (string $zoneTable) => DB::table($zoneTable)->pluck('code', 'id');
+        $makers = fn () => DB::table('manufacturers')->pluck('short_name', 'id');
+        $storages = fn () => DB::table('storage_conditions')->pluck('name', 'id');
 
-            return $rows ?: array_map(
-                fn ($u) => [$u[0], $u[1], $groupLabels[$u[2]], self::number($u[3])],
-                self::defaultUnits()
-            );
+        $rows = match ($key) {
+            'companies' => self::active($table)->orderBy('code')->get()
+                ->map(fn ($r) => [$r->short_name, $r->name]),
+            'departments' => (function () use ($table) {
+                $companies = DB::table('companies')->pluck('short_name', 'id');
+
+                return DB::table($table)->where('isActive', 1)->orderBy('id')->get()
+                    ->map(fn ($r) => [$r->shortName, $r->name, $companies[$r->company_id] ?? null, $r->EngshortName, (int) $r->is_general === 0 ? 'Có' : 'Không']);
+            })(),
+            'groups', 'dept_class' => (function () use ($table, $dept) {
+                $depts = $dept();
+
+                return self::ownDepartment(self::active($table))->orderBy('department_id')->orderBy('name')->get()
+                    ->map(fn ($r) => [$depts[$r->department_id] ?? null, $r->name]);
+            })(),
+            'roles' => DB::table($table)->orderBy('id')->get()
+                ->map(fn ($r) => [$r->name, $r->description]),
+            'units' => self::active($table)->orderBy('unit_group')->orderBy('factor_to_base')->get()
+                ->map(fn ($r) => [$r->short_name, $r->name, $label('unit_group', $r->unit_group), self::number($r->factor_to_base)]),
+            'packaging', 'purposes', 'products', 'material_names', 'chem_names' => self::active($table)->orderBy('name')->get()
+                ->map(fn ($r) => [$r->name]),
+            'storage' => self::active($table)->orderBy('name')->get()
+                ->map(fn ($r) => [$r->name, $r->note]),
+            'manufacturers' => self::active($table)->orderBy('short_name')->get()
+                ->map(fn ($r) => [$r->short_name, $r->name]),
+            'suppliers' => self::active($table)->orderBy('name')->get()
+                ->map(fn ($r) => [$r->name, $r->address, $r->tax_no, $r->note]),
+            'consumption' => self::active($table)->orderBy('type')->orderBy('code')->get()
+                ->map(fn ($r) => [$label('consumption_type', $r->type), $r->code, $r->name, $r->location, $label('frequency', $r->frequency)]),
+            'standard_names' => self::active($table)->orderBy('name')->get()
+                ->map(fn ($r) => [$r->name, $r->active_ingredient_name, $r->cas_no]),
+            'material_cats' => (function () use ($table, $makers, $label) {
+                $names = DB::table('material_names')->pluck('name', 'id');
+                $makerNames = $makers();
+
+                return self::active($table)->orderBy('code')->get()->map(function ($r) use ($names, $makerNames, $label) {
+                    $cls = MaterialClassification::decode($r->classification);
+                    $criterion = fn (string $key) => isset($cls[$key]) ? $label('cls_'.$key, $cls[$key]) : null;
+
+                    return [
+                        $r->code, $names[$r->material_names_id] ?? null, $makerNames[$r->manufacturers_id] ?? null, $r->technical_specification,
+                        $criterion('price'), $criterion('importance'), $criterion('dangerous'),
+                        $label('purchasing', $r->purchasing_department), $criterion('qa_calibration'), $r->lead_time_days, null,
+                    ];
+                });
+            })(),
+            'chemical_cats' => (function () use ($table, $makers, $storages) {
+                $names = DB::table('chem_names')->pluck('name', 'id');
+                $makerNames = $makers();
+                $storageNames = $storages();
+
+                return self::active($table)->orderBy('code')->get()->map(fn ($r) => [
+                    $r->code, $names[$r->chem_names_id] ?? null, $r->type, $makerNames[$r->manufacturers_id] ?? null,
+                    self::numberOrNull($r->density), self::numberOrNull($r->ai_content_percent), $r->shelf_life_months,
+                    $storageNames[$r->storage_condition_id] ?? null, $r->doc_no,
+                    implode(', ', (array) json_decode((string) $r->safety_warning, true)), $r->lead_time_days, null,
+                ]);
+            })(),
+            'standard_cats' => (function () use ($table, $makers, $storages) {
+                // standard_categories.chem_names_id trỏ tới standard_names (tên cột giữ từ bản cũ)
+                $names = DB::table('standard_names')->pluck('name', 'id');
+                $makerNames = $makers();
+                $storageNames = $storages();
+
+                return self::active($table)->orderBy('code')->get()->map(fn ($r) => [
+                    $r->code, $names[$r->chem_names_id] ?? null, $makerNames[$r->manufacturers_id] ?? null, $r->cas_no,
+                    self::numberOrNull($r->density), $storageNames[$r->storage_condition_id] ?? null,
+                    implode(', ', StandardCode::decodeGroups($r->groups)), $r->shelf_life_months, $r->doc_no, $r->note,
+                    $r->lead_time_days, null,
+                ]);
+            })(),
+            'warehouses', 'shelves', 'columns', 'tiers', 'locations' => (function () use ($key, $table, $dept, $code, $label) {
+                $depts = $dept();
+                $parents = [];
+                foreach (['warehouse' => 'warehouses', 'shelf' => 'shelves', 'column' => 'columns', 'tier' => 'tiers'] as $level => $zoneTable) {
+                    $parents[$level] = $zoneTable === $table ? collect() : $code($zoneTable);
+                }
+
+                return self::ownDepartment(self::active($table))->orderBy('department_id')->orderBy('code')->get()
+                    ->map(function ($r) use ($key, $depts, $parents, $label) {
+                        $parentCodes = [];
+                        foreach (['warehouse', 'shelf', 'column', 'tier'] as $level) {
+                            if (property_exists($r, $level.'_id')) {
+                                $parentCodes[] = $parents[$level][$r->{$level.'_id'}] ?? null;
+                            }
+                        }
+                        $zone = [$label('zone_type', $r->zone_type), $r->color];
+
+                        return $key === 'locations'
+                            ? array_merge([$depts[$r->department_id] ?? null, $r->code], $parentCodes, [$label('item_type', $r->item_type)], $zone)
+                            : array_merge([$depts[$r->department_id] ?? null, $r->code, $r->name], $parentCodes, $zone);
+                    });
+            })(),
+            default => collect(),
+        };
+
+        return $rows->map(fn ($row) => array_map(fn ($v) => $v === null ? null : (string) $v, $row))->all();
+    }
+
+    /** Bản ghi đang sử dụng (và đã duyệt nếu bảng có luồng duyệt). */
+    private static function active(string $table): \Illuminate\Database\Query\Builder
+    {
+        return DB::table($table)
+            ->where('status_id', 1)
+            ->when(Schema::hasColumn($table, 'app_status'), fn ($q) => $q->where('app_status', 'approved'));
+    }
+
+    /** File của phòng ban: dữ liệu theo phòng (tổ, phân loại, định khu) chỉ lấy của phòng đó. */
+    private static function ownDepartment(\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Query\Builder
+    {
+        return $query->when(self::$department, fn ($q) => $q->where('department_id', self::$department->id));
+    }
+
+    private static function numberOrNull($value): ?string
+    {
+        return $value === null ? null : self::number($value);
+    }
+
+    /** Dòng gợi ý ghi sẵn vào vùng nhập mới khi sheet chưa có dữ liệu hệ thống. */
+    private static function seedRows(string $key): array
+    {
+        if ($key !== 'units') {
+            return [];
         }
 
-        return [];
+        $groupLabels = array_flip(InitialDataSchema::lists()['unit_group']);
+
+        return array_map(fn ($u) => [$u[0], $u[1], $groupLabels[$u[2]], self::number($u[3])], self::defaultUnits());
     }
 
     /** Bộ đơn vị chuẩn khi DB chưa có đơn vị nào - trùng với database/seeders/UnitSeeder. */
@@ -455,14 +794,18 @@ class InitialDataTemplate
     {
         $sheets = InitialDataSchema::sheets();
         $first = InitialDataSchema::FIRST_DATA_ROW;
-        $max = InitialDataSchema::REF_MAX_ROWS;
 
         foreach (InitialDataSchema::refs() as $name => [$sheetKey, $column]) {
+            // Sheet nguồn không có trong file (khác module / giai đoạn): không sheet nào trong file chọn tới nó
+            if (! isset(self::$roles[$sheetKey])) {
+                continue;
+            }
             $title = InitialDataSchema::sheetTitle($sheetKey);
             $letter = InitialDataSchema::columnLetter($sheetKey, $column);
             $isCalc = is_string($column) && collect($sheets[$sheetKey]['columns'])->firstWhere('key', $column)['type'] === 'calc';
 
             $quoted = "'".str_replace("'", "''", $title)."'";
+            $max = self::$lastRows[$sheetKey] ?? $first + InitialDataSchema::MAX_ROWS - 1;
             $span = $quoted.'!$'.$letter.'$'.$first.':$'.$letter.'$'.$max;
             $count = $isCalc ? 'COUNTIF('.$span.',"?*")' : 'COUNTA('.$span.')';
 
@@ -474,15 +817,23 @@ class InitialDataTemplate
         }
     }
 
-    private static function addValidations(Worksheet $ws, array $sheet): void
+    private static function addValidations(Worksheet $ws, string $key, array $sheet): void
     {
-        $first = InitialDataSchema::FIRST_DATA_ROW;
-        $max = InitialDataSchema::MAX_ROWS;
+        // Ô chọn chỉ gắn cho vùng nhập mới, dòng điền sẵn đã khoá
+        $first = InitialDataSchema::FIRST_DATA_ROW + self::$prefillCounts[$key];
+        $max = self::$lastRows[$key];
 
         foreach ($sheet['columns'] as $i => $col) {
             $letter = InitialDataSchema::letter($i);
             $range = $letter.$first.':'.$letter.$max;
             $label = $col['label'];
+
+            // File của phòng ban: cột Phòng ban chỉ chọn được đúng phòng đó
+            if (self::$department && $col['key'] === 'department') {
+                $ws->setDataValidation($range, self::validation(DataValidation::TYPE_LIST, '"'.str_replace(['"', ','], '', self::$department->shortName).'"', $label));
+
+                continue;
+            }
 
             $validation = match ($col['type']) {
                 'list' => self::validation(DataValidation::TYPE_LIST, '='.self::listName($col['list']), $label, ! empty($col['free'])),

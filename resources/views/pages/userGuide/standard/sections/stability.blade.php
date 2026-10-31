@@ -5,7 +5,9 @@
 <h3>Lập phiếu đánh giá</h3>
 <ol class="ug-steps">
     <li>Bấm <b>Lập phiếu đánh giá</b> trên tab, hoặc bấm nhãn <span class="ug-chip">+ ĐGHD</span> dưới cột Hạn Dùng của ống ở tab
-        <b>Theo mã ống chuẩn</b> (modal mở sẵn đúng ống đó).</li>
+        <b>Theo mã ống chuẩn</b> (modal mở sẵn đúng ống đó).
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/danh-gia-lap-phieu.png', 'caption' => 'Hộp thoại Lập Phiếu Đánh Giá Hạn Dùng'])
+    </li>
     <li>Chọn ống chuẩn. Chỉ ống CTC được tick <b>Lô đánh giá hạn dùng</b> lúc nhập mới hiện ở đây. Mỗi ống chỉ có <b>một</b> phiếu còn
         hiệu lực; muốn lập lại thì huỷ phiếu cũ trước.</li>
     <li>Nhập <b>ngày bắt đầu</b> và <b>chu kỳ đánh giá</b> (số tháng).</li>
@@ -15,6 +17,8 @@
 <h3>Theo dõi ngay trên bảng tồn</h3>
 <p>Ống đã có phiếu còn hiệu lực hiện nhãn <span class="ug-chip">ĐGHD 2/5</span> (số mốc đã đánh giá / tổng số mốc) dưới cột
     <b>Hạn Dùng</b> của tab Theo mã ống chuẩn. Nhãn vàng là có mốc quá hạn, đỏ là phiếu đã dừng đánh giá. Bấm nhãn để mở trang chi tiết phiếu.</p>
+
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/danh-gia-chi-tiet.png', 'caption' => 'Trang chi tiết phiếu đánh giá: các mốc, chỉ tiêu, kết quả'])
 
 <h3>Thực hiện tại mỗi mốc</h3>
 <ul>

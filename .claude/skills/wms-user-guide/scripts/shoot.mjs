@@ -56,6 +56,13 @@ const PRELUDE = `window.__ug = {
     }
     return false;
   },
+  click(sel) {
+    // Ưu tiên nút đang hiện; nút nằm trong cột thu gọn / menu thao tác vẫn bấm được qua handler gắn ở document
+    const all = [...document.querySelectorAll(sel)];
+    const el = all.find(e => this.visible(e)) || all[0];
+    if (el) el.click();
+    return !!el;
+  },
   clickCreate() {
     const panes = [...document.querySelectorAll('.tab-pane.active, .tab-pane.show')].filter(this.visible);
     const scope = panes.length ? panes[panes.length - 1] : document;
@@ -85,11 +92,14 @@ for (const shot of plan) {
     await Promise.race([loaded, sleep(20000)]);
     await sleep(shot.wait || 1500);
     await evaluate(PRELUDE);
+    // Chờ bảng tải ngầm (@deferredRows, DataTables AJAX) đổ xong dữ liệu - trước khi bấm nút trên dòng và trước khi chụp
+    const settle = async () => {
+        for (let i = 0; i < 40 && await evaluate(`/Đang tải dữ liệu|Loading\.\.\.|Processing/.test(document.body.innerText)`); i++) await sleep(500);
+        await sleep(300);
+    };
     if (shot.tab?.length) { await evaluate(`__ug.tab(${JSON.stringify(shot.tab)})`); await sleep(1500); }
-    if (shot.js) { await evaluate(shot.js); await sleep(shot.afterJs || 1200); }
-    // Chờ bảng tải ngầm (@deferredRows, DataTables AJAX) đổ xong dữ liệu
-    for (let i = 0; i < 40 && await evaluate(`/Đang tải dữ liệu|Loading\.\.\.|Processing/.test(document.body.innerText)`); i++) await sleep(500);
-    await sleep(300);
+    await settle();
+    if (shot.js) { await evaluate(shot.js); await sleep(shot.afterJs || 1200); await settle(); }
     if (shot.probe) console.log('probe', shot.name, JSON.stringify(await evaluate(shot.probe)));
     for (const sel of shot.highlight || []) await evaluate(`document.querySelectorAll(${JSON.stringify(sel)}).forEach(e => e.classList.add('ug-hl'))`);
 

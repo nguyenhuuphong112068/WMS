@@ -6,6 +6,7 @@ use App\Http\Controllers\Pages\MaterData\ConsumptionObjectController;
 use App\Http\Controllers\Pages\MaterData\ZoneController;
 use App\Support\MaterialClassification;
 use App\Support\ZoneType;
+use Illuminate\Support\Facades\DB;
 
 /**
  * KHỞI TẠO DỮ LIỆU BAN ĐẦU - CẤU TRÚC FILE EXCEL
@@ -34,11 +35,16 @@ use App\Support\ZoneType;
  *   multi  : nhiều giá trị cách nhau dấu phẩy / chấm phẩy, mỗi giá trị thuộc `list`
  *   color  : mã màu #RRGGBB
  *   calc   : cột công thức do file mẫu tự tính, bộ nhập bỏ qua
+ *   auto   : mã danh mục tự sinh bằng công thức (`prefix` + 5 số), người điền không nhập; bộ nhập
+ *            đọc làm khoá tham chiếu trong file và cấp mã thật lúc nạp
+ *
+ * Dòng dữ liệu đã có trong hệ thống được điền sẵn ở đầu mỗi sheet (khoá, nền xám); số dòng
+ * điền sẵn ghi ở sheet ẩn LIST_SHEET để bộ nhập bỏ qua đúng các dòng đó.
  */
 class InitialDataSchema
 {
     /** Phiên bản cấu trúc file. Đổi cột / sheet thì tăng số này để chặn file mẫu cũ. */
-    public const VERSION = 'WMS-INITIAL-DATA-V1';
+    public const VERSION = 'WMS-INITIAL-DATA-V2';
 
     /** Tên sheet ẩn chứa danh sách chọn cố định + phiên bản file. */
     public const LIST_SHEET = '_DS';
@@ -59,8 +65,90 @@ class InitialDataSchema
     /** Số dòng tối đa được gắn danh sách chọn / công thức sẵn trong file mẫu. */
     public const MAX_ROWS = 5000;
 
-    /** Số dòng tối đa được đếm vào danh sách chọn tham chiếu (sheet tên hàng có thể rất dài). */
-    public const REF_MAX_ROWS = 20000;
+    /** Ô ở sheet LIST_SHEET bắt đầu ghi số dòng điền sẵn của từng sheet (dạng "key:số dòng"). */
+    public const PREFILL_CELL_ROW = 4;
+
+    /**
+     * Mục ghi kèm trong danh sách trên ("@department:<tên viết tắt>") khi file là file riêng của
+     * một phòng ban: phòng đó chỉ được khai dữ liệu của chính mình.
+     */
+    public const SCOPE_KEY = '@department';
+
+    /**
+     * Sheet chỉ Admin khai ở file toàn hệ thống. File của phòng ban ẩn hẳn các sheet này (vẫn giữ
+     * trong file làm nguồn ô chọn Vai trò / Tổ ở sheet Người dùng) và bộ nạp chặn dòng mới.
+     */
+    public const ADMIN_ONLY_SHEETS = ['companies', 'departments', 'roles'];
+
+    /** Mục ghi kèm ("@stage:<số>") khi file chỉ thu thập dữ liệu của một giai đoạn. */
+    public const STAGE_KEY = '@stage';
+
+    /**
+     * Các giai đoạn tập hợp dữ liệu, nạp theo thứ tự: giai đoạn sau chọn lại dữ liệu đã nạp ở
+     * giai đoạn trước (lấy từ DB lúc tải file).
+     */
+    public const STAGES = [
+        1 => 'Tổ chức (Admin)',
+        2 => 'Người dùng & Tổ - Nhóm',
+        3 => 'Dữ liệu gốc & danh mục',
+        4 => 'Tồn đầu kỳ',
+    ];
+
+    /**
+     * Giai đoạn luôn là MỘT file toàn hệ thống dùng chung cho mọi phòng ban: không chia theo phòng
+     * ban / module (tổ chức do Admin khai; người dùng các phòng cùng điền một file).
+     */
+    public const SHARED_STAGES = [1, 2];
+
+    /**
+     * Sheet thuộc giai đoạn 1 (tổ chức - Admin chuẩn bị) / 2 (người dùng + tổ - nhóm, các phòng bổ sung
+     * tổ còn thiếu ngay trong file người dùng) / 4 (tồn đầu kỳ); sheet còn
+     * lại (dữ liệu gốc, tên hàng, danh mục, định khu, hàng của phòng) là giai đoạn 3.
+     */
+    public const STAGE_SHEETS = [
+        'companies' => 1,
+        'departments' => 1,
+        'roles' => 1,
+        'groups' => 2,
+        'users' => 2,
+        'stock_materials' => 4,
+        'stock_chemicals' => 4,
+        'stock_standards' => 4,
+    ];
+
+    /** Mục ghi kèm ("@module:<module>") khi file chỉ thu thập dữ liệu của một module. */
+    public const MODULE_KEY = '@module';
+
+    /** Module tách file thu thập riêng. */
+    public const MODULES = ['material' => 'Vật tư', 'chemical' => 'Hoá chất', 'standard' => 'Chất chuẩn'];
+
+    /**
+     * Sheet (dữ liệu + tra cứu) thuộc riêng module nào; sheet không có ở đây là sheet dùng chung,
+     * có mặt trong file của mọi module (tổ chức, đơn vị, nhà sản xuất, sản phẩm, định khu, quy đổi).
+     */
+    public const MODULE_SHEETS = [
+        'packaging' => ['standard'],
+        'storage' => ['chemical', 'standard'],
+        'suppliers' => ['chemical', 'standard'],
+        'purposes' => ['standard'],
+        'consumption' => ['material'],
+        'dept_class' => ['material'],
+        'material_names' => ['material'],
+        'material_cats' => ['material'],
+        'dept_materials' => ['material'],
+        'stock_materials' => ['material'],
+        'chem_names' => ['chemical'],
+        'chem_comp' => ['chemical'],
+        'chemical_cats' => ['chemical'],
+        'dept_chemicals' => ['chemical'],
+        'stock_chemicals' => ['chemical'],
+        'ref_active_ingredients' => ['chemical'],
+        'ref_hazard_categories' => ['chemical'],
+        'standard_names' => ['standard'],
+        'standard_cats' => ['standard'],
+        'dept_standards' => ['standard'],
+        'stock_standards' => ['standard'],
+    ];
 
     /** Đánh dấu ghi vào ghi chú các phiếu nhập tồn đầu kỳ - dùng để chặn nhập trùng lần hai. */
     public const OPENING_NOTE = '[TỒN ĐẦU KỲ]';
@@ -170,7 +258,7 @@ class InitialDataSchema
 
     private static function buildSheets(): array
     {
-        $dept = ['key' => 'department', 'label' => 'Phòng ban', 'type' => 'ref', 'ref' => 'R_PHONG_BAN', 'req' => true, 'width' => 16, 'hint' => 'Chọn tên viết tắt ở sheet 02'];
+        $dept = ['key' => 'department', 'label' => 'Phòng ban', 'type' => 'ref', 'ref' => 'R_PHONG_BAN', 'req' => true, 'width' => 16, 'hint' => 'Chọn tên viết tắt phòng ban'];
         $zoneType = ['key' => 'zone_type', 'label' => 'Phân loại khu', 'type' => 'list', 'list' => 'zone_type', 'width' => 18, 'hint' => 'Dự Phòng / Sử Dụng / Biệt Trữ...'];
         $color = ['key' => 'color', 'label' => 'Màu hiển thị', 'type' => 'color', 'width' => 13, 'hint' => 'VD: #16A34A (để trống = màu theo phân loại)'];
         $leadTime = ['key' => 'lead_time_days', 'label' => 'Thời gian đặt hàng (ngày)', 'type' => 'int', 'min' => 0, 'maxValue' => MaterialClassification::MAX_LEAD_TIME_DAYS, 'width' => 14, 'hint' => 'VD: 30'];
@@ -180,6 +268,7 @@ class InitialDataSchema
         $defaultLocation = ['key' => 'default_location', 'label' => 'Vị trí mặc định', 'type' => 'ref', 'ref' => 'R_VI_TRI', 'width' => 16, 'hint' => 'Mã vị trí ở sheet 26, cùng phòng ban'];
         $note = ['key' => 'note', 'label' => 'Ghi chú', 'type' => 'text', 'max' => 500, 'width' => 30, 'hint' => ''];
         $stockLocation = ['key' => 'location', 'label' => 'Vị trí lưu', 'type' => 'ref', 'ref' => 'R_VI_TRI', 'req' => true, 'width' => 16, 'hint' => 'Mã vị trí ở sheet 26, cùng phòng ban'];
+        $autoCode = fn (string $prefix) => ['key' => 'code', 'label' => 'Mã DM (tự sinh)', 'type' => 'auto', 'prefix' => $prefix, 'width' => 12, 'hint' => 'Tự sinh khi điền tên, không nhập'];
         $packs = ['key' => 'packs', 'label' => 'Số kiện / chai (tách mã)', 'type' => 'int', 'min' => 1, 'maxValue' => 1000, 'width' => 13, 'hint' => 'Để trống = 1. Mỗi kiện 1 mã xuất nhập'];
 
         return [
@@ -231,13 +320,13 @@ class InitialDataSchema
                 'title' => '05.Người dùng',
                 'table' => 'user_management',
                 'group' => 'Tổ chức',
-                'desc' => 'Tài khoản đăng nhập. KHÔNG ghi mật khẩu vào file: người nhập khai mật khẩu khởi tạo chung lúc nhập, người dùng bắt buộc đổi ở lần đăng nhập đầu.',
+                'desc' => 'Tài khoản đăng nhập, đăng nhập bằng mã số nhân viên. KHÔNG ghi mật khẩu vào file: người nhập khai mật khẩu khởi tạo chung lúc nhập, người dùng bắt buộc đổi ở lần đăng nhập đầu.',
                 'columns' => [
-                    ['key' => 'user_name', 'label' => 'Tên đăng nhập', 'type' => 'text', 'req' => true, 'min_len' => 5, 'max' => 10, 'width' => 14, 'hint' => '5-10 ký tự, không trùng'],
+                    ['key' => 'user_name', 'label' => 'Mã số nhân viên', 'type' => 'text', 'req' => true, 'min_len' => 5, 'max' => 10, 'width' => 16, 'hint' => 'Dùng làm tên đăng nhập. 5-10 ký tự, không trùng'],
                     ['key' => 'full_name', 'label' => 'Họ và tên', 'type' => 'text', 'req' => true, 'min_len' => 5, 'max' => 255, 'width' => 28, 'hint' => 'VD: Nguyễn Văn An'],
                     $dept,
                     ['key' => 'mail', 'label' => 'Email', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 28, 'hint' => 'Không có thì ghi NA'],
-                    ['key' => 'role_1', 'label' => 'Vai trò chính', 'type' => 'ref', 'ref' => 'R_VAI_TRO', 'req' => true, 'width' => 26, 'hint' => 'Chọn ở sheet 04'],
+                    ['key' => 'role_1', 'label' => 'Vai trò chính', 'type' => 'ref', 'ref' => 'R_VAI_TRO', 'req' => true, 'width' => 26, 'hint' => 'Chọn trong danh sách vai trò'],
                     ['key' => 'role_2', 'label' => 'Vai trò 2', 'type' => 'ref', 'ref' => 'R_VAI_TRO', 'width' => 22, 'hint' => ''],
                     ['key' => 'role_3', 'label' => 'Vai trò 3', 'type' => 'ref', 'ref' => 'R_VAI_TRO', 'width' => 22, 'hint' => ''],
                     ['key' => 'group', 'label' => 'Tổ / nhóm', 'type' => 'ref', 'ref' => 'R_TO_NHOM', 'width' => 22, 'hint' => 'Tổ thuộc đúng phòng ban ở trên'],
@@ -388,17 +477,16 @@ class InitialDataSchema
                 'title' => '19.DM vật tư',
                 'table' => 'material_categories',
                 'group' => 'Danh mục công ty',
-                'desc' => 'Danh mục vật tư = Tên vật tư + Nhà sản xuất. Mã danh mục do bạn tự đánh theo dạng M00001, M00002... (không trùng) để các sheet sau chọn lại.',
+                'desc' => 'Danh mục vật tư = Tên vật tư + Nhà sản xuất. Mã danh mục (M00001...) tự sinh nối tiếp mã đã có khi điền tên, các sheet sau chọn lại theo mã này.',
                 'columns' => [
-                    ['key' => 'code', 'label' => 'Mã DM', 'type' => 'text', 'req' => true, 'max' => 50, 'pattern' => '/^M\d{5}$/', 'width' => 11, 'hint' => 'M00001, M00002...'],
+                    $autoCode('M'),
                     ['key' => 'material_name', 'label' => 'Tên vật tư', 'type' => 'ref', 'ref' => 'R_TEN_VT', 'req' => true, 'width' => 40, 'hint' => 'Chọn ở sheet 15'],
                     ['key' => 'manufacturer', 'label' => 'Nhà sản xuất', 'type' => 'ref', 'ref' => 'R_NSX', 'req' => true, 'width' => 16, 'hint' => 'Chọn ở sheet 09'],
                     ['key' => 'technical_specification', 'label' => 'Thông tin kỹ thuật', 'type' => 'text', 'max' => 100, 'width' => 24, 'hint' => 'VD: Size M, hộp 100 cái'],
                     ['key' => 'cls_price', 'label' => 'Theo giá trị', 'type' => 'list', 'list' => 'cls_price', 'req' => true, 'width' => 11, 'hint' => 'Thấp / Cao'],
                     ['key' => 'cls_importance', 'label' => 'Mức độ quan trọng', 'type' => 'list', 'list' => 'cls_importance', 'req' => true, 'width' => 12, 'hint' => 'Thấp / Cao'],
                     ['key' => 'cls_dangerous', 'label' => 'Hàng nguy hiểm', 'type' => 'list', 'list' => 'cls_dangerous', 'req' => true, 'width' => 11, 'hint' => 'Có / Không'],
-                    ['key' => 'purchasing_department', 'label' => 'Bộ phận mua hàng', 'type' => 'list', 'list' => 'purchasing', 'req' => true, 'width' => 13, 'hint' => 'Cung Ứng / Hành Chánh / IT'],
-                    ['key' => 'cls_supply', 'label' => 'Cấp phát bởi', 'type' => 'list', 'list' => 'cls_supply', 'req' => true, 'width' => 12, 'hint' => 'Hành Chánh / Khác'],
+                    ['key' => 'purchasing_department', 'label' => 'Bộ phận mua hàng', 'type' => 'list', 'list' => 'purchasing', 'req' => true, 'width' => 13, 'hint' => 'Cung Ứng / Hành Chánh'],
                     ['key' => 'cls_qa_calibration', 'label' => 'Cần hiệu chuẩn trước khi dùng', 'type' => 'list', 'list' => 'cls_qa_calibration', 'req' => true, 'width' => 13, 'hint' => 'Có / Không'],
                     $leadTime,
                     ['key' => 'display', 'label' => 'Hiển thị chọn (tự động)', 'type' => 'calc', 'width' => 40, 'hidden' => true, 'formula' => '=IF(A{r}="","",A{r}&" | "&B{r}&" ("&C{r}&")")'],
@@ -408,9 +496,9 @@ class InitialDataSchema
                 'title' => '20.DM hoá chất',
                 'table' => 'chemical_categories',
                 'group' => 'Danh mục công ty',
-                'desc' => 'Danh mục hoá chất = Tên hoá chất + Loại + Nhà sản xuất. Mã danh mục tự đánh dạng C00001, C00002... (không trùng).',
+                'desc' => 'Danh mục hoá chất = Tên hoá chất + Loại + Nhà sản xuất. Mã danh mục (C00001...) tự sinh nối tiếp mã đã có khi điền tên.',
                 'columns' => [
-                    ['key' => 'code', 'label' => 'Mã DM', 'type' => 'text', 'req' => true, 'max' => 50, 'pattern' => '/^C\d{5}$/', 'width' => 11, 'hint' => 'C00001, C00002...'],
+                    $autoCode('C'),
                     ['key' => 'chem_name', 'label' => 'Tên hoá chất', 'type' => 'ref', 'ref' => 'R_TEN_HC', 'req' => true, 'width' => 40, 'hint' => 'Chọn ở sheet 16'],
                     ['key' => 'type', 'label' => 'Loại', 'type' => 'list', 'list' => 'chem_type', 'free' => true, 'max' => 30, 'width' => 18, 'hint' => 'Chọn hoặc tự gõ (≤ 30 ký tự)'],
                     ['key' => 'manufacturer', 'label' => 'Nhà sản xuất', 'type' => 'ref', 'ref' => 'R_NSX', 'req' => true, 'width' => 16, 'hint' => 'Chọn ở sheet 09'],
@@ -428,9 +516,9 @@ class InitialDataSchema
                 'title' => '21.DM chất chuẩn',
                 'table' => 'standard_categories',
                 'group' => 'Danh mục công ty',
-                'desc' => 'Danh mục chất chuẩn = Tên chất chuẩn + Nguồn gốc/NSX. Mã danh mục tự đánh dạng S00001, S00002... Version tự tăng theo cùng Tên + NSX.',
+                'desc' => 'Danh mục chất chuẩn = Tên chất chuẩn + Nguồn gốc/NSX. Mã danh mục (S00001...) tự sinh nối tiếp mã đã có khi điền tên. Version tự tăng theo cùng Tên + NSX.',
                 'columns' => [
-                    ['key' => 'code', 'label' => 'Mã DM', 'type' => 'text', 'req' => true, 'max' => 50, 'pattern' => '/^S\d{5}$/', 'width' => 11, 'hint' => 'S00001, S00002...'],
+                    $autoCode('S'),
                     ['key' => 'standard_name', 'label' => 'Tên chất chuẩn', 'type' => 'ref', 'ref' => 'R_TEN_CC', 'req' => true, 'width' => 36, 'hint' => 'Chọn ở sheet 18'],
                     ['key' => 'manufacturer', 'label' => 'Nguồn gốc / NSX', 'type' => 'ref', 'ref' => 'R_NSX', 'req' => true, 'width' => 16, 'hint' => 'Chọn ở sheet 09'],
                     ['key' => 'cas_no', 'label' => 'Số CAS', 'type' => 'text', 'max' => 50, 'width' => 14, 'hint' => ''],
@@ -689,6 +777,75 @@ class InitialDataSchema
                 ],
             ],
         ];
+    }
+
+    /** Số thứ tự lớn nhất của mã dạng <prefix><số> đang có trong bảng (0 nếu chưa có). */
+    public static function maxCodeNumber(string $table, string $prefix): int
+    {
+        return (int) (DB::table($table)->where('code', 'like', $prefix.'%')->pluck('code')
+            ->map(fn ($code) => (int) substr((string) $code, strlen($prefix)))
+            ->max() ?? 0);
+    }
+
+    /** Sheet có trong file của module $module (null = file đủ mọi module). */
+    public static function inModule(string $sheetKey, ?string $module): bool
+    {
+        return $module === null || ! isset(self::MODULE_SHEETS[$sheetKey]) || in_array($module, self::MODULE_SHEETS[$sheetKey], true);
+    }
+
+    /** Giai đoạn của một sheet (sheet không có trong STAGE_SHEETS thuộc giai đoạn 3). */
+    public static function stageOf(string $sheetKey): int
+    {
+        return self::STAGE_SHEETS[$sheetKey] ?? 3;
+    }
+
+    /**
+     * Sheet NHẬP được của file (module $module, giai đoạn $stage), giữ đúng thứ tự nhập.
+     * null = không lọc theo tiêu chí đó.
+     */
+    public static function sheetsFor(?string $module, ?int $stage = null): array
+    {
+        return array_filter(
+            self::sheets(),
+            fn ($key) => self::inModule($key, $module) && ($stage === null || self::stageOf($key) === $stage),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    /**
+     * Mọi sheet có trong file: [key => 'edit' | 'source'], theo thứ tự nhập. 'source' = sheet
+     * giai đoạn trước mà sheet nhập được chọn tới (ô chọn tham chiếu) - điền sẵn từ DB, ẩn và khoá.
+     */
+    public static function fileSheets(?string $module, ?int $stage = null): array
+    {
+        $edit = self::sheetsFor($module, $stage);
+        $refs = self::refs();
+        $sources = [];
+
+        foreach ($edit as $sheet) {
+            foreach ($sheet['columns'] as $col) {
+                if ($col['type'] === 'ref' && ! isset($edit[$refs[$col['ref']][0]])) {
+                    $sources[$refs[$col['ref']][0]] = true;
+                }
+            }
+        }
+
+        $roles = [];
+        foreach (array_keys(self::sheets() + self::referenceSheets()) as $key) {
+            if (isset($edit[$key])) {
+                $roles[$key] = 'edit';
+            } elseif (isset($sources[$key])) {
+                $roles[$key] = 'source';
+            }
+        }
+
+        return $roles;
+    }
+
+    /** Sheet có cột Phòng ban: file của phòng ban chỉ được khai đúng phòng đó. */
+    public static function hasDepartmentColumn(array $sheet): bool
+    {
+        return collect($sheet['columns'])->contains(fn ($col) => $col['key'] === 'department');
     }
 
     /** Chữ cái cột Excel của cột thứ $index (0 = A). */

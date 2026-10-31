@@ -12,6 +12,7 @@ use App\Support\MaterialCode;
 use App\Support\StandardCode;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -61,6 +62,21 @@ class InitialDataImporter
 
     private string $sheetKey = '';
 
+    /** Số dòng điền sẵn (đã có trong hệ thống) ở đầu từng sheet - bỏ qua khi nạp. */
+    private array $prefilled = [];
+
+    /** Tên viết tắt phòng ban của file riêng; null = file toàn hệ thống. */
+    private ?string $scopeDepartment = null;
+
+    /** Module của file riêng (material / chemical / standard); null = file đủ 3 module. */
+    private ?string $module = null;
+
+    /** Giai đoạn của file riêng; null = file đủ 3 giai đoạn. Chỉ đọc / nạp sheet của giai đoạn này. */
+    private ?int $stage = null;
+
+    /** Số thứ tự mã danh mục lớn nhất đã cấp trong lần nạp này: [bảng => số]. */
+    private array $codeNumbers = [];
+
     private string $now;
 
     private string $today;
@@ -94,12 +110,30 @@ class InitialDataImporter
             return $this->result(false);
         }
 
+        // Nhiều file phòng ban nạp cùng lúc sẽ cấp trùng mã danh mục: chỉ cho một lượt nạp thật
+        $lock = $commit ? Cache::lock('wms:initial-data-import', 3600) : null;
+        if ($lock && ! $lock->get()) {
+            $this->error(null, null, 'Đang có một file khởi tạo khác được nạp. Vui lòng chờ lượt đó xong rồi nạp lại.');
+
+            return $this->result(false);
+        }
+
+        try {
+            return $this->runInTransaction($data, $commit, $fileName);
+        } finally {
+            $lock?->release();
+        }
+    }
+
+    private function runInTransaction(array $data, bool $commit, string $fileName): array
+    {
         DB::beginTransaction();
 
         try {
-            foreach (InitialDataSchema::sheets() as $key => $sheet) {
+            foreach (InitialDataSchema::sheetsFor($this->module, $this->stage) as $key => $sheet) {
                 $this->sheetKey = $key;
-                $this->stats[$key] = ['title' => $sheet['title'], 'rows' => count($data[$key]), 'inserted' => 0, 'existing' => 0];
+                $prefilled = $this->prefilled[$key] ?? 0;
+                $this->stats[$key] = ['title' => $sheet['title'], 'rows' => count($data[$key]) + $prefilled, 'inserted' => 0, 'existing' => $prefilled];
 
                 $valid = array_values(array_filter($data[$key], fn ($row) => empty($row['_invalid'])));
                 $this->{'import'.str_replace('_', '', ucwords($key, '_'))}($valid);
@@ -156,15 +190,31 @@ class InitialDataImporter
             return null;
         }
 
-        $version = $book->getSheetByName(InitialDataSchema::LIST_SHEET)?->getCell('A2')->getValue();
+        $lists = $book->getSheetByName(InitialDataSchema::LIST_SHEET);
+        $version = $lists?->getCell('A2')->getValue();
         if ($version !== InitialDataSchema::VERSION) {
             $this->error(null, null, 'File không đúng mẫu khởi tạo dữ liệu (phiên bản '.InitialDataSchema::VERSION.'). Vui lòng tải file mẫu mới nhất trên hệ thống và điền lại.');
 
             return null;
         }
 
+        for ($r = InitialDataSchema::PREFILL_CELL_ROW; ($entry = (string) $lists->getCell('A'.$r)->getValue()) !== ''; $r++) {
+            [$key, $value] = array_pad(explode(':', $entry, 2), 2, 0);
+            if ($key === InitialDataSchema::SCOPE_KEY) {
+                $this->scopeDepartment = (string) $value;
+            } elseif ($key === InitialDataSchema::STAGE_KEY) {
+                $this->stage = isset(InitialDataSchema::STAGES[(int) $value]) ? (int) $value : null;
+            } elseif ($key === InitialDataSchema::MODULE_KEY) {
+                $this->module = isset(InitialDataSchema::MODULES[$value]) ? (string) $value : null;
+            } else {
+                $this->prefilled[$key] = (int) $value;
+            }
+        }
+
+        // File của một module / giai đoạn: chỉ đọc sheet nhập được; sheet giai đoạn trước kèm theo
+        // (ẩn, khoá) chỉ là nguồn ô chọn lấy từ DB
         $data = [];
-        foreach (InitialDataSchema::sheets() as $key => $sheet) {
+        foreach (InitialDataSchema::sheetsFor($this->module, $this->stage) as $key => $sheet) {
             $this->sheetKey = $key;
             $data[$key] = $this->readSheet($book, $sheet);
         }
@@ -198,10 +248,13 @@ class InitialDataImporter
         $rows = [];
         $lastRow = $ws->getHighestDataRow();
 
-        for ($r = InitialDataSchema::FIRST_DATA_ROW; $r <= $lastRow; $r++) {
+        // Dòng điền sẵn từ hệ thống (đã khoá trong file) đã có trong DB - bỏ qua
+        $start = InitialDataSchema::FIRST_DATA_ROW + ($this->prefilled[$this->sheetKey] ?? 0);
+
+        for ($r = $start; $r <= $lastRow; $r++) {
             $raw = [];
             foreach ($sheet['columns'] as $i => $col) {
-                if ($col['type'] === 'calc') {
+                if (in_array($col['type'], ['calc', 'auto'], true)) {
                     continue;
                 }
                 $value = $ws->getCell(InitialDataSchema::letter($i).$r)->getValue();
@@ -213,10 +266,40 @@ class InitialDataImporter
                 continue;
             }
 
-            $rows[] = $this->normalizeRow($sheet, $raw, $r);
+            // Mã tự sinh là công thức: lấy giá trị Excel đã tính, file chưa mở bằng Excel thì tự tính
+            foreach ($sheet['columns'] as $i => $col) {
+                if ($col['type'] === 'auto') {
+                    $cell = $ws->getCell(InitialDataSchema::letter($i).$r);
+                    $raw[$col['key']] = $cell->isFormula()
+                        ? ($cell->getOldCalculatedValue() ?? $cell->getCalculatedValue())
+                        : $cell->getValue();
+                }
+            }
+
+            $rows[] = $this->checkScope($sheet, $this->normalizeRow($sheet, $raw, $r));
         }
 
         return $rows;
+    }
+
+    /**
+     * File riêng của một phòng ban: không thêm dòng ở sheet chỉ Admin khai, và mọi dòng có cột
+     * Phòng ban phải đúng phòng của file - tránh phòng này khai hộ / ghi đè sang phòng khác.
+     */
+    private function checkScope(array $sheet, array $row): array
+    {
+        if ($this->scopeDepartment === null) {
+            return $row;
+        }
+
+        if (in_array($this->sheetKey, InitialDataSchema::ADMIN_ONLY_SHEETS, true)) {
+            $row['_invalid'] = $this->error($row['_row'], null, 'File riêng của phòng '.$this->scopeDepartment.' không được thêm dòng ở sheet này (Admin khai ở file toàn hệ thống).');
+        } elseif (InitialDataSchema::hasDepartmentColumn($sheet)
+            && $row['department'] !== null && mb_strtolower($row['department']) !== mb_strtolower($this->scopeDepartment)) {
+            $row['_invalid'] = $this->error($row['_row'], 'Phòng ban', 'File riêng của phòng '.$this->scopeDepartment.' chỉ khai dữ liệu của phòng '.$this->scopeDepartment.'.');
+        }
+
+        return $row;
     }
 
     /** Chuẩn hoá một dòng theo khai báo cột; lỗi kiểu dữ liệu đánh dấu _invalid để bỏ qua dòng. */
@@ -839,18 +922,15 @@ class InitialDataImporter
     private function importMaterialCats(array $rows): void
     {
         $this->eachUnique($rows, ['code'], function ($row) {
-            if ($this->lookup('material_categories', 'code', $row['code'])) {
-                return $this->existing();
-            }
             $nameId = $this->requireRef($row, 'material_names', 'name', 'material_name', 'Tên vật tư', 'sheet 15');
             $makerId = $this->requireRef($row, 'manufacturers', 'short_name', 'manufacturer', 'Nhà sản xuất', 'sheet 09');
             if (! $nameId || ! $makerId) {
                 return;
             }
 
-            $sameCode = DB::table('material_categories')->where('material_names_id', $nameId)->where('manufacturers_id', $makerId)->value('code');
-            if ($sameCode) {
-                return $this->error($row['_row'], 'Tên vật tư', 'Tổ hợp Vật tư - Nhà sản xuất này đã có trong danh mục với mã '.$sameCode.'.');
+            $same = DB::table('material_categories')->where('material_names_id', $nameId)->where('manufacturers_id', $makerId)->first(['id', 'code']);
+            if ($same) {
+                return $this->existingCategory('material_categories', $row, $same);
             }
 
             $classification = [];
@@ -859,7 +939,7 @@ class InitialDataImporter
             }
 
             $id = DB::table('material_categories')->insertGetId([
-                'code' => $row['code'],
+                'code' => $this->categoryCode('material_categories', 'M', $row),
                 'material_names_id' => $nameId,
                 'manufacturers_id' => $makerId,
                 'technical_specification' => $row['technical_specification'],
@@ -870,16 +950,13 @@ class InitialDataImporter
 
             $this->categoryHistory('material_category_histories', 'material_category_id', 'material_categories', $id);
             $this->inserted();
-            $this->remember('material_categories', 'code', $row['code'], $id);
+            $this->rememberFileCode('material_categories', $row, $id);
         });
     }
 
     private function importChemicalCats(array $rows): void
     {
         $this->eachUnique($rows, ['code'], function ($row) {
-            if ($this->lookup('chemical_categories', 'code', $row['code'])) {
-                return $this->existing();
-            }
             $nameId = $this->requireRef($row, 'chem_names', 'name', 'chem_name', 'Tên hoá chất', 'sheet 16');
             $makerId = $this->requireRef($row, 'manufacturers', 'short_name', 'manufacturer', 'Nhà sản xuất', 'sheet 09');
             $storageId = $this->optionalRef($row, 'storage_conditions', 'name', 'storage_condition', 'Điều kiện bảo quản', 'sheet 08');
@@ -887,16 +964,16 @@ class InitialDataImporter
                 return;
             }
 
-            $sameCode = DB::table('chemical_categories')
+            $same = DB::table('chemical_categories')
                 ->where('chem_names_id', $nameId)->where('manufacturers_id', $makerId)
                 ->when($row['type'] === null, fn ($q) => $q->whereNull('type'), fn ($q) => $q->where('type', $row['type']))
-                ->value('code');
-            if ($sameCode) {
-                return $this->error($row['_row'], 'Tên hoá chất', 'Tổ hợp Tên hoá chất - Loại - Nhà sản xuất này đã có trong danh mục với mã '.$sameCode.'.');
+                ->first(['id', 'code']);
+            if ($same) {
+                return $this->existingCategory('chemical_categories', $row, $same);
             }
 
             $id = DB::table('chemical_categories')->insertGetId([
-                'code' => $row['code'],
+                'code' => $this->categoryCode('chemical_categories', 'C', $row),
                 'type' => $row['type'],
                 'chem_names_id' => $nameId,
                 'manufacturers_id' => $makerId,
@@ -911,16 +988,13 @@ class InitialDataImporter
 
             $this->categoryHistory('chemical_category_histories', 'chemical_category_id', 'chemical_categories', $id);
             $this->inserted();
-            $this->remember('chemical_categories', 'code', $row['code'], $id);
+            $this->rememberFileCode('chemical_categories', $row, $id);
         });
     }
 
     private function importStandardCats(array $rows): void
     {
         $this->eachUnique($rows, ['code'], function ($row) {
-            if ($this->lookup('standard_categories', 'code', $row['code'])) {
-                return $this->existing();
-            }
             $nameId = $this->requireRef($row, 'standard_names', 'name', 'standard_name', 'Tên chất chuẩn', 'sheet 18');
             $makerId = $this->requireRef($row, 'manufacturers', 'short_name', 'manufacturer', 'Nguồn gốc / NSX', 'sheet 09');
             $storageId = $this->optionalRef($row, 'storage_conditions', 'name', 'storage_condition', 'Điều kiện bảo quản', 'sheet 08');
@@ -930,10 +1004,23 @@ class InitialDataImporter
 
             // Giữ đúng thứ tự khai báo trong config để chuỗi JSON luôn ổn định
             $groups = array_values(array_intersect(array_keys(config('standard.groups')), $row['groups']));
+
+            // Cùng Tên + NSX là version mới; chỉ coi là đã có khi trùng cả nhóm, CAS, số tài liệu
+            // (nạp lại đúng file cũ không sinh thêm version)
+            $same = DB::table('standard_categories')
+                ->where('chem_names_id', $nameId)->where('manufacturers_id', $makerId)
+                ->where('groups', json_encode($groups))
+                ->when($row['cas_no'] === null, fn ($q) => $q->whereNull('cas_no'), fn ($q) => $q->where('cas_no', $row['cas_no']))
+                ->when($row['doc_no'] === null, fn ($q) => $q->whereNull('doc_no'), fn ($q) => $q->where('doc_no', $row['doc_no']))
+                ->first(['id', 'code']);
+            if ($same) {
+                return $this->existingCategory('standard_categories', $row, $same);
+            }
+
             $maxVersion = DB::table('standard_categories')->where('chem_names_id', $nameId)->where('manufacturers_id', $makerId)->max('version');
 
             $id = DB::table('standard_categories')->insertGetId([
-                'code' => $row['code'],
+                'code' => $this->categoryCode('standard_categories', 'S', $row),
                 'chem_names_id' => $nameId,
                 'cas_no' => $row['cas_no'],
                 'manufacturers_id' => $makerId,
@@ -949,8 +1036,43 @@ class InitialDataImporter
 
             $this->categoryHistory('standard_category_histories', 'standard_category_id', 'standard_categories', $id);
             $this->inserted();
-            $this->remember('standard_categories', 'code', $row['code'], $id);
+            $this->rememberFileCode('standard_categories', $row, $id);
         });
+    }
+
+    /**
+     * Mã danh mục thật cấp lúc nạp, nối tiếp mã lớn nhất trong DB. Thường trùng mã file đã tự
+     * sinh; khác khi có người thêm danh mục trong lúc điền file -> báo cảnh báo.
+     */
+    private function categoryCode(string $table, string $prefix, array $row): string
+    {
+        $this->codeNumbers[$table] ??= InitialDataSchema::maxCodeNumber($table, $prefix);
+        $code = $prefix.str_pad((string) ++$this->codeNumbers[$table], 5, '0', STR_PAD_LEFT);
+
+        if ($row['code'] !== null && strcasecmp($row['code'], $code) !== 0) {
+            $this->warning($row['_row'], 'Mã DM (tự sinh)', 'Mã "'.$row['code'].'" đã được dùng trong lúc điền file, hệ thống cấp mã '.$code.'. Các sheet sau chọn mã "'.$row['code'].'" vẫn trỏ đúng danh mục này.');
+        }
+
+        return $code;
+    }
+
+    /** Dòng mới trùng tổ hợp đã có: dùng lại danh mục đó, mã trong file trỏ về nó. */
+    private function existingCategory(string $table, array $row, object $same): void
+    {
+        $this->existing();
+        $this->rememberFileCode($table, $row, (int) $same->id);
+
+        if ($row['code'] !== null && strcasecmp($row['code'], $same->code) !== 0) {
+            $this->warning($row['_row'], 'Mã DM (tự sinh)', 'Đã có trong danh mục với mã '.$same->code.' - dùng lại mã này, không thêm mới.');
+        }
+    }
+
+    /** Các sheet sau chọn danh mục theo mã trong file: trỏ mã đó về bản ghi thật. */
+    private function rememberFileCode(string $table, array $row, int $id): void
+    {
+        if ($row['code'] !== null) {
+            $this->remember($table, 'code', $row['code'], $id);
+        }
     }
 
     // ================================================================== ĐỊNH KHU
@@ -1701,11 +1823,7 @@ class InitialDataImporter
 
     private function nextCode(string $table, string $prefix, int $length): string
     {
-        $max = DB::table($table)->where('code', 'like', $prefix.'%')->pluck('code')
-            ->map(fn ($code) => (int) substr((string) $code, strlen($prefix)))
-            ->max() ?? 0;
-
-        return $prefix.str_pad((string) ($max + 1), $length, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) (InitialDataSchema::maxCodeNumber($table, $prefix) + 1), $length, '0', STR_PAD_LEFT);
     }
 
     private function inserted(): void
