@@ -13,7 +13,7 @@
     <!-- Title Center -->
     <div class="mx-auto text-center">
         <h4 class="library-title mb-0" style="color: var(--primary-dark); letter-spacing: 1px;">
-            {{ session('title', 'WMS - QUẢN LÝ KHO') }}
+            {{ session('title', 'CMS - QUẢN LÝ VẬT TƯ TIÊU HAO') }}
         </h4>
     </div>
 

@@ -132,6 +132,8 @@
         return [
             $import->id => [
                 'code' => $import->code,
+                // Gói Sản phẩm - Chỉ tiêu tìm lô theo mã danh mục
+                'category_id' => (int) $import->category_id,
                 'chem_name' => $import->chem_name,
                 'category_code' => $import->category_code,
                 'batch_no' => $import->batch_no,
@@ -145,6 +147,8 @@
                 // Lô nhận lẻ từ phòng khác: không được dùng vượt tồn (không có phần +5%)
                 'partial' => !empty($import->is_partial_lot),
                 'expired_date' => $import->expired_date ? \Carbon\Carbon::parse($import->expired_date)->format('d/m/Y') : null,
+                // Ngày nhập (Y-m-d) - xếp lô FEFO rồi FIFO khi gợi ý theo gói / đổi lô trong modal Sử Dụng
+                'imported_date' => $import->imported_date ? \Carbon\Carbon::parse($import->imported_date)->format('Y-m-d') : null,
                 // Hoá chất cấm: dòng trong modal Sử Dụng bắt buộc chọn Người Kiểm Tra
                 'banned' => $expBanned($import->category_id),
                 'banned_label' => \App\Support\ChemicalClassification::shortLabel(11),

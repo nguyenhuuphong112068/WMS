@@ -260,10 +260,15 @@ Route::prefix('/materData')
             Route::post('reject', 'reject')->name('reject');
         });
 
-        // Khởi Tạo Dữ Liệu: tải file Excel mẫu, kiểm tra và nạp dữ liệu ban đầu (chỉ Admin)
+        // Khởi Tạo Dữ Liệu: Admin tải file Excel mẫu; phòng ban đính kèm file đã điền. Admin tổng hợp, làm sạch rồi nạp bằng lệnh wms:initial-data
         Route::prefix('/initialData')->name('initialData.')->controller(InitialDataController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('template', 'template')->name('template');
-            Route::post('process', 'process')->name('process');
+            // Phòng ban đính kèm file đã điền - chỉ lưu file cho Admin xem, không ghi DB nghiệp vụ
+            Route::post('upload', 'upload')->name('upload');
+            Route::get('download/{id}', 'download')->whereNumber('id')->name('download');
+            Route::post('review', 'review')->name('review');
+            Route::post('skip', 'skip')->name('skip');
+            Route::post('deadline', 'deadline')->name('deadline');
         });
     });

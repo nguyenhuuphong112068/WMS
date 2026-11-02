@@ -32,10 +32,12 @@ class PageTabs
         'category_chemical' => ['parent' => 'category_chemical_view', 'tabs' => [
             'company' => 'Danh mục hoá chất công ty',
             'department' => 'Hoá chất của phòng',
+            'product' => 'Danh sách hoá chất theo sản phẩm',
         ]],
         'category_standard' => ['parent' => 'category_standard_view', 'tabs' => [
             'company' => 'Danh mục chất chuẩn công ty',
             'department' => 'Chất chuẩn của phòng',
+            'product' => 'Danh sách chất chuẩn theo sản phẩm',
         ]],
 
         // ----- Nhập -----

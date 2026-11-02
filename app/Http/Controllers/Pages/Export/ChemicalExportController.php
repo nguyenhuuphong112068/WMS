@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pages\Export;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
+use App\Support\ProductList;
 use App\Support\DepartmentChemical;
 use App\Support\ListRange;
 use App\Support\TitleSuggestions;
@@ -242,6 +243,8 @@ class ChemicalExportController extends Controller
             'declaredCategoryIds' => $declaredCategoryIds,
             'currentDepartmentId' => $departmentId,
             'imports' => $this->importOptions($departmentId),
+            // Gói Sản phẩm - Chỉ tiêu (Danh Mục Hoá Chất): chọn gói thì gợi ý cả danh sách hoá chất
+            'productLists' => ProductList::rowsOfDepartment(ProductList::CHEMICAL, $departmentId, true),
             'checkers' => $this->checkerOptions($departmentId),
             'units' => DB::table('units')->where('status_id', 1)->orderBy('name')->get(),
             'types' => self::TYPES,

@@ -39,6 +39,5 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div><b>Mã hoạt chất</b> do hệ thống tự sinh (bắt đầu bằng chữ <span class="ug-key">A</span>). Hoạt chất chỉ được
-        dùng để cảnh báo và ghép vào hoá chất sau khi <b>Đã duyệt</b>.</div>
+    <div>Đơn chất chỉ được dùng để cảnh báo và ghép vào hoá chất sau khi <b>Đã duyệt</b>.</div>
 </div>

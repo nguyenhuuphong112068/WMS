@@ -7,6 +7,7 @@ use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
 use App\Support\DepartmentStandard;
 use App\Support\ListRange;
+use App\Support\ProductList;
 use App\Support\StandardCode;
 use App\Support\TitleSuggestions;
 use Illuminate\Http\Request;
@@ -364,6 +365,8 @@ class StandardExportController extends Controller
             'availableImports' => $availableImports,
             'imports' => $availableImports,
             'purposes' => $purposes,
+            // Gói Sản phẩm - Chỉ tiêu (Danh Mục Chất Chuẩn): thêm sẵn các dòng đề nghị cấp phát chuẩn nội bộ
+            'productLists' => ProductList::rowsOfDepartment(ProductList::STANDARD, $departmentId, true),
             'suppliers' => $suppliers,
             'units' => $units,
             'checkers' => $this->checkerOptions($departmentId),

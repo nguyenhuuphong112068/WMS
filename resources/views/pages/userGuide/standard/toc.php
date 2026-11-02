@@ -32,6 +32,10 @@ return [
             'path' => 'Danh Mục › Chất Chuẩn › tab Chất chuẩn của phòng',
             'route' => 'pages.category.standardCategory.list', 'pane' => 'tabDepartment', 'perm' => 'category_standard_view', 'chips' => [$byDept],
             'keywords' => 'don vi tinh han dung sau khi mo ong nguong dinh khu'],
+        ['id' => 'theo-san-pham', 'file' => 'productList', 'title' => 'Danh Sách Chất Chuẩn Theo Sản Phẩm', 'icon' => 'fas fa-box-open',
+            'path' => 'Danh Mục › Chất Chuẩn › tab Danh sách chất chuẩn theo sản phẩm',
+            'route' => 'pages.category.standardCategory.list', 'pane' => 'tabProduct', 'perm' => 'category_standard_view', 'chips' => [$byDept],
+            'keywords' => 'goi san pham chi tieu kiem chat chuan can dung de nghi cap phat'],
     ],
     'Nhập › Chất Chuẩn' => [
         ['id' => 'nhap-chuan', 'file' => 'importCheck', 'title' => 'Nhập Chất Chuẩn & Kiểm Tra', 'icon' => 'fas fa-dolly',
@@ -50,6 +54,12 @@ return [
         ['id' => 'de-nghi-noi-bo',
             'extraShots' => [
                 ['name' => 'de-nghi-noi-bo-tao', 'url' => '/export/standardExport?tab=request', 'tab' => ['expPaneRequest'], 'js' => '__ug.click(\'[data-target="#requestModal"]\')', 'clip' => '#requestModal .modal-content', 'pad' => 0],
+                // Nút "Theo sản phẩm - chỉ tiêu": chọn gói rồi xem các chất chuẩn sẽ thêm vào đề nghị
+                ['name' => 'de-nghi-noi-bo-theo-san-pham', 'url' => '/export/standardExport?tab=request', 'tab' => ['expPaneRequest'], 'clip' => '#stdKitPickerModal .modal-content', 'pad' => 0, 'afterJs' => 1500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms)); __ug.click('[data-target=\"#requestModal\"]'); await w(800); $('#requestModal .btn-open-std-kit').trigger('click'); await w(800); $('#stdKitPickerModal .std-kit-select').select2('open'); await w(900); $('.select2-results__option[aria-selected]').first().trigger('mouseup'); await w(600); return true; })()"],
+                // Sau khi bấm "Thêm Vào Đề Nghị": các dòng đề nghị đã điền theo gói
+                ['name' => 'de-nghi-noi-bo-theo-san-pham-ket-qua', 'url' => '/export/standardExport?tab=request', 'tab' => ['expPaneRequest'], 'clip' => '#requestModal .modal-content', 'pad' => 0, 'afterJs' => 2500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms)); __ug.click('[data-target=\"#requestModal\"]'); await w(800); $('#requestModal .btn-open-std-kit').trigger('click'); await w(800); $('#stdKitPickerModal .std-kit-select').select2('open'); await w(900); $('.select2-results__option[aria-selected]').first().trigger('mouseup'); await w(600); $('#stdKitPickerModal .std-kit-confirm').trigger('click'); await w(1500); document.activeElement.blur(); $('#requestModal .table-responsive').scrollLeft(99999); await w(300); return true; })()"],
             ], 'file' => 'request', 'title' => 'Đề Nghị & Cấp Phát Chuẩn Cho Tổ', 'icon' => 'fas fa-file-signature',
             'path' => 'Đề Nghị - Sử Dụng › Chất Chuẩn › tab Đề nghị cấp phát chuẩn nội bộ',
             'route' => 'pages.export.standardExport.list', 'pane' => 'expPaneRequest', 'params' => ['tab' => 'request'], 'perm' => 'export_standard_view',

@@ -11,7 +11,7 @@
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/login.png', 'caption' => 'Trang đăng nhập', 'width' => 340])
 
 <ol class="ug-steps">
-    <li>Mở địa chỉ của hệ thống WMS trên trình duyệt.</li>
+    <li>Mở địa chỉ của hệ thống CMS (Quản Lý Vật Tư Tiêu Hao) trên trình duyệt.</li>
     <li>Nhập <b>Tên tài khoản</b> và <b>Mật khẩu</b>, bấm <b>Đăng nhập hệ thống</b>. Sai thì thông báo đỏ hiện trên đầu khung, kèm
         số lần đã sai.
         @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/login-error.png', 'caption' => 'Báo sai mật khẩu, kèm số lần sai', 'width' => 340])

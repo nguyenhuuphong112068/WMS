@@ -223,7 +223,7 @@
                     $rowToPopulate = $firstRow;
                 } else {
                     // Clone a new row
-                    var newIdx = $tbody.find('tr.req-row').length;
+                    var newIdx = stdReqNextIndex($tbody);
                     
                     // Destroy select2 before cloning
                     $tbody.find('.select2-criteria, .select2-criteria-edit').each(function() {

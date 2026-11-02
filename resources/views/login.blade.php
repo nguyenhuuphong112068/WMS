@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="{{ asset('img/iconstella.svg') }}">
-    <title>Đăng nhập | WMS - Hệ Thống Quản Lý Kho</title>
+    <title>Đăng nhập | CMS - Hệ Thống Quản Lý Vật Tư Tiêu Hao</title>
 
     <!-- Bootstrap & Icons -->
     <link href="{{ asset('css/bootstrap.min.css') }}" rel="stylesheet">
@@ -371,13 +371,13 @@
                     <img src="{{ asset('img/iconstella.svg') }}" alt="Logo">
                 </div>
                 <div>
-                    <h1>WMS</h1>
-                    <span>Warehouse Management</span>
+                    <h1>CMS</h1>
+                    <span>Consumables Management System</span>
                 </div>
             </div>
 
             <div class="brand-headline">
-                <h2>Hệ Thống Quản Lý Kho</h2>
+                <h2>Hệ Thống Quản Lý Vật Tư Tiêu Hao</h2>
             </div>
 
             <!-- Minh hoạ kệ kho + xe nâng -->
@@ -563,7 +563,7 @@
             </a>
 
             <div class="form-footer">
-                WMS © {{ date('Y') }} – Hệ thống quản lý kho nội bộ
+                CMS © {{ date('Y') }} – Hệ thống quản lý vật tư tiêu hao nội bộ
             </div>
         </div>
     </div>

@@ -12,6 +12,7 @@ use App\Support\CategoryUnitConversion;
 use App\Support\CompanyContext;
 use App\Support\DepartmentChemical;
 use App\Support\MixtureHazardThreshold;
+use App\Support\ProductList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -171,6 +172,12 @@ class ChemicalCategoryController extends Controller
                 $departmentId
             ),
             'dcConversions' => CategoryUnitConversion::declaredByCategory(CategoryUnitConversion::TYPE_CHEMICAL),
+
+            // Tab 3 - Danh sách hoá chất theo sản phẩm (ChemicalProductListController): gói Sản phẩm +
+            // Chỉ tiêu, hoá chất chọn trong số đã khai cho phòng (đang dùng)
+            'plLists' => ProductList::rowsOfDepartment(ProductList::CHEMICAL, $departmentId),
+            'plPurposes' => DB::table('purposes')->where('status_id', 1)->orderBy('name')->get(['id', 'name']),
+            'plOptions' => ProductList::options(ProductList::CHEMICAL, $dcDatas),
         ]);
     }
 

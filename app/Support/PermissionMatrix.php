@@ -26,6 +26,27 @@ class PermissionMatrix
         'standard' => ['label' => 'Chất Chuẩn', 'icon' => 'fa-vial'],
     ];
 
+    /**
+     * Card trên màn Phân Quyền › Nhóm Quyền: theo module của leftNAV ($navModules), cùng thứ tự.
+     * 'groups' = các permission_groups.name thuộc module.
+     */
+    public const MODULES = [
+        'materData' => ['label' => 'Dữ Liệu Gốc', 'icon' => 'fa-database', 'groups' => ['Dữ Liệu Gốc']],
+        'category'  => ['label' => 'Danh Mục', 'icon' => 'fa-clipboard-list', 'groups' => ['Danh Mục']],
+        'import'    => ['label' => 'Nhập', 'icon' => 'fa-dolly', 'groups' => ['Nhập']],
+        'export'    => ['label' => 'Đề Nghị - Sử Dụng', 'icon' => 'fa-hand-holding-water', 'groups' => ['Sử Dụng']],
+        'inventory' => ['label' => 'Tồn Kho', 'icon' => 'fa-boxes', 'groups' => ['Tồn Kho', 'Đánh Giá Hạn Dùng']],
+        'estimate'  => ['label' => 'Dự Trù', 'icon' => 'fa-file-signature', 'groups' => ['Dự Trù']],
+        'admin'     => ['label' => 'Phân Quyền & Lịch Sử', 'icon' => 'fa-user-shield', 'groups' => ['Quản Trị']],
+        'other'     => ['label' => 'Khác', 'icon' => 'fa-ellipsis-h', 'groups' => []],
+    ];
+
+    /** Thứ tự dòng nhóm con trong một card module */
+    private const SUB_GROUP_ORDER = [
+        'Vật Tư', 'Hoá Chất', 'Chất Chuẩn', 'Dùng Chung',
+        'Trình Ký Liên Phòng Ban', 'Khởi Tạo Dữ Liệu', 'Phân Quyền', 'Lịch Sử & Audit Trail',
+    ];
+
     /** Quyền nằm ở băng "Quyền Chung" nhưng chỉ dùng cho nghiệp vụ của một model */
     private const EXTRA_BY_MODEL = [
         'material' => ['is_BOD'],
@@ -72,8 +93,56 @@ class PermissionMatrix
         return [
             'roles' => $roles,
             'tree' => $tree,
+            'modules' => self::modules($permissions),
             'assigned' => self::assigned(),
         ];
+    }
+
+    /**
+     * Cây quyền theo module leftNAV: module -> Vật Tư / Hoá Chất / Chất Chuẩn / Dùng Chung -> quyền.
+     * Dữ Liệu Gốc chia theo loại dữ liệu gốc, Quản Trị chia Phân Quyền / Lịch Sử.
+     */
+    private static function modules($permissions): array
+    {
+        $moduleOfGroup = [];
+        $modules = [];
+        foreach (self::MODULES as $key => $meta) {
+            foreach ($meta['groups'] as $groupName) {
+                $moduleOfGroup[$groupName] = $key;
+            }
+            $modules[$key] = ['label' => $meta['label'], 'icon' => $meta['icon'], 'groups' => []];
+        }
+
+        $modelLabels = ['material' => 'Vật Tư', 'chemical' => 'Hoá Chất', 'standard' => 'Chất Chuẩn', 'common' => 'Dùng Chung'];
+
+        foreach ($permissions as $permission) {
+            $moduleKey = $moduleOfGroup[$permission->group_name] ?? 'other';
+
+            $subGroup = match ($moduleKey) {
+                'materData' => self::materDataScopeLabel($permission->name),
+                'admin' => preg_match('/^(auditTrail_|login_history_)/', $permission->name) ? 'Lịch Sử & Audit Trail' : 'Phân Quyền',
+                default => $modelLabels[self::modelOf($permission->name)],
+            };
+
+            $modules[$moduleKey]['groups'][$subGroup][] = $permission;
+        }
+
+        foreach ($modules as &$module) {
+            uksort($module['groups'], fn ($a, $b) => self::subGroupRank($a) <=> self::subGroupRank($b));
+            foreach ($module['groups'] as &$groupPermissions) {
+                $groupPermissions = self::nestChildren($groupPermissions);
+            }
+        }
+        unset($module, $groupPermissions);
+
+        return array_filter($modules, fn ($module) => !empty($module['groups']));
+    }
+
+    private static function subGroupRank(string $name): int
+    {
+        $rank = array_search($name, self::SUB_GROUP_ORDER, true);
+
+        return $rank === false ? 99 : $rank;
     }
 
     /**
@@ -165,6 +234,7 @@ class PermissionMatrix
         return match (true) {
             // Màn Trình Ký Đề Nghị Liên Phòng Ban có bộ quyền riêng (materData_transferSign_*)
             str_contains($name, '_transferSign_') => 'Trình Ký Liên Phòng Ban',
+            str_contains($name, '_initialData_') => 'Khởi Tạo Dữ Liệu',
             str_contains($name, '_material_') => 'Vật Tư',
             str_contains($name, '_chemical_') => 'Hoá Chất',
             str_contains($name, '_standard_') => 'Chất Chuẩn',

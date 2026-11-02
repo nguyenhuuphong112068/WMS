@@ -33,13 +33,13 @@ class UserGuideController extends Controller
             'title' => 'Phân Quyền',
             'icon' => 'fas fa-user-shield',
             'summary' => 'Cách hệ thống phân quyền theo nhóm quyền và phòng ban, cách thiết lập cho người dùng, các vai trò hiện có và bảng phân quyền chung của toàn hệ thống.',
-            'updated_at' => '2026-10-28',
+            'updated_at' => '2026-11-02',
         ],
         'materData' => [
             'title' => 'Dữ Liệu Gốc',
             'icon' => 'fas fa-database',
             'summary' => 'Khai báo tổ chức, danh mục dùng chung, hoá chất - chất chuẩn - vật tư, định khu kho và khởi tạo dữ liệu ban đầu.',
-            'updated_at' => '2026-10-31',
+            'updated_at' => '2026-11-02',
         ],
         'material' => [
             'title' => 'Vật Tư',
@@ -50,14 +50,14 @@ class UserGuideController extends Controller
         'chemical' => [
             'title' => 'Hoá Chất',
             'icon' => 'fas fa-flask',
-            'summary' => 'Danh mục và phân loại NĐ 24/2026, tương kỵ lưu trữ, nhập - kiểm tra, sử dụng và hoá chất cấm, liên phòng ban, cách ly, tồn kho - hạn dùng nội bộ, ngưỡng tồn trữ PL IV và dự trù.',
-            'updated_at' => '2026-10-28',
+            'summary' => 'Danh mục và phân loại NĐ 24/2026, tương kỵ lưu trữ, danh sách hoá chất theo sản phẩm - chỉ tiêu, nhập - kiểm tra, sử dụng và hoá chất cấm, liên phòng ban, cách ly, tồn kho - hạn dùng nội bộ, ngưỡng tồn trữ PL IV và dự trù.',
+            'updated_at' => '2026-11-02',
         ],
         'standard' => [
             'title' => 'Chất Chuẩn',
             'icon' => 'fas fa-vial',
-            'summary' => 'Mã ống chuẩn theo nhóm, nhập - kiểm tra, cấp phát cho tổ và ghi sử dụng, liên phòng ban, cách ly - loại bỏ - huỷ, hạn dùng retest / check online / nội bộ, kiểm soát khối lượng, đánh giá hạn dùng chuẩn thứ cấp và dự trù.',
-            'updated_at' => '2026-10-30',
+            'summary' => 'Mã ống chuẩn theo nhóm, danh sách chất chuẩn theo sản phẩm - chỉ tiêu, nhập - kiểm tra, cấp phát cho tổ và ghi sử dụng, liên phòng ban, cách ly - loại bỏ - huỷ, hạn dùng retest / check online / nội bộ, kiểm soát khối lượng, đánh giá hạn dùng chuẩn thứ cấp và dự trù.',
+            'updated_at' => '2026-11-02',
         ],
     ];
 

@@ -14,7 +14,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="{{ asset('img/iconstella.svg') }}">
-    <title>Tra cứu tồn kho hoá chất | WMS</title>
+    <title>Tra cứu tồn kho hoá chất | CMS</title>
 
     <link href="{{ asset('css/bootstrap.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/bootstrap-icons.css') }}">
@@ -295,7 +295,7 @@
                 <div class="logo-box"><i class="bi bi-box-seam"></i></div>
                 <div>
                     <h1>Tra cứu tồn kho hoá chất</h1>
-                    <span>WMS – Hệ Thống Quản Lý Kho</span>
+                    <span>CMS – Hệ Thống Quản Lý Vật Tư Tiêu Hao</span>
                 </div>
             </div>
             <a href="{{ route('login') }}" class="clk-login-link">
@@ -502,7 +502,7 @@
         @endif
 
         <div class="clk-footer">
-            WMS © {{ date('Y') }} – Tra cứu tồn kho hoá chất (chỉ đọc)
+            CMS © {{ date('Y') }} – Tra cứu tồn kho hoá chất (chỉ đọc)
         </div>
     </div>
 

@@ -30,6 +30,10 @@ return [
             'path' => 'Danh Mục › Hoá Chất › tab Hoá chất của phòng',
             'route' => 'pages.category.chemicalCategory.list', 'pane' => 'tabDepartment', 'perm' => 'category_chemical_view', 'chips' => [$byDept],
             'keywords' => 'don vi tinh khoi luong quy doi han dung noi bo dinh khu tuong ky'],
+        ['id' => 'theo-san-pham', 'file' => 'productList', 'title' => 'Danh Sách Hoá Chất Theo Sản Phẩm', 'icon' => 'fas fa-box-open',
+            'path' => 'Danh Mục › Hoá Chất › tab Danh sách hoá chất theo sản phẩm',
+            'route' => 'pages.category.chemicalCategory.list', 'pane' => 'tabProduct', 'perm' => 'category_chemical_view', 'chips' => [$byDept],
+            'keywords' => 'goi san pham chi tieu kiem hoa chat can dung goi y su dung'],
     ],
     'Nhập › Hoá Chất' => [
         ['id' => 'nhap-hoa-chat', 'file' => 'importCheck', 'title' => 'Nhập Hoá Chất & Kiểm Tra', 'icon' => 'fas fa-dolly',
@@ -46,7 +50,15 @@ return [
             'keywords' => 'tong nhap quy doi kg'],
     ],
     'Sử Dụng › Hoá Chất' => [
-        ['id' => 'su-dung', 'file' => 'use', 'title' => 'Sử Dụng Hoá Chất & Phiếu Tạm', 'icon' => 'fas fa-vials',
+        ['id' => 'su-dung',
+            // Hộp thoại Sử Dụng sau khi chọn gói ở Cách 3 · Theo sản phẩm - chỉ tiêu
+            'extraShots' => [
+                ['name' => 'su-dung-theo-san-pham', 'url' => '/export/chemicalExport', 'tab' => ['expPaneDraft'], 'clip' => '#createModal .modal-content', 'pad' => 0, 'afterJs' => 1500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms)); __ug.click('.btn-md-create'); await w(700); $('#createModal .exp-kit-select').select2('open'); await w(900); $('.select2-results__option[aria-selected]').first().trigger('mouseup'); await w(900); return true; })()"],
+                // Bấm Đổi lô trên dòng cuối: danh sách mã xuất nhập khác của cùng hoá chất (FEFO rồi FIFO)
+                ['name' => 'su-dung-doi-lo', 'url' => '/export/chemicalExport', 'tab' => ['expPaneDraft'], 'clip' => '#createModal .modal-content', 'pad' => 0, 'afterJs' => 1500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms)); __ug.click('.btn-md-create'); await w(700); $('#createModal .exp-kit-select').select2('open'); await w(900); $('.select2-results__option[aria-selected]').first().trigger('mouseup'); await w(900); $('#expRowsBody .exp-lot-switch').last().trigger('click'); await w(500); return true; })()"],
+            ], 'file' => 'use', 'title' => 'Sử Dụng Hoá Chất & Phiếu Tạm', 'icon' => 'fas fa-vials',
             'path' => 'Đề Nghị - Sử Dụng › Hoá Chất › tab Sử Dụng Hoá Chất',
             'route' => 'pages.export.chemicalExport.list', 'pane' => 'expPaneDraft', 'perm' => 'export_chemical_view', 'chips' => [$byDept],
             'keywords' => 'quet ma luu tam xuat vuot 5% nguoi kiem tra'],

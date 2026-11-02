@@ -130,7 +130,7 @@ class InitialDataImporter
         DB::beginTransaction();
 
         try {
-            foreach (InitialDataSchema::sheetsFor($this->module, $this->stage) as $key => $sheet) {
+            foreach (InitialDataSchema::importSheets($this->module, $this->stage) as $key => $sheet) {
                 $this->sheetKey = $key;
                 $prefilled = $this->prefilled[$key] ?? 0;
                 $this->stats[$key] = ['title' => $sheet['title'], 'rows' => count($data[$key]) + $prefilled, 'inserted' => 0, 'existing' => $prefilled];
@@ -211,10 +211,10 @@ class InitialDataImporter
             }
         }
 
-        // File của một module / giai đoạn: chỉ đọc sheet nhập được; sheet giai đoạn trước kèm theo
-        // (ẩn, khoá) chỉ là nguồn ô chọn lấy từ DB
+        // File của một module / giai đoạn: đọc sheet của giai đoạn + sheet bổ sung giai đoạn trước;
+        // sheet tổ chức kèm theo (ẩn, khoá) chỉ là nguồn ô chọn lấy từ DB
         $data = [];
-        foreach (InitialDataSchema::sheetsFor($this->module, $this->stage) as $key => $sheet) {
+        foreach (InitialDataSchema::importSheets($this->module, $this->stage) as $key => $sheet) {
             $this->sheetKey = $key;
             $data[$key] = $this->readSheet($book, $sheet);
         }
@@ -373,7 +373,7 @@ class InitialDataImporter
                         }
                         $mapped = $this->matchList($lists[$col['list']], $part);
                         if ($mapped === null) {
-                            $row['_invalid'] = $this->error($r, $label, '"'.$part.'" không phải mã hợp lệ.');
+                            $row['_invalid'] = $this->error($r, $label, '"'.$part.'" không có trong danh sách chọn của cột.');
                             continue;
                         }
                         $values[$mapped] = $mapped;
@@ -621,14 +621,17 @@ class InitialDataImporter
 
             $deptId = $this->department($row);
             $roleIds = [];
-            foreach (['role_1' => 'Vai trò chính', 'role_2' => 'Vai trò 2', 'role_3' => 'Vai trò 3'] as $key => $label) {
-                if ($row[$key] === null) {
-                    continue;
+            // Cột phân quyền chung / Vật tư / Hoá chất / Chất chuẩn: vai trò đầu tiên là vai trò chính
+            foreach (array_keys(InitialDataSchema::ROLE_COLUMNS) as $key) {
+                foreach ($row[$key] as $name) {
+                    $roleId = $this->lookup('roles', 'name', $name);
+                    if ($roleId) {
+                        $roleIds[$roleId] = $roleId;
+                    }
                 }
-                $roleId = $this->requireRef($row, 'roles', 'name', $key, $label, 'sheet 04');
-                if ($roleId) {
-                    $roleIds[$roleId] = $roleId;
-                }
+            }
+            if (! $roleIds) {
+                $this->error($row['_row'], 'Phân quyền', 'Cần ít nhất một vai trò ở các cột Phân quyền.');
             }
             $groupId = null;
             if ($deptId && $row['group'] !== null) {

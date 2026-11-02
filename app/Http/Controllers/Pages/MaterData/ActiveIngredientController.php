@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * DỮ LIỆU GỐC - TÊN HOẠT CHẤT (Nghị định 24/2026/NĐ-CP)
+ * DỮ LIỆU GỐC - ĐƠN CHẤT (Nghị định 24/2026/NĐ-CP)
  *
  * Mỗi hoạt chất được phân loại theo quy tắc "hình 1" của NĐ 24/2026. Ở màn này khai được
  * các nhóm ĐƠN CHẤT: 1, 3, 4, 5, 6, 7, 9 (App\Support\ChemicalClassification::SINGLE_SUBSTANCE_GROUPS).
@@ -92,7 +92,7 @@ class ActiveIngredientController extends Controller
             $row->member_count = (int) ($memberCounts[$row->id] ?? 0);
         }
 
-        session()->put(['title' => 'DỮ LIỆU GỐC - TÊN HOẠT CHẤT']);
+        session()->put(['title' => 'DỮ LIỆU GỐC - ĐƠN CHẤT']);
 
         return view('pages.materData.ActiveIngredient.list', [
             'datas' => $datas,

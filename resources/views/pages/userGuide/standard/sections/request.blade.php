@@ -27,7 +27,13 @@
         Ô <b>Chất Chuẩn</b> chỉ gồm chuẩn phòng đã khai ở <a href="#chuan-cua-phong">Chất Chuẩn Của Phòng</a> (kho phòng chỉ có ống
         của các chuẩn này); gõ mã, tên hoặc nhà sản xuất để tìm, mỗi kết quả hiện nhà sản xuất ngay dưới tên để phân biệt các chuẩn
         trùng tên. Hoặc bấm <span class="btn btn-sm btn-outline-info ug-ui"><i class="fas fa-boxes-stacked mr-1"></i> Danh mục chuẩn tồn của phòng</span>
-        để tick nhiều chuẩn cùng lúc.
+        để tick nhiều chuẩn cùng lúc, hoặc bấm <span class="btn btn-sm btn-outline-success ug-ui"><i class="fas fa-box-open mr-1"></i> Theo sản phẩm - chỉ tiêu</span>
+        để thêm các chất chuẩn của một gói đã khai ở <a href="#theo-san-pham">Danh sách chất chuẩn theo sản phẩm</a>:
+        chọn gói, bỏ tick chất chuẩn không cần rồi bấm <b>Thêm Vào Đề Nghị</b>. Mỗi chất chuẩn thành một dòng, điền sẵn
+        <b>Số Lượng ĐN</b> theo lượng gợi ý, <b>Tên Sản Phẩm</b> và <b>Chỉ Tiêu</b> theo gói; Quy cách, Nhà sản xuất, ĐVT tự nạp như khi
+        chọn tay. Dòng đã có cùng chất chuẩn và cùng tên sản phẩm thì bỏ qua. Nút này có cả trong hộp thoại Điều chỉnh đề nghị.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/de-nghi-noi-bo-theo-san-pham.png', 'caption' => 'Chọn gói Sản phẩm - Chỉ tiêu, tick các chất chuẩn cần đề nghị'])
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/de-nghi-noi-bo-theo-san-pham-ket-qua.png', 'caption' => 'Các dòng đề nghị được điền sẵn theo gói'])
         Ô <b>Kiểm Nghiệm Viên</b> chỉ liệt kê người thuộc bộ phận đang chọn (phòng ban chính hoặc thành viên một tổ của phòng),
         gõ tên / mã nhân viên để tìm nhanh.</li>
     <li>Bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-save mr-1"></i> Lưu</span> để giữ lại sửa tiếp, hoặc

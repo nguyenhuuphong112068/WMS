@@ -44,6 +44,10 @@
                                 </div>
                             </div>
                             <div class="d-flex align-items-center">
+                                <button type="button" class="btn btn-sm btn-outline-success mr-2 btn-open-std-kit shadow-sm" data-target-modal="#requestEditModal_{{ $req->id }}"
+                                    title="Thêm các chất chuẩn của một gói Sản phẩm - Chỉ tiêu">
+                                    <i class="fas fa-box-open mr-1"></i> Theo sản phẩm - chỉ tiêu
+                                </button>
                                 <button type="button" class="btn btn-sm btn-outline-info mr-2 btn-open-inventory-picker shadow-sm" data-target-modal="#requestEditModal_{{ $req->id }}">
                                     <i class="fas fa-boxes-stacked mr-1"></i> Danh mục chuẩn tồn của phòng
                                 </button>
@@ -310,7 +314,7 @@
             var modalId = $(this).data('modal');
             var $tbody = $(modalId).find('table.table-edit-req-rows tbody');
             var $firstRow = $tbody.find('tr:first');
-            var newIdx = $tbody.find('tr').length;
+            var newIdx = stdReqNextIndex($tbody);
 
             // Destroy select2 on rows before clone
             $tbody.find('.select2-criteria-edit').each(function() {

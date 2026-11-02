@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>WMS - Hệ Thống Quản Lý Kho</title>
+    <title>CMS - Hệ Thống Quản Lý Vật Tư Tiêu Hao</title>
     <!-- Tell the browser to be responsive to screen width -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" href="{{ asset('img/iconstella.svg') }}">

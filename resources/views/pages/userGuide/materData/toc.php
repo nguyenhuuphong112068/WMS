@@ -83,8 +83,11 @@ return [
     ],
     'Quản trị' => [
         ['id' => 'khoi-tao-du-lieu', 'file' => 'initialData', 'title' => 'Khởi Tạo Dữ Liệu', 'icon' => 'fas fa-file-import',
-            'route' => 'pages.materData.initialData.list', 'perm' => 'Admin', 'chips' => [['Chỉ Admin', 'is-danger']],
-            'keywords' => 'excel file mau nap ton dau ky'],
+            'route' => 'pages.materData.initialData.list', 'perm' => 'materData_initialData_upload',
+            'keywords' => 'excel file mau nap ton dau ky dinh kem upload theo doi tien do',
+            // Mở tab Giai đoạn 3 của bảng theo dõi để ảnh có đủ các trạng thái việc
+            'shots' => [['name' => 'khoi-tao-du-lieu', 'clip' => '.content-wrapper', 'maxHeight' => 1100,
+                'js' => "$('.idt-stage-tabs a[href=\"#idtStage3\"]').tab('show'); $('#idtStage3 .idt-task.is-returned .btn-idt-history').first().click()"]]],
     ],
     'Hỗ trợ' => [
         ['id' => 'loi-thuong-gap', 'file' => 'faq', 'title' => 'Lỗi Thường Gặp', 'icon' => 'fas fa-question-circle'],

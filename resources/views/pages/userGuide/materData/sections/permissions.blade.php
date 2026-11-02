@@ -43,5 +43,5 @@
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
     <div>Không thấy menu hoặc nút cần dùng? Liên hệ quản trị viên để được cấp quyền phù hợp.
-        Màn hình <b>Khởi Tạo Dữ Liệu</b> chỉ dành cho tài khoản Admin.</div>
+        Ở màn hình <b>Khởi Tạo Dữ Liệu</b>, tải file mẫu chỉ dành cho Admin; phòng ban cần quyền <b>Đính Kèm File Khởi Tạo Dữ Liệu</b> để nộp file đã điền.</div>
 </div>

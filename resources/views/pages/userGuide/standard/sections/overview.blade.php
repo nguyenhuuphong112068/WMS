@@ -10,6 +10,7 @@
         <span class="ug-flow-no">1</span>
         <b>Khai danh mục</b>
         <a href="#danh-muc-cong-ty">Danh mục công ty</a> (nhóm chuẩn) → <a href="#chuan-cua-phong">Chuẩn của phòng</a>
+        → <a href="#theo-san-pham">gói theo sản phẩm</a> (tuỳ chọn)
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">2</span>

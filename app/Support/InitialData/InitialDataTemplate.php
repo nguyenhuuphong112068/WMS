@@ -142,6 +142,9 @@ class InitialDataTemplate
             self::buildDataSheet($ws, $key, $sheet);
             if (self::hidden($key)) {
                 $ws->setSheetState(Worksheet::SHEETSTATE_VERYHIDDEN);
+            } elseif (self::$roles[$key] === 'extra') {
+                // Sheet bổ sung (giai đoạn trước): tab xám để tách khỏi sheet chính của giai đoạn
+                $ws->getTabColor()->setRGB(self::MUTED);
             }
         }
 
@@ -193,8 +196,8 @@ class InitialDataTemplate
     }
 
     /**
-     * Sheet ẩn hẳn + khoá: sheet giai đoạn trước chỉ làm nguồn ô chọn, hoặc sheet chỉ Admin khai
-     * trong file của phòng ban.
+     * Sheet ẩn hẳn + khoá: sheet tổ chức chỉ làm nguồn ô chọn, hoặc sheet chỉ Admin khai trong
+     * file của phòng ban. Sheet giai đoạn trước khác ('extra') vẫn hiện để bổ sung khi thiếu.
      */
     private static function hidden(string $key): bool
     {
@@ -228,7 +231,7 @@ class InitialDataTemplate
         $ws->getColumnDimension('C')->setWidth(30);
         $ws->getColumnDimension('D')->setWidth(95);
 
-        $ws->setCellValue('A1', 'FILE KHỞI TẠO DỮ LIỆU BAN ĐẦU - HỆ THỐNG QUẢN LÝ KHO (WMS)');
+        $ws->setCellValue('A1', 'FILE KHỞI TẠO DỮ LIỆU BAN ĐẦU - HỆ THỐNG QUẢN LÝ VẬT TƯ TIÊU HAO (CMS)');
         $ws->mergeCells('A1:D1');
         $ws->getStyle('A1')->getFont()->setBold(true)->setSize(16)->getColor()->setRGB(self::PRIMARY);
         $ws->getRowDimension(1)->setRowHeight(28);
@@ -237,97 +240,266 @@ class InitialDataTemplate
         $ws->mergeCells('A2:D2');
         $ws->getStyle('A2')->getFont()->setItalic(true)->getColor()->setRGB(self::MUTED);
 
-        $row = 3;
-        $scope = [];
-        if (self::$stage) {
-            $scope[] = 'GIAI ĐOẠN '.self::$stage.' - '.mb_strtoupper(InitialDataSchema::STAGES[self::$stage])
-                .(self::$stage > 1 ? '. Dữ liệu giai đoạn trước lấy theo hệ thống lúc tải file (thiếu thì bổ sung trên hệ thống rồi tải lại file).' : '.')
-                .(in_array(self::$stage, InitialDataSchema::SHARED_STAGES, true) ? ' File dùng chung cho mọi phòng ban.' : '');
-        }
-        if (self::$module) {
-            $scope[] = 'FILE MODULE '.mb_strtoupper(InitialDataSchema::MODULES[self::$module]).' - chỉ gồm sheet dùng chung và sheet '.InitialDataSchema::MODULES[self::$module].'.';
-        }
-        if (self::$department) {
-            $scope[] = 'FILE RIÊNG CỦA PHÒNG '.self::$department->shortName.' - chỉ khai dữ liệu của phòng '.self::$department->shortName
-                .'. Công ty, Phòng ban, Vai trò do Admin khai ở file toàn hệ thống.';
-        }
-        foreach ($scope as $text) {
-            $ws->setCellValue('A'.$row, $text);
-            $ws->mergeCells('A'.$row.':D'.$row);
-            $ws->getStyle('A'.$row)->getFont()->setBold(true)->getColor()->setRGB(self::DANGER);
-            $row++;
-        }
-        $row++;
-        $row = self::guideHeading($ws, $row, 'A. CÁCH ĐIỀN FILE');
-
-        $rules = [
-            'Điền lần lượt theo thứ tự sheet 01 → 33. Sheet sau chỉ chọn lại được dữ liệu đã khai ở sheet trước (ô có mũi tên chọn).',
-            'Chỉ điền dữ liệu từ DÒNG 5 trở xuống. Dòng 3 là tên cột, dòng 4 là gợi ý / ví dụ. KHÔNG đổi tên sheet, KHÔNG chèn / xoá / đổi thứ tự cột.',
-            'Cột có dấu * (nền xanh đậm) là bắt buộc. Cột còn lại để trống nếu không có thông tin.',
-            'Điền liền mạch từ trên xuống, không bỏ dòng trống xen giữa (danh sách chọn ở sheet sau sẽ bị cắt tại dòng trống).',
-            'Ô có danh sách chọn: nên chọn từ danh sách thay vì gõ tay để tránh sai chính tả. Có thể dán (paste) giá trị nhưng phải trùng khớp chính xác.',
-            'Ngày ghi theo dạng dd/mm/yyyy (VD: 31/12/2027). Số thập phân dùng dấu chấm hoặc theo định dạng số của Excel.',
-            'Cột nhiều giá trị (Cảnh báo an toàn, Phân nhóm chuẩn, Mục đích sử dụng): ghi các mã / tên cách nhau bằng dấu phẩy hoặc chấm phẩy.',
-            'Mã danh mục (sheet 19, 20, 21) KHÔNG nhập tay: file tự sinh M00001 / C00001 / S00001 nối tiếp mã đang có ngay khi điền Tên. Các sheet 27-33 chọn lại theo mã này. Lúc nạp, nếu mã đã bị dùng trong lúc bạn điền file, hệ thống cấp mã kế tiếp và báo trong kết quả.',
-            'Dòng NỀN XÁM ở đầu mỗi sheet là dữ liệu đang có trong hệ thống (dữ liệu gốc, danh mục, định khu), đã khoá - chỉ để chọn lại ở các sheet sau. Bổ sung dữ liệu mới ở các dòng trắng bên dưới.',
-            'Sheet nào không có dữ liệu mới thì để trống, hệ thống bỏ qua. Dòng mới trùng dữ liệu đã có (trùng tên / tổ hợp) được giữ nguyên, không ghi đè.',
-            'Nhiều phòng ban điền file cùng lúc: mỗi phòng một file riêng. Tên hàng / danh mục mà phòng khác cũng thêm thì phòng nạp sau được dùng lại bản đã có; Mã DM được cấp lại theo thứ tự nạp, các sheet sau trong file vẫn trỏ đúng danh mục đã khai.',
-        ];
         $visible = self::visibleSheets();
-        $hasCategories = (bool) array_intersect_key($visible, array_flip(['material_cats', 'chemical_cats', 'standard_cats']));
-        if (! $hasCategories) {
-            unset($rules[7]);
+        $info = self::guideInfo();
+
+        $row = 4;
+        $row = self::guideHeading($ws, $row, 'A. FILE NÀY DÙNG ĐỂ LÀM GÌ');
+        foreach ($info['about'] as [$label, $text]) {
+            $row = self::guideField($ws, $row, $label, $text);
         }
-        foreach (array_values($rules) as $i => $text) {
+
+        $row++;
+        $row = self::guideHeading($ws, $row, 'B. CÁC BƯỚC ĐIỀN');
+        $no = 1;
+        $extra = array_filter($visible, fn ($key) => self::$roles[$key] === 'extra', ARRAY_FILTER_USE_KEY);
+        foreach (array_diff_key($visible, $extra) as $key => $sheet) {
+            $row = self::guideLine($ws, $row, 'B'.$no++, $sheet['title'].': '.(self::GUIDE_STEPS[$key] ?? $sheet['desc']));
+        }
+        if ($extra) {
+            $row = self::guideLine($ws, $row, 'B'.$no++, 'Nếu thiếu dữ liệu giai đoạn trước (danh mục, vị trí, tên hàng...) thì bổ sung ngay ở các SHEET BỔ SUNG (tab màu xám, xem mục B+), không cần chờ cập nhật hệ thống.');
+        }
+        $row = self::guideLine($ws, $row, 'B'.$no, 'Lưu file, gửi lại cho Admin. Admin tổng hợp file của các phòng ban, làm sạch dữ liệu rồi nạp lên hệ thống.');
+
+        if ($extra) {
+            $row++;
+            $row = self::guideHeading($ws, $row, 'B+. SHEET BỔ SUNG (CHỈ ĐIỀN KHI CÒN THIẾU)');
+            $row = self::guideLine($ws, $row, '', 'Dòng nền xám là dữ liệu đã có trên hệ thống. Dòng mới thêm ở đây được nạp lên hệ thống cùng file và chọn được ngay ở các sheet chính. Điền theo thứ tự sheet từ trái sang phải.');
+            foreach ($extra as $key => $sheet) {
+                $row = self::guideLine($ws, $row, '+', $sheet['title'].': '.(self::GUIDE_STEPS[$key] ?? $sheet['desc']));
+            }
+        }
+
+        $row++;
+        $row = self::guideHeading($ws, $row, 'C. QUY TẮC CHUNG');
+        foreach (self::commonRules($visible) as $i => $text) {
             $row = self::guideLine($ws, $row, ($i + 1).'.', $text);
         }
 
-        if (array_intersect_key($visible, array_flip(['stock_materials', 'stock_chemicals', 'stock_standards']))) {
-            $row = self::stockGuide($ws, $row);
+        if ($info['notes']) {
+            $row++;
+            $row = self::guideHeading($ws, $row, 'D. LƯU Ý RIÊNG CỦA FILE NÀY');
+            foreach ($info['notes'] as $i => $text) {
+                $row = self::guideLine($ws, $row, ($i + 1).'.', $text);
+            }
         }
 
         $row++;
-        $row = self::guideHeading($ws, $row, 'C. DANH SÁCH SHEET');
+        $row = self::guideHeading($ws, $row, 'E. DANH SÁCH SHEET');
         $row = self::guideSheetList($ws, $row, $visible);
 
         $lists = InitialDataSchema::lists();
         $multi = [];
+        $examples = [];
         if (isset($visible['chemical_cats'])) {
             $multi[] = 'Cảnh báo an toàn (sheet 20): '.implode('; ', array_keys($lists['safety_warning']));
+            $examples[] = '"TOXIC, CORROSIVE"';
         }
         if (isset($visible['standard_cats']) || isset($visible['stock_standards'])) {
             $multi[] = 'Phân nhóm chuẩn (sheet 21, 33): '.implode('; ', array_keys($lists['standard_group']));
+            $examples[] = '"PRS, IMPRS"';
+        }
+        if (isset($visible['users'])) {
+            foreach (array_keys(InitialDataSchema::ROLE_COLUMNS) as $column) {
+                $label = collect(InitialDataSchema::sheets()['users']['columns'])->firstWhere('key', $column)['label'];
+                $multi[] = $label.' (sheet 05): '.(implode('; ', array_keys($lists[$column])) ?: '(chưa có vai trò)');
+            }
+            $examples[] = '"Người dùng Hoá chất, Quản Lý Kho Hóa Chất"';
         }
         if ($multi) {
             $row++;
-            $row = self::guideHeading($ws, $row, 'D. MÃ DÙNG CHO CỘT NHIỀU GIÁ TRỊ');
+            $row = self::guideHeading($ws, $row, 'F. MÃ DÙNG CHO CỘT NHIỀU GIÁ TRỊ');
             foreach ($multi as $text) {
                 $row = self::guideLine($ws, $row, '', $text);
             }
-            $row = self::guideLine($ws, $row, '', 'Chỉ cần ghi phần mã đứng trước dấu " - ", VD: "TOXIC, CORROSIVE" hoặc "PRS, IMPRS".');
+            $row = self::guideLine($ws, $row, '', 'Nhiều giá trị cách nhau dấu phẩy; danh sách dạng "MÃ - tên" chỉ cần ghi phần mã. VD: '.implode(' hoặc ', $examples).'.');
         }
 
         $ws->getStyle('A4:D'.$row)->getFont()->getColor()->setRGB(self::TEXT_MAIN);
         $ws->freezePane('A4');
     }
 
-    private static function stockGuide(Worksheet $ws, int $row): int
+    /** Cách điền từng sheet, hiện ở mục "Các bước điền" theo đúng các sheet có trong file. */
+    private const GUIDE_STEPS = [
+        'companies' => 'khai công ty / nhà máy (tên viết tắt + tên đầy đủ). Mã công ty hệ thống tự sinh.',
+        'departments' => 'khai phòng ban, chọn công ty. Tên viết tắt ngắn, không dấu cách (dùng làm tiền tố mã ống chuẩn). Phòng ban không có kho (BGĐ, Cung ứng...) chọn "Phòng ban chung" = Có.',
+        'roles' => 'vai trò đang có đã điền sẵn; chỉ thêm vai trò mới khi cần. Quyền chi tiết của vai trò cấu hình sau trên màn hình Phân Quyền.',
+        'groups' => 'xem các tổ đã có của phòng mình (nền xám), thêm tổ còn thiếu: chọn phòng ban + ghi tên tổ.',
+        'users' => 'mỗi người một dòng: Mã số nhân viên (dùng đăng nhập), họ tên, phòng ban, email, tổ và phân quyền theo module (chung / Vật tư / Hoá chất / Chất chuẩn; ít nhất một vai trò, mỗi ô ghi được nhiều vai trò cách dấu phẩy).',
+        'units' => 'đơn vị đã có điền sẵn; chỉ thêm đơn vị mới, khai nhóm đơn vị và hệ số quy về đơn vị gốc (g / ml / đơn vị).',
+        'packaging' => 'thêm quy cách đóng gói còn thiếu.',
+        'storage' => 'thêm điều kiện bảo quản còn thiếu (VD: Tủ lạnh 2-8°C).',
+        'manufacturers' => 'thêm nhà sản xuất còn thiếu (tên viết tắt + tên đầy đủ, không trùng).',
+        'suppliers' => 'thêm nhà cung cấp còn thiếu.',
+        'purposes' => 'thêm mục đích sử dụng / chỉ tiêu kiểm nghiệm của chất chuẩn còn thiếu.',
+        'products' => 'thêm tên thành phẩm còn thiếu.',
+        'consumption' => 'thêm thiết bị / đối tượng tiêu hao vật tư định kỳ còn thiếu (loại, mã, tên, tần suất).',
+        'dept_class' => 'thêm nhóm phân loại vật tư riêng của phòng (dùng ở sheet 27).',
+        'material_names' => 'thêm tên vật tư chưa có (chỉ tên, KHÔNG kèm nhà sản xuất).',
+        'chem_names' => 'thêm tên hoá chất chưa có (chỉ tên, KHÔNG kèm nhà sản xuất).',
+        'chem_comp' => 'khai thành phần cho tên hoá chất mới: mỗi dòng 1 hoạt chất (tra mã ở sheet TC.Hoạt chất, kèm hàm lượng %) hoặc 1 nhóm nguy hại Bảng B.',
+        'standard_names' => 'thêm tên chất chuẩn chưa có (kèm tên hoạt chất, số CAS nếu có).',
+        'material_cats' => 'mỗi dòng = Tên vật tư + Nhà sản xuất + các tiêu chí phân loại. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
+        'chemical_cats' => 'mỗi dòng = Tên hoá chất + Loại + Nhà sản xuất. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
+        'standard_cats' => 'mỗi dòng = Tên chất chuẩn + Nguồn gốc / NSX + nhóm chuẩn. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
+        'warehouses' => 'định khu cấp 1: kho / phòng của phòng ban. Mã không trùng toàn hệ thống.',
+        'shelves' => 'định khu cấp 2: kệ / tủ, chọn mã kho.',
+        'columns' => 'định khu cấp 3: cột, chọn mã kệ (kho tự suy theo kệ).',
+        'tiers' => 'định khu cấp 4: tầng, chỉ cần chọn cấp cha gần nhất.',
+        'locations' => 'định khu cấp 5: vị trí đặt hàng (nơi gắn tồn kho), chọn cấp cha gần nhất; loại lưu trữ để trống = dùng chung.',
+        'dept_materials' => 'chọn danh mục vật tư phòng dùng, đơn vị tính của phòng, tồn tối thiểu / tối đa, vị trí mặc định.',
+        'dept_chemicals' => 'chọn danh mục hoá chất phòng dùng, đơn vị tính của phòng, tồn tối thiểu / tối đa, vị trí mặc định.',
+        'dept_standards' => 'chọn danh mục chất chuẩn phòng dùng, đơn vị tính của phòng, tồn tối thiểu / tối đa, vị trí mặc định.',
+        'conversions' => 'chỉ điền khi cùng một mã hàng mà các phòng dùng đơn vị khác nhóm (VD: chai và ml): 1 [Từ đơn vị] = [Hệ số] [Sang đơn vị].',
+        'stock_materials' => 'mỗi dòng 1 nhóm kiện giống hệt nhau: danh mục, số lượng mỗi kiện, số kiện, lô, hạn dùng, vị trí lưu.',
+        'stock_chemicals' => 'mỗi dòng 1 nhóm chai / can giống hệt nhau: danh mục, lượng còn mỗi chai, số chai, lô, hạn dùng, vị trí lưu.',
+        'stock_standards' => 'mỗi dòng 1 nhóm ống giống hệt nhau: danh mục, nhóm chuẩn, lượng còn mỗi ống, số ống, kiểu hạn dùng, vị trí lưu.',
+    ];
+
+    /**
+     * Phần mô tả file (mục đích, người điền, điều kiện, bước tiếp theo) + lưu ý riêng theo
+     * giai đoạn / module / phòng ban của file.
+     *
+     * @return array{about: array<int, array{0: string, 1: string}>, notes: array<int, string>}
+     */
+    private static function guideInfo(): array
     {
-        $row++;
-        $row = self::guideHeading($ws, $row, 'B. TỒN ĐẦU KỲ (SHEET 31 - 33)');
-        $stockRules = [
-            'Ghi tồn kho THỰC TẾ tại thời điểm bắt đầu dùng hệ thống, theo đơn vị tính của phòng đã khai ở sheet 27 / 28 / 29.',
-            'Mỗi dòng = 1 nhóm kiện / chai / ống giống hệt nhau. "Số kiện" = bao nhiêu kiện như vậy; mỗi kiện được cấp 1 mã xuất nhập riêng để in nhãn. VD: 3 chai Methanol 4L còn nguyên → Lượng mỗi chai = 4, Số kiện = 3.',
-            'Chai / ống đã mở dở thì ghi riêng 1 dòng với lượng còn lại thực tế.',
-            'Ngày nhập kho trên hệ thống = ngày nạp file (không điền tay). Lô tồn đầu được ghi nhận ĐẠT kiểm tra và cộng ngay vào tồn kho.',
-            'Vị trí lưu bắt buộc, phải là vị trí (sheet 26) cùng phòng ban, loại lưu trữ trống hoặc đúng loại hàng.',
-            'Mỗi phòng ban chỉ nạp tồn đầu kỳ MỘT lần. Nạp lại sẽ bị chặn để tránh cộng trùng tồn.',
-        ];
-        foreach ($stockRules as $i => $text) {
-            $row = self::guideLine($ws, $row, ($i + 1).'.', $text);
+        $stage = self::$stage;
+        $label = $stage ? 'Giai đoạn '.$stage.' - '.InitialDataSchema::STAGES[$stage] : 'File đầy đủ (cả 4 giai đoạn)';
+        if (self::$module) {
+            $label .= ' · Module '.InitialDataSchema::MODULES[self::$module];
+        }
+        if (self::$department) {
+            $label .= ' · Phòng '.self::$department->shortName;
+        }
+        $ownDepartment = self::$department ? 'Phòng '.self::$department->shortName.' - chỉ khai dữ liệu của phòng mình.' : null;
+
+        $about = match ($stage) {
+            1 => [
+                ['Mục đích', 'Khai khung tổ chức dùng chung toàn hệ thống: công ty, phòng ban, vai trò.'],
+                ['Người điền', 'Admin.'],
+                ['Cần có trước', 'Không.'],
+                ['Bước tiếp theo', 'Nạp xong thì tải file Giai đoạn 2 (Người dùng & Tổ - Nhóm) và Giai đoạn 3 (Dữ liệu gốc & danh mục) gửi các phòng ban - hai giai đoạn này làm song song được.'],
+            ],
+            2 => [
+                ['Mục đích', 'Khai tài khoản người dùng của các phòng ban và bổ sung tổ - nhóm còn thiếu.'],
+                ['Người điền', 'Các phòng ban - MỘT file chung: mỗi phòng điền tổ và người dùng của phòng mình vào cùng file này.'],
+                ['Cần có trước', 'Giai đoạn 1 đã nạp.'],
+                ['Bước tiếp theo', 'Admin nạp file và nhập mật khẩu khởi tạo chung; người dùng đăng nhập bằng mã số nhân viên và phải đổi mật khẩu ở lần đầu.'],
+            ],
+            3 => [
+                ['Mục đích', 'Khai dữ liệu gốc (đơn vị, nhà sản xuất, tên hàng, định khu kho...), danh mục công ty và hàng hoá phòng ban sử dụng.'],
+                ['Người điền', $ownDepartment ?? 'Các phòng ban.'],
+                ['Cần có trước', 'Giai đoạn 1 đã nạp.'],
+                ['Bước tiếp theo', 'Nạp xong thì tải file Giai đoạn 4 (Tồn đầu kỳ) - file đó chỉ chọn được danh mục và vị trí đã nạp ở giai đoạn này.'],
+            ],
+            4 => [
+                ['Mục đích', 'Nhập tồn kho thực tế tại thời điểm bắt đầu dùng hệ thống.'],
+                ['Người điền', $ownDepartment ?? 'Các phòng ban có kho.'],
+                ['Cần có trước', 'Giai đoạn 3 đã nạp: danh mục phòng đã khai (sheet 27 - 29) và vị trí kho (sheet 26).'],
+                ['Bước tiếp theo', 'Đây là giai đoạn cuối. Mỗi phòng ban chỉ nạp tồn đầu kỳ MỘT lần.'],
+            ],
+            default => [
+                ['Mục đích', 'Khai toàn bộ dữ liệu ban đầu trong một file: tổ chức, người dùng, dữ liệu gốc, danh mục, định khu, tồn đầu kỳ.'],
+                ['Người điền', $ownDepartment ?? 'Admin (tổng hợp từ các phòng ban).'],
+                ['Cần có trước', 'Không.'],
+                ['Bước tiếp theo', 'Nạp một lần. Khi nhiều phòng cùng điền, nên dùng file theo từng giai đoạn.'],
+            ],
+        };
+        array_unshift($about, ['Loại file', $label]);
+        if ($stage > 1) {
+            $about[] = ['Dữ liệu sẵn có', self::hasExtra()
+                ? 'Dữ liệu giai đoạn trước lấy theo hệ thống lúc tải file (dòng nền xám). Còn thiếu thì bổ sung trực tiếp vào các sheet bổ sung (tab màu xám) trong file này - dữ liệu bổ sung được nạp lên hệ thống cùng file.'
+                : 'Dữ liệu giai đoạn trước (phòng ban, vai trò) lấy theo hệ thống lúc tải file; còn thiếu thì báo Admin.'];
         }
 
-        return $row;
+        $stockRules = [
+            'Ghi tồn kho THỰC TẾ theo đơn vị tính của phòng đã khai cho danh mục đó (sheet 27 / 28 / 29). Chỉ nhập tồn được cho danh mục phòng đã khai.',
+            '"Số kiện" = số kiện / chai / ống giống hệt nhau; mỗi kiện được cấp 1 mã xuất nhập riêng để in nhãn. VD: 3 chai Methanol 4L còn nguyên → Lượng mỗi chai = 4, Số kiện = 3.',
+            'Chai / ống đã mở dở ghi riêng 1 dòng với lượng còn lại thực tế.',
+            'Ngày nhập kho = ngày nạp file (không điền tay). Lô tồn đầu được ghi nhận ĐẠT kiểm tra và cộng ngay vào tồn kho.',
+            'Vị trí lưu bắt buộc, phải là vị trí cùng phòng ban, loại lưu trữ trống hoặc đúng loại hàng.',
+            'Mỗi phòng ban chỉ nạp tồn đầu kỳ MỘT lần; nạp lại bị chặn để tránh cộng trùng tồn.',
+        ];
+        $catKeys = ['material_cats' => 'M00001', 'chemical_cats' => 'C00001', 'standard_cats' => 'S00001'];
+        $cats = array_intersect_key($catKeys, self::visibleSheets()) ?: $catKeys;
+        $codeRule = 'Mã DM ('.self::titles(array_keys($cats)).') KHÔNG nhập tay: file tự sinh '.implode(' / ', $cats)
+            .'... nối tiếp mã đang có khi điền tên; các sheet sau chọn lại theo mã này. Nhiều phòng điền song song có thể trùng mã trong file - lúc nạp hệ thống cấp mã thật theo thứ tự nạp và vẫn trỏ đúng danh mục đã khai.';
+        $userRules = [
+            'Mã số nhân viên dùng làm tên đăng nhập: 5 - 10 ký tự, không trùng. Mã đã có tài khoản thì giữ nguyên, không ghi đè.',
+            'KHÔNG ghi mật khẩu vào file: Admin nhập mật khẩu khởi tạo chung lúc nạp.',
+            'Tổ / nhóm phải thuộc đúng phòng ban của người dùng. Tổ mới thêm ở sheet 03 chọn được ngay ở sheet Người dùng.',
+            'Không có email thì ghi NA.',
+        ];
+
+        $notes = match ($stage) {
+            1 => ['Công ty / phòng ban / vai trò đã có trên hệ thống (nền xám) giữ nguyên, không sửa trong file. Tên viết tắt không trùng.'],
+            2 => $userRules,
+            3 => array_values(array_filter([
+                self::hasVisible(['material_names', 'chem_names', 'standard_names'])
+                    ? 'Thêm tên hàng mới ở '.self::titles(['material_names', 'chem_names', 'standard_names']).' trước, rồi mới tạo danh mục công ty ở '
+                        .self::titles(['material_cats', 'chemical_cats', 'standard_cats']).' từ tên đó.'
+                    : null,
+                self::hasVisible(['material_cats', 'chemical_cats', 'standard_cats']) ? $codeRule : null,
+                'Tên hàng / danh mục đã có (nền xám) thì chọn lại, không khai lại. Dòng mới trùng tổ hợp đã có sẽ được dùng lại bản cũ.',
+                self::hasVisible(['warehouses']) ? 'Định khu khai từ cấp lớn đến nhỏ: Kho → Kệ / Tủ → Cột → Tầng → Vị trí.' : null,
+            ])),
+            4 => $stockRules,
+            default => array_merge($userRules, [$codeRule], $stockRules),
+        };
+
+        return ['about' => $about, 'notes' => $notes];
+    }
+
+    /** Quy tắc nhập liệu chung cho mọi loại file. */
+    private static function commonRules(array $visible): array
+    {
+        $hasPrefill = (bool) array_filter(array_intersect_key(self::$prefillCounts, $visible));
+
+        return array_values(array_filter([
+            'Điền theo đúng thứ tự các bước ở mục B: sheet sau chỉ chọn lại được dữ liệu đã khai ở sheet trước hoặc đã có trên hệ thống.',
+            $hasPrefill
+                ? 'Dòng NỀN XÁM ở đầu sheet là dữ liệu đang có trên hệ thống, đã khoá - chỉ để xem / chọn lại. Điền dữ liệu mới ở các dòng trắng ngay bên dưới.'
+                : null,
+            'Dòng 3 là tên cột, dòng 4 là gợi ý / ví dụ. KHÔNG đổi tên sheet, KHÔNG chèn / xoá / đổi thứ tự cột.',
+            'Cột có dấu * (nền xanh đậm) là bắt buộc; cột còn lại để trống nếu không có thông tin.',
+            'Điền liền mạch từ trên xuống, không bỏ dòng trống xen giữa (danh sách chọn ở sheet sau bị cắt tại dòng trống).',
+            'Ô có mũi tên chọn: nên chọn từ danh sách thay vì gõ tay. Có thể dán (paste) giá trị nhưng phải trùng khớp chính xác.',
+            'Ngày ghi dạng dd/mm/yyyy (VD: 31/12/2027). Số thập phân dùng dấu chấm hoặc theo định dạng số của Excel.',
+            'Sheet không có dữ liệu mới thì để trống, hệ thống bỏ qua.',
+        ]));
+    }
+
+    /** Tên các sheet đang hiện trong file, trong số $keys (VD: "15.Tên vật tư, 16.Tên hoá chất"). */
+    private static function titles(array $keys): string
+    {
+        $titles = array_column(array_intersect_key(self::visibleSheets(), array_flip($keys)), 'title');
+
+        return $titles ? implode(', ', $titles) : 'sheet '.implode(' / ', array_map(fn ($k) => strtok(InitialDataSchema::sheetTitle($k), '.'), $keys));
+    }
+
+    private static function hasExtra(): bool
+    {
+        return in_array('extra', self::$roles, true);
+    }
+
+    private static function hasVisible(array $keys): bool
+    {
+        return (bool) array_intersect_key(self::visibleSheets(), array_flip($keys));
+    }
+
+    /** Một dòng "Nhãn: nội dung" trong phần mô tả file. */
+    private static function guideField(Worksheet $ws, int $row, string $label, string $text): int
+    {
+        $ws->setCellValue('A'.$row, $label);
+        $ws->mergeCells('A'.$row.':B'.$row);
+        $ws->setCellValue('C'.$row, $text);
+        $ws->mergeCells('C'.$row.':D'.$row);
+        $ws->getStyle('A'.$row)->getFont()->setBold(true)->getColor()->setRGB(self::PRIMARY_DARK);
+        $ws->getStyle('A'.$row.':D'.$row)->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+        $ws->getRowDimension($row)->setRowHeight(15 * max(1, (int) ceil(mb_strlen($text) / 120)));
+
+        return $row + 1;
     }
 
     private static function guideSheetList(Worksheet $ws, int $row, array $visible): int
@@ -838,6 +1010,8 @@ class InitialDataTemplate
             $validation = match ($col['type']) {
                 'list' => self::validation(DataValidation::TYPE_LIST, '='.self::listName($col['list']), $label, ! empty($col['free'])),
                 'ref' => self::validation(DataValidation::TYPE_LIST, '='.$col['ref'], $label),
+                // Ô nhiều giá trị: chọn một giá trị trong danh sách hoặc gõ nhiều giá trị cách dấu phẩy
+                'multi' => self::validation(DataValidation::TYPE_LIST, '='.self::listName($col['list']), $label, true),
                 'int' => self::numberValidation(DataValidation::TYPE_WHOLE, $col, $label),
                 'num' => self::numberValidation(DataValidation::TYPE_DECIMAL, $col, $label),
                 'date' => self::dateValidation($label),

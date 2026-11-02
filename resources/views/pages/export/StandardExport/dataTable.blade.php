@@ -141,8 +141,9 @@
                                                 {{ $types[$row->type] ?? $row->type }}
                                             </span>
                                         </td>
+                                        {{-- Chỉ hiện ngày; data-order giữ đủ ngày giờ để sắp xếp đúng thứ tự trong ngày --}}
                                         <td class="text-center md-sub" data-order="{{ $row->created_at }}">
-                                            {{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '—' }}
+                                            {{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '—' }}
                                         </td>
                                         <td class="md-sub">
                                             @if ($row->type === 'cancel')

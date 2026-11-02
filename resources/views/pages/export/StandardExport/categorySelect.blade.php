@@ -55,6 +55,21 @@
         });
     };
 
+    /**
+     * Chỉ số items[n] cho dòng mới của bảng đề nghị: lớn nhất đang có + 1. Không dùng số dòng vì xoá
+     * một dòng giữa bảng rồi thêm dòng mới sẽ trùng chỉ số với dòng cuối (mất dữ liệu khi gửi).
+     */
+    window.stdReqNextIndex = function ($tbody) {
+        var max = -1;
+
+        $tbody.find('[name^="items["]').each(function () {
+            var m = /^items\[(\d+)\]/.exec(this.name);
+            if (m) max = Math.max(max, +m[1]);
+        });
+
+        return max + 1;
+    };
+
     /** Picker điền chất chuẩn vào một ô: tạo option nếu chưa có rồi chọn. */
     window.stdSetCategory = function ($select, id, text, attrs) {
         wmsEnsureOption($select, id, text, attrs);

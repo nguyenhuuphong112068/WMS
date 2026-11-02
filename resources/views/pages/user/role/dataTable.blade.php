@@ -262,7 +262,7 @@
             </div>
         </div>
 
-        @if (empty($tree))
+        @if (empty($modules))
             <div class="card perm-model-card">
                 <div class="card-body">
                     <div class="alert alert-warning mb-0">
@@ -271,8 +271,8 @@
                 </div>
             </div>
         @else
-            {{-- Mỗi model một card riêng --}}
-            @foreach ($tree as $modelKey => $model)
+            {{-- Mỗi module leftNAV một card riêng --}}
+            @foreach ($modules as $modelKey => $model)
                 <div class="card perm-model-card" data-model="{{ $modelKey }}">
                     <div class="card-header perm-model-header">
                         <span class="perm-model-icon"><i class="fas {{ $model['icon'] }}"></i></span>

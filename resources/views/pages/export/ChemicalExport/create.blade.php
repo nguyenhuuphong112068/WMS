@@ -2,6 +2,18 @@
     $bag = $errors->getBag('createErrors');
     // Số lô còn dùng được - hiện trên nút "Tồn Kho Của Phòng"
     $expSelectableCount = $imports->where('selectable', true)->count();
+
+    // Gói Sản phẩm - Chỉ tiêu đang dùng của phòng (Danh Mục Hoá Chất, tab theo sản phẩm)
+    $expKits = $productLists->map(fn($list) => [
+        'id' => (string) $list->id,
+        'text' => \App\Support\ProductList::label($list),
+        'items' => $list->items->map(fn($item) => [
+            'category_id' => (int) $item->category_id,
+            'code' => $item->category_code,
+            'name' => $item->item_name,
+            'amount' => \App\Support\ProductList::amount($item->amount),
+        ])->values(),
+    ])->values();
 @endphp
 
 <style>
@@ -48,7 +60,7 @@
     /* ---------- Khối 1: 2 cách chọn hoá chất ---------- */
     #createModal .exp-pick-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 280px) minmax(260px, 340px);
         gap: 14px;
         margin-bottom: 22px;
     }
@@ -95,6 +107,31 @@
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.25);
         font-size: 0.75rem;
+    }
+
+    /* Cách 3: kết quả gợi ý theo gói Sản phẩm - Chỉ tiêu */
+    #createModal .exp-kit-result {
+        margin-top: 6px;
+        font-size: 0.78rem;
+        color: #475569;
+    }
+
+    #createModal .exp-kit-result .is-ok {
+        color: #16A34A;
+    }
+
+    #createModal .exp-kit-result .is-bad {
+        color: #DC2626;
+    }
+
+    @media (max-width: 1199.98px) {
+        #createModal .exp-pick-grid {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+
+        #createModal .exp-pick-grid .exp-scan {
+            grid-column: 1 / -1;
+        }
     }
 
     @media (max-width: 767.98px) {
@@ -260,6 +297,78 @@
         color: var(--primary-dark);
     }
 
+    /* Đổi lô: cùng hoá chất, các mã xuất nhập khác còn dùng được (FEFO rồi FIFO) */
+    #expRowsTable .exp-lot-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+        padding: 1px 8px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        font-size: 0.72rem;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    #expRowsTable .exp-lot-switch:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+    }
+
+    .exp-lot-menu {
+        max-height: 320px;
+    }
+
+    .exp-lot-menu .exp-lot-item {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--primary-soft);
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .exp-lot-menu .exp-lot-item:hover {
+        background: var(--primary-soft);
+    }
+
+    .exp-lot-menu .exp-lot-item.is-current,
+    .exp-lot-menu .exp-lot-item.is-used {
+        cursor: default;
+        background: var(--bg-neutral);
+    }
+
+    .exp-lot-menu .exp-code {
+        font-family: Consolas, monospace;
+        font-weight: 700;
+        color: var(--primary-dark);
+    }
+
+    .exp-lot-menu .exp-lot-tag {
+        margin-left: 6px;
+        padding: 0 7px;
+        border-radius: 999px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        background: #DCFCE7;
+        color: #15803D;
+    }
+
+    .exp-lot-menu .exp-lot-tag.is-muted {
+        background: #E2E8F0;
+        color: #475569;
+    }
+
+    .exp-lot-menu .exp-lot-meta {
+        margin-top: 2px;
+        font-size: 0.75rem;
+        color: #64748B;
+    }
+
     .exp-ac-menu .exp-ac-more {
         padding: 6px 12px;
         font-size: 0.75rem;
@@ -345,6 +454,15 @@
                                 <span class="exp-method-badge">{{ number_format($expSelectableCount) }} lô</span>
                             </button>
                         </div>
+
+                        {{-- Cách 3: chọn gói Sản phẩm - Chỉ tiêu, gợi ý mỗi hoá chất một lô hạn dùng gần nhất --}}
+                        <div class="exp-method">
+                            <label><i class="fas fa-box-open mr-1"></i> Cách 3 · Theo sản phẩm - chỉ tiêu</label>
+                            <select class="form-control exp-kit-select" {{ $expKits->isEmpty() ? 'disabled' : '' }}>
+                                <option value="">{{ $expKits->isEmpty() ? 'Phòng chưa khai sản phẩm - chỉ tiêu' : '-- Chọn sản phẩm - chỉ tiêu --' }}</option>
+                            </select>
+                            <div class="exp-kit-result"></div>
+                        </div>
                     </div>
 
                     {{-- ===== KHỐI 2: HOÁ CHẤT ĐÃ CHỌN ===== --}}
@@ -429,6 +547,7 @@
         var checkUrl = @json(route($expRoute . 'checkAmount'));
         var productUrl = @json(route('pages.category.lookup.productNames'));
         var overPercent = {{ (int) $overIssuePercent }};
+        var kits = @json($expKits);
 
         function esc(value) {
             return $('<div>').text(value == null ? '' : value).html();
@@ -824,6 +943,8 @@
             var hasCheckers = (window.expCheckerOptions || []).length > 0;
             var days = daysLeft(data.expired_date);
             var name = 'items[' + importId + ']';
+            // Cùng hoá chất còn lô khác dùng được thì cho đổi mã xuất nhập ngay trên dòng
+            var otherLots = lotsOf(data.category_id).length - 1;
 
             var checkerCell = '<span class="md-empty">—</span>';
             if (banned) {
@@ -843,7 +964,9 @@
                 (data.location ? '<div class="md-sub mt-1"><i class="fas fa-map-marker-alt mr-1"></i>' + esc(data.location) + '</div>' : '') +
                 '</td>' +
                 '<td class="exp-cell-mid"><span class="md-tag">' + esc(data.category_code || '—') + '</span></td>' +
-                '<td class="exp-cell-mid"><span class="exp-code">' + esc(data.code) + '</span></td>' +
+                '<td class="exp-cell-mid"><span class="exp-code">' + esc(data.code) + '</span>' +
+                (otherLots > 0 ? '<div><button type="button" class="exp-lot-switch" title="Đổi sang mã xuất nhập khác của cùng hoá chất">' +
+                    '<i class="fas fa-exchange-alt"></i> Đổi lô (' + otherLots + ')</button></div>' : '') + '</td>' +
                 '<td class="exp-cell-mid">' + esc(data.batch_no || '—') + '</td>' +
                 '<td class="exp-cell-mid exp-num exp-remaining-cell"></td>' +
                 '<td class="exp-cell-mid text-center">' + esc(data.expired_date || '—') +
@@ -896,9 +1019,230 @@
             syncRows();
         }
 
+        /* ---------- Lô còn dùng được của một hoá chất, xếp FEFO rồi FIFO ----------
+         | Hạn dùng gần nhất trước (FEFO), cùng hạn thì lô nhập trước (FIFO), cùng ngày nhập thì theo id. */
+        function dmyKey(dmy) {
+            var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dmy || '');
+            return m ? m[3] + m[2] + m[1] : '99999999';
+        }
+
+        function lotsOf(categoryId) {
+            var lots = [];
+
+            $.each(window.expImportData || {}, function(importId, data) {
+                if (Number(data.category_id) === Number(categoryId)) lots.push($.extend({ id: String(importId) }, data));
+            });
+
+            return lots.sort(function(a, b) {
+                return dmyKey(a.expired_date).localeCompare(dmyKey(b.expired_date)) ||
+                    String(a.imported_date || '9999-12-31').localeCompare(String(b.imported_date || '9999-12-31')) ||
+                    Number(a.id) - Number(b.id);
+            });
+        }
+
+        /* ---------- Đổi lô trên một dòng ----------
+         | Danh sách mã xuất nhập khác của cùng hoá chất (FEFO rồi FIFO); lô đã có dòng khác trong bảng thì
+         | khoá. Chọn lô mới: dựng lại dòng tại đúng vị trí cũ, giữ Số Lượng / Người Kiểm Tra / Mục Đích. */
+        var $lotMenu = $('<div class="exp-ac-menu exp-lot-menu" role="listbox"></div>').hide().appendTo(document.body);
+        var lotMenuRow = null;
+
+        function ymdToDmy(ymd) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd || '');
+            return m ? m[3] + '/' + m[2] + '/' + m[1] : '—';
+        }
+
+        function closeLotMenu() {
+            $lotMenu.hide().empty();
+            lotMenuRow = null;
+        }
+
+        function placeLotMenu($button) {
+            var rect = $button[0].getBoundingClientRect();
+            var below = window.innerHeight - rect.bottom;
+            var up = below < 260 && rect.top > below;
+
+            $lotMenu.css({
+                left: Math.min(rect.left, window.innerWidth - 400),
+                width: 380,
+                top: up ? 'auto' : rect.bottom + 4,
+                bottom: up ? window.innerHeight - rect.top + 4 : 'auto'
+            });
+        }
+
+        function openLotMenu($button) {
+            var $row = $button.closest('tr');
+            var current = String($row.data('import-id'));
+            var data = (window.expImportData || {})[current] || {};
+            var used = {};
+
+            $('#expRowsBody tr').each(function() {
+                used[String($(this).data('import-id'))] = true;
+            });
+
+            $lotMenu.empty();
+            lotsOf(data.category_id).forEach(function(lot, index) {
+                var isCurrent = lot.id === current;
+                var isUsed = !isCurrent && used[lot.id];
+                var tags = (index === 0 ? '<span class="exp-lot-tag">FEFO</span>' : '') +
+                    (isCurrent ? '<span class="exp-lot-tag is-muted">Đang chọn</span>' : '') +
+                    (isUsed ? '<span class="exp-lot-tag is-muted">Đã có trong bảng</span>' : '');
+
+                $('<div class="exp-lot-item" role="option">')
+                    .toggleClass('is-current', isCurrent)
+                    .toggleClass('is-used', !!isUsed)
+                    .attr('data-id', lot.id)
+                    .html(
+                        '<div><span class="exp-code">' + esc(lot.code) + '</span>' + tags + '</div>' +
+                        '<div class="exp-lot-meta">HSD <b>' + esc(lot.expired_date || '—') + '</b> · Nhập ' +
+                        esc(ymdToDmy(lot.imported_date)) + ' · Tồn <b>' + fmt(lot.remaining) + '</b> ' + esc(lot.unit || '') +
+                        (lot.batch_no ? ' · Lô ' + esc(lot.batch_no) : '') +
+                        (lot.location ? ' · ' + esc(lot.location) : '') + '</div>'
+                    )
+                    .appendTo($lotMenu);
+            });
+
+            lotMenuRow = $row;
+            $lotMenu.show();
+            placeLotMenu($button);
+        }
+
+        function swapLot($row, newId) {
+            var $prev = $row.prev();
+            var values = {
+                amount: $.trim($row.find('.exp-amount-input').val()),
+                checked_by: $row.find('select[name$="[checked_by]"]').val() || '',
+                purpose: $row.find('.exp-purpose').val() || ''
+            };
+
+            clearTimeout($row.data('timer'));
+            $row.remove();
+            window.expAddRow(newId, values);
+
+            var $new = $('#expRowsBody tr[data-import-id="' + newId + '"]');
+
+            if ($prev.length) {
+                $new.insertAfter($prev);
+            } else {
+                $new.prependTo('#expRowsBody');
+            }
+
+            syncRows();
+            $new.find('.exp-amount-input').trigger('focus');
+        }
+
+        $(document).on('click', '#expRowsBody .exp-lot-switch', function(e) {
+            e.stopPropagation();
+
+            if ($lotMenu.is(':visible') && lotMenuRow && lotMenuRow[0] === $(this).closest('tr')[0]) {
+                closeLotMenu();
+                return;
+            }
+
+            openLotMenu($(this));
+        });
+
+        $lotMenu.on('click', '.exp-lot-item', function() {
+            if ($(this).is('.is-current, .is-used') || !lotMenuRow) return;
+
+            var $row = lotMenuRow;
+            var newId = String($(this).data('id'));
+
+            closeLotMenu();
+            swapLot($row, newId);
+        });
+
+        $(document).on('mousedown', function(e) {
+            if ($lotMenu.is(':visible') && !$(e.target).closest('.exp-lot-menu, .exp-lot-switch').length) closeLotMenu();
+        });
+
+        document.addEventListener('scroll', function(e) {
+            if (e.target !== $lotMenu[0] && $lotMenu.is(':visible')) closeLotMenu();
+        }, true);
+        $(document).on('hide.bs.modal', '.modal', closeLotMenu);
+
+        /* ---------- Cách 3: gói Sản phẩm - Chỉ tiêu ----------
+         | Mỗi hoá chất của gói lấy MỘT lô còn dùng được của phòng theo FEFO rồi FIFO; muốn lô khác thì bấm
+         | Đổi lô trên dòng. Hoá chất đã có dòng trong bảng thì giữ nguyên. Lượng gợi ý điền vào Số Lượng,
+         | "Sản phẩm - Chỉ tiêu" điền vào Mục Đích. */
+        function kitLot(item) {
+            return lotsOf(item.category_id)[0] || null;
+        }
+
+        function applyKit(kit) {
+            var added = 0;
+            var kept = 0;
+            var missing = [];
+
+            kit.items.forEach(function(item) {
+                var hasRow = $('#expRowsBody tr').filter(function() {
+                    var data = (window.expImportData || {})[$(this).data('import-id')] || {};
+                    return Number(data.category_id) === Number(item.category_id);
+                }).length > 0;
+
+                if (hasRow) {
+                    kept++;
+                    return;
+                }
+
+                var lot = kitLot(item);
+
+                if (!lot) {
+                    missing.push(item);
+                    return;
+                }
+
+                window.expAddRow(lot.id, {
+                    amount: item.amount || '',
+                    purpose: kit.text
+                });
+                added++;
+            });
+
+            var html = '<span class="is-ok"><i class="fas fa-check-circle mr-1"></i>Đã thêm ' + added + '/' +
+                kit.items.length + ' hoá chất</span>' + (kept ? ' · ' + kept + ' đã có sẵn trong bảng' : '');
+
+            if (missing.length) {
+                html += '<div class="is-bad mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>Không còn lô dùng được: ' +
+                    missing.map(function(item) {
+                        return '<b>' + esc(item.code || '—') + '</b> ' + esc(item.name || '');
+                    }).join(', ') + '</div>';
+            }
+
+            $modal.find('.exp-kit-result').html(html);
+            $('#expRowsBody .exp-amount-input').filter(function() {
+                return !this.value;
+            }).first().trigger('focus');
+        }
+
+        var $kitSelect = $modal.find('.exp-kit-select');
+
+        if (kits.length) {
+            $kitSelect.select2($.extend({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $modal,
+                placeholder: $kitSelect.find('option[value=""]').text(),
+                language: {
+                    noResults: function() {
+                        return 'Không tìm thấy sản phẩm - chỉ tiêu phù hợp';
+                    }
+                }
+            }, { ajax: window.wmsLocalLookup(kits) }));
+
+            $kitSelect.on('select2:select', function(e) {
+                var kit = kits.filter(function(item) {
+                    return item.id === String(e.params.data.id);
+                })[0];
+
+                if (kit) applyKit(kit);
+                $kitSelect.val(null).trigger('change');
+            });
+        }
+
         // Mở modal Thêm mới thì dọn sạch bảng dòng + trả nút Lưu về mặc định "Sử dụng ngay"
         $(document).on('click', '.btn-md-create', function() {
             clearRows();
+            $modal.find('.exp-kit-result').empty();
             $modal.find('.exp-mode-input').val('use');
         });
 

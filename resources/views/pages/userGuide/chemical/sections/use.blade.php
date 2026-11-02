@@ -5,12 +5,24 @@
 <h3>Ghi phiếu sử dụng</h3>
 <ol class="ug-steps">
     <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Sử dụng hoá chất</span>.</li>
-    <li>Chọn lô bằng một trong hai cách:
+    <li>Chọn lô bằng một trong ba cách:
         <ul>
             <li><b>Cách 1 · Quét mã xuất nhập</b>: đưa máy quét vào mã trên nhãn, hoặc gõ mã rồi Enter.</li>
             <li><b>Cách 2 · Tồn kho của phòng</b>: bấm <b>Chọn Từ Tồn Kho</b>, tick một hoặc nhiều lô còn tồn, còn hạn, rồi
                 <b>Thêm Vào Danh Sách</b>.</li>
+            <li><b>Cách 3 · Theo sản phẩm - chỉ tiêu</b>: chọn một gói đã khai ở
+                <a href="#theo-san-pham">Danh sách hoá chất theo sản phẩm</a>. Mỗi hoá chất của gói được thêm <b>một lô</b>
+                còn dùng được, chọn theo <b>FEFO</b> (hạn dùng gần nhất trước) rồi <b>FIFO</b> (cùng hạn thì lô nhập trước),
+                điền sẵn Số Lượng Dùng theo lượng gợi ý và Mục đích là "Sản phẩm - Chỉ tiêu". Hoá chất đã có dòng trong bảng
+                thì giữ nguyên; hoá chất không còn lô dùng được thì hiện tên màu đỏ ngay dưới ô chọn.</li>
         </ul>
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/su-dung-theo-san-pham.png', 'caption' => 'Chọn gói ở Cách 3 · Theo sản phẩm - chỉ tiêu: các hoá chất của gói được thêm sẵn lô, số lượng và mục đích'])
+    </li>
+    <li>Muốn dùng lô khác của cùng hoá chất, bấm <span class="ug-chip"><i class="fas fa-exchange-alt mr-1"></i>Đổi lô (n)</span>
+        dưới Mã Xuất Nhập (<b>n</b> = số lô khác còn dùng được). Danh sách xếp FEFO rồi FIFO, lô đầu có nhãn <b>FEFO</b>;
+        lô đã có dòng khác trong bảng thì không chọn được. Chọn lô mới thì dòng giữ nguyên vị trí, Số Lượng, Người Kiểm Tra
+        và Mục đích đã nhập.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/su-dung-doi-lo.png', 'caption' => 'Bấm Đổi lô: các mã xuất nhập khác của cùng hoá chất, xếp FEFO rồi FIFO'])
     </li>
     <li>Mỗi dòng nhập <b>Số Lượng Dùng</b> và <b>Mục đích</b> (gõ tìm tên sản phẩm hoặc gõ tự do). Hoá chất cấm phải chọn thêm
         <b>Người Kiểm Tra</b> là Quản Lý Kho Hoá Chất của phòng. Cột <b>Tồn Còn</b> báo ngay nếu vượt tồn.</li>

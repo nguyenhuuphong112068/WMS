@@ -8,6 +8,26 @@
         </thead>
         <tbody>
             <tr>
+                <td>"Phòng đã có gói cho sản phẩm ... với chỉ tiêu này"</td>
+                <td style="font-weight: 400">Mỗi cặp Sản phẩm + Chỉ tiêu chỉ có một gói đang dùng trong phòng. Sửa gói đã có ở
+                    <a href="#theo-san-pham">Danh sách hoá chất theo sản phẩm</a>, hoặc khoá gói cũ rồi tạo gói mới.</td>
+            </tr>
+            <tr>
+                <td>"Có hoá chất chưa khai (hoặc đã khoá) ở tab Hoá chất của phòng" khi lưu gói</td>
+                <td style="font-weight: 400">Gói chỉ gồm hoá chất phòng đang dùng. Dòng màu đỏ trong bảng gói là hoá chất đã bị khoá ở
+                    <a href="#hoa-chat-cua-phong">Hoá Chất Của Phòng</a>: bỏ dòng đó hoặc mở khoá lại hoá chất.</td>
+            </tr>
+            <tr>
+                <td>Chọn gói ở Cách 3 nhưng báo đỏ "Không còn lô dùng được: ..."</td>
+                <td style="font-weight: 400">Các hoá chất đó không còn lô nào còn tồn, còn hạn, đã kiểm tra Đạt và đã có hạn dùng nội bộ.
+                    Kiểm tra ở <a href="#ton-kho">Tồn kho</a>, xác định <a href="#han-dung">hạn nội bộ</a> hoặc lập <a href="#du-tru">dự trù</a>.</td>
+            </tr>
+            <tr>
+                <td>Lô hệ thống gợi ý theo gói không đủ số lượng</td>
+                <td style="font-weight: 400">Lô được chọn theo FEFO rồi FIFO, không xét lượng. Bấm <b>Đổi lô</b> trên dòng để chọn mã xuất
+                    nhập khác, hoặc thêm lô thứ hai bằng Cách 1 / Cách 2.</td>
+            </tr>
+            <tr>
                 <td>Không tìm thấy hoá chất khi nhập kho</td>
                 <td style="font-weight: 400">Chưa khai ở <a href="#hoa-chat-cua-phong">Hoá Chất Của Phòng</a>, hoặc danh mục công ty chưa được duyệt.</td>
             </tr>

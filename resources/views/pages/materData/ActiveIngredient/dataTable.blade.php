@@ -116,9 +116,6 @@
                                                 title="Dòng khai theo nhóm chất của nghị định - tồn của các chất thành viên được cộng chung vào ngưỡng này">Mục
                                                 gộp</span>
                                         @endif
-                                        @if ($row->code)
-                                            <div class="md-sub">{{ $row->code }}</div>
-                                        @endif
                                         @if ($row->parent_name)
                                             <div class="md-sub" title="Tồn của chất này cộng vào ngưỡng của mục gộp">
                                                 <i class="fas fa-level-up-alt fa-rotate-90 mr-1"></i>{{ $row->parent_name }}

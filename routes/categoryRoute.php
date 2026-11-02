@@ -11,6 +11,8 @@
 
 use App\Http\Controllers\Pages\Category\CategoryLookupController;
 use App\Http\Controllers\Pages\Category\ChemicalCategoryController;
+use App\Http\Controllers\Pages\Category\ChemicalProductListController;
+use App\Http\Controllers\Pages\Category\StandardProductListController;
 use App\Http\Controllers\Pages\Category\DepartmentChemicalController;
 use App\Http\Controllers\Pages\Category\DepartmentMaterialController;
 use App\Http\Controllers\Pages\Category\DepartmentStandardController;
@@ -111,6 +113,14 @@ Route::prefix('/category')
             Route::post('deActive', 'deActive')->name('deActive');
         });
 
+        // Tab "Danh sách hoá chất theo sản phẩm" của /category/chemicalCategory: gói Sản phẩm + Chỉ tiêu
+        // + các hoá chất cần dùng, modal Sử Dụng Hoá Chất chọn gói thì gợi ý cả danh sách.
+        Route::prefix('/chemicalProductList')->name('chemicalProductList.')->controller(ChemicalProductListController::class)->group(function () {
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+        });
+
         // Trang 2 tab: "Danh Mục Chất Chuẩn Công Ty" + "Chất Chuẩn Của Phòng"
         Route::prefix('/standardCategory')->name('standardCategory.')->controller(StandardCategoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
@@ -121,6 +131,14 @@ Route::prefix('/category')
             Route::post('approve', 'approve')->name('approve');
             // Điều chỉnh Thời gian đặt hàng - quyền riêng, không đưa về Chờ duyệt (UpdatesCategoryLeadTime)
             Route::post('updateLeadTime', 'updateLeadTime')->name('updateLeadTime');
+        });
+
+        // Tab "Danh sách chất chuẩn theo sản phẩm" của /category/standardCategory: gói Sản phẩm + Chỉ tiêu
+        // + các chất chuẩn, modal Đề nghị cấp phát chuẩn nội bộ chọn gói thì thêm sẵn các dòng đề nghị.
+        Route::prefix('/standardProductList')->name('standardProductList.')->controller(StandardProductListController::class)->group(function () {
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
         });
 
         // Cấu hình riêng của từng phòng ban cho chất chuẩn dùng chung - không có bước duyệt.

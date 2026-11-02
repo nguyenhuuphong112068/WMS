@@ -9,6 +9,7 @@ use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
 use App\Support\DepartmentStandard;
+use App\Support\ProductList;
 use App\Support\StandardCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -133,6 +134,12 @@ class StandardCategoryController extends Controller
                 $departmentId
             ),
             'dsConversions' => CategoryUnitConversion::declaredByCategory(CategoryUnitConversion::TYPE_STANDARD),
+
+            // Tab 3 - Danh sách chất chuẩn theo sản phẩm (StandardProductListController): gói Sản phẩm +
+            // Chỉ tiêu, chất chuẩn chọn trong số đã khai cho phòng (đang dùng)
+            'plLists' => ProductList::rowsOfDepartment(ProductList::STANDARD, $departmentId),
+            'plPurposes' => DB::table('purposes')->where('status_id', 1)->orderBy('name')->get(['id', 'name']),
+            'plOptions' => ProductList::options(ProductList::STANDARD, $dsDatas),
         ]);
     }
 

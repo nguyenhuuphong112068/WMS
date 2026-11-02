@@ -1,5 +1,5 @@
 <p>21 CFR Part 11 là quy định của FDA (Hoa Kỳ) về <b>hồ sơ điện tử</b> và <b>chữ ký điện tử</b> trong môi trường GMP: hồ sơ trên
-    máy phải đáng tin cậy như hồ sơ giấy. Bảng dưới tóm tắt yêu cầu chính và cách WMS đáp ứng, để bạn biết vì sao hệ thống có những
+    máy phải đáng tin cậy như hồ sơ giấy. Bảng dưới tóm tắt yêu cầu chính và cách hệ thống đáp ứng, để bạn biết vì sao hệ thống có những
     ràng buộc như khoá tài khoản, tự đăng xuất hay bắt nhập lại mật khẩu khi ký.</p>
 
 <div class="table-responsive">
@@ -8,7 +8,7 @@
             <tr>
                 <th style="width: 120px">Điều khoản</th>
                 <th style="width: 220px">Yêu cầu</th>
-                <th>WMS đáp ứng thế nào</th>
+                <th>Hệ thống đáp ứng thế nào</th>
             </tr>
         </thead>
         <tbody>

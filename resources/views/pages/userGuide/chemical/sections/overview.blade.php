@@ -10,6 +10,7 @@
         <span class="ug-flow-no">1</span>
         <b>Khai danh mục</b>
         <a href="#danh-muc-cong-ty">Danh mục công ty</a> → <a href="#hoa-chat-cua-phong">Hoá chất của phòng</a>
+        → <a href="#theo-san-pham">gói theo sản phẩm</a> (tuỳ chọn)
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">2</span>
@@ -24,7 +25,7 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">4</span>
         <b>Sử dụng</b>
-        <a href="#su-dung">Quét mã lô, ghi số lượng dùng</a>, trừ tồn ngay
+        <a href="#su-dung">Quét mã lô hoặc chọn gói sản phẩm</a>, ghi số lượng dùng, trừ tồn ngay
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">5</span>

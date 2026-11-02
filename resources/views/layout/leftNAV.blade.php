@@ -574,7 +574,7 @@
             ['consumptionObject', 'Đối Tượng', 'fas fa-cogs', 'materData_common_view'],
         ],
         'Quản trị' => [
-            ['initialData', 'Khởi Tạo Dữ Liệu', 'fas fa-file-import', 'Admin'],
+            ['initialData', 'Khởi Tạo Dữ Liệu', 'fas fa-file-import', 'materData_initialData_upload'],
         ],
     ];
     $materDataItems = [];
@@ -731,8 +731,8 @@
 @endphp
 
 <nav class="wms-rail" id="wms-rail" aria-label="Menu chính" data-current="{{ $navCurrent }}">
-    <a href="{{ route('pages.home') }}" class="wms-rail-logo" title="WMS - Quản Lý Kho">
-        <img src="{{ asset('img/iconstella.svg') }}" alt="WMS">
+    <a href="{{ route('pages.home') }}" class="wms-rail-logo" title="CMS - Quản Lý Vật Tư Tiêu Hao">
+        <img src="{{ asset('img/iconstella.svg') }}" alt="CMS">
     </a>
 
     @foreach ($navModules as $m)

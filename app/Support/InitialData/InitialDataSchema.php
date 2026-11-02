@@ -44,7 +44,7 @@ use Illuminate\Support\Facades\DB;
 class InitialDataSchema
 {
     /** Phiên bản cấu trúc file. Đổi cột / sheet thì tăng số này để chặn file mẫu cũ. */
-    public const VERSION = 'WMS-INITIAL-DATA-V2';
+    public const VERSION = 'WMS-INITIAL-DATA-V3';
 
     /** Tên sheet ẩn chứa danh sách chọn cố định + phiên bản file. */
     public const LIST_SHEET = '_DS';
@@ -76,7 +76,7 @@ class InitialDataSchema
 
     /**
      * Sheet chỉ Admin khai ở file toàn hệ thống. File của phòng ban ẩn hẳn các sheet này (vẫn giữ
-     * trong file làm nguồn ô chọn Vai trò / Tổ ở sheet Người dùng) và bộ nạp chặn dòng mới.
+     * trong file làm nguồn ô chọn Phòng ban / Tổ ở sheet Người dùng) và bộ nạp chặn dòng mới.
      */
     public const ADMIN_ONLY_SHEETS = ['companies', 'departments', 'roles'];
 
@@ -205,7 +205,72 @@ class InitialDataSchema
             'standard_form' => ['Dạng Bột Rời' => 'Dạng Bột Rời', 'Dạng Bột Mịn' => 'Dạng Bột Mịn', 'Dạng Sệt' => 'Dạng Sệt'],
             'standard_group' => $standardGroups,
             'safety_warning' => $safetyWarnings,
-        ] + $classification;
+        ] + $classification + self::roleLists();
+    }
+
+    /** Cột phân quyền ở sheet Người dùng => module của vai trò được chọn (null = chung). */
+    public const ROLE_COLUMNS = [
+        'role_general' => null,
+        'role_material' => 'material',
+        'role_chemical' => 'chemical',
+        'role_standard' => 'standard',
+    ];
+
+    private static ?array $roleLists = null;
+
+    /**
+     * Danh sách vai trò cho từng cột phân quyền: [cột => [tên vai trò => tên vai trò]]. Bảng roles
+     * không lưu module nên suy ra: tên chứa "vật tư" / "hoá chất" / "chuẩn" là vai trò của module
+     * đó, trừ khi quyền của vai trò trải đều nhiều module (VD Nhân Viên Cung Ứng Vật Tư có quyền cả
+     * hoá chất, chất chuẩn) thì xếp vào chung. Admin không cấp qua file.
+     */
+    public static function roleLists(): array
+    {
+        if (self::$roleLists !== null) {
+            return self::$roleLists;
+        }
+
+        $counts = [];
+        $rows = DB::table('role_permission')
+            ->join('permissions', 'permissions.id', '=', 'role_permission.permission_id')
+            ->get(['role_permission.role_id', 'permissions.name']);
+        foreach ($rows as $row) {
+            foreach (['material', 'chemical', 'standard'] as $module) {
+                if (str_contains(strtolower($row->name), $module)) {
+                    $counts[$row->role_id][$module] = ($counts[$row->role_id][$module] ?? 0) + 1;
+                    break;
+                }
+            }
+        }
+
+        $lists = array_fill_keys(array_keys(self::ROLE_COLUMNS), []);
+        foreach (DB::table('roles')->where('name', '!=', 'Admin')->orderBy('name')->pluck('name', 'id') as $id => $name) {
+            $module = self::roleModule($name, $counts[$id] ?? []);
+            $lists[array_search($module, self::ROLE_COLUMNS, true)][$name] = $name;
+        }
+
+        return self::$roleLists = $lists;
+    }
+
+    /** Module của một vai trò theo tên + số quyền từng module; null = vai trò chung. */
+    private static function roleModule(string $name, array $counts): ?string
+    {
+        $name = mb_strtolower(\Normalizer::normalize($name));
+        $module = match (true) {
+            str_contains($name, 'vật tư') => 'material',
+            str_contains($name, 'hoá chất'), str_contains($name, 'hóa chất') => 'chemical',
+            str_contains($name, 'chuẩn') => 'standard',
+            default => null,
+        };
+
+        // Quyền module khác chiếm từ 20% trở lên so với module chính: vai trò dùng chung
+        arsort($counts);
+        $values = array_values($counts);
+        if ($module && count($values) > 1 && $values[1] >= 0.2 * $values[0]) {
+            return null;
+        }
+
+        return $module;
     }
 
     /**
@@ -326,9 +391,10 @@ class InitialDataSchema
                     ['key' => 'full_name', 'label' => 'Họ và tên', 'type' => 'text', 'req' => true, 'min_len' => 5, 'max' => 255, 'width' => 28, 'hint' => 'VD: Nguyễn Văn An'],
                     $dept,
                     ['key' => 'mail', 'label' => 'Email', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 28, 'hint' => 'Không có thì ghi NA'],
-                    ['key' => 'role_1', 'label' => 'Vai trò chính', 'type' => 'ref', 'ref' => 'R_VAI_TRO', 'req' => true, 'width' => 26, 'hint' => 'Chọn trong danh sách vai trò'],
-                    ['key' => 'role_2', 'label' => 'Vai trò 2', 'type' => 'ref', 'ref' => 'R_VAI_TRO', 'width' => 22, 'hint' => ''],
-                    ['key' => 'role_3', 'label' => 'Vai trò 3', 'type' => 'ref', 'ref' => 'R_VAI_TRO', 'width' => 22, 'hint' => ''],
+                    ['key' => 'role_general', 'label' => 'Phân quyền chung', 'type' => 'multi', 'list' => 'role_general', 'width' => 26, 'hint' => 'Vai trò dùng cho nhiều module. Nhiều vai trò cách nhau dấu phẩy'],
+                    ['key' => 'role_material', 'label' => 'Phân quyền Vật tư', 'type' => 'multi', 'list' => 'role_material', 'width' => 26, 'hint' => 'Chỉ vai trò module Vật tư'],
+                    ['key' => 'role_chemical', 'label' => 'Phân quyền Hoá chất', 'type' => 'multi', 'list' => 'role_chemical', 'width' => 26, 'hint' => 'Chỉ vai trò module Hoá chất'],
+                    ['key' => 'role_standard', 'label' => 'Phân quyền Chất chuẩn', 'type' => 'multi', 'list' => 'role_standard', 'width' => 26, 'hint' => 'Chỉ vai trò module Chất chuẩn'],
                     ['key' => 'group', 'label' => 'Tổ / nhóm', 'type' => 'ref', 'ref' => 'R_TO_NHOM', 'width' => 22, 'hint' => 'Tổ thuộc đúng phòng ban ở trên'],
                 ],
             ],
@@ -813,33 +879,100 @@ class InitialDataSchema
     }
 
     /**
-     * Mọi sheet có trong file: [key => 'edit' | 'source'], theo thứ tự nhập. 'source' = sheet
-     * giai đoạn trước mà sheet nhập được chọn tới (ô chọn tham chiếu) - điền sẵn từ DB, ẩn và khoá.
+     * Sheet bắt buộc phải có trước dù không chọn tới qua ô chọn: nhập tồn được chỉ khi danh mục
+     * đã khai cho phòng (sheet 27 - 29).
+     */
+    private const EXTRA_DEPENDS = [
+        'stock_materials' => ['dept_materials'],
+        'stock_chemicals' => ['dept_chemicals'],
+        'stock_standards' => ['dept_standards'],
+    ];
+
+    /**
+     * Mọi sheet có trong file: [key => 'edit' | 'extra' | 'source'], theo thứ tự nhập.
+     *   edit   : sheet của giai đoạn đang thu thập
+     *   extra  : sheet giai đoạn trước mà sheet nhập được cần tới (ô chọn tham chiếu, kể cả gián
+     *            tiếp) - điền sẵn từ DB và CHO BỔ SUNG dòng mới khi còn thiếu, bộ nạp nạp cùng file
+     *   source : sheet tổ chức (giai đoạn 1, Admin khai) - chỉ làm nguồn ô chọn, ẩn và khoá
      */
     public static function fileSheets(?string $module, ?int $stage = null): array
     {
         $edit = self::sheetsFor($module, $stage);
+        $all = self::sheets();
         $refs = self::refs();
-        $sources = [];
 
-        foreach ($edit as $sheet) {
-            foreach ($sheet['columns'] as $col) {
-                if ($col['type'] === 'ref' && ! isset($edit[$refs[$col['ref']][0]])) {
-                    $sources[$refs[$col['ref']][0]] = true;
+        // Gom phụ thuộc bắc cầu: VD tồn đầu → danh mục phòng → danh mục công ty → tên hàng, NSX
+        $needed = [];
+        $queue = array_keys($edit);
+        while ($queue) {
+            $key = array_shift($queue);
+            $deps = self::EXTRA_DEPENDS[$key] ?? [];
+            foreach ($all[$key]['columns'] ?? [] as $col) {
+                if ($col['type'] === 'ref') {
+                    $deps[] = $refs[$col['ref']][0];
+                }
+            }
+            foreach ($deps as $dep) {
+                if (! isset($edit[$dep]) && ! isset($needed[$dep]) && self::inModule($dep, $module)) {
+                    $needed[$dep] = true;
+                    $queue[] = $dep;
                 }
             }
         }
 
         $roles = [];
-        foreach (array_keys(self::sheets() + self::referenceSheets()) as $key) {
+        foreach (array_keys($all + self::referenceSheets()) as $key) {
             if (isset($edit[$key])) {
                 $roles[$key] = 'edit';
-            } elseif (isset($sources[$key])) {
-                $roles[$key] = 'source';
+            } elseif (isset($needed[$key])) {
+                $roles[$key] = isset($all[$key]) && self::stageOf($key) > 1 ? 'extra' : 'source';
             }
         }
 
         return $roles;
+    }
+
+    /** Sheet bộ nạp đọc của file: sheet giai đoạn đang thu thập + sheet bổ sung, theo thứ tự nhập. */
+    public static function importSheets(?string $module, ?int $stage = null): array
+    {
+        $roles = array_filter(self::fileSheets($module, $stage), fn ($role) => $role !== 'source');
+
+        return array_intersect_key(self::sheets(), $roles);
+    }
+
+    /**
+     * Thông tin file mẫu ghi trong sheet ẩn LIST_SHEET: phiên bản, giai đoạn, module, phòng ban.
+     * null = không đọc được hoặc không phải file mẫu WMS. Chỉ nạp đúng sheet đó nên rất nhanh.
+     *
+     * @return array{version: string, stage: ?int, module: ?string, department: ?string}|null
+     */
+    public static function fileMeta(string $path): ?array
+    {
+        try {
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
+            $reader->setReadDataOnly(true);
+            $reader->setLoadSheetsOnly([self::LIST_SHEET]);
+            $sheet = $reader->load($path)->getSheetByName(self::LIST_SHEET);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! $sheet || (string) $sheet->getCell('A1')->getValue() !== 'VERSION') {
+            return null;
+        }
+
+        $meta = ['version' => (string) $sheet->getCell('A2')->getValue(), 'stage' => null, 'module' => null, 'department' => null];
+        for ($r = self::PREFILL_CELL_ROW; ($entry = (string) $sheet->getCell('A'.$r)->getValue()) !== ''; $r++) {
+            [$key, $value] = array_pad(explode(':', $entry, 2), 2, '');
+            match ($key) {
+                self::STAGE_KEY => $meta['stage'] = (int) $value,
+                self::MODULE_KEY => $meta['module'] = $value,
+                self::SCOPE_KEY => $meta['department'] = $value,
+                default => null,
+            };
+        }
+
+        return $meta;
     }
 
     /** Sheet có cột Phòng ban: file của phòng ban chỉ được khai đúng phòng đó. */

@@ -8,6 +8,21 @@
         </thead>
         <tbody>
             <tr>
+                <td>"Phòng đã có gói cho sản phẩm ... với chỉ tiêu này"</td>
+                <td style="font-weight: 400">Mỗi cặp Sản phẩm + Chỉ tiêu chỉ có một gói đang dùng trong phòng. Sửa gói đã có ở
+                    <a href="#theo-san-pham">Danh sách chất chuẩn theo sản phẩm</a>, hoặc khoá gói cũ rồi tạo gói mới.</td>
+            </tr>
+            <tr>
+                <td>"Có chất chuẩn chưa khai (hoặc đã khoá) ở tab Chất chuẩn của phòng" khi lưu gói</td>
+                <td style="font-weight: 400">Gói chỉ gồm chất chuẩn phòng đang dùng. Dòng màu đỏ trong bảng gói là chuẩn đã bị khoá ở
+                    <a href="#chuan-cua-phong">Chất Chuẩn Của Phòng</a>: bỏ dòng đó hoặc mở khoá lại.</td>
+            </tr>
+            <tr>
+                <td>Bấm "Theo sản phẩm - chỉ tiêu" nhưng thêm ít dòng hơn số chất chuẩn của gói</td>
+                <td style="font-weight: 400">Chất chuẩn đã có dòng cùng <b>Tên Sản Phẩm</b> trong đề nghị thì được bỏ qua để không trùng
+                    (thông báo góc màn hình ghi số dòng bỏ qua). Gói không hiện trong danh sách thì gói đã bị khoá.</td>
+            </tr>
+            <tr>
                 <td>Không chọn được chất chuẩn khi nhập</td>
                 <td style="font-weight: 400">Chưa khai ở <a href="#chuan-cua-phong">Chất Chuẩn Của Phòng</a>, danh mục chưa duyệt, hoặc danh mục
                     chưa có nhóm chuẩn.</td>

@@ -3,12 +3,14 @@
 @php
     /*
     |--------------------------------------------------------------------------
-    | DANH MỤC - HOÁ CHẤT (1 TRANG, 2 TAB)
+    | DANH MỤC - HOÁ CHẤT (1 TRANG, 3 TAB)
     |--------------------------------------------------------------------------
     | Tab 1 "Danh Mục Hoá Chất Công Ty" : bản chất của chất, dùng chung toàn công ty,
     |                                     có bước duyệt (ChemicalCategoryController).
     | Tab 2 "Hoá Chất Của Phòng"        : cách dùng riêng của phòng ban đang chọn,
     |                                     không duyệt (DepartmentChemicalController).
+    | Tab 3 "Danh sách hoá chất theo sản phẩm": gói Sản phẩm + Chỉ tiêu + hoá chất cần dùng
+    |                                     của phòng (ChemicalProductListController), biến tiền tố pl.
     |
     | Hai tab dùng chung một trang nên phải tách nhau ở 3 chỗ:
     | - Biến dữ liệu : tab 2 đặt tiền tố dc (dcDatas, dcCategories...)
@@ -45,7 +47,12 @@
     | nên DepartmentChemicalController luôn kèm activeTab = 'department' lúc quay lại.
     */
     $dcHasErrors = $errors->getBag('dcCreateErrors')->any() || $errors->getBag('dcUpdateErrors')->any();
-    $activeTab = session('activeTab') === 'department' || $dcHasErrors ? 'department' : 'company';
+    $plHasErrors = $errors->getBag('plCreateErrors')->any() || $errors->getBag('plUpdateErrors')->any();
+    $activeTab = match (true) {
+        $plHasErrors || session('activeTab') === 'product' => 'product',
+        $dcHasErrors || session('activeTab') === 'department' => 'department',
+        default => 'company',
+    };
     $activeTab = \App\Support\PageTabs::active('category_chemical', $activeTab);
 @endphp
 
@@ -74,6 +81,16 @@
                     </a>
                 </li>
                 @endtab
+                @tab('category_chemical', 'product')
+                <li class="nav-item">
+                    <a class="nav-link {{ $activeTab === 'product' ? 'active' : '' }}" id="tabProductLink"
+                        data-toggle="pill" href="#tabProduct" role="tab">
+                        <i class="fas fa-box-open"></i>
+                        <span>Danh sách hoá chất theo sản phẩm</span>
+                        <span class="cat-tab-count">{{ $plLists->count() }}</span>
+                    </a>
+                </li>
+                @endtab
             </ul>
 
             <div class="tab-content">
@@ -96,6 +113,13 @@
                         'classificationLabels' => $classificationLabels,
                         'classificationCodes' => $classificationCodes,
                     ])
+                </div>
+                @endtab
+
+                @tab('category_chemical', 'product')
+                <div class="tab-pane fade {{ $activeTab === 'product' ? 'show active' : '' }}" id="tabProduct"
+                    role="tabpanel">
+                    @include('pages.category.shared.productListTable', ['plType' => 'chemical', 'lists' => $plLists])
                 </div>
                 @endtab
             </div>
@@ -225,7 +249,7 @@
             /* ---------- Mở đúng tab theo địa chỉ #tab... nếu server không chỉ định ---------- */
             var wanted = window.location.hash;
 
-            if (!@json($activeTab === 'department') && (wanted === '#tabCompany' || wanted === '#tabDepartment')) {
+            if (!@json($activeTab !== 'company') && ['#tabCompany', '#tabDepartment', '#tabProduct'].indexOf(wanted) !== -1) {
                 $('.cat-tabs a[href="' + wanted + '"]').tab('show');
             }
         });
@@ -269,4 +293,8 @@
     ])
     {{-- Cảnh báo tương kỵ ở ô Định Khu của 2 modal trên --}}
     @include('pages.category.DepartmentChemical.compatibility')
+
+    {{-- Tab 3: thêm / sửa gói Sản phẩm - Chỉ tiêu --}}
+    @include('pages.category.shared.productListForm', ['plType' => 'chemical', 'mode' => 'create'])
+    @include('pages.category.shared.productListForm', ['plType' => 'chemical', 'mode' => 'update'])
 @endsection

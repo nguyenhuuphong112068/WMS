@@ -20,7 +20,7 @@
 
 <h3>2. Tick quyền cho nhóm</h3>
 <ol class="ug-steps">
-    <li>Ở bảng Nhóm Quyền, mỗi cột là một nhóm quyền, mỗi dòng là một quyền, chia theo Quyền Chung, Vật Tư, Hoá Chất, Chất Chuẩn.</li>
+    <li>Ở bảng Nhóm Quyền, mỗi cột là một nhóm quyền, mỗi dòng là một quyền, chia thành từng khối theo module trên menu trái (Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Dự Trù, Phân Quyền &amp; Lịch Sử); trong mỗi khối quyền xếp tiếp theo Vật Tư, Hoá Chất, Chất Chuẩn, Dùng Chung.</li>
     <li>Tick hoặc bỏ tick ô: hệ thống <b>lưu ngay</b>, không có nút Lưu (quyền <i>Phân Quyền Cho Nhóm</i>).</li>
     <li>Tick một quyền con thì quyền cha được tick theo; bỏ quyền cha thì các quyền con bị bỏ theo.</li>
     <li>Cột <b>Admin</b> luôn đủ quyền, không bỏ tick được.</li>

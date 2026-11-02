@@ -43,8 +43,9 @@
     <i class="fas fa-lightbulb"></i>
     <div>
         Hệ thống mới triển khai, cần nạp số lượng lớn? Quản trị viên có thể dùng
-        <a href="#khoi-tao-du-lieu">Khởi Tạo Dữ Liệu</a> để điền toàn bộ dữ liệu gốc, danh mục, định khu và tồn đầu kỳ
-        vào một file Excel mẫu rồi nạp một lần, thay vì nhập tay từng màn hình.
+        <a href="#khoi-tao-du-lieu">Khởi Tạo Dữ Liệu</a>: gửi file Excel mẫu theo từng giai đoạn cho các phòng ban điền
+        dữ liệu gốc, danh mục, định khu và tồn đầu kỳ, phòng ban đính kèm file đã điền, Admin tổng hợp rồi nạp một lần
+        thay vì nhập tay từng màn hình.
     </div>
 </div>
 

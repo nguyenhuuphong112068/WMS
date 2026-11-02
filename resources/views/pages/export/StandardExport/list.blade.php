@@ -77,6 +77,8 @@
     {{-- issueModal (cấp phát ống cho Tổ) bỏ include: nút .btn-std-issue mở nó đã gỡ, cấp phát làm trong requestDetailModal --}}
     @include('pages.export.StandardExport.requestDetailModal')
     @include('pages.export.StandardExport.inventoryPickerModal')
+    {{-- Thêm dòng đề nghị theo gói Sản phẩm - Chỉ tiêu (Danh Mục › Chất Chuẩn) --}}
+    @include('pages.export.StandardExport.productKitModal')
 @include('pages.export.StandardExport.inventoryImportPickerModal')
 @include('pages.export.StandardExport.transferRequestModal')
 @include('pages.export.StandardExport.transferRequestEditModal')

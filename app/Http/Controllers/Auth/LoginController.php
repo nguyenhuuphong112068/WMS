@@ -28,7 +28,7 @@ class LoginController extends Controller
 
     public function showLogin()
     {
-        session()->put(['title' => 'WMS - QUẢN LÝ KHO']);
+        session()->put(['title' => 'CMS - QUẢN LÝ VẬT TƯ TIÊU HAO']);
 
         return view('login', []);
     }

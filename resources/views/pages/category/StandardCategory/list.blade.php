@@ -3,12 +3,14 @@
 @php
     /*
     |--------------------------------------------------------------------------
-    | DANH MỤC - CHẤT CHUẨN (1 TRANG, 2 TAB)
+    | DANH MỤC - CHẤT CHUẨN (1 TRANG, 3 TAB)
     |--------------------------------------------------------------------------
     | Tab 1 "Danh Mục Chất Chuẩn Công Ty" : bản chất của chất chuẩn, dùng chung toàn
     |                                        công ty, có bước duyệt (StandardCategoryController).
     | Tab 2 "Chất Chuẩn Của Phòng"        : cách dùng riêng của phòng ban đang chọn,
     |                                        không duyệt (DepartmentStandardController).
+    | Tab 3 "Danh sách chất chuẩn theo sản phẩm": gói Sản phẩm + Chỉ tiêu + chất chuẩn cần dùng
+    |                                        của phòng (StandardProductListController), biến tiền tố pl.
     |
     | Hai tab dùng chung một trang nên phải tách nhau ở 3 chỗ:
     | - Biến dữ liệu : tab 2 đặt tiền tố ds (dsDatas, dsCategories...)
@@ -49,7 +51,12 @@
     | nên DepartmentStandardController luôn kèm activeTab = 'department' lúc quay lại.
     */
     $dsHasErrors = $errors->getBag('dsCreateErrors')->any() || $errors->getBag('dsUpdateErrors')->any();
-    $activeTab = session('activeTab') === 'department' || $dsHasErrors ? 'department' : 'company';
+    $plHasErrors = $errors->getBag('plCreateErrors')->any() || $errors->getBag('plUpdateErrors')->any();
+    $activeTab = match (true) {
+        $plHasErrors || session('activeTab') === 'product' => 'product',
+        $dsHasErrors || session('activeTab') === 'department' => 'department',
+        default => 'company',
+    };
     $activeTab = \App\Support\PageTabs::active('category_standard', $activeTab);
 @endphp
 
@@ -78,6 +85,16 @@
                     </a>
                 </li>
                 @endtab
+                @tab('category_standard', 'product')
+                <li class="nav-item">
+                    <a class="nav-link {{ $activeTab === 'product' ? 'active' : '' }}" id="tabProductLink"
+                        data-toggle="pill" href="#tabProduct" role="tab">
+                        <i class="fas fa-box-open"></i>
+                        <span>Danh sách chất chuẩn theo sản phẩm</span>
+                        <span class="cat-tab-count">{{ $plLists->count() }}</span>
+                    </a>
+                </li>
+                @endtab
             </ul>
 
             <div class="tab-content">
@@ -99,6 +116,13 @@
                         'mdIcon' => $dsIcon,
                         'groups' => $groups,
                     ])
+                </div>
+                @endtab
+
+                @tab('category_standard', 'product')
+                <div class="tab-pane fade {{ $activeTab === 'product' ? 'show active' : '' }}" id="tabProduct"
+                    role="tabpanel">
+                    @include('pages.category.shared.productListTable', ['plType' => 'standard', 'lists' => $plLists])
                 </div>
                 @endtab
             </div>
@@ -200,7 +224,7 @@
             /* ---------- Mở đúng tab theo địa chỉ #tab... nếu server không chỉ định ---------- */
             var wanted = window.location.hash;
 
-            if (!@json($activeTab === 'department') && (wanted === '#tabCompany' || wanted === '#tabDepartment')) {
+            if (!@json($activeTab !== 'company') && ['#tabCompany', '#tabDepartment', '#tabProduct'].indexOf(wanted) !== -1) {
                 $('.cat-tabs a[href="' + wanted + '"]').tab('show');
             }
         });
@@ -232,4 +256,8 @@
         'unitsInUse' => $dsUnitsInUse,
         'conversions' => $dsConversions,
     ])
+
+    {{-- Tab 3: thêm / sửa gói Sản phẩm - Chỉ tiêu --}}
+    @include('pages.category.shared.productListForm', ['plType' => 'standard', 'mode' => 'create'])
+    @include('pages.category.shared.productListForm', ['plType' => 'standard', 'mode' => 'update'])
 @endsection

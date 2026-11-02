@@ -37,6 +37,10 @@
                             </div>
                         </div>
                         <div class="d-flex align-items-center">
+                            <button type="button" class="btn btn-sm btn-outline-success mr-2 btn-open-std-kit shadow-sm" data-target-modal="#requestModal"
+                                title="Thêm các chất chuẩn của một gói Sản phẩm - Chỉ tiêu">
+                                <i class="fas fa-box-open mr-1"></i> Theo sản phẩm - chỉ tiêu
+                            </button>
                             <button type="button" class="btn btn-sm btn-outline-info mr-2 btn-open-inventory-picker shadow-sm" data-target-modal="#requestModal">
                                 <i class="fas fa-boxes-stacked mr-1"></i> Danh mục chuẩn tồn của phòng
                             </button>
@@ -222,8 +226,6 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var rowIdx = 1;
-
         function initCriteriaSelect2($context) {
             var $targets = $context ? $context.find('.select2-criteria') : $('.select2-criteria');
             $targets.each(function() {
@@ -326,6 +328,7 @@
         $('.btn-add-req-row').click(function() {
             var $tbody = $('#tableReqRows tbody');
             var $firstRow = $tbody.find('tr:first');
+            var newIdx = stdReqNextIndex($tbody);
 
             // Destroy select2 before cloning
             $tbody.find('.select2-criteria').each(function() {
@@ -340,7 +343,7 @@
             $newRow.find('select, input, textarea').each(function() {
                 var name = $(this).attr('name');
                 if (name) {
-                    $(this).attr('name', name.replace(/items\[\d+\]/, 'items[' + rowIdx + ']'));
+                    $(this).attr('name', name.replace(/items\[\d+\]/, 'items[' + newIdx + ']'));
                 }
                 $(this).val(null);
             });
@@ -352,7 +355,6 @@
 
             $newRow.find('.btn-remove-req-row').prop('disabled', false);
             $tbody.append($newRow);
-            rowIdx++;
             updateDeleteButtons();
 
             // Re-init select2 on all rows
