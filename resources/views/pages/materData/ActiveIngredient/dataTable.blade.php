@@ -53,7 +53,7 @@
 
                 <div class="md-toolbar">
                     <div class="d-flex flex-wrap" style="gap: 10px">
-                        @perm('materData_chemical_create')
+                        @perm(md_perm('activeIngredient', 'create'))
                             <button type="button" class="btn btn-primary btn-md-create">
                                 <i class="fas fa-plus mr-1"></i> Thêm mới
                             </button>

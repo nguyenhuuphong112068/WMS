@@ -1147,7 +1147,7 @@ class HomeController extends Controller
     }
 
     /**
-     * Dữ liệu gốc chờ duyệt - đọc theo đúng quyền materData_<phạm vi>_approve mà nút
+     * Dữ liệu gốc chờ duyệt - đọc theo đúng quyền Duyệt của từng màn (materData_<phạm vi>_approve_<màn>) mà nút
      * Duyệt ở resources/views/pages/materData/shared/rowActions.blade.php đang kiểm tra.
      */
     private function masterDataReviews(): array
@@ -1169,7 +1169,8 @@ class HomeController extends Controller
         $rows = [];
 
         foreach ($tables as [$table, $scope, $route, $label, $codeColumn, $nameColumn]) {
-            if (! user_can('materData_'.$scope.'_approve')) {
+            // Quyền con Duyệt của đúng màn hình (App\Support\MaterDataPermissions), như nút Duyệt ở rowActions
+            if (! user_can(md_perm($route, 'approve'))) {
                 continue;
             }
 

@@ -72,3 +72,48 @@
         <button type="button" class="ug-top" title="Lên đầu trang"><i class="fas fa-arrow-up"></i></button>
     </div>
 </div>
+
+{{--
+| Bảng phân quyền (shared.permissionMatrix, shared.roleTable - đánh dấu data-ug-live) đọc CSDL lúc mở trang.
+| Màn Phân Quyền › Nhóm Quyền ghi mốc localStorage 'wmsPermissionChanged' mỗi khi đổi quyền / nhóm quyền; trang hướng
+| dẫn đang mở ở tab khác, mở lại bằng nút Back hoặc quay lại tab sẽ tải ngầm trang và thay các mục có bảng đó, giữ vị trí cuộn.
+--}}
+<script>
+    (function () {
+        var KEY = 'wmsPermissionChanged';
+        var loadedAt = Date.now();
+        var busy = false;
+
+        function changedAt() {
+            try { return Number(localStorage.getItem(KEY)) || 0; } catch (e) { return 0; }
+        }
+
+        function refresh() {
+            if (busy) return;
+            busy = true;
+            fetch(location.pathname, { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.text() : Promise.reject(); })
+                .then(function (html) {
+                    var doc = new DOMParser().parseFromString(html, 'text/html');
+                    document.querySelectorAll('.ug-section').forEach(function (section) {
+                        if (!section.querySelector('[data-ug-live]')) return;
+                        var fresh = doc.getElementById(section.id);
+                        if (fresh) section.innerHTML = fresh.innerHTML;
+                    });
+                    loadedAt = Date.now();
+                })
+                .catch(function () {})
+                .then(function () { busy = false; });
+        }
+
+        window.addEventListener('storage', function (e) {
+            if (e.key === KEY) refresh();
+        });
+        window.addEventListener('pageshow', function (e) {
+            if (e.persisted || changedAt() > loadedAt) refresh();
+        });
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible' && changedAt() > loadedAt) refresh();
+        });
+    })();
+</script>

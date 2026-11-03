@@ -9,18 +9,12 @@
 | - $historyCount : (tuỳ chọn) số lần đã thay đổi, mặc định 0 nếu không truyền
 --}}
 @php
-    // Suy phạm vi dữ liệu gốc từ tiền tố route để check quyền materData_<scope>_<action>
+    // Quyền con của màn hình (App\Support\MaterDataPermissions), suy từ tiền tố route
     $mdEntity = last(explode('.', rtrim($prefix, '.')));
-    $mdScope = match ($mdEntity) {
-        'materialName' => 'material',
-        'chemName', 'activeIngredient', 'mixtureHazardCategory' => 'chemical',
-        'standardName', 'purpose' => 'standard',
-        default => 'common',
-    };
-    $mdCanEdit = user_can("materData_{$mdScope}_update");
-    $mdCanApprove = user_can("materData_{$mdScope}_approve");
-    $mdCanReject = user_can("materData_{$mdScope}_reject");
-    $mdCanDeActive = user_can("materData_{$mdScope}_deActive");
+    $mdCanEdit = user_can(md_perm($mdEntity, 'update'));
+    $mdCanApprove = user_can(md_perm($mdEntity, 'approve'));
+    $mdCanReject = user_can(md_perm($mdEntity, 'reject'));
+    $mdCanDeActive = user_can(md_perm($mdEntity, 'deActive'));
 @endphp
 <div class="md-actions">
     <span class="md-btn-wrap">

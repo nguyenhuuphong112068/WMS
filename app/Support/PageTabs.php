@@ -234,7 +234,7 @@ class PageTabs
                     'parent_id' => $parent->id,
                     'name' => $name,
                     'display_name' => 'Tab '.self::label($page, $tab),
-                    'description' => ($parent->display_name ?: $parent->name).' - tab "'.self::label($page, $tab).'"',
+                    'description' => 'Thấy và mở tab "'.self::label($page, $tab).'" trên màn hình của quyền "'.($parent->display_name ?: $parent->name).'".',
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);

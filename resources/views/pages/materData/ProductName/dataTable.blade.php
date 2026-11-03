@@ -6,7 +6,7 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    @perm('materData_common_create')
+                    @perm(md_perm('productName', 'create'))
                         <button type="button" class="btn btn-primary btn-md-create">
                             <i class="fas fa-plus mr-1"></i> Thêm tên sản phẩm
                         </button>
@@ -45,7 +45,7 @@
                                     <td class="text-center">
                                         <div class="md-actions">
                                             <span class="md-btn-wrap">
-                                                @perm('materData_common_update')
+                                                @perm(md_perm('productName', 'update'))
                                                     <button type="button" class="btn btn-sm btn-warning btn-md-edit"
                                                         title="Sửa sản phẩm {{ $row->name }}"
                                                         data-row="{{ json_encode([
@@ -64,7 +64,7 @@
                                                 ])
                                             </span>
 
-                                            @perm('materData_common_deActive')
+                                            @perm(md_perm('productName', 'deActive'))
                                                 <form class="form-md-confirm d-inline" data-require-reason="1"
                                                     action="{{ route('pages.materData.productName.deActive') }}" method="POST"
                                                     data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} sản phẩm {{ $row->name }}?"

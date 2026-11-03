@@ -4,3 +4,4 @@
 @section('mainContent')
     @include('pages.userGuide.shared.page')
 @endsection
+

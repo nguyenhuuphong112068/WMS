@@ -283,3 +283,14 @@ if (! function_exists('user_can_any')) {
         return false;
     }
 }
+
+if (! function_exists('md_perm')) {
+    /**
+     * Tên quyền con của một màn hình Dữ Liệu Gốc - App\Support\MaterDataPermissions.
+     * Dùng trong view: @perm(md_perm('unit', 'create')) ... @endperm
+     */
+    function md_perm(string $screen, string $action): string
+    {
+        return \App\Support\MaterDataPermissions::name($screen, $action);
+    }
+}

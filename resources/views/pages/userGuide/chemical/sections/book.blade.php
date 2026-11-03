@@ -3,6 +3,10 @@
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/so-su-dung.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › Hoá Chất › tab Sổ sử dụng hoá chất'])
 
 <h3>Sửa một dòng</h3>
+<p>Người có quyền <b>Điều Chỉnh Sổ Sử Dụng Hoá Chất</b> bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span>
+    để sửa hoặc <span class="btn btn-sm btn-secondary ug-ui"><i class="fas fa-lock"></i></span> để khoá / mở khoá một dòng ghi sai.
+    Nút Sửa chỉ mở cho phiếu sử dụng <b>trong ngày</b>, qua ngày là chốt sổ. Mọi lần điều chỉnh đều lưu lịch sử - số nhỏ ở góc nút Sửa
+    là số lần đã điều chỉnh, bấm vào để xem.</p>
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Phiếu Nhập', true, 'Đổi sang lô khác thì mã xuất nhập đổi theo.'],
     ['Số Lượng', true, 'Vẫn áp dụng hạn mức vượt tồn tối đa 5%.'],

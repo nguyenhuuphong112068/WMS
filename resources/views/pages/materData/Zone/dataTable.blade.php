@@ -401,7 +401,7 @@
                             id="zonePane-{{ $key }}" role="tabpanel">
 
                             <div class="zone-toolbar">
-                                @if ($meta['canCreate'] && user_can('materData_common_create'))
+                                @if ($meta['canCreate'] && user_can(md_perm('zone', 'create')))
                                     <button type="button" class="btn btn-primary btn-zone-create"
                                         data-type="{{ $key }}">
                                         <i class="fas fa-plus mr-1"></i> Thêm {{ $meta['label'] }}
@@ -502,7 +502,7 @@
                                                 <td>
                                                     <div class="zone-actions">
                                                         <span class="md-btn-wrap">
-                                                            @perm('materData_common_update')
+                                                            @perm(md_perm('zone', 'update'))
                                                                 <button type="button" class="btn btn-sm btn-warning btn-zone-edit"
                                                                     title="Sửa"
                                                                     data-type="{{ $key }}"
@@ -527,7 +527,7 @@
                                                             ])
                                                         </span>
 
-                                                        @perm('materData_common_deActive')
+                                                        @perm(md_perm('zone', 'deActive'))
                                                             <form class="form-zone-confirm d-inline"
                                                                 action="{{ route($zoneRoute . 'deActive', $key) }}"
                                                                 method="POST"
@@ -544,7 +544,7 @@
                                                             </form>
                                                         @endperm
 
-                                                        @perm('materData_common_deActive')
+                                                        @perm(md_perm('zone', 'deActive'))
                                                             <form class="form-zone-confirm d-inline"
                                                                 action="{{ route($zoneRoute . 'destroy', $key) }}"
                                                                 method="POST"

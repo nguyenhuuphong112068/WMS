@@ -20,7 +20,27 @@
             <tr>
                 <td>Đã tick quyền xem tab mà vẫn không thấy tab</td>
                 <td style="font-weight: 400">Thiếu quyền xem màn hình (quyền cha). Ô hiện dấu tick nhạt trong
-                    <a href="#bang-quyen-chung">bảng phân quyền chung</a>.</td>
+                    <a href="#bang-materData">bảng phân quyền chung</a>.</td>
+            </tr>
+            <tr>
+                <td>Vừa tạo nhóm quyền mà không thấy cột của nhóm trên bảng</td>
+                <td style="font-weight: 400">Bảng đang lọc: nút loại (Vật Tư / Hoá Chất / Chất Chuẩn) khác loại phụ trách của nhóm,
+                    hoặc nút <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-users"></i> nhóm quyền</span>
+                    đang chọn một số nhóm. Bấm <b>Tất cả</b> và chọn <b>Chọn tất cả</b> trong danh sách nhóm quyền.</td>
+            </tr>
+            <tr>
+                <td>Nhóm quyền nằm sai cột loại (Chung / Vật Tư / Hoá Chất / Chất Chuẩn)</td>
+                <td style="font-weight: 400">Sửa ô <b>Loại Phụ Trách</b> của nhóm trong
+                    <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-users-cog"></i> Quản Lý Nhóm Quyền</span>:
+                    tick 1 loại thì nằm ở loại đó, tick 2-3 loại thì nằm ở Chung.</td>
+            </tr>
+            <tr>
+                <td>"Vui lòng chọn ít nhất một loại phụ trách (Vật Tư / Hoá Chất / Chất Chuẩn)."</td>
+                <td style="font-weight: 400">Tick ít nhất một ô Loại Phụ Trách trước khi bấm Lưu.</td>
+            </tr>
+            <tr>
+                <td>Thấy dấu tick trên bảng Nhóm Quyền nhưng bấm không đổi được</td>
+                <td style="font-weight: 400">Tài khoản chỉ có quyền <i>Xem Nhóm Quyền</i>, thiếu quyền <i>Phân Quyền Cho Nhóm</i>.</td>
             </tr>
             <tr>
                 <td>Nhóm quyền có quyền nhưng một người vẫn không thấy</td>

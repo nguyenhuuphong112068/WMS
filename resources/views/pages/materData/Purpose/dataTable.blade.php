@@ -6,7 +6,7 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    @perm('materData_standard_create')
+                    @perm(md_perm('purpose', 'create'))
                         <button type="button" class="btn btn-primary btn-md-create">
                             <i class="fas fa-plus mr-1"></i> Thêm chỉ tiêu kiểm
                         </button>
@@ -44,7 +44,7 @@
                                     <td class="text-center">
                                         <div class="md-actions">
                                             <span class="md-btn-wrap">
-                                                @perm('materData_standard_update')
+                                                @perm(md_perm('purpose', 'update'))
                                                     <button type="button" class="btn btn-sm btn-warning btn-md-edit"
                                                         title="Sửa chỉ tiêu {{ $row->name }}"
                                                         data-row="{{ json_encode([
@@ -63,7 +63,7 @@
                                                 ])
                                             </span>
 
-                                            @perm('materData_standard_deActive')
+                                            @perm(md_perm('purpose', 'deActive'))
                                                 <form class="form-md-confirm d-inline" data-require-reason="1"
                                                     action="{{ route('pages.materData.purpose.deActive') }}" method="POST"
                                                     data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} chỉ tiêu {{ $row->name }}?"

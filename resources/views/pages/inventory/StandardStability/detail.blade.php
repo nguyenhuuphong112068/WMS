@@ -347,15 +347,15 @@
 
                                                     @if ($item->state !== 'done' && user_can('stability_standard_delete'))
                                                         <form class="form-md-confirm d-inline"
-                                                            action="{{ route($ssaRoute . 'deleteItem') }}" method="POST"
-                                                            data-title="Xoá mốc {{ $item->name }}?"
-                                                            data-text="Mốc T{{ $item->timepoint }} sẽ bị xoá khỏi phiếu. Thao tác này không khôi phục được."
+                                                            action="{{ route($ssaRoute . 'cancelItem') }}" method="POST"
+                                                            data-title="Huỷ mốc {{ $item->name }}?"
+                                                            data-text="Mốc T{{ $item->timepoint }} sẽ bị huỷ: không còn trên phiếu, không tính vào tiến độ, vẫn lưu trong lịch sử thay đổi."
                                                             data-danger="1">
                                                             @csrf
                                                             <input type="hidden" name="id" value="{{ $item->id }}">
                                                             <button type="submit" class="btn btn-sm btn-danger"
-                                                                title="Xoá mốc đánh giá">
-                                                                <i class="fas fa-trash"></i>
+                                                                title="Huỷ mốc đánh giá">
+                                                                <i class="fas fa-ban"></i>
                                                             </button>
                                                         </form>
                                                     @endif

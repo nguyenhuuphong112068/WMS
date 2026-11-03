@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\MaterData;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\InitialData\InitialDataPreview;
 use App\Support\InitialData\InitialDataSchema;
 use App\Support\InitialData\InitialDataTemplate;
 use App\Support\Signer;
@@ -365,6 +366,20 @@ class InitialDataController extends Controller
         abort_unless($row && Storage::disk('local')->exists($row->stored_path), 404, 'Không tìm thấy file.');
 
         return response()->download(Storage::disk('local')->path($row->stored_path), $row->original_name);
+    }
+
+    /** Xem nội dung file đã đính kèm ngay trên web (JSON theo từng sheet), không cần tải về. */
+    public function preview(int $id)
+    {
+        $this->authorizeView();
+
+        $row = $this->visibleFile($id, true);
+        abort_unless($row && Storage::disk('local')->exists($row->stored_path), 404, 'Không tìm thấy file.');
+
+        $data = InitialDataPreview::read(Storage::disk('local')->path($row->stored_path));
+        abort_unless($data, 422, 'Không đọc được file Excel này, hãy tải về để mở bằng Excel.');
+
+        return response()->json($data);
     }
 
     /** Admin cập nhật trạng thái xử lý file: Chờ xử lý / Đã xử lý / Trả lại (kèm ghi chú). */

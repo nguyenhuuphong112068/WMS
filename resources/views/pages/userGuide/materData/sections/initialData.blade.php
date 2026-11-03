@@ -30,7 +30,8 @@
     </li>
     <li>Gửi file cho phòng ban. Người điền làm theo sheet <b>Hướng dẫn</b> trong file (mỗi loại file có mục đích, các bước
         điền và lưu ý riêng), điền xong thì đính kèm lên màn hình này.</li>
-    <li>Theo dõi khối <b>Theo dõi tiến độ</b> (xem bên dưới). Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-download"></i></span>
+    <li>Theo dõi khối <b>Theo dõi tiến độ</b> (xem bên dưới). Bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-eye mr-1"></i>Xem</span>
+        để <a href="#khoi-tao-du-lieu-xem-file">xem nhanh file</a> ngay trên web, bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-download"></i></span>
         để tải file mới nhất của từng việc về, tổng hợp file của tất cả phòng ban trong giai đoạn, làm sạch dữ liệu rồi nạp lên hệ
         thống. Nạp xong giai đoạn trước mới tải file giai đoạn sau.</li>
     <li>Bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-clipboard-check"></i></span> để cập nhật trạng thái file:
@@ -67,11 +68,26 @@
 </table>
 <p>Mỗi việc ghi file đang nộp (lần nộp thứ mấy, người nộp, giờ nộp, tên file) và ghi chú của Admin. Bấm
     <span class="btn btn-sm btn-outline-secondary ug-ui"><i class="fas fa-history mr-1"></i>2</span> (số lần đã nộp) để mở
-    <b>lịch sử nộp</b> ngay dưới việc: mọi lần nộp kèm trạng thái, người / giờ nộp, ghi chú, ghi chú của Admin và nút tải
-    <i class="fas fa-download"></i> từng file. Bật <b>Chỉ hiện việc chưa xong</b> để ẩn việc đã hoàn thành / không áp dụng.</p>
+    <b>lịch sử nộp</b> ngay dưới việc: mọi lần nộp kèm trạng thái, người / giờ nộp, ghi chú, ghi chú của Admin, nút xem
+    <i class="fas fa-eye"></i> và nút tải <i class="fas fa-download"></i> từng file. Bật <b>Chỉ hiện việc chưa xong</b> để ẩn việc đã hoàn thành / không áp dụng.</p>
 <p>Giai đoạn 2 - 4 có dòng <b>Hạn nộp</b> ở đầu tab: <span class="badge badge-info">Còn N ngày</span>,
     <span class="badge badge-warning">Hết hạn cuối ngày hôm nay</span> hoặc <span class="badge badge-danger">Đã hết hạn - không đính kèm được nữa</span>
     (nút Đính kèm / Nộp lại bị khoá).</p>
+
+<h3 id="khoi-tao-du-lieu-xem-file">Xem file đã nộp</h3>
+<p>Bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-eye mr-1"></i>Xem</span> ở một việc (file nộp mới nhất) hoặc
+    <i class="fas fa-eye"></i> ở một lần nộp trong lịch sử để xem nội dung file ngay trên web, không cần tải về. Admin xem được mọi file,
+    phòng ban xem được file của phòng mình.</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/khoi-tao-du-lieu-xem.png', 'caption' => 'Hộp thoại Xem file khởi tạo dữ liệu'])
+<ul>
+    <li>Cột trái là danh sách sheet có dữ liệu; số bên cạnh là số dòng của sheet, số màu xanh <span class="ug-key">+N</span> là số
+        <b>dòng mới điền</b>. Hộp thoại tự mở sheet đầu tiên có dòng mới. Bỏ qua sheet ẩn, sheet Hướng dẫn và sheet tra cứu.</li>
+    <li>Bảng bên phải hiện dữ liệu của sheet đang chọn; cột <b>Dòng</b> là số dòng trong file Excel, dùng để ghi lý do khi Trả lại
+        (VD: sheet 05 dòng 12 thiếu email). Ô <b>Tìm kiếm</b> lọc nhanh trong sheet.</li>
+    <li><b>Dòng nền xám</b> là dữ liệu hệ thống điền sẵn trong file mẫu; bật <b>Chỉ dòng mới điền</b> để chỉ xem dòng phòng ban mới khai.</li>
+    <li>Cột công thức (VD Mã DM tự sinh) hiện giá trị Excel đã tính lúc lưu file. Sheet quá 10.000 dòng chỉ hiện 10.000 dòng đầu -
+        bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-download mr-1"></i> Tải file</span> để xem đủ.</li>
+</ul>
 
 <h3>Đính kèm file đã điền (phòng ban)</h3>
 <ol class="ug-steps">

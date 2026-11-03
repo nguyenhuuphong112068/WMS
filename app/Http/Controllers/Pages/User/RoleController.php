@@ -24,6 +24,11 @@ class RoleController extends Controller
      */
     public function store_or_update(Request $request)
     {
+        // Ô tick chỉ đọc trên giao diện không chặn được gửi tay, kiểm tra lại ở server
+        if (!user_can('role_update')) {
+            return response()->json(['error' => 'Bạn không có quyền Phân Quyền Cho Nhóm'], 403);
+        }
+
         try {
             $roleId = $request->input('role_id');
             $permissionId = $request->input('permission_id');
@@ -62,6 +67,10 @@ class RoleController extends Controller
      */
     public function saveRole(Request $request)
     {
+        if (!user_can('role_manage')) {
+            return redirect()->back()->with('error', 'Bạn không có quyền Tạo / Sửa Nhóm Quyền');
+        }
+
         $id = $request->input('id');
 
         if ($id && (int) $id === 1) {
@@ -76,7 +85,12 @@ class RoleController extends Controller
                 $id ? 'unique:roles,name,' . (int) $id : 'unique:roles,name',
             ],
             'description' => ['nullable', 'string', 'max:255'],
+            'kinds' => ['required', 'array', 'min:1'],
+            'kinds.*' => ['in:' . implode(',', array_keys(PermissionMatrix::ROLE_KINDS))],
         ], [
+            'kinds.required' => 'Vui lòng chọn ít nhất một loại phụ trách (Vật Tư / Hoá Chất / Chất Chuẩn).',
+            'kinds.min' => 'Vui lòng chọn ít nhất một loại phụ trách (Vật Tư / Hoá Chất / Chất Chuẩn).',
+            'kinds.*.in' => 'Loại phụ trách không hợp lệ.',
             'name.required' => 'Vui lòng nhập tên nhóm quyền.',
             'name.unique' => 'Tên nhóm quyền này đã tồn tại.',
             'name.max' => 'Tên nhóm quyền không vượt quá :max ký tự.',
@@ -93,6 +107,7 @@ class RoleController extends Controller
             DB::table('roles')->where('id', $id)->update([
                 'name' => $request->name,
                 'description' => $request->description,
+                'kinds' => implode(',', $request->kinds),
                 'updated_at' => now(),
             ]);
 
@@ -108,6 +123,7 @@ class RoleController extends Controller
         $newId = DB::table('roles')->insertGetId([
             'name' => $request->name,
             'description' => $request->description,
+            'kinds' => implode(',', $request->kinds),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -122,6 +138,10 @@ class RoleController extends Controller
      */
     public function deleteRole($id)
     {
+        if (!user_can('role_manage')) {
+            return redirect()->back()->with('error', 'Bạn không có quyền Tạo / Sửa Nhóm Quyền');
+        }
+
         $id = (int) $id;
 
         if ($id === 1) {

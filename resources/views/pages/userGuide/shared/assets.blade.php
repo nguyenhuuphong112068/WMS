@@ -623,8 +623,7 @@
 
     /* ---------- Ma trận phân quyền chung ---------- */
     .ug-matrix-scroll {
-        max-height: 75vh;
-        overflow: auto;
+        overflow-x: auto;
         border: 1px solid var(--border-soft);
         border-radius: var(--border-radius-md);
     }
@@ -654,6 +653,32 @@
     }
 
     /* Tên nhóm quyền xoay dọc để 16+ cột vẫn vừa khung */
+    /* Hàng loại phụ trách phía trên tên vai trò; hàng tên vai trò dính ngay dưới */
+    .ug-matrix thead th.ug-mx-kind {
+        height: 28px;
+        text-align: center;
+        font-size: 0.72rem;
+        letter-spacing: .5px;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .ug-matrix thead tr + tr th {
+        top: 28px;
+    }
+
+    .ug-matrix thead th.is-common { box-shadow: inset 0 -3px 0 var(--primary); }
+    .ug-matrix thead th.is-material { box-shadow: inset 0 -3px 0 var(--state-success); }
+    .ug-matrix thead th.is-chemical { box-shadow: inset 0 -3px 0 var(--state-warning, #F59E0B); }
+    .ug-matrix thead th.is-standard { box-shadow: inset 0 -3px 0 var(--accent); }
+
+    .ug-matrix .ug-mx-total td {
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        font-weight: 700;
+        border-bottom: 2px solid var(--primary-lighter);
+    }
+
     .ug-matrix th.ug-mx-role {
         min-width: 34px;
         text-align: center;
@@ -692,7 +717,7 @@
         background: var(--bg-neutral);
     }
 
-    .ug-matrix tbody tr:not(.ug-mx-group):hover td {
+    .ug-matrix tbody tr:not(.ug-mx-group):not(.ug-mx-total):hover td {
         background: var(--primary-soft);
     }
 

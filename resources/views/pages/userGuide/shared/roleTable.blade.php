@@ -3,6 +3,7 @@
 | Biến vào: $ugRoleSummary từ UserGuideController::show() (App\Support\PermissionMatrix::roleSummary)
 | Chỉ liệt kê quyền có hiệu lực: quyền xem tab cần đi kèm quyền xem màn hình.
 --}}
+<div data-ug-live>
 @if (empty($ugRoleSummary))
     <div class="ug-callout is-warn">
         <i class="fas fa-exclamation-triangle"></i>
@@ -51,3 +52,4 @@
         </table>
     </div>
 @endif
+</div>

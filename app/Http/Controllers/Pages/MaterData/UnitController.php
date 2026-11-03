@@ -236,7 +236,7 @@ class UnitController extends Controller
     /** Bảng tra nhãn để lịch sử hiện tên nhóm đơn vị thay vì mã nhóm. */
     private function maps(): array
     {
-        return ['unit_group' => config('unit.groups')];
+        return ['unit_group' => array_map(fn ($group) => $group['label'], config('unit.groups'))];
     }
 
     private function rules($ignoreId = null): array

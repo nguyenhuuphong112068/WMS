@@ -1,6 +1,8 @@
 <p>Menu bên trái gồm <b>cột icon</b> luôn hiện và <b>bảng con</b> mở ngay cạnh cột khi bấm vào một icon. Cột icon chỉ hiện các
     mục bạn có quyền xem ở phòng ban đang chọn.</p>
 
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/permission/menu-trai.png', 'caption' => 'Cột icon và bảng con của nhóm Phân Quyền', 'width' => 260])
+
 <h3>Mở một màn hình</h3>
 <ol class="ug-steps">
     <li>Bấm icon của nhóm chức năng trên cột icon, ví dụ <b>Tồn kho</b>. Icon của nhóm chứa màn hình đang mở có vạch xanh bên trái.</li>

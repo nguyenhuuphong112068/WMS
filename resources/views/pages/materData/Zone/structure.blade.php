@@ -1102,8 +1102,8 @@
     "maxTiers": {{ (int) $structureLimits['maxTiers'] }},
     "maxLocations": {{ (int) $structureLimits['maxLocations'] }},
     "maxBatch": {{ (int) $structureLimits['maxBatch'] }},
-    "canCreate": @json(user_can('materData_common_create')),
-    "canUpdate": @json(user_can('materData_common_update')),
+    "canCreate": @json(user_can(md_perm('zone', 'create'))),
+    "canUpdate": @json(user_can(md_perm('zone', 'update'))),
     "csrf": @json(csrf_token())
 }
 </script>

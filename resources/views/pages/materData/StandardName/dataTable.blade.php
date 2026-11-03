@@ -7,7 +7,7 @@
             <div class="card-body">
 
                 <div class="md-toolbar">
-                    @perm('materData_standard_create')
+                    @perm(md_perm('standardName', 'create'))
                         <button type="button" class="btn btn-primary btn-md-create">
                             <i class="fas fa-plus mr-1"></i> Thêm mới
                         </button>

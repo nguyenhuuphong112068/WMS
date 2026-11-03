@@ -3,7 +3,7 @@
     <div class="card">
 
         <div class="card-body">
-            @perm('materData_common_create')
+            @perm(md_perm('department', 'create'))
                 <button class="btn btn-success btn-create mb-2" data-toggle="modal" data-target="#createModal"
                     style="width: 155px">
                     <i class="fas fa-plus"></i> Thêm mới
@@ -56,7 +56,7 @@
                             <td>{{ \Carbon\Carbon::parse($data->created_at)->format('d/m/Y') }}</td>
                             <td class="text-center align-middle">
                                 <span class="md-btn-wrap">
-                                    @perm('materData_common_update')
+                                    @perm(md_perm('department', 'update'))
                                         <button type="button" class="btn btn-warning btn-edit mb-1"
                                             data-id="{{ $data->id }}" data-shortname="{{ $data->shortName }}"
                                             data-name="{{ $data->name }}" data-company_id="{{ $data->company_id }}"
@@ -74,7 +74,7 @@
                                     ])
                                 </span>
 
-                                @perm('materData_common_deActive')
+                                @perm(md_perm('department', 'deActive'))
                                     <form class="form-deActive d-inline"
                                         action="{{ route('pages.materData.department.deActive') }}" method="POST">
                                         @csrf

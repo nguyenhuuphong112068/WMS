@@ -421,6 +421,12 @@
                                             </button>
                                         @endif
                                         @if ($latest)
+                                            <button type="button" class="btn btn-sm btn-outline-primary btn-idt-preview" title="Xem file nộp mới nhất"
+                                                data-url="{{ route('pages.materData.initialData.preview', $latest->id) }}"
+                                                data-download="{{ route('pages.materData.initialData.download', $latest->id) }}"
+                                                data-file="Lần nộp {{ $latest->submission_no }} · {{ $latest->original_name }}">
+                                                <i class="fas fa-eye mr-1"></i>Xem
+                                            </button>
                                             <a href="{{ route('pages.materData.initialData.download', $latest->id) }}" class="btn btn-sm btn-primary"
                                                 title="Tải file nộp mới nhất">
                                                 <i class="fas fa-download"></i>
@@ -466,7 +472,11 @@
                                                             · <span class="{{ $f->review_status === 'returned' ? 'text-danger' : '' }}">Admin: {{ $f->review_note }}</span>
                                                         @endif
                                                     </span>
-                                                    <a href="{{ route('pages.materData.initialData.download', $f->id) }}" class="ml-auto"
+                                                    <a href="#" class="ml-auto btn-idt-preview" title="Xem file lần nộp {{ $f->submission_no }}"
+                                                        data-url="{{ route('pages.materData.initialData.preview', $f->id) }}"
+                                                        data-download="{{ route('pages.materData.initialData.download', $f->id) }}"
+                                                        data-file="Lần nộp {{ $f->submission_no }} · {{ $f->original_name }}"><i class="fas fa-eye"></i></a>
+                                                    <a href="{{ route('pages.materData.initialData.download', $f->id) }}"
                                                         title="Tải file lần nộp {{ $f->submission_no }}"><i class="fas fa-download"></i></a>
                                                 </div>
                                             @endforeach

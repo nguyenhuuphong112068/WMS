@@ -22,7 +22,7 @@
 | StandardStabilityController::tabData() / planData()): index chỉ chuyển sang tab, còn
 | lại là trang chi tiết một phiếu + các hành động ghi. Phiếu không xoá cứng nên dùng
 | "cancel" (chuyển "Huỷ") thay cho deActive; "resume" mở lại phiếu đã ngưng; mốc chưa có
-| kết quả thì xoá được (deleteItem). Mọi thay đổi ghi standard_stability_assessment_histories.
+| kết quả thì huỷ được (cancelItem: chuyển trạng thái mốc "Huỷ", không xoá dòng). Mọi thay đổi ghi standard_stability_assessment_histories.
 */
 
 use App\Http\Controllers\Pages\Inventory\ChemicalInventoryController;
@@ -69,7 +69,7 @@ Route::prefix('/inventory')
             // Mốc đánh giá
             Route::post('storeItem', 'storeItem')->name('storeItem');
             Route::post('updateItem', 'updateItem')->name('updateItem');
-            Route::post('deleteItem', 'deleteItem')->name('deleteItem');
+            Route::post('cancelItem', 'cancelItem')->name('cancelItem');
             Route::post('assess', 'assess')->name('assess');
             Route::post('issueTestings', 'issueTestings')->name('issueTestings');
         });

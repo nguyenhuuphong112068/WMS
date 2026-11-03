@@ -206,7 +206,7 @@
                                                     {{-- Badge số lần điều chỉnh nằm ở góc trên bên phải nút Sửa --}}
                                                     <div class="exp-btn-wrap">
                                                         {{-- Dòng sinh từ phiếu cách ly (hoặc đã gom vào đợt huỷ cũ) chỉ điều chỉnh qua phiếu đó --}}
-                                                        @perm('export_chemical_issue')
+                                                        @perm(\App\Http\Controllers\Pages\Export\ChemicalExportController::UPDATE_PERMISSION)
                                                             <button type="button" class="btn btn-sm btn-warning btn-md-edit"
                                                                 {{ $expEditLocked ? 'disabled' : '' }}
                                                                 title="{{ $expEditLocked ?: 'Sửa' }}"
@@ -233,7 +233,7 @@
                                                         @endif
                                                     </div>
 
-                                                    @perm('export_chemical_issue')
+                                                    @perm(\App\Http\Controllers\Pages\Export\ChemicalExportController::UPDATE_PERMISSION)
                                                         <form class="form-md-confirm d-inline"
                                                             action="{{ route($expRoute . 'deActive') }}" method="POST"
                                                             data-title="{{ $row->status_id == 1 ? 'Khoá' : 'Mở khoá' }} {{ $expLabel }}?"

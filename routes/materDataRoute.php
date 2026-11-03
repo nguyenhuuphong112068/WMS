@@ -267,6 +267,7 @@ Route::prefix('/materData')
             // Phòng ban đính kèm file đã điền - chỉ lưu file cho Admin xem, không ghi DB nghiệp vụ
             Route::post('upload', 'upload')->name('upload');
             Route::get('download/{id}', 'download')->whereNumber('id')->name('download');
+            Route::get('preview/{id}', 'preview')->whereNumber('id')->name('preview');
             Route::post('review', 'review')->name('review');
             Route::post('skip', 'skip')->name('skip');
             Route::post('deadline', 'deadline')->name('deadline');

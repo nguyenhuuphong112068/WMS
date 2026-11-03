@@ -81,14 +81,14 @@
 
         <div class="card-body">
             <div class="d-flex flex-wrap align-items-center mb-2 obj-toolbar">
-                @perm('materData_common_create')
+                @perm(md_perm('consumptionObject', 'create'))
                     <button class="btn btn-success btn-create" data-toggle="modal" data-target="#createModal"
                         style="width: 155px">
                         <i class="fas fa-plus"></i> Thêm mới
                     </button>
                 @endperm
 
-                @perm('materData_common_update')
+                @perm(md_perm('consumptionObject', 'update'))
                     <form id="form-sync" action="{{ route('pages.materData.consumptionObject.sync') }}" method="POST"
                         class="d-inline">
                         @csrf
@@ -170,7 +170,7 @@
                             </td>
                             <td class="text-center align-middle">
                                 <span class="md-btn-wrap">
-                                    @perm('materData_common_update')
+                                    @perm(md_perm('consumptionObject', 'update'))
                                         <button type="button" class="btn btn-warning btn-edit mb-1"
                                             data-id="{{ $data->id }}" data-source="{{ $data->source }}"
                                             data-type="{{ $data->type }}" data-code="{{ $data->code }}"
@@ -191,7 +191,7 @@
                                     ])
                                 </span>
 
-                                @perm('materData_common_deActive')
+                                @perm(md_perm('consumptionObject', 'deActive'))
                                     <form class="form-deActive d-inline"
                                         action="{{ route('pages.materData.consumptionObject.deActive') }}"
                                         method="POST">

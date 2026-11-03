@@ -41,15 +41,24 @@ class PermissionMatrix
         'other'     => ['label' => 'Khác', 'icon' => 'fa-ellipsis-h', 'groups' => []],
     ];
 
+    /** Loại hàng nhóm quyền phụ trách, chọn khi tạo / sửa nhóm quyền (roles.kinds) */
+    public const ROLE_KINDS = ['material' => 'Vật Tư', 'chemical' => 'Hoá Chất', 'standard' => 'Chất Chuẩn'];
+
+    /** Loại hàng của dòng nhóm con trong card module, dùng cho bộ lọc Vật Tư / Hoá Chất / Chất Chuẩn */
+    public const KINDS = [
+        'material' => ['label' => 'Vật Tư', 'icon' => 'fa-box'],
+        'chemical' => ['label' => 'Hoá Chất', 'icon' => 'fa-flask'],
+        'standard' => ['label' => 'Chất Chuẩn', 'icon' => 'fa-vial'],
+        'common'   => ['label' => 'Dùng Chung', 'icon' => 'fa-layer-group'],
+    ];
+
+    /** Nhóm quyền luôn xếp ở loại Chung trên bảng phân quyền, không suy theo quyền đang có */
+    private const COMMON_ROLES = ['Admin', 'Ban Giám Đốc'];
+
     /** Thứ tự dòng nhóm con trong một card module */
     private const SUB_GROUP_ORDER = [
         'Vật Tư', 'Hoá Chất', 'Chất Chuẩn', 'Dùng Chung',
         'Trình Ký Liên Phòng Ban', 'Khởi Tạo Dữ Liệu', 'Phân Quyền', 'Lịch Sử & Audit Trail',
-    ];
-
-    /** Quyền nằm ở băng "Quyền Chung" nhưng chỉ dùng cho nghiệp vụ của một model */
-    private const EXTRA_BY_MODEL = [
-        'material' => ['is_BOD'],
     ];
 
     /**
@@ -58,8 +67,8 @@ class PermissionMatrix
      */
     public static function build(): array
     {
-        $roles = DB::table('roles')->orderBy('id', 'asc')->get();
         $permissions = self::permissions();
+        $roles = self::sortRoles(DB::table('roles')->orderBy('id', 'asc')->get(), $permissions);
 
         // Gom quyền 2 cấp: model chính  ->  nhóm chức năng  ->  danh sách quyền
         $tree = [];
@@ -94,6 +103,10 @@ class PermissionMatrix
             'roles' => $roles,
             'tree' => $tree,
             'modules' => self::modules($permissions),
+            'kinds' => self::KINDS,
+            'roleKinds' => self::ROLE_KINDS,
+            // Dòng nhóm con nào không phải Vật Tư / Hoá Chất / Chất Chuẩn thì tính là Dùng Chung
+            'kindOfGroup' => array_flip(array_map(fn ($kind) => $kind['label'], array_slice(self::KINDS, 0, 3))),
             'assigned' => self::assigned(),
         ];
     }
@@ -138,6 +151,87 @@ class PermissionMatrix
         return array_filter($modules, fn ($module) => !empty($module['groups']));
     }
 
+    /**
+     * Xếp cột nhóm quyền theo loại Chung -> Vật Tư -> Hoá Chất -> Chất Chuẩn, trong cùng loại nhóm nhiều quyền hơn đứng trước.
+     * Gắn thêm $role->kinds (loại phụ trách), $role->kind (cột xếp vào) và $role->permission_count.
+     * Loại lấy theo roles.kinds chọn khi tạo nhóm quyền; chưa chọn thì suy tự động (roleKind).
+     */
+    private static function sortRoles($roles, $permissions)
+    {
+        $business = array_keys(self::ROLE_KINDS);
+        $kindOf = $permissions->mapWithKeys(fn ($permission) => [$permission->id => self::kindOf($permission->name)])->all();
+        $counts = [];
+        foreach (DB::table('role_permission')->get() as $item) {
+            if (isset($kindOf[$item->permission_id])) {
+                $counts[$item->role_id][$kindOf[$item->permission_id]] = ($counts[$item->role_id][$kindOf[$item->permission_id]] ?? 0) + 1;
+            }
+        }
+
+        $kindOrder = array_flip(['common', 'material', 'chemical', 'standard']);
+
+        return $roles->map(function ($role) use ($counts, $business) {
+            $chosen = in_array($role->name, self::COMMON_ROLES, true)
+                ? $business
+                : array_values(array_intersect($business, explode(',', $role->kinds ?? '')));
+
+            if ($chosen) {
+                $role->kinds = $chosen;
+                $role->kind = count($chosen) === 1 ? $chosen[0] : 'common';
+            } else {
+                $role->kind = self::roleKind($role, $counts[$role->id] ?? []);
+                $role->kinds = $role->kind === 'common' ? $business : [$role->kind];
+            }
+            $role->permission_count = array_sum($counts[$role->id] ?? []);
+
+            return $role;
+        })->sort(fn ($a, $b) => [$kindOrder[$a->kind], $b->permission_count, $a->id]
+            <=> [$kindOrder[$b->kind], $a->permission_count, $b->id])->values();
+    }
+
+    /**
+     * Loại của nhóm quyền: >= 80% quyền nghiệp vụ (Vật Tư / Hoá Chất / Chất Chuẩn) rơi vào một loại thì là loại đó,
+     * trải nhiều loại là Chung; chưa có quyền nghiệp vụ nào thì suy theo tên nhóm.
+     */
+    private static function roleKind($role, array $counts): string
+    {
+        if (in_array($role->name, self::COMMON_ROLES, true)) {
+            return 'common';
+        }
+
+        $business = array_intersect_key($counts, array_flip(['material', 'chemical', 'standard']));
+        $total = array_sum($business);
+        arsort($business);
+
+        // Quyền trải nhiều loại -> Chung (vd. Nhân Viên Cung Ứng Vật Tư)
+        if ($total > 0 && reset($business) / $total < 0.8) {
+            return 'common';
+        }
+
+        // Tên nói rõ loại thì theo tên, tránh nhóm mới tick vài quyền lệch loại bị xếp sai
+        return match (true) {
+            (bool) preg_match('/vật tư/iu', $role->name) => 'material',
+            (bool) preg_match('/hoá chất|hóa chất/iu', $role->name) => 'chemical',
+            (bool) preg_match('/chuẩn/iu', $role->name) => 'standard',
+            $total > 0 => key($business),
+            default => 'common',
+        };
+    }
+
+    /** Loại hàng của một quyền; quyền Dữ Liệu Gốc suy theo loại dữ liệu gốc */
+    private static function kindOf(string $name): string
+    {
+        if (str_starts_with($name, 'materData_')) {
+            return match (self::materDataScopeLabel($name)) {
+                'Vật Tư' => 'material',
+                'Hoá Chất' => 'chemical',
+                'Chất Chuẩn' => 'standard',
+                default => 'common',
+            };
+        }
+
+        return self::modelOf($name);
+    }
+
     private static function subGroupRank(string $name): int
     {
         $rank = array_search($name, self::SUB_GROUP_ORDER, true);
@@ -174,6 +268,21 @@ class PermissionMatrix
 
             foreach ($permissions as $permission) {
                 if (!self::isEffective($role->id, $permission->id, $parentOf, $assigned)) {
+                    continue;
+                }
+
+                // Dữ Liệu Gốc: gom theo từng màn hình (quyền con MaterDataPermissions), bỏ quyền nhóm phủ nhiều màn
+                if ($scope === 'materData' && ($screen = MaterDataPermissions::parse($permission->name))) {
+                    [$screenKey, $action] = $screen;
+                    $groupName = self::materDataScopeLabel($permission->name) . ' › ' . MaterDataPermissions::SCREENS[$screenKey][1];
+                    $groups[$groupName] ??= ['actions' => [], 'tabs' => []];
+                    $groups[$groupName]['actions'][] = MaterDataPermissions::ACTIONS[$action];
+                    if ($action !== 'view') {
+                        $onlyView = false;
+                    }
+                    continue;
+                }
+                if ($scope === 'materData' && MaterDataPermissions::isGroupPermission($permission->name)) {
                     continue;
                 }
 
@@ -328,7 +437,7 @@ class PermissionMatrix
             return str_starts_with($name, 'materData_');
         }
 
-        return self::modelOf($name) === $scope || in_array($name, self::EXTRA_BY_MODEL[$scope] ?? [], true);
+        return self::modelOf($name) === $scope;
     }
 
     /**

@@ -3,7 +3,7 @@
     <div class="card">
 
         <div class="card-body">
-            @perm('materData_common_create')
+            @perm(md_perm('company', 'create'))
                 <button class="btn btn-success btn-create mb-2" data-toggle="modal" data-target="#createModal"
                     style="width: 155px">
                     <i class="fas fa-plus"></i> Thêm mới
@@ -46,7 +46,7 @@
                             </td>
                             <td class="text-center align-middle">
                                 <span class="md-btn-wrap">
-                                    @perm('materData_common_update')
+                                    @perm(md_perm('company', 'update'))
                                         <button type="button" class="btn btn-warning btn-edit mb-1"
                                             data-id="{{ $data->id }}" data-short_name="{{ $data->short_name }}"
                                             data-name="{{ $data->name }}" data-toggle="modal" data-target="#updateModal">
@@ -62,7 +62,7 @@
                                     ])
                                 </span>
 
-                                @perm('materData_common_deActive')
+                                @perm(md_perm('company', 'deActive'))
                                     <form class="form-deActive d-inline"
                                         action="{{ route('pages.materData.company.deActive') }}" method="POST">
                                         @csrf

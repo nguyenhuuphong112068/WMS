@@ -93,6 +93,9 @@ class StandardStabilityController extends Controller
 
     public const ITEM_FAILED = 'Không Đạt';
 
+    /** Mốc huỷ (thay cho xoá): giữ dòng để tra lại, không hiện trên phiếu / kế hoạch, không tính tiến độ. */
+    public const ITEM_CANCELLED = 'Huỷ';
+
     /** Kết luận được chọn khi ghi kết quả cho một mốc. */
     public const ITEM_RESULTS = [self::ITEM_PASSED, self::ITEM_FAILED];
 
@@ -251,6 +254,7 @@ class StandardStabilityController extends Controller
             ->where('standard_imports.department_id', $departmentId)
             // Phiếu đã huỷ hoặc đã ngưng thì các mốc còn lại không thực hiện nữa
             ->whereNotIn(self::TABLE.'.status', [self::STATUS_CANCELLED, self::STATUS_STOPPED])
+            ->where(self::ITEM_TABLE.'.status', '!=', self::ITEM_CANCELLED)
             ->whereNotNull(self::ITEM_TABLE.'.due_date')
             ->whereBetween(self::ITEM_TABLE.'.due_date', [$period['from'], $period['to']])
             ->orderBy(self::ITEM_TABLE.'.due_date', 'asc')
@@ -751,45 +755,51 @@ class StandardStabilityController extends Controller
     }
 
     /**
-     * Xoá hẳn một mốc khỏi phiếu.
-     *
-     * Ngoại lệ của quy tắc "chỉ khoá, không xoá": mốc chưa có kết quả mới chỉ là nội dung
-     * đang soạn của phiếu. Mốc đã đánh giá là dữ liệu đã xảy ra nên giữ lại. Mọi lần xoá
-     * đều ghi vào nhật ký thay đổi của phiếu và Audit Trail.
+     * Huỷ một mốc chưa có kết quả (không xoá cứng): chuyển trạng thái mốc sang "Huỷ", dòng vẫn
+     * giữ trong CSDL. Mốc huỷ không hiện trên phiếu / kế hoạch, không tính vào tiến độ phiếu và
+     * được thêm lại mốc cùng số tháng. Ghi nhật ký thay đổi của phiếu và Audit Trail.
      */
-    public function deleteItem(Request $request)
+    public function cancelItem(Request $request)
     {
         [$item, $list] = $this->findItem($request->id);
 
-        if (! $item) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần xoá!')->with('activeTab', 'stability');
+        if (! $item || $item->status === self::ITEM_CANCELLED) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần huỷ!')->with('activeTab', 'stability');
         }
 
         if (! $this->editable($list)) {
-            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không xoá mốc đánh giá được nữa!')->with('activeTab', 'stability');
+            return redirect()->back()->with('error', 'Phiếu đã huỷ nên không huỷ mốc đánh giá được nữa!')->with('activeTab', 'stability');
         }
 
         if ($item->status !== self::ITEM_INITIAL) {
-            return redirect()->back()->with('error', 'Mốc đánh giá đã có kết quả nên không xoá được!')->with('activeTab', 'stability');
+            return redirect()->back()->with('error', 'Mốc đánh giá đã có kết quả nên không huỷ được!')->with('activeTab', 'stability');
         }
 
         DB::transaction(function () use ($item, $list) {
-            DB::table(self::ITEM_TABLE)->where('id', $item->id)->delete();
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'status' => self::ITEM_CANCELLED,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
 
-            // Ghi nhật ký sau khi xoá: dòng nhật ký giữ lại nội dung mốc vừa mất
             $this->writeHistory(
                 $list->id,
-                'Xoá mốc',
+                'Huỷ mốc',
                 $item->id,
                 $this->itemTargetOf($item),
                 $this->itemDigestOf($item),
-                null
+                'Trạng thái: '.self::ITEM_CANCELLED
             );
+
+            // Mốc huỷ không tính tiến độ nữa: tính lại trạng thái phiếu (vd. huỷ mốc cuối còn chờ -> Hoàn Thành)
+            if ($list->status !== self::STATUS_STOPPED) {
+                DB::table(self::TABLE)->where('id', $list->id)->update(['status' => $this->statusFromItems($list->id)]);
+            }
         });
 
-        AuditTrialController::log('Xoá', self::ITEM_TABLE, $item->id, $item->name.' (T'.$item->timepoint.')', 'Xoá khỏi phiếu #'.$list->id);
+        AuditTrialController::log('Huỷ', self::ITEM_TABLE, $item->id, $item->name.' (T'.$item->timepoint.')', 'Huỷ mốc của phiếu #'.$list->id);
 
-        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu!')->with('activeTab', 'stability');
+        return redirect()->back()->with('success', 'Đã huỷ '.self::ITEM_LABEL.'!')->with('activeTab', 'stability');
     }
 
     /**
@@ -1115,6 +1125,7 @@ class StandardStabilityController extends Controller
 
         return DB::table(self::ITEM_TABLE)
             ->where(self::ITEM_FK, $listId)
+            ->where('status', '!=', self::ITEM_CANCELLED)
             ->orderBy('timepoint', 'asc')
             ->orderBy('id', 'asc')
             ->get()
@@ -1171,6 +1182,7 @@ class StandardStabilityController extends Controller
 
         $rows = DB::table(self::ITEM_TABLE)
             ->whereIn(self::ITEM_FK, $listIds)
+            ->where('status', '!=', self::ITEM_CANCELLED)
             ->orderBy('due_date', 'asc')
             ->get();
 
@@ -1320,7 +1332,8 @@ class StandardStabilityController extends Controller
     /** Trạng thái phiếu suy ra từ tiến độ các mốc. */
     private function statusFromItems(int $listId): string
     {
-        $total = DB::table(self::ITEM_TABLE)->where(self::ITEM_FK, $listId)->count();
+        $total = DB::table(self::ITEM_TABLE)->where(self::ITEM_FK, $listId)
+            ->where('status', '!=', self::ITEM_CANCELLED)->count();
 
         if ($total === 0) {
             return self::STATUS_INITIAL;
@@ -1328,7 +1341,7 @@ class StandardStabilityController extends Controller
 
         $done = DB::table(self::ITEM_TABLE)
             ->where(self::ITEM_FK, $listId)
-            ->where('status', '!=', self::ITEM_INITIAL)
+            ->whereNotIn('status', [self::ITEM_INITIAL, self::ITEM_CANCELLED])
             ->count();
 
         if ($done === 0) {
@@ -1655,6 +1668,7 @@ class StandardStabilityController extends Controller
             $exists = DB::table(self::ITEM_TABLE)
                 ->where(self::ITEM_FK, $listId)
                 ->where('timepoint', $timepoint)
+                ->where('status', '!=', self::ITEM_CANCELLED)
                 ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
                 ->exists();
 

@@ -80,6 +80,9 @@ class ChemicalExportController extends Controller
         'cancel' => 'Loại bỏ',
     ];
 
+    /** Được điều chỉnh / khoá phiếu sử dụng đã ghi ở tab Sổ sử dụng hoá chất. */
+    public const UPDATE_PERMISSION = 'export_chemical_update';
+
     /**
      * Loại phiếu CẤP PHÁT LIÊN PHÒNG BAN - không nằm trong TYPES vì không được chọn ở
      * form Sử Dụng chung, chỉ tạo được qua transferIssueStore(). Xem khối "ĐỀ NGHỊ
@@ -585,6 +588,11 @@ class ChemicalExportController extends Controller
 
     public function update(Request $request)
     {
+        // Phiếu đã ghi là đã trừ tồn: chặn ở server, không chỉ ẩn nút ở giao diện
+        if (! user_can(self::UPDATE_PERMISSION)) {
+            return redirect()->back()->with('error', 'Bạn không có quyền điều chỉnh sổ sử dụng hoá chất!');
+        }
+
         $departmentId = $this->departmentId();
 
         $current = DB::table(self::TABLE)
@@ -669,6 +677,10 @@ class ChemicalExportController extends Controller
 
     public function deActive(Request $request)
     {
+        if (! user_can(self::UPDATE_PERMISSION)) {
+            return redirect()->back()->with('error', 'Bạn không có quyền điều chỉnh sổ sử dụng hoá chất!');
+        }
+
         $current = DB::table(self::TABLE)
             ->where('id', $request->id)
             ->where('department_id', $this->departmentId())

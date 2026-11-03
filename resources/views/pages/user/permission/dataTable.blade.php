@@ -38,6 +38,18 @@
         font-size: 12px;
         color: #94A3B8;
     }
+
+    .permission-note {
+        font-size: 13px;
+        color: #64748B;
+        margin-top: 4px;
+    }
+
+    .permission-parent {
+        font-size: 13px;
+        color: var(--primary, #2E7BC4);
+        margin-top: 4px;
+    }
 </style>
 
 <div class="content-wrapper">
@@ -72,7 +84,18 @@
                                     <div>{{ $data->display_name ?: $data->name }}</div>
                                     <div class="permission-code">{{ $data->name }}</div>
                                 </td>
-                                <td>{{ $data->description }}</td>
+                                <td>
+                                    {{-- Dòng đầu: được làm gì; các dòng sau ("Lưu ý: ...") là điều kiện, giới hạn --}}
+                                    @foreach (preg_split('/\R/', (string) $data->description) as $line)
+                                        <div class="{{ $loop->first ? '' : 'permission-note' }}">{{ $line }}</div>
+                                    @endforeach
+                                    @if ($data->parent_name)
+                                        <div class="permission-parent">
+                                            <i class="fas fa-level-up-alt fa-rotate-90 mr-1"></i>Chỉ có hiệu lực khi có cả quyền
+                                            "{{ $data->parent_display_name ?: $data->parent_name }}"
+                                        </div>
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

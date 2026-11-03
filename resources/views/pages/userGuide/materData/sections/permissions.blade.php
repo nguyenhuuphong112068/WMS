@@ -1,5 +1,5 @@
-<p>Mỗi màn hình Dữ Liệu Gốc thuộc một trong bốn phạm vi. Quyền được cấp theo từng phạm vi, ở màn hình
-    <b>Phân Quyền › Nhóm Quyền</b>.</p>
+<p>Mỗi màn hình Dữ Liệu Gốc thuộc một trong bốn phạm vi. Quyền được cấp ở màn hình <b>Phân Quyền › Nhóm Quyền</b>,
+    theo phạm vi và chi tiết tới từng màn hình.</p>
 
 <div class="table-responsive">
     <table class="table table-bordered ug-table">
@@ -25,17 +25,20 @@
             </tr>
             <tr>
                 <td>Vật tư</td>
-                <td>Tên Vật Tư, Phân Loại, Trình Ký Đề Nghị CP Vật Tư, Trình Ký Đề Nghị Liên Phòng Ban</td>
+                <td>Tên Vật Tư, Phân Loại, Trình Ký Đề Nghị CP Vật Tư. Trình Ký Đề Nghị Liên Phòng Ban có bộ quyền riêng.</td>
             </tr>
         </tbody>
     </table>
 </div>
 
-<p>Trong mỗi phạm vi, quyền chia nhỏ theo thao tác: <b>Xem</b>, <b>Thêm</b>, <b>Sửa</b>, <b>Duyệt</b>,
-    <b>Từ chối</b>, <b>Khoá/Mở khoá</b>. Nút nào bạn không có quyền sẽ không hiện trên màn hình.</p>
+<p>Mỗi phạm vi có ba quyền: <b>Xem</b>, <b>Thêm/Sửa/Khoá</b> (thêm, sửa, khoá / mở khoá) và <b>Duyệt/Từ Chối</b>. Dưới mỗi
+    quyền là <b>quyền con theo từng màn hình</b> (ví dụ <i>Xem Dữ Liệu Gốc Vật Tư</i> › <i>Xem Tên Vật Tư</i>,
+    <i>Xem Phân Loại</i>...). Một thao tác ở một màn hình chỉ được làm khi có cả quyền của phạm vi lẫn quyền con của màn
+    hình đó; màn không có bước duyệt thì không có quyền Duyệt/Từ Chối. Nút nào bạn không có quyền sẽ không hiện trên màn
+    hình, màn không có quyền Xem thì không hiện trên menu.</p>
 
 <h3>Mỗi vai trò được làm gì</h3>
-<p>Đọc trực tiếp từ <b>Phân Quyền › Nhóm Quyền</b> hiện tại, mỗi dòng là một phạm vi ở bảng trên. Cách thiết lập xem
+<p>Đọc trực tiếp từ <b>Phân Quyền › Nhóm Quyền</b> hiện tại, mỗi dòng là một màn hình (kèm phạm vi ở bảng trên). Cách thiết lập xem
     <a href="{{ route('pages.userGuide.show', 'permission') }}">Hướng dẫn Phân Quyền</a>.</p>
 
 @include('pages.userGuide.shared.roleTable')

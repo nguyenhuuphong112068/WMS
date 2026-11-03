@@ -33,13 +33,13 @@ class UserGuideController extends Controller
             'title' => 'Phân Quyền',
             'icon' => 'fas fa-user-shield',
             'summary' => 'Cách hệ thống phân quyền theo nhóm quyền và phòng ban, cách thiết lập cho người dùng, các vai trò hiện có và bảng phân quyền chung của toàn hệ thống.',
-            'updated_at' => '2026-11-02',
+            'updated_at' => '2026-11-03',
         ],
         'materData' => [
             'title' => 'Dữ Liệu Gốc',
             'icon' => 'fas fa-database',
             'summary' => 'Khai báo tổ chức, danh mục dùng chung, hoá chất - chất chuẩn - vật tư, định khu kho và khởi tạo dữ liệu ban đầu.',
-            'updated_at' => '2026-11-02',
+            'updated_at' => '2026-11-03',
         ],
         'material' => [
             'title' => 'Vật Tư',
@@ -51,13 +51,13 @@ class UserGuideController extends Controller
             'title' => 'Hoá Chất',
             'icon' => 'fas fa-flask',
             'summary' => 'Danh mục và phân loại NĐ 24/2026, tương kỵ lưu trữ, danh sách hoá chất theo sản phẩm - chỉ tiêu, nhập - kiểm tra, sử dụng và hoá chất cấm, liên phòng ban, cách ly, tồn kho - hạn dùng nội bộ, ngưỡng tồn trữ PL IV và dự trù.',
-            'updated_at' => '2026-11-02',
+            'updated_at' => '2026-11-03',
         ],
         'standard' => [
             'title' => 'Chất Chuẩn',
             'icon' => 'fas fa-vial',
             'summary' => 'Mã ống chuẩn theo nhóm, danh sách chất chuẩn theo sản phẩm - chỉ tiêu, nhập - kiểm tra, cấp phát cho tổ và ghi sử dụng, liên phòng ban, cách ly - loại bỏ - huỷ, hạn dùng retest / check online / nội bộ, kiểm soát khối lượng, đánh giá hạn dùng chuẩn thứ cấp và dự trù.',
-            'updated_at' => '2026-11-02',
+            'updated_at' => '2026-11-03',
         ],
     ];
 
@@ -94,17 +94,17 @@ class UserGuideController extends Controller
     }
 
     /**
-     * Ma trận chung cho tài liệu Phân Quyền: roles, tree, assigned như màn hình Nhóm Quyền, kèm
+     * Ma trận chung cho tài liệu Phân Quyền: roles, modules, assigned như màn hình Nhóm Quyền, kèm
      *  - parentOf   : [permissionId => parentId] để đánh dấu ô đã tick nhưng thiếu quyền cha;
-     *  - roleCounts : [roleId => [model => số quyền có hiệu lực]] cho bảng các vai trò.
+     *  - roleCounts : [roleId => [module => số quyền có hiệu lực]] cho bảng các vai trò.
      */
     private function permissionMatrix(): array
     {
         $matrix = PermissionMatrix::build();
         $parentOf = [];
 
-        foreach ($matrix['tree'] as $model) {
-            foreach ($model['groups'] as $permissions) {
+        foreach ($matrix['modules'] as $module) {
+            foreach ($module['groups'] as $permissions) {
                 foreach ($permissions as $permission) {
                     $parentOf[$permission->id] = $permission->parent_id;
                 }
@@ -113,9 +113,9 @@ class UserGuideController extends Controller
 
         $roleCounts = [];
         foreach ($matrix['roles'] as $role) {
-            foreach ($matrix['tree'] as $modelKey => $model) {
+            foreach ($matrix['modules'] as $moduleKey => $module) {
                 $count = 0;
-                foreach ($model['groups'] as $permissions) {
+                foreach ($module['groups'] as $permissions) {
                     foreach ($permissions as $permission) {
                         if ($role->name === 'Admin'
                             || PermissionMatrix::isEffective($role->id, $permission->id, $parentOf, $matrix['assigned'])) {
@@ -123,7 +123,7 @@ class UserGuideController extends Controller
                         }
                     }
                 }
-                $roleCounts[$role->id][$modelKey] = $count;
+                $roleCounts[$role->id][$moduleKey] = $count;
             }
         }
 

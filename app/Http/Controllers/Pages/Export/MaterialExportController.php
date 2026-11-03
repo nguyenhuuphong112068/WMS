@@ -452,7 +452,6 @@ class MaterialExportController extends Controller
             'declaredCategoryIds' => $declaredCategoryIds,
             'currentDepartmentId' => $departmentId,
             'activeTab' => $activeTab,
-            // ---- Tab "Ký duyệt (mọi phòng ban)" - hộp ký duyệt liên phòng ban ----
         ]);
     }
 

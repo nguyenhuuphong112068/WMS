@@ -12,6 +12,15 @@
         đó; quyền Trao Đổi Theo Dõi Dự Trù cần cả quyền xem tab Theo dõi dự trù.</li>
 </ol>
 
+<h3>Quyền được sắp xếp thế nào</h3>
+<p>Danh sách quyền chia theo <b>module trên menu trái</b>: Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Dự Trù và
+    Phân Quyền &amp; Lịch Sử. Trong mỗi module, quyền xếp tiếp theo <b>Vật Tư, Hoá Chất, Chất Chuẩn</b> và <b>Dùng Chung</b>.
+    Mỗi nhóm quyền có <b>loại phụ trách</b> (Vật Tư / Hoá Chất / Chất Chuẩn, hoặc cả ba là Chung) để xếp cột trên bảng
+    phân quyền: nhóm phụ trách một loại nằm ở loại đó, nhóm phụ trách 2-3 loại nằm ở <b>Chung</b>; Admin và Ban Giám Đốc luôn ở
+    Chung. Loại phụ trách chỉ dùng để sắp xếp và lọc bảng, không cấp hay chặn quyền nào. Xem các bảng ở phần
+    <a href="#bang-materData">Bảng Phân Quyền Chung</a>. Các bảng này đọc thẳng cấu hình Nhóm Quyền: đổi quyền trên màn hình
+    Nhóm Quyền thì trang hướng dẫn đang mở ở tab khác tự cập nhật bảng, không cần tải lại trang.</p>
+
 <div class="table-responsive">
     <table class="table table-bordered ug-table">
         <thead>

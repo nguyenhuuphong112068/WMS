@@ -11,7 +11,7 @@
     <li>Chọn ống chuẩn. Chỉ ống CTC được tick <b>Lô đánh giá hạn dùng</b> lúc nhập mới hiện ở đây. Mỗi ống chỉ có <b>một</b> phiếu còn
         hiệu lực; muốn lập lại thì huỷ phiếu cũ trước.</li>
     <li>Nhập <b>ngày bắt đầu</b> và <b>chu kỳ đánh giá</b> (số tháng).</li>
-    <li>Khai các mốc: mỗi mốc có số tháng tính từ ngày bắt đầu (ngày đến hạn tự tính) và các <b>chỉ tiêu</b> cần thử. Thêm, sửa, xoá mốc được.</li>
+    <li>Khai các mốc: mỗi mốc có số tháng tính từ ngày bắt đầu (ngày đến hạn tự tính) và các <b>chỉ tiêu</b> cần thử. Thêm, sửa được; mốc chưa có kết quả thì <b>huỷ</b> được (nút <span class="btn btn-sm btn-danger ug-ui"><i class="fas fa-ban"></i></span>): mốc huỷ không còn trên phiếu, không tính vào tiến độ nhưng vẫn lưu trong lịch sử thay đổi.</li>
 </ol>
 
 <h3>Theo dõi ngay trên bảng tồn</h3>

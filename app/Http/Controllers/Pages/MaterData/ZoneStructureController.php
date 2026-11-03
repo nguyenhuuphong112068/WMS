@@ -78,7 +78,7 @@ class ZoneStructureController extends Controller
     {
         $id = $request->input('id');
 
-        if (! user_can($id ? 'materData_common_update' : 'materData_common_create')) {
+        if (! user_can($id ? md_perm('zone', 'update') : md_perm('zone', 'create'))) {
             return $this->fail('Bạn không có quyền thực hiện thao tác này.', 403);
         }
 
@@ -197,7 +197,7 @@ class ZoneStructureController extends Controller
     /** Sửa nhanh mã + tên kệ từ thẻ kệ; đổi mã thì mã cột/tầng/vị trí con đổi theo. */
     public function saveShelf(Request $request)
     {
-        if (! user_can('materData_common_update')) {
+        if (! user_can(md_perm('zone', 'update'))) {
             return $this->fail('Bạn không có quyền thực hiện thao tác này.', 403);
         }
 
@@ -264,7 +264,7 @@ class ZoneStructureController extends Controller
     /** Đổi phân loại định khu và/hoặc loại lưu trữ cho các vị trí đang chọn trên lưới của một kệ. */
     public function saveLocations(Request $request)
     {
-        if (! user_can('materData_common_update')) {
+        if (! user_can(md_perm('zone', 'update'))) {
             return $this->fail('Bạn không có quyền thực hiện thao tác này.', 403);
         }
 
@@ -525,7 +525,7 @@ class ZoneStructureController extends Controller
     {
         $shelfId = $request->input('shelf_id');
 
-        if (! user_can($shelfId ? 'materData_common_update' : 'materData_common_create')) {
+        if (! user_can($shelfId ? md_perm('zone', 'update') : md_perm('zone', 'create'))) {
             return $this->fail('Bạn không có quyền thực hiện thao tác này.', 403);
         }
 
