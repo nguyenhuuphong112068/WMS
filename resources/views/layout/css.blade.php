@@ -410,10 +410,13 @@
             }
 
             /* Cột chữ dài: hưởng phần rộng dư, nhưng không hẹp quá mức đọc được.
-               Khi màn hình quá nhỏ thì .table-responsive cuộn ngang. */
+               Khi màn hình quá nhỏ thì .table-responsive cuộn ngang.
+               !important: DataTables Responsive đo bề rộng tối thiểu trên bản sao tiêu
+               đề có gắn inline min-width:0 - thiếu nó Responsive tưởng bảng vừa khung
+               nên không thu cột vào dòng con, bảng thật lại tràn ngang. */
             .table th.md-col-flex,
             table.dataTable th.md-col-flex {
-                  min-width: 120px;
+                  min-width: 120px !important;
             }
 
             .table td.md-col-flex,
@@ -426,12 +429,14 @@
                gắn .md-col-name theo chữ tiêu đề): thông tin chính của bảng nên luôn
                đủ rộng để đọc tên trên 1-2 dòng, thắng cả width đặt cứng trong blade.
                Màn hình hẹp thì .table-responsive cuộn ngang thay vì bóp cột tên. */
-            table th.md-col-name {
+            table th.md-col-name,
+            table.dataTable th.md-col-name {
                   min-width: 240px !important;
             }
 
             @media (max-width: 767.98px) {
-                  table th.md-col-name {
+                  table th.md-col-name,
+                  table.dataTable th.md-col-name {
                         min-width: 180px !important;
                   }
             }

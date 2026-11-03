@@ -587,6 +587,14 @@
                 if ($table.is('[data-no-fit]')) return;
                 if ($table.data('mdFitApplied')) return;
 
+                /*
+                | Bảng nạp dòng sau (data-deferred, pages/shared/deferredRows): lúc khởi
+                | tạo chưa có dòng nào, đo lúc đó thì cột nào cũng thành "ngắn" và bị cấm
+                | xuống dòng - CAS / Nhà sản xuất dài dàn thành một dòng, kéo bảng rộng
+                | gấp rưỡi khung nhìn. Chờ dòng về (sự kiện md:rows-loaded) rồi mới đo.
+                */
+                if ($table.is('[data-deferred]') && !$table.is('[data-deferred-loaded]')) return;
+
                 // Tiêu đề nhiều tầng hoặc có ô gộp: để nguyên cho chắc
                 var $headRows = $table.children('thead').children('tr');
                 if ($headRows.length !== 1) return;
@@ -646,11 +654,19 @@
 
                 var fitCols = [];
                 var flexCols = [];
+                var textCols = [];
 
                 $heads.each(function (i) {
                     if (lens[i] > FIT_MAX || $(this).hasClass('md-col-name')) {
                         flexCols.push(idx[i]);
                         $(this).addClass('md-col-flex');
+
+                        // Cột chữ dài KHÔNG phải cột tên (Số CAS, Nhà Sản Xuất...): màn hình
+                        // nào cần chặn bề rộng tối đa thì đặt max-width cho .md-col-text
+                        if (!$(this).hasClass('md-col-name')) {
+                            textCols.push(idx[i]);
+                            $(this).addClass('md-col-text');
+                        }
                         return;
                     }
 
@@ -670,9 +686,21 @@
                     flexCols.forEach(function (c) {
                         api.column(c).nodes().to$().addClass('md-col-flex');
                     });
+                    textCols.forEach(function (c) {
+                        api.column(c).nodes().to$().addClass('md-col-text');
+                    });
                 }
 
                 paint();
+
+                /*
+                | Responsive chia cột từ lúc khởi tạo, trước khi cột được co / giãn ở trên:
+                | tính lại để cột không còn chỗ thu vào dòng con thay vì kéo bảng tràn ngang.
+                | Dùng columns.adjust() (Responsive nghe sự kiện column-sizing) chứ không
+                | gọi responsive.recalc(): layout/js nạp lại jquery.dataTables.min.js sau
+                | plugin Responsive nên Api ở đây không có nhánh .responsive.
+                */
+                api.columns.adjust();
 
                 // Sang trang / tìm kiếm / sắp xếp: gắn lại cho các dòng vừa dựng
                 $table.on('draw.dt', paint);
@@ -681,7 +709,7 @@
                 $table.one('destroy.dt', function () {
                     $table.off('draw.dt', paint).removeData('mdFitApplied');
                     $table.children('thead, tbody').children('tr').children('th, td')
-                        .removeClass('md-col-fit md-col-flex');
+                        .removeClass('md-col-fit md-col-flex md-col-text');
                 });
 
                 $table.data('mdFitApplied', true);
@@ -712,6 +740,7 @@
 
             // Bảng dựng sau (tab nạp bằng AJAX, modal...) cũng được tính
             $(document).on('init.dt', schedule);
+            $(document).on('md:rows-loaded', schedule);
             $(document).ready(schedule);
 
             // Bảng thường (không DataTables) nạp bằng AJAX vẫn cần cột tên đủ rộng

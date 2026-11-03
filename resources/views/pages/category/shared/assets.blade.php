@@ -223,6 +223,15 @@
         border: 1px solid #FCA5A5;
     }
 
+    /* ---------- Bề rộng tối đa của cột chữ dài ----------
+       Số CAS, Nhà Sản Xuất, Phòng Ban Đang Dùng... (mdFitColumns ở layout/master gắn
+       .md-col-text cho cột chữ dài không phải cột tên): dữ liệu dài xuống dòng thay vì
+       kéo cột - và cả bảng - rộng ra; phần rộng còn dư dồn cho cột tên. */
+    table.dataTable th.md-col-text,
+    table.dataTable td.md-col-text {
+        max-width: 260px;
+    }
+
     /* ---------- Badge số lần thay đổi, gắn ở góc trên bên phải nút Sửa ---------- */
     .cat-btn-wrap {
         position: relative;
