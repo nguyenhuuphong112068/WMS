@@ -51,7 +51,7 @@ class UserGuideController extends Controller
             'title' => 'Hoá Chất',
             'icon' => 'fas fa-flask',
             'summary' => 'Danh mục và phân loại NĐ 24/2026, tương kỵ lưu trữ, danh sách hoá chất theo sản phẩm - chỉ tiêu, nhập - kiểm tra, sử dụng và hoá chất cấm, liên phòng ban, cách ly, tồn kho - hạn dùng nội bộ, ngưỡng tồn trữ PL IV và dự trù.',
-            'updated_at' => '2026-11-04',
+            'updated_at' => '2026-11-05',
         ],
         'standard' => [
             'title' => 'Chất Chuẩn',

@@ -201,6 +201,9 @@
                             <td class="text-center" data-order="{{ $row->national_portal_declared ? 1 : 0 }}">
                                 @if ($row->national_portal_declared)
                                     <span class="badge badge-success"><i class="fas fa-check mr-1"></i>Đã khai báo</span>
+                                    @if ($row->national_portal_declaration_no)
+                                        <div class="mt-1" title="Mã hồ sơ khai báo"><strong>{{ $row->national_portal_declaration_no }}</strong></div>
+                                    @endif
                                     <div class="md-sub mt-1">{{ $row->national_portal_declared_by ?: '—' }}</div>
                                     @if ($row->national_portal_declared_at)
                                         <small class="md-sub">{{ \Carbon\Carbon::parse($row->national_portal_declared_at)->format('d/m/Y') }}</small>
@@ -209,6 +212,8 @@
                                     <span class="badge badge-warning">Chưa khai báo</span>
                                     @perm('category_chemical_update')
                                         <form class="form-md-confirm mt-1" data-require-password="1"
+                                            data-extra-name="declaration_no" data-extra-label="Mã hồ sơ khai báo"
+                                            data-extra-placeholder="Mã hồ sơ trên Cổng thông tin quốc gia"
                                             action="{{ route($mdRoute . 'declarePortal') }}" method="POST"
                                             data-title="Xác nhận đã khai báo trên Cổng thông tin quốc gia?"
                                             data-text="Mã {{ $row->code }} - {{ $row->chem_name }}. Thông tin này chỉ cập nhật được MỘT lần, sau khi xác nhận sẽ không sửa hay gỡ lại được.">

@@ -360,6 +360,16 @@ class ChemicalCategoryController extends Controller
             return redirect()->back()->with('error', $alreadyDeclared);
         }
 
+        $declarationNo = trim((string) $request->input('declaration_no'));
+
+        if ($declarationNo === '') {
+            return redirect()->back()->with('error', 'Vui lòng nhập Mã hồ sơ khai báo trên Cổng thông tin quốc gia!');
+        }
+
+        if (mb_strlen($declarationNo) > 100) {
+            return redirect()->back()->with('error', 'Mã hồ sơ khai báo không được vượt quá 100 ký tự!');
+        }
+
         if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Xác nhận khai báo Cổng thông tin quốc gia')) {
             return $stop;
         }
@@ -370,6 +380,7 @@ class ChemicalCategoryController extends Controller
             ->where('national_portal_declared', 0)
             ->update([
                 'national_portal_declared' => 1,
+                'national_portal_declaration_no' => $declarationNo,
                 'national_portal_declared_by' => $this->actor(),
                 'national_portal_declared_at' => now(),
                 'updated_by' => $this->actor(),
@@ -380,9 +391,9 @@ class ChemicalCategoryController extends Controller
             return redirect()->back()->with('error', $alreadyDeclared);
         }
 
-        $this->writeHistory($current->id, 'Khai báo Cổng TTQG', 'Khai báo trên Cổng thông tin quốc gia: Chưa khai báo -> Đã khai báo');
+        $this->writeHistory($current->id, 'Khai báo Cổng TTQG', 'Khai báo trên Cổng thông tin quốc gia: Chưa khai báo -> Đã khai báo (Mã hồ sơ: ' . $declarationNo . ')');
 
-        AuditTrialController::log('Khai báo Cổng thông tin quốc gia', self::TABLE, $current->id, 'national_portal_declared: 0', 'national_portal_declared: 1');
+        AuditTrialController::log('Khai báo Cổng thông tin quốc gia', self::TABLE, $current->id, 'national_portal_declared: 0', 'national_portal_declared: 1, national_portal_declaration_no: ' . $declarationNo);
 
         return redirect()->back()->with('success', 'Đã xác nhận ' . self::LABEL . ' ' . $current->code . ' đã khai báo trên Cổng thông tin quốc gia!');
     }
@@ -434,6 +445,7 @@ class ChemicalCategoryController extends Controller
                     'Khai báo Cổng TT quốc gia' => $row->national_portal_declared === null
                         ? '—'
                         : ($row->national_portal_declared ? 'Đã khai báo' : 'Chưa khai báo'),
+                    'Mã hồ sơ khai báo' => $row->national_portal_declaration_no ?: '—',
                 ];
 
                 // Đơn vị tính đã chuyển sang danh mục của phòng nên bản ghi mới không còn
@@ -639,6 +651,7 @@ class ChemicalCategoryController extends Controller
             'safety_warning' => $row->safety_warning,
             'lead_time_days' => $row->lead_time_days,
             'national_portal_declared' => $row->national_portal_declared,
+            'national_portal_declaration_no' => $row->national_portal_declaration_no,
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
             'change_note' => $note,

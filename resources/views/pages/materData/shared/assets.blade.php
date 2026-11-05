@@ -385,6 +385,10 @@
          | data-require-reason="1": bắt buộc nhập lý do điều chỉnh - dùng cho Khoá / Mở khoá
          | dữ liệu gốc và danh mục. Lý do được gắn vào form dưới tên "change_reason".
          | Hai cờ này không dùng chung trên một nút (duyệt cần mật khẩu, khoá cần lý do).
+         |
+         | data-extra-name="...": thêm 1 ô chữ BẮT BUỘC phía trên ô mật khẩu / lý do
+         | (nhãn data-extra-label, gợi ý data-extra-placeholder), gửi lên dưới đúng tên đó.
+         | Ô nằm trong vùng html của Swal nên không ảnh hưởng Swal.getInput().
         */
         /*
          | Gửi form KHÔNG phụ thuộc vị trí của nó trong DOM.
@@ -473,6 +477,35 @@
             var form = this;
             var needPassword = String($(form).data('require-password') || '') === '1';
             var needReason = String($(form).data('require-reason') || '') === '1';
+            var extraName = $(form).data('extra-name') || '';
+            var extraLabel = $(form).data('extra-label') || '';
+            var escapeHtml = function(value) {
+                return $('<div>').text(value == null ? '' : String(value)).html();
+            };
+            var extraHtml = extraName ?
+                '<div>' + escapeHtml($(form).data('text')) + '</div>' +
+                '<div class="text-left mt-3">' +
+                '<label for="md-confirm-extra" class="mb-1" style="font-weight:600;font-size:14px;">' +
+                escapeHtml(extraLabel) + ' <span class="text-danger">*</span></label>' +
+                '<input type="text" id="md-confirm-extra" class="form-control" maxlength="100" autocomplete="off"' +
+                ' placeholder="' + escapeHtml($(form).data('extra-placeholder') || '') + '">' +
+                '</div>' : undefined;
+            // Chốt giá trị ngay trong preConfirm: sau khi hộp đóng, ô đã bị gỡ khỏi DOM
+            var extraValue = '';
+            var checkExtra = function() {
+                if (!extraName) return true;
+                extraValue = $.trim($('#md-confirm-extra').val() || '');
+                if (!extraValue) {
+                    Swal.showValidationMessage('Vui lòng nhập ' + extraLabel);
+                    $('#md-confirm-extra').trigger('focus');
+                    return false;
+                }
+                return true;
+            };
+            var focusExtra = function() {
+                // Swal tự đặt focus vào ô mật khẩu sau didOpen -> trả focus về ô phụ ở nhịp sau
+                if (extraName) setTimeout(function() { $('#md-confirm-extra').trigger('focus'); }, 0);
+            };
 
             // Ô mật khẩu Swal không nằm trong <form> nên khi chọn tài khoản đã lưu,
             // Chrome điền userName vào ô chữ gần nhất trên trang (ô Tìm kiếm DataTables).
@@ -514,7 +547,8 @@
 
             Swal.fire({
                 title: $(form).data('title'),
-                text: $(form).data('text'),
+                text: extraName ? undefined : $(form).data('text'),
+                html: extraHtml,
                 icon: 'warning',
                 showCancelButton: true,
                 input: needPassword ? 'password' : (needReason ? 'textarea' : undefined),
@@ -528,27 +562,38 @@
                 } : (needReason ? {
                     maxlength: '500'
                 } : undefined),
-                didOpen: needPassword ? lockPageInputs : undefined,
+                didOpen: function() {
+                    if (needPassword) lockPageInputs();
+                    focusExtra();
+                },
                 didClose: needPassword ? unlockPageInputs : undefined,
                 confirmButtonColor: $(form).data('danger') ? '#DC2626' : '#2E7BC4',
                 cancelButtonColor: '#94A3B8',
                 confirmButtonText: 'Đồng ý',
                 cancelButtonText: 'Huỷ',
                 preConfirm: needPassword ? function(value) {
+                    if (!checkExtra()) return false;
                     if (!value) {
                         Swal.showValidationMessage('Vui lòng nhập mật khẩu để ký xác nhận');
                     }
                     return value;
                 } : (needReason ? function(value) {
+                    if (!checkExtra()) return false;
                     if (!value || !value.trim()) {
                         Swal.showValidationMessage('Vui lòng nhập lý do điều chỉnh');
                     }
                     return value;
-                } : undefined)
+                } : (extraName ? function() {
+                    return checkExtra();
+                } : undefined))
             }).then(function(result) {
                 if (!result.isConfirmed) return;
 
                 var extras = {};
+
+                if (extraName) {
+                    extras[extraName] = extraValue;
+                }
 
                 if (needPassword) {
                     extras.sign_password = result.value || '';

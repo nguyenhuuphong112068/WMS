@@ -41,8 +41,9 @@
     <li><b>Phân Loại</b>: các nhóm NĐ 24/2026 suy được. Mã thuộc nhóm 9 (Bảng A) hoặc nhóm 10 (Bảng B) có thêm số liệu đối chiếu
         ngưỡng tồn trữ toàn công ty; bấm vào con số để xem các lô tạo nên nó.</li>
     <li><b>Phòng Ban Đang Dùng</b>: các phòng đã khai hoá chất này ở tab Hoá chất của phòng.</li>
-    <li><b>Đã khai báo trên Cổng thông tin quốc gia</b>: bấm nút xác nhận và nhập lại mật khẩu. Chỉ xác nhận được <b>một lần</b>,
-        sau đó không sửa hay gỡ được, và không làm danh mục phải duyệt lại.</li>
+    <li><b>Khai Báo Cổng TT Quốc Gia</b>: bấm <b>Xác nhận</b>, nhập <b>Mã hồ sơ khai báo</b> (bắt buộc, tối đa 100 ký tự) và nhập lại mật khẩu.
+        Mã hồ sơ hiện dưới nhãn <b>Đã khai báo</b> và được ghi vào lịch sử. Chỉ xác nhận được <b>một lần</b>,
+        sau đó không sửa hay gỡ được (kể cả mã hồ sơ), và không làm danh mục phải duyệt lại.</li>
 </ul>
 
 <h3>Điều chỉnh thời gian đặt hàng</h3>
