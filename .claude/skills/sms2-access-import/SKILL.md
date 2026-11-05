@@ -18,6 +18,7 @@ Script ở `.claude/skills/sms2-access-import/scripts/`; thư mục dữ liệu 
 | 1 | `php scripts/1_standard_catalog.php <D> [--dry]` | standard_names, manufacturers, storage_conditions, units, standard_categories (+ histories) | 1_standard_catalog_report.csv |
 | 2 | `php scripts/2_department_categories.php <D> [--dry]` | warehouses→shelves→columns→tiers→locations (item_type standard), standard_department_categories | 2_department_categories_report.csv |
 | 3 | `php scripts/3_stock.php <D> [--dry]` | purposes (Chỉ tiêu kiểm), standard_imports + standard_exports "tổng xuất" (+ histories) = tồn đầu kỳ, standard_categories.density (chuẩn ml có KSKL) | 3_stock_report.csv |
+| 5 | `php scripts/5_add_categories.php <D> [--dry]` | mã SMS tạo SAU lần nạp bước 1 (đang được bộ phận dùng): tên chuẩn / NSX / danh mục công ty theo quy tắc gộp bước 1; trùng dòng có sẵn → lịch sử "Cập nhật" "Nạp từ SMS 2.0, gộp thêm mã Access: …" (sms2_codes_from_history đọc được). Chạy trước bước 2. KHÔNG chạy lại bước 1 khi đã có dữ liệu thật | 5_add_categories_report.csv |
 | 4 | `php scripts/4_stability.php <D> [--dry]` | standard_stability_assessment_list / _item / _histories (tab Đánh giá hạn dùng CTC ở Tồn Kho Chất Chuẩn), purposes thiếu | 4_stability_report.csv |
 
 - **Luôn `--dry` trước** (cả transaction rollback), đọc số liệu + CSV (cột "Cần rà"), rồi mới chạy thật.
@@ -72,6 +73,11 @@ Script ở `.claude/skills/sms2-access-import/scripts/`; thư mục dữ liệu 
 - Trạng thái phiếu tính theo mốc như controller; "Kết Thúc Đánh Giá" còn mốc chưa làm → Dừng Đánh Giá. Người tạo / ngày / trạng thái gốc → nhật ký "Lập phiếu".
 - Lần nạp 26/10/2026: 45 phiếu (QC1 36, QC2 9), 211 mốc (31 đã đánh giá), 24 chỉ tiêu kiểm mới; 31 Đang Đánh Giá, 14 Ban Đầu.
 
+### Nạp lại tồn theo SMS mới nhất (04/11/2026)
+- Trình tự: bước 0 (`-Departments "QC1,QC2,QC,AD"`) → xoá phiếu thử của người dùng (phiếu sử dụng, ống nhập tay, đề nghị cấp phát chuẩn) → 5 → 2 (không `--only`, dựng lại cả 4 phòng; tự xoá tồn + phiếu đánh giá script tạo) → 3 → 4.
+- **Mã ống trùng giữa 2 phòng**: SMS cho QC2 / QC / AD dùng chung mã ống chia của QC1 (`QC1CTC26010039.2` có ở cả QC NM1 và PTPT, đều còn tồn). Mã WMS duy nhất → ống phòng xử lý sau = `<Maxn>-<BP>` (vd `-AD`), ghi chú phiếu "mã ống SMS 2.0 <Maxn>" (AccessLegacyCode::standardTube đọc). "mã cũ …" trong ghi chú là cột `Maxn_old2` của Access, KHÔNG phải mã ống.
+- Lần 04/11/2026: 15 mã mới S4144–S4158 → S03844–S03858 (không mã nào trùng nhóm ĐVT với dòng có sẵn); danh mục phòng QC1 1.966 / QC2 528 / QC NM1 847 / PTPT 1.793; ống QC1 2.210, QC2 603 (khớp), QC NM1 563 (+999 do 1 ống g → mg), PTPT 1.829 (−1.853,145 do 2 ống mg → g), 11 ống thêm hậu tố; 45 phiếu đánh giá CTC.
+
 ## 3. Bẫy dữ liệu đã gặp
 
 - SMS_2.0_L.accdb chỉ là front-end: bảng là LINK tới `\\stellapharm.int\share-bd\QLHC\Database_SMS\` (General_Database, Database_QC/QC1/QC2/AD/PROC .accdb) → máy chạy phải vào được ổ mạng.
@@ -91,7 +97,9 @@ Script ở `.claude/skills/sms2-access-import/scripts/`; thư mục dữ liệu 
 
 ## 5. Thêm bộ phận mới / việc còn treo
 
-- Thêm bộ phận (QC → ?, AD → ?): hỏi người dùng phòng WMS, thêm vào `SMS2['departments']` (id, warehouse_code, warehouse_name, zone_table = dbo_T_DinhKhu3 / dbo_T_DinhKhu4), chạy bước 0 với `-Departments "QC1,QC2,QC,AD"` rồi 2 → 3. Kiểm lại cách tách mã định khu (QC dạng `086.1A`, AD dạng `C-T1.01`) trước khi chạy thật.
+- **QC → id 15 KTCL-NM1 (kho `QCNM1-CC`, dbo_T_DinhKhu3), AD → id 10 PTPT (kho `PTPT-CC`, dbo_T_DinhKhu4)** - người dùng chốt 04/11/2026 (Q_DMHC_QC3HH / Q_DMHC_QC4HH). Đã nạp CHỈ danh mục phòng: bước 0 `-Departments "QC,AD"` rồi `2_department_categories.php <D> --only=QC,AD` (chỉ xoá/dựng danh mục phòng + định khu của các phòng đó, không gọi sms2_delete_stock, dừng nếu phòng đã có phiếu nhập). Kết quả: QC 845 dòng (80 gộp 2 mã), AD 1.791 dòng (26 gộp), 21 tủ / 130 vị trí; tồn đầu kỳ chưa nạp (bước 3 hiện xoá tồn mọi phòng - cần thêm --only trước khi chạy cho QC/AD).
+- Định khu QC/AD: `086.1A` → tủ QC-INS-086/Tầng 1/Vị trí A, `088.1B2` → Tầng 1/Vị trí B2, "Tủ số 6" + `6C3` → C/03, tủ không số + `13A1` → Tầng 13/Vị trí A1 (giữ logic cũ); AD `C-T1.01` → Tầng 1/Vị trí 01, `C-T7` → Tầng 7; mã không có trong bảng nhưng cùng tiền tố `C-` với các mã của 1 tủ → tủ đó; `QC/ISN-264` (Tu = NA) → chính nó là tủ.
+- 4 mã tạo trên SMS sau 26/10/2026 chưa có danh mục công ty → bỏ qua: S4144 Calcium gluconate EP (trùng nhóm S00516), S4157 Desogestrel Synzeal (trùng nhóm S03640), S4150 Prednisolone Sigma, S4158 Thiamin hydroclorid VKNTP (chưa có dòng).
 - Lần nạp 26/10/2026: danh mục công ty 3.843 dòng (2.430 tên, 110 NSX mới); QC1 1.951 dòng phòng (61 không định khu) + 2.217 ống / 1.013 phiếu tổng xuất (tồn 466.574,44 theo Access; 536.504,44 trên WMS do 1 lô 70 g → 70.000 mg); QC2 528 dòng (14 không định khu) + 604 ống / 263 phiếu tổng xuất (558.831,81 khớp); 349 ống chép KL Bì + Chuẩn, 5 ống chép KL Bì; 411 vị trí / 18 tủ; 37 chỉ tiêu kiểm mới.
 - Màn Sử Dụng Chất Chuẩn ~19 MB vì ô chọn mã ống (2 ô × 2.218) và danh mục (2 ô × 3.844) in sẵn option → nên chuyển sang tìm AJAX (data-lookup-url, xem CategoryLookup) - chưa làm.
 - Độ lệch KSKL đã sửa theo Q_ChuanKSKL của Access (26/10/2026, `App\Support\StandardWeight`): KL thực = Bì+Chuẩn − Bì sau dùng (ĐVT ml: /1000/d), chỉ tính khi đã cân bì sau dùng; ống dùng dở hiện "Đang sử dụng - chưa cân bì sau dùng". Sau khi nạp: QC1 chỉ 2 ống tính được (1 ngoài giới hạn thật: QC1IMP26010251 7,82 mg vs 4,9 mg - Access cũng ra 59,6%).

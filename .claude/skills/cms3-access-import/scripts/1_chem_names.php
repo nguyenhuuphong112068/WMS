@@ -4,8 +4,9 @@
  *
  * Quy tắc (user đã chốt):
  *   - MỌI tên hoá chất phải liên kết >= 1 hoạt chất (chem_name_active_ingredient), cả đơn chất lẫn hỗn hợp.
- *   - Đơn chất: tên hoá chất = tên hoạt chất (gộp mọi dòng Access cùng hoạt chất).
- *   - Hỗn hợp (>= 2 thành phần): tên = TenhoachatTA, % lấy từ cột Tenhoatchat.
+ *   - Tên hoá chất = TenhoachatTA cho MỌI mã (đơn chất lẫn hỗn hợp, đổi 04/11/2026); thành phần = hoạt chất ở
+ *     Dữ Liệu Gốc đơn chất. Cùng TenhoachatTA (bỏ hoa/thường, dấu cách) -> 1 tên, giữ bộ nhiều thành phần nhất.
+ *   - Hỗn hợp (>= 2 thành phần): % lấy từ cột Tenhoatchat.
  *   - Khớp thành phần: CAS -> tên -> CAS tra theo tên ở dòng Access khác -> mục gộp (từ khoá + cờ PL)
  *     -> tạo hoạt chất ngoài danh mục (is_statutory=0, ghi nhóm theo cờ PL nếu là đơn chất).
  *   - Access xếp nhóm hỗn hợp (2/8/10) mà chỉ có 1 CAS => dung dịch pha loãng = hoạt chất + "Nước".
@@ -303,9 +304,11 @@ try {
             $inc('dilute_solution_rows');
         }
         $isMixture = count($linked) >= 2;
-        $key = $isMixture ? 'mix:' . mb_strtolower($ta) : 'ai:' . array_key_first($linked);
-        $name = $isMixture ? mb_substr($ta, 0, 255) : $aiName[array_key_first($linked)];
-        if (! isset($chem[$key]) || ($isMixture && count($linked) > count($chem[$key]['components']))) {
+        // Tên = TenhoachatTA cho MỌI mã (04/11/2026, trước đây đơn chất lấy tên hoạt chất). Khoá so trùng bỏ hoa/thường
+        // + dấu cách, gạch...; cùng tên mà thành phần khác thì giữ bộ nhiều thành phần nhất.
+        $key = 'ta:' . preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($ta));
+        $name = mb_substr($ta, 0, 255);
+        if (! isset($chem[$key]) || count($linked) > count($chem[$key]['components'])) {
             $chem[$key] = ['name' => $name, 'mixture' => $isMixture, 'components' => $linked,
                 'rows' => $chem[$key]['rows'] ?? [], 'banned' => $chem[$key]['banned'] ?? false, 'pl10' => $chem[$key]['pl10'] ?? false];
         }

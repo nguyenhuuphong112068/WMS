@@ -12,6 +12,16 @@
         đó; quyền Trao Đổi Theo Dõi Dự Trù cần cả quyền xem tab Theo dõi dự trù.</li>
 </ol>
 
+<h3>Phạm vi làm việc và phòng ban chỉ xem</h3>
+<p><b>Phạm vi làm việc</b> của bạn gồm phòng ban chính và các phòng ban được gán cho vai trò của bạn; có vai trò không giới hạn
+    phòng ban (hoặc là Admin) thì phạm vi là mọi phòng. Bạn vẫn chuyển sang được phòng ngoài phạm vi để <b>xem</b> dữ liệu:</p>
+<ul>
+    <li>Quyền ở phòng đó chỉ gồm quyền <b>Xem màn hình</b> và <b>Xem tab</b> lấy từ mọi vai trò của bạn (cộng quyền cấp riêng).</li>
+    <li>Không vai trò nào có hiệu lực ở phòng đó: không ký duyệt, không nằm trong danh sách người ký của phòng.</li>
+    <li>Mọi thao tác ghi (thêm, sửa, khoá, duyệt, ký, nhập, cấp phát...) bị chặn với thông báo
+        <i>"Phòng ban ... ngoài phạm vi làm việc của bạn - chỉ được xem, không thao tác được."</i></li>
+</ul>
+
 <h3>Quyền được sắp xếp thế nào</h3>
 <p>Danh sách quyền chia theo <b>module trên menu trái</b>: Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Dự Trù và
     Phân Quyền &amp; Lịch Sử. Trong mỗi module, quyền xếp tiếp theo <b>Vật Tư, Hoá Chất, Chất Chuẩn</b> và <b>Dùng Chung</b>.
@@ -49,8 +59,7 @@
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>Đổi phòng ban đang làm việc thì quyền cũng đổi theo. Ở phòng này bạn có thể thấy nút Duyệt, sang phòng khác thì không.
-        Danh sách phòng ban được chọn gồm phòng ban chính của bạn và các phòng ban gán cho vai trò của bạn; có vai trò không
-        giới hạn phòng ban thì chọn được mọi phòng.</div>
+        Muốn một người <b>thao tác</b> được ở phòng khác thì gán vai trò cho phòng đó; chỉ cần xem thì không phải gán gì.</div>
 </div>
 
 <div class="ug-callout">

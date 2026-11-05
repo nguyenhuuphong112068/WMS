@@ -14,6 +14,12 @@
     <div class="mx-auto text-center">
         <h4 class="library-title mb-0" style="color: var(--primary-dark); letter-spacing: 1px;">
             {{ session('title', 'CMS - QUẢN LÝ VẬT TƯ TIÊU HAO') }}
+            @if (user_department_view_only())
+                <span class="badge align-middle ml-2" style="font-size: 0.7rem; letter-spacing: 0; background: rgba(245, 158, 11, 0.15); color: #B45309; border: 1px solid #F59E0B; border-radius: var(--border-radius-md);"
+                    title="Phòng ban {{ session('user')['selected_department'] ?? '' }} ngoài phạm vi làm việc của bạn">
+                    <i class="fas fa-eye mr-1"></i>Chỉ xem
+                </span>
+            @endif
         </h4>
     </div>
 

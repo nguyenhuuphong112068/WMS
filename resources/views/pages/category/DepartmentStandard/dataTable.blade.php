@@ -80,7 +80,15 @@
                         @endphp
                         <tr data-groups="{{ implode(',', $dsCodes) }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
-                            <td><span class="md-tag">{{ $row->category_code ?: '—' }}</span></td>
+                            <td>
+                                <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
+                                {{-- TẠM THỜI: mã bên SMS 2.0 (App\Support\AccessLegacyCode), đối chiếu xong thì gỡ --}}
+                                @if (! empty(($accessCodes ?? [])[$row->category_id]))
+                                    <div class="md-sub mt-1" title="Mã cũ bên Access dùng để nạp mã danh mục này">
+                                        Access: {{ implode(', ', $accessCodes[$row->category_id]) }}
+                                    </div>
+                                @endif
+                            </td>
                             <td>
                                 <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
                                 @if ($row->cas_no)

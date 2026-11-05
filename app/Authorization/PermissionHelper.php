@@ -14,12 +14,41 @@ if (! function_exists('user_current_department_id')) {
     }
 }
 
+if (! function_exists('user_department_view_only')) {
+    /**
+     * Phòng ban $departmentId (mặc định phòng đang chọn) nằm NGOÀI phạm vi làm việc của user
+     * (user_allowed_department_ids). Mọi user đều chuyển sang xem được mọi phòng, nhưng ở phòng
+     * ngoài phạm vi chỉ còn quyền xem (user_permission_names) và mọi thao tác ghi bị chặn
+     * (middleware ViewOnlyDepartment).
+     */
+    function user_department_view_only($userId = null, ?int $departmentId = null): bool
+    {
+        $userId ??= session('user')['userId'] ?? 0;
+        $departmentId ??= user_current_department_id();
+
+        return $userId && $departmentId && ! user_can_access_department($userId, $departmentId);
+    }
+}
+
+if (! function_exists('user_permission_is_view')) {
+    /**
+     * Quyền chỉ để XEM: xem màn hình (*_view, materData_*_view_*) hoặc xem tab (*_tab_*).
+     * Đây là phần quyền còn giữ lại ở phòng ban ngoài phạm vi làm việc.
+     */
+    function user_permission_is_view(string $name): bool
+    {
+        return (bool) preg_match('/(^|_)view($|_)|_tab_/', $name);
+    }
+}
+
 if (! function_exists('user_permission_names')) {
     /**
      * Danh sách tên quyền user thực sự có, TÍNH THEO PHÒNG BAN ĐANG CHỌN:
      *   - quyền từ role gán qua user_role có department_id = NULL (áp mọi phòng)
      *     hoặc = phòng ban đang chọn;
      *   - sau đó áp quyền cấp riêng cho user (user_permission) đè lên (không phụ thuộc phòng).
+     * Phòng ngoài phạm vi làm việc (user_department_view_only): lấy quyền từ MỌI role của user
+     * rồi chỉ giữ quyền xem - user thấy ở phòng khác đúng những màn hình / tab thấy ở phòng mình.
      * Tài khoản Admin luôn có toàn bộ quyền, mọi phòng.
      * Kết quả cache theo (user, phòng ban) trong 1 request.
      */
@@ -41,18 +70,19 @@ if (! function_exists('user_permission_names')) {
             );
         }
 
+        $viewOnly = user_department_view_only($userId, $departmentId);
         $names = [];
 
         $fromRole = DB::table('permissions')
             ->join('role_permission', 'permissions.id', '=', 'role_permission.permission_id')
             ->join('user_role', 'role_permission.role_id', '=', 'user_role.role_id')
             ->where('user_role.user_id', $userId)
-            ->where(function ($q) use ($departmentId) {
+            ->when(! $viewOnly, fn ($query) => $query->where(function ($q) use ($departmentId) {
                 $q->whereNull('user_role.department_id');
                 if ($departmentId) {
                     $q->orWhere('user_role.department_id', $departmentId);
                 }
-            })
+            }))
             ->pluck('permissions.name');
 
         foreach ($fromRole as $name) {
@@ -71,6 +101,10 @@ if (! function_exists('user_permission_names')) {
             } else {
                 $names[$name] = true;
             }
+        }
+
+        if ($viewOnly) {
+            $names = array_filter($names, fn ($v, $name) => user_permission_is_view($name), ARRAY_FILTER_USE_BOTH);
         }
 
         // Quyền con (permissions.parent_id) chỉ có hiệu lực khi có cả quyền cha
@@ -121,9 +155,15 @@ if (! function_exists('user_has_any_role')) {
      *  - Role chính (user_management.role_id) là danh tính gốc: áp cho MỌI phòng ban.
      *  - Role gán qua user_role chỉ tính khi department_id = NULL hoặc = phòng ban đang chọn.
      * Role 'Admin' được coi là toàn quyền (bỏ qua $roleNames).
+     * Phòng đang chọn nằm ngoài phạm vi làm việc (chỉ xem): không vai trò nào có hiệu lực
+     * (Admin luôn trong phạm vi nên không bị ảnh hưởng).
      */
     function user_has_any_role($userId, array $roleNames, ?int $departmentId = null): bool
     {
+        if ($departmentId === null && user_department_view_only($userId)) {
+            return false;
+        }
+
         $departmentId ??= user_current_department_id();
 
         $primaryRole = DB::table('user_management')
@@ -155,7 +195,8 @@ if (! function_exists('user_has_any_role')) {
 
 if (! function_exists('user_allowed_department_ids')) {
     /**
-     * Các phòng ban user được phép vào làm việc (chọn ở "Chuyển Bộ Phận").
+     * PHẠM VI LÀM VIỆC: các phòng ban user được thao tác. Mọi user chuyển sang xem được mọi
+     * phòng; phòng ngoài danh sách này chỉ xem (user_department_view_only).
      *  - Trả ['*'] nếu user là Admin (role chính) hoặc có role gán với department_id = NULL
      *    (role áp mọi phòng) -> vào được mọi phòng.
      *  - Ngược lại: phòng ban chính + các phòng ban đã gán role cụ thể.

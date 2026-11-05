@@ -43,8 +43,14 @@
     <i>ton hoa chat</i>), dùng <kbd>↑</kbd> <kbd>↓</kbd> để chọn rồi <kbd>Enter</kbd> để mở. Chỉ tìm được màn hình bạn có quyền xem.</p>
 
 <h3>Đổi phòng ban</h3>
-<p>Ô cuối cột icon là <b>phòng ban đang làm việc</b>. Được làm việc ở nhiều phòng thì bấm vào ô này, chọn phòng ban trong bảng
-    con (chia theo công ty nếu có nhiều công ty). Trang hiện tại tải lại theo phòng ban mới.</p>
+<p>Ô cuối cột icon là <b>phòng ban đang chọn</b>. Bấm vào ô này, chọn phòng ban trong bảng con (chia theo công ty nếu có nhiều
+    công ty). Trang hiện tại tải lại theo phòng ban mới. Mọi người dùng đều chọn được mọi phòng ban:</p>
+<ul>
+    <li>Phòng trong <b>phạm vi làm việc</b> của bạn (icon <i class="fas fa-building"></i>): làm việc theo quyền của vai trò.</li>
+    <li>Phòng ngoài phạm vi (icon con mắt <i class="fas fa-eye" style="color:#B45309"></i>): <b>chỉ xem</b>. Ô phòng ban chuyển
+        màu cam và tiêu đề màn hình có nhãn <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #B45309; border: 1px solid #F59E0B;"><i class="fas fa-eye mr-1"></i>Chỉ xem</span>.
+        Bạn thấy đúng các màn hình và tab được xem ở phòng mình, không có nút thao tác; mọi thao tác ghi đều bị chặn.</li>
+</ul>
 
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>

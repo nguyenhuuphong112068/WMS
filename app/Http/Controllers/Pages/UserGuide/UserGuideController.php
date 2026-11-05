@@ -27,13 +27,13 @@ class UserGuideController extends Controller
             'title' => 'Bắt Đầu & Bảo Mật',
             'icon' => 'fas fa-shield-alt',
             'summary' => 'Đăng nhập, đổi mật khẩu, khoá tài khoản và hết phiên; các chức năng của Trang chủ; Lịch Sử Đăng Nhập, Audit Trail và cách hệ thống đáp ứng 21 CFR Part 11.',
-            'updated_at' => '2026-10-28',
+            'updated_at' => '2026-11-04',
         ],
         'permission' => [
             'title' => 'Phân Quyền',
             'icon' => 'fas fa-user-shield',
             'summary' => 'Cách hệ thống phân quyền theo nhóm quyền và phòng ban, cách thiết lập cho người dùng, các vai trò hiện có và bảng phân quyền chung của toàn hệ thống.',
-            'updated_at' => '2026-11-03',
+            'updated_at' => '2026-11-04',
         ],
         'materData' => [
             'title' => 'Dữ Liệu Gốc',
@@ -45,19 +45,19 @@ class UserGuideController extends Controller
             'title' => 'Vật Tư',
             'icon' => 'fas fa-cubes',
             'summary' => 'Trọn vòng đời vật tư: danh mục, nhập và kiểm tra, đề nghị - ký duyệt - cấp phát, liên phòng ban và VPP, tồn kho - kiểm kê, dự trù và thống kê, kèm sơ đồ đường đi phiếu.',
-            'updated_at' => '2026-10-28',
+            'updated_at' => '2026-11-04',
         ],
         'chemical' => [
             'title' => 'Hoá Chất',
             'icon' => 'fas fa-flask',
             'summary' => 'Danh mục và phân loại NĐ 24/2026, tương kỵ lưu trữ, danh sách hoá chất theo sản phẩm - chỉ tiêu, nhập - kiểm tra, sử dụng và hoá chất cấm, liên phòng ban, cách ly, tồn kho - hạn dùng nội bộ, ngưỡng tồn trữ PL IV và dự trù.',
-            'updated_at' => '2026-11-03',
+            'updated_at' => '2026-11-04',
         ],
         'standard' => [
             'title' => 'Chất Chuẩn',
             'icon' => 'fas fa-vial',
             'summary' => 'Mã ống chuẩn theo nhóm, danh sách chất chuẩn theo sản phẩm - chỉ tiêu, nhập - kiểm tra, cấp phát cho tổ và ghi sử dụng, liên phòng ban, cách ly - loại bỏ - huỷ, hạn dùng retest / check online / nội bộ, kiểm soát khối lượng, đánh giá hạn dùng chuẩn thứ cấp và dự trù.',
-            'updated_at' => '2026-11-03',
+            'updated_at' => '2026-11-04',
         ],
     ];
 

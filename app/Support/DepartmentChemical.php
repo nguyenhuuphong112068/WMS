@@ -196,7 +196,6 @@ class DepartmentChemical
                 'chemical_categories.code as category_code',
                 'chemical_categories.type as category_type',
                 'chemical_categories.density as category_density',
-                'chemical_categories.doc_no as category_doc_no',
                 'chemical_categories.shelf_life_months as category_shelf_life_months',
                 'chem_names.name as chem_name',
                 'manufacturers.name as manufacturer_name',
@@ -248,11 +247,15 @@ class DepartmentChemical
     {
         $query = DB::table('chemical_categories')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('manufacturers', 'chemical_categories.manufacturers_id', '=', 'manufacturers.id')
             ->select(
                 'chemical_categories.id',
                 'chemical_categories.code',
                 'chemical_categories.shelf_life_months',
-                'chem_names.name as chem_name'
+                'chem_names.name as chem_name',
+                // Nhà sản xuất để ô tìm nhanh của modal Khai ... Cho Phòng phân biệt các mã trùng tên
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name'
             )
             ->where('chemical_categories.status_id', 1)
             ->where('chemical_categories.app_status', 'approved')

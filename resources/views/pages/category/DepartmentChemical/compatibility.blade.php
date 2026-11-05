@@ -7,6 +7,9 @@
 |   - Chọn xong một định khu: gọi lookup.chemicalCompatibility, đổ kết quả vào .dc-compat.
 | Controller vẫn chặn lại lúc lưu (DepartmentChemicalController::checkCompatibility), khung này chỉ
 | để người dùng thấy trước.
+|
+| Modal Khai (bảng nhiều dòng - shared/deptBatch) đối chiếu theo TỪNG DÒNG: gọi window.dcCompatCheck($dòng),
+| dòng là <tbody> có ô .cbt-category, .cbt-location và khung .dc-compat ở dòng phụ.
 --}}
 @php
     $dcPicto = collect(\App\Support\ChemicalCompatibility::labels())
@@ -118,10 +121,11 @@
     document.addEventListener('DOMContentLoaded', function() {
         var DC_SAFETY = @json($dcPicto);
         var DC_COMPAT_URL = @json(route('pages.category.lookup.chemicalCompatibility'));
-        var $forms = $('#dcCreateModal form, #dcUpdateModal form');
+        var $forms = $('#dcUpdateModal form');
 
+        // $form: form modal Sửa hoặc một dòng (<tbody>) của bảng Khai nhiều dòng
         function categoryOf($form) {
-            return String($form.find('[name="category_id"]').val() || '');
+            return String($form.find('[name="category_id"], .cbt-category').first().val() || '');
         }
 
         function chip(code) {
@@ -202,7 +206,7 @@
 
         function check($form) {
             var $box = $form.find('.dc-compat');
-            var location = String($form.find('[name="default_location_id"]').val() || '');
+            var location = String($form.find('[name="default_location_id"], .cbt-location').first().val() || '');
             var category = categoryOf($form);
             var token = ($box.data('token') || 0) + 1;
 
@@ -242,6 +246,8 @@
                 check($form);
             }, 30));
         }
+
+        window.dcCompatCheck = scheduleCheck;
 
         $forms.each(function() {
             var $form = $(this);

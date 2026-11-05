@@ -21,17 +21,18 @@ class SwitchProductionController extends Controller
                 fn ($q) => $q->where('id', $request->selected_department_id),
                 fn ($q) => $q->where('shortName', $selected_dept_name)
             )
+            ->where('isActive', 1)
             ->select('id', 'shortName')
             ->first();
 
-        $selected_department_id = $selected_dept->id ?? null;
-        $selected_dept_name = $selected_dept->shortName ?? $selected_dept_name;
-
-        // Chỉ cho chuyển sang phòng ban user được cấp (role gán theo phòng, hoặc phòng chính)
-        if ($selected_department_id
-            && !user_can_access_department($user['userId'] ?? 0, $selected_department_id)) {
-            return redirect()->back()->with('error', 'Bạn không được phân quyền làm việc ở phòng ban này.');
+        // Mọi user chuyển được sang mọi phòng ban; phòng ngoài phạm vi làm việc chỉ được xem
+        // (user_department_view_only + middleware ViewOnlyDepartment)
+        if (! $selected_dept) {
+            return redirect()->back()->with('error', 'Phòng ban không tồn tại hoặc đã ngưng hoạt động.');
         }
+
+        $selected_department_id = $selected_dept->id;
+        $selected_dept_name = $selected_dept->shortName;
 
         // Đổi phòng ban là đổi luôn công ty đang làm việc (mỗi phòng ban thuộc một công ty)
         $companyId = \App\Support\CompanyContext::resolveForDepartment(

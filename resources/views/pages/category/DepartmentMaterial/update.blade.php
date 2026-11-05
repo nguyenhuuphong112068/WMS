@@ -157,6 +157,12 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
 
+        /* Dòng nhắc "ngưỡng tồn theo đơn vị nào" chạy theo ô Đơn Vị Tính */
+        $(document).on('change', '#dmUpdateModal .cat-select[name="unit_id"]', function() {
+            var short = $(this).find('option:selected').data('short');
+            $(this).closest('form').find('.dm-unit-hint').text(short || 'đơn vị');
+        });
+
         /* ---------- Ô chỉ đọc, đổ theo dòng đang sửa ---------- */
         $(document).on('click', '.btn-md-edit[data-modal="#dmUpdateModal"]', function() {
             var row = $(this).data('row') || {};

@@ -166,6 +166,17 @@
         cursor: default;
     }
 
+    /* phòng ban ngoài phạm vi làm việc - chỉ xem */
+    .wms-rbtn.wms-dept.is-view-only {
+        border-color: #F59E0B;
+        background: rgba(245, 158, 11, 0.1);
+        color: #B45309;
+    }
+
+    .wms-link.is-view-only i {
+        color: #B45309;
+    }
+
     /* ---------- Bảng con ---------- */
     .wms-panel {
         position: fixed;
@@ -505,9 +516,11 @@
     $currentDept = session('user')['selected_department'] ?? (session('user')['department'] ?? null);
     $currentCompanyId = session('user')['company_id'] ?? null;
 
-    // Phòng ban user được phép làm việc (Admin -> tất cả; user thường -> phòng được gán role).
+    // Mọi user chuyển được sang mọi phòng ban; phòng ngoài phạm vi làm việc (Admin -> tất cả;
+    // user thường -> phòng được gán role) chỉ được xem, đánh dấu icon con mắt.
     // Phòng ban chung (is_general = 0, VD: BOD, Cung Ứng) chỉ để tạo user, không có kho riêng.
     $allowedDeptIds = user_allowed_department_ids(session('user')['userId'] ?? 0);
+    $currentViewOnly = user_department_view_only();
     $switchableDepts = DB::table('deparments')
         ->leftJoin('companies', 'companies.id', '=', 'deparments.company_id')
         ->select(
@@ -519,10 +532,6 @@
         )
         ->where('deparments.isActive', 1)
         ->where('deparments.is_general', 1)
-        ->when(
-            $allowedDeptIds !== ['*'],
-            fn($q) => $q->whereIn('deparments.id', $allowedDeptIds ?: [0]),
-        )
         ->orderBy('companies.name', 'asc')
         ->orderBy('deparments.shortName', 'asc')
         ->get();
@@ -753,10 +762,10 @@
         @endif
     @endforeach
 
-    {{-- Phòng ban đang làm việc: bấm để đổi (chỉ khi được làm việc ở nhiều phòng) --}}
-    <button type="button" class="wms-rbtn wms-dept" @if ($switchableDepts->count() > 1) data-wms-panel="dept" @else disabled @endif
-        title="{{ trim((session('user')['company_name'] ?? '') . ' - ' . ($currentDept ?? ''), ' -') }}">
-        <i class="fas fa-building"></i>{{ $currentDept ?? 'Chưa phân bộ phận' }}
+    {{-- Phòng ban đang chọn: bấm để đổi; phòng ngoài phạm vi làm việc hiện icon con mắt (chỉ xem) --}}
+    <button type="button" class="wms-rbtn wms-dept {{ $currentViewOnly ? 'is-view-only' : '' }}" @if ($switchableDepts->count() > 1) data-wms-panel="dept" @else disabled @endif
+        title="{{ trim((session('user')['company_name'] ?? '') . ' - ' . ($currentDept ?? ''), ' -') . ($currentViewOnly ? ' (chỉ xem)' : '') }}">
+        <i class="fas {{ $currentViewOnly ? 'fa-eye' : 'fa-building' }}"></i>{{ $currentDept ?? 'Chưa phân bộ phận' }}
     </button>
 </nav>
 
@@ -801,9 +810,11 @@
                         <div class="wms-grp">{{ $companyLabels[$companyId] ?? 'Chưa gán công ty' }}</div>
                     @endif
                     @foreach ($depts as $dept)
+                        @php $deptViewOnly = $allowedDeptIds !== ['*'] && !in_array((int) $dept->id, $allowedDeptIds, true); @endphp
                         <a href="{{ route('switch', ['selected_department' => $dept->shortName, 'selected_department_id' => $dept->id, 'redirect' => url()->current()]) }}"
-                            class="wms-link {{ $currentDept == $dept->shortName ? 'active' : '' }}">
-                            <i class="fas fa-building"></i><span>{{ $dept->shortName }}</span>
+                            class="wms-link {{ $currentDept == $dept->shortName ? 'active' : '' }} {{ $deptViewOnly ? 'is-view-only' : '' }}"
+                            @if ($deptViewOnly) title="Ngoài phạm vi làm việc - chỉ xem" @endif>
+                            <i class="fas {{ $deptViewOnly ? 'fa-eye' : 'fa-building' }}"></i><span>{{ $dept->shortName }}</span>
                         </a>
                     @endforeach
                 @endforeach

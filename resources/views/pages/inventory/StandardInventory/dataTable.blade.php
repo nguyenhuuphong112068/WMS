@@ -288,6 +288,14 @@
                                             <div class="md-sub">
                                                 <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
                                             </div>
+                                            {{-- TẠM THỜI: mã bên SMS 2.0 (App\Support\AccessLegacyCode), đối chiếu xong thì gỡ --}}
+                                            @php
+                                                $accessTube = \App\Support\AccessLegacyCode::standardTube($row->import_note ?? null);
+                                                $accessLine = implode(' · ', array_filter([implode(', ', $accessCodes[$row->category_id] ?? []), $accessTube ? 'ống ' . $accessTube : null]));
+                                            @endphp
+                                            @if ($accessLine !== '')
+                                                <div class="md-sub">Access {{ $accessLine }}</div>
+                                            @endif
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->standard_name ?: '—' }}</div>
@@ -485,6 +493,9 @@
                                             <div class="font-weight-bold">{{ $sum->standard_name ?: '—' }}</div>
                                             <div class="md-sub">
                                                 <span class="md-tag">{{ $sum->category_code ?: '—' }}</span>
+                                                @if (!empty($accessCodes[$sum->category_id]))
+                                                    <span class="ml-1">Access {{ implode(', ', $accessCodes[$sum->category_id]) }}</span>
+                                                @endif
                                                 @if ($sum->cas_no)
                                                     <span class="ml-1">CAS: {{ $sum->cas_no }}</span>
                                                 @endif

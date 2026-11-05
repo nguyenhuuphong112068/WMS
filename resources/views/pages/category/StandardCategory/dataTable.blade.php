@@ -19,7 +19,7 @@
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 55px">STT</th>
-                        <th style="width: 110px">Mã Chuẩn</th>
+                        <th style="width: 110px">Mã Chuẩn<br><small>/ Mã Access</small></th>
                         <th>Tên Chất Chuẩn</th>
                         <th style="width: 130px">Số CAS</th>
                         <th style="width: 160px">Nguồn Gốc / NSX</th>
@@ -50,7 +50,15 @@
                         <tr data-groups="{{ implode(',', $sdCodes) }}"
                             data-approval="{{ $row->status_id == 0 ? 'locked' : ($row->app_status ?: 'pending') }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
-                            <td><span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span></td>
+                            <td>
+                                <span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span>
+                                {{-- TẠM THỜI: mã bên Access (App\Support\AccessLegacyCode), đối chiếu xong thì gỡ --}}
+                                @if (! empty($accessCodes[$row->id]))
+                                    <div class="md-sub mt-1" title="Mã cũ bên Access dùng để nạp mã danh mục này">
+                                        Access: {{ implode(', ', $accessCodes[$row->id]) }}
+                                    </div>
+                                @endif
+                            </td>
                             <td>
                                 <span class="font-weight-bold">{{ $row->standard_name ?: '—' }}</span>
                                 @if ($row->doc_no)

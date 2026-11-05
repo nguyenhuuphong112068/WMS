@@ -243,6 +243,7 @@
         'mdIcon' => $dsIcon,
         'categories' => $dsCategories,
         'locations' => $dsLocations,
+        'batchLocations' => $dsBatchLocations,
         'units' => $dsUnits,
         'unitsInUse' => $dsUnitsInUse,
         'conversions' => $dsConversions,

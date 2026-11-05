@@ -156,13 +156,24 @@ try {
             continue;
         }
         $dc = $deptCat[$dept . '|' . $cat];
-        if (isset($usedCodes[$code])) {
-            $line[10] = 'Bỏ qua: trùng mã ống ' . $code;
-            $report[] = $line;
-            $inc('skip_duplicate_code');
-            continue;
+        $accessCode = $code;
+        if (isset($usedCodes[mb_strtoupper($code)])) {
+            // SMS 2.0 cho 2 phòng dùng chung mã ống chia (QC1CTC26010039.2 ở cả QC NM1 và PTPT, đều còn tồn) - mã WMS
+            // là duy nhất nên ống của phòng xử lý sau mang thêm hậu tố bộ phận
+            $suffixed = $code . '-' . $bp;
+            if (isset($usedCodes[mb_strtoupper($suffixed)])) {
+                $line[10] = 'Bỏ qua: trùng mã ống ' . $code;
+                $report[] = $line;
+                $inc('skip_duplicate_code');
+                continue;
+            }
+            $issues[] = 'Trùng mã ống với phòng khác ở SMS 2.0 - mã WMS ' . $suffixed;
+            $inc('duplicate_code_suffixed');
+            $accessCode = $code;
+            $code = $suffixed;
         }
-        $usedCodes[$code] = true;
+        $usedCodes[mb_strtoupper($code)] = true;
+        $line[1] = $code;
         if (isset($dupMaxn[$k])) {
             $issues[] = 'Mã ống có nhiều dòng nhập ở SMS 2.0 (đã cộng)';
         }
@@ -286,7 +297,11 @@ try {
         if (sms2_clean($r['SoPP']) !== '') {
             $noteParts[] = 'SoPP ' . sms2_clean($r['SoPP']);
         }
-        if (($old2 = sms2_clean($r['Maxn_old2'])) !== '' && $old2 !== $code) {
+        if ($accessCode !== $code) {
+            // AccessLegacyCode::standardTube() đọc lại để hiện mã ống SMS 2.0 cạnh mã WMS
+            $noteParts[] = 'mã ống SMS 2.0 ' . $accessCode;
+        }
+        if (($old2 = sms2_clean($r['Maxn_old2'])) !== '' && $old2 !== $accessCode) {
             $noteParts[] = 'mã cũ ' . $old2;
         }
         foreach (['Ghichu', 'Khac'] as $f) {

@@ -16,9 +16,9 @@ use Illuminate\Support\Facades\Validator;
  * ngày đặt hàng không đụng tới bản chất của mã nên KHÔNG đưa bản ghi về Chờ duyệt, nhưng vẫn
  * bắt lý do điều chỉnh, ghi lịch sử và Audit Trail như một lần sửa.
  *
- * Mã mới tạo bật cờ lead_time_pending (leadTimePendingOnCreate) - trang chủ báo người có quyền
- * vào khai (HomeController::leadTimeReviews). Lưu ở đây thì tắt cờ, kể cả khi giữ nguyên số
- * ngày người tạo đã nhập (coi như xác nhận).
+ * Modal Thêm mới cũng không có ô này (cả vật tư / hoá chất / chất chuẩn): mã mới luôn bật cờ
+ * lead_time_pending (trừ vật tư Hành Chánh) - trang chủ báo người có quyền vào khai
+ * (HomeController::leadTimeReviews). Lưu ở đây thì tắt cờ.
  *
  * Lớp dùng trait phải có: hằng TABLE, LABEL, LEAD_TIME_PERMISSION; hàm writeHistory(), actor();
  * và dùng kèm trait RequiresChangeReason.
@@ -85,18 +85,6 @@ trait UpdatesCategoryLeadTime
     private function leadTimeApplies(?string $purchasing): bool
     {
         return true;
-    }
-
-    /**
-     * Cờ chờ khai thời gian đặt hàng cho mã mới (hoá chất / chất chuẩn - modal Thêm còn ô số ngày;
-     * vật tư không còn ô này nên luôn chờ khai, xem MaterialCategoryController::store): chỉ bỏ qua khi chính người tạo có quyền điều
-     * chỉnh và đã nhập số ngày - còn lại báo người có quyền vào khai / xác nhận.
-     */
-    private function leadTimePendingOnCreate(Request $request): int
-    {
-        $filled = MaterialClassification::leadTimeValue($request->lead_time_days) !== null;
-
-        return $filled && user_can(self::LEAD_TIME_PERMISSION) ? 0 : 1;
     }
 
     /**

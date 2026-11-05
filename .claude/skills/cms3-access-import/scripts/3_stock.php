@@ -54,7 +54,7 @@ try {
     DB::table('chemical_imports')->whereIn('id', $old)->delete();
     $stats['deleted_old'] = $old->count();
 
-    $catOf = cms3_codes_from_history('chemical_category_histories', 'chemical_category_id');
+    $catOf = cms3_category_of_access_code(); // mã tách ở bước 6 -> danh mục mới; mã gộp thêm ở bước 8
     $catCode = DB::table('chemical_categories')->pluck('code', 'id');
     $dc = [];
     foreach (DB::table('chemical_department_categories as d')->join('units as u', 'u.id', '=', 'd.unit_id')

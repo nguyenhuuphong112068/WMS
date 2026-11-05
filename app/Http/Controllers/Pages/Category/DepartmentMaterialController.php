@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Concerns\RequiresChangeReason;
+use App\Http\Controllers\Concerns\StoresBatchItems;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
@@ -33,48 +34,76 @@ use Illuminate\Validation\Rule;
  * Mỗi dòng ở đây cũng chính là lời khai "phòng tôi có dùng vật tư này", dùng cho cột
  * "Phòng Ban Đang Dùng" ở tab Danh Mục Vật Tư Công Ty.
  *
+ * Modal Thêm mới là BẢNG NHIỀU DÒNG (items[i][...], mỗi dòng một vật tư): một lần khai được
+ * nhiều vật tư. Modal Cập nhật vẫn sửa từng dòng.
+ *
  * Không xoá cứng: khoá (status_id = 0) để giữ lại vết đã từng khai.
  */
 class DepartmentMaterialController extends Controller
 {
     use RequiresChangeReason;
+    use StoresBatchItems;
 
     private const TABLE = 'material_department_categories';
 
     private const LABEL = 'vật tư của phòng';
 
+    /**
+     * Khai nhiều vật tư một lần từ bảng items[i][...] của modal Thêm mới. Một dòng lỗi thì không
+     * lưu dòng nào, lỗi báo theo "Dòng N".
+     */
     public function store(Request $request)
     {
         $departmentId = $this->departmentId();
 
-        $validator = Validator::make($request->all(), $this->rules($departmentId), $this->messages());
-        $this->checkConversions($validator, $request, (int) $request->category_id, $departmentId);
-        $this->checkStockRange($validator, $request);
+        $items = $this->batchItems($request, fn ($item) => blank($item['category_id'] ?? null));
 
-        if ($validator->fails()) {
-            return $this->backToTab()->withErrors($validator, 'dmCreateErrors')->withInput();
-        }
+        $rules = $this->batchRules($this->rules($departmentId));
+        // Một vật tư chỉ một dòng trong cùng lần khai
+        $rules['items.*.category_id'][] = 'distinct';
 
-        $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
-            'department_id' => $departmentId,
-            'category_id' => (int) $request->category_id,
-            'status_id' => 1,
-            'created_by' => $this->actor(),
-            'created_at' => now(),
-            'updated_at' => now(),
+        $validator = Validator::make(['items' => $items], $rules, $this->batchMessages($this->messages(), 'Vui lòng chọn ít nhất một vật tư cần khai.') + [
+            'items.*.category_id.distinct' => 'Vật tư bị chọn trùng ở nhiều dòng.',
         ]);
 
-        $this->saveConversions($request, (int) $request->category_id, $departmentId);
+        foreach ($items as $index => $item) {
+            $prefix = 'items.'.$index.'.';
+            $this->checkConversions($validator, $item, (int) $item['category_id'], $departmentId, $prefix);
+            $this->checkStockRange($validator, $item, $prefix);
+        }
 
-        AuditTrialController::log(
-            'Thêm mới',
-            self::TABLE,
-            $id,
-            'NA',
-            'Khai vật tư cho phòng ban, category_id: '.$request->category_id
+        if ($validator->fails()) {
+            // Gửi lại đúng các dòng đã kiểm tra để số "Dòng N" khớp với bảng
+            return $this->backToTab()->withErrors($validator, 'dmCreateErrors')->withInput(['items' => $items]);
+        }
+
+        DB::transaction(function () use ($items, $departmentId) {
+            foreach ($items as $item) {
+                $id = DB::table(self::TABLE)->insertGetId($this->payload($item) + [
+                    'department_id' => $departmentId,
+                    'category_id' => (int) $item['category_id'],
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $this->saveConversions($item, (int) $item['category_id'], $departmentId);
+
+                AuditTrialController::log(
+                    'Thêm mới',
+                    self::TABLE,
+                    $id,
+                    'NA',
+                    'Khai vật tư cho phòng ban, category_id: '.$item['category_id']
+                );
+            }
+        });
+
+        return $this->backToTab()->with(
+            'success',
+            count($items) === 1 ? 'Đã khai '.self::LABEL.' thành công!' : 'Đã khai '.count($items).' '.self::LABEL.' thành công!'
         );
-
-        return $this->backToTab()->with('success', 'Đã khai '.self::LABEL.' thành công!');
     }
 
     public function update(Request $request)
@@ -102,20 +131,20 @@ class DepartmentMaterialController extends Controller
             $this->messages() + $this->changeReasonMessages()
         );
 
-        $this->checkConversions($validator, $request, (int) $current->category_id, $departmentId);
+        $this->checkConversions($validator, $request->all(), (int) $current->category_id, $departmentId);
 
-        $this->checkStockRange($validator, $request);
+        $this->checkStockRange($validator, $request->all());
 
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dmUpdateErrors')->withInput();
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request) + [
+        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request->all()) + [
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
 
-        $this->saveConversions($request, (int) $current->category_id, $departmentId);
+        $this->saveConversions($request->all(), (int) $current->category_id, $departmentId);
 
         $units = DB::table('units')->pluck('name', 'id');
         $locations = DB::table('locations')->pluck('code', 'id');
@@ -275,18 +304,18 @@ class DepartmentMaterialController extends Controller
      * Không dùng rule gte:min_stock vì ô tối thiểu thường để trống, lúc đó gte so sánh
      * chuỗi rỗng và cho kết quả vô nghĩa. Chỉ so khi cả hai ô đều có số.
      */
-    private function checkStockRange($validator, Request $request): void
+    private function checkStockRange($validator, array $input, string $prefix = ''): void
     {
-        $validator->after(function ($validator) use ($request) {
-            $min = trim((string) $request->min_stock);
-            $max = trim((string) $request->max_stock);
+        $validator->after(function ($validator) use ($input, $prefix) {
+            $min = trim((string) ($input['min_stock'] ?? ''));
+            $max = trim((string) ($input['max_stock'] ?? ''));
 
             if ($min === '' || $max === '' || ! is_numeric($min) || ! is_numeric($max)) {
                 return;
             }
 
             if ((float) $max < (float) $min) {
-                $validator->errors()->add('max_stock', 'Ngưỡng tồn tối đa phải lớn hơn hoặc bằng ngưỡng tồn tối thiểu.');
+                $validator->errors()->add($prefix.'max_stock', 'Ngưỡng tồn tối đa phải lớn hơn hoặc bằng ngưỡng tồn tối thiểu.');
             }
         });
     }
@@ -297,20 +326,20 @@ class DepartmentMaterialController extends Controller
      * Cùng một mã vật tư mà mỗi phòng một đơn vị thì lúc CHUYỂN VẬT TƯ LIÊN PHÒNG BAN hệ
      * thống phải biết đổi qua lại; thiếu hệ số là phòng nhận không nhận hàng được.
      */
-    private function checkConversions($validator, Request $request, int $categoryId, int $departmentId): void
+    private function checkConversions($validator, array $input, int $categoryId, int $departmentId, string $prefix = ''): void
     {
-        $validator->after(function ($validator) use ($request, $categoryId, $departmentId) {
+        $validator->after(function ($validator) use ($input, $categoryId, $departmentId, $prefix) {
             $missing = CategoryUnitConversion::missingFor(
                 CategoryUnitConversion::TYPE_MATERIAL,
                 $categoryId,
                 $departmentId,
-                (int) $request->unit_id,
-                (array) $request->input('conversions', [])
+                (int) ($input['unit_id'] ?? 0),
+                (array) ($input['conversions'] ?? [])
             );
 
             foreach ($missing as $unit) {
                 $validator->errors()->add(
-                    'conversions.'.$unit->unit_id,
+                    $prefix.'conversions.'.$unit->unit_id,
                     'Vui lòng khai hệ số quy đổi sang '.($unit->unit_short_name ?: $unit->unit_name)
                     .' - đơn vị phòng '.($unit->department_short ?: $unit->department_name).' đang dùng cho vật tư này.'
                 );
@@ -318,28 +347,29 @@ class DepartmentMaterialController extends Controller
         });
     }
 
-    private function saveConversions(Request $request, int $categoryId, int $departmentId): void
+    private function saveConversions(array $input, int $categoryId, int $departmentId): void
     {
         CategoryUnitConversion::saveDeclarations(
             CategoryUnitConversion::TYPE_MATERIAL,
             $categoryId,
             $departmentId,
-            (int) $request->unit_id,
-            (array) $request->input('conversions', []),
+            (int) ($input['unit_id'] ?? 0),
+            (array) ($input['conversions'] ?? []),
             $this->actor(),
-            (array) $request->input('conversion_dirs', [])
+            (array) ($input['conversion_dirs'] ?? [])
         );
     }
 
-    private function payload(Request $request): array
+    /** Giá trị ghi DB - $input là $request->all() (Cập nhật) hoặc một dòng items[i] (Thêm mới). */
+    private function payload(array $input): array
     {
         return [
-            'classification_id' => $request->classification_id ? (int) $request->classification_id : null,
-            'unit_id' => (int) $request->unit_id,
-            'min_stock' => $this->nullIfBlank($request->min_stock),
-            'max_stock' => $this->nullIfBlank($request->max_stock),
-            'default_location_id' => $request->default_location_id ? (int) $request->default_location_id : null,
-            'note' => $this->nullIfBlank($request->note),
+            'classification_id' => ! empty($input['classification_id']) ? (int) $input['classification_id'] : null,
+            'unit_id' => (int) ($input['unit_id'] ?? 0),
+            'min_stock' => $this->nullIfBlank($input['min_stock'] ?? null),
+            'max_stock' => $this->nullIfBlank($input['max_stock'] ?? null),
+            'default_location_id' => ! empty($input['default_location_id']) ? (int) $input['default_location_id'] : null,
+            'note' => $this->nullIfBlank($input['note'] ?? null),
         ];
     }
 

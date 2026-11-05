@@ -276,6 +276,7 @@
         'mdIcon' => $dcIcon,
         'categories' => $dcCategories,
         'locations' => $dcLocations,
+        'batchLocations' => $dcBatchLocations,
         'storageConditions' => $dcStorageConditions,
         'units' => $dcUnits,
         'unitsInUse' => $dcUnitsInUse,

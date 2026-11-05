@@ -17,6 +17,15 @@
 | - $unitsInUse : [category_id => [đơn vị phòng khác đang dùng]]
 | - $conversions: [category_id => ['<from>-<to>' => hệ số đã khai]]
 | - $label      : 'chất chuẩn', 'hoá chất' hoặc 'vật tư', chỉ dùng trong câu chữ
+|
+| Bảng nhập NHIỀU DÒNG (Khai Vật Tư Cho Phòng - DepartmentMaterial/createRow) không include file
+| này mà tự dựng khối .cuc-box cho từng dòng, dùng chung phần JS bên dưới:
+| - khối nằm trong phần tử .cuc-scope (tbody của dòng) thì chỉ đọc ô đơn vị của phần tử đó,
+|   không phải của cả form
+| - data-units-in-use / data-conversions đọc ở phần tử cha gần nhất có thuộc tính đó (đặt một lần
+|   trên bảng thay vì lặp ở từng dòng)
+| - data-name-prefix="items[3]" thì tên ô thành items[3][conversions][<unit_id>]
+| - window.cucRefresh($box) dựng lại khối sau khi trang tự đổi mã / đơn vị của dòng
 --}}
 
 <div class="cuc-box" data-soft-sync="cuc-{{ $prefix }}" data-prefix="{{ $prefix }}" data-units-in-use="{{ json_encode($unitsInUse) }}"
@@ -114,7 +123,7 @@
             var $row = $(this).closest('.cuc-row');
             var $box = $row.closest('.cuc-box');
             var d = $row.data();
-            var declared = ($box.data('conversions') || {})[String($box.find('.cuc-category').val() || '')] || {};
+            var declared = ($box.closest('[data-conversions]').data('conversions') || {})[String($box.find('.cuc-category').val() || '')] || {};
 
             d.dir = d.dir === 'reverse' ? 'forward' : 'reverse';
 
@@ -124,20 +133,21 @@
             cucPaintRow($row);
         });
 
-        /* Dựng lại danh sách ô nhập hệ số theo mã + đơn vị đang chọn của chính form đó */
+        /* Dựng lại danh sách ô nhập hệ số theo mã + đơn vị đang chọn của chính form (hoặc dòng) đó */
         function cucRefresh($box) {
             var prefix = $box.data('prefix');
-            var $form = $box.closest('form');
+            var $scope = $box.closest('.cuc-scope, form');
             var categoryId = String($box.find('.cuc-category').val() || '');
-            var unitId = String($form.find('.' + prefix + '-unit').val() || '');
+            var unitId = String($scope.find('.' + prefix + '-unit').val() || '');
+            var namePrefix = $box.attr('data-name-prefix') || '';
 
-            var unitsInUse = ($box.data('units-in-use') || {})[categoryId] || [];
-            var declared = ($box.data('conversions') || {})[categoryId] || {};
+            var unitsInUse = ($box.closest('[data-units-in-use]').data('units-in-use') || {})[categoryId] || [];
+            var declared = ($box.closest('[data-conversions]').data('conversions') || {})[categoryId] || {};
             var olds = $box.data('old') || {};
             var oldDirs = $box.data('old-dirs') || {};
 
             var $list = $box.find('.cuc-list').empty();
-            var $unitOption = $form.find('.' + prefix + '-unit option:selected');
+            var $unitOption = $scope.find('.' + prefix + '-unit option:selected');
             var ownShort = $unitOption.data('short') || 'đơn vị';
             var shown = 0;
 
@@ -182,7 +192,7 @@
                     type: 'number',
                     step: '0.00000001',
                     min: '0.00000001',
-                    name: 'conversions[' + row.unit_id + ']',
+                    name: namePrefix ? namePrefix + '[conversions][' + row.unit_id + ']' : 'conversions[' + row.unit_id + ']',
                     placeholder: 'Nhập hệ số'
                 }).addClass('form-control').val(value).appendTo($row);
 
@@ -190,7 +200,7 @@
 
                 $('<input>').attr({
                     type: 'hidden',
-                    name: 'conversion_dirs[' + row.unit_id + ']'
+                    name: namePrefix ? namePrefix + '[conversion_dirs][' + row.unit_id + ']' : 'conversion_dirs[' + row.unit_id + ']'
                 }).addClass('cuc-dir').appendTo($row);
 
                 $('<button>').attr({
@@ -211,6 +221,8 @@
 
             $box.toggle(shown > 0);
         }
+
+        window.cucRefresh = cucRefresh;
 
         /* Đổi mã (modal Thêm mới) hoặc đổi đơn vị -> tính lại các ô cần khai */
         $(document).on('change', '.ds-category, .dc-category, .dm-category', function() {

@@ -1,14 +1,34 @@
+{{--
+| Modal "Thêm Danh Mục Chất Chuẩn Công Ty Mới" dạng bảng: mỗi dòng là một mã chất chuẩn, lưu một lần
+| được nhiều mã - xem StandardCategoryController::store(). Mã S00001... cấp theo thứ tự dòng lúc lưu,
+| cột Mã chỉ là mã dự kiến. Trùng Tên + Nguồn gốc vẫn thêm được (lên Version mới).
+|
+| Hàng "Điền nhanh" (Nguồn gốc/NSX, Điều kiện bảo quản, Phân nhóm) áp cho mọi dòng
+| đang có và làm giá trị sẵn của dòng thêm sau; nút nhân bản chép cả dòng trừ Tên và Số CAS.
+--}}
 @php
     $bag = $errors->getBag('createErrors');
 
-    // Trang có 2 tab nên có tới 4 form dùng chung kho old(): chỉ điền lại giá trị vừa
-    // nhập khi chính form này báo lỗi, không thì để giá trị mặc định.
-    $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
-    $oldGroups = (array) $old('groups', []);
+    // Trang có nhiều form dùng chung kho old() (modal Khai Chất Chuẩn Cho Phòng cũng gửi items[]):
+    // chỉ dựng lại các dòng vừa nhập khi chính form này báo lỗi.
+    $scbRows = $bag->any() ? array_values(array_filter((array) old('items', []), 'is_array')) : [];
+
+    $scbRowVars = [
+        'nameLabels' => collect($batchNames ?? [])
+            ->mapWithKeys(fn($n) => [(string) $n->id => \App\Support\CategoryLookup::nameLabel($n)])
+            ->all(),
+        'mfrLabels' => collect($manufacturers)->mapWithKeys(fn($m) => [(string) $m->id => $m->name])->all(),
+    ];
+    $scbMfrItems = collect($manufacturers)
+        ->map(fn($m) => ['id' => (string) $m->id, 'text' => $m->name, 'search' => trim($m->name . ' ' . ($m->short_name ?? ''))])
+        ->values();
 @endphp
 
-<div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+@include('pages.category.shared.batchTable')
+
+<div class="modal fade md-modal cbt-modal" id="createModal" tabindex="-1" role="dialog"
+    data-next-code="{{ $nextCode }}" data-manufacturers="{{ json_encode($scbMfrItems, JSON_UNESCAPED_UNICODE) }}">
+    <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="{{ $mdIcon }}"></i> Thêm {{ $mdTitle }} Mới</h5>
@@ -18,176 +38,100 @@
             <form action="{{ route($mdRoute . 'store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-lg-7">
-                            <div class="form-group">
-                                <label>Mã Chất Chuẩn</label>
-                                <input type="text" class="form-control cat-readonly" value="{{ $nextCode }}"
-                                    readonly tabindex="-1">
-                                <small class="md-sub">Sinh tự động khi lưu, dạng S00001.</small>
-                            </div>
+                    @include('pages.category.shared.batchErrors', ['bag' => $bag])
 
-                            <div class="form-group">
-                                <label>Tên Chất Chuẩn <span class="text-danger">*</span></label>
-                                <select name="chem_names_id"
-                                    class="form-control cat-select sd-name-select {{ $bag->has('chem_names_id') ? 'is-invalid' : '' }}"
-                                    data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'standard']) }}" required>
-                                    <option value="">-- Chọn tên chuẩn --</option>
-                                    @foreach ($chemNames as $option)
-                                        <option value="{{ $option->id }}"
-                                            data-cas-no="{{ $option->cas_no }}"
-                                            {{ $old('chem_names_id') == $option->id ? 'selected' : '' }}>
-                                            {{ $option->name }}{{ $option->cas_no ? ' (CAS: ' . $option->cas_no . ')' : '' }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                @if ($bag->has('chem_names_id'))
-                                    <span class="md-error">{{ $bag->first('chem_names_id') }}</span>
-                                @endif
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Số CAS</label>
-                                        <input type="text" name="cas_no" maxlength="50"
-                                            class="form-control sd-cas-input {{ $bag->has('cas_no') ? 'is-invalid' : '' }}"
-                                            value="{{ $old('cas_no') }}" placeholder="Ví dụ: 59277-89-3">
-                                        <small class="md-sub">Điền sẵn theo tên đã chọn, sửa lại được.</small>
-                                        @if ($bag->has('cas_no'))
-                                            <span class="md-error">{{ $bag->first('cas_no') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Nguồn Gốc / Nhà Sản Xuất <span class="text-danger">*</span></label>
-                                        <select name="manufacturers_id"
-                                            class="form-control cat-select {{ $bag->has('manufacturers_id') ? 'is-invalid' : '' }}"
-                                            required>
-                                            <option value="">-- Chọn nguồn gốc / NSX --</option>
-                                            @foreach ($manufacturers as $option)
-                                                <option value="{{ $option->id }}"
-                                                    {{ $old('manufacturers_id') == $option->id ? 'selected' : '' }}>
-                                                    {{ $option->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @if ($bag->has('manufacturers_id'))
-                                            <span class="md-error">{{ $bag->first('manufacturers_id') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-
-                            {{-- Đơn vị tính đã chuyển sang tab "Chất Chuẩn Của Phòng": mỗi phòng
-                                 nhập / xuất theo đơn vị của phòng mình. --}}
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Tỷ Trọng (g/ml)</label>
-                                        <div class="input-group">
-                                            <input type="text" inputmode="decimal" name="density" min="0.0001"
-                                                class="form-control js-decimal {{ $bag->has('density') ? 'is-invalid' : '' }}"
-                                                value="{{ $old('density') }}" placeholder="Ví dụ: 1.04">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text">g/ml</span>
-                                            </div>
-                                        </div>
-                                        @if ($bag->has('density'))
-                                            <span class="md-error">{{ $bag->first('density') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Điều Kiện Bảo Quản</label>
-                                        <select name="storage_condition_id"
-                                            class="form-control cat-select {{ $bag->has('storage_condition_id') ? 'is-invalid' : '' }}">
-                                            <option value="">-- Chọn điều kiện bảo quản --</option>
-                                            @foreach ($storageConditions as $option)
-                                                <option value="{{ $option->id }}"
-                                                    {{ $old('storage_condition_id') == $option->id ? 'selected' : '' }}>
-                                                    {{ $option->name }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @if ($bag->has('storage_condition_id'))
-                                            <span class="md-error">{{ $bag->first('storage_condition_id') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Thời Gian Đặt Hàng</label>
-                                        <div class="input-group">
-                                            <input type="text" inputmode="numeric" name="lead_time_days"
-                                                class="form-control {{ $bag->has('lead_time_days') ? 'is-invalid' : '' }}"
-                                                value="{{ $old('lead_time_days') }}" placeholder="Ví dụ: 30">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text">ngày</span>
-                                            </div>
-                                        </div>
-                                        @if ($bag->has('lead_time_days'))
-                                            <span class="md-error">{{ $bag->first('lead_time_days') }}</span>
-                                        @endif
-                                        <small class="md-sub">Số ngày từ lúc đặt hàng tới lúc hàng về công ty.</small>
-                                    </div>
-                                </div>
-                            </div>
-
-
-
-                            <div class="form-group">
-                                <label>Ghi Chú</label>
-                                <textarea name="note" rows="2" maxlength="500"
-                                    class="form-control {{ $bag->has('note') ? 'is-invalid' : '' }}"
-                                    placeholder="Ví dụ: Chuẩn gốc do VKNTP cấp, kèm phiếu công bố giá trị">{{ $old('note') }}</textarea>
-                                @if ($bag->has('note'))
-                                    <span class="md-error">{{ $bag->first('note') }}</span>
-                                @endif
-                            </div>
+                    <div class="cbt-toolbar">
+                        <div class="cbt-toolbar-left">
+                            <button type="button" class="btn btn-sm btn-primary btn-cbt-add">
+                                <i class="fas fa-plus mr-1"></i> Thêm dòng
+                            </button>
                         </div>
-
-                        <div class="col-lg-5">
-                            <div class="form-group">
-                                <label>Phân Nhóm Chuẩn <span class="text-danger">*</span></label>
-                                <div class="cat-check-group {{ $bag->has('groups') ? 'is-invalid' : '' }}">
-                                    @foreach ($groups as $code => $group)
-                                        <label
-                                            class="cat-check-item {{ in_array($code, $oldGroups) ? 'is-checked' : '' }}">
-                                            <input type="radio" class="cat-check-input" name="groups[]"
-                                                value="{{ $code }}" {{ in_array($code, $oldGroups) ? 'checked' : '' }}>
-                                            <span class="cat-check-code">{{ $group['no'] }}</span>
-                                            <span class="cat-check-name">
-                                                {{ $group['name'] }} ({{ $group['short'] }})
-                                                <br><small class="md-sub">Mã trong mã ống chuẩn:
-                                                    <b>{{ $group['code'] }}</b></small>
-                                            </span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                                <small class="md-sub">Chỉ chọn được 1 nhóm. Lúc nhập kho, mã ống chuẩn lấy mã nhóm
-                                    của nhóm được chọn.</small>
-                                @if ($bag->has('groups'))
-                                    <span class="md-error">{{ $bag->first('groups') }}</span>
-                                @endif
-                                @if ($bag->has('groups.0'))
-                                    <span class="md-error">{{ $bag->first('groups.0') }}</span>
-                                @endif
-                            </div>
-                        </div>
+                        <span class="cbt-count"></span>
                     </div>
 
-                    <div class="md-hint">
+                    <div class="cbt-scroll">
+                        <table class="table cbt-table" data-no-datatable style="min-width: 1410px">
+                            <colgroup>
+                                <col style="width: 44px">
+                                <col style="width: 90px">
+                                <col>
+                                <col style="width: 130px">
+                                <col style="width: 190px">
+                                <col style="width: 95px">
+                                <col style="width: 150px">
+                                <col style="width: 180px">
+                                <col style="width: 140px">
+                                <col style="width: 84px">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th class="text-center">#</th>
+                                    <th>Mã</th>
+                                    <th>Tên Chất Chuẩn <span class="text-danger">*</span></th>
+                                    <th>Số CAS</th>
+                                    <th>Nguồn Gốc / NSX <span class="text-danger">*</span></th>
+                                    <th class="text-right">Tỷ Trọng (g/ml)</th>
+                                    <th>Điều Kiện Bảo Quản</th>
+                                    <th title="Chỉ chọn 1 nhóm. Lúc nhập kho, mã ống chuẩn lấy mã nhóm của nhóm được chọn.">
+                                        Phân Nhóm Chuẩn <span class="text-danger">*</span>
+                                    </th>
+                                    <th>Ghi Chú</th>
+                                    <th class="text-center">Thao Tác</th>
+                                </tr>
+                                <tr class="cbt-fill">
+                                    <th colspan="4">
+                                        <span class="cbt-fill-label">
+                                            <i class="fas fa-fill-drip"></i> Điền nhanh cho mọi dòng
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <select class="form-control cbt-select scb-mfr" data-fill="manufacturers_id">
+                                            <option value="">-- Nguồn gốc / NSX --</option>
+                                        </select>
+                                    </th>
+                                    <th></th>
+                                    <th>
+                                        <select class="form-control" data-fill="storage_condition_id">
+                                            <option value="">-- Bảo quản --</option>
+                                            @foreach ($storageConditions as $option)
+                                                <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <select class="form-control" data-fill="groups">
+                                            <option value="">-- Phân nhóm --</option>
+                                            @foreach ($groups as $code => $info)
+                                                <option value="{{ $code }}">{{ $info['no'] }}. {{ $info['name'] }} ({{ $info['short'] }})</option>
+                                            @endforeach
+                                        </select>
+                                    </th>
+                                    <th colspan="2"></th>
+                                </tr>
+                            </thead>
+                            @foreach ($scbRows as $index => $row)
+                                @include('pages.category.StandardCategory.createRow', ['index' => $index, 'row' => $row] + $scbRowVars)
+                            @endforeach
+                            <tbody class="cbt-empty" @if (count($scbRows)) style="display:none" @endif>
+                                <tr>
+                                    <td colspan="10">
+                                        <i class="fas fa-vial"></i>
+                                        Chưa có dòng nào. Bấm <b>Thêm dòng</b> để khai mã chất chuẩn mới.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <template id="scbRowTpl">
+                        @include('pages.category.StandardCategory.createRow', ['index' => '', 'row' => [], 'nameLabels' => [], 'mfrLabels' => []])
+                    </template>
+
+                    <div class="md-hint mt-3 mb-0">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Mã chất chuẩn sinh tự động dạng <b>S00001</b>. Bản ghi mới ở trạng thái
-                        <b>Chờ duyệt</b>, cần được duyệt trước khi dùng.
+                        Mã chất chuẩn sinh tự động dạng <b>S00001</b>. Số CAS điền sẵn theo tên đã chọn, sửa lại được.
+                        Phân nhóm chuẩn chọn <b>1 nhóm</b> - mã ống chuẩn lúc nhập kho lấy mã của nhóm này. Bản ghi mới ở
+                        trạng thái <b>Chờ duyệt</b>, cần được duyệt trước khi dùng.
                     </div>
                 </div>
 
@@ -202,29 +146,24 @@
     </div>
 </div>
 
-{{-- Chia 2 cột (thông tin chuẩn + phân nhóm chuẩn) nên cần khung rộng hơn modal-lg mặc định --}}
-<style>
-    @media (min-width: 992px) {
-        #createModal .modal-dialog {
-            max-width: 1280px;
-        }
-    }
-</style>
-
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        cbtBatch({
+            modal: '#createModal',
+            template: '#scbRowTpl',
+            local: {
+                '.scb-mfr': $('#createModal').data('manufacturers') || []
+            },
+            blankStart: true
+        });
+
         /* Đổi tên chất chuẩn thì điền sẵn số CAS của tên đó, nhưng không đè giá trị đã gõ tay */
-        $(document).on('change', '.sd-name-select', function() {
-            var $form = $(this).closest('form');
-            var $cas = $form.find('.sd-cas-input');
+        $('#createModal').on('change', '.scb-name', function() {
+            var $cas = $(this).closest('tbody.cbt-item').find('.scb-cas');
+            if ($cas.val().trim() !== '') return;
 
-            if (!$cas.length || $cas.val().trim() !== '') return;
-
-            // Chọn qua ô tìm (AJAX) thì số CAS nằm trong dữ liệu Select2; option dựng sẵn (old()) mang data-cas-no
-            var picked = $(this).data('select2') ? ($(this).select2('data') || [])[0] || {} : {};
-            var cas = picked.cas_no !== undefined ? picked.cas_no : $(this).find('option:selected').data('cas-no');
-
-            $cas.val(cas || '');
+            var picked = ($(this).select2('data') || [])[0] || {};
+            $cas.val(picked.cas_no || '');
         });
     });
 </script>

@@ -304,7 +304,7 @@
         'categories' => $dmCategories,
         'units' => $dmUnits,
         'classifications' => $dmClassifications,
-        'locations' => $dmLocations,
+        'batchLocations' => $dmBatchLocations,
         'unitsInUse' => $dmUnitsInUse,
         'conversions' => $dmConversions,
     ])

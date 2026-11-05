@@ -135,7 +135,6 @@
                         <th>Nhà Sản Xuất</th>
                         <th class="text-center" style="width: 90px">Đơn Vị</th>
                         <th class="text-center" style="width: 105px">Tỉ Trọng d<br><small>(g/ml)</small></th>
-                        <th style="width: 110px">Số Tài Liệu</th>
                         <th style="width: 170px">Phân Loại</th>
                         <th class="text-center" style="width: 135px">Hạn Dùng Nội Bộ<br><small>(tháng)</small>
                         </th>
@@ -164,6 +163,12 @@
                                 <span class="md-tag">{{ $row->category_code ?: '—' }}</span>
                                 @if ($row->category_type)
                                     <br><span class="md-tag">{{ $row->category_type }}</span>
+                                @endif
+                                {{-- TẠM THỜI: mã bên CMS 3.0 (App\Support\AccessLegacyCode), đối chiếu xong thì gỡ --}}
+                                @if (! empty(($accessCodes ?? [])[$row->category_id]))
+                                    <div class="md-sub mt-1" title="Mã cũ bên Access dùng để nạp mã danh mục này">
+                                        Access: {{ implode(', ', $accessCodes[$row->category_id]) }}
+                                    </div>
                                 @endif
                             </td>
                             <td>
@@ -199,7 +204,6 @@
                                     <span class="md-empty">—</span>
                                 @endif
                             </td>
-                            <td class="md-sub">{{ $row->category_doc_no ?: '—' }}</td>
                             <td>
                                 @if ($codes)
                                     <div class="cat-chips">

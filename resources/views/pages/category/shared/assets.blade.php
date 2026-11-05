@@ -407,67 +407,80 @@
 
         /* ---------- Bật tìm kiếm cho các ô chọn trong modal ----------
            Ô có data-lookup-url (tên dữ liệu gốc, định khu) không nhúng cả danh mục vào trang: gõ tìm
-           thì gọi CategoryLookupController, mỗi lần 30 dòng, cuộn xuống cuối thì tải tiếp. */
+           thì gọi CategoryLookupController, mỗi lần 30 dòng, cuộn xuống cuối thì tải tiếp.
+           Ô có $select.data('localLookup', [{id, text, search?}]) tìm ngay trên mảng đó (wmsLocalLookup)
+           - dùng cho bảng nhập nhiều dòng, mỗi dòng không phải nhúng lại cả danh sách option.
+           Bảng nhập nhiều dòng (dòng dựng bằng JS) gọi lại catSelect2($select, $modal) cho ô mới;
+           $extra: tuỳ chọn Select2 riêng của ô (vd closeOnSelect: false cho ô tìm nhanh thêm dòng). */
+        window.catSelect2 = function($select, $modal, $extra) {
+            var lookupUrl = $select.data('lookup-url');
+            var localItems = $select.data('localLookup');
+            var options = {
+                theme: 'bootstrap4',
+                dropdownParent: $modal,
+                width: '100%',
+                placeholder: '-- Chọn --',
+                language: {
+                    noResults: function() {
+                        return 'Không tìm thấy dữ liệu phù hợp';
+                    },
+                    searching: function() {
+                        return 'Đang tìm...';
+                    },
+                    loadingMore: function() {
+                        return 'Đang tải thêm...';
+                    },
+                    errorLoading: function() {
+                        return 'Không tải được dữ liệu, vui lòng thử lại';
+                    }
+                }
+            };
+
+            if (lookupUrl || localItems) {
+                options.placeholder = $select.find('option[value=""]').first().text().trim() || options.placeholder;
+                // Option trống không nằm trong kết quả tìm: ô không bắt buộc (Định khu) phải xoá được lựa chọn
+                options.allowClear = !$select.prop('required');
+            }
+
+            if (localItems) {
+                options.ajax = window.wmsLocalLookup(localItems);
+            } else if (lookupUrl) {
+                options.ajax = {
+                    url: lookupUrl,
+                    dataType: 'json',
+                    delay: 250,
+                    cache: true,
+                    data: function(params) {
+                        // Trang có thể gắn thêm tham số lọc qua $select.data('lookupParams', fn)
+                        var extra = $select.data('lookupParams');
+
+                        return $.extend({
+                            q: params.term || '',
+                            page: params.page || 1,
+                            // Chip lọc nhanh theo phân loại định khu (layout/js)
+                            zone_filter: $select.data('zoneFilter') || ''
+                        }, typeof extra === 'function' ? extra($select) : {});
+                    }
+                };
+                // Dòng kết quả có "warning" (ví dụ định khu tương kỵ) hiện thêm lý do màu đỏ bên dưới
+                options.templateResult = function(item) {
+                    if (!item.id || !item.warning) return window.wmsZoneTemplate(item);
+
+                    return $('<div class="cat-opt-warn">').append(
+                        $('<div>').append(window.wmsZoneTemplate(item)),
+                        $('<small>').text(item.warning)
+                    );
+                };
+            }
+
+            $select.select2($.extend(options, $extra || {}));
+        };
+
         $('.md-modal').each(function() {
             var $modal = $(this);
 
             $modal.find('.cat-select').each(function() {
-                var $select = $(this);
-                var lookupUrl = $select.data('lookup-url');
-                var options = {
-                    theme: 'bootstrap4',
-                    dropdownParent: $modal,
-                    width: '100%',
-                    placeholder: '-- Chọn --',
-                    language: {
-                        noResults: function() {
-                            return 'Không tìm thấy dữ liệu phù hợp';
-                        },
-                        searching: function() {
-                            return 'Đang tìm...';
-                        },
-                        loadingMore: function() {
-                            return 'Đang tải thêm...';
-                        },
-                        errorLoading: function() {
-                            return 'Không tải được dữ liệu, vui lòng thử lại';
-                        }
-                    }
-                };
-
-                if (lookupUrl) {
-                    options.placeholder = $select.find('option[value=""]').first().text().trim() || options.placeholder;
-                    // Option trống không nằm trong kết quả tìm: ô không bắt buộc (Định khu) phải xoá được lựa chọn
-                    options.allowClear = !$select.prop('required');
-                    options.ajax = {
-                        url: lookupUrl,
-                        dataType: 'json',
-                        delay: 250,
-                        cache: true,
-                        data: function(params) {
-                            // Trang có thể gắn thêm tham số lọc qua $select.data('lookupParams', fn)
-                            var extra = $select.data('lookupParams');
-
-                            return $.extend({
-                                q: params.term || '',
-                                page: params.page || 1,
-                                // Chip lọc nhanh theo phân loại định khu (layout/js)
-                                zone_filter: $select.data('zoneFilter') || ''
-                            }, typeof extra === 'function' ? extra($select) : {});
-                        }
-                    };
-                    // Dòng kết quả có "warning" (ví dụ định khu tương kỵ) hiện thêm lý do màu đỏ bên dưới
-                    options.templateResult = function(item) {
-                        if (!item.id || !item.warning) return window.wmsZoneTemplate(item);
-
-                        return $('<div class="cat-opt-warn">').append(
-                            $('<div>').append(window.wmsZoneTemplate(item)),
-                            $('<small>').text(item.warning)
-                        );
-                    };
-                }
-
-                $select.select2(options);
+                catSelect2($(this), $modal);
             });
         });
 

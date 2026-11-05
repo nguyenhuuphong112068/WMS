@@ -27,40 +27,6 @@ $ACTOR = CMS3['actor'];
 $now = now();
 mt_srand(CMS3['random_seed']);
 
-/** Mã Dinhkhu -> [tủ, tầng, vị trí] hoặc null (không đặt định khu). */
-function parseLocation(string $raw): ?array
-{
-    $d = mb_strtoupper(cms3_clean($raw));
-    if ($d === '' || in_array($d, ['NA', 'N/A', '-'], true) || preg_match('/^OQDK\d+$/', $d)) {
-        return null;
-    }
-    if (preg_match('/^TỦ\s*(\S+)$/u', $d, $m)) {
-        return [$m[1], '1', '1'];
-    }
-    if (preg_match('/^([A-Z]*\d+)([A-Z]+)(\d+)$/', $d, $m)) {   // 14D4, T1H5, 9AA1
-        return [$m[1], $m[2], $m[3]];
-    }
-    if (preg_match('/^(\d+)([A-Z]+)$/', $d, $m)) {              // 15A, 381B
-        return [$m[1], $m[2], '1'];
-    }
-    if (preg_match('/^([A-Z]*\d+)\.([A-Z]*)(\d+)$/', $d, $m)) { // 5.1, DTT1.2, 034.X1
-        return $m[2] === '' ? [$m[1], $m[3], '1'] : [$m[1], $m[2], $m[3]];
-    }
-    return [$d, '1', '1'];                                       // DT, DC, M5, T2DDCĐ -> cả mã là 1 tủ
-}
-
-function tierPosition(string $t): int
-{
-    if (ctype_digit($t)) {
-        return (int) $t;
-    }
-    $n = 0;
-    foreach (str_split(preg_replace('/[^A-Z]/', '', $t)) as $ch) {
-        $n = $n * 26 + (ord($ch) - 64);
-    }
-    return $n ?: 1;
-}
-
 $pad = fn ($v) => ctype_digit((string) $v) ? str_pad((string) (int) $v, 2, '0', STR_PAD_LEFT) : (string) $v;
 
 $chung = array_values(array_filter(cms3_unique_rows(cms3_json("$dir/dmhc_chung.json")), fn ($r) => ! cms3_is_test_row($r)));
@@ -197,7 +163,7 @@ try {
         $tCode = $sCode . '/01/' . $pad($tier);
         if (! isset($ids['tier'][$tCode])) {
             $ids['tier'][$tCode] = DB::table('tiers')->insertGetId($base($dept) + ['code' => $tCode, 'name' => 'Tầng ' . $pad($tier),
-                'warehouse_id' => $wh, 'shelf_id' => $ids['shelf'][$sCode], 'column_id' => $ids['col'][$sCode], 'position' => tierPosition($tier)]);
+                'warehouse_id' => $wh, 'shelf_id' => $ids['shelf'][$sCode], 'column_id' => $ids['col'][$sCode], 'position' => cms3_tier_position($tier)]);
             $inc('tiers_new');
         }
         $lCode = $tCode . '/' . $pad($pos);
@@ -256,7 +222,7 @@ try {
             $inc('dept_merged');
             continue;
         }
-        $p = parseLocation($dinhkhu);
+        $p = cms3_parse_location($dinhkhu);
         [$locId, $locCode, $tierId] = $p ? $locationFor($bp, $p) : [null, '', null];
         if ($tierId) {
             $onTier[$tierId][] = $cat;

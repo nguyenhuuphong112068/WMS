@@ -1,13 +1,45 @@
+{{--
+| Modal "Thêm Danh Mục Vật Tư Công Ty Mới" dạng bảng: mỗi dòng là một mã vật tư (Tên + Nhà sản
+| xuất), lưu một lần được nhiều mã - xem MaterialCategoryController::store(). Mã M00001... cấp
+| theo thứ tự dòng lúc lưu, cột Mã chỉ là mã dự kiến.
+|
+| Hàng "Điền nhanh" ở đầu bảng: chọn Nhà sản xuất / phân loại là áp cho mọi dòng đang có và làm
+| giá trị sẵn của dòng thêm sau. Nút nhân bản chép cả dòng trừ Tên vật tư.
+--}}
 @php
+    use App\Support\MaterialClassification;
+
     $bag = $errors->getBag('createErrors');
 
-    // Trang có 2 tab nên nhiều form dùng chung kho old(): chỉ điền lại giá trị vừa nhập
-    // khi chính form này báo lỗi.
-    $oldClassification = $bag->any() ? (array) old('classification', []) : [];
+    // Trang có nhiều form dùng chung kho old() (cả modal Khai Vật Tư Cho Phòng cũng gửi items[]):
+    // chỉ dựng lại các dòng vừa nhập khi chính form này báo lỗi.
+    $mcbRows = $bag->any() ? array_values(array_filter((array) old('items', []), 'is_array')) : [];
+    $mcbGroups = MaterialClassification::formGroups();
+
+    $mcbNameLabels = collect($batchNames ?? [])->mapWithKeys(fn($n) => [(string) $n->id => $n->name])->all();
+    $mcbMfrLabels = collect($manufacturers)->mapWithKeys(fn($m) => [(string) $m->id => $m->name])->all();
+    $mcbMfrItems = collect($manufacturers)
+        ->map(fn($m) => [
+            'id' => (string) $m->id,
+            'text' => $m->name,
+            'search' => trim($m->name . ' ' . ($m->short_name ?? '')),
+        ])
+        ->values();
+
+    // Gom lỗi thành "Dòng N: ..." để biết dòng nào sai
+    $mcbErrors = collect($bag->messages())
+        ->map(fn($messages, $key) => preg_match('/^items\.(\d+)\./', $key, $m)
+            ? 'Dòng ' . ($m[1] + 1) . ': ' . $messages[0]
+            : $messages[0])
+        ->unique()
+        ->values();
 @endphp
 
-<div class="modal fade md-modal" id="createModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+@include('pages.category.shared.batchTable')
+
+<div class="modal fade md-modal cbt-modal" id="createModal" tabindex="-1" role="dialog"
+    data-next-code="{{ $nextCode }}" data-manufacturers="{{ json_encode($mcbMfrItems, JSON_UNESCAPED_UNICODE) }}">
+    <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="{{ $mdIcon }}"></i> Thêm {{ $mdTitle }} Mới</h5>
@@ -17,100 +49,114 @@
             <form action="{{ route($mdRoute . 'store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-lg-7">
+                    <div class="alert alert-danger cbt-errors" @if ($mcbErrors->isEmpty()) style="display:none" @endif>
+                        <ul>
+                            @foreach ($mcbErrors as $message)
+                                <li>{{ $message }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
 
-                            <div class="form-group">
-                                <label>Mã Vật Tư</label>
-                                <input type="text" class="form-control cat-readonly" value="{{ $nextCode }}" readonly
-                                    tabindex="-1">
-                                <small class="md-sub">Sinh tự động khi lưu, dạng M00001.</small>
-                            </div>
+                    <div class="cbt-toolbar">
+                        <div class="cbt-toolbar-left">
+                            <button type="button" class="btn btn-sm btn-primary btn-cbt-add">
+                                <i class="fas fa-plus mr-1"></i> Thêm dòng
+                            </button>
+                        </div>
+                        <span class="cbt-count"></span>
+                    </div>
 
-                            <div class="form-group">
-                                <label>Tên Vật Tư <span class="text-danger">*</span></label>
-                                <select name="material_names_id"
-                                    data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'material']) }}"
-                                    class="form-control cat-select {{ $bag->has('material_names_id') ? 'is-invalid' : '' }}"
-                                    required>
-                                    <option value="">-- Chọn tên vật tư --</option>
-                                    @foreach ($materialNames as $option)
-                                        <option value="{{ $option->id }}"
-                                            {{ old('material_names_id') == $option->id ? 'selected' : '' }}>
-                                            {{ $option->name }}
-                                        </option>
+                    <div class="cbt-scroll">
+                        <table class="table cbt-table" data-no-datatable style="min-width: 1520px">
+                            <colgroup>
+                                <col style="width: 44px">
+                                <col style="width: 90px">
+                                <col>
+                                <col style="width: 210px">
+                                <col style="width: 120px">
+                                <col style="width: 170px">
+                                @foreach ($mcbGroups as $group)
+                                    <col style="width: 110px">
+                                @endforeach
+                                <col style="width: 84px">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th class="text-center">#</th>
+                                    <th>Mã</th>
+                                    <th>Tên Vật Tư <span class="text-danger">*</span></th>
+                                    <th>Nhà Sản Xuất <span class="text-danger">*</span></th>
+                                    <th>Part Number</th>
+                                    <th>Thông Tin Kỹ Thuật</th>
+                                    @foreach ($mcbGroups as $group)
+                                        <th title="{{ $group['label'] }}">
+                                            {{ \Illuminate\Support\Str::after($group['label'], 'Theo ') }}
+                                            <span class="text-danger">*</span>
+                                        </th>
                                     @endforeach
-                                </select>
-                                @if ($bag->has('material_names_id'))
-                                    <span class="md-error">{{ $bag->first('material_names_id') }}</span>
-                                @endif
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Nhà Sản Xuất <span class="text-danger">*</span></label>
-                                        <select name="manufacturers_id"
-                                            class="form-control cat-select {{ $bag->has('manufacturers_id') ? 'is-invalid' : '' }}"
-                                            required>
-                                            <option value="">-- Chọn nhà sản xuất --</option>
-                                            @foreach ($manufacturers as $option)
-                                                <option value="{{ $option->id }}"
-                                                    {{ old('manufacturers_id') == $option->id ? 'selected' : '' }}>
-                                                    {{ $option->name }}
-                                                </option>
-                                            @endforeach
+                                    <th class="text-center">Thao Tác</th>
+                                </tr>
+                                <tr class="cbt-fill">
+                                    <th colspan="3">
+                                        <span class="cbt-fill-label">
+                                            <i class="fas fa-fill-drip"></i> Điền nhanh cho mọi dòng
+                                        </span>
+                                    </th>
+                                    <th>
+                                        <select class="form-control cbt-select mcb-mfr" data-fill="manufacturers_id">
+                                            <option value="">-- Nhà sản xuất --</option>
                                         </select>
-                                        @if ($bag->has('manufacturers_id'))
-                                            <span class="md-error">{{ $bag->first('manufacturers_id') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
+                                    </th>
+                                    <th colspan="2"></th>
+                                    @foreach ($mcbGroups as $group)
+                                        <th>
+                                            <select class="form-control" data-fill="{{ $group['errorKey'] }}"
+                                                title="{{ $group['label'] }}">
+                                                <option value="">--</option>
+                                                @foreach ($group['options'] as $optionValue => $optionName)
+                                                    <option value="{{ $optionValue }}">{{ $optionName }}</option>
+                                                @endforeach
+                                            </select>
+                                        </th>
+                                    @endforeach
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            @foreach ($mcbRows as $index => $row)
+                                @include('pages.category.MaterialCategory.createRow', [
+                                    'index' => $index,
+                                    'row' => $row,
+                                    'groups' => $mcbGroups,
+                                    'nameLabels' => $mcbNameLabels,
+                                    'mfrLabels' => $mcbMfrLabels,
+                                ])
+                            @endforeach
+                            <tbody class="cbt-empty" @if (count($mcbRows)) style="display:none" @endif>
+                                <tr>
+                                    <td colspan="{{ 7 + count($mcbGroups) }}">
+                                        <i class="fas fa-cubes"></i>
+                                        Chưa có dòng nào. Bấm <b>Thêm dòng</b> để khai mã vật tư mới.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Thông Tin Kỹ Thuật</label>
-                                        <input type="text" name="technical_specification" maxlength="100"
-                                            class="form-control {{ $bag->has('technical_specification') ? 'is-invalid' : '' }}"
-                                            value="{{ old('technical_specification') }}"
-                                            placeholder="Nhập thông tin kỹ thuật">
-                                        @if ($bag->has('technical_specification'))
-                                            <span class="md-error">{{ $bag->first('technical_specification') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
+                    <template id="mcbRowTpl">
+                        @include('pages.category.MaterialCategory.createRow', [
+                            'index' => '',
+                            'row' => [],
+                            'groups' => $mcbGroups,
+                            'nameLabels' => [],
+                            'mfrLabels' => [],
+                        ])
+                    </template>
 
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Part Number</label>
-                                        <input type="text" name="part_number" maxlength="100"
-                                            class="form-control {{ $bag->has('part_number') ? 'is-invalid' : '' }}"
-                                            value="{{ old('part_number') }}"
-                                            placeholder="Mã linh kiện của nhà sản xuất">
-                                        @if ($bag->has('part_number'))
-                                            <span class="md-error">{{ $bag->first('part_number') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="md-hint">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Ô chọn chỉ hiển thị dữ liệu gốc <b>đã duyệt</b> và <b>đang hoạt động</b>.
-                                Bản ghi mới ở trạng thái <b>Chờ duyệt</b>, cần được duyệt trước khi dùng.
-                                Đơn vị tính khai ở tab <b>Vật Tư Của Phòng</b>.
-                            </div>
-                        </div>
-
-                        <div class="col-lg-5">
-                            @include('pages.category.MaterialCategory.classificationFields', [
-                                'bag' => $bag,
-                                'selected' => $oldClassification,
-                                'purchasing' => $bag->any() ? old('purchasing_department') : null,
-                            ])
-                        </div>
+                    <div class="md-hint mt-3 mb-0">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Ô chọn chỉ hiển thị dữ liệu gốc <b>đã duyệt</b> và <b>đang hoạt động</b>.
+                        Bản ghi mới ở trạng thái <b>Chờ duyệt</b>, cần được duyệt trước khi dùng.
+                        Đơn vị tính khai ở tab <b>Vật Tư Của Phòng</b>.
                     </div>
                 </div>
 
@@ -125,16 +171,27 @@
     </div>
 </div>
 
-{{-- Chia 2 cột (thông tin bên trái, Phân Loại bên phải) nên cần khung rộng hơn modal-lg mặc định --}}
+{{-- Modal Cập nhật vẫn một dòng, chia 2 cột (thông tin bên trái, Phân Loại bên phải) --}}
 <style>
     @media (min-width: 992px) {
-
-        #createModal .modal-dialog,
         #updateModal .modal-dialog {
             max-width: 1180px;
         }
     }
 </style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        cbtBatch({
+            modal: '#createModal',
+            template: '#mcbRowTpl',
+            local: {
+                '.mcb-mfr': $('#createModal').data('manufacturers') || []
+            },
+            blankStart: true
+        });
+    });
+</script>
 
 @if ($bag->any())
     <script>

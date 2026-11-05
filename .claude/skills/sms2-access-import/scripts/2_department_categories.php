@@ -12,7 +12,9 @@
  *     (người dùng chọn); điều kiện bảo quản để trống (phòng theo danh mục công ty); note = GhiChu.
  *
  * CHẠY LẠI = xoá danh mục phòng + định khu do script tạo rồi dựng lại; dừng nếu đã có phiếu nhập chất chuẩn.
- * php 2_department_categories.php <thư mục JSON> [--dry]     Ra: <thư mục>/2_department_categories_report.csv
+ * --only=QC,AD: CHỈ dựng các bộ phận này, chỉ xoá danh mục phòng + định khu script tạo của chúng, không đụng tồn
+ *               đầu kỳ / phòng khác (dừng nếu các phòng đó đã có phiếu nhập hoặc dòng khai do người dùng tạo).
+ * php 2_department_categories.php <thư mục JSON> [--only=QC,AD] [--dry]     Ra: <thư mục>/2_department_categories_report.csv
  */
 require __DIR__ . '/_boot.php';
 
@@ -24,6 +26,12 @@ $dir = rtrim($argv[1] ?? '', '/\\');
 $dry = in_array('--dry', $argv, true);
 $ACTOR = SMS2['actor'];
 $now = now();
+$onlyArg = preg_grep('/^--only=/', $argv);
+$only = $onlyArg ? array_values(array_filter(explode(',', substr(reset($onlyArg), 7)))) : null;
+if ($only !== null && array_diff($only, array_keys(SMS2['departments']))) {
+    throw new RuntimeException('Bộ phận chưa khai trong SMS2[departments]: ' . implode(',', array_diff($only, array_keys(SMS2['departments']))));
+}
+$onlyDeptIds = $only === null ? null : array_map(fn ($bp) => SMS2['departments'][$bp]['id'], $only);
 
 /** Phần mã tủ đưa vào code định khu: có số thì giữ (QC-INS-036, T10, 054), không thì viết tắt (TCPHC). */
 function sms2_shelf_segment(string $tu): string
@@ -52,13 +60,14 @@ function sms2_shelf_prefix(string $tu): ?string
 /**
  * Mã vị trí Access (đã bỏ số hiệu tủ) -> [cột, tầng, vị trí].
  *   K.BHA28 -> 01/K/BHA28   O7, A.1 -> 01/O/7   A, DT -> 01/A/1   1A, 2.DT -> 01/1/A
- *   T7M2 (tủ con T7) -> T7/M/2   còn lại -> 01/1/<cả mã>
+ *   T7M2 (tủ con T7) -> T7/M/2   C-T1.01 (PTPT) -> 01/1/01   C-T7 -> 01/7/1   còn lại -> 01/1/<cả mã>
  */
 function sms2_parse_rest(string $rest): array
 {
     $rest = ltrim($rest, '.');
     return match (true) {
         $rest === '' => ['01', '1', '1'],
+        (bool) preg_match('/^[A-Z]-T(\d+)(?:\.(\d+))?$/', $rest, $m) => ['01', $m[1], $m[2] ?? '1'],
         (bool) preg_match('/^([A-Z]+)\.?(\d+)$/', $rest, $m) => ['01', $m[1], $m[2]],
         (bool) preg_match('/^([A-Z]+)\.([A-Z0-9]+)$/', $rest, $m) => ['01', $m[1], $m[2]],
         (bool) preg_match('/^([A-Z]+)$/', $rest, $m) => ['01', $m[1], '1'],
@@ -85,7 +94,7 @@ $pad = fn ($v) => ctype_digit((string) $v) ? str_pad((string) (int) $v, 2, '0', 
 /* ---------- Đọc dữ liệu Access ---------- */
 $deptRows = [];
 foreach (sms2_json("$dir/dmhc_dept.json") as $r) {
-    if (isset(SMS2['departments'][$r['Bophan']])) {
+    if (isset(SMS2['departments'][$r['Bophan']]) && ($only === null || in_array($r['Bophan'], $only, true))) {
         $deptRows[$r['Bophan'] . '|' . $r['Machuan']] = $r; // query có thể lặp dòng giống hệt nhau
     }
 }
@@ -119,11 +128,28 @@ $resolveZone = function (string $bp, string $raw) use ($zoneOf, $prefixes): ?arr
                 $best = $p;
             }
         }
-        if ($best === null) {
+        if ($best !== null) {
+            $tu = $prefixes[$bp][$best];
+            $how = 'suy theo số hiệu tủ';
+        } elseif (preg_match('/^([A-Z]+-)/', $code, $m)) {
+            // C-T6.01 (PTPT): mọi mã "C-…" có trong bảng định khu cùng 1 tủ -> lấy tủ đó
+            $tus = [];
+            foreach ($zoneOf[$bp] ?? [] as $known => $name) {
+                if (str_starts_with($known, $m[1])) {
+                    $tus[$name] = 1;
+                }
+            }
+            if (count($tus) !== 1) {
+                return null;
+            }
+            $tu = array_key_first($tus);
+            $how = 'suy theo tiền tố ' . $m[1];
+        } elseif (preg_match('#^[A-Z]+/[A-Z]+-\d+$#', $code)) {
+            // QC/ISN-264: mã là mã thiết bị của chính cái tủ (bảng định khu để Tu = NA)
+            return [$code, '01', '1', '1', 'mã định khu là mã tủ'];
+        } else {
             return null;
         }
-        $tu = $prefixes[$bp][$best];
-        $how = 'suy theo số hiệu tủ';
     }
     $p = sms2_shelf_prefix($tu);
     if ($p !== null && str_starts_with($code, $p)) {
@@ -147,13 +173,19 @@ $inc = function ($k, $n = 1) use (&$stats) { $stats[$k] = ($stats[$k] ?? 0) + $n
 DB::beginTransaction();
 try {
     /* ---------- 0. Dọn dữ liệu script tạo trước đó ---------- */
-    // Tồn đầu kỳ (bước 3) trỏ vào danh mục phòng + định khu -> xoá cùng, chạy lại bước 2 thì chạy lại bước 3
-    sms2_delete_stock($argv, $inc);
-    $inc('cleanup_department_categories', DB::table('standard_department_categories')->where('created_by', $ACTOR)->delete());
-    foreach (['locations', 'tiers', 'columns', 'shelves'] as $t) {
-        $inc("cleanup_$t", DB::table($t)->where('created_by', $ACTOR)->delete());
+    $scope = fn ($q) => $onlyDeptIds === null ? $q : $q->whereIn('department_id', $onlyDeptIds);
+    if ($onlyDeptIds === null) {
+        // Tồn đầu kỳ (bước 3) trỏ vào danh mục phòng + định khu -> xoá cùng, chạy lại bước 2 thì chạy lại bước 3
+        sms2_delete_stock($argv, $inc);
+    } elseif (DB::table('standard_imports')->whereIn('department_id', $onlyDeptIds)->exists()
+        || DB::table('standard_department_categories')->whereIn('department_id', $onlyDeptIds)->where('created_by', '<>', $ACTOR)->exists()) {
+        throw new RuntimeException('Phòng ' . implode(',', $only) . ' đã có phiếu nhập hoặc dòng khai do người dùng tạo - không xoá để dựng lại.');
     }
-    $oldWh = DB::table('warehouses')->where('created_by', $ACTOR)->pluck('id');
+    $inc('cleanup_department_categories', $scope(DB::table('standard_department_categories')->where('created_by', $ACTOR))->delete());
+    foreach (['locations', 'tiers', 'columns', 'shelves'] as $t) {
+        $inc("cleanup_$t", $scope(DB::table($t)->where('created_by', $ACTOR))->delete());
+    }
+    $oldWh = $scope(DB::table('warehouses')->where('created_by', $ACTOR))->pluck('id');
     DB::table('datamaster_histories')->where('table_name', 'warehouses')->whereIn('record_id', $oldWh)->delete();
     $inc('cleanup_warehouses', DB::table('warehouses')->whereIn('id', $oldWh)->delete());
 

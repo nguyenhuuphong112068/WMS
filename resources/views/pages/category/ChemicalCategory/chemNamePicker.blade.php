@@ -10,6 +10,10 @@
 | của form tương ứng. Sau khi chọn, ô xem nhanh [data-cls-preview] trong
 | modal đó hiển thị các nhóm phân loại suy được của hoá chất.
 |
+| Mở từ modal Thêm mới dạng BẢNG NHIỀU DÒNG (.cbt-modal): mỗi lần bấm "Chọn" gửi sự kiện cbt:pick
+| {id, text, groups} về modal đó và bảng vẫn mở để chọn tiếp (nút đổi thành "đã thêm").
+| window.cnpClsChips(id, groups?) dựng chip nhóm phân loại cho dòng của bảng nhiều dòng.
+|
 | Danh sách hoá chất KHÔNG nhúng vào trang: mở bảng lần đầu mới nạp JSON từ
 | CategoryLookupController::chemicalNames(). $chemNameGroups chỉ mang mã nhóm
 | (N1..N10) của các tên danh mục đang dùng, cho ô xem nhanh ở modal Cập nhật.
@@ -337,6 +341,12 @@
             /* ---------- Mở bảng chọn từ nút trong modal Thêm / Cập nhật ---------- */
             $(document).on('click', '.cat-pick-chem', function() {
                 pickerTargetForm = $($(this).data('target-form') || '#createModal');
+
+                // Mở lại thì các nút "đã thêm" của lần trước trở về "Chọn"
+                if (cnpTable) {
+                    $(cnpTable.rows().nodes()).find('.cnp-choose.btn-success').removeClass('btn-success')
+                        .addClass('btn-primary').attr('title', 'Chọn hoá chất này').html('<i class="fas fa-check"></i>');
+                }
                 $('#chemNamePickerModal').modal('show');
             });
 
@@ -346,6 +356,18 @@
 
                 var row = cnpTable.row($(this).closest('tr')).data() || {};
                 var id = String(row.id || $(this).data('id'));
+
+                // Modal bảng nhiều dòng: thêm tên vào bảng, giữ bảng chọn mở để chọn tiếp
+                if (pickerTargetForm.hasClass('cbt-modal')) {
+                    pickerTargetForm.trigger('cbt:pick', [{
+                        id: id,
+                        text: row.text || id,
+                        groups: cnpCodes(row)
+                    }]);
+                    $(this).removeClass('btn-primary').addClass('btn-success')
+                        .attr('title', 'Đã thêm vào bảng').html('<i class="fas fa-check-double"></i>');
+                    return;
+                }
                 var $sel = pickerTargetForm.find('select[name="chem_names_id"]');
                 if (!$sel.length) return;
 
@@ -359,6 +381,28 @@
                 $('#chemNamePickerModal').modal('hide');
                 renderClsPreview(pickerTargetForm.closest('.md-modal'));
             });
+
+            /* Chip nhóm NĐ 24/2026 của một tên hoá chất; groups (nếu có) bổ sung vào bảng tra */
+            function clsChips(id, groups) {
+                if (Array.isArray(groups)) CNP_GROUP_CODES[id] = groups;
+
+                var codes = CNP_GROUP_CODES[id] || [];
+                if (!codes.length) {
+                    return $('<span class="md-empty">').text('Chưa thuộc nhóm nào của NĐ 24/2026.');
+                }
+
+                var $chips = $('<div class="cat-chips">');
+                codes.forEach(function(code) {
+                    var tone = CRITICAL.indexOf(code) !== -1 ? 'critical' :
+                        (BANNED.indexOf(code) !== -1 ? 'banned' : '');
+                    $chips.append($('<span class="cat-chip">').addClass(tone)
+                        .attr('title', CNP_CLS_LABELS[code] || code).text(code));
+                });
+
+                return $chips;
+            }
+
+            window.cnpClsChips = clsChips;
 
             /* ---------- Ô xem nhanh nhóm phân loại trong modal Thêm / Cập nhật ---------- */
             function renderClsPreview($modal) {

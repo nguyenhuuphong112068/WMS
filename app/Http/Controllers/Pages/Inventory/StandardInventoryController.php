@@ -126,6 +126,8 @@ class StandardInventoryController extends Controller
 
         return view('pages.inventory.StandardInventory.list', [
             'datas' => $datas,
+            // TẠM THỜI: mã chuẩn bên SMS 2.0 để đối chiếu, xong thì gỡ (App\Support\AccessLegacyCode)
+            'accessCodes' => \App\Support\AccessLegacyCode::byStandardCategory(),
             // File đính kèm của phiếu nhập, để xem ngay trên màn hình tồn kho
             'attachments' => $this->attachmentsFor($datas->pluck('id')),
             'summaries' => $this->stockByStandard($datas),
@@ -1158,6 +1160,8 @@ class StandardInventoryController extends Controller
                 'standard_imports.id',
                 'standard_imports.code',
                 'standard_imports.category_id',
+                // TẠM THỜI: đọc mã ống SMS 2.0 khi khác mã WMS (App\Support\AccessLegacyCode::standardTube)
+                'standard_imports.note as import_note',
                 'standard_imports.group_code',
                 'standard_imports.stability_batch',
                 'standard_imports.amount',

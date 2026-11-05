@@ -285,7 +285,9 @@
                     col({
                         data: 'code',
                         display: function(row) {
-                            return '<span class="inv-code font-weight-bold">' + esc(row.code) + '</span>' + sub(tag(row.category_code));
+                            // TẠM THỜI: mã bên CMS 3.0 (App\Support\AccessLegacyCode), đối chiếu xong thì gỡ
+                            return '<span class="inv-code font-weight-bold">' + esc(row.code) + '</span>' + sub(tag(row.category_code)) +
+                                (row.access ? sub('Access ' + esc(row.access)) : '');
                         }
                     }),
                     col({
@@ -498,7 +500,7 @@
                         data: 'chem_name',
                         display: function(sum) {
                             return '<div class="font-weight-bold">' + esc(sum.chem_name || '—') + specialBadge(sum) + '</div>' +
-                                sub(tag(sum.category_code));
+                                sub(tag(sum.category_code)) + (sum.access ? sub('Access ' + esc(sum.access)) : '');
                         }
                     }),
                     col({

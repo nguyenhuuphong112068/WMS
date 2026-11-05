@@ -1,204 +1,48 @@
-@php
-    $bag = $errors->getBag('dcCreateErrors');
+{{--
+| Modal "Khai Hoá Chất Cho Phòng" dạng bảng nhiều dòng - khuôn chung pages.category.shared.deptBatch
+| (xem chú thích ở đó). Riêng hoá chất: Hạn Dùng Nội Bộ, Khối lượng quy đổi (đơn vị đếm / bao bì) và
+| cảnh báo tương kỵ ở định khu theo từng dòng (DepartmentChemical/compatibility.blade.php).
+|
+| Đơn vị gợi ý = đơn vị phòng khác đang dùng cho mã đó ($unitsInUse).
+--}}
+@include('pages.category.shared.deptBatch', [
+    'cfg' => [
+        'modalId' => 'dcCreateModal',
+        'prefix' => 'dcb',
+        'title' => 'Khai Hoá Chất Cho Phòng',
+        'icon' => $mdIcon,
+        'action' => route($mdRoute . 'store'),
+        'bag' => 'dcCreateErrors',
+        'word' => 'hoá chất',
+        'items' => collect($categories)
+            ->map(function ($c) use ($unitsInUse) {
+                $maker = $c->manufacturer_short_name ?: $c->manufacturer_name;
 
-    // Trang có 2 tab nên có tới 4 form dùng chung kho old(): chỉ điền lại giá trị vừa
-    // nhập khi chính form này báo lỗi, không thì lấy giá trị mặc định.
-    $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
-
-    // Hạn dùng mặc định của từng hoá chất, JS đổ vào placeholder khi đổi ô chọn
-    $dcDefaults = $categories
-        ->mapWithKeys(fn($category) => [$category->id => ['shelf_life_months' => $category->shelf_life_months]])
-        ->toArray();
-@endphp
-
-<div class="modal fade md-modal" id="dcCreateModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="{{ $mdIcon }}"></i> Khai Hoá Chất Cho Phòng</h5>
-                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-            </div>
-
-            <form action="{{ route($mdRoute . 'store') }}" method="POST">
-                @csrf
-
-                <div class="modal-body">
-
-                    <div class="form-group">
-                        <label>Hoá Chất <span class="text-danger">*</span></label>
-                        <select name="category_id"
-                            class="form-control cat-select dc-category {{ $bag->has('category_id') ? 'is-invalid' : '' }}"
-                            data-defaults="{{ json_encode($dcDefaults) }}"
-                            data-lookup-url="{{ route('pages.category.lookup.chemicalCategories', ['scope' => 'undeclared']) }}"
-                            required>
-                            <option value="">-- Chọn hoá chất --</option>
-                            {{-- Gõ tìm qua AJAX (chỉ hoá chất phòng chưa khai), chỉ dựng sẵn option của giá trị old() --}}
-                            @foreach ($categories->where('id', $old('category_id')) as $category)
-                                <option value="{{ $category->id }}" selected>
-                                    {{ \App\Support\CategoryLookup::chemicalCategoryLabel($category) }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @if ($bag->has('category_id'))
-                            <span class="md-error">{{ $bag->first('category_id') }}</span>
-                        @endif
-                        <small class="md-sub">Chỉ hiện hoá chất đã duyệt trong danh mục chung và
-                            <b>phòng chưa khai</b>. Danh sách trống nghĩa là phòng đã khai hết.</small>
-                    </div>
-
-                    {{-- Đơn vị tính là của RIÊNG PHÒNG: danh mục chung không còn khai đơn vị --}}
-                    <div class="form-group">
-                        <label>Đơn Vị Tính <span class="text-danger">*</span></label>
-                        <select name="unit_id"
-                            class="form-control cat-select dc-unit {{ $bag->has('unit_id') ? 'is-invalid' : '' }}"
-                            required>
-                            <option value="">-- Chọn đơn vị tính --</option>
-                            @foreach ($units as $unit)
-                                <option value="{{ $unit->id }}" data-short="{{ $unit->short_name }}"
-                                    data-group="{{ $unit->unit_group }}"
-                                    {{ $old('unit_id') == $unit->id ? 'selected' : '' }}>
-                                    {{ $unit->short_name }} - {{ $unit->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @if ($bag->has('unit_id'))
-                            <span class="md-error">{{ $bag->first('unit_id') }}</span>
-                        @endif
-                        <small class="md-sub">Đơn vị phòng dùng để nhập / xuất và ghi tồn cho hoá chất này.
-                            Phòng khác có thể khai đơn vị khác.</small>
-                    </div>
-
-                    {{-- Chỉ hiện khi đơn vị của phòng thuộc nhóm đếm / bao bì: cần con số này để
-                         quy tồn ra kg lúc đối chiếu Ngưỡng Tồn Trữ PL IV. --}}
-                    <div class="form-group dc-packweight" style="display: none">
-                        <label>Khối Lượng Quy Đổi</label>
-                        <div class="input-group">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text">1 <b class="dc-unit-hint mx-1">đơn vị</b> =</span>
-                            </div>
-                            <input type="text" inputmode="decimal" name="pack_weight_kg" min="0"
-                                class="form-control js-decimal {{ $bag->has('pack_weight_kg') ? 'is-invalid' : '' }}"
-                                value="{{ $old('pack_weight_kg') }}" placeholder="Ví dụ: 25">
-                            <div class="input-group-append">
-                                <span class="input-group-text">kg</span>
-                            </div>
-                        </div>
-                        @if ($bag->has('pack_weight_kg'))
-                            <span class="md-error">{{ $bag->first('pack_weight_kg') }}</span>
-                        @endif
-                        <small class="md-sub">Khối lượng hoá chất (kg) chứa trong 1 đơn vị đếm. Để trống nếu chưa
-                            cần đối chiếu Ngưỡng Tồn Trữ PL IV.</small>
-                    </div>
-
-                    @include('pages.category.shared.unitConversion', [
-                        'prefix' => 'dc',
-                        'bag' => $bag,
-                        'unitsInUse' => $unitsInUse,
-                        'conversions' => $conversions,
-                        'label' => 'hoá chất',
-                    ])
-
-                    <div class="form-row">
-                        <div class="form-group col-md-6">
-                            <label>Hạn Dùng Nội Bộ (tháng)</label>
-                            <input type="number" name="shelf_life_months" min="1" max="1200" step="1"
-                                class="form-control dc-shelf-life {{ $bag->has('shelf_life_months') ? 'is-invalid' : '' }}"
-                                value="{{ $old('shelf_life_months') }}" placeholder="Để trống = theo danh mục">
-                            @if ($bag->has('shelf_life_months'))
-                                <span class="md-error">{{ $bag->first('shelf_life_months') }}</span>
-                            @endif
-                            <small class="md-sub dc-shelf-hint">Để trống thì lấy hạn dùng mặc định của danh mục.</small>
-                        </div>
-
-                        <div class="form-group col-md-6">
-                            <label>Ngưỡng Tồn Tối Thiểu</label>
-                            <input type="text" inputmode="decimal" name="min_stock" min="0"
-                                class="form-control js-decimal {{ $bag->has('min_stock') ? 'is-invalid' : '' }}"
-                                value="{{ $old('min_stock') }}" placeholder="Để trống = cảnh báo theo tỉ lệ 20%">
-                            @if ($bag->has('min_stock'))
-                                <span class="md-error">{{ $bag->first('min_stock') }}</span>
-                            @endif
-                            <small class="md-sub">Tồn xuống dưới mức này thì màn hình Tồn Kho báo "Sắp hết".
-                                Theo <b class="dc-unit-hint">đơn vị</b> đã chọn ở trên.</small>
-                        </div>
-
-                        <div class="form-group col-md-6">
-                            <label>Ngưỡng Tồn Tối Đa</label>
-                            <input type="text" inputmode="decimal" name="max_stock" min="0"
-                                class="form-control js-decimal {{ $bag->has('max_stock') ? 'is-invalid' : '' }}"
-                                value="{{ $old('max_stock') }}" placeholder="Để trống nếu không đặt trần tồn">
-                            @if ($bag->has('max_stock'))
-                                <span class="md-error">{{ $bag->first('max_stock') }}</span>
-                            @endif
-                            <small class="md-sub">Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.
-                                Theo <b class="dc-unit-hint">đơn vị</b> đã chọn ở trên.</small>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <label>Định Khu</label>
-                            <button type="button" class="btn btn-sm btn-outline-primary mb-2" data-toggle="modal"
-                                data-target="#storageChartModal">
-                                <i class="fas fa-th mr-1"></i> Sơ đồ tương kỵ
-                            </button>
-                        </div>
-                        <select name="default_location_id" data-zone-filter
-                            data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'chemical']) }}"
-                            class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
-                            <option value="">-- Chưa định khu --</option>
-                            @foreach ($locations as $location)
-                                <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
-                                    {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
-                                    {{ $location->warehouse_name ?: '—' }} /
-                                    {{ $location->shelf_name ?: '—' }} /
-                                    {{ $location->column_name ?: '—' }} /
-                                    {{ $location->tier_name ?: '—' }} /
-                                    {{ $location->code }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @if ($bag->has('default_location_id'))
-                            <span class="md-error">{{ $bag->first('default_location_id') }}</span>
-                        @endif
-                        <small class="md-sub">Chỗ <b>dự kiến</b> để hàng. Định khu thật của từng lô vẫn khai lúc
-                            nhập. Định khu cùng kệ/tủ với hoá chất tương kỵ bị khoá, không chọn được.</small>
-                        {{-- Kết quả đối chiếu tương kỵ (Sơ đồ lưu trữ GHS), JS đổ vào khi chọn định khu --}}
-                        <div class="dc-compat" hidden></div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Ghi Chú</label>
-                        <textarea name="note" rows="2" class="form-control {{ $bag->has('note') ? 'is-invalid' : '' }}"
-                            placeholder="Ví dụ: chỉ dùng cho kiểm nghiệm vi sinh">{{ $old('note') }}</textarea>
-                        @if ($bag->has('note'))
-                            <span class="md-error">{{ $bag->first('note') }}</span>
-                        @endif
-                    </div>
-
-                    <div class="md-hint">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        Bản chất hoá chất (tên, nhà sản xuất, tỉ trọng, phân loại, đơn vị gốc) khai ở
-                        <b>Danh Mục Hoá Chất</b> và dùng chung toàn công ty. Ở đây chỉ khai phần
-                        <b>riêng của phòng</b>. Để trống ô nào thì ô đó tự chạy theo danh mục.
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save mr-1"></i> Lưu
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-@if ($bag->any())
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            $('#dcCreateModal').modal('show');
-        });
-    </script>
-@endif
+                return [
+                    'id' => (string) $c->id,
+                    'text' => $c->code . ' - ' . $c->chem_name . ($maker ? ' (' . $maker . ')' : ''),
+                    'search' => implode(' ', array_filter([$c->code, $c->chem_name, $c->manufacturer_name, $c->manufacturer_short_name])),
+                    'name' => (string) $c->chem_name,
+                    'meta' => implode(' · ', array_filter([$c->code, $maker])),
+                    'unit' => (string) (collect($unitsInUse[$c->id] ?? [])->first()->unit_id ?? ''),
+                    'shelf' => $c->shelf_life_months ? (string) $c->shelf_life_months : '',
+                ];
+            })
+            ->values(),
+        'units' => $units,
+        'classifications' => null,
+        'shelf' => true,
+        'packWeight' => true,
+        'compat' => true,
+        'locationType' => 'chemical',
+        'batchLocations' => $batchLocations ?? [],
+        'unitsInUse' => $unitsInUse,
+        'conversions' => $conversions,
+        'picker' => false,
+        'emptyIcon' => 'fas fa-flask',
+        'hint' => 'Chỉ chọn được hoá chất đã duyệt trong danh mục công ty và <b>phòng chưa khai</b>. Bản chất hoá chất '
+            . '(tên, nhà sản xuất, tỉ trọng, phân loại) khai ở <b>Danh Mục Hoá Chất Công Ty</b>; ở đây chỉ khai phần '
+            . '<b>riêng của phòng</b>, ô để trống tự chạy theo danh mục. Đơn vị đếm / bao bì thì khai thêm khối lượng '
+            . 'quy đổi (kg). Định khu cùng kệ/tủ với hoá chất tương kỵ - kể cả giữa các dòng trong bảng - không lưu được.',
+    ],
+])

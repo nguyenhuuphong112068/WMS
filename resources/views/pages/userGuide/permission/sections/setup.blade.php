@@ -56,14 +56,15 @@
         hoặc nút Sửa trên dòng người dùng.</li>
     <li>Chọn một hoặc nhiều nhóm ở ô <b>Phân Quyền (Chọn 1 hoặc nhiều)</b>.</li>
     <li>Ở <b>Phạm vi phòng ban của từng quyền</b>, chọn phòng ban cho từng nhóm. <b>Để trống</b> nghĩa là nhóm đó áp dụng cho
-        mọi phòng ban. Ô Công ty chỉ để lọc nhanh danh sách phòng ban.</li>
+        mọi phòng ban. Ô Công ty chỉ để lọc nhanh danh sách phòng ban. Phòng ngoài phạm vi người dùng vẫn chuyển sang xem
+        được (chỉ xem), nên không cần gán vai trò chỉ để xem phòng khác.</li>
 </ol>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/permission/thiet-lap-user.png', 'caption' => 'Hộp thoại Cập Nhật User: chọn nhóm quyền và phạm vi phòng ban của từng nhóm', 'width' => 600])
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
     <div>Nhóm chọn đầu tiên là <b>nhóm quyền chính</b> của người dùng. Khi hệ thống xét người dùng có thuộc một vai trò hay không
-        (ví dụ tài khoản Admin), nhóm chính được tính ở mọi phòng ban. Ở bước ký dự trù, vai trò Quản Lý Bộ Phận và Ban Giám Đốc
+        (ví dụ tài khoản Admin), nhóm chính được tính ở mọi phòng ban trong phạm vi làm việc (phòng chỉ xem thì không). Ở bước ký dự trù, vai trò Quản Lý Bộ Phận và Ban Giám Đốc
         phải có phạm vi gồm đúng phòng lập phiếu.</div>
 </div>
 

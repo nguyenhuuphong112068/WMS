@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\RequiresChangeReason;
+use App\Http\Controllers\Concerns\StoresBatchItems;
 use App\Http\Controllers\Concerns\UpdatesCategoryLeadTime;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
@@ -38,6 +39,7 @@ use Illuminate\Validation\Rule;
 class StandardCategoryController extends Controller
 {
     use RequiresChangeReason;
+    use StoresBatchItems;
     use VerifiesSignature;
     use UpdatesCategoryLeadTime;
 
@@ -98,13 +100,20 @@ class StandardCategoryController extends Controller
         // gửi về DepartmentStandardController, ở đây chỉ dựng dữ liệu để hiển thị.
         $dsDatas = DepartmentStandard::rowsOfDepartment($departmentId);
 
+        // Các dòng modal Thêm mới (bảng nhiều dòng) vừa báo lỗi - của tab 1 hoặc tab 2
+        $oldItems = collect((array) old('items', []))->filter(fn ($item) => is_array($item));
+
         return view('pages.category.StandardCategory.list', [
             // Vào từ thẻ trang chủ "Mã mới chờ khai thời gian đặt hàng": mở sẵn hộp thoại điều chỉnh
             'leadTimeOpen' => $this->leadTimeOpen(),
             'datas' => $datas,
+            // TẠM THỜI: mã chất chuẩn bên Access SMS 2.0 để đối chiếu dữ liệu chuyển đổi, đối chiếu xong thì gỡ
+            'accessCodes' => \App\Support\AccessLegacyCode::byStandardCategory(),
             // Ô Tên chất chuẩn tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị vừa gửi bị
             // lỗi validate; dòng đang sửa gửi kèm nhãn qua chem_names_id_text.
             'chemNames' => \App\Support\CategoryLookup::namesByIds('standard', [old('chem_names_id')]),
+            // Nhãn tên chuẩn của các dòng modal Thêm mới vừa báo lỗi (bảng nhiều dòng)
+            'batchNames' => \App\Support\CategoryLookup::namesByIds('standard', $oldItems->pluck('chem_names_id')->all()),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
             'storageConditions' => $this->options('storage_conditions', $datas->pluck('storage_condition_id')->all()),
             'groups' => config('standard.groups'),
@@ -123,6 +132,7 @@ class StandardCategoryController extends Controller
             'dsCategories' => DepartmentStandard::categoryOptions($dsDatas->pluck('category_id')->all()),
             // Định khu tìm qua AJAX, chỉ dựng sẵn option của giá trị old()
             'dsLocations' => \App\Support\CategoryLookup::locationsByIds([old('default_location_id')]),
+            'dsBatchLocations' => \App\Support\CategoryLookup::locationsByIds($oldItems->pluck('default_location_id')->all()),
             'dsUnits' => DepartmentStandard::unitOptions($dsDatas->pluck('unit_id')->all()),
             /*
             | Đơn vị các phòng KHÁC đang dùng cho từng chất chuẩn. Phòng đang khai chọn
@@ -143,40 +153,68 @@ class StandardCategoryController extends Controller
         ]);
     }
 
+    /**
+     * Thêm nhiều mã một lần từ bảng items[i][...] của modal Thêm mới. Một dòng lỗi thì không lưu
+     * dòng nào, lỗi báo theo "Dòng N".
+     *
+     * Trùng Tên + Nguồn gốc/NSX vẫn cho thêm (chất chuẩn ra Version mới) - kể cả hai dòng trùng nhau
+     * trong cùng lần thêm: ghi lần lượt nên dòng sau tự lên Version kế tiếp.
+     */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), $this->rules(), $this->messages());
+        // Dòng chưa chọn tên, nguồn gốc, chưa nhập CAS / ghi chú thì coi là để trống - các ô hàng
+        // Điền nhanh tự điền sẵn (phân nhóm, điều kiện bảo quản...) không tính
+        $items = $this->batchItems($request, fn ($item) => blank($item['chem_names_id'] ?? null)
+            && blank($item['manufacturers_id'] ?? null)
+            && blank($item['cas_no'] ?? null)
+            && blank($item['note'] ?? null));
 
-        $this->checkDuplicate($validator, $request);
+        $validator = Validator::make(
+            ['items' => $items],
+            $this->batchRules($this->rules()),
+            $this->batchMessages($this->messages(), 'Vui lòng thêm ít nhất một dòng chất chuẩn.')
+        );
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
+            // Gửi lại đúng các dòng đã kiểm tra (đã bỏ dòng trống) để số "Dòng N" khớp với bảng
+            return redirect()->back()->withErrors($validator, 'createErrors')->withInput(['items' => $items]);
         }
 
         // Sinh mã và ghi bản ghi trong cùng một transaction
-        $id = DB::transaction(function () use ($request) {
-            $version = $this->nextVersion((int) $request->chem_names_id, (int) $request->manufacturers_id);
+        $ids = DB::transaction(function () use ($items) {
+            $number = $this->nextNumber();
+            $ids = [];
 
-            return DB::table(self::TABLE)->insertGetId($this->payload($request) + [
-                'code' => $this->nextCode(),
-                'version' => $version,
-                'app_status' => 'pending',
-                // Báo người có quyền vào khai thời gian đặt hàng (thẻ trang chủ)
-                'lead_time_pending' => $this->leadTimePendingOnCreate($request),
-                'status_id' => 1,
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            foreach ($items as $item) {
+                $ids[] = DB::table(self::TABLE)->insertGetId($this->payload($item) + [
+                    'code' => $this->formatCode($number++),
+                    'version' => $this->nextVersion((int) $item['chem_names_id'], (int) $item['manufacturers_id']),
+                    'app_status' => 'pending',
+                    // Modal Thêm không có ô Thời gian đặt hàng: báo người có quyền vào khai (thẻ trang chủ)
+                    'lead_time_pending' => 1,
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return $ids;
         });
 
-        $code = DB::table(self::TABLE)->where('id', $id)->value('code');
+        $codes = DB::table(self::TABLE)->whereIn('id', $ids)->orderBy('id')->pluck('code', 'id');
 
-        $this->writeHistory($id, 'Thêm mới', 'Khai báo mới '.self::LABEL.', mã '.$code.'.');
+        foreach ($ids as $id) {
+            $this->writeHistory($id, 'Thêm mới', 'Khai báo mới '.self::LABEL.', mã '.$codes[$id].'.');
 
-        AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm '.self::LABEL.': '.$code);
+            AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', 'Thêm '.self::LABEL.': '.$codes[$id]);
+        }
 
-        return redirect()->back()->with('success', 'Đã thêm '.self::LABEL.' mã '.$code.'! Bản ghi đang chờ duyệt.');
+        $message = count($ids) === 1
+            ? 'Đã thêm '.self::LABEL.' mã '.$codes->first().'! Bản ghi đang chờ duyệt.'
+            : 'Đã thêm '.count($ids).' '.self::LABEL.' (mã '.$codes->first().' - '.$codes->last().')! Các bản ghi đang chờ duyệt.';
+
+        return redirect()->back()->with('success', $message);
     }
 
     public function update(Request $request)
@@ -199,7 +237,7 @@ class StandardCategoryController extends Controller
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
-        $payload = $this->payload($request);
+        $payload = $this->payload($request->all());
         // Thời gian đặt hàng chỉ sửa qua updateLeadTime() (quyền riêng), ở đây giữ nguyên giá trị cũ
         $payload['lead_time_days'] = $current->lead_time_days;
         $note = $this->changeNote($current, $payload);
@@ -465,14 +503,23 @@ class StandardCategoryController extends Controller
      */
     private function nextCode(): string
     {
+        return $this->formatCode($this->nextNumber());
+    }
+
+    /** Phần số của mã kế tiếp; thêm nhiều dòng thì cộng dần từ số này. */
+    private function nextNumber(): int
+    {
         $numbers = DB::table(self::TABLE)
             ->where('code', 'like', self::CODE_PREFIX.'%')
             ->pluck('code')
             ->map(fn ($code) => (int) substr((string) $code, strlen(self::CODE_PREFIX)));
 
-        $next = ($numbers->max() ?? 0) + 1;
+        return ($numbers->max() ?? 0) + 1;
+    }
 
-        return self::CODE_PREFIX.str_pad((string) $next, self::CODE_LENGTH, '0', STR_PAD_LEFT);
+    private function formatCode(int $number): string
+    {
+        return self::CODE_PREFIX.str_pad((string) $number, self::CODE_LENGTH, '0', STR_PAD_LEFT);
     }
 
     /** Version tự động tăng theo từng tổ hợp Tên + NSX, bắt đầu từ 0. */
@@ -587,26 +634,27 @@ class StandardCategoryController extends Controller
         ] + \App\Support\MaterialClassification::leadTimeRules();
     }
 
-    private function payload(Request $request): array
+    /** Giá trị ghi DB - $input là $request->all() (Cập nhật) hoặc một dòng items[i] (Thêm mới). */
+    private function payload(array $input): array
     {
         // Giữ đúng thứ tự khai báo trong config để chuỗi JSON luôn ổn định
-        $selected = (array) $request->input('groups', []);
+        $selected = (array) ($input['groups'] ?? []);
         $groups = array_values(array_intersect(array_keys(config('standard.groups')), $selected));
-        $density = trim((string) $request->density);
+        $density = trim((string) ($input['density'] ?? ''));
+        $shelfLife = $this->nullIfBlank($input['shelf_life_months'] ?? null);
 
         return [
-            'chem_names_id' => (int) $request->chem_names_id,
-            'cas_no' => $this->nullIfBlank($request->cas_no),
-            'manufacturers_id' => (int) $request->manufacturers_id,
+            'chem_names_id' => (int) ($input['chem_names_id'] ?? 0),
+            'cas_no' => $this->nullIfBlank($input['cas_no'] ?? null),
+            'manufacturers_id' => (int) ($input['manufacturers_id'] ?? 0),
             'density' => $density === '' ? null : $density,
-            'storage_condition_id' => $request->storage_condition_id ? (int) $request->storage_condition_id : null,
+            'storage_condition_id' => ! empty($input['storage_condition_id']) ? (int) $input['storage_condition_id'] : null,
             'groups' => $groups ? json_encode($groups, JSON_UNESCAPED_UNICODE) : null,
-            'shelf_life_months' => $this->nullIfBlank($request->shelf_life_months) === null
-                ? null
-                : (int) $request->shelf_life_months,
-            'doc_no' => $this->nullIfBlank($request->doc_no),
-            'note' => $this->nullIfBlank($request->note),
-            'lead_time_days' => \App\Support\MaterialClassification::leadTimeValue($request->lead_time_days),
+            'shelf_life_months' => $shelfLife === null ? null : (int) $shelfLife,
+            'doc_no' => $this->nullIfBlank($input['doc_no'] ?? null),
+            'note' => $this->nullIfBlank($input['note'] ?? null),
+            // Không nhận từ form: người có quyền khai sau qua updateLeadTime(), update() giữ giá trị cũ
+            'lead_time_days' => null,
         ];
     }
 

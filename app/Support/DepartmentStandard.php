@@ -205,12 +205,16 @@ class DepartmentStandard
     {
         $query = DB::table('standard_categories')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('manufacturers', 'standard_categories.manufacturers_id', '=', 'manufacturers.id')
             ->select(
                 'standard_categories.id',
                 'standard_categories.code',
                 'standard_categories.version',
                 'standard_categories.shelf_life_months',
-                'standard_names.name as standard_name'
+                'standard_names.name as standard_name',
+                // Nhà sản xuất để ô tìm nhanh của modal Khai ... Cho Phòng phân biệt các mã trùng tên
+                'manufacturers.name as manufacturer_name',
+                'manufacturers.short_name as manufacturer_short_name'
             )
             ->where('standard_categories.status_id', 1)
             ->where('standard_categories.app_status', 'approved')

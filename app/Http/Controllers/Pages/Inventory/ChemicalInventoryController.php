@@ -183,11 +183,20 @@ class ChemicalInventoryController extends Controller
 
         $classOf = fn ($categoryId) => $codes[$categoryId] ?? [];
 
+        // TẠM THỜI: mã hoá chất + mã xuất nhập bên CMS 3.0 để đối chiếu (App\Support\AccessLegacyCode)
+        $accessCodes = \App\Support\AccessLegacyCode::byChemicalCategory();
+        $access = fn ($row) => implode(' · ', array_filter([
+            implode(', ', $accessCodes[$row->category_id] ?? []),
+            ($lot = \App\Support\AccessLegacyCode::chemicalLot($row->note)) ? 'XN '.$lot : null,
+        ]));
+
         return response()->json([
-            'rows' => $datas->map(fn ($row) => $this->rowPayload($row, $classOf($row->category_id), $files->get($row->id)))
+            'rows' => $datas->map(fn ($row) => $this->rowPayload($row, $classOf($row->category_id), $files->get($row->id))
+                + ['access' => $access($row)])
                 ->values(),
             'summaries' => $this->stockByChemical($datas)
-                ->map(fn ($sum) => $this->summaryPayload($sum, $classOf($sum->category_id)))
+                ->map(fn ($sum) => $this->summaryPayload($sum, $classOf($sum->category_id))
+                    + ['access' => implode(', ', $accessCodes[$sum->category_id] ?? [])])
                 ->values(),
             // Cộng dồn tách theo cờ Hoá chất VS cho bộ lọc VS: một hoá chất có cả mã VS lẫn
             // không VS thì ra hai dòng, mỗi dòng chỉ cộng đúng phần mã của nó
@@ -198,7 +207,8 @@ class ChemicalInventoryController extends Controller
 
                     return $sum;
                 }))
-                ->map(fn ($sum) => $this->summaryPayload($sum, $classOf($sum->category_id)))
+                ->map(fn ($sum) => $this->summaryPayload($sum, $classOf($sum->category_id))
+                    + ['access' => implode(', ', $accessCodes[$sum->category_id] ?? [])])
                 ->values(),
         ]);
     }
@@ -894,6 +904,7 @@ class ChemicalInventoryController extends Controller
                 'chemical_imports.batch_no',
                 'chemical_imports.invoice_number',
                 'chemical_imports.is_microbiological_chemicals',
+                'chemical_imports.note',
                 'chemical_categories.code as category_code',
                 'chemical_categories.type as category_type',
                 DepartmentChemical::shelfLifeColumn(),

@@ -18,6 +18,12 @@
                     từng quyền</a>.</td>
             </tr>
             <tr>
+                <td>"Phòng ban ... ngoài phạm vi làm việc của bạn - chỉ được xem, không thao tác được."</td>
+                <td style="font-weight: 400">Phòng đang chọn có nhãn <b>Chỉ xem</b>. Chuyển về phòng ban của bạn ở ô cuối cột icon, hoặc
+                    nhờ quản trị viên gán vai trò cho phòng đó nếu cần thao tác. Xem
+                    <a href="#tong-quan">Phạm vi làm việc và phòng ban chỉ xem</a>.</td>
+            </tr>
+            <tr>
                 <td>Đã tick quyền xem tab mà vẫn không thấy tab</td>
                 <td style="font-weight: 400">Thiếu quyền xem màn hình (quyền cha). Ô hiện dấu tick nhạt trong
                     <a href="#bang-materData">bảng phân quyền chung</a>.</td>

@@ -2,16 +2,35 @@
     xuất</b>. Các phòng chỉ khai và dùng được vật tư đã có ở đây và đã <b>Đã duyệt</b>.</p>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/danh-muc-cong-ty.png', 'caption' => 'Màn hình Danh Mục › Vật Tư › tab Danh mục vật tư công ty'])
 
-<h3>Các ô nhập</h3>
+<h3>Thêm nhiều mã một lần</h3>
+<p>Hộp thoại <b>Thêm Danh Mục Vật Tư Công Ty Mới</b> là một bảng, <b>mỗi dòng là một mã vật tư</b>. Bấm <b>Lưu</b> một lần là
+    thêm được tất cả các dòng.</p>
+<ol class="ug-steps">
+    <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus"></i> Thêm mới</span>, hộp thoại mở sẵn một dòng trống.</li>
+    <li>Nếu nhiều mã cùng nhà sản xuất / cùng phân loại: chọn trước ở hàng <b>Điền nhanh cho mọi dòng</b> (ngay dưới tiêu đề
+        bảng). Giá trị chọn ở đây áp ngay cho mọi dòng đang có và điền sẵn cho dòng thêm sau.</li>
+    <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus"></i> Thêm dòng</span> để thêm mã, hoặc
+        <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-clone"></i></span> ở một dòng để nhân bản dòng đó
+        (giữ nhà sản xuất, thông tin, phân loại - chỉ cần chọn lại tên). Nút
+        <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-trash-alt"></i></span> bỏ dòng.</li>
+    <li>Bấm <b>Lưu</b>. Mã cấp liên tiếp theo thứ tự dòng (cột <b>Mã</b> là mã dự kiến). Dòng để trống hoàn toàn được bỏ qua.</li>
+</ol>
+<div class="ug-callout is-warn">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>Chỉ cần <b>một dòng lỗi</b> là không dòng nào được lưu: hộp thoại mở lại với đủ các dòng vừa nhập, lỗi ghi theo
+        <b>"Dòng N: ..."</b> ở đầu hộp thoại và dòng lỗi tô nền đỏ nhạt. Sửa xong bấm Lưu lại. Mỗi lần lưu tối đa 200 dòng.</div>
+</div>
+
+<h3>Các ô nhập (mỗi dòng)</h3>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/danh-muc-cong-ty-form.png', 'caption' => 'Hộp thoại thêm mới - Danh Mục Vật Tư Công Ty'])
 
 @include('pages.userGuide.shared.fields', ['fields' => [
-    ['Mã Vật Tư', false, 'Hệ thống tự sinh khi lưu, dạng <span class="ug-key">M00001</span>.'],
+    ['Mã', false, 'Hệ thống tự sinh khi lưu, dạng <span class="ug-key">M00001</span>.'],
     ['Tên Vật Tư', true, 'Chọn từ <b>Dữ Liệu Gốc › Tên Vật Tư</b> (đã duyệt).'],
     ['Nhà Sản Xuất', true, 'Chọn từ <b>Dữ Liệu Gốc › Nhà Sản Xuất</b>.'],
     ['Thông Tin Kỹ Thuật', false, 'Quy cách, kích thước, tiêu chuẩn. Tối đa 100 ký tự.'],
     ['Part Number', false, 'Mã P/N của hãng. Tối đa 100 ký tự.'],
-    ['Phân Loại Vật Tư', true, 'Chọn đủ 4 tiêu chí: <b>Theo Giá Trị</b> (Thấp/Cao), <b>Theo Mức Độ Quan Trọng</b> (Thấp/Cao), <b>Theo Hàng Hoá Nguy Hiểm</b> (Có/Không), <b>Theo Cần Hiệu Chuẩn Trước Khi Dùng</b> (Có/Không).'],
+    ['Phân loại (4 cột)', true, 'Mỗi tiêu chí một cột, chọn đủ cả 4: <b>Giá Trị</b> (Thấp/Cao), <b>Mức Độ Quan Trọng</b> (Thấp/Cao), <b>Hàng Hoá Nguy Hiểm</b> (Có/Không), <b>Cần Hiệu Chuẩn Trước Khi Dùng</b> (Có/Không). Hộp thoại Cập nhật vẫn chọn bằng ô tick như cũ.'],
     ['Bộ Phận Mua Hàng', true, '<b>Cung Ứng</b> hoặc <b>Hành Chánh</b>. Quyết định vật tư đi đường nào khi thiếu: Cung Ứng → lập phiếu dự trù; Hành Chánh → gửi đề nghị VPP.'],
 ]])
 

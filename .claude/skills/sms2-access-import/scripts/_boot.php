@@ -19,6 +19,9 @@ const SMS2 = [
     'departments' => [
         'QC1' => ['id' => 20, 'warehouse_code' => 'QC1-CC', 'warehouse_name' => 'Kho Chất Chuẩn QC1', 'zone_table' => 'dbo_T_DinhKhu'],
         'QC2' => ['id' => 9, 'warehouse_code' => 'QC2-CC', 'warehouse_name' => 'Kho Chất Chuẩn QC2', 'zone_table' => 'dbo_T_DinhKhu2'],
+        // Thêm 04/11/2026 (Q_DMHC_QC3HH / Q_DMHC_QC4HH): chỉ danh mục phòng, chạy 2_department_categories.php --only=QC,AD
+        'QC' => ['id' => 15, 'warehouse_code' => 'QCNM1-CC', 'warehouse_name' => 'Kho Chất Chuẩn QC NM1', 'zone_table' => 'dbo_T_DinhKhu3'],
+        'AD' => ['id' => 10, 'warehouse_code' => 'PTPT-CC', 'warehouse_name' => 'Kho Chất Chuẩn PTPT', 'zone_table' => 'dbo_T_DinhKhu4'],
     ],
 
     // Cờ nhóm Access (dbo_T_LoaiChuan) => khoá config('standard.groups')
@@ -216,13 +219,15 @@ function sms2_delete_stability(array $argv, callable $inc, ?array $importIds = n
 /** Mã Access => id bản ghi, đọc từ ghi chú lịch sử "Thêm mới" (… mã S0375, S0376 …). */
 function sms2_codes_from_history(string $table, string $idColumn, string $noteColumn = 'change_note', array $where = []): array
 {
-    $q = Illuminate\Support\Facades\DB::table($table)->where('action', 'Thêm mới');
+    // + dòng "Cập nhật" của bước 5 (mã tạo trên SMS 2.0 sau lần nạp, gộp vào danh mục sẵn có)
+    $q = Illuminate\Support\Facades\DB::table($table)->whereIn('action', ['Thêm mới', 'Cập nhật'])->orderBy('id');
     foreach ($where as $col => $val) {
         $q->where($col, $val);
     }
     $out = [];
-    foreach ($q->get([$idColumn, $noteColumn]) as $h) {
-        if (! str_contains((string) $h->{$noteColumn}, 'SMS 2.0')) {
+    foreach ($q->get([$idColumn, $noteColumn, 'action']) as $h) {
+        $note = (string) $h->{$noteColumn};
+        if (! str_contains($note, 'SMS 2.0') || ($h->action === 'Cập nhật' && ! str_contains($note, 'SMS 2.0, gộp thêm mã Access'))) {
             continue;
         }
         preg_match_all('/\bS\d{4}\b/', (string) $h->{$noteColumn}, $m);

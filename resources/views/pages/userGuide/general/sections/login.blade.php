@@ -18,8 +18,8 @@
     </li>
     <li>Nếu là lần đăng nhập đầu tiên, hoặc mật khẩu đã hết hạn, hệ thống chuyển sang khung <a href="#doi-mat-khau">Đổi Mật Khẩu</a>.
         Đổi xong bạn được đưa thẳng vào <a href="#trang-chu">Trang chủ</a>.</li>
-    <li>Sau khi vào, hệ thống chọn sẵn <b>phòng ban chính</b> của bạn. Được làm việc ở nhiều phòng thì đổi phòng ở ô cuối cột icon
-        bên trái, xem <a href="{{ route('pages.userGuide.show', 'permission') }}#menu-trai">Thanh Menu Bên Trái</a>.</li>
+    <li>Sau khi vào, hệ thống chọn sẵn <b>phòng ban chính</b> của bạn. Đổi phòng ở ô cuối cột icon bên trái (phòng ngoài
+        phạm vi làm việc chỉ được xem), xem <a href="{{ route('pages.userGuide.show', 'permission') }}#menu-trai">Thanh Menu Bên Trái</a>.</li>
 </ol>
 
 <h3>Đăng xuất</h3>

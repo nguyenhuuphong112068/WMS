@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\RequiresChangeReason;
+use App\Http\Controllers\Concerns\StoresBatchItems;
 use App\Http\Controllers\Concerns\UpdatesCategoryLeadTime;
 use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
@@ -33,12 +34,16 @@ use Illuminate\Support\Facades\Validator;
  * Riêng ĐƠN VỊ TÍNH vẫn không khai ở đây: mỗi phòng nhập / xuất theo đơn vị của phòng mình
  * nên nằm ở tab "Vật Tư Của Phòng" (material_department_categories.unit_id).
  *
+ * Modal Thêm mới là BẢNG NHIỀU DÒNG (items[i][...]): một lần lưu được nhiều mã, mã M00001...
+ * cấp liên tiếp theo thứ tự dòng. Modal Cập nhật vẫn sửa từng dòng.
+ *
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về "Chờ duyệt".
  * Mọi thay đổi đều được chụp lại ở bảng material_category_histories.
  */
 class MaterialCategoryController extends Controller
 {
     use RequiresChangeReason;
+    use StoresBatchItems;
     use VerifiesSignature;
     use UpdatesCategoryLeadTime;
 
@@ -100,6 +105,11 @@ class MaterialCategoryController extends Controller
             // Ô Tên vật tư tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị vừa gửi bị lỗi
             // validate; dòng đang sửa gửi kèm nhãn qua material_names_id_text.
             'materialNames' => \App\Support\CategoryLookup::namesByIds('material', [old('material_names_id')]),
+            // Nhãn tên vật tư của các dòng modal Thêm mới vừa báo lỗi (bảng nhiều dòng)
+            'batchNames' => \App\Support\CategoryLookup::namesByIds(
+                'material',
+                collect((array) old('items', []))->filter(fn ($item) => is_array($item))->pluck('material_names_id')->all()
+            ),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
             'nextCode' => $this->nextCode(),
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa thay vì một nút riêng
@@ -121,6 +131,10 @@ class MaterialCategoryController extends Controller
             ),
             // Định khu tìm qua AJAX như ô Tên vật tư, chỉ dựng sẵn option của giá trị old()
             'dmLocations' => \App\Support\CategoryLookup::locationsByIds([old('default_location_id')]),
+            // ... và của các dòng modal Khai Vật Tư Cho Phòng vừa báo lỗi (bảng nhiều dòng)
+            'dmBatchLocations' => \App\Support\CategoryLookup::locationsByIds(
+                collect((array) old('items', []))->filter(fn ($item) => is_array($item))->pluck('default_location_id')->all()
+            ),
             /*
             | Đơn vị các phòng KHÁC đang dùng cho từng mã + hệ số đã khai. Phòng khai đơn
             | vị lệch với phòng khác thì phải khai hệ số quy đổi, nếu không lúc CHUYỂN VẬT
@@ -161,38 +175,67 @@ class MaterialCategoryController extends Controller
         ]);
     }
 
+    /**
+     * Thêm nhiều mã một lần từ bảng items[i][...] của modal Thêm mới. Một dòng lỗi thì không lưu
+     * dòng nào, lỗi báo theo "Dòng N".
+     */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), $this->rules(), $this->messages());
+        // Dòng để trống hoàn toàn (chưa chọn tên, nhà sản xuất, chưa nhập thông tin) thì bỏ qua -
+        // phân loại không tính vì hàng Điền nhanh tự điền sẵn cho mọi dòng
+        $items = $this->batchItems($request, fn ($item) => blank($item['material_names_id'] ?? null)
+            && blank($item['manufacturers_id'] ?? null)
+            && blank($item['part_number'] ?? null)
+            && blank($item['technical_specification'] ?? null));
 
-        $this->checkDuplicate($validator, $request);
+        $validator = Validator::make(
+            ['items' => $items],
+            $this->batchRules($this->rules()),
+            $this->batchMessages($this->messages(), 'Vui lòng thêm ít nhất một dòng vật tư.')
+        );
+
+        $this->checkBatchDuplicates($validator, $items);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
+            // Gửi lại đúng các dòng đã kiểm tra (đã bỏ dòng trống) để số "Dòng N" khớp với bảng
+            return redirect()->back()->withErrors($validator, 'createErrors')->withInput(['items' => $items]);
         }
 
         // Sinh mã và ghi bản ghi trong cùng một transaction để hai người thêm cùng lúc không trùng mã
-        $id = DB::transaction(function () use ($request) {
-            return DB::table(self::TABLE)->insertGetId($this->payload($request) + [
-                'code' => $this->nextCode(),
-                'app_status' => 'pending',
-                // Modal Thêm không có ô Thời gian đặt hàng: báo người có quyền vào khai (thẻ trang chủ),
-                // trừ vật tư Hành Chánh - không cần thời gian đặt hàng
-                'lead_time_pending' => $this->leadTimeApplies($request->purchasing_department) ? 1 : 0,
-                'status_id' => 1,
-                'created_by' => $this->actor(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        $ids = DB::transaction(function () use ($items) {
+            $number = $this->nextNumber();
+            $ids = [];
+
+            foreach ($items as $item) {
+                $ids[] = DB::table(self::TABLE)->insertGetId($this->payload($item) + [
+                    'code' => $this->formatCode($number++),
+                    'app_status' => 'pending',
+                    // Modal Thêm không có ô Thời gian đặt hàng: báo người có quyền vào khai (thẻ trang chủ),
+                    // trừ vật tư Hành Chánh - không cần thời gian đặt hàng
+                    'lead_time_pending' => $this->leadTimeApplies($item['purchasing_department'] ?? null) ? 1 : 0,
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return $ids;
         });
 
-        $code = DB::table(self::TABLE)->where('id', $id)->value('code');
+        $codes = DB::table(self::TABLE)->whereIn('id', $ids)->orderBy('id')->pluck('code', 'id');
 
-        $this->writeHistory($id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . ', mã ' . $code . '.');
+        foreach ($ids as $id) {
+            $this->writeHistory($id, 'Thêm mới', 'Khai báo mới ' . self::LABEL . ', mã ' . $codes[$id] . '.');
 
-        AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', $this->describe($id));
+            AuditTrialController::log('Thêm mới', self::TABLE, $id, 'NA', $this->describe($id));
+        }
 
-        return redirect()->back()->with('success', 'Đã thêm ' . self::LABEL . ' mã ' . $code . '! Bản ghi đang chờ duyệt.');
+        $message = count($ids) === 1
+            ? 'Đã thêm ' . self::LABEL . ' mã ' . $codes->first() . '! Bản ghi đang chờ duyệt.'
+            : 'Đã thêm ' . count($ids) . ' ' . self::LABEL . ' (mã ' . $codes->first() . ' - ' . $codes->last() . ')! Các bản ghi đang chờ duyệt.';
+
+        return redirect()->back()->with('success', $message);
     }
 
     public function update(Request $request)
@@ -215,7 +258,7 @@ class MaterialCategoryController extends Controller
             return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
         }
 
-        $payload = $this->payload($request);
+        $payload = $this->payload($request->all());
         // Thời gian đặt hàng chỉ sửa qua updateLeadTime() (quyền riêng), ở đây giữ nguyên giá trị cũ
         $payload['lead_time_days'] = $current->lead_time_days;
         $note = $this->changeNote($current, $payload);
@@ -477,14 +520,23 @@ class MaterialCategoryController extends Controller
      */
     private function nextCode(): string
     {
+        return $this->formatCode($this->nextNumber());
+    }
+
+    /** Phần số của mã kế tiếp; thêm nhiều dòng thì cộng dần từ số này. */
+    private function nextNumber(): int
+    {
         $numbers = DB::table(self::TABLE)
             ->where('code', 'like', self::CODE_PREFIX . '%')
             ->pluck('code')
             ->map(fn ($code) => (int) substr($code, strlen(self::CODE_PREFIX)));
 
-        $next = ($numbers->max() ?? 0) + 1;
+        return ($numbers->max() ?? 0) + 1;
+    }
 
-        return self::CODE_PREFIX . str_pad((string) $next, self::CODE_LENGTH, '0', STR_PAD_LEFT);
+    private function formatCode(int $number): string
+    {
+        return self::CODE_PREFIX . str_pad((string) $number, self::CODE_LENGTH, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -501,6 +553,38 @@ class MaterialCategoryController extends Controller
 
             if ($exists) {
                 $validator->errors()->add('material_names_id', 'Tổ hợp Vật tư - Nhà sản xuất này đã có trong danh mục.');
+            }
+        });
+    }
+
+    /**
+     * Không cho trùng tổ hợp Vật tư + Nhà sản xuất: với danh mục đang có và giữa các dòng
+     * trong cùng một lần thêm.
+     */
+    private function checkBatchDuplicates($validator, array $items): void
+    {
+        $validator->after(function ($validator) use ($items) {
+            $key = fn ($item) => (int) ($item['material_names_id'] ?? 0) . '-' . (int) ($item['manufacturers_id'] ?? 0);
+
+            $existing = DB::table(self::TABLE)
+                ->whereIn('material_names_id', collect($items)->pluck('material_names_id')->filter()->map(fn ($id) => (int) $id)->all())
+                ->get(['material_names_id', 'manufacturers_id'])
+                ->mapWithKeys(fn ($row) => [$row->material_names_id . '-' . $row->manufacturers_id => true]);
+
+            $seen = [];
+
+            foreach ($items as $index => $item) {
+                if (blank($item['material_names_id'] ?? null) || blank($item['manufacturers_id'] ?? null)) {
+                    continue;
+                }
+
+                if (isset($existing[$key($item)])) {
+                    $validator->errors()->add('items.' . $index . '.material_names_id', 'Tổ hợp Vật tư - Nhà sản xuất này đã có trong danh mục.');
+                } elseif (isset($seen[$key($item)])) {
+                    $validator->errors()->add('items.' . $index . '.material_names_id', 'Trùng Vật tư - Nhà sản xuất với dòng ' . ($seen[$key($item)] + 1) . '.');
+                }
+
+                $seen[$key($item)] ??= $index;
             }
         });
     }
@@ -543,19 +627,21 @@ class MaterialCategoryController extends Controller
         ] + MaterialClassification::rules();
     }
 
-    private function payload(Request $request): array
+    /** Giá trị ghi DB của một vật tư - $input là $request->all() (Cập nhật) hoặc một dòng items[i] (Thêm mới). */
+    private function payload(array $input): array
     {
-        $techSpec = trim((string) $request->technical_specification);
-        $partNumber = trim((string) $request->part_number);
+        $techSpec = trim((string) ($input['technical_specification'] ?? ''));
+        $partNumber = trim((string) ($input['part_number'] ?? ''));
+        $purchasing = (string) ($input['purchasing_department'] ?? '');
 
         return [
-            'material_names_id' => (int) $request->material_names_id,
-            'manufacturers_id' => (int) $request->manufacturers_id,
+            'material_names_id' => (int) ($input['material_names_id'] ?? 0),
+            'manufacturers_id' => (int) ($input['manufacturers_id'] ?? 0),
             'part_number' => $partNumber === '' ? null : $partNumber,
             'technical_specification' => $techSpec === '' ? null : $techSpec,
-            'classification' => MaterialClassification::encode($request->input('classification')),
-            'purchasing_department' => isset(MaterialClassification::PURCHASING_DEPARTMENTS[(string) $request->purchasing_department])
-                ? $request->purchasing_department
+            'classification' => MaterialClassification::encode($input['classification'] ?? null),
+            'purchasing_department' => isset(MaterialClassification::PURCHASING_DEPARTMENTS[$purchasing])
+                ? $purchasing
                 : null,
             // Không nhận từ form: người có quyền khai sau qua updateLeadTime(), update() giữ giá trị cũ
             'lead_time_days' => null,

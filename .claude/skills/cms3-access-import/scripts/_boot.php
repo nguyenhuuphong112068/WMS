@@ -19,7 +19,13 @@ const CMS3 = [
     'departments' => [
         'QC1' => ['id' => 20, 'warehouse_code' => 'QC1-HC', 'warehouse_name' => 'Kho Hoá Chất QC1'],
         'QC2' => ['id' => 9, 'warehouse_code' => 'QC2-HC', 'warehouse_name' => 'Kho Hoá Chất QC2'],
+        // Thêm 04/11/2026 bằng 7_add_departments.php (Q_DMHC_QC3HH / Q_DMHC_QC4HH)
+        'QC' => ['id' => 15, 'warehouse_code' => 'QCNM1-HC', 'warehouse_name' => 'Kho Hoá Chất QC NM1'],
+        'AD' => ['id' => 10, 'warehouse_code' => 'PTPT-HC', 'warehouse_name' => 'Kho Hoá Chất PTPT'],
     ],
+
+    // DVT Access viết khác tên đơn vị trong units (khoá viết thường) - UN = đơn vị hoạt tính enzyme
+    'unit_aliases' => ['un' => 'u'],
 
     // Cờ phụ lục Access => nhóm NĐ 24/2026 (PL_1_1 KHÔNG dùng). HC_Cam => chem_names.is_banned
     'pl_flags' => ['PL_2_1' => 1, 'PL_2_2' => 2, 'PL_3_1_A' => 3, 'PL_3_1_B' => 4, 'PL_3_2_A' => 5,
@@ -149,6 +155,84 @@ function cms3_write_csv(string $file, array $header, array $rows): void
         fputcsv($fh, $row);
     }
     fclose($fh);
+}
+
+/** Mã Dinhkhu -> [tủ, tầng, vị trí] hoặc null (không đặt định khu). */
+function cms3_parse_location(string $raw): ?array
+{
+    $d = mb_strtoupper(cms3_clean($raw));
+    if ($d === '' || in_array($d, ['NA', 'N/A', '-'], true) || preg_match('/^OQDK\d+$/', $d)) {
+        return null;
+    }
+    if (preg_match('/^TỦ\s*(\S+)$/u', $d, $m)) {
+        return [$m[1], '1', '1'];
+    }
+    if (preg_match('/^([A-Z]*\d+)([A-Z]+)(\d+)$/', $d, $m)) {   // 14D4, T1H5, 9AA1
+        return [$m[1], $m[2], $m[3]];
+    }
+    if (preg_match('/^(\d+)([A-Z]+)$/', $d, $m)) {              // 15A, 381B
+        return [$m[1], $m[2], '1'];
+    }
+    if (preg_match('/^([A-Z]*\d+)\.([A-Z]*)(\d+)$/', $d, $m)) { // 5.1, DTT1.2, 034.X1
+        return $m[2] === '' ? [$m[1], $m[3], '1'] : [$m[1], $m[2], $m[3]];
+    }
+    return [$d, '1', '1'];                                       // DT, DC, M5, T2DDCĐ -> cả mã là 1 tủ
+}
+
+/**
+ * Như cms3_parse_location, thêm các dạng mã của QC NM1 / PTPT (7_add_departments.php):
+ *   T1-A1, T088.1-D2 -> Tủ T1 / Tầng A / Vị trí 1;  TL1-10, T25V-3, T088.2-1 -> Tủ (phần trước "-") / Tầng 1 / Vị trí n;
+ *   TLA1 -> Tủ TL / Tầng A / Vị trí 1.
+ * Tách riêng để không đổi định khu QC1/QC2 nếu chạy lại bước 2.
+ */
+function cms3_parse_location_ext(string $raw): ?array
+{
+    $d = mb_strtoupper(cms3_clean($raw));
+    if (preg_match('/^([A-Z]*\d+(?:\.\d+)?)-([A-Z]+)(\d+)$/', $d, $m)) {
+        return [$m[1], $m[2], $m[3]];
+    }
+    if (preg_match('/^(\S+)-(\d+)$/u', $d, $m)) {
+        return [$m[1], '1', $m[2]];
+    }
+    if (preg_match('/^(TL)([A-Z])(\d+)$/', $d, $m)) {
+        return [$m[1], $m[2], $m[3]];
+    }
+    return cms3_parse_location($raw);
+}
+
+function cms3_tier_position(string $t): int
+{
+    if (ctype_digit($t)) {
+        return (int) $t;
+    }
+    $n = 0;
+    foreach (str_split(preg_replace('/[^A-Z]/', '', $t)) as $ch) {
+        $n = $n * 26 + (ord($ch) - 64);
+    }
+    return $n ?: 1;
+}
+
+/**
+ * Mã Access (H…) => id danh mục hoá chất công ty, đọc lịch sử "Thêm mới" theo thứ tự id: mã bị tách ở bước 6
+ * có 2 dòng "Thêm mới" (danh mục cũ + danh mục mới) - dòng sau (danh mục mới) thắng.
+ */
+function cms3_category_of_access_code(): array
+{
+    $out = [];
+    // + dòng "Cập nhật" của bước 8 (mã tạo trên CMS 3.0 sau lần nạp, gộp vào danh mục sẵn có)
+    $rows = Illuminate\Support\Facades\DB::table('chemical_category_histories')->whereIn('action', ['Thêm mới', 'Cập nhật'])
+        ->orderBy('id')->get(['chemical_category_id', 'action', 'change_note']);
+    foreach ($rows as $h) {
+        $note = (string) $h->change_note;
+        if (! str_contains($note, 'CMS 3.0') || ($h->action === 'Cập nhật' && ! str_contains($note, 'CMS 3.0, gộp thêm mã'))) {
+            continue;
+        }
+        preg_match_all('/\bH\d{4,5}\b/', (string) $h->change_note, $m);
+        foreach ($m[0] as $code) {
+            $out[$code] = (int) $h->chemical_category_id;
+        }
+    }
+    return $out;
 }
 
 /** Mã Access => id bản ghi, đọc từ ghi chú lịch sử "Thêm mới" (… mã H0001, H0002 …). */

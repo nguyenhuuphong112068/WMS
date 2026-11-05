@@ -18,6 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\ServeDeferredRows::class,
             // Header X-WMS-Soft: form gửi ngầm, đổi redirect()->back() thành JSON (layout/softSubmit)
             \App\Http\Middleware\SoftSubmit::class,
+            // Phòng ban ngoài phạm vi làm việc: chỉ xem, chặn mọi request ghi
+            \App\Http\Middleware\ViewOnlyDepartment::class,
         ]);
 
         $middleware->alias([

@@ -25,7 +25,7 @@
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 55px">STT</th>
-                        <th style="width: 130px">Mã Danh Mục</th>
+                        <th style="width: 130px">Mã Danh Mục<br><small>/ Mã Access</small></th>
                         <th>Tên Hoá Chất</th>
                         <th style="width: 130px">Số CAS</th>
                         <th>Nhà Sản Xuất</th>
@@ -71,6 +71,12 @@
                                 <span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span>
                                 @if ($row->type)
                                     <br><span class="md-tag">{{ $row->type }}</span>
+                                @endif
+                                {{-- TẠM THỜI: mã bên Access (App\Support\AccessLegacyCode), đối chiếu xong thì gỡ --}}
+                                @if (! empty($accessCodes[$row->id]))
+                                    <div class="md-sub mt-1" title="Mã cũ bên Access dùng để nạp mã danh mục này">
+                                        Access: {{ implode(', ', $accessCodes[$row->id]) }}
+                                    </div>
                                 @endif
                             </td>
                             <td>

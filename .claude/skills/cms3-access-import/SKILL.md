@@ -18,6 +18,9 @@ Script nằm ở `.claude/skills/cms3-access-import/scripts/`. Thư mục dữ l
 | 2 | `php scripts/2_categories.php <D> [--dry]` | manufacturers, chemical_categories, units, warehouses→locations, chemical_department_categories |
 | 3 | `php scripts/3_stock.php <D> [--dry]` | suppliers, chemical_imports (+ histories) |
 | 4 | `php scripts/4_review.php <D>` | không - CSV rà soát |
+| 6 | `php scripts/6_rename_by_ta.php <D> [--dry]` | **chỉ dùng cho dữ liệu nạp TRƯỚC 04/11/2026** (bước 1 cũ đặt tên đơn chất = tên hoạt chất): đổi tên tại chỗ theo TenhoachatTA, tách mã C đã gộp nhiều TenhoachatTA (mã C mới C01013…), chuyển dòng khai phòng + lô theo mã H. Đã chạy 04/11/2026 - không chạy lại |
+| 7 | `php scripts/7_add_departments.php <D> QC,AD [--dry]` (xuất bước 0 với `-Departments QC,AD`) | chỉ chemical_department_categories + định khu (warehouses→locations) của phòng mới; KHÔNG đụng danh mục công ty / QC1 / QC2. Dừng nếu phòng đã có phiếu nhập. Đã chạy 04/11/2026 |
+| 8 | `php scripts/8_add_new_codes.php <D> [--dry]` | mã Access tạo SAU lần nạp (đang được bộ phận dùng, chưa có mã C): tên hoá chất (tạo nếu chưa có, thành phần theo CAS) + danh mục công ty (gộp tên+NSX+Loại với dòng có sẵn → lịch sử "Cập nhật" "CMS 3.0, gộp thêm mã: H…", không thì mã C tiếp theo). Chạy trước bước 7 |
 | 5 | `php scripts/5_compare.php <D>` rồi `python scripts/5_compare_xlsx.py <D> "%USERPROFILE%\Desktop\DoiChieu_DanhMucHoaChat_WMS_CMS3.xlsx"` | không - Excel đối chiếu mã C ↔ mã H (mỗi mã H 1 dòng, so Tên/CAS/NSX/Loại/Trạng thái/Nhóm/Cảnh báo/ĐVT-hạn dùng-định khu QC1, QC2) + sheet mã nghi ngờ (bước 4) + hoạt chất tạo mới |
 
 - Excel có công thức (COUNTIF, SUMPRODUCT): máy này không có LibreOffice (recalc.py của skill xlsx lỗi AF_UNIX trên Windows) → tính lại bằng Excel 2016 qua COM: `$x=New-Object -ComObject Excel.Application; $wb=$x.Workbooks.Open($f); $x.CalculateFull(); $wb.Save(); $x.Quit()`, rồi kiểm lỗi bằng openpyxl `data_only=True`.
@@ -35,11 +38,13 @@ Script nằm ở `.claude/skills/cms3-access-import/scripts/`. Thư mục dữ l
 ### Nguồn Access
 - "Q_DMHC_Chung" người dùng nói = **`Q_DMHC_ChungHH`** (phiên bản MHC lớn nhất của từng mã trong `dbo_T_DMHC_Chung`).
 - Danh mục phòng = `Q_DMHC_<BP>HH` (bảng `dbo_T_DMHC_QC1` lọc `Mabophan`), tồn = `Q_Ton` (QC1) / `Q_Ton2` (QC2) (`dbo_T_Nhap_<BP>` ⟕ `dbo_T_Xuat_<BP>`).
-- Mabophan → phòng WMS: **QC1 → id 20 "Kiểm tra chất lượng - Toàn nhà 1" (QC-B1)**, **QC2 → id 9 QC-B2**. (Phòng id 5 có EngshortName=QC1 nhưng đã khoá - KHÔNG dùng.) Bộ phận khác có trong Access: `QC` (QC3, dbo_T_Nhap_QC), `AD` (QC4, dbo_T_Nhap_AD) - ứng viên theo EngshortName: QC → id 15 KTCL-NM1, AD → id 10 PTPT; **hỏi người dùng trước khi thêm**.
+- Mabophan → phòng WMS: **QC1 → id 20 "Kiểm tra chất lượng - Toàn nhà 1" (QC-B1)**, **QC2 → id 9 QC-B2**. (Phòng id 5 có EngshortName=QC1 nhưng đã khoá - KHÔNG dùng.) **QC (Q_DMHC_QC3HH) → id 15 KTCL-NM1 (kho `QCNM1-HC`), AD (Q_DMHC_QC4HH) → id 10 PTPT (kho `PTPT-HC`)** - người dùng chốt 04/11/2026, nạp danh mục phòng bằng bước 7 (chưa nạp tồn đầu kỳ: QC 540 lô, AD 557 lô trong lots.json).
 
 ### Tên hoá chất (bước 1)
-- Tên = `TenhoachatTA`. **Mọi tên hoá chất phải liên kết ≥ 1 hoạt chất** (script ném lỗi nếu có tên mồ côi).
-- **Đơn chất: tên hoá chất = tên hoạt chất** (tiếng Việt, `active_ingredients.name`) → nhiều mã Access cùng CAS gộp 1 tên (Etanol tuyệt đối / HPLC / 96 % … cùng "Etanol"; cấp độ còn ở cột Loại + NSX). **Hỗn hợp** (≥ 2 thành phần) giữ `TenhoachatTA`, % lấy số lớn nhất trên dòng của cột `Tenhoatchat`.
+- **Tên hoá chất = `TenhoachatTA` cho MỌI mã** (đơn chất lẫn hỗn hợp - người dùng đổi 04/11/2026; trước đó đơn chất lấy tên hoạt chất). Thành phần = hoạt chất ở Dữ Liệu Gốc đơn chất. **Mọi tên hoá chất phải liên kết ≥ 1 hoạt chất** (script ném lỗi nếu có tên mồ côi).
+- Khoá so trùng tên: bỏ hoa/thường + mọi ký tự không phải chữ/số ("di-Sodium…" = "di- Sodium…"). Cùng tên mà thành phần khác (vd "Buffer solution pH 2.00" vừa đơn chất "Đệm pH 2.00" vừa hỗn hợp Nước + Citric + HCl) → **1 tên, giữ bộ nhiều thành phần nhất** (người dùng chọn gộp; hợp lại sẽ lẫn hoạt chất mang tên sản phẩm vào hỗn hợp).
+- Hỗn hợp (≥ 2 thành phần): % lấy số lớn nhất trên dòng của cột `Tenhoatchat`.
+- Hệ quả ở bước 2: danh mục gộp theo (tên + NSX + Loại) nên mã Access khác TenhoachatTA KHÔNG còn chung mã C (Ethanol / Ethanol 96 % là 2 mã).
 - Khớp thành phần theo thứ tự: CAS → tên (name/name_en) → **CAS tra theo tên ở dòng Access khác** → mục gộp → tạo mới.
 - Mục gộp (`CMS3['collectives']`, vd Thủy ngân và hợp chất id 248, Xyanua 281, Chì 3034, Cr6+ 3043…): chỉ gắn `parent_id` khi tên khớp từ khoá **và** cờ PL Access trùng nhóm của mục gộp.
 - Tạo mới: `is_statutory=0`, `legal_ref='Ngoài danh mục NĐ 24/2026 (nạp từ CMS 3.0)'`, tên Việt từ `TenhoachatTV` đã bỏ nồng độ cuối tên; nếu là đơn chất thì ghi nhóm theo cờ PL vào `active_ingredient_classifications` (is_statutory=0, note "Theo phân loại CMS 3.0").
@@ -62,6 +67,17 @@ Script nằm ở `.claude/skills/cms3-access-import/scripts/`. Thư mục dữ l
 - NCC: `MaNCC` → `dbo_T_NCC` → bảng `suppliers` (tạo mới nếu chưa có tên).
 - Ghi chú phiếu: mã XN Access, SL nhập gốc, cân đối, đã xuất, mở nắp, ghi chú cũ.
 
+### Nạp lại tồn theo Access mới nhất khi đã có dữ liệu thật (04/11/2026)
+- Trình tự: bước 0 (`-Departments QC1,QC2,QC,AD`) → xoá phiếu thử trên WMS (người dùng đồng ý; sao lưu cả CSDL trước) → 8 → 7 (`QC1,QC2,QC,AD`, dựng lại danh mục phòng + định khu) → 3. KHÔNG chạy lại 1, 2 (xoá cả danh mục công ty).
+- Bước 3 tra mã H → mã C bằng `cms3_category_of_access_code()` (đúng với mã tách ở bước 6 và mã gộp thêm ở bước 8).
+- Lần 04/11/2026: xoá 12 phiếu xuất, 7 phiếu nhập, 1 cách ly, 3 phiếu nháp, 2 phiếu chuyển; thêm H1083 → C01061, H1084 (Hydranal-Titrant 2 = Metanol + Iot) → C01062; tồn QC1 1.319 lô / 1.964.794,806, QC2 568 / 781.659,455 (= Q_Ton2), QC NM1 540 / 953.606,296, PTPT 557 / 514.654,089 - khớp 100% Access.
+
+### Thêm bộ phận khi đã có dữ liệu thật (bước 7, 04/11/2026)
+- Bước 2 xoá & dựng lại toàn bộ danh mục công ty → KHÔNG chạy lại; dùng bước 7. Mã Access → mã C qua `cms3_category_of_access_code()` (lịch sử "Thêm mới" theo id: mã tách ở bước 6 lấy danh mục mới).
+- Định khu: `cms3_parse_location_ext()` = cms3_parse_location + `T1-A1`/`T088.1-D2` → Tủ/Tầng/Vị trí, `TL1-10`/`T25V-3`/`T088.2-1` → Tủ (trước "-")/Tầng 1/Vị trí n, `TLA1` → Tủ TL/Tầng A/Vị trí 1. `Tủ lạnh`/`Tủ mát` → tủ "LẠNH"/"MÁT"; PTPT có ~110 mã chung tủ `TH`.
+- DVT `UN` (enzyme) → đơn vị `U` (`CMS3['unit_aliases']`).
+- Lần chạy 04/11/2026: QC NM1 591 dòng, PTPT 353 dòng (+3 mã gộp, 1 dòng thử), 2 kho / 80 tủ / 580 vị trí, 479 dòng tương kỵ cùng tầng (giữ đúng Access).
+
 ## 3. Bẫy dữ liệu Access đã gặp
 
 - **File gốc bị khoá độc quyền** ("placed in a state by user 'Admin' on machine …") → luôn chép ra rồi đọc bản chép (export_access.ps1 làm sẵn).
@@ -75,6 +91,8 @@ Script nằm ở `.claude/skills/cms3-access-import/scripts/`. Thư mục dữ l
 - Thành phần không ghi CAS ("Hydrochloric acid" trong "Cleaning") → tra CAS theo tên ở dòng Access khác, nếu không sẽ tạo hoạt chất trùng.
 - `TenhoachatTV` có lỗi chính tả / gán nhầm (NaCl ghi "Natri clorit") → tên trùng hoạt chất khác thì dùng tên tiếng Anh.
 - Lô quá hạn trong Access đã được đánh `Het = True` nên không có trong tồn.
+- **Chủng vi sinh** (Bacillus, E. coli, Candida…, CAS "NA") từng bị khớp hết vào 1 hoạt chất "Bacillus Subtilis" → bước 6 đã tạo hoạt chất riêng (cas_no "Chủng vi sinh"). Nạp lại thì kiểm 4_review: mã không CAS phải ra hoạt chất đúng tên.
+- Bản xuất `lots.json` mới hơn lần nạp thì có lô đã hết ở Access → bước 6 báo `lots_unmapped` (tra lại ở bản xuất cũ).
 - Mã Access gộp chung 1 mã danh mục nhưng khác DVT (vd ml vs g) → báo "ĐVT Access khác ĐVT phòng - chưa quy đổi", không tự đổi.
 
 ## 4. Kiểm tra sau khi nạp

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Category;
 
 use App\Http\Controllers\Concerns\RequiresChangeReason;
+use App\Http\Controllers\Concerns\StoresBatchItems;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
@@ -31,52 +32,79 @@ use Illuminate\Validation\Rule;
  * Mỗi dòng ở đây cũng chính là lời khai "phòng tôi có dùng chất này", dùng cho cột
  * "Phòng Ban Đang Dùng" ở tab Danh Mục Hoá Chất Công Ty.
  *
+ * Modal Thêm mới là BẢNG NHIỀU DÒNG (items[i][...], mỗi dòng một hoá chất): một lần khai được
+ * nhiều hoá chất. Modal Cập nhật vẫn sửa từng dòng.
+ *
  * Không xoá cứng: khoá (status_id = 0) để giữ lại vết đã từng khai.
  */
 class DepartmentChemicalController extends Controller
 {
     use RequiresChangeReason;
+    use StoresBatchItems;
 
     private const TABLE = 'chemical_department_categories';
 
     private const LABEL = 'hoá chất của phòng';
 
+    /**
+     * Khai nhiều hoá chất một lần từ bảng items[i][...] của modal Thêm mới. Một dòng lỗi thì không
+     * lưu dòng nào, lỗi báo theo "Dòng N".
+     */
     public function store(Request $request)
     {
         $departmentId = $this->departmentId();
 
-        $validator = Validator::make($request->all(), $this->rules($departmentId), $this->messages());
+        $items = $this->batchItems($request, fn ($item) => blank($item['category_id'] ?? null));
 
-        $this->checkConversions($validator, $request, (int) $request->category_id, $departmentId);
+        $rules = $this->batchRules($this->rules($departmentId));
+        // Một hoá chất chỉ một dòng trong cùng lần khai
+        $rules['items.*.category_id'][] = 'distinct';
 
-        $this->checkStockRange($validator, $request);
-
-        $this->checkCompatibility($validator, $request, (int) $request->category_id);
-
-        if ($validator->fails()) {
-            return $this->backToTab()->withErrors($validator, 'dcCreateErrors')->withInput();
-        }
-
-        $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
-            'department_id' => $departmentId,
-            'category_id' => (int) $request->category_id,
-            'status_id' => 1,
-            'created_by' => $this->actor(),
-            'created_at' => now(),
-            'updated_at' => now(),
+        $validator = Validator::make(['items' => $items], $rules, $this->batchMessages($this->messages(), 'Vui lòng chọn ít nhất một hoá chất cần khai.') + [
+            'items.*.category_id.distinct' => 'Hoá chất bị chọn trùng ở nhiều dòng.',
         ]);
 
-        $this->saveConversions($request, (int) $request->category_id, $departmentId);
+        foreach ($items as $index => $item) {
+            $prefix = 'items.'.$index.'.';
+            $this->checkConversions($validator, $item, (int) $item['category_id'], $departmentId, $prefix);
+            $this->checkStockRange($validator, $item, $prefix);
+            $this->checkCompatibility($validator, $item, (int) $item['category_id'], 0, $prefix);
+        }
 
-        AuditTrialController::log(
-            'Thêm mới',
-            self::TABLE,
-            $id,
-            'NA',
-            'Khai hoá chất cho phòng ban, category_id: '.$request->category_id
+        $this->checkBatchCompatibility($validator, $items);
+
+        if ($validator->fails()) {
+            // Gửi lại đúng các dòng đã kiểm tra để số "Dòng N" khớp với bảng
+            return $this->backToTab()->withErrors($validator, 'dcCreateErrors')->withInput(['items' => $items]);
+        }
+
+        DB::transaction(function () use ($items, $departmentId) {
+            foreach ($items as $item) {
+                $id = DB::table(self::TABLE)->insertGetId($this->payload($item) + [
+                    'department_id' => $departmentId,
+                    'category_id' => (int) $item['category_id'],
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $this->saveConversions($item, (int) $item['category_id'], $departmentId);
+
+                AuditTrialController::log(
+                    'Thêm mới',
+                    self::TABLE,
+                    $id,
+                    'NA',
+                    'Khai hoá chất cho phòng ban, category_id: '.$item['category_id']
+                );
+            }
+        });
+
+        return $this->backToTab()->with(
+            'success',
+            count($items) === 1 ? 'Đã khai '.self::LABEL.' thành công!' : 'Đã khai '.count($items).' '.self::LABEL.' thành công!'
         );
-
-        return $this->backToTab()->with('success', 'Đã khai '.self::LABEL.' thành công!');
     }
 
     public function update(Request $request)
@@ -104,22 +132,22 @@ class DepartmentChemicalController extends Controller
             $this->messages() + $this->changeReasonMessages()
         );
 
-        $this->checkConversions($validator, $request, (int) $current->category_id, $departmentId);
+        $this->checkConversions($validator, $request->all(), (int) $current->category_id, $departmentId);
 
-        $this->checkStockRange($validator, $request);
+        $this->checkStockRange($validator, $request->all());
 
-        $this->checkCompatibility($validator, $request, (int) $current->category_id, (int) $current->default_location_id);
+        $this->checkCompatibility($validator, $request->all(), (int) $current->category_id, (int) $current->default_location_id);
 
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dcUpdateErrors')->withInput();
         }
 
-        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request) + [
+        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request->all()) + [
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
 
-        $this->saveConversions($request, (int) $current->category_id, $departmentId);
+        $this->saveConversions($request->all(), (int) $current->category_id, $departmentId);
 
         $units = DB::table('units')->pluck('name', 'id');
 
@@ -133,7 +161,7 @@ class DepartmentChemicalController extends Controller
                 .' | ngưỡng: '.($current->min_stock ?? 'mặc định')
                 .' | ngưỡng tối đa: '.($current->max_stock ?? 'chưa khai'),
             'đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
-                .' | kg/đơn vị: '.($this->packWeightKg($request) ?? 'không khai')
+                .' | kg/đơn vị: '.($this->packWeightKg($request->all()) ?? 'không khai')
                 .' | hạn: '.($request->shelf_life_months ?: 'mặc định')
                 .' | ngưỡng: '.($request->min_stock ?: 'mặc định')
                 .' | ngưỡng tối đa: '.($request->max_stock ?: 'chưa khai')
@@ -223,18 +251,18 @@ class DepartmentChemicalController extends Controller
      * Không dùng rule gte:min_stock vì ô tối thiểu thường để trống, lúc đó gte so sánh
      * chuỗi rỗng và cho kết quả vô nghĩa. Chỉ so khi cả hai ô đều có số.
      */
-    private function checkStockRange($validator, Request $request): void
+    private function checkStockRange($validator, array $input, string $prefix = ''): void
     {
-        $validator->after(function ($validator) use ($request) {
-            $min = trim((string) $request->min_stock);
-            $max = trim((string) $request->max_stock);
+        $validator->after(function ($validator) use ($input, $prefix) {
+            $min = trim((string) ($input['min_stock'] ?? ''));
+            $max = trim((string) ($input['max_stock'] ?? ''));
 
             if ($min === '' || $max === '' || ! is_numeric($min) || ! is_numeric($max)) {
                 return;
             }
 
             if ((float) $max < (float) $min) {
-                $validator->errors()->add('max_stock', 'Ngưỡng tồn tối đa phải lớn hơn hoặc bằng ngưỡng tồn tối thiểu.');
+                $validator->errors()->add($prefix.'max_stock', 'Ngưỡng tồn tối đa phải lớn hơn hoặc bằng ngưỡng tồn tối thiểu.');
             }
         });
     }
@@ -247,20 +275,69 @@ class DepartmentChemicalController extends Controller
      * cũ thì cho lưu - chỗ cũ có thể thành tương kỵ do lô khác được xếp vào sau, lỗi đó không nằm
      * ở dòng này (modal vẫn hiện cảnh báo để phòng chuyển chỗ).
      */
-    private function checkCompatibility($validator, Request $request, int $categoryId, int $currentLocationId = 0): void
+    private function checkCompatibility($validator, array $input, int $categoryId, int $currentLocationId = 0, string $prefix = ''): void
     {
-        $validator->after(function ($validator) use ($request, $categoryId, $currentLocationId) {
-            $locationId = (int) $request->default_location_id;
+        $validator->after(function ($validator) use ($input, $categoryId, $currentLocationId, $prefix) {
+            $locationId = (int) ($input['default_location_id'] ?? 0);
 
             if (! $locationId || ! $categoryId || $locationId === $currentLocationId
-                || $validator->errors()->has('default_location_id') || $validator->errors()->has('category_id')) {
+                || $validator->errors()->has($prefix.'default_location_id') || $validator->errors()->has($prefix.'category_id')) {
                 return;
             }
 
             $result = ChemicalCompatibility::checkPlacement($categoryId, $locationId);
 
             if ($result['conflicts']) {
-                $validator->errors()->add('default_location_id', ChemicalCompatibility::message($result));
+                $validator->errors()->add($prefix.'default_location_id', ChemicalCompatibility::message($result));
+            }
+        });
+    }
+
+    /**
+     * Tương kỵ GIỮA CÁC DÒNG của cùng một lần khai: checkPlacement() chỉ thấy hoá chất đã lưu, hai
+     * dòng mới đặt cùng kệ/tủ mà tương kỵ nhau thì phải bắt ở đây. Báo ở dòng sau.
+     */
+    private function checkBatchCompatibility($validator, array $items): void
+    {
+        $validator->after(function ($validator) use ($items) {
+            $placed = collect($items)
+                ->map(fn ($item, $index) => [
+                    'index' => $index,
+                    'category' => (int) ($item['category_id'] ?? 0),
+                    'location' => (int) ($item['default_location_id'] ?? 0),
+                ])
+                ->filter(fn ($row) => $row['category'] && $row['location']
+                    && ! $validator->errors()->has('items.'.$row['index'].'.default_location_id'))
+                ->values();
+
+            if ($placed->count() < 2) {
+                return;
+            }
+
+            $warnings = DB::table('chemical_categories')
+                ->whereIn('id', $placed->pluck('category')->unique()->all())
+                ->pluck('safety_warning', 'id')
+                ->map(fn ($value) => ChemicalCompatibility::decode($value));
+            $neighbours = ChemicalCompatibility::neighbourIds($placed->pluck('location')->all());
+
+            foreach ($placed as $i => $row) {
+                foreach ($placed->slice(0, $i) as $before) {
+                    if (! in_array($before['location'], $neighbours[$row['location']] ?? [$row['location']], true)) {
+                        continue;
+                    }
+
+                    $pairs = ChemicalCompatibility::pairs($warnings[$row['category']] ?? [], $warnings[$before['category']] ?? []);
+
+                    if ($pairs) {
+                        $validator->errors()->add(
+                            'items.'.$row['index'].'.default_location_id',
+                            'Tương kỵ với hoá chất ở dòng '.($before['index'] + 1).' ('.ChemicalCompatibility::pairsText($pairs)
+                            .') nhưng cùng '.ChemicalCompatibility::scope()['label'].'. Vui lòng chọn định khu khác.'
+                        );
+
+                        break;
+                    }
+                }
             }
         });
     }
@@ -271,20 +348,20 @@ class DepartmentChemicalController extends Controller
      * Cùng một mã mà mỗi phòng một đơn vị thì lúc chuyển kho hệ thống phải biết đổi qua
      * lại; thiếu hệ số là số lượng nhận về sẽ sai đơn vị.
      */
-    private function checkConversions($validator, Request $request, int $categoryId, int $departmentId): void
+    private function checkConversions($validator, array $input, int $categoryId, int $departmentId, string $prefix = ''): void
     {
-        $validator->after(function ($validator) use ($request, $categoryId, $departmentId) {
+        $validator->after(function ($validator) use ($input, $categoryId, $departmentId, $prefix) {
             $missing = CategoryUnitConversion::missingFor(
                 CategoryUnitConversion::TYPE_CHEMICAL,
                 $categoryId,
                 $departmentId,
-                (int) $request->unit_id,
-                (array) $request->input('conversions', [])
+                (int) ($input['unit_id'] ?? 0),
+                (array) ($input['conversions'] ?? [])
             );
 
             foreach ($missing as $unit) {
                 $validator->errors()->add(
-                    'conversions.'.$unit->unit_id,
+                    $prefix.'conversions.'.$unit->unit_id,
                     'Vui lòng khai hệ số quy đổi sang '.($unit->unit_short_name ?: $unit->unit_name)
                     .' - đơn vị phòng '.($unit->department_short ?: $unit->department_name).' đang dùng cho hoá chất này.'
                 );
@@ -292,30 +369,31 @@ class DepartmentChemicalController extends Controller
         });
     }
 
-    private function saveConversions(Request $request, int $categoryId, int $departmentId): void
+    private function saveConversions(array $input, int $categoryId, int $departmentId): void
     {
         CategoryUnitConversion::saveDeclarations(
             CategoryUnitConversion::TYPE_CHEMICAL,
             $categoryId,
             $departmentId,
-            (int) $request->unit_id,
-            (array) $request->input('conversions', []),
+            (int) ($input['unit_id'] ?? 0),
+            (array) ($input['conversions'] ?? []),
             $this->actor(),
-            (array) $request->input('conversion_dirs', [])
+            (array) ($input['conversion_dirs'] ?? [])
         );
     }
 
-    private function payload(Request $request): array
+    /** Giá trị ghi DB - $input là $request->all() (Cập nhật) hoặc một dòng items[i] (Thêm mới). */
+    private function payload(array $input): array
     {
         return [
-            'unit_id' => (int) $request->unit_id,
-            'pack_weight_kg' => $this->packWeightKg($request),
-            'shelf_life_months' => $this->nullIfBlank($request->shelf_life_months),
-            'min_stock' => $this->nullIfBlank($request->min_stock),
-            'max_stock' => $this->nullIfBlank($request->max_stock),
-            'storage_condition_id' => $request->storage_condition_id ? (int) $request->storage_condition_id : null,
-            'default_location_id' => $request->default_location_id ? (int) $request->default_location_id : null,
-            'note' => $this->nullIfBlank($request->note),
+            'unit_id' => (int) ($input['unit_id'] ?? 0),
+            'pack_weight_kg' => $this->packWeightKg($input),
+            'shelf_life_months' => $this->nullIfBlank($input['shelf_life_months'] ?? null),
+            'min_stock' => $this->nullIfBlank($input['min_stock'] ?? null),
+            'max_stock' => $this->nullIfBlank($input['max_stock'] ?? null),
+            'storage_condition_id' => ! empty($input['storage_condition_id']) ? (int) $input['storage_condition_id'] : null,
+            'default_location_id' => ! empty($input['default_location_id']) ? (int) $input['default_location_id'] : null,
+            'note' => $this->nullIfBlank($input['note'] ?? null),
         ];
     }
 
@@ -331,15 +409,15 @@ class DepartmentChemicalController extends Controller
      * đơn vị khối lượng / thể tích đã tự quy đổi ra kg được. Chọn đơn vị nhóm khác thì
      * bỏ con số này đi để không còn dữ liệu thừa treo lại.
      */
-    private function packWeightKg(Request $request): ?float
+    private function packWeightKg(array $input): ?float
     {
-        $value = $this->nullIfBlank($request->pack_weight_kg);
+        $value = $this->nullIfBlank($input['pack_weight_kg'] ?? null);
 
         if ($value === null) {
             return null;
         }
 
-        $group = DB::table('units')->where('id', (int) $request->unit_id)->value('unit_group');
+        $group = DB::table('units')->where('id', (int) ($input['unit_id'] ?? 0))->value('unit_group');
 
         return $group === 'count' ? (float) $value : null;
     }

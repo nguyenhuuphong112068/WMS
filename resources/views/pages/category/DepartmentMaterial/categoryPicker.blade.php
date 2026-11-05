@@ -5,15 +5,16 @@
 | Mở từ nút ".dmc-pick-category" đặt trong modal "Khai Vật Tư Cho Phòng"
 | (nút mang data-target-form="#dmCreateModal").
 |
-| Ô select[name="category_id"] của modal đó đã có Select2 (tìm theo tên),
-| nhưng chỉ hiện được tên vật tư nên khó phân biệt các dòng trùng tên khác
-| nhà sản xuất. Bảng này cho xem đủ Tên / Nhà Sản Xuất / Thông Tin Kỹ Thuật,
-| tìm nhanh rồi bấm "Chọn" để đổ vào select.
+| Ô tìm nhanh của modal đó chỉ hiện được một dòng chữ nên khó phân biệt các
+| dòng trùng tên khác nhà sản xuất. Bảng này cho xem đủ Tên / Nhà Sản Xuất /
+| Thông Tin Kỹ Thuật / Phân Loại, lọc rồi TICK CHỌN NHIỀU vật tư, bấm "Thêm vào
+| bảng" là gửi sự kiện cbt:add [{id, name, meta, unit}] về modal đích - mỗi vật
+| tư thành một dòng. Vật tư đã có trong bảng thì khoá ô tick.
 |
 | Danh sách $categories lấy từ DepartmentMaterial::categoryOptions() - chỉ
 | gồm vật tư đã duyệt trong danh mục chung và phòng CHƯA khai, khớp với
-| chính danh sách đã có sẵn trong select. Dùng lại toàn bộ CSS md-*/cat-*
-| và khung bảng chọn cnp-* của chemNamePicker.
+| ô tìm nhanh. Dùng lại toàn bộ CSS md-*/cat-* và khung bảng chọn cnp-* của
+| chemNamePicker.
 --}}
 
 @php
@@ -39,8 +40,8 @@
             <div class="modal-body">
                 <p class="md-hint">
                     <i class="fas fa-info-circle mr-1"></i>
-                    Chỉ hiện vật tư đã duyệt trong danh mục chung và <b>phòng chưa khai</b>. Tìm nhanh
-                    theo mã, tên, nhà sản xuất hoặc thông tin kỹ thuật rồi bấm <b>Chọn</b>.
+                    Chỉ hiện vật tư đã duyệt trong danh mục chung và <b>phòng chưa khai</b>. Tick chọn
+                    nhiều vật tư rồi bấm <b>Thêm vào bảng</b>, mỗi vật tư thành một dòng.
                 </p>
 
                 <div class="cnp-filters">
@@ -78,6 +79,9 @@
                     <table id="dmCategoryPickerTable" class="table table-bordered table-hover w-100">
                         <thead>
                             <tr>
+                                <th class="text-center" style="width: 44px">
+                                    <input type="checkbox" class="dmc-pick-all" title="Chọn tất cả dòng đang hiện">
+                                </th>
                                 <th class="text-center" style="width: 52px">STT</th>
                                 <th style="width: 100px">Mã Vật Tư</th>
                                 <th>Tên Vật Tư</th>
@@ -87,7 +91,6 @@
                                 <th style="width: 200px">Phân Loại</th>
                                 <th style="width: 120px">Bộ Phận Mua Hàng</th>
                                 <th class="text-center" style="width: 95px">Thời Gian Đặt Hàng</th>
-                                <th class="text-center" style="width: 70px">Chọn</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -98,12 +101,19 @@
                                     $dmcChips = MaterialClassification::chips($category->classification);
                                     $dmcManufacturer = $category->manufacturer_short_name ?: $category->manufacturer_name;
                                 @endphp
-                                <tr data-classification="{{ $dmcClassKeys }}"
+                                <tr class="dmc-row" data-classification="{{ $dmcClassKeys }}"
                                     data-purchasing="{{ $category->purchasing_department ? 'purchasing_department:' . $category->purchasing_department : '' }}"
-                                    data-manufacturer="{{ $dmcManufacturer }}">
+                                    data-manufacturer="{{ $dmcManufacturer }}" data-id="{{ $category->id }}"
+                                    data-name="{{ $category->material_name }}"
+                                    data-meta="{{ implode(' · ', array_filter([$category->code, $dmcManufacturer, $category->part_number, $category->technical_specification])) }}"
+                                    data-unit="{{ $category->suggested_unit_id }}">
+                                    <td class="text-center"><input type="checkbox" class="dmc-pick"></td>
                                     <td class="text-center">{{ $loop->iteration }}</td>
                                     <td class="text-nowrap">{{ $category->code ?: '—' }}</td>
-                                    <td class="font-weight-bold">{{ $category->material_name ?: '—' }}</td>
+                                    <td class="font-weight-bold">
+                                        {{ $category->material_name ?: '—' }}
+                                        <span class="badge badge-secondary dmc-added" style="display: none">Đã có trong bảng</span>
+                                    </td>
                                     <td class="md-sub">
                                         {{ $category->manufacturer_name ?: '—' }}
                                         @if ($category->manufacturer_short_name)
@@ -135,14 +145,6 @@
                                             <span class="md-empty">—</span>
                                         @endif
                                     </td>
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-primary dmc-choose"
-                                            data-id="{{ $category->id }}"
-                                            data-name="{{ $category->code ? '[' . $category->code . '] ' : '' }}{{ $category->material_name }}{{ $dmcManufacturer ? ' (' . $dmcManufacturer . ')' : '' }}"
-                                            title="Chọn vật tư này">
-                                            <i class="fas fa-check"></i>
-                                        </button>
-                                    </td>
                                 </tr>
                             @empty
                                 <tr>
@@ -157,7 +159,11 @@
             </div>
 
             <div class="modal-footer">
+                <span class="dmc-pick-count mr-auto">Đã chọn 0 vật tư</span>
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary dmc-pick-apply" disabled>
+                    <i class="fas fa-arrow-down mr-1"></i> Thêm vào bảng
+                </button>
             </div>
         </div>
     </div>
@@ -218,6 +224,10 @@
         #dmCategoryPickerTable tbody td {
             font-size: 0.86rem;
             vertical-align: middle;
+        }
+
+        #dmCategoryPickerTable tbody tr.dmc-row {
+            cursor: pointer;
         }
 
         #dmCategoryPickerModal .dmc-foot {
@@ -326,25 +336,80 @@
                 initDmcTable();
             });
 
+            /* Mọi dòng của bảng chọn, kể cả dòng ở trang DataTables đang ẩn */
+            function allRows() {
+                return dmcTable ? $(dmcTable.rows().nodes()) : $('#dmCategoryPickerTable tbody tr.dmc-row');
+            }
+
+            function refreshCount() {
+                var count = allRows().find('.dmc-pick:checked').length;
+
+                $('#dmCategoryPickerModal .dmc-pick-count').text('Đã chọn ' + count + ' vật tư');
+                $('#dmCategoryPickerModal .dmc-pick-apply').prop('disabled', count === 0);
+            }
+
             /* ---------- Mở bảng chọn từ nút trong modal Khai Vật Tư Cho Phòng ---------- */
             $(document).on('click', '.dmc-pick-category', function() {
                 pickerTargetForm = $($(this).data('target-form') || '#dmCreateModal');
+
+                // Vật tư đã có dòng trong bảng của modal đích thì khoá ô tick
+                var added = {};
+                pickerTargetForm.find('.cbt-category').each(function() {
+                    added[this.value] = true;
+                });
+
+                allRows().each(function() {
+                    var isAdded = !!added[String($(this).data('id'))];
+
+                    $(this).find('.dmc-pick').prop({
+                        checked: false,
+                        disabled: isAdded
+                    });
+                    $(this).find('.dmc-added').toggle(isAdded);
+                });
+
+                $('#dmCategoryPickerModal .dmc-pick-all').prop('checked', false);
+                refreshCount();
                 $('#dmCategoryPickerModal').modal('show');
             });
 
-            /* ---------- Chọn một vật tư ---------- */
-            $(document).on('click', '.dmc-choose', function() {
+            /* ---------- Tick chọn: bấm vào dòng cũng tick ---------- */
+            $(document).on('click', '#dmCategoryPickerTable tbody tr.dmc-row', function(event) {
+                if ($(event.target).is('input, a, button')) return;
+
+                var $check = $(this).find('.dmc-pick');
+                if (!$check.prop('disabled')) $check.prop('checked', !$check.prop('checked'));
+                refreshCount();
+            });
+
+            $(document).on('change', '#dmCategoryPickerTable .dmc-pick', refreshCount);
+
+            /* Tick đầu cột: chọn / bỏ mọi dòng đang hiện theo bộ lọc (mọi trang) */
+            $(document).on('change', '#dmCategoryPickerModal .dmc-pick-all', function() {
+                var rows = dmcTable ? $(dmcTable.rows({
+                    search: 'applied'
+                }).nodes()) : allRows();
+
+                rows.find('.dmc-pick:not(:disabled)').prop('checked', this.checked);
+                refreshCount();
+            });
+
+            /* ---------- Thêm các vật tư đã tick vào bảng của modal đích ---------- */
+            $(document).on('click', '#dmCategoryPickerModal .dmc-pick-apply', function() {
                 if (!pickerTargetForm || !pickerTargetForm.length) return;
 
-                var id = String($(this).data('id'));
-                var $sel = pickerTargetForm.find('select[name="category_id"]');
-                if (!$sel.length) return;
+                var list = allRows().filter(function() {
+                    return $(this).find('.dmc-pick').is(':checked');
+                }).map(function() {
+                    return {
+                        id: String($(this).data('id')),
+                        name: String($(this).attr('data-name') || ''),
+                        meta: String($(this).attr('data-meta') || ''),
+                        unit: String($(this).attr('data-unit') || '')
+                    };
+                }).get();
 
-                if (!$sel.find('option[value="' + id + '"]').length) {
-                    $sel.append(new Option($(this).data('name'), id, true, true));
-                }
-                $sel.val(id).trigger('change');
-
+                pickerTargetForm.trigger('cbt:add', [list]);
                 $('#dmCategoryPickerModal').modal('hide');
             });
 
