@@ -497,7 +497,7 @@ class MaterialCalibrationController extends Controller
                     ])
                     : null;
 
-                // Hàng không đạt dời sang khu Chờ Quyết Định: trừ tồn ngay như phiếu cách ly lập tay
+                // Hàng không đạt dời sang khu Cách Ly Chờ Quyết Định: trừ tồn ngay như phiếu cách ly lập tay
                 if ($quarantineId) {
                     MaterialQuarantineController::deductStock((int) $quarantineId, $actor);
                 }

@@ -122,7 +122,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Định khu Chờ Quyết Định <span class="text-danger">*</span></label>
+                        <label>Định khu Cách Ly Chờ Quyết Định <span class="text-danger">*</span></label>
                         <select name="pending_location_id" class="form-control wms-zone-select" required>
                             <option value="">-- Chọn vị trí đặt hoá chất cách ly --</option>
                             @foreach ($qrPendingLocations as $loc)

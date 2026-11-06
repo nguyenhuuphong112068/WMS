@@ -15,7 +15,7 @@ use Illuminate\Support\HtmlString;
  *   - Dự Phòng        : hàng dự trữ, chưa đưa vào sử dụng.
  *   - Sử Dụng         : hàng đã thông qua, đang dùng cho sản xuất/kiểm nghiệm.
  *   - Biệt Trữ        : hàng mới nhập, đang chờ kiểm tra chất lượng.
- *   - Chờ Quyết Định  : hàng có kết quả bất thường, chờ kết luận xử lý.
+ *   - Cách Ly Chờ Quyết Định  : hàng có kết quả bất thường, chờ kết luận xử lý.
  *   - Loại Bỏ/Chờ Huỷ : hàng không đạt, chờ tiêu huỷ.
  *
  * Màu mặc định đi theo quy ước cảnh báo quen thuộc trong kho: xanh lá = dùng được,
@@ -29,8 +29,16 @@ class ZoneType
         'reserve' => 'Dự Phòng',
         'in_use' => 'Sử Dụng',
         'quarantine' => 'Biệt Trữ',
-        'pending' => 'Chờ Quyết Định',
+        'pending' => 'Cách Ly Chờ Quyết Định',
         'rejected' => 'Loại Bỏ/Chờ Huỷ',
+    ];
+
+    /**
+     * Tên cũ của phân loại (trước khi đổi tên) - bộ nạp file Khởi Tạo Dữ Liệu vẫn hiểu khi
+     * file Excel điền theo tên cũ. 06/11/2026: "Chờ Quyết Định" -> "Cách Ly Chờ Quyết Định".
+     */
+    public const LEGACY_LABELS = [
+        'Chờ Quyết Định' => 'pending',
     ];
 
     /** Màu mặc định của từng phân loại, dùng khi mục định khu chưa chọn màu riêng. */

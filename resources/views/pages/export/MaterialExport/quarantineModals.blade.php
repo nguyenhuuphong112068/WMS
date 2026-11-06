@@ -42,7 +42,7 @@
         ],
     ]);
 
-    // Ô chọn định khu theo phân loại: Chờ Quyết Định (bước 1) / Loại Bỏ/Chờ Huỷ (bước 2)
+    // Ô chọn định khu theo phân loại: Cách Ly Chờ Quyết Định (bước 1) / Loại Bỏ/Chờ Huỷ (bước 2)
     $qrPendingLocations = collect($quarantinePendingLocations ?? []);
     $qrRejectedLocations = collect($quarantineRejectedLocations ?? []);
     $qrReturnLocations = collect($quarantineReturnLocations ?? []);
@@ -252,7 +252,7 @@
 
                     <div class="form-row mt-3">
                         <div class="form-group col-md-5 mb-0">
-                            <label>Định khu Chờ Quyết Định <span class="text-danger">*</span></label>
+                            <label>Định khu Cách Ly Chờ Quyết Định <span class="text-danger">*</span></label>
                             <select name="pending_location_id" required {{ $qrPendingLocations->isEmpty() ? 'disabled' : '' }}
                                 class="form-control wms-zone-select {{ $qrBag->has('pending_location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chọn vị trí đặt vật tư cách ly --</option>
@@ -264,7 +264,7 @@
                                 @endforeach
                             </select>
                             @if ($qrPendingLocations->isEmpty())
-                                <div class="md-error text-danger small">Phòng ban chưa khai định khu vật tư loại "Chờ Quyết Định" ở Dữ Liệu Gốc → Định Khu.</div>
+                                <div class="md-error text-danger small">Phòng ban chưa khai định khu vật tư loại "Cách Ly Chờ Quyết Định" ở Dữ Liệu Gốc → Định Khu.</div>
                             @endif
                             @if ($qrBag->has('pending_location_id')) <div class="md-error text-danger small">{{ $qrBag->first('pending_location_id') }}</div> @endif
                         </div>
@@ -442,7 +442,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Định khu Chờ Quyết Định <span class="text-danger">*</span></label>
+                        <label>Định khu Cách Ly Chờ Quyết Định <span class="text-danger">*</span></label>
                         <select name="pending_location_id" class="form-control wms-zone-select" required>
                             <option value="">-- Chọn vị trí đặt vật tư cách ly --</option>
                             @foreach ($qrPendingLocations as $loc)

@@ -70,7 +70,7 @@
                             @if ($iqBag->has('items.0.amount')) <div class="md-error text-danger small">{{ $iqBag->first('items.0.amount') }}</div> @endif
                         </div>
                         <div class="form-group col-md-7">
-                            <label>Định khu Chờ Quyết Định <span class="text-danger">*</span></label>
+                            <label>Định khu Cách Ly Chờ Quyết Định <span class="text-danger">*</span></label>
                             <select name="pending_location_id" required {{ $iqLocations->isEmpty() ? 'disabled' : '' }}
                                 class="form-control wms-zone-select {{ $iqBag->has('pending_location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chọn vị trí đặt hoá chất cách ly --</option>
@@ -82,7 +82,7 @@
                                 @endforeach
                             </select>
                             @if ($iqLocations->isEmpty())
-                                <div class="md-error text-danger small">Phòng ban chưa khai định khu hoá chất loại "Chờ Quyết Định" ở Dữ Liệu Gốc → Định Khu.</div>
+                                <div class="md-error text-danger small">Phòng ban chưa khai định khu hoá chất loại "Cách Ly Chờ Quyết Định" ở Dữ Liệu Gốc → Định Khu.</div>
                             @endif
                             @if ($iqBag->has('pending_location_id')) <div class="md-error text-danger small">{{ $iqBag->first('pending_location_id') }}</div> @endif
                         </div>

@@ -2,7 +2,7 @@
 | SỬ DỤNG HOÁ CHẤT - TAB "CÁCH LY - LOẠI BỎ - HUỶ"
 |
 | Quy trình 3 bước - xem ChemicalQuarantineController:
-|   1. Cách ly chờ quyết định : bấm [Cách ly] ở Tồn Kho Hoá Chất; hàng dời sang khu Chờ Quyết Định, trừ
+|   1. Cách ly chờ quyết định : bấm [Cách ly] ở Tồn Kho Hoá Chất; hàng dời sang khu Cách Ly Chờ Quyết Định, trừ
 |                               tồn ngay; trả về kho thì hoàn tồn.
 |   2. Loại bỏ - Chờ huỷ      : hàng dời sang khu Loại Bỏ/Chờ Huỷ, không quay lại kho.
 |   3. Huỷ                    : ghi nhận đã huỷ thực tế.

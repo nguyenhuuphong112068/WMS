@@ -307,6 +307,8 @@ class InitialDataImporter
     {
         $row = ['_row' => $r];
         $lists = InitialDataSchema::lists();
+        // File điền theo tên phân loại định khu cũ vẫn nạp được
+        $lists['zone_type'] += \App\Support\ZoneType::LEGACY_LABELS;
 
         foreach ($sheet['columns'] as $col) {
             if ($col['type'] === 'calc') {

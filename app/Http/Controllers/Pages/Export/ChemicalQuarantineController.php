@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Validator;
  * và "Cận hạn dùng"); các bước sau làm ở tab "Cách ly - Loại bỏ - Huỷ" của Sử Dụng Hoá Chất, dữ liệu
  * do ChemicalExportController::index() nạp qua paneData().
  *
- *   BƯỚC 1 - CÁCH LY  (quarantined): dời hàng sang định khu "Chờ Quyết Định" -> TRỪ TỒN NGAY bằng
+ *   BƯỚC 1 - CÁCH LY  (quarantined): dời hàng sang định khu "Cách Ly Chờ Quyết Định" -> TRỪ TỒN NGAY bằng
  *                     chemical_exports type = cancel (quarantine_id trỏ về phiếu cách ly, xem
  *                     deductStock()). Quyết định "Trả về kho" (returned) thì khoá dòng xuất đó
  *                     (status_id = 0) - tồn quay lại.
@@ -68,7 +68,7 @@ class ChemicalQuarantineController extends Controller
 
     public const REJECTED_ZONE = 'rejected';
 
-    /** Trả về kho: được đặt vào mọi định khu hoá chất của phòng, trừ khu Chờ Quyết Định / Loại Bỏ. */
+    /** Trả về kho: được đặt vào mọi định khu hoá chất của phòng, trừ khu Cách Ly Chờ Quyết Định / Loại Bỏ. */
     private const NOT_RETURN_ZONES = [self::PENDING_ZONE, self::REJECTED_ZONE];
 
     public const DECISIONS = [
@@ -675,7 +675,7 @@ class ChemicalQuarantineController extends Controller
             ->values();
     }
 
-    /** Định khu được chọn khi trả về kho: định khu hoá chất của phòng, trừ khu Chờ Quyết Định / Loại Bỏ. */
+    /** Định khu được chọn khi trả về kho: định khu hoá chất của phòng, trừ khu Cách Ly Chờ Quyết Định / Loại Bỏ. */
     public static function returnLocations(int $departmentId)
     {
         return DepartmentChemical::locationOptions($departmentId)
@@ -857,8 +857,8 @@ class ChemicalQuarantineController extends Controller
             'amount.min' => 'Số lượng phải lớn hơn 0.',
             'reason.required' => 'Vui lòng nhập lý do cách ly (hỏng / hết hạn...).',
             'reason.max' => 'Lý do tối đa 500 ký tự.',
-            'pending_location_id.required' => 'Vui lòng chọn định khu Chờ Quyết Định để đặt hoá chất cách ly.',
-            'pending_location_id.integer' => 'Định khu Chờ Quyết Định không hợp lệ.',
+            'pending_location_id.required' => 'Vui lòng chọn định khu Cách Ly Chờ Quyết Định để đặt hoá chất cách ly.',
+            'pending_location_id.integer' => 'Định khu Cách Ly Chờ Quyết Định không hợp lệ.',
         ];
     }
 }

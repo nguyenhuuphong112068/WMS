@@ -50,8 +50,8 @@
 
 <h3>Gán phân loại và loại lưu trữ cho vị trí</h3>
 <ol class="ug-steps">
-    <li>Mở một kệ đã lưu. <b>Bấm</b> hoặc <b>rê chuột</b> qua các ô để chọn nhiều vị trí; bấm <b>Chọn cả kệ</b> để chọn tất cả.</li>
-    <li>Chọn <b>Phân loại</b>: <i>Dự Phòng</i>, <i>Sử Dụng</i>, <i>Biệt Trữ</i>, <i>Chờ Quyết Định</i>, <i>Loại Bỏ/Chờ Huỷ</i>.
+    <li>Mở một kệ đã lưu. <b>Bấm</b> hoặc <b>rê chuột</b> qua các ô để chọn nhiều vị trí; giữ <b>Shift</b> rồi kéo chuột để quét một khung chữ nhật, mọi ô chạm khung (kể cả ở nhiều tầng, nhiều cột) được thêm vào lựa chọn; bấm <b>Chọn cả kệ</b> để chọn tất cả.</li>
+    <li>Chọn <b>Phân loại</b>: <i>Dự Phòng</i>, <i>Sử Dụng</i>, <i>Biệt Trữ</i>, <i>Cách Ly Chờ Quyết Định</i>, <i>Loại Bỏ/Chờ Huỷ</i>.
         Mỗi phân loại có một màu riêng trên lưới.</li>
     <li>Chọn <b>Loại lưu trữ</b>: <i>Vật tư</i>, <i>Hoá chất</i>, <i>Chất chuẩn</i> hoặc <i>Dùng chung</i>. Màn hình Tồn của
         từng loại chỉ hiện các vị trí đúng loại; vị trí <i>Dùng chung</i> hiện ở cả ba màn hình.</li>

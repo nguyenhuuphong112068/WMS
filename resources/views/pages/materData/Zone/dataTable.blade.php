@@ -811,7 +811,7 @@
             var value = $(this).val();
             var table = $('#zoneTable-' + $(this).data('type')).DataTable();
 
-            // So khớp trọn ô để "Chờ Quyết Định" không dính nhầm sang nhãn khác
+            // So khớp trọn ô để "Cách Ly Chờ Quyết Định" không dính nhầm sang nhãn khác
             table.column($(this).data('col'))
                 .search(value ? '^' + value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$' : '', true, false)
                 .draw();

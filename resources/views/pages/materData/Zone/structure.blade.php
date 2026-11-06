@@ -1222,6 +1222,19 @@
         cursor: pointer;
     }
 
+    .zs-pickable.is-marquee,
+    .zs-pickable.is-marquee .zs-cell[data-id] {
+        cursor: crosshair;
+    }
+
+    .zs-marquee {
+        position: fixed;
+        z-index: 1050;
+        border: 1px dashed #2E7BC4;
+        background: rgba(46, 123, 196, .12);
+        pointer-events: none;
+    }
+
     .zs-cell.is-picked,
     .zs-swatch.is-picked {
         outline: 2px solid #F59E0B;
@@ -3152,6 +3165,7 @@
 
     // Bấm hoặc rê chuột qua các ô để chọn/bỏ chọn; ô đầu tiên quyết định đang chọn hay đang bỏ.
     el.editor.addEventListener('pointerdown', function (event) {
+        if (event.shiftKey && event.button === 0 && startMarquee(event)) return;
         var node = event.target.closest('.zs-pickable .zs-cell[data-id]');
         if (!node) return;
         event.preventDefault();
@@ -3171,6 +3185,70 @@
     document.addEventListener('pointerup', function () {
         state.painting = null;
     });
+
+    // Shift + kéo chuột: quét khung chữ nhật, mọi ô chạm khung được thêm vào lựa chọn.
+    // Điểm đầu neo theo nội dung vùng cột nên cuộn trang giữa chừng vẫn đúng.
+    var marquee = null;
+
+    function startMarquee(event) {
+        if (!el.columns.classList.contains('zs-pickable')) return false;
+        if (!el.columns.contains(event.target)) return false;
+        if (event.target.closest('input, select, textarea, button, a')) return false;
+
+        event.preventDefault();
+        var box = el.columns.getBoundingClientRect();
+        marquee = {
+            x: event.clientX - box.left + el.columns.scrollLeft,
+            y: event.clientY - box.top + el.columns.scrollTop,
+            cx: event.clientX,
+            cy: event.clientY,
+            base: new Set(state.picked),
+            node: document.createElement('div')
+        };
+        marquee.node.className = 'zs-marquee';
+        document.body.appendChild(marquee.node);
+        el.columns.classList.add('is-marquee');
+        drawMarquee();
+        return true;
+    }
+
+    function drawMarquee() {
+        if (!marquee) return;
+        var box = el.columns.getBoundingClientRect();
+        var sx = box.left - el.columns.scrollLeft + marquee.x;
+        var sy = box.top - el.columns.scrollTop + marquee.y;
+        var left = Math.min(sx, marquee.cx), right = Math.max(sx, marquee.cx);
+        var top = Math.min(sy, marquee.cy), bottom = Math.max(sy, marquee.cy);
+
+        marquee.node.style.left = left + 'px';
+        marquee.node.style.top = top + 'px';
+        marquee.node.style.width = (right - left) + 'px';
+        marquee.node.style.height = (bottom - top) + 'px';
+
+        el.columns.querySelectorAll('.zs-cell[data-id]').forEach(function (node) {
+            var r = node.getBoundingClientRect();
+            var inside = r.right >= left && r.left <= right && r.bottom >= top && r.top <= bottom;
+            pick(node, inside || marquee.base.has(Number(node.dataset.id)));
+        });
+        updatePicked();
+    }
+
+    function endMarquee() {
+        if (!marquee) return;
+        marquee.node.remove();
+        marquee = null;
+        el.columns.classList.remove('is-marquee');
+    }
+
+    document.addEventListener('pointermove', function (event) {
+        if (!marquee) return;
+        marquee.cx = event.clientX;
+        marquee.cy = event.clientY;
+        drawMarquee();
+    });
+    document.addEventListener('pointerup', endMarquee);
+    document.addEventListener('pointercancel', endMarquee);
+    window.addEventListener('scroll', drawMarquee, true);
 
     el.locAll.addEventListener('click', function () {
         el.columns.querySelectorAll('.zs-cell[data-id]').forEach(function (node) { pick(node, true); });

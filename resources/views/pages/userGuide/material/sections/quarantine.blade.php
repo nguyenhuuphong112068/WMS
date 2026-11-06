@@ -6,7 +6,7 @@
 
 <ol class="ug-steps">
     <li><b>Cách ly</b>: bấm <span class="btn btn-sm btn-danger ug-ui"><i class="fas fa-biohazard mr-1"></i> Cách ly vật tư hỏng</span>,
-        chọn các mã xuất nhập (lọc được theo hạn dùng: đã hết hạn, sát hạn, cận hạn), số lượng, <b>Định khu Chờ Quyết Định</b>
+        chọn các mã xuất nhập (lọc được theo hạn dùng: đã hết hạn, sát hạn, cận hạn), số lượng, <b>Định khu Cách Ly Chờ Quyết Định</b>
         và <b>Lý do cách ly</b>.</li>
     <li><b>Quyết định</b> (quyền <i>Quyết Định Loại Bỏ Vật Tư Hỏng</i>), ghi căn cứ và nhập lại mật khẩu:
         <ul>
@@ -21,6 +21,6 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Vật tư <a href="#hieu-chuan">hiệu chuẩn Không đạt</a> tự vào bước Cách ly mà không cần thao tác. Định khu Chờ Quyết Định
+    <div>Vật tư <a href="#hieu-chuan">hiệu chuẩn Không đạt</a> tự vào bước Cách ly mà không cần thao tác. Định khu Cách Ly Chờ Quyết Định
         và Loại Bỏ/Chờ Huỷ là các vị trí đã gán phân loại tương ứng ở <b>Dữ Liệu Gốc › Định Khu</b>.</div>
 </div>

@@ -136,7 +136,7 @@ class ChemicalInventoryController extends Controller
             'vsFilter' => in_array($request->input('vs'), ['yes', 'no'], true) ? $request->input('vs') : 'all',
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
             'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
-            // Nút [Cách ly] ở tab Theo mã xuất nhập / Cận hạn dùng: định khu Chờ Quyết Định của phòng
+            // Nút [Cách ly] ở tab Theo mã xuất nhập / Cận hạn dùng: định khu Cách Ly Chờ Quyết Định của phòng
             'quarantinePendingLocations' => \App\Http\Controllers\Pages\Export\ChemicalQuarantineController::zoneLocations(
                 $departmentId,
                 \App\Http\Controllers\Pages\Export\ChemicalQuarantineController::PENDING_ZONE

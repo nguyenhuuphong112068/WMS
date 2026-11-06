@@ -2,7 +2,7 @@
 | SỬ DỤNG VẬT TƯ - TAB "CÁCH LY - LOẠI BỎ - HUỶ"
 |
 | Quy trình 3 bước - xem MaterialQuarantineController:
-|   1. Cách ly chờ quyết định : hàng dời sang khu Chờ Quyết Định, trừ tồn ngay; trả về kho thì hoàn tồn.
+|   1. Cách ly chờ quyết định : hàng dời sang khu Cách Ly Chờ Quyết Định, trừ tồn ngay; trả về kho thì hoàn tồn.
 |   2. Loại bỏ                : hàng dời sang khu Loại Bỏ/Chờ Huỷ, không quay lại kho.
 |   3. Huỷ                    : ghi nhận đã huỷ thực tế.
 | Nhóm "Vật tư sắp hết hạn dùng" (qstatus=expiring) không phải phiếu mà là danh sách LÔ còn tồn có

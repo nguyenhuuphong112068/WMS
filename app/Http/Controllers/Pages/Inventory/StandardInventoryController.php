@@ -142,7 +142,7 @@ class StandardInventoryController extends Controller
             'expiringFilters' => $this->expiringFilters(),
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
             'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
-            // Nút [Cách ly] (bước 1 quy trình chất chuẩn hỏng): tồn HÔM NAY của từng ống + định khu Chờ Quyết Định
+            // Nút [Cách ly] (bước 1 quy trình chất chuẩn hỏng): tồn HÔM NAY của từng ống + định khu Cách Ly Chờ Quyết Định
             'quarantineRemaining' => \App\Http\Controllers\Pages\Export\StandardQuarantineController::remainingMap($departmentId),
             'quarantinePendingLocations' => \App\Http\Controllers\Pages\Export\StandardQuarantineController::zoneLocations(
                 $departmentId,

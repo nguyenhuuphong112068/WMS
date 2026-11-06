@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Validator;
  * "Hạn dùng sắp hết"); các bước sau làm ở tab "Cách ly - Loại bỏ - Huỷ" của Sử Dụng Chất Chuẩn, dữ
  * liệu do StandardExportController::index() nạp qua paneData().
  *
- *   BƯỚC 1 - CÁCH LY  (quarantined): dời ống sang định khu "Chờ Quyết Định" -> TRỪ TỒN NGAY bằng
+ *   BƯỚC 1 - CÁCH LY  (quarantined): dời ống sang định khu "Cách Ly Chờ Quyết Định" -> TRỪ TỒN NGAY bằng
  *                     standard_exports type = cancel (quarantine_id trỏ về phiếu cách ly, xem
  *                     deductStock()). Quyết định "Trả về kho" (returned) thì đưa số lượng dòng xuất
  *                     đó về 0 - tồn quay lại. standard_exports không có cột status_id nên không khoá
@@ -69,7 +69,7 @@ class StandardQuarantineController extends Controller
 
     public const REJECTED_ZONE = 'rejected';
 
-    /** Trả về kho: được đặt vào mọi định khu chất chuẩn của phòng, trừ khu Chờ Quyết Định / Loại Bỏ. */
+    /** Trả về kho: được đặt vào mọi định khu chất chuẩn của phòng, trừ khu Cách Ly Chờ Quyết Định / Loại Bỏ. */
     private const NOT_RETURN_ZONES = [self::PENDING_ZONE, self::REJECTED_ZONE];
 
     public const DECISIONS = [
@@ -714,7 +714,7 @@ class StandardQuarantineController extends Controller
             ->values();
     }
 
-    /** Định khu được chọn khi trả về kho: định khu chất chuẩn của phòng, trừ khu Chờ Quyết Định / Loại Bỏ. */
+    /** Định khu được chọn khi trả về kho: định khu chất chuẩn của phòng, trừ khu Cách Ly Chờ Quyết Định / Loại Bỏ. */
     public static function returnLocations(int $departmentId)
     {
         return DepartmentStandard::locationOptions($departmentId)
@@ -890,8 +890,8 @@ class StandardQuarantineController extends Controller
             'amount.min' => 'Số lượng phải lớn hơn 0.',
             'reason.required' => 'Vui lòng nhập lý do cách ly (hỏng / hết hạn...).',
             'reason.max' => 'Lý do tối đa 500 ký tự.',
-            'pending_location_id.required' => 'Vui lòng chọn định khu Chờ Quyết Định để đặt ống chuẩn cách ly.',
-            'pending_location_id.integer' => 'Định khu Chờ Quyết Định không hợp lệ.',
+            'pending_location_id.required' => 'Vui lòng chọn định khu Cách Ly Chờ Quyết Định để đặt ống chuẩn cách ly.',
+            'pending_location_id.integer' => 'Định khu Cách Ly Chờ Quyết Định không hợp lệ.',
         ];
     }
 }

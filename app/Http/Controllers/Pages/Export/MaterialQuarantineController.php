@@ -79,7 +79,7 @@ class MaterialQuarantineController extends Controller
 
     public const REJECTED_ZONE = 'rejected';
 
-    /** Trả về kho: được đặt vào mọi định khu vật tư của phòng, trừ khu Chờ Quyết Định / Loại Bỏ. */
+    /** Trả về kho: được đặt vào mọi định khu vật tư của phòng, trừ khu Cách Ly Chờ Quyết Định / Loại Bỏ. */
     private const NOT_RETURN_ZONES = [self::PENDING_ZONE, self::REJECTED_ZONE];
 
     public const DECISIONS = [
@@ -678,7 +678,7 @@ class MaterialQuarantineController extends Controller
             ->values();
     }
 
-    /** Định khu được chọn khi trả về kho: định khu vật tư của phòng, trừ khu Chờ Quyết Định / Loại Bỏ. */
+    /** Định khu được chọn khi trả về kho: định khu vật tư của phòng, trừ khu Cách Ly Chờ Quyết Định / Loại Bỏ. */
     public static function returnLocations(int $departmentId)
     {
         return DepartmentMaterial::locationOptions($departmentId)
@@ -860,8 +860,8 @@ class MaterialQuarantineController extends Controller
             'amount.min' => 'Số lượng phải lớn hơn 0.',
             'reason.required' => 'Vui lòng nhập lý do cách ly (hỏng / hết hạn...).',
             'reason.max' => 'Lý do tối đa 500 ký tự.',
-            'pending_location_id.required' => 'Vui lòng chọn định khu Chờ Quyết Định để đặt vật tư cách ly.',
-            'pending_location_id.integer' => 'Định khu Chờ Quyết Định không hợp lệ.',
+            'pending_location_id.required' => 'Vui lòng chọn định khu Cách Ly Chờ Quyết Định để đặt vật tư cách ly.',
+            'pending_location_id.integer' => 'Định khu Cách Ly Chờ Quyết Định không hợp lệ.',
         ];
     }
 }

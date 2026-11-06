@@ -5,7 +5,7 @@
 <ol class="ug-steps">
     <li><b>Cách ly</b>: mở <b>Tồn Kho Chất Chuẩn</b> (tab Theo mã ống chuẩn hoặc Cận hạn dùng), bấm
         <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-biohazard"></i></span> ở cột Thao Tác của ống, nhập
-        <b>Số lượng cách ly</b> (không vượt tồn hiện tại), chọn <b>Định khu Chờ Quyết Định</b> và ghi <b>Lý do cách ly</b>. Nút
+        <b>Số lượng cách ly</b> (không vượt tồn hiện tại), chọn <b>Định khu Cách Ly Chờ Quyết Định</b> và ghi <b>Lý do cách ly</b>. Nút
         <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-biohazard mr-1"></i> Cách ly từ Tồn Kho</span> ở tab này dẫn thẳng sang đó.
         Khi còn chờ quyết định, bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span> để sửa số lượng, lý do, định khu.
         @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/standard/cach-ly-tu-ton-kho.png', 'caption' => 'Hộp thoại Cách ly chất chuẩn chờ quyết định (mở từ Tồn Kho)', 'width' => 560])
@@ -31,6 +31,6 @@
 
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
-    <div>Phòng phải khai sẵn định khu chất chuẩn loại <b>Chờ Quyết Định</b> và <b>Loại Bỏ/Chờ Huỷ</b> ở Dữ Liệu Gốc › Định Khu. Chỉ cách ly
+    <div>Phòng phải khai sẵn định khu chất chuẩn loại <b>Cách Ly Chờ Quyết Định</b> và <b>Loại Bỏ/Chờ Huỷ</b> ở Dữ Liệu Gốc › Định Khu. Chỉ cách ly
         một phần ống thì khi trả về kho chỉ đặt lại được đúng vị trí cũ của ống.</div>
 </div>
