@@ -17,6 +17,7 @@
 |   shelf          : có cột Hạn Dùng Nội Bộ        packWeight: có ô Khối lượng quy đổi (hoá chất)
 |   compat         : khung cảnh báo tương kỵ ở định khu (hoá chất - DepartmentChemical/compatibility)
 |   locationType   : material|chemical|standard (lọc định khu)
+|   locationLabel  : 'path' (mặc định: Kho / Kệ / Cột / Tầng / mã) | 'code' (chỉ mã vị trí)
 |   batchLocations : định khu của các dòng vừa báo lỗi (dựng sẵn option)
 |   unitsInUse / conversions : như shared/unitConversion
 |   picker         : có nút bảng chọn nhiều (DepartmentMaterial/categoryPicker)
@@ -29,9 +30,14 @@
     // chỉ dựng lại các dòng vừa nhập khi chính form này báo lỗi.
     $cbtRows = $bag->any() ? array_values(array_filter((array) old('items', []), 'is_array')) : [];
 
+    $codeOnly = ($cfg['locationLabel'] ?? 'path') === 'code';
+    $cfg['locationLookupUrl'] = route('pages.category.lookup.locations', array_filter([
+        'type' => $cfg['locationType'],
+        'label' => $codeOnly ? 'code' : null,
+    ]));
     $cfg['locationLabels'] = collect($cfg['batchLocations'] ?? [])
         ->mapWithKeys(fn($l) => [(string) $l->id => [
-            'text' => \App\Support\CategoryLookup::locationLabel($l),
+            'text' => $codeOnly ? $l->code : \App\Support\CategoryLookup::locationLabel($l),
             'zone' => $l->zone_type ?? '',
         ]])
         ->all();
@@ -149,7 +155,7 @@
                                     <th>
                                         <select class="form-control cbt-select cbt-location" data-fill="default_location_id"
                                             data-zone-filter
-                                            data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => $cfg['locationType']]) }}">
+                                            data-lookup-url="{{ $cfg['locationLookupUrl'] }}">
                                             <option value="">-- Định khu --</option>
                                         </select>
                                     </th>

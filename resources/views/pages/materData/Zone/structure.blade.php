@@ -377,11 +377,12 @@
 
     .zs-tile-code {
         font-weight: 800;
-        font-size: 1.25rem;
+        font-size: 1.15rem;
+        line-height: 1.3;
         color: var(--text-main);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        min-width: 0;
     }
 
     .zs-tile-tools {
@@ -427,9 +428,7 @@
         color: #334155;
         margin-bottom: 12px;
         min-height: 1.5rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        overflow-wrap: anywhere;
     }
 
     .zs-tile-bar {

@@ -56,6 +56,11 @@ class CategoryLookupController extends Controller
 
         $result = CategoryLookup::searchLocations($type, $departmentId, (string) $request->q, (int) $request->page, $zone, $onlyZone);
 
+        // label=code: chỉ hiện mã vị trí (modal "Khai Hoá Chất Cho Phòng"), vẫn tìm theo cả đường dẫn
+        if ($request->label === 'code') {
+            $result['results'] = array_map(fn ($item) => ['text' => $item['code']] + $item, $result['results']);
+        }
+
         // Ô Định khu của modal "Khai Hoá Chất Cho Phòng" gửi kèm hoá chất đang khai: định khu nằm
         // cùng kệ/tủ với hoá chất tương kỵ bị khoá lại, kèm câu giải thích.
         if ($type === 'chemical' && (int) $request->category_id > 0) {

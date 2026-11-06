@@ -35,6 +35,7 @@
         'packWeight' => true,
         'compat' => true,
         'locationType' => 'chemical',
+        'locationLabel' => 'code',
         'batchLocations' => $batchLocations ?? [],
         'unitsInUse' => $unitsInUse,
         'conversions' => $conversions,

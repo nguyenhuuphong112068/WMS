@@ -392,6 +392,7 @@ class CategoryLookup
             $rows->map(fn ($row) => [
                 'id' => (int) $row->id,
                 'text' => self::locationLabel($row),
+                'code' => (string) $row->code,
                 'zone_type' => $row->zone_type,
             ])->all(),
             $more

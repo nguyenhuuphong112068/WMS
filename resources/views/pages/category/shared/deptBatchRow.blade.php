@@ -95,7 +95,7 @@
         </td>
         <td>
             <select name="items[{{ $index }}][default_location_id]" data-fill="default_location_id" data-zone-filter
-                data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => $cfg['locationType']]) }}"
+                data-lookup-url="{{ $cfg['locationLookupUrl'] }}"
                 class="form-control cbt-select cbt-location {{ $err('default_location_id') }}">
                 <option value="">-- Chưa định khu --</option>
                 @if ($locationId !== '' && isset($cfg['locationLabels'][$locationId]))
