@@ -35,6 +35,8 @@ class ZoneStructureController extends Controller
     private const MAX_LOCATIONS = 200;
     // Số dãy tối đa theo chiều sâu của một tầng.
     private const MAX_DEPTH = 20;
+    // Mã tầng tự đặt: chữ không dấu, số, . _ - (dấu / là ký tự nối các cấp nên không được dùng).
+    private const SEGMENT_PATTERN = '/^[A-Za-z0-9._-]+$/';
     // Một lượt lưu có thể sinh vài nghìn vị trí, chặn ngưỡng để transaction không phình quá lớn.
     private const MAX_CELLS = 20000;
     // Số kệ tối đa tạo cùng lúc theo một cấu trúc.
@@ -563,6 +565,8 @@ class ZoneStructureController extends Controller
             $grid . '.*.tiers.*.position' => ['required', 'integer', 'min:1', 'max:99'],
             $grid . '.*.tiers.*.max' => ['required', 'integer', 'min:1', 'max:' . self::MAX_LOCATIONS],
             $grid . '.*.tiers.*.depth' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_DEPTH],
+            // Mã tầng (đoạn cuối trong mã tầng/mã vị trí) người dùng tự đặt; để trống = giữ mã đang có / mã mặc định
+            $grid . '.*.tiers.*.code' => ['nullable', 'string', 'max:20', 'regex:' . self::SEGMENT_PATTERN],
         ], [
             'code.required' => 'Chưa nhập mã kệ/tủ.',
             'code.max' => 'Mã kệ/tủ tối đa 40 ký tự.',
@@ -579,6 +583,8 @@ class ZoneStructureController extends Controller
             $grid . '.*.tiers.*.max.max' => 'Tối đa ' . self::MAX_LOCATIONS . ' ô theo chiều ngang mỗi tầng.',
             $grid . '.*.tiers.*.depth.min' => 'Mỗi tầng phải có ít nhất 1 dãy theo chiều sâu.',
             $grid . '.*.tiers.*.depth.max' => 'Tối đa ' . self::MAX_DEPTH . ' dãy theo chiều sâu mỗi tầng.',
+            $grid . '.*.tiers.*.code.max' => 'Mã tầng tối đa 20 ký tự.',
+            $grid . '.*.tiers.*.code.regex' => 'Mã tầng chỉ gồm chữ không dấu, số và dấu . _ - (không có khoảng trắng, không có dấu /).',
         ]);
 
         if ($validator->fails()) {
@@ -675,20 +681,30 @@ class ZoneStructureController extends Controller
         $newCodes = ['columns' => [], 'tiers' => [], 'locations' => []];
 
         foreach ($targets as $target) {
-            foreach ($this->plannedCodes($target['code'], $target['wanted'], $existingColumns, $existingTiers, $existingCells) as $table => $codes) {
+            foreach ($this->plannedCodes($target['code'], $target['wanted'], $target['names']['segments'], $existingColumns, $existingTiers, $existingCells) as $table => $codes) {
                 array_push($newCodes[$table], ...$codes);
             }
         }
 
         foreach ($newCodes as $table => $codes) {
+            $repeated = array_unique(array_diff_assoc($codes, array_unique($codes)));
+            if ($repeated) {
+                $label = ['columns' => 'cột', 'tiers' => 'tầng', 'locations' => 'vị trí'][$table];
+
+                return $this->fail('Mã ' . $label . ' bị trùng trong lượt lưu: ' . implode(', ', array_slice($repeated, 0, 5))
+                    . '. Hãy đặt mã tầng khác nhau trong cùng một cột.');
+            }
+
             foreach (array_chunk($codes, 1000) as $chunk) {
                 $clash = DB::table($table)->whereIn('code', $chunk)->limit(5)->pluck('code');
 
                 if ($clash->isNotEmpty()) {
                     $label = ['columns' => 'cột', 'tiers' => 'tầng', 'locations' => 'vị trí'][$table];
 
-                    return $this->fail('Mã ' . $label . ' đã tồn tại: ' . $clash->implode(', ')
-                        . '. Hãy đổi mã kệ hoặc sửa bản ghi trùng ở tab Danh sách định khu.');
+                    return $this->fail('Mã ' . $label . ' đã tồn tại: ' . $clash->implode(', ') . '. '
+                        . ($table === 'tiers'
+                            ? 'Hãy chọn mã tầng khác (bấm vào tên tầng để đổi).'
+                            : 'Hãy đổi mã kệ hoặc sửa bản ghi trùng ở tab Danh sách định khu.'));
                 }
             }
         }
@@ -731,10 +747,13 @@ class ZoneStructureController extends Controller
         ]);
     }
 
-    /** Tên cột/tầng người dùng đặt trên lưới: ['columns' => [cột => tên], 'tiers' => [cột => [tầng => tên]]]. */
+    /**
+     * Tên cột/tầng và mã tầng người dùng đặt trên lưới:
+     * ['columns' => [cột => tên], 'tiers' => [cột => [tầng => tên]], 'segments' => [cột => [tầng => mã tầng]]].
+     */
     private function namesGrid(array $columns): array
     {
-        $names = ['columns' => [], 'tiers' => []];
+        $names = ['columns' => [], 'tiers' => [], 'segments' => []];
 
         foreach ($columns as $column) {
             $colPos = (int) $column['position'];
@@ -742,10 +761,51 @@ class ZoneStructureController extends Controller
 
             foreach ($column['tiers'] as $tier) {
                 $names['tiers'][$colPos][(int) $tier['position']] = trim((string) ($tier['name'] ?? ''));
+                $names['segments'][$colPos][(int) $tier['position']] = trim((string) ($tier['code'] ?? ''));
             }
         }
 
         return $names;
+    }
+
+    /**
+     * Mã tầng sau lượt lưu: mã tự đặt ghép sau mã cột, không đặt thì tầng có sẵn giữ mã cũ,
+     * tầng mới lấy số thứ tự. Trả về [mã tầng, mã cũ nếu tầng có sẵn bị đổi mã / null].
+     */
+    private function tierCodeFor(string $columnCode, int $tierPos, $tier, string $segment): array
+    {
+        if ($segment === '') {
+            return [$tier ? $tier->code : $columnCode . '/' . $this->seg($tierPos), null];
+        }
+
+        $code = $columnCode . '/' . $segment;
+
+        return [$code, $tier && $tier->code !== $code ? $tier->code : null];
+    }
+
+    /** Đổi tiền tố mã của một vị trí con khi tầng đổi mã. */
+    private function retag(string $code, string $oldTierCode, string $newTierCode): string
+    {
+        return str_starts_with($code, $oldTierCode . '/') ? $newTierCode . substr($code, strlen($oldTierCode)) : $code;
+    }
+
+    /** Đổi mã một tầng có sẵn cùng mã mọi vị trí con của nó; trả về số bản ghi đã đổi mã. */
+    private function retagTier($tier, string $newCode, array $context): int
+    {
+        $stamp = ['updated_by' => $context['actor'], 'updated_at' => $context['now']];
+        $count = 0;
+
+        foreach (DB::table('locations')->where('tier_id', $tier->id)->get(['id', 'code']) as $cell) {
+            $code = $this->retag((string) $cell->code, (string) $tier->code, $newCode);
+            if ($code !== $cell->code) {
+                DB::table('locations')->where('id', $cell->id)->update(['code' => $code] + $stamp);
+                $count++;
+            }
+        }
+
+        DB::table('tiers')->where('id', $tier->id)->update(['code' => $newCode] + $stamp);
+
+        return $count + 1;
     }
 
     /** Lưới người dùng gửi lên -> wanted[cột][tầng] = [số ô ngang, số dãy sâu], đã sắp theo vị trí. */
@@ -779,7 +839,7 @@ class ZoneStructureController extends Controller
     }
 
     /** Các mã cột/tầng/vị trí chưa có mà lượt lưu này sẽ sinh ra cho một kệ. */
-    private function plannedCodes(string $shelfCode, array $wanted, $existingColumns, $existingTiers, $existingCells): array
+    private function plannedCodes(string $shelfCode, array $wanted, array $segments, $existingColumns, $existingTiers, $existingCells): array
     {
         $newCodes = ['columns' => [], 'tiers' => [], 'locations' => []];
 
@@ -793,10 +853,17 @@ class ZoneStructureController extends Controller
 
             foreach ($tiers as $tierPos => [$width, $depth]) {
                 $tier = $column ? optional($existingTiers->get($column->id))->get($tierPos) : null;
-                $tierCode = $tier ? $tier->code : $colCode . '/' . $this->seg($tierPos);
+                [$tierCode, $oldCode] = $this->tierCodeFor($colCode, $tierPos, $tier, $segments[$colPos][$tierPos] ?? '');
 
-                if (! $tier) {
+                if (! $tier || $oldCode) {
                     $newCodes['tiers'][] = $tierCode;
+                }
+
+                // Tầng có sẵn đổi mã: mọi vị trí con đổi tiền tố theo, phải chắc mã mới chưa bị chiếm
+                if ($oldCode) {
+                    foreach ($existingCells[$tier->id] ?? collect() as $cell) {
+                        $newCodes['locations'][] = $this->retag((string) $cell->code, $oldCode, $tierCode);
+                    }
                 }
 
                 $have = $tier ? $this->cellKeys($existingCells[$tier->id] ?? collect()) : [];
@@ -894,14 +961,16 @@ class ZoneStructureController extends Controller
                 $tier = $oldTiers->get($tierPos);
 
                 $tierName = $names['tiers'][$colPos][$tierPos] ?? '';
+                [$tierCode, $oldCode] = $this->tierCodeFor($columnCode, $tierPos, $tier, $names['segments'][$colPos][$tierPos] ?? '');
 
                 if ($tier) {
                     $tierId = $tier->id;
-                    $tierCode = $tier->code;
                     $this->reopen('tiers', $tier, $context);
                     $totals['renamed'] += $this->rename('tiers', $tier, $tierName, $context);
+                    if ($oldCode) {
+                        $totals['renamed_codes'] += $this->retagTier($tier, $tierCode, $context);
+                    }
                 } else {
-                    $tierCode = $columnCode . '/' . $this->seg($tierPos);
                     $tierId = DB::table('tiers')->insertGetId([
                         'code' => $tierCode,
                         'name' => $tierName ?: 'Tầng ' . $this->seg($tierPos),

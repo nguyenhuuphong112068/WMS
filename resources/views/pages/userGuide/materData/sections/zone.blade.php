@@ -15,8 +15,11 @@
     <li>Chọn thẻ <b>kho/phòng</b> có sẵn hoặc bấm nút thêm kho để tạo mới (nhập <b>Mã</b>, ví dụ <span class="ug-key">03</span>,
         và <b>Tên</b>, ví dụ <i>Kho 03</i>), rồi bấm <b>Lưu kho/phòng</b>.</li>
     <li>Trong kho, bấm <b>Thêm kệ</b>, nhập <b>Mã kệ/tủ</b> và <b>Tên kệ/tủ</b>. Hệ thống báo ngay nếu mã kệ đã tồn tại.
-        Chọn <b>Đánh số tầng</b>: <i>Từ dưới lên</i> (Tầng 01 nằm dưới cùng, mặc định) hoặc <i>Từ trên xuống</i>
-        (Tầng 01 nằm trên cùng). Lựa chọn này áp cho mọi kệ tạo cùng lượt và chỉ đổi cách xếp tầng trên lưới, mã tầng không đổi.</li>
+        Trong khung chọn nhanh, bấm chọn <b>Đánh số tầng</b> trước: <i>Từ dưới lên</i> (Tầng 01 nằm dưới cùng) hoặc
+        <i>Từ trên xuống</i> (Tầng 01 nằm trên cùng); số tầng hiện ngay cạnh từng hàng của khung, Tầng 01 tô đậm. Rồi rê
+        chuột chọn số tầng × số ô ngang, nhập <b>Số cột</b>, <b>Số dãy sâu</b> và bấm vào ô để xác nhận. Tầng 01 mang mã
+        <span class="ug-key">01</span> ở đúng vị trí đã chọn nên không cần đổi tên / mã từng tầng. Sau khi xác nhận, ô
+        <b>Đánh số tầng</b> hiện ở góc phải đầu form để đổi lại nếu cần; lựa chọn áp cho mọi kệ tạo cùng lượt.</li>
     <li>Trên lưới, mỗi <b>cột</b> là một khối, mỗi <b>tầng</b> là một lưới nhỏ nhìn từ trên xuống, giống mặt kệ thật:
         chiều <b>Ngang</b> là các ô <span class="ug-key">A</span>, <span class="ug-key">B</span>, <span class="ug-key">C</span>...
         dọc mép trước tầng, chiều <b>Sâu</b> là các dãy <span class="ug-key">1</span>, <span class="ug-key">2</span>,
@@ -26,6 +29,11 @@
         để mở rộng; ô <b>Mọi tầng</b> đặt cùng lúc Ngang × Sâu cho mọi tầng của cột (để trống ô nào thì giữ nguyên chiều
         đó), bấm <i class="fas fa-check"></i> để áp dụng. Góc phải tiêu đề cột có nút <i class="fas fa-clone"></i>
         <b>Nhân bản</b> (thêm cột mới cùng cấu trúc tầng) và <i class="fas fa-times"></i> <b>Gỡ cột</b>.</li>
+    <li>Bấm vào <b>tên tầng</b> để mở hộp <b>Đổi tên / mã tầng</b>: <i>Tên tầng</i> là tên hiển thị, <i>Mã tầng</i> là đoạn
+        mã của tầng nằm trong mã vị trí (mặc định là số thứ tự, ví dụ <span class="ug-key">06</span>; có thể đặt
+        <span class="ug-key">T6</span> để mã vị trí thành <span class="ug-key">…/01/T6/A1</span>). Mã tầng 1-20 ký tự, chỉ gồm
+        chữ không dấu, số và dấu <span class="ug-key">. _ -</span>, không trùng tầng khác trong cùng cột. Khi lưu, mã mọi vị trí
+        của tầng đổi theo; nhãn đã in theo mã cũ cần in lại.</li>
     <li>Bấm vào tên cột để đổi tên nếu cần. Xem phần chú thích màu phía trên lưới để biết ô nào <i>Sẽ tạo</i> (vị
         trí mới) và ô nào <i>Sẽ khoá</i> (vị trí sẽ bị thu lại) trước khi lưu.</li>
     <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-save mr-1"></i> Lưu cấu trúc</span>. Muốn bỏ các thay
