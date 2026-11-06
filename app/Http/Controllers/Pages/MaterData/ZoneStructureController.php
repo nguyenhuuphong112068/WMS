@@ -15,9 +15,11 @@ use Illuminate\Validation\Rule;
  * ĐỊNH KHU - CẤU TRÚC KHO
  *
  * Gộp thao tác khai báo Kệ/Tủ -> Cột -> Tầng -> Vị Trí vào một lưới: mỗi cột là một khối,
- * hàng là tầng, ô là vị trí. Năm bảng warehouses / shelves / columns / tiers / locations
- * vẫn giữ nguyên, chỉ gộp chỗ nhập liệu. Mã các cấp con tự sinh theo mã cấp cha:
- *   Kệ 01/01 -> Cột 01/01/01 -> Tầng 01/01/01/01 -> Vị trí 01/01/01/01/01
+ * hàng là tầng, mỗi tầng là một lưới 2 chiều giống mặt kệ thật: Ngang (ô A, B, C... dọc mép
+ * trước, cột `position`) × Sâu (dãy 1 sát cửa, 2, 3... vào trong, cột `depth`).
+ * Năm bảng warehouses / shelves / columns / tiers / locations vẫn giữ nguyên, chỉ gộp chỗ nhập
+ * liệu. Mã các cấp con tự sinh theo mã cấp cha:
+ *   Kệ 01/01 -> Cột 01/01/01 -> Tầng 01/01/01/01 -> Vị trí 01/01/01/01/E2 (ô E, dãy 2)
  *
  * Vị trí là bản ghi thật (lô nhập, lịch sử, nhãn in đều trỏ vào id/mã), nên khi thu nhỏ
  * ta KHOÁ ô thừa chứ không xoá, và khi nới lại thì mở đúng dải đã khoá. Ô đang có lô hàng
@@ -27,7 +29,12 @@ class ZoneStructureController extends Controller
 {
     private const MAX_COLUMNS = 30;
     private const MAX_TIERS = 30;
+
+    /** Chiều đánh số tầng: bottom_up = Tầng 01 dưới cùng, top_down = Tầng 01 trên cùng. */
+    private const TIER_ORDERS = ['bottom_up', 'top_down'];
     private const MAX_LOCATIONS = 200;
+    // Số dãy tối đa theo chiều sâu của một tầng.
+    private const MAX_DEPTH = 20;
     // Một lượt lưu có thể sinh vài nghìn vị trí, chặn ngưỡng để transaction không phình quá lớn.
     private const MAX_CELLS = 20000;
     // Số kệ tối đa tạo cùng lúc theo một cấu trúc.
@@ -42,6 +49,7 @@ class ZoneStructureController extends Controller
             'maxColumns' => self::MAX_COLUMNS,
             'maxTiers' => self::MAX_TIERS,
             'maxLocations' => self::MAX_LOCATIONS,
+            'maxDepth' => self::MAX_DEPTH,
             'maxBatch' => self::MAX_BATCH,
         ];
     }
@@ -470,7 +478,7 @@ class ZoneStructureController extends Controller
         $locations = DB::table('locations')
             ->where('shelf_id', $shelf->id)
             ->whereNotNull('position')
-            ->get(['id', 'code', 'tier_id', 'position', 'status_id', 'zone_type', 'item_type'])
+            ->get(['id', 'code', 'tier_id', 'position', 'depth', 'status_id', 'zone_type', 'item_type'])
             ->groupBy('tier_id');
 
         $busy = $this->busyIds($locations->flatten()->pluck('id')->all());
@@ -478,26 +486,32 @@ class ZoneStructureController extends Controller
         foreach ($columns as $column) {
             $column->tiers = ($tiers[$column->id] ?? collect())->map(function ($tier) use ($locations, $busy) {
                 $cells = $locations[$tier->id] ?? collect();
-                $tier->max = (int) $cells->where('status_id', 1)->max('position');
+                $open = $cells->where('status_id', 1);
+                // Sức chứa hiện tại: số ô ngang × số dãy sâu của các ô đang mở
+                $tier->max = (int) $open->max('position');
+                $tier->depth = (int) $open->max(fn ($cell) => $this->depthOf($cell));
                 $tier->busy = [];
                 $tier->off = [];
                 $tier->codes = [];
                 $tier->attrs = [];
+                $tier->last_busy = 0;
+                $tier->last_busy_depth = 0;
 
+                // Ô trên lưới đánh khoá "<ngang>:<sâu>"
                 foreach ($cells as $cell) {
-                    $position = (int) $cell->position;
-                    $tier->codes[$position] = $cell->code;
-                    $tier->attrs[$position] = $this->cellAttrs($cell);
+                    $key = $this->cellKey((int) $cell->position, $this->depthOf($cell));
+                    $tier->codes[$key] = $cell->code;
+                    $tier->attrs[$key] = $this->cellAttrs($cell);
 
                     // Ô đã khoá thì coi là khoá dù còn lô cũ trỏ vào - khoá lại lần nữa không đổi gì
                     if ((int) $cell->status_id !== 1) {
-                        $tier->off[] = $position;
+                        $tier->off[] = $key;
                     } elseif (isset($busy[$cell->id])) {
-                        $tier->busy[] = $position;
+                        $tier->busy[] = $key;
+                        $tier->last_busy = max($tier->last_busy, (int) $cell->position);
+                        $tier->last_busy_depth = max($tier->last_busy_depth, $this->depthOf($cell));
                     }
                 }
-
-                $tier->last_busy = $tier->busy ? max($tier->busy) : 0;
 
                 return $tier;
             })->values();
@@ -537,6 +551,7 @@ class ZoneStructureController extends Controller
             'warehouse_id' => ['required', 'integer'],
             'code' => [$shelfId || $batch ? 'nullable' : 'required', 'string', 'max:40'],
             'name' => [$batch ? 'nullable' : 'required', 'string', 'max:255'],
+            'tier_order' => ['nullable', 'in:' . implode(',', self::TIER_ORDERS)],
             'shelves' => ['nullable', 'array', 'min:1', 'max:' . self::MAX_BATCH],
             'shelves.*.code' => ['required', 'string', 'max:40'],
             'shelves.*.name' => ['required', 'string', 'max:255'],
@@ -547,6 +562,7 @@ class ZoneStructureController extends Controller
             $grid . '.*.tiers' => ['required', 'array', 'min:1', 'max:' . self::MAX_TIERS],
             $grid . '.*.tiers.*.position' => ['required', 'integer', 'min:1', 'max:99'],
             $grid . '.*.tiers.*.max' => ['required', 'integer', 'min:1', 'max:' . self::MAX_LOCATIONS],
+            $grid . '.*.tiers.*.depth' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_DEPTH],
         ], [
             'code.required' => 'Chưa nhập mã kệ/tủ.',
             'code.max' => 'Mã kệ/tủ tối đa 40 ký tự.',
@@ -559,8 +575,10 @@ class ZoneStructureController extends Controller
             $grid . '.max' => 'Tối đa ' . self::MAX_COLUMNS . ' cột mỗi kệ/tủ.',
             $grid . '.*.tiers.required' => 'Mỗi cột phải có ít nhất một tầng.',
             $grid . '.*.tiers.max' => 'Tối đa ' . self::MAX_TIERS . ' tầng mỗi cột.',
-            $grid . '.*.tiers.*.max.min' => 'Mỗi tầng phải có ít nhất 1 vị trí.',
-            $grid . '.*.tiers.*.max.max' => 'Tối đa ' . self::MAX_LOCATIONS . ' vị trí mỗi tầng.',
+            $grid . '.*.tiers.*.max.min' => 'Mỗi tầng phải có ít nhất 1 ô theo chiều ngang.',
+            $grid . '.*.tiers.*.max.max' => 'Tối đa ' . self::MAX_LOCATIONS . ' ô theo chiều ngang mỗi tầng.',
+            $grid . '.*.tiers.*.depth.min' => 'Mỗi tầng phải có ít nhất 1 dãy theo chiều sâu.',
+            $grid . '.*.tiers.*.depth.max' => 'Tối đa ' . self::MAX_DEPTH . ' dãy theo chiều sâu mỗi tầng.',
         ]);
 
         if ($validator->fails()) {
@@ -606,7 +624,7 @@ class ZoneStructureController extends Controller
                 ->get()->groupBy('column_id')->map(fn ($rows) => $rows->keyBy('position'));
             $existingCells = DB::table('locations')
                 ->where('shelf_id', $shelf->id)->whereNotNull('position')
-                ->get(['id', 'code', 'tier_id', 'position', 'status_id'])
+                ->get(['id', 'code', 'tier_id', 'position', 'depth', 'status_id'])
                 ->groupBy('tier_id');
 
             // Các bước kiểm/ghi phía sau đọc mã con từ đây, nên áp mã mới vào bản đọc luôn.
@@ -640,7 +658,7 @@ class ZoneStructureController extends Controller
             }
         }
 
-        $cells = array_sum(array_map(fn ($target) => array_sum(array_map('array_sum', $target['wanted'])), $targets));
+        $cells = array_sum(array_map(fn ($target) => $this->gridCells($target['wanted']), $targets));
         if ($cells > self::MAX_CELLS) {
             return $this->fail((count($targets) > 1 ? 'Các kệ này' : 'Kệ này') . ' sẽ có '
                 . number_format($cells, 0, ',', '.') . ' vị trí, vượt mức '
@@ -681,6 +699,7 @@ class ZoneStructureController extends Controller
             'warehouse_id' => $shelf && $shelf->warehouse_id ? (int) $shelf->warehouse_id : (int) $warehouse->id,
             'actor' => $this->actor(),
             'now' => now(),
+            'tier_order' => $request->input('tier_order') ?: ($shelf->tier_order ?? self::TIER_ORDERS[0]),
         ];
 
         $rename = $rename ?? [];
@@ -729,14 +748,14 @@ class ZoneStructureController extends Controller
         return $names;
     }
 
-    /** Lưới người dùng gửi lên -> wanted[cột][tầng] = số vị trí, đã sắp theo vị trí. */
+    /** Lưới người dùng gửi lên -> wanted[cột][tầng] = [số ô ngang, số dãy sâu], đã sắp theo vị trí. */
     private function wantedGrid(array $columns): array
     {
         $wanted = [];
         foreach ($columns as $column) {
             $tiers = [];
             foreach ($column['tiers'] as $tier) {
-                $tiers[(int) $tier['position']] = (int) $tier['max'];
+                $tiers[(int) $tier['position']] = [(int) $tier['max'], max(1, (int) ($tier['depth'] ?? 1))];
             }
             ksort($tiers);
             $wanted[(int) $column['position']] = $tiers;
@@ -744,6 +763,19 @@ class ZoneStructureController extends Controller
         ksort($wanted);
 
         return $wanted;
+    }
+
+    /** Tổng số ô của một lưới wanted. */
+    private function gridCells(array $wanted): int
+    {
+        $total = 0;
+        foreach ($wanted as $tiers) {
+            foreach ($tiers as [$width, $depth]) {
+                $total += $width * $depth;
+            }
+        }
+
+        return $total;
     }
 
     /** Các mã cột/tầng/vị trí chưa có mà lượt lưu này sẽ sinh ra cho một kệ. */
@@ -759,7 +791,7 @@ class ZoneStructureController extends Controller
                 $newCodes['columns'][] = $colCode;
             }
 
-            foreach ($tiers as $tierPos => $max) {
+            foreach ($tiers as $tierPos => [$width, $depth]) {
                 $tier = $column ? optional($existingTiers->get($column->id))->get($tierPos) : null;
                 $tierCode = $tier ? $tier->code : $colCode . '/' . $this->seg($tierPos);
 
@@ -767,11 +799,13 @@ class ZoneStructureController extends Controller
                     $newCodes['tiers'][] = $tierCode;
                 }
 
-                $have = $tier ? ($existingCells[$tier->id] ?? collect())->pluck('position')->map(fn ($p) => (int) $p)->flip() : collect();
+                $have = $tier ? $this->cellKeys($existingCells[$tier->id] ?? collect()) : [];
 
-                for ($p = 1; $p <= $max; $p++) {
-                    if (! $have->has($p)) {
-                        $newCodes['locations'][] = $tierCode . '/' . $this->seg($p);
+                for ($d = 1; $d <= $depth; $d++) {
+                    for ($p = 1; $p <= $width; $p++) {
+                        if (! isset($have[$this->cellKey($p, $d)])) {
+                            $newCodes['locations'][] = $this->locationCode($tierCode, $p, $d);
+                        }
                     }
                 }
             }
@@ -804,6 +838,9 @@ class ZoneStructureController extends Controller
             if ((int) $shelf->status_id !== 1) {
                 $changes['status_id'] = 1;
             }
+            if (($shelf->tier_order ?? '') !== $context['tier_order']) {
+                $changes['tier_order'] = $context['tier_order'];
+            }
             if ($changes) {
                 DB::table('shelves')->where('id', $shelfId)->update($changes + [
                     'updated_by' => $context['actor'],
@@ -816,6 +853,7 @@ class ZoneStructureController extends Controller
                 'name' => $name,
                 'department_id' => $context['department_id'],
                 'warehouse_id' => $context['warehouse_id'],
+                'tier_order' => $context['tier_order'],
                 'status_id' => 1,
                 'created_by' => $context['actor'],
                 'created_at' => $context['now'],
@@ -852,7 +890,7 @@ class ZoneStructureController extends Controller
 
             $oldTiers = $column ? ($existingTiers->get($column->id) ?? collect()) : collect();
 
-            foreach ($tiers as $tierPos => $max) {
+            foreach ($tiers as $tierPos => [$width, $depth]) {
                 $tier = $oldTiers->get($tierPos);
 
                 $tierName = $names['tiers'][$colPos][$tierPos] ?? '';
@@ -881,7 +919,7 @@ class ZoneStructureController extends Controller
                 }
 
                 $cells = $tier ? ($existingCells[$tier->id] ?? collect()) : collect();
-                $changes = $this->syncTier($shelfId, $columnId, $tierId, $tierCode, $cells, $max, $context);
+                $changes = $this->syncTier($shelfId, $columnId, $tierId, $tierCode, $cells, $width, $depth, $context);
 
                 foreach ($changes as $key => $value) {
                     $totals[$key] += $value;
@@ -951,33 +989,39 @@ class ZoneStructureController extends Controller
     }
 
     /**
-     * Đưa số vị trí của một tầng về $max: tạo ô còn thiếu, mở lại dải vừa nằm ngoài sức chứa
-     * cũ, khoá ô vượt sức chứa mới. Ô người dùng chủ động khoá nằm trong sức chứa cũ giữ nguyên.
+     * Đưa lưới vị trí của một tầng về $width ô ngang × $depth dãy sâu: tạo ô còn thiếu, mở lại
+     * các ô vừa lọt vào lưới mà nằm ngoài sức chứa cũ, khoá ô nằm ngoài lưới mới. Ô người dùng
+     * chủ động khoá nằm trong sức chứa cũ giữ nguyên.
      */
-    private function syncTier(int $shelfId, int $columnId, int $tierId, string $tierCode, $cells, int $max, array $context): array
+    private function syncTier(int $shelfId, int $columnId, int $tierId, string $tierCode, $cells, int $width, int $depth, array $context): array
     {
         $changes = ['created' => 0, 'locked' => 0, 'unlocked' => 0];
-        $oldMax = (int) $cells->where('status_id', 1)->max('position');
-        $have = $cells->pluck('position')->map(fn ($p) => (int) $p)->flip();
+        $open = $cells->where('status_id', 1);
+        $oldWidth = (int) $open->max('position');
+        $oldDepth = (int) $open->max(fn ($cell) => $this->depthOf($cell));
+        $have = $this->cellKeys($cells);
 
         $rows = [];
-        for ($p = 1; $p <= $max; $p++) {
-            if ($have->has($p)) {
-                continue;
+        for ($d = 1; $d <= $depth; $d++) {
+            for ($p = 1; $p <= $width; $p++) {
+                if (isset($have[$this->cellKey($p, $d)])) {
+                    continue;
+                }
+                $rows[] = [
+                    'code' => $this->locationCode($tierCode, $p, $d),
+                    'department_id' => $context['department_id'],
+                    'warehouse_id' => $context['warehouse_id'],
+                    'shelf_id' => $shelfId,
+                    'column_id' => $columnId,
+                    'tier_id' => $tierId,
+                    'position' => $p,
+                    'depth' => $d,
+                    'status_id' => 1,
+                    'created_by' => $context['actor'],
+                    'created_at' => $context['now'],
+                    'updated_at' => $context['now'],
+                ];
             }
-            $rows[] = [
-                'code' => $tierCode . '/' . $this->seg($p),
-                'department_id' => $context['department_id'],
-                'warehouse_id' => $context['warehouse_id'],
-                'shelf_id' => $shelfId,
-                'column_id' => $columnId,
-                'tier_id' => $tierId,
-                'position' => $p,
-                'status_id' => 1,
-                'created_by' => $context['actor'],
-                'created_at' => $context['now'],
-                'updated_at' => $context['now'],
-            ];
         }
 
         foreach (array_chunk($rows, 500) as $chunk) {
@@ -987,21 +1031,62 @@ class ZoneStructureController extends Controller
 
         $stamp = ['updated_by' => $context['actor'], 'updated_at' => $context['now']];
 
-        if ($max > $oldMax) {
-            $changes['unlocked'] = DB::table('locations')
-                ->where('tier_id', $tierId)
-                ->whereBetween('position', [$oldMax + 1, $max])
-                ->where('status_id', '<>', 1)
-                ->update(['status_id' => 1] + $stamp);
-        }
+        $changes['unlocked'] = DB::table('locations')
+            ->where('tier_id', $tierId)
+            ->where('status_id', '<>', 1)
+            ->where('position', '<=', $width)
+            ->where('depth', '<=', $depth)
+            ->where(fn ($q) => $q->where('position', '>', $oldWidth)->orWhere('depth', '>', $oldDepth))
+            ->update(['status_id' => 1] + $stamp);
 
         $changes['locked'] = DB::table('locations')
             ->where('tier_id', $tierId)
-            ->where('position', '>', $max)
             ->where('status_id', 1)
+            ->where(fn ($q) => $q->where('position', '>', $width)->orWhere('depth', '>', $depth))
             ->update(['status_id' => 0] + $stamp);
 
         return $changes;
+    }
+
+    /** Khoá của một ô trên lưới tầng: "<ô ngang>:<dãy sâu>". */
+    private function cellKey(int $position, int $depth): string
+    {
+        return $position . ':' . $depth;
+    }
+
+    /** Tập khoá ô đã có của một tầng (kể cả ô đang khoá). */
+    private function cellKeys($cells): array
+    {
+        $keys = [];
+        foreach ($cells as $cell) {
+            $keys[$this->cellKey((int) $cell->position, $this->depthOf($cell))] = true;
+        }
+
+        return $keys;
+    }
+
+    private function depthOf($cell): int
+    {
+        return max(1, (int) ($cell->depth ?? 1));
+    }
+
+    /** Mã vị trí: <mã tầng>/<chữ ô ngang><số dãy sâu>, ví dụ 01/01/01/03/E2. */
+    private function locationCode(string $tierCode, int $position, int $depth): string
+    {
+        return $tierCode . '/' . self::letters($position) . $depth;
+    }
+
+    /** Chữ của ô ngang thứ $n kiểu cột Excel: 1 -> A, 26 -> Z, 27 -> AA. */
+    public static function letters(int $n): string
+    {
+        $out = '';
+        while ($n > 0) {
+            $n--;
+            $out = chr(65 + $n % 26) . $out;
+            $n = intdiv($n, 26);
+        }
+
+        return $out;
     }
 
     /** Khoá một tầng cùng các vị trí đang mở của nó, trả về số vị trí vừa khoá. */
@@ -1040,10 +1125,10 @@ class ZoneStructureController extends Controller
 
         foreach ($columns as $colPos => $column) {
             foreach ($tiers->get($column->id) ?? collect() as $tierPos => $tier) {
-                $max = $wanted[$colPos][$tierPos] ?? 0;
+                [$width, $depth] = $wanted[$colPos][$tierPos] ?? [0, 0];
 
                 foreach ($cells[$tier->id] ?? collect() as $cell) {
-                    if ((int) $cell->status_id === 1 && (int) $cell->position > $max) {
+                    if ((int) $cell->status_id === 1 && ((int) $cell->position > $width || $this->depthOf($cell) > $depth)) {
                         $doomed[$cell->id] = $cell->code;
                     }
                 }

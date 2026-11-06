@@ -14,9 +14,18 @@
 <ol class="ug-steps">
     <li>Chọn thẻ <b>kho/phòng</b> có sẵn hoặc bấm nút thêm kho để tạo mới (nhập <b>Mã</b>, ví dụ <span class="ug-key">03</span>,
         và <b>Tên</b>, ví dụ <i>Kho 03</i>), rồi bấm <b>Lưu kho/phòng</b>.</li>
-    <li>Trong kho, bấm <b>Thêm kệ</b>, nhập <b>Mã kệ/tủ</b> và <b>Tên kệ/tủ</b>. Hệ thống báo ngay nếu mã kệ đã tồn tại.</li>
-    <li>Trên lưới, mỗi <b>cột</b> là một khối, mỗi <b>hàng</b> là một tầng, mỗi <b>ô</b> là một vị trí. Bấm <b>Thêm cột</b> và
-        <b>Thêm tầng</b> để mở rộng. <b>Kéo tay nắm</b> ở cuối hàng để tăng hoặc giảm số vị trí của tầng đó.</li>
+    <li>Trong kho, bấm <b>Thêm kệ</b>, nhập <b>Mã kệ/tủ</b> và <b>Tên kệ/tủ</b>. Hệ thống báo ngay nếu mã kệ đã tồn tại.
+        Chọn <b>Đánh số tầng</b>: <i>Từ dưới lên</i> (Tầng 01 nằm dưới cùng, mặc định) hoặc <i>Từ trên xuống</i>
+        (Tầng 01 nằm trên cùng). Lựa chọn này áp cho mọi kệ tạo cùng lượt và chỉ đổi cách xếp tầng trên lưới, mã tầng không đổi.</li>
+    <li>Trên lưới, mỗi <b>cột</b> là một khối, mỗi <b>tầng</b> là một lưới nhỏ nhìn từ trên xuống, giống mặt kệ thật:
+        chiều <b>Ngang</b> là các ô <span class="ug-key">A</span>, <span class="ug-key">B</span>, <span class="ug-key">C</span>...
+        dọc mép trước tầng, chiều <b>Sâu</b> là các dãy <span class="ug-key">1</span>, <span class="ug-key">2</span>,
+        <span class="ug-key">3</span>... từ cửa vào trong (dãy 1 sát cửa, vẽ dưới cùng). Mỗi ô là một vị trí.
+        Nhập số ô ngang ở ô số <b>dưới thước chữ</b>, số dãy sâu ở ô số <b>bên phải dãy trong cùng</b>, hoặc <b>kéo góc</b>
+        nhỏ ở góc dưới phải lưới: kéo ngang đổi số ô ngang, kéo lên/xuống đổi số dãy sâu. Tầng chỉ có một dãy thì để Sâu = 1. Bấm <b>Thêm cột</b> (ô nhỏ bên phải các cột) và <b>Thêm tầng</b>
+        để mở rộng; ô <b>Mọi tầng</b> đặt cùng lúc Ngang × Sâu cho mọi tầng của cột (để trống ô nào thì giữ nguyên chiều
+        đó), bấm <i class="fas fa-check"></i> để áp dụng. Góc phải tiêu đề cột có nút <i class="fas fa-clone"></i>
+        <b>Nhân bản</b> (thêm cột mới cùng cấu trúc tầng) và <i class="fas fa-times"></i> <b>Gỡ cột</b>.</li>
     <li>Bấm vào tên cột để đổi tên nếu cần. Xem phần chú thích màu phía trên lưới để biết ô nào <i>Sẽ tạo</i> (vị
         trí mới) và ô nào <i>Sẽ khoá</i> (vị trí sẽ bị thu lại) trước khi lưu.</li>
     <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-save mr-1"></i> Lưu cấu trúc</span>. Muốn bỏ các thay
@@ -26,7 +35,8 @@
 <div class="ug-callout">
     <i class="fas fa-lightbulb"></i>
     <div><b>Mã tự sinh theo cấp cha</b>: kệ <span class="ug-key">01/01</span> → cột <span class="ug-key">01/01/01</span> →
-        tầng <span class="ug-key">01/01/01/01</span> → vị trí <span class="ug-key">01/01/01/01/01</span>. Đổi mã kệ thì mã của
+        tầng <span class="ug-key">01/01/01/03</span> → vị trí <span class="ug-key">01/01/01/03/E2</span> (ô E, dãy 2 của tầng 03).
+        Chữ ô ngang tầng nào cũng bắt đầu lại từ A; quá 26 ô thì tiếp AA, AB... Đổi mã kệ thì mã của
         mọi cột, tầng, vị trí con đổi theo.</div>
 </div>
 
@@ -48,7 +58,7 @@
     <i class="fas fa-exclamation-triangle"></i>
     <div>
         <ul class="mb-0 pl-3">
-            <li>Không thu nhỏ hoặc gỡ được vị trí <b>đang có lô hàng</b>. Hãy chuyển hàng đi trước.</li>
+            <li>Không thu nhỏ (cả chiều Ngang lẫn Sâu) hoặc gỡ được vị trí <b>đang có lô hàng</b>. Hãy chuyển hàng đi trước.</li>
             <li>Thu nhỏ lưới thì vị trí thừa bị <b>khoá</b> chứ không xoá; nới lại sẽ mở đúng các vị trí đó.</li>
             <li>Chỉ xoá được một cấp khi cấp đó <b>chưa có cấp con</b> (ví dụ kệ không còn cột nào).</li>
         </ul>

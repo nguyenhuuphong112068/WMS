@@ -108,19 +108,28 @@
                         <label for="zs-name">Tên kệ/tủ <span class="text-danger">*</span></label>
                         <input type="text" id="zs-name" class="form-control form-control-sm zs-name-input" maxlength="255" placeholder="VD: Kệ/Tủ 05">
                     </div>
+                    <div class="form-group mb-0">
+                        <label for="zs-tier-order">Đánh số tầng</label>
+                        <select id="zs-tier-order" class="form-control form-control-sm">
+                            <option value="bottom_up">Từ dưới lên (Tầng 01 dưới cùng)</option>
+                            <option value="top_down">Từ trên xuống (Tầng 01 trên cùng)</option>
+                        </select>
+                    </div>
                     <div id="zs-preview" class="zs-preview" hidden></div>
                 </div>
 
                 {{-- Lưới chọn nhanh kiểu chèn bảng của Word, chỉ hiện khi kệ chưa có cột nào --}}
                 <div id="zs-picker" class="zs-picker" hidden>
                     <div class="zs-picker-title">
-                        Rê chuột chọn số tầng (dọc) × số vị trí mỗi tầng (ngang) cho mỗi cột, rồi bấm để xác nhận.
+                        Rê chuột chọn số tầng (dọc) × số ô ngang mỗi tầng cho mỗi cột, nhập số dãy sâu, rồi bấm để xác nhận.
                     </div>
                     <div class="zs-picker-row">
                         <div id="zs-picker-grid" class="zs-picker-grid"></div>
                         <div class="zs-picker-side">
                             <label for="zs-picker-cols" class="mb-1">Số cột</label>
                             <input type="number" id="zs-picker-cols" class="form-control form-control-sm" min="1" value="1">
+                            <label for="zs-picker-depth" class="mb-1 mt-2" title="Số dãy tính từ cửa vào trong của mỗi tầng">Số dãy sâu</label>
+                            <input type="number" id="zs-picker-depth" class="form-control form-control-sm" min="1" value="1">
                             <span id="zs-picker-readout" class="zs-picker-readout">Chưa chọn</span>
                         </div>
                     </div>
@@ -722,26 +731,40 @@
         margin-top: auto;
     }
 
+    /* Đánh số từ trên xuống: Tầng 01 trên cùng, các cột thẳng hàng theo mép trên */
+    #zs-editor.zs-top-down .zs-columns .zs-col > .zs-grid,
+    #zs-editor.zs-top-down .zs-columns .zs-col > .zs-note,
+    #zs-editor.zs-top-down .zs-columns .zs-col > .zs-col-off {
+        margin-top: 0;
+    }
+
+    #zs-editor.zs-top-down .zs-columns .zs-col > .zs-col-foot {
+        margin-top: auto;
+    }
+
+    /* Ô "Thêm cột" nhỏ gọn ở đầu hàng cột, không kéo dài theo chiều cao các cột */
     .zs-col-add {
         flex: 0 0 auto;
-        width: 120px;
+        align-self: flex-start;
+        width: 88px;
+        padding: 14px 6px;
         border: 2px dashed var(--primary-lighter);
         border-radius: var(--border-radius-lg);
         background: var(--bg-neutral);
         color: var(--primary);
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 4px;
         cursor: pointer;
         transition: all 0.2s;
     }
 
     .zs-col-add i {
-        font-size: 1.2rem;
+        font-size: 1rem;
     }
 
     .zs-col-add:hover {
@@ -761,9 +784,54 @@
     .zs-col-head {
         display: flex;
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
         gap: 8px;
         margin-bottom: 10px;
+    }
+
+    .zs-col-bar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .zs-col-actions {
+        display: flex;
+        gap: 4px;
+        flex: none;
+    }
+
+    .zs-col-actions .btn {
+        border-radius: var(--border-radius-md);
+    }
+
+    /* Nút chỉ có biểu tượng (Nhân bản, Gỡ cột): tên đầy đủ hiện khi rê chuột */
+    .zs-icon-btn {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--border-radius-md);
+        background: #fff;
+        color: #475569;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .zs-icon-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: var(--primary-soft);
+    }
+
+    .zs-icon-btn.is-danger:hover {
+        border-color: #DC2626;
+        color: #DC2626;
+        background: #FEF2F2;
     }
 
     .zs-col-title {
@@ -789,38 +857,84 @@
         padding: 2px 8px;
     }
 
-    .zs-col-title small {
+    /* Số tầng · số vị trí nằm dòng dưới tên cột để tiêu đề không kéo rộng card */
+    .zs-col-meta {
+        display: block;
+        margin-top: 2px;
+        padding-left: 14px;
+        font-size: 0.78rem;
         font-weight: 500;
         color: #64748b;
     }
 
-    .zs-col.is-removed .zs-col-title small {
+    .zs-col.is-removed .zs-col-meta {
         color: #DC2626;
         font-weight: 600;
-    }
-
-    .zs-col-tools {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
     }
 
     .zs-bulk {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         font-size: 0.8rem;
         font-weight: 600;
         color: #475569;
     }
 
-    .zs-bulk input {
-        width: 60px;
+    /* Ngang × Sâu + nút áp dụng gộp thành một ô liền */
+    .zs-bulk-group {
+        display: inline-flex;
+        align-items: stretch;
+        height: 28px;
+        border: 1px solid #cbd5e1;
+        border-radius: var(--border-radius-md);
+        background: #fff;
+        overflow: hidden;
+        transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    .zs-col-tools .btn {
-        border-radius: var(--border-radius-md);
+    .zs-bulk-group:focus-within {
+        border-color: var(--primary-light);
+        box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.15);
+    }
+
+    .zs-bulk-group input {
+        width: 54px;
+        border: none;
+        outline: none;
+        padding: 0 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-main);
+        background: transparent;
+        -moz-appearance: textfield;
+    }
+
+    .zs-bulk-group input::-webkit-outer-spin-button,
+    .zs-bulk-group input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .zs-bulk-group .zs-x {
+        display: flex;
+        align-items: center;
+        padding: 0 2px;
+    }
+
+    .zs-bulk-group button {
+        border: none;
+        border-left: 1px solid #cbd5e1;
+        background: var(--primary-soft);
+        color: var(--primary);
+        padding: 0 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .zs-bulk-group button:hover {
+        background: var(--primary);
+        color: #fff;
     }
 
     .zs-grid {
@@ -832,7 +946,7 @@
         display: flex;
         align-items: center;
         gap: 6px;
-        margin-bottom: 3px;
+        margin-bottom: 6px;
     }
 
     .zs-row-label {
@@ -849,6 +963,55 @@
         grid-template-columns: repeat(var(--cols), var(--zs-cell));
         gap: 2px;
         flex: none;
+    }
+
+    /* Một tầng = lưới nhìn từ trên xuống: dãy trong cùng ở trên, dãy 1 (sát cửa) ở dưới,
+       thước chữ A, B, C... chạy dọc mép trước giống nhãn dán trên kệ thật */
+    /* Lưới 3 cột: [số dãy | ô | ô Sâu + góc kéo], 3 hàng: [ô | thước chữ | ô Ngang] */
+    .zs-block {
+        display: grid;
+        grid-template-columns: 12px auto auto;
+        gap: 2px 3px;
+        flex: none;
+    }
+
+    .zs-block > .zs-depth-rule { grid-column: 1; grid-row: 1; }
+    .zs-block > .zs-cells { grid-column: 2; grid-row: 1; }
+    .zs-block > .zs-side { grid-column: 3; grid-row: 1; align-self: start; }
+    .zs-block > .zs-front-rule { grid-column: 2; grid-row: 2; }
+    .zs-block > .zs-corner { grid-column: 3; grid-row: 2; align-self: start; }
+    .zs-block > .zs-under { grid-column: 2; grid-row: 3; justify-self: center; }
+
+    .zs-depth-rule {
+        display: grid;
+        grid-auto-rows: var(--zs-cell);
+        gap: 2px;
+        font-size: 9px;
+        line-height: var(--zs-cell);
+        text-align: right;
+        color: #64748b;
+        user-select: none;
+    }
+
+    .zs-front-rule {
+        display: grid;
+        grid-template-columns: repeat(var(--cols), var(--zs-cell));
+        gap: 2px;
+        font-size: 8px;
+        font-weight: 700;
+        line-height: 10px;
+        text-align: center;
+        color: #64748b;
+        user-select: none;
+    }
+
+    .zs-front-rule span {
+        overflow: hidden;
+        border-top: 2px solid #CBD5E1;
+    }
+
+    .zs-cell.is-void {
+        visibility: hidden;
     }
 
     .zs-cell {
@@ -1014,17 +1177,18 @@
         margin-left: 3px;
     }
 
+    /* Góc kéo ở góc dưới phải lưới: kéo ngang đổi số ô ngang, kéo lên/xuống đổi số dãy sâu */
     .zs-handle {
-        flex: none;
-        width: 10px;
-        height: 22px;
+        display: block;
+        width: 12px;
+        height: 12px;
         border: 1px solid #94a3b8;
         border-radius: 3px;
-        background: #f1f5f9;
-        cursor: ew-resize;
+        background: linear-gradient(135deg, transparent 45%, #94a3b8 45%, #94a3b8 55%, transparent 55%), #f1f5f9;
+        cursor: nesw-resize;
         padding: 0;
         touch-action: none;
-        transition: background 0.2s;
+        transition: background 0.2s, border-color 0.2s;
     }
 
     .zs-handle:hover,
@@ -1033,13 +1197,34 @@
         border-color: var(--primary-dark);
     }
 
-    .zs-num {
-        flex: none;
-        width: 52px;
-        font-size: 0.76rem;
-        padding: 1px 4px;
+    /* Ô Ngang (dưới thước chữ) và ô Sâu (cạnh dãy trong cùng) nằm sát chiều mà nó điều khiển */
+    .zs-num,
+    .zs-depth {
+        display: block;
+        width: 36px;
+        height: 22px;
+        font-size: 0.74rem;
+        text-align: center;
+        padding: 0 2px;
         border: 1px solid #cbd5e1;
         border-radius: 4px;
+        background: #fff;
+        -moz-appearance: textfield;
+        transition: border-color 0.2s;
+    }
+
+    .zs-num:focus,
+    .zs-depth:focus {
+        outline: none;
+        border-color: var(--primary-light);
+    }
+
+    .zs-num::-webkit-outer-spin-button,
+    .zs-num::-webkit-inner-spin-button,
+    .zs-depth::-webkit-outer-spin-button,
+    .zs-depth::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
     }
 
     .zs-drop {
@@ -1056,8 +1241,15 @@
         color: #DC2626;
     }
 
+    .zs-x {
+        flex: none;
+        font-size: 0.72rem;
+        color: #94a3b8;
+    }
+
     .zs-row.is-removed .zs-row-label,
-    .zs-row.is-removed .zs-num {
+    .zs-row.is-removed .zs-num,
+    .zs-row.is-removed .zs-depth {
         text-decoration: line-through;
         opacity: 0.6;
     }
@@ -1101,6 +1293,7 @@
     "maxColumns": {{ (int) $structureLimits['maxColumns'] }},
     "maxTiers": {{ (int) $structureLimits['maxTiers'] }},
     "maxLocations": {{ (int) $structureLimits['maxLocations'] }},
+    "maxDepth": {{ (int) $structureLimits['maxDepth'] }},
     "maxBatch": {{ (int) $structureLimits['maxBatch'] }},
     "canCreate": @json(user_can(md_perm('zone', 'create'))),
     "canUpdate": @json(user_can(md_perm('zone', 'update'))),
@@ -1149,12 +1342,14 @@
         shelfTitle: byId('zs-shelf-title'),
         code: byId('zs-code'),
         name: byId('zs-name'),
+        tierOrder: byId('zs-tier-order'),
         preview: byId('zs-preview'),
         drafts: byId('zs-drafts'),
         addShelf: byId('zs-add-shelf'),
         picker: byId('zs-picker'),
         pickerGrid: byId('zs-picker-grid'),
         pickerCols: byId('zs-picker-cols'),
+        pickerDepth: byId('zs-picker-depth'),
         readout: byId('zs-picker-readout'),
         columns: byId('zs-columns'),
         foot: byId('zs-foot'),
@@ -1162,18 +1357,22 @@
     };
 
     el.pickerCols.max = CFG.maxColumns;
+    el.pickerDepth.max = CFG.maxDepth;
 
     /*
      | view: 'warehouses' | 'shelves' | 'editor'
      | shelf: kệ đang sửa (null = đang tạo kệ mới)
      | columns: [{ position, existing, removed, wasRemoved, code, label, tiers: [...] }]
-     | tier:    { position, max, origMax, lastBusy, busy:Set, off:Set, codes:{}, existing, removed, wasRemoved, label }
+     | tier:    { position, max (ô ngang), depth (dãy sâu), origMax, origDepth, lastBusy, lastBusyDepth,
+     |            busy:Set, off:Set, codes:{}, attrs:{} (khoá ô "<ngang>:<sâu>"), existing, removed, wasRemoved, label }
     */
     var state = {
         view: 'warehouses',
         warehouses: [], shelves: [], suggest: '',
         warehouse: null, shelf: null,
         columns: [], dirty: false, editingWarehouse: null, formKind: 'warehouse',
+        // Chiều đánh số tầng của kệ đang sửa / các kệ đang tạo: 'bottom_up' | 'top_down'
+        tierOrder: 'bottom_up',
         // Vị trí đang chọn trên lưới (id); cellView = tô ô theo 'zone' (phân loại) hay 'status'
         picked: new Set(), painting: null, cellView: 'zone',
         codeTimer: null, nameTouched: false,
@@ -1200,6 +1399,26 @@
 
     function seg(position) {
         return String(position).padStart(2, '0');
+    }
+
+    // Chữ của ô ngang thứ n kiểu cột Excel: 1 -> A, 26 -> Z, 27 -> AA (khớp máy chủ).
+    function letters(n) {
+        var out = '';
+        while (n > 0) {
+            n--;
+            out = String.fromCharCode(65 + n % 26) + out;
+            n = Math.floor(n / 26);
+        }
+        return out;
+    }
+
+    function cellKey(position, depth) {
+        return position + ':' + depth;
+    }
+
+    function splitKey(key) {
+        var parts = String(key).split(':');
+        return { p: Number(parts[0]) || 0, d: Number(parts[1]) || 1 };
     }
 
     function toast(icon, text) {
@@ -1569,9 +1788,9 @@
 
     /* ---------- cấp 3: một kệ/tủ ---------- */
 
-    function newTier(position, max) {
+    function newTier(position, max, depth) {
         return {
-            position: position, max: max, origMax: 0, lastBusy: 0,
+            position: position, max: max, depth: depth || 1, origMax: 0, origDepth: 0, lastBusy: 0, lastBusyDepth: 0,
             busy: new Set(), off: new Set(), codes: {}, attrs: {},
             existing: false, removed: false, wasRemoved: false,
             label: 'Tầng ' + seg(position)
@@ -1579,7 +1798,7 @@
     }
 
     function newColumn(position, template) {
-        var tiers = (template || []).map(function (tier) { return newTier(tier.position, tier.max); });
+        var tiers = (template || []).map(function (tier) { return newTier(tier.position, tier.max, tier.depth); });
         return {
             position: position, existing: false, removed: false, wasRemoved: false,
             code: null, label: 'Cột ' + seg(position), tiers: tiers
@@ -1614,7 +1833,7 @@
 
     function columnCells(column) {
         if (column.removed) return 0;
-        return activeTiers(column).reduce(function (sum, tier) { return sum + tier.max; }, 0);
+        return activeTiers(column).reduce(function (sum, tier) { return sum + tier.max * tier.depth; }, 0);
     }
 
     function maxPosition(list) {
@@ -1623,7 +1842,7 @@
 
     // Mẫu tầng của cột còn dùng cuối cùng, để cột mới thêm vào giống cột trước.
     function templateOf(column) {
-        return column ? activeTiers(column).map(function (tier) { return { position: tier.position, max: tier.max }; }) : [];
+        return column ? activeTiers(column).map(function (tier) { return { position: tier.position, max: tier.max, depth: tier.depth }; }) : [];
     }
 
     function startCreate(template) {
@@ -1636,6 +1855,7 @@
         el.code.value = state.suggest || '';
         state.nameTouched = false;
         syncName();
+        setTierOrder(state.tierOrder);
 
         if (template && template.length) {
             state.columns = template.map(function (tiers, index) { return newColumn(index + 1, tiers); });
@@ -1674,6 +1894,8 @@
                 el.code.readOnly = !CFG.canUpdate;
                 el.name.value = data.shelf.name;
                 el.preview.hidden = true;
+                setTierOrder(data.shelf.tier_order);
+                el.tierOrder.disabled = !CFG.canUpdate;
 
                 state.columns = data.columns.map(function (column) {
                     var removed = Number(column.status_id) !== 1;
@@ -1684,13 +1906,19 @@
                         tiers: column.tiers.map(function (tier) {
                             var off = Number(tier.status_id) !== 1;
                             var codes = tier.codes || {};
+                            // Tầng đang khoá hết ô thì sức chứa hiện tại là 0; lấy khung các ô đã có
+                            // làm mức gợi ý để khi "Dùng lại" là mở lại đủ các ô cũ.
+                            var had = Object.keys(codes).map(splitKey);
+                            var hadMax = had.reduce(function (m, k) { return Math.max(m, k.p); }, 0);
+                            var hadDepth = had.reduce(function (m, k) { return Math.max(m, k.d); }, 0);
                             return {
                                 position: Number(tier.position),
-                                // Tầng đang khoá hết ô thì sức chứa hiện tại là 0; lấy số ô đã có
-                                // làm mức gợi ý để khi "Dùng lại" là mở lại đủ các ô cũ.
-                                max: Number(tier.max) || Object.keys(codes).length || 1,
+                                max: Number(tier.max) || hadMax || 1,
+                                depth: Number(tier.depth) || hadDepth || 1,
                                 origMax: Number(tier.max) || 0,
+                                origDepth: Number(tier.depth) || 0,
                                 lastBusy: Number(tier.last_busy) || 0,
+                                lastBusyDepth: Number(tier.last_busy_depth) || 0,
                                 busy: new Set(tier.busy || []),
                                 off: new Set(tier.off || []),
                                 codes: codes,
@@ -1779,7 +2007,7 @@
         }
 
         el.preview.innerHTML = 'Sẽ tạo kệ/tủ <b>' + esc(code) + '</b> · cột <b>' + esc(code) + '/01</b>'
-            + ' · tầng <b>' + esc(code) + '/01/01</b> · vị trí <b>' + esc(code) + '/01/01/01</b>...';
+            + ' · tầng <b>' + esc(code) + '/01/01</b> · vị trí <b>' + esc(code) + '/01/01/A1</b>...';
     }
 
     /* ---------- tạo nhiều kệ: mỗi kệ thêm là một card bên dưới, có lưới riêng ---------- */
@@ -2015,7 +2243,7 @@
 
         el.preview.className = 'zs-preview';
         el.preview.innerHTML = 'Đổi mã kệ <b>' + esc(state.shelf.code) + '</b> thành <b>' + esc(code) + '</b>: mã cột, tầng, vị trí con đổi theo'
-            + ' (<b>' + esc(state.shelf.code) + '/01/01/01</b> -> <b>' + esc(code) + '/01/01/01</b>). Bấm "Lưu cấu trúc" để áp dụng.';
+            + ' (<b>' + esc(state.shelf.code) + '/01/01/A1</b> -> <b>' + esc(code) + '/01/01/A1</b>). Bấm "Lưu cấu trúc" để áp dụng.';
     }
 
     function refreshCodeCheck() {
@@ -2044,6 +2272,7 @@
         pickerRows = 6;
         pickerCols = 20;
         el.pickerCols.value = 1;
+        el.pickerDepth.value = 1;
         el.readout.textContent = 'Chưa chọn';
         el.picker.hidden = false;
         drawPicker(0, 0);
@@ -2082,11 +2311,16 @@
         }
 
         var cols = pickerColumns();
-        el.readout.textContent = cols + ' cột × ' + r + ' tầng × ' + c + ' vị trí = ' + num(cols * r * c) + ' ô';
+        var depth = pickerDepth();
+        el.readout.textContent = cols + ' cột × ' + r + ' tầng × ' + c + ' ngang × ' + depth + ' sâu = ' + num(cols * r * c * depth) + ' ô';
     });
 
     function pickerColumns() {
         return Math.min(Math.max(Number(el.pickerCols.value) || 1, 1), CFG.maxColumns);
+    }
+
+    function pickerDepth() {
+        return Math.min(Math.max(Number(el.pickerDepth.value) || 1, 1), CFG.maxDepth);
     }
 
     el.pickerGrid.addEventListener('click', function (event) {
@@ -2096,7 +2330,8 @@
         var rows = Number(cell.dataset.r);
         var cols = Number(cell.dataset.c);
         var template = [];
-        for (var p = 1; p <= rows; p++) template.push({ position: p, max: cols });
+        var depth = pickerDepth();
+        for (var p = 1; p <= rows; p++) template.push({ position: p, max: cols, depth: depth });
 
         var start = maxPosition(state.columns);
         for (var i = 1; i <= pickerColumns(); i++) {
@@ -2113,7 +2348,7 @@
     var lockedSize = null;
 
     // Phần cố định của một khối cột ngoài các ô: nhãn tầng, tay kéo, ô số, nút gỡ, lề, khoảng cách.
-    var COLUMN_CHROME = 230;
+    var COLUMN_CHROME = 190;
 
     // Mọi cột dùng chung một cỡ ô; các cột xếp ngang nên chia bề ngang cho đủ số cột,
     // không vừa thì giữ cỡ tối thiểu và cho cuộn ngang.
@@ -2133,64 +2368,102 @@
     // Chữ cái hiện trong ô theo loại lưu trữ (để trống = dùng chung).
     var TYPE_LETTERS = { material: 'V', chemical: 'H', standard: 'C' };
 
+    // Ô (p ngang, d sâu) có trên lưới mới / có trong sức chứa cũ không.
+    function inNew(tier, p, d) { return p <= tier.max && d <= tier.depth; }
+    function inOld(tier, p, d) { return p <= tier.origMax && d <= tier.origDepth; }
+
     function cellsMarkup(column, tier) {
         var width = Math.max(tier.max, tier.origMax);
+        var height = Math.max(tier.depth, tier.origDepth);
         var markup = '';
 
-        for (var p = 1; p <= width; p++) {
-            var cls, status;
-            if (tier.removed || column.removed || p > tier.max) {
-                // Ô đang mở nằm ngoài sức chứa mới (hoặc cả tầng/cột bị gỡ)
-                cls = 'is-cut'; status = tier.wasRemoved || column.wasRemoved ? 'đang khoá' : 'sẽ khoá';
-            } else if (p > tier.origMax) {
-                // Vượt sức chứa cũ: ô chưa có thì sinh mới, ô từng bị khoá do thu nhỏ thì mở lại
-                cls = 'is-new'; status = tier.codes[p] ? 'sẽ mở lại' : 'sẽ tạo';
-            } else if (tier.busy.has(p)) {
-                cls = 'is-busy'; status = 'có lô hàng';
-            } else if (tier.off.has(p)) {
-                cls = 'is-off'; status = 'đang khoá';
-            } else {
-                cls = 'is-free'; status = 'trống';
-            }
-            var code = remap(tier.codes[p]) || tierCode(column, tier) + '/' + seg(p);
-            var attr = cls === 'is-new' || cls === 'is-cut' ? null : tier.attrs[p];
-            var extra = '';
-            var letter = '';
+        // Dãy trong cùng vẽ trên, dãy 1 (sát cửa) vẽ dưới cùng, sát thước chữ mép trước.
+        for (var d = height; d >= 1; d--) {
+            for (var p = 1; p <= width; p++) {
+                var key = cellKey(p, d);
+                var isNew = inNew(tier, p, d);
+                var isOld = inOld(tier, p, d);
+                var cls, status;
 
-            if (attr) {
-                var styles = [];
-                var zt = attr.zone_type && CFG.zoneColors[attr.zone_type];
-                if (attr.shown) styles.push('--loc:' + esc(attr.shown));
-                if (zt) styles.push('--zt:' + zt, '--zt-soft:' + soften(zt));
-                extra = ' data-id="' + attr.id + '" data-zone="' + esc(zt ? attr.zone_type : '') + '"'
-                    + (styles.length ? ' style="' + styles.join(';') + '"' : '');
-                cls += (attr.shown ? ' has-color' : '') + (zt ? ' has-zone' : '')
-                    + (state.picked.has(attr.id) ? ' is-picked' : '');
-                status += ' · ' + (CFG.zoneTypes[attr.zone_type] || 'Chưa phân loại')
-                    + ' · ' + (CFG.locationTypes[attr.item_type] || 'Dùng chung');
-                letter = TYPE_LETTERS[attr.item_type] || '';
-            }
+                if (!isNew && !isOld) {
+                    // Nằm ngoài cả lưới cũ lẫn mới (ví dụ thu hẹp ngang nhưng tăng sâu): chừa trống
+                    markup += '<span class="zs-cell is-void"></span>';
+                    continue;
+                }
+                if (tier.removed || column.removed || !isNew) {
+                    // Ô đang mở nằm ngoài lưới mới (hoặc cả tầng/cột bị gỡ)
+                    cls = 'is-cut'; status = tier.wasRemoved || column.wasRemoved ? 'đang khoá' : 'sẽ khoá';
+                } else if (!isOld) {
+                    // Ngoài sức chứa cũ: ô chưa có thì sinh mới, ô từng bị khoá do thu nhỏ thì mở lại
+                    cls = 'is-new'; status = tier.codes[key] ? 'sẽ mở lại' : 'sẽ tạo';
+                } else if (tier.busy.has(key)) {
+                    cls = 'is-busy'; status = 'có lô hàng';
+                } else if (tier.off.has(key)) {
+                    cls = 'is-off'; status = 'đang khoá';
+                } else {
+                    cls = 'is-free'; status = 'trống';
+                }
+                var code = remap(tier.codes[key]) || tierCode(column, tier) + '/' + letters(p) + d;
+                var attr = cls === 'is-new' || cls === 'is-cut' ? null : tier.attrs[key];
+                var extra = '';
+                var letter = '';
 
-            markup += '<span class="zs-cell ' + cls + '"' + extra + ' title="' + esc(code) + ' - ' + esc(status) + '">' + letter + '</span>';
+                if (attr) {
+                    var styles = [];
+                    var zt = attr.zone_type && CFG.zoneColors[attr.zone_type];
+                    if (attr.shown) styles.push('--loc:' + esc(attr.shown));
+                    if (zt) styles.push('--zt:' + zt, '--zt-soft:' + soften(zt));
+                    extra = ' data-id="' + attr.id + '" data-zone="' + esc(zt ? attr.zone_type : '') + '"'
+                        + (styles.length ? ' style="' + styles.join(';') + '"' : '');
+                    cls += (attr.shown ? ' has-color' : '') + (zt ? ' has-zone' : '')
+                        + (state.picked.has(attr.id) ? ' is-picked' : '');
+                    status += ' · ' + (CFG.zoneTypes[attr.zone_type] || 'Chưa phân loại')
+                        + ' · ' + (CFG.locationTypes[attr.item_type] || 'Dùng chung');
+                    letter = TYPE_LETTERS[attr.item_type] || '';
+                }
+
+                markup += '<span class="zs-cell ' + cls + '"' + extra + ' title="' + esc(code) + ' - ' + esc(status) + '">' + letter + '</span>';
+            }
         }
 
         return markup;
     }
 
-    function rowMarkup(column, tier) {
+    // Khối một tầng: thước số dãy bên trái, lưới ô, thước chữ ô ngang dọc mép trước.
+    function blockMarkup(column, tier) {
         var width = Math.max(tier.max, tier.origMax);
-        var note = tier.lastBusy ? ' (ô ' + tier.lastBusy + ' đang có lô hàng)' : '';
-        var locked = column.removed;
+        var height = Math.max(tier.depth, tier.origDepth);
+        var depthRule = '';
+        var frontRule = '';
+        for (var d = height; d >= 1; d--) depthRule += '<span>' + d + '</span>';
+        for (var p = 1; p <= width; p++) frontRule += '<span>' + letters(p) + '</span>';
 
+        var locked = column.removed;
+        var off = tier.removed ? ' disabled' : '';
+        var note = tier.lastBusy ? ' (ô ' + letters(tier.lastBusy) + ', dãy ' + tier.lastBusyDepth + ' đang có lô hàng)' : '';
+
+        return '<div class="zs-block" style="--cols:' + width + '">'
+            + '<div class="zs-depth-rule" title="Dãy tính từ cửa vào trong (1 = sát cửa)">' + depthRule + '</div>'
+            + '<div class="zs-cells">' + cellsMarkup(column, tier) + '</div>'
+            + '<div class="zs-side">' + (locked ? '' :
+                '<input type="number" class="zs-depth" data-pos="' + tier.position + '" min="1" max="' + CFG.maxDepth
+                + '" value="' + tier.depth + '" title="Số dãy sâu (1 = sát cửa)"' + off + '>') + '</div>'
+            + '<div class="zs-front-rule" title="Ô ngang dọc mép trước tầng">' + frontRule + '</div>'
+            + '<div class="zs-corner">' + (locked || tier.removed ? '' :
+                '<button type="button" class="zs-handle" data-pos="' + tier.position + '" title="Kéo ngang để đổi số ô ngang, kéo lên/xuống để đổi số dãy sâu' + esc(note) + '"></button>') + '</div>'
+            + '<div class="zs-under">' + (locked ? '' :
+                '<input type="number" class="zs-num" data-pos="' + tier.position + '" min="1" max="' + CFG.maxLocations
+                + '" value="' + tier.max + '" title="Số ô ngang (A, B, C...)"' + off + '>') + '</div>'
+            + '</div>';
+    }
+
+    function rowMarkup(column, tier) {
         return '<div class="zs-row' + (tier.removed ? ' is-removed' : '') + '" data-pos="' + tier.position + '">'
             + '<button type="button" class="zs-row-label zs-rename zs-tier-rename" data-pos="' + tier.position + '" title="'
             + esc(tierCode(column, tier)) + ' - bấm để đổi tên tầng">' + esc(tier.label) + '</button>'
-            + '<div class="zs-cells" style="--cols:' + width + '">' + cellsMarkup(column, tier) + '</div>'
-            + (locked ? '' :
-                '<button type="button" class="zs-handle" data-pos="' + tier.position + '" title="Kéo để đổi số vị trí' + esc(note) + '"></button>'
-                + '<input type="number" class="zs-num" data-pos="' + tier.position + '" min="1" max="' + CFG.maxLocations
-                + '" value="' + tier.max + '"' + (tier.removed ? ' disabled' : '') + '>'
-                + '<button type="button" class="zs-drop" data-pos="' + tier.position + '" title="'
+            + blockMarkup(column, tier)
+            + (column.removed ? '' :
+                '<button type="button" class="zs-drop" data-pos="' + tier.position + '" title="'
                 + (tier.removed ? 'Dùng lại tầng này' : 'Gỡ tầng này') + '"><i class="fas fa-' + (tier.removed ? 'undo' : 'times') + '"></i></button>')
             + '</div>';
     }
@@ -2199,28 +2472,36 @@
         var tiers = activeTiers(column);
         var visible = column.tiers
             .filter(function (tier) { return !(tier.removed && tier.origMax === 0 && !tier.existing); })
-            .sort(function (a, b) { return b.position - a.position; });
+            .sort(function (a, b) { return state.tierOrder === 'top_down' ? a.position - b.position : b.position - a.position; });
 
         var meta = column.removed
             ? (column.wasRemoved ? 'Đang khoá' : 'Sẽ khoá toàn bộ cột')
             : tiers.length + ' tầng · ' + num(columnCells(column)) + ' vị trí';
 
         var head = '<div class="zs-col-head">'
-            + '<div class="zs-col-title"><i class="fas fa-grip-lines-vertical"></i> '
-            +   '<button type="button" class="zs-rename zs-col-rename" title="Bấm để đổi tên cột">' + esc(column.label) + '<i class="fas fa-pen"></i></button>'
-            +   ' <span class="zs-code">' + esc(columnCode(column)) + '</span>'
-            +   ' <small>' + meta + '</small></div>'
-            + '<div class="zs-col-tools">'
+            + '<div class="zs-col-bar">'
+            +   '<div class="zs-col-name">'
+            +     '<div class="zs-col-title"><i class="fas fa-grip-lines-vertical"></i> '
+            +       '<button type="button" class="zs-rename zs-col-rename" title="Bấm để đổi tên cột">' + esc(column.label) + '<i class="fas fa-pen"></i></button>'
+            +       ' <span class="zs-code">' + esc(columnCode(column)) + '</span></div>'
+            +     '<small class="zs-col-meta">' + meta + '</small>'
+            +   '</div>'
+            +   '<div class="zs-col-actions">'
+            +   (column.removed
+                    ? '<button type="button" class="btn btn-sm btn-outline-success zs-col-drop"><i class="fas fa-undo mr-1"></i>Dùng lại cột</button>'
+                    : '<button type="button" class="zs-icon-btn zs-col-copy" title="Nhân bản: thêm một cột mới có cùng cấu trúc tầng"><i class="fas fa-clone"></i></button>'
+                      + '<button type="button" class="zs-icon-btn is-danger zs-col-drop" title="Gỡ cột"><i class="fas fa-times"></i></button>')
+            +   '</div>'
+            + '</div>'
             + (column.removed ? '' :
-                '<div class="zs-bulk"><label class="mb-0" title="Đặt số vị trí cho mọi tầng của cột">Mọi tầng</label>'
-                + '<input type="number" class="form-control form-control-sm zs-bulk-value" min="1" max="' + CFG.maxLocations + '">'
-                + '<button type="button" class="btn btn-sm btn-outline-secondary zs-bulk-apply">Áp dụng</button></div>'
-                + '<button type="button" class="btn btn-sm btn-outline-primary zs-col-copy" title="Thêm một cột mới có cùng cấu trúc tầng">'
-                + '<i class="fas fa-clone mr-1"></i>Nhân bản</button>')
-            + '<button type="button" class="btn btn-sm ' + (column.removed ? 'btn-outline-success' : 'btn-outline-danger') + ' zs-col-drop">'
-            + (column.removed ? '<i class="fas fa-undo mr-1"></i>Dùng lại cột' : '<i class="fas fa-times mr-1"></i>Gỡ cột')
-            + '</button>'
-            + '</div></div>';
+                '<div class="zs-bulk"><label class="mb-0" title="Đặt số ô ngang × số dãy sâu cho mọi tầng của cột (để trống ô nào thì giữ nguyên chiều đó)">Mọi tầng</label>'
+                + '<div class="zs-bulk-group">'
+                +   '<input type="number" class="zs-bulk-value" min="1" max="' + CFG.maxLocations + '" placeholder="Ngang" title="Số ô ngang">'
+                +   '<span class="zs-x">×</span>'
+                +   '<input type="number" class="zs-bulk-depth" min="1" max="' + CFG.maxDepth + '" placeholder="Sâu" title="Số dãy sâu">'
+                +   '<button type="button" class="zs-bulk-apply" title="Áp dụng cho mọi tầng của cột"><i class="fas fa-check"></i></button>'
+                + '</div></div>')
+            + '</div>';
 
         var body;
         if (column.removed && column.wasRemoved) {
@@ -2266,10 +2547,10 @@
         var counts = { '': 0 };
         state.columns.forEach(function (column) {
             column.tiers.forEach(function (tier) {
-                Object.keys(tier.attrs || {}).forEach(function (position) {
-                    var p = Number(position);
-                    if (column.removed || tier.removed || p > tier.max || p > tier.origMax || tier.off.has(p)) return;
-                    var type = tier.attrs[position].zone_type;
+                Object.keys(tier.attrs || {}).forEach(function (key) {
+                    var k = splitKey(key);
+                    if (column.removed || tier.removed || !inNew(tier, k.p, k.d) || !inOld(tier, k.p, k.d) || tier.off.has(key)) return;
+                    var type = tier.attrs[key].zone_type;
                     type = type && CFG.zoneTypes[type] ? type : '';
                     counts[type] = (counts[type] || 0) + 1;
                 });
@@ -2308,6 +2589,20 @@
         updatePicked();
     });
 
+    function setTierOrder(order) {
+        state.tierOrder = order === 'top_down' ? 'top_down' : 'bottom_up';
+        el.tierOrder.value = state.tierOrder;
+        el.tierOrder.disabled = false;
+        el.editor.classList.toggle('zs-top-down', state.tierOrder === 'top_down');
+    }
+
+    // Đổi chiều đánh số: chỉ xếp lại lưới, mã tầng giữ theo số thứ tự; áp cho mọi kệ đang tạo.
+    el.tierOrder.addEventListener('change', function () {
+        setTierOrder(el.tierOrder.value);
+        renderAllColumns();
+        setDirty(true);
+    });
+
     function renderColumns() {
         state.columns.sort(function (a, b) { return a.position - b.position; });
         el.columns.style.setProperty('--zs-cell', cellSize() + 'px');
@@ -2330,10 +2625,17 @@
             return;
         }
 
-        var cells = row.querySelector('.zs-cells');
-        cells.style.setProperty('--cols', Math.max(tier.max, tier.origMax));
-        cells.innerHTML = cellsMarkup(column, tier);
+        // Chỉ vẽ lại thước và ô; góc kéo đang giữ con trỏ thì giữ nguyên phần tử.
+        var fresh = document.createElement('div');
+        fresh.innerHTML = blockMarkup(column, tier);
+        fresh = fresh.firstChild;
+        var block = row.querySelector('.zs-block');
+        block.style.setProperty('--cols', Math.max(tier.max, tier.origMax));
+        ['.zs-depth-rule', '.zs-cells', '.zs-front-rule'].forEach(function (selector) {
+            block.querySelector(selector).innerHTML = fresh.querySelector(selector).innerHTML;
+        });
         row.querySelector('.zs-num').value = tier.max;
+        row.querySelector('.zs-depth').value = tier.depth;
         updateSummary();
     }
 
@@ -2360,9 +2662,13 @@
         return column.tiers.find(function (tier) { return tier.position === Number(position); });
     }
 
-    // Không cho thu nhỏ qua ô cuối cùng đang có lô hàng: thao tác sai bị chặn ngay ở tay.
+    // Không cho thu nhỏ qua ô / dãy xa nhất đang có lô hàng: thao tác sai bị chặn ngay ở tay.
     function clampMax(tier, value) {
         return Math.min(Math.max(value, Math.max(1, tier.lastBusy)), CFG.maxLocations);
+    }
+
+    function clampDepth(tier, value) {
+        return Math.min(Math.max(value, Math.max(1, tier.lastBusyDepth)), CFG.maxDepth);
     }
 
     function columnBusy(column) {
@@ -2388,9 +2694,13 @@
         var tier = found && findTier(found.column, handle.dataset.pos);
         if (!tier || tier.removed) return;
 
-        var cells = handle.parentElement.querySelector('.zs-cells');
-        var left = cells.getBoundingClientRect().left;
         var size = parseFloat(getComputedStyle(el.columns).getPropertyValue('--zs-cell')) || 14;
+        var step = size + 2;
+        // Tính theo độ dời so với lúc bấm: ngang đổi số ô ngang, lên/xuống đổi số dãy sâu.
+        var startX = event.clientX;
+        var startY = event.clientY;
+        var startMax = tier.max;
+        var startDepth = tier.depth;
 
         lockedSize = size;
         handle.classList.add('is-dragging');
@@ -2398,9 +2708,11 @@
         event.preventDefault();
 
         function onMove(moveEvent) {
-            var next = clampMax(tier, Math.round((moveEvent.clientX - left) / (size + 2)));
-            if (next === tier.max) return;
-            tier.max = next;
+            var nextMax = clampMax(tier, startMax + Math.round((moveEvent.clientX - startX) / step));
+            var nextDepth = clampDepth(tier, startDepth + Math.round((startY - moveEvent.clientY) / step));
+            if (nextMax === tier.max && nextDepth === tier.depth) return;
+            tier.max = nextMax;
+            tier.depth = nextDepth;
             setDirty(true);
             renderRow(found.column, tier, found.section);
         }
@@ -2418,18 +2730,21 @@
     });
 
     el.editor.addEventListener('change', function (event) {
-        var input = event.target.closest('.zs-num');
+        var input = event.target.closest('.zs-num, .zs-depth');
         if (!input) return;
 
         var found = columnAt(input);
         var tier = found && findTier(found.column, input.dataset.pos);
         if (!tier) return;
 
-        var next = clampMax(tier, Number(input.value) || 1);
+        var isDepth = input.classList.contains('zs-depth');
+        var next = isDepth ? clampDepth(tier, Number(input.value) || 1) : clampMax(tier, Number(input.value) || 1);
         if (next > Number(input.value) && tier.lastBusy) {
-            toast('warning', tier.label + ' không thể nhỏ hơn ' + next + ' vì ô ' + tier.lastBusy + ' đang có lô hàng.');
+            toast('warning', tier.label + ' không thể nhỏ hơn ' + next + (isDepth ? ' dãy' : ' ô ngang') + ' vì ô '
+                + (isDepth ? 'ở dãy ' + tier.lastBusyDepth : letters(tier.lastBusy)) + ' đang có lô hàng.');
         }
-        tier.max = next;
+        if (isDepth) tier.depth = next;
+        else tier.max = next;
         setDirty(true);
         renderColumns();
     });
@@ -2463,7 +2778,7 @@
             if (!tier) return;
 
             if (!tier.removed && tier.lastBusy) {
-                toast('warning', tier.label + ' đang có lô hàng (tới ô ' + tier.lastBusy + '), không gỡ được. Hãy chuyển hàng đi trước.');
+                toast('warning', tier.label + ' đang có lô hàng, không gỡ được. Hãy chuyển hàng đi trước.');
                 return;
             }
 
@@ -2484,7 +2799,7 @@
                 return;
             }
             var last = activeTiers(column).sort(function (a, b) { return a.position - b.position; }).pop();
-            column.tiers.push(newTier(highest + 1, last ? last.max : 10));
+            column.tiers.push(newTier(highest + 1, last ? last.max : 10, last ? last.depth : 1));
             setDirty(true);
             renderColumns();
             return;
@@ -2492,19 +2807,29 @@
 
         if (event.target.closest('.zs-bulk-apply')) {
             var value = Number(found.section.querySelector('.zs-bulk-value').value);
-            if (!value) return;
+            var depthValue = Number(found.section.querySelector('.zs-bulk-depth').value);
+            if (!value && !depthValue) return;
 
             var blocked = [];
             activeTiers(column).forEach(function (item) {
-                var next = clampMax(item, value);
-                if (next !== value && item.lastBusy) blocked.push(item.label + ' (tối thiểu ' + next + ')');
-                item.max = next;
+                var parts = [];
+                if (value) {
+                    var next = clampMax(item, value);
+                    if (next !== value && item.lastBusy) parts.push('ngang tối thiểu ' + next);
+                    item.max = next;
+                }
+                if (depthValue) {
+                    var nextDepth = clampDepth(item, depthValue);
+                    if (nextDepth !== depthValue && item.lastBusy) parts.push('sâu tối thiểu ' + nextDepth);
+                    item.depth = nextDepth;
+                }
+                if (parts.length) blocked.push(item.label + ' (' + parts.join(', ') + ')');
             });
             setDirty(true);
             renderColumns();
 
             if (blocked.length) {
-                toast('warning', 'Một số tầng không xuống được ' + value + ' vì đang có lô hàng: ' + blocked.join(', '));
+                toast('warning', 'Một số tầng không thu nhỏ được vì đang có lô hàng: ' + blocked.join('; '));
             }
             return;
         }
@@ -2525,7 +2850,7 @@
                 // Dùng lại cột đang khoá thì mở lại luôn các tầng của nó
                 if (!column.removed && column.wasRemoved) {
                     column.tiers.forEach(function (item) { item.removed = false; });
-                    if (!column.tiers.length) column.tiers.push(newTier(1, 10));
+                    if (!column.tiers.length) column.tiers.push(newTier(1, 10, 1));
                 }
             } else {
                 dropNew(state.columns, column, function (x) { if (!x.custom) x.label = 'Cột ' + seg(x.position); });
@@ -2676,7 +3001,7 @@
             return;
         }
 
-        var tiers = template && template.length ? template : [{ position: 1, max: 10 }];
+        var tiers = template && template.length ? template : [{ position: 1, max: 10, depth: 1 }];
         state.columns.push(newColumn(highest + 1, tiers));
         setDirty(true);
         renderColumns();
@@ -2710,7 +3035,7 @@
                 return {
                     position: column.position,
                     name: column.label,
-                    tiers: activeTiers(column).map(function (tier) { return { position: tier.position, max: tier.max, name: tier.label }; })
+                    tiers: activeTiers(column).map(function (tier) { return { position: tier.position, max: tier.max, depth: tier.depth, name: tier.label }; })
                 };
             });
     }
@@ -2750,6 +3075,7 @@
 
             post(CFG.apply, {
                 warehouse_id: state.warehouse.id,
+                tier_order: state.tierOrder,
                 shelves: shelves
             }).then(function (result) {
                 el.save.disabled = false;
@@ -2803,7 +3129,7 @@
             if (column.removed) return;
             column.tiers.forEach(function (tier) {
                 if (tier.removed && !tier.wasRemoved) droppedTiers++;
-                else if (!tier.removed && tier.max < tier.origMax) shrunk++;
+                else if (!tier.removed && (tier.max < tier.origMax || tier.depth < tier.origDepth)) shrunk++;
             });
         });
 
@@ -2840,6 +3166,7 @@
                 warehouse_id: state.warehouse.id,
                 code: code,
                 name: name,
+                tier_order: state.tierOrder,
                 columns: columns
             }).then(function (result) {
                 el.save.disabled = false;

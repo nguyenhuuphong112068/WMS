@@ -39,7 +39,7 @@ class UserGuideController extends Controller
             'title' => 'Dữ Liệu Gốc',
             'icon' => 'fas fa-database',
             'summary' => 'Khai báo tổ chức, danh mục dùng chung, hoá chất - chất chuẩn - vật tư, định khu kho và khởi tạo dữ liệu ban đầu.',
-            'updated_at' => '2026-11-03',
+            'updated_at' => '2026-11-06',
         ],
         'material' => [
             'title' => 'Vật Tư',
