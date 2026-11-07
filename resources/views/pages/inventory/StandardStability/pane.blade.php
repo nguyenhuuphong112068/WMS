@@ -42,7 +42,7 @@
                 <th class="text-center" style="width: 90px"
                     title="Khoảng cách giữa hai mốc đánh giá liên tiếp">Chu Kỳ</th>
                 <th class="text-center" style="width: 150px"
-                    title="Số mốc đã có kết quả trên tổng số mốc của phiếu">Tiến Độ Các Mốc</th>
+                    title="Số thời điểm đã có kết quả trên tổng số thời điểm đánh giá của phiếu">Tiến Độ</th>
                 <th class="text-center" style="width: 150px"
                     title="Mốc chưa đánh giá có ngày đến hạn sớm nhất">Mốc Kế Tiếp</th>
                 <th class="text-center" style="width: 120px"
@@ -89,12 +89,12 @@
                     <td class="text-center" data-order="{{ $row->progress }}">
                         @if ($row->item_total > 0)
                             <span class="font-weight-bold">{{ $row->item_done }}/{{ $row->item_total }}</span>
-                            <span class="md-sub">mốc</span>
+                            <span class="md-sub">thời điểm</span>
                             <div class="ssa-progress {{ $row->progress >= 100 ? 'is-done' : '' }}">
                                 <span style="width: {{ $row->progress }}%"></span>
                             </div>
                         @else
-                            <span class="md-empty" title="Phiếu chưa khai mốc đánh giá nào">Chưa có mốc</span>
+                            <span class="md-empty" title="Phiếu chưa khai thời điểm đánh giá nào">Chưa có thời điểm</span>
                         @endif
                     </td>
                     <td class="text-center md-sub" data-order="{{ $row->next_due_date ?: '9999-12-31' }}">

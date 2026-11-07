@@ -48,6 +48,57 @@
         mọi cột, tầng, vị trí con đổi theo.</div>
 </div>
 
+<h3>Cách đọc mã vị trí</h3>
+<p>Mã vị trí gồm 4 đoạn cách nhau bằng dấu <span class="ug-key">/</span>:
+    <span class="ug-key">Mã kệ/tủ</span> / <span class="ug-key">Cột</span> / <span class="ug-key">Tầng</span> /
+    <span class="ug-key">Ô ngang + Dãy sâu</span>. Ví dụ <span class="ug-key">QC2-INS-068/02/04/D4</span>:</p>
+<div class="table-responsive">
+    <table class="table table-bordered ug-table">
+        <thead>
+            <tr>
+                <th style="width: 18%">Đoạn mã</th>
+                <th style="width: 14%">Cấp</th>
+                <th>Ý nghĩa và ai đặt</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="ug-key">QC2-INS-068</span></td>
+                <td>Kệ/Tủ</td>
+                <td style="font-weight: 400">Mã kệ/tủ do người dùng nhập khi <b>Thêm kệ</b>. Hệ thống chỉ gợi ý
+                    <span class="ug-key">&lt;mã kho&gt;/&lt;số kệ&gt;</span> (ví dụ <span class="ug-key">01/05</span>); đặt mã khác
+                    (như mã thiết bị của tủ) thì mã vị trí không còn chứa mã kho.</td>
+            </tr>
+            <tr>
+                <td><span class="ug-key">02</span></td>
+                <td>Cột</td>
+                <td style="font-weight: 400">Cột thứ 2 của kệ, hệ thống tự đánh số 01, 02, 03... Tên cột (ví dụ <i>Cánh phải</i>)
+                    đổi được, mã cột giữ nguyên.</td>
+            </tr>
+            <tr>
+                <td><span class="ug-key">04</span></td>
+                <td>Tầng</td>
+                <td style="font-weight: 400">Tầng thứ 4. Tầng 01 nằm dưới cùng hay trên cùng tuỳ kệ chọn đánh số <i>Từ dưới lên</i>
+                    hay <i>Từ trên xuống</i>. Đổi được thành mã tự đặt ở hộp <b>Đổi tên / mã tầng</b> (ví dụ
+                    <span class="ug-key">T4</span> → <span class="ug-key">…/02/T4/D4</span>).</td>
+            </tr>
+            <tr>
+                <td><span class="ug-key">D</span></td>
+                <td>Ô ngang</td>
+                <td style="font-weight: 400">Ô thứ 4 dọc mép trước tầng, đếm từ trái sang: A = 1, B = 2, C = 3, D = 4. Hệ thống tự sinh.</td>
+            </tr>
+            <tr>
+                <td><span class="ug-key">4</span></td>
+                <td>Dãy sâu</td>
+                <td style="font-weight: 400">Dãy thứ 4 tính từ cửa vào trong (dãy 1 sát cửa). Hệ thống tự sinh.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<p>Đọc liền: tủ <b>QC2-INS-068</b> → cột <b>02</b> → tầng <b>04</b> → ô ngang thứ 4 (<b>D</b>), dãy thứ <b>4</b> tính từ cửa vào.
+    Ô chọn Định khu ở hộp thoại <b>Khai Hoá Chất Cho Phòng</b> chỉ hiện mã này; các màn khác hiện kèm tên
+    <i>Kho / Kệ / Cột / Tầng</i> phía trước.</p>
+
 <h3>Gán phân loại và loại lưu trữ cho vị trí</h3>
 <ol class="ug-steps">
     <li>Mở một kệ đã lưu. <b>Bấm</b> hoặc <b>rê chuột</b> qua các ô để chọn nhiều vị trí; giữ <b>Shift</b> rồi kéo chuột để quét một khung chữ nhật, mọi ô chạm khung (kể cả ở nhiều tầng, nhiều cột) được thêm vào lựa chọn; bấm <b>Chọn cả kệ</b> để chọn tất cả.</li>
