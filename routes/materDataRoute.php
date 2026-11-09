@@ -91,6 +91,9 @@ Route::prefix('/materData')
                 Route::post('apply', 'apply')->name('apply');
                 Route::post('shelf', 'saveShelf')->name('saveShelf');
                 Route::post('locations', 'saveLocations')->name('saveLocations');
+                // Mặt bằng kho/phòng: vị trí đặt các kệ/tủ trong phòng
+                Route::get('layout', 'layout')->name('layout');
+                Route::post('layout', 'saveLayout')->name('saveLayout');
             });
 
         // Định Khu: Kho/Phòng - Kệ/Tủ - Cột - Tầng - Vị Trí gộp chung một màn hình, {type} là cấp đang thao tác

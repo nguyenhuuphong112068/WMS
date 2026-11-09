@@ -24,6 +24,12 @@
 <p>Dựa vào <b>Cảnh Báo An Toàn</b> (hình đồ GHS) khai ở danh mục, hệ thống chặn việc xếp hai hoá chất tương kỵ (ví dụ chất lỏng dễ
     cháy với chất oxy hoá) vào <b>cùng một tầng</b> của kệ/tủ. Hoá chất chưa khai cảnh báo an toàn thì không xét được.</p>
 
+<h3>Chọn định khu (vị trí lưu trữ)</h3>
+<p>Mọi ô chọn định khu đều gõ tìm được theo tên hoặc mã của kho, kệ/tủ, cột, tầng, vị trí. Trong khung tìm có hai hàng chip lọc
+    nhanh: <b>phân loại</b> (Dự Phòng, Sử Dụng, Biệt Trữ...) và <b><i class="fas fa-layer-group"></i> Kệ/Tủ</b> - bấm đúng kệ/tủ
+    cần cất hàng để chỉ còn vị trí của kệ/tủ đó (số bên cạnh là số vị trí). Hai hàng chip dùng cùng nhau được; đóng ô chọn thì
+    chip trở về <b>Tất cả</b>. Phòng chỉ có một kệ/tủ thì không hiện hàng chip Kệ/Tủ.</p>
+
 <h3>Ký điện tử bằng mật khẩu</h3>
 <p>Các thao tác <span class="ug-chip is-warn">Ký bằng mật khẩu</span> (duyệt danh mục, xác nhận khai báo cổng quốc gia,
     quyết định loại bỏ, huỷ, ký dự trù) bắt buộc nhập lại mật khẩu đăng nhập (21 CFR Part 11).</p>

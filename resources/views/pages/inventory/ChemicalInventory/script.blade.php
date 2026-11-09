@@ -556,7 +556,19 @@
                             expired: row.effective_expired_date,
                             state_label: cfg.states[row.state] || ''
                         });
-                    })
+                    }),
+                    // Định khu nhanh xong: vá vị trí mới vào dòng tồn gốc để mọi tab (cột Định khu ở
+                    // Theo mã xuất nhập...) cùng cập nhật, rồi dựng lại - không tải lại cả kỳ
+                    onAssigned: function(res) {
+                        var ids = {};
+
+                        (res.import_ids || []).forEach(function(id) { ids[id] = true; });
+                        source.rows.forEach(function(row) {
+                            if (ids[row.id]) $.extend(row, res.location);
+                        });
+
+                        reloadBuilt();
+                    }
                 });
 
                 // Dựng lại (đổi bộ lọc VS) thì áp lại tình trạng / loại định khu đang chọn

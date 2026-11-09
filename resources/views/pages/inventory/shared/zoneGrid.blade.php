@@ -14,12 +14,23 @@
 |        warehouse_id, shelf_id, column_id, tier_id, *_name}. Chỉ mã CÒN TỒN được đếm.
 |
 | Tham số: $zgId (id khung), $zgItem (tên loại hàng, chữ thường), $zgCode (nhãn cột mã).
+|
+| KHỐI "CHƯA XẾP VỊ TRÍ" thu gọn / mở được (nhớ theo trình duyệt), ô tìm kiếm lọc cả thẻ trong khối.
+| $zgAssign (tuỳ chọn, null = chỉ xem) bật ĐỊNH KHU NHANH: mỗi thẻ có ô chọn + nút [Định khu], đầu khối
+| có [Chọn tất cả] và [Định khu N mã đã chọn], mở modal #<zgId>Assign chọn một vị trí (Select2 AJAX)
+| rồi POST {import_ids[], location_id} về $zgAssign['url']. Khai báo:
+|   ['url' => route POST, 'lookup' => route tra cứu định khu (CategoryLookup), 'max' => số mã tối đa/lượt]
+| Lưu xong gọi opts.onAssigned(res) để trang tự vá dữ liệu rồi dựng lại; không có thì tự vá rows và dựng lại.
 --}}
 @include('pages.inventory.shared.zoneMapStyles')
+@include('pages.inventory.shared.zone3d')
+{{-- nút camera ở ô tìm (thường đã nạp qua ô quét mã của tab Theo mã xuất nhập; @once nên không nạp lại) --}}
+@include('pages.shared.cameraScan')
 
 @php
     $zgItem = $zgItem ?? 'hoá chất';
     $zgCode = $zgCode ?? 'Mã xuất nhập';
+    $zgAssign = ! empty($zgAssign) ? $zgAssign + ['token' => csrf_token(), 'max' => 200] : null;
     $zgZoneTypes = collect(\App\Support\ZoneType::TYPES)
         ->map(function ($label, $type) {
             $color = \App\Support\ZoneType::color($type);
@@ -30,37 +41,39 @@
 @endphp
 
 <div class="mz-root" id="{{ $zgId }}" data-item="{{ $zgItem }}" data-code-label="{{ $zgCode }}"
-    data-zone-types="{{ json_encode($zgZoneTypes) }}">
+    data-zone-types="{{ json_encode($zgZoneTypes) }}" @if ($zgAssign) data-assign="{{ json_encode($zgAssign) }}" @endif>
+    {{-- Một dòng: chip lọc bên trái, công cụ (Thẻ | 3D | Mặt bằng, tìm kiếm) bên phải - hẹp thì tự xuống dòng --}}
     <div class="mz-head">
-        <div class="mz-stats"></div>
+        <div class="mz-filters">
+            <button type="button" class="mz-filter is-active" data-state="">Tất cả vị trí</button>
+            <button type="button" class="mz-filter" data-state="stocked"><span class="dot ok"></span>Đang có hàng</button>
+            <button type="button" class="mz-filter" data-state="alert"><span class="dot warn"></span>Cần chú ý</button>
+            <button type="button" class="mz-filter" data-state="empty"><span class="dot empty"></span>Còn trống</button>
+
+            <span class="mz-filter-sep"></span>
+            <span class="mz-filter-label">Loại định khu</span>
+            <button type="button" class="mz-filter mz-zt-filter is-active" data-zone-type="*">Tất cả</button>
+            @foreach (\App\Support\ZoneType::TYPES as $ztKey => $ztLabel)
+                <button type="button" class="mz-filter mz-zt-filter" data-zone-type="{{ $ztKey }}"
+                    style="--zt: {{ \App\Support\ZoneType::color($ztKey) }}"><span class="dot zt"></span>{{ $ztLabel }}</button>
+            @endforeach
+            <button type="button" class="mz-filter mz-zt-filter" data-zone-type=""><span class="dot empty"></span>Chưa phân
+                loại</button>
+        </div>
 
         <div class="mz-tools">
-            <div class="mz-search">
+            <div class="mz-search scan-box">
                 <i class="fas fa-search"></i>
-                <input type="text" class="form-control form-control-sm mz-search-input"
+                <input type="text" class="form-control form-control-sm mz-search-input" autocomplete="off"
                     placeholder="Tìm vị trí, kệ/tủ, mã hoặc tên {{ $zgItem }}...">
+                <button type="button" class="btn btn-outline-primary btn-camera-scan" title="Quét mã trên nhãn bằng camera">
+                    <i class="fas fa-camera"></i>
+                </button>
             </div>
             <button type="button" class="btn btn-sm btn-outline-secondary mz-toggle-all">
                 <i class="fas fa-compress mr-1"></i> Thu gọn tất cả
             </button>
         </div>
-    </div>
-
-    <div class="mz-filters">
-        <button type="button" class="mz-filter is-active" data-state="">Tất cả vị trí</button>
-        <button type="button" class="mz-filter" data-state="stocked"><span class="dot ok"></span>Đang có hàng</button>
-        <button type="button" class="mz-filter" data-state="alert"><span class="dot warn"></span>Cần chú ý</button>
-        <button type="button" class="mz-filter" data-state="empty"><span class="dot empty"></span>Còn trống</button>
-
-        <span class="mz-filter-sep"></span>
-        <span class="mz-filter-label">Loại định khu</span>
-        <button type="button" class="mz-filter mz-zt-filter is-active" data-zone-type="*">Tất cả</button>
-        @foreach (\App\Support\ZoneType::TYPES as $ztKey => $ztLabel)
-            <button type="button" class="mz-filter mz-zt-filter" data-zone-type="{{ $ztKey }}"
-                style="--zt: {{ \App\Support\ZoneType::color($ztKey) }}"><span class="dot zt"></span>{{ $ztLabel }}</button>
-        @endforeach
-        <button type="button" class="mz-filter mz-zt-filter" data-zone-type=""><span class="dot empty"></span>Chưa phân
-            loại</button>
     </div>
 
     <div class="mz-body">
@@ -124,6 +137,61 @@
         </div>
     </div>
 </div>
+
+@if ($zgAssign)
+    {{-- Định khu nhanh các mã đang "Chưa xếp vị trí" --}}
+    <div class="modal fade md-modal" id="{{ $zgId }}Assign" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-map-marker-alt"></i> Định Khu Nhanh</h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-2">
+                        <div class="col-6 col-md-3">
+                            <small class="text-muted">{{ $zgCode }}</small>
+                            <div class="font-weight-bold mz-as-count">0</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <small class="text-muted">{{ \Illuminate\Support\Str::ucfirst($zgItem) }}</small>
+                            <div class="font-weight-bold mz-as-items">0</div>
+                        </div>
+                    </div>
+
+                    <div class="mz-as-list mb-3">
+                        <table class="table table-bordered table-sm mb-0 md-no-sticky">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width:50px">STT</th>
+                                    <th style="width:160px">{{ $zgCode }}</th>
+                                    <th>{{ \Illuminate\Support\Str::ucfirst($zgItem) }}</th>
+                                    <th class="text-right" style="width:120px">Tồn</th>
+                                    <th class="text-center" style="width:105px">Hạn Áp Dụng</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-group mb-0">
+                        <label>Vị trí lưu trữ <span class="text-danger">*</span></label>
+                        <select class="form-control mz-as-location" data-lookup-url="{{ $zgAssign['lookup'] }}" data-zone-filter>
+                            <option value="">-- Chọn vị trí lưu trữ --</option>
+                        </select>
+                        <span class="md-error mz-as-error" hidden></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
+                    <button type="button" class="btn btn-primary mz-as-submit">
+                        <i class="fas fa-map-marker-alt mr-1"></i> Lưu định khu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
 
 @once
     <script>
@@ -230,6 +298,9 @@
                 var rows = opts.rows || [];
                 var item = $root.data('item') || 'hoá chất';
                 var zoneTypes = $root.data('zone-types') || {};
+                // Định khu nhanh: chỉ bật khi trang khai $zgAssign (có quyền)
+                var assign = $root.data('assign') || null;
+                var $assign = $(selector + 'Assign');
 
                 var find = function(list) {
                     var map = {};
@@ -334,23 +405,8 @@
                     .sort(function(a, b) { return Number(b.remaining) - Number(a.remaining); });
 
                 /* ---------- Vẽ ---------- */
-                function stat(value, label, cls) {
-                    return '<div class="mz-stat ' + (cls || '') + '"><b>' + value + '</b><span>' + label + '</span></div>';
-                }
-
-                var allCats = {};
-                rows.forEach(function(r) {
-                    if (Number(r.remaining) > EPSILON) allCats[r.category_id ? 'c' + r.category_id : 'n' + r.name] = true;
-                });
-
-                $root.find('.mz-stats').html(
-                    stat(outW.length, 'Kho / Phòng') + stat(totals.shelves, 'Kệ / Tủ') + stat(totals.columns, 'Cột') +
-                    stat(totals.tiers, 'Tầng') + stat(totals.filled + '/' + totals.locations, 'Vị trí có hàng') +
-                    stat(totals.lots + unzoned.length, esc($root.data('code-label'))) +
-                    stat(Object.keys(allCats).length, esc(item)) +
-                    (totals.alerts > 0 ? stat(totals.alerts, 'Cần chú ý', 'is-alert') : '')
-                );
-
+                // (Đã bỏ hàng thẻ thống kê đầu sơ đồ - nhường chỗ cho khung 3D / Mặt bằng; số vị trí có hàng,
+                //  số mã từng kho / kệ vẫn hiện ở đầu khối kho và dòng tiêu đề khung 3D.)
                 function cell(n) {
                     var zoned = n.badge.bg !== '#FFFFFF';
                     var more = n.cats.length - n.preview.length;
@@ -378,19 +434,50 @@
                 }
 
                 var html = '';
+                var codeLabel = String($root.data('code-label') || '').toLowerCase();
+                var unzonedKey = 'wms.zoneGrid.unzonedClosed.' + ($root.attr('id') || '');
+                var unzonedById = {};
+
+                unzoned.forEach(function(r) { unzonedById[r.id] = r; });
+
+                function unzonedClosed() {
+                    try { return window.localStorage.getItem(unzonedKey) === '1'; } catch (e) { return false; }
+                }
+
+                function rememberUnzoned(closed) {
+                    try { window.localStorage.setItem(unzonedKey, closed ? '1' : '0'); } catch (e) {}
+                }
+
+                /** Thẻ một mã chưa xếp vị trí; có quyền định khu thì kèm ô chọn + nút [Định khu] */
+                function unzonedCard(r) {
+                    return '<div class="mz-cell mz-ucard is-warn' + (assign ? ' is-pickable' : '') + '" data-id="' + esc(r.id) + '"' +
+                        ' data-search="' + esc([r.code, r.name, r.sub].join(' ').toLowerCase()) + '">' +
+                        '<div class="mz-cell-top">' +
+                        (assign ? '<input type="checkbox" class="mz-ucard-pick" title="Chọn để định khu cùng lúc">' : '') +
+                        '<span class="mz-cell-code">' + esc(r.code) + '</span></div>' +
+                        '<div class="mz-ucard-row"><span class="mz-cell-name" title="' + esc(r.name || '') + '">' +
+                        esc(r.name || '—') + '</span>' +
+                        '<span class="mz-cell-lots">' + num(r.remaining) + ' ' + esc(r.unit) + '</span></div>' +
+                        '<div class="mz-cell-foot mz-ucard-foot"><span>Hạn áp dụng ' + date(r.expired) + '</span>' +
+                        (assign ? '<button type="button" class="mz-ucard-assign" title="Xếp mã này vào một vị trí lưu trữ">' +
+                            '<i class="fas fa-map-marker-alt"></i> Định khu</button>' : '') +
+                        '</div></div>';
+                }
 
                 // Mã còn tồn nhưng chưa xếp vị trí - để trên cùng cho dễ thấy mà bổ sung định khu
                 if (unzoned.length) {
-                    html += '<div class="mz-unzoned"><div class="mz-unzoned-head"><i class="fas fa-exclamation-triangle"></i>' +
-                        ' Chưa xếp vị trí <span class="mz-pill is-alert">' + unzoned.length + ' ' +
-                        esc(String($root.data('code-label')).toLowerCase()) + '</span></div><div class="mz-grid">';
-                    unzoned.forEach(function(r) {
-                        html += '<div class="mz-cell is-warn"><div class="mz-cell-top"><span class="mz-cell-code">' +
-                            esc(r.code) + '</span><span class="mz-cell-lots">' + num(r.remaining) + ' ' + esc(r.unit) +
-                            '</span></div><div class="mz-cell-name">' + esc(r.name || '—') + '</div>' +
-                            '<div class="mz-cell-foot">Hạn áp dụng ' + date(r.expired) + '</div></div>';
-                    });
-                    html += '</div></div>';
+                    html += '<div class="mz-unzoned' + (unzonedClosed() ? ' is-closed' : '') + '">' +
+                        '<div class="mz-unzoned-head is-toggle" title="Bấm để thu gọn / mở khối">' +
+                        '<i class="fas fa-chevron-down mz-caret"></i><i class="fas fa-exclamation-triangle"></i>' +
+                        ' Chưa xếp vị trí <span class="mz-pill is-alert mz-unzoned-count">' + unzoned.length + ' ' +
+                        esc(codeLabel) + '</span>' +
+                        (assign ? '<div class="mz-unzoned-tools">' +
+                            '<button type="button" class="btn btn-sm btn-outline-primary mz-pick-all">' +
+                            '<i class="far fa-check-square mr-1"></i> <span>Chọn tất cả</span></button>' +
+                            '<button type="button" class="btn btn-sm btn-primary mz-assign-picked" disabled>' +
+                            '<i class="fas fa-map-marker-alt mr-1"></i> Định khu <b class="mz-picked-count">0</b> mã đã chọn</button>' +
+                            '</div>' : '') +
+                        '</div><div class="mz-grid mz-unzoned-grid">' + unzoned.map(unzonedCard).join('') + '</div></div>';
                 }
 
                 outW.forEach(function(w) {
@@ -470,8 +557,129 @@
                         });
                     });
 
+                    // Khối Chưa xếp vị trí: chỉ lọc theo từ khoá (mã, tên); đang tìm thì đếm "khớp/tổng"
+                    var $cards = $root.find('.mz-ucard');
+                    var cardsShown = 0;
+
+                    if ($cards.length) {
+                        $cards.each(function() {
+                            this.style.display = q === '' || ($(this).attr('data-search') || '').indexOf(q) >= 0 ? '' : 'none';
+                        });
+                        cardsShown = shown($cards);
+                        $root.find('.mz-unzoned-count').text((q ? cardsShown + '/' : '') + $cards.length + ' ' + codeLabel);
+                        $root.find('.mz-unzoned').css('display', q && !cardsShown ? 'none' : '');
+                        syncPicked();
+                    }
+
                     var total = $root.find('.mz-wh').length;
-                    $root.find('.mz-noresult').css('display', total > 0 && shown($root.find('.mz-wh')) === 0 ? 'block' : 'none');
+                    $root.find('.mz-noresult').css('display',
+                        (total > 0 || $cards.length) && shown($root.find('.mz-wh')) === 0 && !cardsShown ? 'block' : 'none');
+                }
+
+                /* ---------- Định khu nhanh: chọn thẻ, mở modal, lưu ---------- */
+                function pickedIds() {
+                    return $root.find('.mz-ucard.is-picked').map(function() { return $(this).attr('data-id'); }).get();
+                }
+
+                /** Đồng bộ nút đầu khối theo số thẻ đang chọn / đang hiện */
+                function syncPicked() {
+                    if (!assign) return;
+
+                    var count = pickedIds().length;
+                    var $visible = $root.find('.mz-ucard').filter(function() { return this.style.display !== 'none'; });
+                    var allPicked = $visible.length > 0 && $visible.not('.is-picked').length === 0;
+
+                    $root.find('.mz-picked-count').text(count);
+                    $root.find('.mz-assign-picked').prop('disabled', count === 0);
+                    $root.find('.mz-pick-all span').text(allPicked ? 'Bỏ chọn tất cả' : 'Chọn tất cả');
+                }
+
+                function setPicked($card, on) {
+                    $card.toggleClass('is-picked', on).find('.mz-ucard-pick').prop('checked', on);
+                }
+
+                function openAssign(ids) {
+                    if (!assign || !$assign.length) return;
+
+                    var max = Number(assign.max) || 200;
+                    if (ids.length > max) {
+                        var text = 'Mỗi lần định khu tối đa ' + max + ' ' + codeLabel + ', vui lòng bỏ bớt mã đã chọn.';
+                        return window.Swal ? Swal.fire({ icon: 'info', title: 'Chọn quá nhiều', text: text, confirmButtonColor: '#2E7BC4' }) :
+                            window.alert(text);
+                    }
+
+                    var list = ids.map(function(id) { return unzonedById[id]; }).filter(Boolean);
+                    var categories = {};
+                    var $tb = $assign.find('tbody').empty();
+
+                    list.forEach(function(r, i) {
+                        categories[r.category_id ? 'c' + r.category_id : 'n' + r.name] = r.category_id || null;
+                        $tb.append('<tr><td class="text-center">' + (i + 1) + '</td>' +
+                            '<td class="font-weight-bold">' + esc(r.code) + '</td>' +
+                            '<td><div class="font-weight-bold">' + esc(r.name || '—') + '</div>' +
+                            (r.sub ? '<div class="md-sub small text-muted">' + esc(r.sub) + '</div>' : '') + '</td>' +
+                            '<td class="text-right font-weight-bold">' + num(r.remaining) + ' ' + esc(r.unit) + '</td>' +
+                            '<td class="text-center md-sub">' + date(r.expired) + '</td></tr>');
+                    });
+
+                    $assign.find('.mz-as-count').text(list.length);
+                    $assign.find('.mz-as-items').text(Object.keys(categories).length);
+                    $assign.find('.mz-as-error').prop('hidden', true).text('');
+                    $assign.data('ids', list.map(function(r) { return r.id; }));
+                    // Danh sách vị trí khoá sẵn chỗ tương kỵ với bất kỳ hoá chất nào đang xếp
+                    $assign.data('categoryIds', values(categories).filter(Boolean));
+
+                    var $select = $assign.find('.mz-as-location');
+                    $select.val(null).find('option[value!=""]').remove();
+                    $select.trigger('change');
+
+                    $assign.modal('show');
+                }
+
+                function saveAssign() {
+                    var ids = $assign.data('ids') || [];
+                    var locationId = $assign.find('.mz-as-location').val();
+                    var $error = $assign.find('.mz-as-error');
+                    var $btn = $assign.find('.mz-as-submit');
+
+                    if (!locationId) {
+                        $error.text('Vui lòng chọn vị trí lưu trữ.').prop('hidden', false);
+                        return;
+                    }
+
+                    $error.prop('hidden', true).text('');
+                    $btn.prop('disabled', true).find('i').attr('class', 'fas fa-circle-notch fa-spin mr-1');
+
+                    $.ajax({
+                        url: assign.url,
+                        method: 'POST',
+                        dataType: 'json',
+                        data: { _token: assign.token, import_ids: ids, location_id: locationId }
+                    }).done(function(res) {
+                        $assign.modal('hide');
+
+                        if (window.Swal) {
+                            Swal.fire({ icon: 'success', title: 'Thành công!', text: res.message, timer: 1800, showConfirmButton: false });
+                        }
+
+                        if (typeof opts.onAssigned === 'function') {
+                            opts.onAssigned(res);
+                            return;
+                        }
+
+                        // Trang không tự xử lý: vá vị trí vào dòng tồn rồi dựng lại sơ đồ
+                        (res.import_ids || []).forEach(function(id) {
+                            rows.forEach(function(r) { if (String(r.id) === String(id)) $.extend(r, res.location); });
+                        });
+                        window.invZoneGrid(selector, opts);
+                        $root.find('.mz-filter[data-state].is-active, .mz-zt-filter.is-active').trigger('click');
+                    }).fail(function(xhr) {
+                        var message = (xhr.responseJSON && xhr.responseJSON.message) ||
+                            'Không lưu được định khu, vui lòng tải lại trang rồi thử lại.';
+                        $error.text(message).prop('hidden', false);
+                    }).always(function() {
+                        $btn.prop('disabled', false).find('i').attr('class', 'fas fa-map-marker-alt mr-1');
+                    });
                 }
 
                 $root.off('.mz');
@@ -493,13 +701,79 @@
                 $root.on('click.mz', '.mz-wh-head', function() {
                     $(this).closest('.mz-wh').toggleClass('is-closed');
                 });
+                // Thu gọn / mở khối Chưa xếp vị trí (bấm nút trong đầu khối thì không tính)
+                $root.on('click.mz', '.mz-unzoned-head', function(e) {
+                    if ($(e.target).closest('.mz-unzoned-tools').length) return;
+
+                    var $block = $(this).closest('.mz-unzoned').toggleClass('is-closed');
+                    rememberUnzoned($block.hasClass('is-closed'));
+                });
                 $root.on('click.mz', '.mz-toggle-all', function() {
-                    var closeAll = $root.find('.mz-wh').not('.is-closed').length > 0;
-                    $root.find('.mz-wh').toggleClass('is-closed', closeAll);
+                    var closeAll = $root.find('.mz-wh, .mz-unzoned').not('.is-closed').length > 0;
+                    $root.find('.mz-wh, .mz-unzoned').toggleClass('is-closed', closeAll);
+                    if ($root.find('.mz-unzoned').length) rememberUnzoned(closeAll);
                     $(this).html(closeAll ?
                         '<i class="fas fa-expand mr-1"></i> Mở tất cả' :
                         '<i class="fas fa-compress mr-1"></i> Thu gọn tất cả');
                 });
+
+                if (assign) {
+                    // Bấm vào thẻ (ngoài nút Định khu) = chọn / bỏ chọn
+                    $root.on('click.mz', '.mz-ucard', function(e) {
+                        if ($(e.target).closest('.mz-ucard-assign').length) return;
+
+                        var $card = $(this);
+                        var on = $(e.target).is('.mz-ucard-pick') ? e.target.checked : !$card.hasClass('is-picked');
+                        setPicked($card, on);
+                        syncPicked();
+                    });
+                    $root.on('click.mz', '.mz-ucard-assign', function() {
+                        openAssign([$(this).closest('.mz-ucard').attr('data-id')]);
+                    });
+                    $root.on('click.mz', '.mz-pick-all', function() {
+                        var $visible = $root.find('.mz-ucard').filter(function() { return this.style.display !== 'none'; });
+                        var on = $visible.not('.is-picked').length > 0;
+                        setPicked($visible, on);
+                        syncPicked();
+                    });
+                    $root.on('click.mz', '.mz-assign-picked', function() {
+                        openAssign(pickedIds());
+                    });
+
+                    $assign.off('.mz');
+                    $assign.on('click.mz', '.mz-as-submit', saveAssign);
+                    $assign.on('change.mz', '.mz-as-location', function() {
+                        if ($(this).val()) $assign.find('.mz-as-error').prop('hidden', true).text('');
+                    });
+                    // Mở modal là mở luôn danh sách vị trí để gõ tìm ngay
+                    $assign.on('shown.bs.modal.mz', function() {
+                        var $select = $assign.find('.mz-as-location');
+
+                        if (!$select.hasClass('select2-hidden-accessible')) {
+                            $select.data('lookupParams', function() {
+                                return { category_ids: $assign.data('categoryIds') || [] };
+                            });
+                            $select.select2({
+                                theme: 'bootstrap4',
+                                width: '100%',
+                                dropdownParent: $assign,
+                                placeholder: '-- Chọn vị trí lưu trữ --',
+                                ajax: window.wmsLookupAjax($select),
+                                // Vị trí tương kỵ: khoá lại, hiện lý do màu đỏ bên dưới
+                                templateResult: function(row) {
+                                    if (!row.id || !row.warning) return window.wmsZoneTemplate(row);
+
+                                    return $('<div class="mz-opt-warn">').append(
+                                        $('<div>').append(window.wmsZoneTemplate(row)),
+                                        $('<small>').text(row.warning)
+                                    );
+                                }
+                            });
+                        }
+
+                        $select.select2('open');
+                    });
+                }
 
                 // Bấm một ô vị trí -> xem đủ các mã đang nằm ở đó
                 $root.on('click.mz', '.mz-cell[data-key]', function() {
@@ -526,6 +800,14 @@
                 });
 
                 apply();
+
+                // Nút Thẻ | 3D: dựng kệ 3D từ cùng khung định khu và các ô vừa gom ở trên
+                if (window.invZone3d) {
+                    window.invZone3d.init($root[0], {
+                        zones: { warehouses: warehouses, shelves: shelves, columns: columns, tiers: tiers, locations: locations },
+                        nodes: index
+                    });
+                }
             };
         })();
     </script>

@@ -110,7 +110,9 @@ return [
         ['id' => 'danh-gia',
             'extraShots' => [
                 ['name' => 'danh-gia-lap-phieu', 'url' => '/inventory/standardInventory?tab=stability', 'tab' => ['invPaneStability'], 'js' => '__ug.click(\'.btn-md-create\')', 'clip' => '#ssaCreateModal .modal-content', 'pad' => 0],
-                ['name' => 'danh-gia-chi-tiet', 'url' => '/inventory/standardStability/detail?id=49', 'clip' => '.content-wrapper', 'maxHeight' => 900, 'pad' => 0],
+                // Mở phiếu đầu tiên trên danh sách (id phiếu đổi mỗi lần nạp lại dữ liệu nên không ghi cứng)
+                ['name' => 'danh-gia-chi-tiet', 'url' => '/inventory/standardInventory?tab=stability', 'tab' => ['invPaneStability'], 'clip' => '.content-wrapper', 'maxHeight' => 900, 'pad' => 0, 'afterJs' => 3000,
+                    'js' => "(() => { const a = document.querySelector('#invPaneStability a[href*=\"standardStability/detail\"]'); if (a) location.href = a.href; return true; })()"],
             ], 'file' => 'stability', 'title' => 'Đánh Giá Hạn Dùng CTC', 'icon' => 'fas fa-clipboard-list',
             'path' => 'Tồn Kho › Chất Chuẩn › tab Đánh giá hạn dùng CTC',
             'route' => 'pages.inventory.standardInventory.list', 'pane' => 'invPaneStability', 'params' => ['tab' => 'stability'],
@@ -139,6 +141,8 @@ return [
             'keywords' => 'cung ung tiep nhan ngay hen huy muc'],
     ],
     'Hỗ trợ' => [
+        ['id' => 'tra-cuu', 'file' => 'publicLookup', 'title' => 'Tra Cứu Không Cần Đăng Nhập', 'icon' => 'fas fa-search-location',
+            'keywords' => 'tim vi tri chat chuan dang nhap mat bang 3d quet ma camera'],
         ['id' => 'loi-thuong-gap', 'file' => 'faq', 'title' => 'Lỗi Thường Gặp', 'icon' => 'fas fa-question-circle'],
     ],
 ];

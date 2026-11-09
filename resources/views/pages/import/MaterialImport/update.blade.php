@@ -76,7 +76,7 @@
                         <select name="location_id" class="form-control imp-select">
                             <option value="">-- Chưa định khu --</option>
                             @foreach ($locations as $loc)
-                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}">
+                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}" data-shelf="{{ \App\Support\CategoryLookup::shelfKey($loc) }}">
                                     {{ $loc->code }} — {{ $loc->warehouse_name }} / {{ $loc->shelf_name }} / {{ $loc->column_name }} / {{ $loc->tier_name }}
                                 </option>
                             @endforeach

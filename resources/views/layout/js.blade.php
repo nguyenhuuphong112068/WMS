@@ -85,13 +85,32 @@
                 $.fn.select2.defaults.set('matcher', function (params, data) {
                     var select = data.element && data.element.closest ? data.element.closest('select') : null;
                     var filter = select ? $(select).data('zoneFilter') : '';
+                    var shelf = select ? $(select).data('shelfFilter') : '';
 
                     if (filter && data.element.tagName === 'OPTION') {
                         if (!data.element.hasAttribute('data-zone') || !data.element.value) return null;
                         if ((data.element.getAttribute('data-zone') || '__none') !== filter) return null;
                     }
 
+                    // Chip Kệ/Tủ: option không khai data-shelf (vd. "vị trí hiện tại của lô") luôn hiện
+                    if (shelf && data.element.tagName === 'OPTION') {
+                        if (!data.element.value) return null;
+                        if (data.element.hasAttribute('data-shelf') && (data.element.getAttribute('data-shelf') || '__none') !== shelf) return null;
+                    }
+
                     return baseMatcher(params, data);
+                });
+
+                // Chữ tiếng Việt mặc định cho mọi ô Select2 (ô nào khai language riêng thì đè lên)
+                $.fn.select2.defaults.set('language', {
+                    errorLoading: function () { return 'Không tải được dữ liệu, vui lòng thử lại'; },
+                    inputTooLong: function (args) { return 'Vui lòng xoá bớt ' + (args.input.length - args.maximum) + ' ký tự'; },
+                    inputTooShort: function (args) { return 'Vui lòng nhập thêm ' + (args.minimum - args.input.length) + ' ký tự'; },
+                    loadingMore: function () { return 'Đang tải thêm...'; },
+                    maximumSelected: function (args) { return 'Chỉ chọn được tối đa ' + args.maximum + ' mục'; },
+                    noResults: function () { return 'Không tìm thấy kết quả phù hợp'; },
+                    searching: function () { return 'Đang tìm...'; },
+                    removeAllItems: function () { return 'Xoá tất cả'; }
                 });
 
                 function isZoneSelect($select) {
@@ -162,7 +181,7 @@
                     event.stopPropagation();
                 });
 
-                $(document).on('click', '.zone-filter-chip', function (event) {
+                $(document).on('click', '.zone-filter-chip:not(.shelf-filter-chip)', function (event) {
                     event.preventDefault();
                     event.stopPropagation();
 
@@ -174,13 +193,149 @@
                     $select.data('zoneFilter', String($(this).attr('data-zone-key') || ''));
                     renderChips($select, $bar);
 
+                    // Số vị trí trên chip Kệ/Tủ tính theo phân loại đang chọn
+                    var $shelfBar = instance.$dropdown.find('.shelf-filter-bar');
+                    if ($shelfBar.length) renderShelves($select, $shelfBar);
+
+                    var term = instance.$dropdown.find('.select2-search__field').val() || '';
+                    instance.trigger('query', { term: term });
+                });
+
+                /*
+                | LỌC THEO KỆ/TỦ - hàng chip thứ hai (dưới hàng phân loại) để tìm đúng kệ/tủ cần cất hàng, thay vì
+                | cuộn hàng trăm ô A1, A2... của mọi kệ:
+                |   - Ô AJAX định khu (data-lookup-url trỏ lookup/locations): danh sách kệ lấy từ chính URL đó kèm
+                |     shelves=1 (cùng điều kiện type / only_zone / except_zone + chip phân loại đang chọn), bấm chip
+                |     thì ô gửi kèm shelf_filter (wmsLookupAjax, catSelect2) - App\Support\CategoryLookup::locationShelves.
+                |   - Ô render sẵn: option khai data-shelf="Kho › Kệ/Tủ" (CategoryLookup::shelfKey, rỗng = chưa gán
+                |     kệ), lọc qua matcher ở trên.
+                | Chip đang chọn ở $select.data('shelfFilter') ('' = tất cả, '__none' = chưa gán kệ/tủ). Chỉ có một
+                | kệ/tủ thì không hiện hàng chip.
+                */
+                function isShelfAjax($select) {
+                    return String($select.data('lookup-url') || '').indexOf('/lookup/locations') !== -1;
+                }
+
+                function shelvesOf($select, done) {
+                    if (!isShelfAjax($select)) {
+                        var counts = {};
+                        var order = [];
+
+                        $select.find('option[data-shelf]').each(function () {
+                            if (!this.value) return;
+                            var key = this.getAttribute('data-shelf') || '__none';
+                            if (!(key in counts)) {
+                                counts[key] = 0;
+                                order.push(key);
+                            }
+                            counts[key]++;
+                        });
+
+                        // Cùng một kho thì bỏ tên kho cho chip gọn
+                        var warehouses = {};
+                        order.forEach(function (key) { if (key !== '__none') warehouses[key.split(' › ')[0]] = true; });
+                        var oneWarehouse = Object.keys(warehouses).length <= 1;
+
+                        done(order.map(function (key) {
+                            return {
+                                id: key,
+                                text: key === '__none' ? 'Chưa gán kệ/tủ' : (oneWarehouse ? key.split(' › ').slice(1).join(' › ') : key),
+                                count: counts[key]
+                            };
+                        }));
+                        return;
+                    }
+
+                    var zone = String($select.data('zoneFilter') || '');
+                    var cache = $select.data('shelfCache') || {};
+                    if (cache[zone]) return done(cache[zone]);
+
+                    $.getJSON($select.data('lookup-url'), $.extend({}, $select.data('lookup-query') || {}, { shelves: 1, zone_filter: zone }))
+                        .done(function (res) {
+                            cache[zone] = res.shelves || [];
+                            $select.data('shelfCache', cache);
+                            done(cache[zone]);
+                        })
+                        .fail(function () { done([]); });
+                }
+
+                function renderShelves($select, $bar) {
+                    var token = ($bar.data('token') || 0) + 1;
+                    $bar.data('token', token);
+
+                    if (isShelfAjax($select) && !($select.data('shelfCache') || {})[String($select.data('zoneFilter') || '')]) {
+                        $bar.prop('hidden', false).html('<span class="shelf-filter-label"><i class="fas fa-layer-group"></i>Kệ/Tủ</span>' +
+                            '<span class="shelf-filter-loading"><i class="fas fa-circle-notch fa-spin mr-1"></i>Đang tải...</span>');
+                    }
+
+                    shelvesOf($select, function (list) {
+                        if ($bar.data('token') !== token) return;
+
+                        var current = String($select.data('shelfFilter') || '');
+                        var total = 0;
+                        list.forEach(function (item) { total += item.count; });
+
+                        // Kệ đang chọn không còn vị trí khớp phân loại mới vẫn giữ chip (0) để bỏ chọn được
+                        if (current && !list.some(function (item) { return String(item.id) === current; })) {
+                            list = list.concat([{ id: current, text: $select.data('shelfLabel') || 'Kệ/Tủ đã chọn', count: 0 }]);
+                        }
+
+                        $bar.empty().prop('hidden', list.length <= 1 && !current);
+                        if (list.length <= 1 && !current) return;
+
+                        $bar.append('<span class="shelf-filter-label"><i class="fas fa-layer-group"></i>Kệ/Tủ</span>');
+                        [{ id: '', text: 'Tất cả', count: total }].concat(list).forEach(function (item) {
+                            $bar.append($('<button type="button" class="zone-filter-chip shelf-filter-chip">')
+                                .toggleClass('is-active', String(item.id) === current)
+                                .attr('data-shelf-key', item.id)
+                                .attr('title', item.code ? 'Mã kệ/tủ: ' + item.code : null)
+                                .text(item.text)
+                                .append($('<b>').text(item.count)));
+                        });
+                    });
+                }
+
+                $(document).on('select2:open', 'select', function () {
+                    var $select = $(this);
+                    var instance = $select.data('select2');
+                    if (!instance || (!isShelfAjax($select) && !$select.find('option[data-shelf]').length)) return;
+
+                    var $dropdown = instance.$dropdown.find('.select2-dropdown');
+                    var $bar = $dropdown.children('.shelf-filter-bar');
+                    if (!$bar.length) {
+                        $bar = $('<div class="shelf-filter-bar">');
+                        var $after = $dropdown.children('.zone-filter-bar, .select2-search').last();
+                        $after.length ? $bar.insertAfter($after) : $dropdown.prepend($bar);
+                    }
+                    $bar.data('shelfSelect', $select);
+                    renderShelves($select, $bar);
+                });
+
+                $(document).on('mousedown', '.shelf-filter-bar', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                });
+
+                $(document).on('click', '.shelf-filter-chip', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    var $bar = $(this).closest('.shelf-filter-bar');
+                    var $select = $bar.data('shelfSelect');
+                    var instance = $select && $select.data('select2');
+                    if (!instance) return;
+
+                    $select.data('shelfFilter', String($(this).attr('data-shelf-key') || ''));
+                    $select.data('shelfLabel', $(this).contents().first().text());
+                    renderShelves($select, $bar);
+
                     var term = instance.$dropdown.find('.select2-search__field').val() || '';
                     instance.trigger('query', { term: term });
                 });
 
                 // Mở lại ô chọn thì bắt đầu từ "Tất cả"
                 $(document).on('select2:close', 'select', function () {
-                    $(this).removeData('zoneFilter');
+                    $(this).removeData('zoneFilter').removeData('shelfFilter').removeData('shelfLabel');
                 });
 
                 /*
@@ -230,7 +385,8 @@
                             return $.extend({
                                 q: params.term || '',
                                 page: params.page || 1,
-                                zone_filter: $select.data('zoneFilter') || ''
+                                zone_filter: $select.data('zoneFilter') || '',
+                                shelf_filter: $select.data('shelfFilter') || ''
                             }, $select.data('lookup-query') || {}, typeof extra === 'function' ? extra($select) : {});
                         }
                     };

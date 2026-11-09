@@ -519,6 +519,11 @@
             $('#zoneDetailModal').modal('show');
         });
 
+        // Nút Thẻ | 3D: kệ dựng 3D theo lưới Định Khu, thùng hàng = vị trí đang có hàng
+        if (window.invZone3d) {
+            window.invZone3d.init(document.getElementById('miPaneZone'), { zones: @json($zones), nodes: mzIndex });
+        }
+
         if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([1, 'asc']).draw();
 
         // Đổi tháng ở tab "Khả dụng tháng tới" nạp lại trang - mở lại đúng tab đó

@@ -236,6 +236,15 @@
                         'zgId' => 'invZoneMap',
                         'zgItem' => 'hoá chất',
                         'zgCode' => 'Mã xuất nhập',
+                        // Định khu nhanh các mã "Chưa xếp vị trí" - ChemicalInventoryController::assignLocation
+                        'zgAssign' => user_can('inventory_chemical_location') ? [
+                            'url' => route('pages.inventory.chemicalInventory.assignLocation'),
+                            'lookup' => route('pages.category.lookup.locations', [
+                                'type' => 'chemical',
+                                'except_zone' => implode(',', \App\Http\Controllers\Pages\Inventory\ChemicalInventoryController::ASSIGN_EXCEPT_ZONES),
+                            ]),
+                            'max' => \App\Http\Controllers\Pages\Inventory\ChemicalInventoryController::ASSIGN_MAX,
+                        ] : null,
                     ])
                 </div>
                 @endtab

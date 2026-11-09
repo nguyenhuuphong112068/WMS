@@ -380,8 +380,9 @@
                         return $.extend({
                             q: params.term || '',
                             page: params.page || 1,
-                            // Chip lọc nhanh theo phân loại định khu (layout/js)
-                            zone_filter: $select.data('zoneFilter') || ''
+                            // Chip lọc nhanh theo phân loại định khu + chip Kệ/Tủ (layout/js)
+                            zone_filter: $select.data('zoneFilter') || '',
+                            shelf_filter: $select.data('shelfFilter') || ''
                         }, typeof extra === 'function' ? extra($select) : {});
                     }
                 };

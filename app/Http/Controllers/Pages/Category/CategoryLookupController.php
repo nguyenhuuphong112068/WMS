@@ -53,8 +53,18 @@ class CategoryLookupController extends Controller
         $zone = $request->filled('zone_filter') ? (string) $request->zone_filter : null;
         $zone = $zone === '__none' ? '' : $zone;
         $onlyZone = $request->filled('only_zone') ? (string) $request->only_zone : null;
+        // except_zone=quarantine,pending,rejected: bỏ các phân loại không nhận hàng ở bước đang làm
+        $exceptZones = array_filter(explode(',', (string) $request->input('except_zone', '')));
 
-        $result = CategoryLookup::searchLocations($type, $departmentId, (string) $request->q, (int) $request->page, $zone, $onlyZone);
+        // shelves=1: chỉ trả hàng chip "Kệ/Tủ" (kệ có vị trí khớp cùng điều kiện, kèm số vị trí) - layout/js
+        if ($request->boolean('shelves')) {
+            return response()->json(['shelves' => CategoryLookup::locationShelves($type, $departmentId, $zone, $onlyZone, $exceptZones)]);
+        }
+
+        // shelf_filter: chip "Kệ/Tủ" đang chọn (shelves.id, '__none' = chưa gán kệ/tủ)
+        $shelf = $request->filled('shelf_filter') ? (string) $request->shelf_filter : null;
+
+        $result = CategoryLookup::searchLocations($type, $departmentId, (string) $request->q, (int) $request->page, $zone, $onlyZone, $exceptZones, $shelf);
 
         // label=code: chỉ hiện mã vị trí (modal "Khai Hoá Chất Cho Phòng"), vẫn tìm theo cả đường dẫn
         if ($request->label === 'code') {
@@ -65,6 +75,31 @@ class CategoryLookupController extends Controller
         // cùng kệ/tủ với hoá chất tương kỵ bị khoá lại, kèm câu giải thích.
         if ($type === 'chemical' && (int) $request->category_id > 0) {
             $result['results'] = ChemicalCompatibility::annotateLocationOptions($result['results'], (int) $request->category_id);
+        }
+
+        // Định khu nhanh nhiều mã cùng lúc (Tồn Kho Hoá Chất) gửi category_ids[]: chỗ tương kỵ với BẤT KỲ
+        // hoá chất nào đang xếp đều bị khoá, gộp lý do của từng hoá chất
+        $categoryIds = array_slice(array_values(array_unique(array_filter(
+            array_map('intval', (array) $request->input('category_ids', []))
+        ))), 0, 20);
+
+        if ($type === 'chemical' && $categoryIds) {
+            $results = $result['results'];
+
+            foreach ($categoryIds as $categoryId) {
+                foreach (ChemicalCompatibility::annotateLocationOptions($result['results'], $categoryId) as $i => $item) {
+                    if (empty($item['warning'])) {
+                        continue;
+                    }
+
+                    $results[$i]['disabled'] = true;
+                    $results[$i]['warning'] = isset($results[$i]['warning'])
+                        ? $results[$i]['warning'].' | '.$item['warning']
+                        : $item['warning'];
+                }
+            }
+
+            $result['results'] = $results;
         }
 
         return response()->json($result);

@@ -41,6 +41,12 @@
 <p>Mỗi lần dùng được vượt tồn còn lại tối đa <b>5%</b> để bù sai số cân. Phần vượt làm tồn bị âm, xử lý bằng
     <a href="#ton-kho">Cân đối</a>. Chỉ chọn được ống còn hạn, còn tồn và đã kiểm tra Đạt.</p>
 
+<h3>Chọn định khu (vị trí lưu trữ)</h3>
+<p>Mọi ô chọn định khu đều gõ tìm được theo tên hoặc mã của kho, kệ/tủ, cột, tầng, vị trí. Trong khung tìm có hai hàng chip lọc
+    nhanh: <b>phân loại</b> (Dự Phòng, Sử Dụng, Biệt Trữ...) và <b><i class="fas fa-layer-group"></i> Kệ/Tủ</b> - bấm đúng kệ/tủ
+    cần cất hàng để chỉ còn vị trí của kệ/tủ đó (số bên cạnh là số vị trí). Hai hàng chip dùng cùng nhau được; đóng ô chọn thì
+    chip trở về <b>Tất cả</b>. Phòng chỉ có một kệ/tủ thì không hiện hàng chip Kệ/Tủ.</p>
+
 <h3>Sửa, duyệt, khoá ở Danh Mục không tải lại trang</h3>
 <p class="mb-0">Ở Danh Mục Chất Chuẩn (tab Công Ty và Chất Chuẩn Của Phòng), <b>Sửa</b>, <b>Duyệt</b> và
     <b>Khoá / Mở khoá</b> lưu ngay tại chỗ: bảng tự cập nhật dòng vừa đổi, giữ nguyên tab, ô tìm kiếm, bộ lọc, trang

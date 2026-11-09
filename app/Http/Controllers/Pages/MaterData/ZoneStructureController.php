@@ -42,6 +42,19 @@ class ZoneStructureController extends Controller
     // Số kệ tối đa tạo cùng lúc theo một cấu trúc.
     private const MAX_BATCH = 20;
 
+    /* Mặt bằng kho/phòng (m): phòng tối đa, kệ nhỏ/lớn nhất, bề rộng cửa ra vào. */
+    private const LAYOUT_MAX_ROOM = 200;
+    private const LAYOUT_MIN_SHELF = 0.2;
+    private const LAYOUT_MAX_SHELF = 50;
+    private const DOOR_WIDTH = 1;
+
+    /** Tường có cửa trên sơ đồ mặt bằng (trên = tường trong cùng khi nhìn 3D). */
+    public const DOOR_WALLS = ['top' => 'Tường trên', 'right' => 'Tường phải', 'bottom' => 'Tường dưới', 'left' => 'Tường trái'];
+
+    /** Hướng mặt trước của kệ trên sơ đồ, xoay theo chiều kim đồng hồ. */
+    private const ROTATIONS = [0, 90, 180, 270];
+    private const ROTATION_LABELS = [0 => 'Hướng xuống', 90 => 'Hướng trái', 180 => 'Hướng lên', 270 => 'Hướng phải'];
+
     /** Các bảng lô hàng có location_id - vị trí đang có lô còn hiệu lực coi là "có hàng". */
     private const LOT_TABLES = ['chemical_imports', 'standard_imports', 'material_imports'];
 
@@ -521,6 +534,289 @@ class ZoneStructureController extends Controller
         }
 
         return response()->json(['shelf' => $shelf, 'columns' => $columns]);
+    }
+
+    /**
+     * Mặt bằng một kho/phòng: kích thước phòng, cửa ra vào và mọi kệ/tủ đang dùng kèm vị trí đặt
+     * trong phòng + khung cột/tầng/ô (để vẽ cả phòng ở 3D). Đơn vị mét.
+     */
+    public function layout(Request $request)
+    {
+        $warehouse = $this->warehouse($request->input('warehouse_id'));
+
+        if (! $warehouse) {
+            return $this->fail('Không tìm thấy kho/phòng.', 404);
+        }
+
+        $shelves = DB::table('shelves')
+            ->where('department_id', $this->departmentId())
+            ->where('warehouse_id', $warehouse->id)
+            ->where('status_id', 1)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']);
+
+        $ids = $shelves->pluck('id')->all();
+
+        $columns = DB::table('columns')
+            ->whereIn('shelf_id', $ids)->where('status_id', 1)->whereNotNull('position')
+            ->orderBy('position')
+            ->get(['id', 'shelf_id', 'name', 'position'])
+            ->groupBy('shelf_id');
+
+        $tiers = DB::table('tiers')
+            ->whereIn('shelf_id', $ids)->where('status_id', 1)->whereNotNull('position')
+            ->orderBy('position')
+            ->get(['id', 'column_id', 'code', 'name', 'position'])
+            ->groupBy('column_id');
+
+        $cells = DB::table('locations')
+            ->whereIn('shelf_id', $ids)->where('status_id', 1)->whereNotNull('position')
+            ->get(['id', 'tier_id', 'position', 'depth']);
+
+        $busy = $this->busyIds($cells->pluck('id')->all());
+        $cells = $cells->groupBy('tier_id');
+
+        $out = $shelves->map(function ($shelf) use ($columns, $tiers, $cells, $busy) {
+            $total = 0;
+            $used = 0;
+
+            $shelf->columns = ($columns[$shelf->id] ?? collect())->map(function ($column) use ($tiers, $cells, $busy, &$total, &$used) {
+                return [
+                    'name' => $column->name,
+                    'position' => (int) $column->position,
+                    'tiers' => ($tiers[$column->id] ?? collect())->map(function ($tier) use ($cells, $busy, &$total, &$used) {
+                        $own = $cells[$tier->id] ?? collect();
+                        $busyKeys = [];
+
+                        foreach ($own as $cell) {
+                            if (isset($busy[$cell->id])) {
+                                $busyKeys[] = $this->cellKey((int) $cell->position, $this->depthOf($cell));
+                            }
+                        }
+
+                        $total += $own->count();
+                        $used += count($busyKeys);
+
+                        return [
+                            'name' => $tier->name,
+                            'code' => $tier->code,
+                            'position' => (int) $tier->position,
+                            'max' => (int) $own->max('position'),
+                            'depth' => (int) $own->max(fn ($cell) => $this->depthOf($cell)),
+                            'busy' => $busyKeys,
+                        ];
+                    })->filter(fn ($tier) => $tier['max'] > 0)->values(),
+                ];
+            })->filter(fn ($column) => count($column['tiers']) > 0)->values();
+
+            $shelf->total = $total;
+            $shelf->used = $used;
+            $shelf->layout = $shelf->layout_x === null ? null : [
+                'x' => (float) $shelf->layout_x,
+                'y' => (float) $shelf->layout_y,
+                'width' => (float) $shelf->layout_width,
+                'depth' => (float) $shelf->layout_depth,
+                'rotation' => (int) $shelf->layout_rotation,
+            ];
+
+            return $shelf;
+        });
+
+        return response()->json([
+            'warehouse' => [
+                'id' => (int) $warehouse->id,
+                'code' => $warehouse->code,
+                'name' => $warehouse->name,
+                'layout' => $warehouse->layout_width === null ? null : [
+                    'width' => (float) $warehouse->layout_width,
+                    'depth' => (float) $warehouse->layout_depth,
+                    'door_wall' => $warehouse->layout_door_wall,
+                    'door_offset' => $warehouse->layout_door_offset === null ? null : (float) $warehouse->layout_door_offset,
+                ],
+            ],
+            'shelves' => $out->values(),
+            'limits' => self::layoutLimits(),
+        ]);
+    }
+
+    /** Lưu mặt bằng kho/phòng: kích thước phòng, cửa ra vào, vị trí / kích thước / hướng của từng kệ. */
+    public function saveLayout(Request $request)
+    {
+        if (! user_can(md_perm('zone', 'update'))) {
+            return $this->fail('Bạn không có quyền thực hiện thao tác này.', 403);
+        }
+
+        $max = self::LAYOUT_MAX_ROOM;
+        $validator = Validator::make($request->all(), [
+            'warehouse_id' => ['required', 'integer'],
+            'room.width' => ['required', 'numeric', 'min:1', 'max:'.$max],
+            'room.depth' => ['required', 'numeric', 'min:1', 'max:'.$max],
+            'room.door_wall' => ['nullable', Rule::in(array_keys(self::DOOR_WALLS))],
+            'room.door_offset' => ['nullable', 'numeric', 'min:0', 'max:'.$max],
+            'shelves' => ['array'],
+            'shelves.*.id' => ['required', 'integer'],
+            'shelves.*.placed' => ['required', 'boolean'],
+            'shelves.*.x' => ['nullable', 'numeric', 'min:0', 'max:'.$max],
+            'shelves.*.y' => ['nullable', 'numeric', 'min:0', 'max:'.$max],
+            'shelves.*.width' => ['nullable', 'numeric', 'min:'.self::LAYOUT_MIN_SHELF, 'max:'.self::LAYOUT_MAX_SHELF],
+            'shelves.*.depth' => ['nullable', 'numeric', 'min:'.self::LAYOUT_MIN_SHELF, 'max:'.self::LAYOUT_MAX_SHELF],
+            'shelves.*.rotation' => ['nullable', Rule::in(self::ROTATIONS)],
+        ], [
+            'room.width.required' => 'Chưa nhập chiều ngang phòng.',
+            'room.depth.required' => 'Chưa nhập chiều sâu phòng.',
+            'room.width.min' => 'Phòng phải rộng ít nhất 1 m.',
+            'room.depth.min' => 'Phòng phải sâu ít nhất 1 m.',
+            'room.width.max' => 'Chiều ngang phòng tối đa '.$max.' m.',
+            'room.depth.max' => 'Chiều sâu phòng tối đa '.$max.' m.',
+            'room.door_wall.in' => 'Tường có cửa không hợp lệ.',
+            'shelves.*.width.min' => 'Bề ngang kệ tối thiểu '.self::LAYOUT_MIN_SHELF.' m.',
+            'shelves.*.depth.min' => 'Bề sâu kệ tối thiểu '.self::LAYOUT_MIN_SHELF.' m.',
+            'shelves.*.width.max' => 'Bề ngang kệ tối đa '.self::LAYOUT_MAX_SHELF.' m.',
+            'shelves.*.depth.max' => 'Bề sâu kệ tối đa '.self::LAYOUT_MAX_SHELF.' m.',
+            'shelves.*.rotation.in' => 'Hướng mặt trước của kệ không hợp lệ.',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->fail($validator->errors()->first());
+        }
+
+        $warehouse = $this->warehouse($request->input('warehouse_id'));
+
+        if (! $warehouse) {
+            return $this->fail('Không tìm thấy kho/phòng.', 404);
+        }
+
+        $room = [
+            'layout_width' => $this->metre($request->input('room.width')),
+            'layout_depth' => $this->metre($request->input('room.depth')),
+            'layout_door_wall' => $request->input('room.door_wall') ?: null,
+            'layout_door_offset' => $request->input('room.door_wall') ? $this->metre($request->input('room.door_offset') ?? 0) : null,
+        ];
+
+        if ($room['layout_door_wall']) {
+            $wall = in_array($room['layout_door_wall'], ['top', 'bottom'], true) ? $room['layout_width'] : $room['layout_depth'];
+            if ((float) $room['layout_door_offset'] + self::DOOR_WIDTH > (float) $wall + 0.001) {
+                return $this->fail('Cửa ra vào (rộng '.self::DOOR_WIDTH.' m) vượt ra ngoài tường. Hãy giảm vị trí cửa.');
+            }
+        }
+
+        $current = DB::table('shelves')
+            ->where('department_id', $this->departmentId())
+            ->where('warehouse_id', $warehouse->id)
+            ->get(['id', 'code', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation'])
+            ->keyBy('id');
+
+        $plans = [];
+        foreach ((array) $request->input('shelves', []) as $item) {
+            $shelf = $current->get((int) $item['id']);
+            if (! $shelf) {
+                return $this->fail('Có kệ/tủ không thuộc kho/phòng này.');
+            }
+
+            $placed = filter_var($item['placed'], FILTER_VALIDATE_BOOLEAN);
+            $plans[$shelf->id] = $placed ? [
+                'layout_x' => $this->metre($item['x'] ?? 0),
+                'layout_y' => $this->metre($item['y'] ?? 0),
+                'layout_width' => $this->metre($item['width'] ?? 1),
+                'layout_depth' => $this->metre($item['depth'] ?? 0.5),
+                'layout_rotation' => (int) ($item['rotation'] ?? 0),
+            ] : array_fill_keys(['layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation'], null);
+        }
+
+        // Kệ phải nằm trọn trong phòng và không chồng lên nhau (kệ xoay 90/270 thì đổi ngang - sâu).
+        $boxes = [];
+        foreach ($plans as $id => $plan) {
+            if ($plan['layout_x'] === null) {
+                continue;
+            }
+            $box = $this->footprint($plan);
+            if ($box[0] < -0.001 || $box[1] < -0.001
+                || $box[2] > (float) $room['layout_width'] + 0.001 || $box[3] > (float) $room['layout_depth'] + 0.001) {
+                return $this->fail('Kệ/tủ '.$current[$id]->code.' nằm ra ngoài phòng. Hãy kéo kệ vào trong hoặc nới kích thước phòng.');
+            }
+            foreach ($boxes as $otherId => $other) {
+                if ($box[0] < $other[2] - 0.001 && $other[0] < $box[2] - 0.001 && $box[1] < $other[3] - 0.001 && $other[1] < $box[3] - 0.001) {
+                    return $this->fail('Kệ/tủ '.$current[$id]->code.' đang chồng lên '.$current[$otherId]->code.'. Hãy dời một trong hai kệ.');
+                }
+            }
+            $boxes[$id] = $box;
+        }
+
+        $roomFields = [
+            'layout_width' => 'Chiều ngang phòng (m)', 'layout_depth' => 'Chiều sâu phòng (m)',
+            'layout_door_wall' => 'Tường có cửa', 'layout_door_offset' => 'Vị trí cửa (m)',
+        ];
+        $shelfFields = [
+            'layout_x' => 'Mặt bằng - tâm kệ theo chiều ngang (m)', 'layout_y' => 'Mặt bằng - tâm kệ theo chiều sâu (m)',
+            'layout_width' => 'Mặt bằng - bề ngang kệ (m)', 'layout_depth' => 'Mặt bằng - bề sâu kệ (m)',
+            'layout_rotation' => 'Mặt bằng - hướng mặt trước',
+        ];
+        $roomMaps = ['layout_door_wall' => ['' => 'Chưa khai'] + self::DOOR_WALLS];
+        $shelfMaps = ['layout_rotation' => ['' => 'Chưa đặt'] + self::ROTATION_LABELS];
+
+        $changed = DB::transaction(function () use ($warehouse, $room, $plans, $current, $roomFields, $shelfFields, $roomMaps, $shelfMaps) {
+            $actor = $this->actor();
+            $now = now();
+            $changed = 0;
+
+            $note = DataMasterHistory::note($roomFields, $warehouse, $room, $roomMaps);
+            if ($note !== '') {
+                DB::table('warehouses')->where('id', $warehouse->id)->update($room + ['updated_by' => $actor, 'updated_at' => $now]);
+                DataMasterHistory::record('warehouses', (int) $warehouse->id, 'Cập nhật', 'Mặt bằng kho/phòng: '.$note, $roomFields, $roomMaps);
+                $changed++;
+            }
+
+            foreach ($plans as $id => $plan) {
+                $shelfNote = DataMasterHistory::note($shelfFields, $current[$id], $plan, $shelfMaps);
+                if ($shelfNote === '') {
+                    continue;
+                }
+                DB::table('shelves')->where('id', $id)->update($plan + ['updated_by' => $actor, 'updated_at' => $now]);
+                DataMasterHistory::record('shelves', (int) $id, 'Cập nhật', $shelfNote, $shelfFields, $shelfMaps);
+                $changed++;
+            }
+
+            if ($changed) {
+                $placed = count(array_filter($plans, fn ($plan) => $plan['layout_x'] !== null));
+                AuditTrialController::log('Cập nhật mặt bằng', 'warehouses', $warehouse->id, $warehouse->code.' - '.$warehouse->name,
+                    'Phòng '.$room['layout_width'].' × '.$room['layout_depth'].' m, đặt '.$placed.' kệ/tủ');
+            }
+
+            return $changed;
+        });
+
+        return response()->json([
+            'ok' => true,
+            'message' => $changed ? 'Đã lưu mặt bằng kho/phòng '.$warehouse->code.'.' : 'Mặt bằng không có gì thay đổi.',
+        ]);
+    }
+
+    public static function layoutLimits(): array
+    {
+        return [
+            'maxRoom' => self::LAYOUT_MAX_ROOM,
+            'minShelf' => self::LAYOUT_MIN_SHELF,
+            'maxShelf' => self::LAYOUT_MAX_SHELF,
+            'doorWidth' => self::DOOR_WIDTH,
+        ];
+    }
+
+    /** Khung chiếm chỗ của một kệ trên mặt bằng: [trái, trên, phải, dưới] (m). */
+    private function footprint(array $plan): array
+    {
+        $turned = in_array((int) $plan['layout_rotation'], [90, 270], true);
+        $w = (float) ($turned ? $plan['layout_depth'] : $plan['layout_width']);
+        $d = (float) ($turned ? $plan['layout_width'] : $plan['layout_depth']);
+        $x = (float) $plan['layout_x'];
+        $y = (float) $plan['layout_y'];
+
+        return [$x - $w / 2, $y - $d / 2, $x + $w / 2, $y + $d / 2];
+    }
+
+    /** Số mét làm tròn 2 chữ số, cùng dạng chuỗi với cột decimal để so thay đổi không bị lệch. */
+    private function metre($value): string
+    {
+        return number_format(round((float) $value, 2), 2, '.', '');
     }
 
     /** Báo sớm mã kệ đã có ngay lúc gõ, thay vì để khai xong cả lưới mới bị từ chối. */

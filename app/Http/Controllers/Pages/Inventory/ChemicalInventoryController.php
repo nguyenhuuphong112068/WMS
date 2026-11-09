@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * TỒN - TỒN KHO HOÁ CHẤT
@@ -83,6 +84,15 @@ class ChemicalInventoryController extends Controller
     /** Sai số cho phép khi so tồn với 0 (cột decimal 15,4). */
     /** Loại lưu trữ của định khu mà màn hình này quan tâm - xem locations.item_type. */
     private const LOCATION_TYPE = 'chemical';
+
+    /**
+     * Định khu nhanh (khối "Chưa xếp vị trí") không xếp lô đã nhập kho vào các phân loại này:
+     * Biệt Trữ dành cho lô chờ kiểm tra, Cách ly / Loại bỏ do luồng Cách ly - Loại bỏ - Huỷ quản lý.
+     */
+    public const ASSIGN_EXCEPT_ZONES = ['quarantine', 'pending', 'rejected'];
+
+    /** Số mã xuất nhập tối đa của một lượt Định khu nhanh. */
+    public const ASSIGN_MAX = 200;
 
     private const EPSILON = 0.00005;
 
@@ -602,6 +612,170 @@ class ChemicalInventoryController extends Controller
             'Đã xác định hạn dùng nội bộ của mã xuất nhập '.$import->code.' là '.$internal->format('d/m/Y')
                 .($capped ? ', lấy theo hạn dùng của nhà sản xuất vì cộng đủ '.$months.' tháng sẽ vượt hạn.' : '.')
         );
+    }
+
+    /**
+     * ĐỊNH KHU NHANH - khối "Chưa xếp vị trí" ở tab Theo định khu (AJAX, trả JSON).
+     *
+     * Xếp một hoặc nhiều mã xuất nhập CHƯA CÓ định khu vào cùng một vị trí lưu trữ:
+     *   - chỉ nhận lô đã kiểm tra Đạt, còn hiệu lực, thuộc phòng ban đang chọn và đang trống định khu
+     *     (đổi chỗ lô đã có định khu thì Điều chỉnh phiếu nhập, bắt buộc ghi lý do);
+     *   - vị trí phải thuộc phòng ban, đang hoạt động, loại lưu trữ Hoá chất / Dùng chung và KHÔNG thuộc
+     *     ASSIGN_EXCEPT_ZONES;
+     *   - đối chiếu tương kỵ (Sơ đồ lưu trữ GHS) lần lượt từng mã TRONG transaction: mã xếp trước được
+     *     tính là "hàng xóm" của mã xếp sau, nên chọn hai hoá chất tương kỵ cùng lúc cũng bị chặn.
+     *     Một mã vướng thì huỷ cả lượt, không xếp dở dang.
+     * Mỗi mã ghi một dòng lịch sử phiếu nhập ("Định khu") và Audit Trail.
+     */
+    public function assignLocation(Request $request)
+    {
+        if (! user_can('inventory_chemical_location')) {
+            return response()->json(['message' => 'Bạn chưa được cấp quyền Định Khu Nhanh Hoá Chất.'], 403);
+        }
+
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), [
+            'import_ids' => ['required', 'array', 'min:1', 'max:'.self::ASSIGN_MAX],
+            'import_ids.*' => ['integer'],
+            'location_id' => [
+                'required',
+                Rule::exists('locations', 'id')
+                    ->where('department_id', $departmentId)
+                    ->where('status_id', 1)
+                    ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
+                    ->where(fn ($query) => $query->whereNull('zone_type')->orWhereNotIn('zone_type', self::ASSIGN_EXCEPT_ZONES)),
+            ],
+        ], [
+            'import_ids.required' => 'Vui lòng chọn mã xuất nhập cần định khu.',
+            'import_ids.min' => 'Vui lòng chọn mã xuất nhập cần định khu.',
+            'import_ids.max' => 'Mỗi lần định khu tối đa '.self::ASSIGN_MAX.' mã xuất nhập.',
+            'location_id.required' => 'Vui lòng chọn vị trí lưu trữ.',
+            'location_id.exists' => 'Vị trí được chọn không còn hoạt động, không thuộc phòng ban đang chọn, hoặc là khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $request->input('import_ids', []))));
+        $locationId = (int) $request->location_id;
+
+        $imports = DB::table('chemical_imports')
+            ->leftJoin('locations', 'chemical_imports.location_id', '=', 'locations.id')
+            ->select('chemical_imports.id', 'chemical_imports.code', 'chemical_imports.category_id', 'chemical_imports.location_id', 'locations.code as location_code')
+            ->whereIn('chemical_imports.id', $ids)
+            ->where('chemical_imports.department_id', $departmentId)
+            ->where('chemical_imports.status_id', 1)
+            ->where('chemical_imports.is_checked', 1)
+            ->orderBy('chemical_imports.code', 'asc')
+            ->get();
+
+        if ($imports->count() !== count($ids)) {
+            return response()->json([
+                'message' => 'Có mã xuất nhập đã bị khoá, chưa kiểm tra Đạt hoặc không thuộc phòng ban đang chọn - vui lòng tải lại trang.',
+            ], 422);
+        }
+
+        $placed = $imports->filter(fn ($import) => $import->location_id);
+
+        if ($placed->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đã có định khu: '
+                    .$placed->map(fn ($import) => $import->code.' ('.($import->location_code ?: '—').')')->implode(', ')
+                    .'. Muốn đổi chỗ vui lòng Điều chỉnh phiếu nhập (ghi lý do), hoặc tải lại trang.',
+            ], 422);
+        }
+
+        $location = DB::table('locations')
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            ->select(
+                'locations.id',
+                'locations.code',
+                'locations.zone_type',
+                'locations.warehouse_id',
+                'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
+            ->where('locations.id', $locationId)
+            ->first();
+        $locationLabel = \App\Support\CategoryLookup::locationLabel($location) ?: (string) $location->code;
+        $note = 'Vị trí lưu trữ: — -> '.$location->code.' (Định khu nhanh ở Tồn Kho Hoá Chất)';
+        $conflict = null;
+
+        try {
+            DB::transaction(function () use ($imports, $locationId, $note, &$conflict) {
+                foreach ($imports as $import) {
+                    $check = \App\Support\ChemicalCompatibility::checkPlacement((int) $import->category_id, $locationId);
+
+                    if ($check['conflicts']) {
+                        $conflict = $import->code.': '.\App\Support\ChemicalCompatibility::message($check);
+
+                        throw new \RuntimeException($conflict);
+                    }
+
+                    // whereNull: hai người cùng định khu một mã thì chỉ lượt đầu được ghi
+                    $updated = DB::table('chemical_imports')
+                        ->where('id', $import->id)
+                        ->whereNull('location_id')
+                        ->update([
+                            'location_id' => $locationId,
+                            'updated_by' => $this->actor(),
+                            'updated_at' => now(),
+                        ]);
+
+                    if (! $updated) {
+                        $conflict = 'Mã xuất nhập '.$import->code.' vừa được người khác định khu - vui lòng tải lại trang.';
+
+                        throw new \RuntimeException($conflict);
+                    }
+
+                    \App\Http\Controllers\Pages\Import\ChemicalImportController::recordHistory((int) $import->id, 'Định khu', $note);
+                }
+            });
+        } catch (\RuntimeException $e) {
+            if ($conflict === null) {
+                throw $e;
+            }
+
+            return response()->json(['message' => $conflict], 422);
+        }
+
+        foreach ($imports as $import) {
+            AuditTrialController::log('Định khu', 'chemical_imports', $import->id, $import->code, $import->code.' | '.$note);
+        }
+
+        $codes = $imports->pluck('code');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã định khu '.($codes->count() === 1 ? 'mã xuất nhập '.$codes->first() : $codes->count().' mã xuất nhập')
+                .' vào '.$locationLabel.'.',
+            'import_ids' => $imports->pluck('id')->map(fn ($id) => (int) $id)->values(),
+            // Cùng tên trường với rowPayload() để trình duyệt vá thẳng vào dòng tồn rồi dựng lại sơ đồ
+            'location' => [
+                'location_id' => (int) $location->id,
+                'location_code' => $location->code,
+                'location_zone_type' => $location->zone_type,
+                'location_order' => $location->warehouse_name.'/'.$location->shelf_name.'/'.$location->column_name.'/'.$location->tier_name.'/'.$location->code,
+                'warehouse_id' => $location->warehouse_id ? (int) $location->warehouse_id : null,
+                'shelf_id' => $location->shelf_id ? (int) $location->shelf_id : null,
+                'column_id' => $location->column_id ? (int) $location->column_id : null,
+                'tier_id' => $location->tier_id ? (int) $location->tier_id : null,
+                'warehouse_name' => $location->warehouse_name,
+                'shelf_name' => $location->shelf_name,
+                'column_name' => $location->column_name,
+                'tier_name' => $location->tier_name,
+            ],
+        ]);
     }
 
     /**
@@ -1232,10 +1406,10 @@ class ChemicalInventoryController extends Controller
             ->get();
 
         return [
-            'warehouses' => $of('warehouses', ['id', 'code', 'name']),
-            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id']),
-            'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id']),
-            'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id']),
+            'warehouses' => $of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_door_wall', 'layout_door_offset']),
+            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']),
+            'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
+            'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']),
             'locations' => $this->locationOptions($departmentId),
         ];
     }
@@ -1247,7 +1421,7 @@ class ChemicalInventoryController extends Controller
     private function locationOptions(int $departmentId)
     {
         return DB::table('locations')
-            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type', 'zone_type', 'color'])
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'position', 'depth', 'item_type', 'zone_type', 'color'])
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))

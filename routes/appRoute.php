@@ -9,7 +9,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\General\HomeController;
-use App\Http\Controllers\General\PublicChemicalLookupController;
+use App\Http\Controllers\General\PublicStockLookupController;
 use App\Http\Controllers\General\PrintTestController;
 use App\Http\Controllers\General\SwitchProductionController;
 use App\Http\Controllers\UploadDataController;
@@ -23,8 +23,10 @@ Route::get('/login', [LoginController::class, 'showLogin'])->name('login.form');
 
 Route::post('/', [LoginController::class, 'login'])->name('login');
 
-// Tra cứu tồn kho + vị trí hoá chất của một phòng ban - CÔNG KHAI, không cần đăng nhập
-Route::get('/tra-cuu-hoa-chat', [PublicChemicalLookupController::class, 'index'])->name('publicChemicalLookup');
+// Tra cứu tồn kho + vị trí (Thẻ / 3D / Mặt bằng) của một phòng ban - CÔNG KHAI, không cần đăng nhập
+Route::get('/tra-cuu-hoa-chat', [PublicStockLookupController::class, 'chemical'])->name('publicChemicalLookup');
+Route::get('/tra-cuu-chat-chuan', [PublicStockLookupController::class, 'standard'])->name('publicStandardLookup');
+Route::get('/tra-cuu-vat-tu', [PublicStockLookupController::class, 'material'])->name('publicMaterialLookup');
 
 Route::post('/changePassword', [LoginController::class, 'changePassword'])->name('changePassword');
 

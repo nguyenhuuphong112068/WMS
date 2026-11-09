@@ -86,7 +86,42 @@ return [
         ['id' => 'ton-kho', 'file' => 'inventory', 'title' => 'Xem Tồn Kho & Cân Đối', 'icon' => 'fas fa-boxes',
             'path' => 'Tồn Kho › Hoá Chất › tab Theo mã xuất nhập / Theo hoá chất / Theo định khu',
             'route' => 'pages.inventory.chemicalInventory.list', 'pane' => ['invPaneCode', 'invPaneChem', 'invPaneZone'], 'perm' => 'inventory_chemical_view', 'chips' => [$byDept],
-            'keywords' => 'ton dau ky cuoi ky am kho sap het can doi bieu do'],
+            // Tab Theo định khu ở chế độ 3D - phòng QC2 (9) có kho QC09 đã khai lưới vị trí
+            'extraShots' => [
+                ['name' => 'ton-kho-3d', 'tab' => ['invPaneZone'], 'dept' => 9, 'clip' => '#invPaneZone', 'maxHeight' => 1000, 'height' => 1000, 'pad' => 0, 'afterJs' => 1500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
+                        ." for (let i = 0; i < 30 && !document.querySelector('#invZoneMap [data-mz-view]'); i++) await w(300);"
+                        ." document.querySelector('#invZoneMap [data-mz-view=\"3d\"]').click(); await w(800); return true; })()"],
+                // Chế độ Mặt bằng (cả kho/phòng theo mặt bằng Định Khu): tìm tên hoá chất của thùng hàng đầu tiên để khung
+                // phóng tới các thùng khớp
+                ['name' => 'ton-kho-mat-bang', 'tab' => ['invPaneZone'], 'dept' => 9, 'clip' => '#invPaneZone', 'maxHeight' => 1000, 'height' => 1000, 'pad' => 0, 'afterJs' => 1500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
+                        ." for (let i = 0; i < 30 && !document.querySelector('#invZoneMap [data-mz-view]'); i++) await w(300);"
+                        ." document.querySelector('#invZoneMap [data-mz-view=\"room\"]').click(); await w(800);"
+                        ." const box = document.querySelector('#invZoneMap .w3d-box'); const t = box ? box.getAttribute('title') : '';"
+                        ." const word = ((t.split(': ')[1] || '').split(',')[0] || '').trim().split(' ')[0];"
+                        ." $('#invZoneMap .mz-search input').val(word).trigger('input'); await w(1200); return true; })()"],
+                // Khối "Chưa xếp vị trí" mở, chọn sẵn 2 thẻ - viền đỏ cụm nút Chọn tất cả / Định khu N mã đã chọn
+                ['name' => 'ton-kho-chua-xep', 'tab' => ['invPaneZone'], 'dept' => 9, 'clip' => '#invPaneZone', 'maxHeight' => 760, 'pad' => 0, 'afterJs' => 800,
+                    'highlight' => ['#invZoneMap .mz-unzoned-tools'],
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
+                        ." for (let i = 0; i < 30 && !document.querySelector('#invZoneMap .mz-ucard'); i++) await w(300);"
+                        ." document.querySelector('#invZoneMap [data-mz-view=\"cards\"]')?.click(); await w(300);"
+                        ." document.querySelector('#invZoneMap .mz-unzoned').classList.remove('is-closed');"
+                        ." document.querySelectorAll('#invZoneMap .mz-ucard').forEach((c, i) => { if (i === 1 || i === 2) c.click(); if (i >= 20) c.style.display = 'none'; });"
+                        ." document.querySelectorAll('#invZoneMap .mz-wh').forEach(w => w.classList.add('is-closed'));"
+                        ." return true; })()"],
+                // Hộp thoại Định Khu Nhanh mở từ nút "Định khu N mã đã chọn", danh sách vị trí mở sẵn
+                ['name' => 'ton-kho-dinh-khu-nhanh', 'tab' => ['invPaneZone'], 'dept' => 9, 'clip' => '.modal.show .modal-content, .select2-container--open .select2-dropdown',
+                    'maxHeight' => 1200, 'pad' => 0, 'afterJs' => 2500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
+                        ." for (let i = 0; i < 30 && !document.querySelector('#invZoneMap .mz-ucard'); i++) await w(300);"
+                        ." document.querySelector('#invZoneMap [data-mz-view=\"cards\"]')?.click(); await w(300);"
+                        ." document.querySelector('#invZoneMap .mz-unzoned').classList.remove('is-closed');"
+                        ." document.querySelectorAll('#invZoneMap .mz-ucard').forEach((c, i) => { if (i < 3) c.click(); });"
+                        ." document.querySelector('#invZoneMap .mz-assign-picked').click(); return true; })()"],
+            ],
+            'keywords' => 'ton dau ky cuoi ky am kho sap het can doi bieu do so do 3d dinh khu chua xep vi tri dinh khu nhanh'],
         ['id' => 'han-dung', 'file' => 'expiry', 'title' => 'Cận Hạn & Hạn Dùng Nội Bộ', 'icon' => 'fas fa-hourglass-half',
             'path' => 'Tồn Kho › Hoá Chất › tab Cận hạn dùng / Chưa có hạn nội bộ',
             'route' => 'pages.inventory.chemicalInventory.list', 'pane' => ['invPaneExpiring', 'invPaneInternal'], 'perm' => 'inventory_chemical_view',
@@ -112,7 +147,7 @@ return [
     ],
     'Hỗ trợ' => [
         ['id' => 'tra-cuu', 'file' => 'publicLookup', 'title' => 'Tra Cứu Không Cần Đăng Nhập', 'icon' => 'fas fa-search-location',
-            'keywords' => 'tim vi tri hoa chat dang nhap'],
+            'keywords' => 'tim vi tri hoa chat dang nhap mat bang 3d quet ma camera'],
         ['id' => 'loi-thuong-gap', 'file' => 'faq', 'title' => 'Lỗi Thường Gặp', 'icon' => 'fas fa-question-circle'],
     ],
 ];

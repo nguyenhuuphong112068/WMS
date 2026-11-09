@@ -75,7 +75,7 @@
                                 class="form-control wms-zone-select {{ $iqBag->has('pending_location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chọn vị trí đặt ống chuẩn cách ly --</option>
                                 @foreach ($iqLocations as $loc)
-                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}"
+                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}" data-shelf="{{ \App\Support\CategoryLookup::shelfKey($loc) }}"
                                         {{ (string) old('pending_location_id', $iqLocations->count() === 1 ? $loc->id : '') === (string) $loc->id ? 'selected' : '' }}>
                                         {{ $iqLocationText($loc) }}
                                     </option>

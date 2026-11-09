@@ -118,7 +118,7 @@
                                 class="form-control imp-select {{ $bag->has('location_id') ? 'is-invalid' : '' }}">
                                 <option value="">-- Chưa định khu --</option>
                                 @foreach ($quarantineLocations as $loc)
-                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}"
+                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}" data-shelf="{{ \App\Support\CategoryLookup::shelfKey($loc) }}"
                                         {{ old('location_id') == $loc->id ? 'selected' : '' }}>
                                         {{ $loc->code }} — {{ $loc->warehouse_name }} /
                                         {{ $loc->shelf_name }} / {{ $loc->column_name }} / {{ $loc->tier_name }}

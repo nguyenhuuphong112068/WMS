@@ -80,8 +80,19 @@ return [
                         ." for (let i = 0; i < 20 && !document.querySelector('#zs-warehouses .zs-tile'); i++) await w(300);"
                         ." document.querySelector('#zs-warehouses .zs-tile').click(); await w(1500);"
                         ." document.querySelector('#zs-add').click(); await w(800); return true; })()"],
+                // Mặt bằng kho/phòng: cửa ở tường dưới, tự xếp các kệ rồi chọn kệ đầu tiên
+                ['name' => 'dinh-khu-mat-bang', 'clip' => '#zoneStructure', 'maxHeight' => 1100, 'pad' => 0, 'afterJs' => 1500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
+                        ." for (let i = 0; i < 20 && !document.querySelector('#zs-warehouses .zs-tile'); i++) await w(300);"
+                        ." document.querySelector('#zs-warehouses .zs-tile').click(); await w(1500);"
+                        ." document.querySelector('#zs-layout-btn').click(); await w(2000);"
+                        ." const door = document.querySelector('.zl-door-wall'); if (!door.value) { door.value = 'bottom';"
+                        ." door.dispatchEvent(new Event('change', { bubbles: true })); }"
+                        ." const auto = document.querySelector('.zl-auto'); if (!auto.disabled) auto.click(); await w(400);"
+                        ." const shelf = document.querySelector('.zl-shelf'); if (shelf) { shelf.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));"
+                        ." document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); } return true; })()"],
             ],
-            'keywords' => 'kho phong ke tu cot tang vi tri cau truc kho biet tru du phong thong so 3d'],
+            'keywords' => 'kho phong ke tu cot tang vi tri cau truc kho biet tru du phong thong so 3d mat bang so do phong cua ra vao'],
         ['id' => 'doi-tuong', 'file' => 'consumptionObject', 'title' => 'Đối Tượng', 'icon' => 'fas fa-cogs',
             'route' => 'pages.materData.consumptionObject.list', 'perm' => md_perm('consumptionObject', 'view'),
             'keywords' => 'thiet bi cal dong bo tan suat'],

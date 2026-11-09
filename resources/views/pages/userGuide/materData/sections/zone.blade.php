@@ -37,7 +37,7 @@
         nghiêng; các nút <b>Nghiêng</b>, <b>Chính diện</b>, <b>Từ trên</b> đổi góc nhìn, <i class="fas fa-search-minus"></i>
         / <i class="fas fa-search-plus"></i> thu nhỏ / phóng to. Rê chuột vào thẻ thông số nào thì phần tương ứng sáng lên
         trên mô hình (ví dụ thẻ Vị trí ngang tô các ô ở mép trước). Khi sửa kệ đã có, ô trên mô hình tô màu như lưới bên
-        dưới (theo phân loại hoặc trạng thái tuỳ nút <b>Tô màu theo</b>).</li>
+        dưới (theo phân loại hoặc trạng thái tuỳ nút <b>Tô màu theo</b>). Nút <i class="fas fa-expand"></i> ở góc phải khung 3D <b>mở to toàn màn hình</b>: lăn chuột để phóng to / thu nhỏ, <span class="ug-key">Shift</span> + kéo (hoặc kéo chuột phải) để dời khung nhìn, <span class="ug-key">Esc</span> hoặc nút <i class="fas fa-compress"></i> để thu về.</li>
     <li>Kệ có chỗ khác thường (một cột ít tầng hơn, một tầng rộng hơn...) thì chỉnh riêng ở lưới bên dưới. Khi đó thẻ của
         chiều bị lệch viền nét đứt màu cam, ô số hiện <span class="ug-key">≠</span> (<i>Đang khác nhau giữa các tầng</i>);
         nhập một số vào thẻ đó sẽ đặt lại cùng một giá trị cho cả kệ.</li>
@@ -130,6 +130,38 @@
     <li>Bấm <b>Áp dụng</b>. Chọn <i>- Giữ nguyên -</i> ở ô nào thì ô đó không bị thay đổi.</li>
 </ol>
 <p>Nút <b>Tô màu theo</b> chuyển cách tô lưới: theo <b>Phân loại</b> hoặc theo <b>Trạng thái</b> (có lô hàng, trống, đang khoá).</p>
+
+<h3>Mặt bằng kho/phòng: đặt các kệ/tủ vào phòng</h3>
+<p>Sau khi đã xây các kệ/tủ, khai luôn chúng đứng ở đâu trong phòng để mọi người hình dung được kho. Mọi số đo tính bằng
+    <b>mét</b>; sơ đồ nhìn từ trên xuống, tường trên của sơ đồ là tường trong cùng khi xem 3D.</p>
+<ol class="ug-steps">
+    <li>Mở một kho/phòng (danh sách kệ/tủ), bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-vector-square mr-1"></i> Mặt bằng kho/phòng</span>.</li>
+    <li>Khai <b>Chiều ngang phòng</b> × <b>Chiều sâu phòng</b> (nút <span class="ug-key">−</span> / <span class="ug-key">+</span>
+        mỗi lần 0,5 m, hoặc gõ số). Chọn <b>Cửa ra vào</b> ở tường nào và <b>Cách góc tường</b> bao xa (cửa rộng 1 m; tường trên /
+        dưới tính từ góc trái, tường trái / phải tính từ góc trên).</li>
+    <li>Đặt kệ vào phòng: kéo tên kệ ở dòng <b>Kệ/tủ chưa đặt</b> thả vào sơ đồ, bấm vào tên kệ để đặt vào chỗ trống đầu tiên,
+        hoặc bấm <b>Tự xếp kệ chưa đặt</b> để xếp lần lượt tất cả. Kệ mới đặt lấy kích thước gợi ý theo số ô của kệ.</li>
+    <li>Kéo kệ trên sơ đồ để dời chỗ (bước 0,05 m, không ra được ngoài tường). Bấm chọn một kệ để chỉnh ở khung bên phải:
+        <b>Bề ngang kệ (mặt trước)</b>, <b>Bề sâu kệ</b>, <b>Cách tường trái</b>, <b>Cách tường trên</b> và
+        <b>Mặt trước (phía lấy hàng) hướng</b> xuống / trái / lên / phải. Trên sơ đồ, mặt trước là cạnh đậm có mũi tên.
+        Phím tắt khi đang chọn kệ: mũi tên dời 0,1 m (giữ <span class="ug-key">Shift</span>: 0,5 m),
+        <span class="ug-key">R</span> xoay 90°, <span class="ug-key">Delete</span> gỡ khỏi mặt bằng,
+        <span class="ug-key">Esc</span> bỏ chọn.</li>
+    <li>Khung 3D bên dưới vẽ cả phòng: sàn kẻ ô 1 m, tường, cửa, các kệ đúng chỗ, đúng hướng, mỗi tầng cao 0,4 m; vị trí
+        đang có lô hàng hiện thành thùng hàng. Kéo chuột để xoay; bấm một kệ trên 3D để chọn, nhấp đúp (trên sơ đồ hoặc 3D) hay
+        bấm <b>Mở cấu trúc kệ</b> để sang sửa cấu trúc kệ đó.
+        Nút <i class="fas fa-expand"></i> ở góc phải khung 3D <b>mở to toàn màn hình</b>: lăn chuột để phóng to / thu nhỏ, <span class="ug-key">Shift</span> + kéo (hoặc kéo chuột phải) để dời khung nhìn, <span class="ug-key">Esc</span> hoặc nút <i class="fas fa-compress"></i> để thu về.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/dinh-khu-mat-bang.png', 'caption' => 'Mặt bằng kho/phòng: sơ đồ kéo thả bên trái, kệ đang chọn và 3D cả phòng bên phải'])
+    </li>
+    <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-save mr-1"></i> Lưu mặt bằng</span>. <b>Hoàn tác</b> bỏ các
+        thay đổi chưa lưu.</li>
+</ol>
+<div class="ug-callout is-warn">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>Không lưu được khi còn kệ <b>chồng lên nhau</b> hoặc <b>nằm ra ngoài phòng</b> (kệ đó tô đỏ, dòng trạng thái ghi số kệ
+        lỗi), hay khi cửa vượt ra ngoài tường. Thu nhỏ phòng có thể làm kệ đang đặt lọt ra ngoài: hãy dời kệ trước.
+        Mặt bằng chỉ là vị trí đặt kệ, không đổi mã hay cấu trúc cột / tầng / vị trí.</div>
+</div>
 
 <h3>Chế độ "Danh sách định khu"</h3>
 <p>Mỗi cấp là một tab với đủ các nút Thêm, Sửa, Khoá/Mở khoá và <b>Xoá</b>. Dùng khi cần sửa riêng một bản ghi hoặc tra cứu nhanh.</p>

@@ -31,7 +31,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-camera"></i> Quét Mã Vạch Bằng Camera</h5>
-                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                    <button type="button" class="close" data-dismiss="modal" data-bs-dismiss="modal"><span>&times;</span></button>
                 </div>
 
                 <div class="modal-body">
@@ -52,7 +52,7 @@
                     <button type="button" class="btn btn-outline-primary btn-cam-switch">
                         <i class="fas fa-sync-alt mr-1"></i> Đổi camera
                     </button>
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" data-bs-dismiss="modal">Huỷ</button>
                 </div>
             </div>
         </div>

@@ -164,7 +164,7 @@
                                                         <select name="dest_location_id" class="form-control wms-zone-select input-dest-location-receive mb-1">
                                                             <option value="">-- Định khu --</option>
                                                             @foreach ($transferOwnLocations as $loc)
-                                                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->shelf_name }}/{{ $loc->column_name }}/{{ $loc->tier_name }})@endif</option>
+                                                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}" data-shelf="{{ \App\Support\CategoryLookup::shelfKey($loc) }}">{{ $loc->code }}@if ($loc->warehouse_name) ({{ $loc->warehouse_name }}/{{ $loc->shelf_name }}/{{ $loc->column_name }}/{{ $loc->tier_name }})@endif</option>
                                                             @endforeach
                                                         </select>
                                                         <select name="dest_purpose_id" class="form-control input-dest-purpose-receive mb-1" style="height: 32px !important; min-height: 32px !important; font-size: 0.78rem;">

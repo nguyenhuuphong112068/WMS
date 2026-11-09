@@ -11,51 +11,40 @@
 --}}
 
 @include('pages.inventory.shared.zoneMapStyles')
+@include('pages.inventory.shared.zone3d')
 
-@php
-    $mzTotals = $zoneMap['totals'];
-@endphp
-
+{{-- Một dòng: chip lọc bên trái, công cụ (Thẻ | 3D | Mặt bằng, tìm kiếm) bên phải - hẹp thì tự xuống dòng --}}
 <div class="mz-head">
-    <div class="mz-stats">
-        <div class="mz-stat"><b>{{ $mzTotals['warehouses'] }}</b><span>Kho / Phòng</span></div>
-        <div class="mz-stat"><b>{{ $mzTotals['shelves'] }}</b><span>Kệ / Tủ</span></div>
-        <div class="mz-stat"><b>{{ $mzTotals['columns'] }}</b><span>Cột</span></div>
-        <div class="mz-stat"><b>{{ $mzTotals['tiers'] }}</b><span>Tầng</span></div>
-        <div class="mz-stat"><b>{{ $mzTotals['filled'] }}/{{ $mzTotals['locations'] }}</b><span>Vị trí có hàng</span></div>
-        <div class="mz-stat"><b>{{ $mzTotals['lots'] }}</b><span>Mã xuất nhập</span></div>
-        <div class="mz-stat"><b>{{ $mzTotals['materials'] }}</b><span>Vật tư</span></div>
-        @if ($mzTotals['alerts'] > 0)
-            <div class="mz-stat is-alert"><b>{{ $mzTotals['alerts'] }}</b><span>Cần chú ý</span></div>
-        @endif
+    <div class="mz-filters">
+        <button type="button" class="mz-filter is-active" data-state="">Tất cả vị trí</button>
+        <button type="button" class="mz-filter" data-state="stocked"><span class="dot ok"></span>Đang có hàng</button>
+        <button type="button" class="mz-filter" data-state="alert"><span class="dot warn"></span>Cần chú ý</button>
+        <button type="button" class="mz-filter" data-state="empty"><span class="dot empty"></span>Còn trống</button>
+
+        <span class="mz-filter-sep"></span>
+        <span class="mz-filter-label">Loại định khu</span>
+        <button type="button" class="mz-filter mz-zt-filter is-active" data-zone-type="*">Tất cả</button>
+        @foreach (\App\Support\ZoneType::TYPES as $ztKey => $ztLabel)
+            <button type="button" class="mz-filter mz-zt-filter" data-zone-type="{{ $ztKey }}"
+                style="--zt: {{ \App\Support\ZoneType::color($ztKey) }}"><span class="dot zt"></span>{{ $ztLabel }}</button>
+        @endforeach
+        <button type="button" class="mz-filter mz-zt-filter" data-zone-type=""><span class="dot empty"></span>Chưa phân loại</button>
     </div>
 
     <div class="mz-tools">
-        <div class="mz-search">
+        {{-- Nút camera dùng modal của pages.shared.cameraScan (list.blade.php đã nạp) --}}
+        <div class="mz-search scan-box">
             <i class="fas fa-search"></i>
-            <input type="text" id="mzSearch" class="form-control form-control-sm"
-                placeholder="Tìm vị trí, kệ/tủ hoặc tên vật tư...">
+            <input type="text" id="mzSearch" class="form-control form-control-sm" autocomplete="off"
+                placeholder="Tìm vị trí, kệ/tủ, mã hoặc tên vật tư...">
+            <button type="button" class="btn btn-outline-primary btn-camera-scan" title="Quét mã trên nhãn bằng camera">
+                <i class="fas fa-camera"></i>
+            </button>
         </div>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="mzToggleAll">
             <i class="fas fa-compress mr-1"></i> Thu gọn tất cả
         </button>
     </div>
-</div>
-
-<div class="mz-filters">
-    <button type="button" class="mz-filter is-active" data-state="">Tất cả vị trí</button>
-    <button type="button" class="mz-filter" data-state="stocked"><span class="dot ok"></span>Đang có hàng</button>
-    <button type="button" class="mz-filter" data-state="alert"><span class="dot warn"></span>Cần chú ý</button>
-    <button type="button" class="mz-filter" data-state="empty"><span class="dot empty"></span>Còn trống</button>
-
-    <span class="mz-filter-sep"></span>
-    <span class="mz-filter-label">Loại định khu</span>
-    <button type="button" class="mz-filter mz-zt-filter is-active" data-zone-type="*">Tất cả</button>
-    @foreach (\App\Support\ZoneType::TYPES as $ztKey => $ztLabel)
-        <button type="button" class="mz-filter mz-zt-filter" data-zone-type="{{ $ztKey }}"
-            style="--zt: {{ \App\Support\ZoneType::color($ztKey) }}"><span class="dot zt"></span>{{ $ztLabel }}</button>
-    @endforeach
-    <button type="button" class="mz-filter mz-zt-filter" data-zone-type=""><span class="dot empty"></span>Chưa phân loại</button>
 </div>
 
 {{-- Mã còn tồn nhưng chưa gán vị trí - để trên cùng cho dễ thấy mà bổ sung định khu --}}
@@ -154,7 +143,9 @@
                                                             ' ' .
                                                             $tier['name'] .
                                                             ' ' .
-                                                            implode(' ', array_column($loc['preview'], 'name')),
+                                                            implode(' ', array_column($loc['preview'], 'name')) .
+                                                            ' ' .
+                                                            implode(' ', array_column($loc['items'] ?? [], 'code')),
                                                     ),
                                                 );
                                                 $mzZoned = $loc['zoneBadge']['bg'] !== '#FFFFFF';

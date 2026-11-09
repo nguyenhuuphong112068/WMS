@@ -749,10 +749,10 @@ class MaterialInventoryController extends Controller
             ->get();
 
         return [
-            'warehouses' => $of('warehouses', ['id', 'code', 'name']),
-            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id']),
-            'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id']),
-            'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id']),
+            'warehouses' => $of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_door_wall', 'layout_door_offset']),
+            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']),
+            'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
+            'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']),
             'locations' => $this->locationOptions($departmentId),
         ];
     }
@@ -764,7 +764,7 @@ class MaterialInventoryController extends Controller
     private function locationOptions(int $departmentId)
     {
         return DB::table('locations')
-            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'item_type', 'zone_type', 'color'])
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'position', 'depth', 'item_type', 'zone_type', 'color'])
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
             ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
@@ -955,6 +955,13 @@ class MaterialInventoryController extends Controller
                 'materials' => $node['stat']['materials'],
                 'alerts' => $node['stat']['alerts'],
                 'items' => $node['items'],
+                // Sơ đồ 3D (inventory/shared/zone3d) tô màu, lọc và tìm kiếm theo các trường này
+                'state' => $node['state'],
+                'zoneType' => $node['zoneType'],
+                'badge' => $node['zoneBadge'],
+                'search' => mb_strtolower(trim($node['code'].' '.$node['path'].' '
+                    .implode(' ', array_column($node['items'], 'material_name')).' '
+                    .implode(' ', array_column($node['items'], 'code')))),
             ];
 
             $branch['locations'][] = $node;

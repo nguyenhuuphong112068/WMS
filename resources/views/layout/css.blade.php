@@ -119,6 +119,42 @@
               font-weight: 600;
               box-shadow: 0 0 0 1px var(--dot, var(--primary)) inset;
           }
+
+          /* Hàng chip "Kệ/Tủ" ngay dưới hàng phân loại - chọn kệ/tủ cần cất hàng (layout/js) */
+          .shelf-filter-bar {
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 5px;
+              padding: 6px 8px;
+              border-bottom: 1px solid #e2e8f0;
+              background: #fff;
+              max-height: 96px;
+              overflow-y: auto;
+          }
+
+          .shelf-filter-bar[hidden] {
+              display: none;
+          }
+
+          .shelf-filter-label {
+              font-size: 0.7rem;
+              font-weight: 700;
+              letter-spacing: 0.4px;
+              text-transform: uppercase;
+              color: #64748b;
+              margin-right: 2px;
+          }
+
+          .shelf-filter-label i {
+              color: var(--primary-light);
+              margin-right: 4px;
+          }
+
+          .shelf-filter-loading {
+              font-size: 0.75rem;
+              color: #94a3b8;
+          }
       </style>
       <!-- Bootstrap4 Duallistbox -->
       <link rel="stylesheet" href="{{asset ('dataTable/plugins/bootstrap4-duallistbox/bootstrap-duallistbox.min.css')}}">

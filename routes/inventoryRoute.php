@@ -50,6 +50,8 @@ Route::prefix('/inventory')
             Route::get('movements', 'movements')->name('movements');
             Route::post('balancing', 'balancing')->name('balancing');
             Route::post('internalExpiry', 'internalExpiry')->name('internalExpiry');
+            // Định khu nhanh mã xuất nhập "Chưa xếp vị trí" ở tab Theo định khu (AJAX, trả JSON)
+            Route::post('assignLocation', 'assignLocation')->name('assignLocation');
             // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');

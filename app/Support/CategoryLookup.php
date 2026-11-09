@@ -362,25 +362,27 @@ class CategoryLookup
      * $onlyZone: chỉ một phân loại cố định (modal Nhập: lô mới chỉ vào khu Biệt Trữ 'quarantine'),
      * khác $zone là chip lọc người dùng bấm trong ô chọn.
      */
-    public static function searchLocations(string $itemType, int $departmentId, string $q, int $page, ?string $zone = null, ?string $onlyZone = null): array
+    /**
+     * $shelf: chip lọc "Kệ/Tủ" trong ô chọn - null/'' = mọi kệ, '__none' = vị trí chưa gán kệ/tủ,
+     * còn lại là shelves.id (danh sách chip lấy từ locationShelves()).
+     */
+    public static function searchLocations(string $itemType, int $departmentId, string $q, int $page, ?string $zone = null, ?string $onlyZone = null, array $exceptZones = [], ?string $shelf = null): array
     {
-        $query = self::locationQuery()
-            ->where('locations.department_id', $departmentId)
-            ->where('locations.status_id', 1)
-            ->when($itemType !== 'all', fn ($query) => $query->where(fn ($sub) => $sub->whereNull('locations.item_type')
-                ->orWhere('locations.item_type', $itemType)))
-            ->when($onlyZone !== null && isset(ZoneType::TYPES[$onlyZone]), fn ($query) => $query->where('locations.zone_type', $onlyZone));
+        $query = self::locationScope($itemType, $departmentId, $zone, $onlyZone, $exceptZones);
 
-        if ($zone === '') {
-            $query->whereNull('locations.zone_type');
-        } elseif ($zone !== null && isset(ZoneType::TYPES[$zone])) {
-            $query->where('locations.zone_type', $zone);
+        if ($shelf === '__none') {
+            $query->whereNull('locations.shelf_id');
+        } elseif ($shelf !== null && ctype_digit($shelf)) {
+            $query->where('locations.shelf_id', (int) $shelf);
         }
 
-        // Gõ "kho 01 tầng 02": mỗi từ khớp một phần bất kỳ của đường dẫn định khu
+        // Gõ "kho 01 tầng 02": mỗi từ khớp một phần bất kỳ của đường dẫn định khu (tên hoặc mã từng cấp)
         foreach (self::terms($q) as $term) {
             $query->where(function ($sub) use ($term) {
-                foreach (['locations.code', 'warehouses.name', 'shelves.name', 'columns.name', 'tiers.name'] as $column) {
+                foreach ([
+                    'locations.code', 'warehouses.name', 'warehouses.code', 'shelves.name', 'shelves.code',
+                    'columns.name', 'columns.code', 'tiers.name', 'tiers.code',
+                ] as $column) {
                     $sub->orWhere($column, 'like', '%'.$term.'%');
                 }
             });
@@ -397,6 +399,73 @@ class CategoryLookup
             ])->all(),
             $more
         );
+    }
+
+    /**
+     * Hàng chip "Kệ/Tủ" của ô chọn định khu: các kệ/tủ có vị trí khớp CÙNG điều kiện với searchLocations()
+     * (loại hàng, phân loại cố định / loại trừ, chip phân loại đang chọn), kèm số vị trí. Vị trí chưa gán
+     * kệ gộp thành một chip '__none'. Có từ 2 kho trở lên thì nhãn kèm tên kho cho khỏi nhầm "Kệ/Tủ 01".
+     *
+     * @return array<int, array{id: string, text: string, code: ?string, count: int}>
+     */
+    public static function locationShelves(string $itemType, int $departmentId, ?string $zone = null, ?string $onlyZone = null, array $exceptZones = []): array
+    {
+        $rows = self::locationScope($itemType, $departmentId, $zone, $onlyZone, $exceptZones)
+            ->reorder()
+            ->select(
+                'locations.shelf_id',
+                'shelves.name as shelf_name',
+                'shelves.code as shelf_code',
+                'warehouses.name as warehouse_name',
+                DB::raw('COUNT(*) as total')
+            )
+            ->groupBy('locations.shelf_id', 'shelves.name', 'shelves.code', 'warehouses.name')
+            ->orderBy('warehouses.name', 'asc')
+            ->orderBy('shelves.name', 'asc')
+            ->get();
+
+        $multiWarehouse = $rows->pluck('warehouse_name')->filter()->unique()->count() > 1;
+
+        return $rows->map(fn ($row) => [
+            'id' => $row->shelf_id ? (string) $row->shelf_id : '__none',
+            'text' => $row->shelf_id
+                ? ($multiWarehouse && $row->warehouse_name ? $row->warehouse_name.' › ' : '').($row->shelf_name ?: $row->shelf_code ?: '—')
+                : 'Chưa gán kệ/tủ',
+            'code' => $row->shelf_code,
+            'count' => (int) $row->total,
+        ])->values()->all();
+    }
+
+    /** Khoá nhóm "Kho › Kệ/Tủ" cho option định khu render sẵn (data-shelf) - '' khi chưa gán kệ/tủ. */
+    public static function shelfKey($row): string
+    {
+        $shelf = trim((string) ($row->shelf_name ?? ''));
+
+        return $shelf === '' ? '' : trim((string) ($row->warehouse_name ?? '')).' › '.$shelf;
+    }
+
+    /** Điều kiện chung của ô chọn định khu: phòng ban, đang hoạt động, loại hàng, phân loại. */
+    private static function locationScope(string $itemType, int $departmentId, ?string $zone, ?string $onlyZone, array $exceptZones)
+    {
+        $exceptZones = array_values(array_intersect($exceptZones, array_keys(ZoneType::TYPES)));
+
+        $query = self::locationQuery()
+            ->where('locations.department_id', $departmentId)
+            ->where('locations.status_id', 1)
+            ->when($itemType !== 'all', fn ($query) => $query->where(fn ($sub) => $sub->whereNull('locations.item_type')
+                ->orWhere('locations.item_type', $itemType)))
+            ->when($onlyZone !== null && isset(ZoneType::TYPES[$onlyZone]), fn ($query) => $query->where('locations.zone_type', $onlyZone))
+            // Bỏ các phân loại không nhận hàng ở bước đang làm (vd. Định khu nhanh ở Tồn Kho: Biệt Trữ / Cách ly / Loại bỏ)
+            ->when($exceptZones, fn ($query) => $query->where(fn ($sub) => $sub->whereNull('locations.zone_type')
+                ->orWhereNotIn('locations.zone_type', $exceptZones)));
+
+        if ($zone === '') {
+            $query->whereNull('locations.zone_type');
+        } elseif ($zone !== null && isset(ZoneType::TYPES[$zone])) {
+            $query->where('locations.zone_type', $zone);
+        }
+
+        return $query;
     }
 
     /** Định khu theo id, không lọc trạng thái / phòng - dựng sẵn option cho giá trị old(). */

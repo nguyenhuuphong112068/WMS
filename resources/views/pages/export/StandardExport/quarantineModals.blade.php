@@ -126,7 +126,7 @@
                         <select name="pending_location_id" class="form-control wms-zone-select" required>
                             <option value="">-- Chọn vị trí đặt ống chuẩn cách ly --</option>
                             @foreach ($qrPendingLocations as $loc)
-                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}">{{ $qrLocationText($loc) }}</option>
+                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}" data-shelf="{{ \App\Support\CategoryLookup::shelfKey($loc) }}">{{ $qrLocationText($loc) }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -192,7 +192,7 @@
                             class="form-control wms-zone-select {{ $qrDecideBag->has('rejected_location_id') ? 'is-invalid' : '' }}">
                             <option value="">-- Chọn vị trí đặt ống chuẩn chờ huỷ --</option>
                             @foreach ($qrRejectedLocations as $loc)
-                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}"
+                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}" data-shelf="{{ \App\Support\CategoryLookup::shelfKey($loc) }}"
                                     {{ (string) old('rejected_location_id', $qrRejectedLocations->count() === 1 ? $loc->id : '') === (string) $loc->id ? 'selected' : '' }}>
                                     {{ $qrLocationText($loc) }}
                                 </option>
@@ -210,7 +210,7 @@
                             class="form-control wms-zone-select {{ $qrDecideBag->has('returned_location_id') ? 'is-invalid' : '' }}">
                             <option value="">-- Chọn vị trí đặt lại ống chuẩn --</option>
                             @foreach ($qrReturnLocations as $loc)
-                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}">{{ $qrLocationText($loc) }}</option>
+                                <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type }}" data-shelf="{{ \App\Support\CategoryLookup::shelfKey($loc) }}">{{ $qrLocationText($loc) }}</option>
                             @endforeach
                         </select>
                         @if ($qrDecideBag->has('returned_location_id')) <div class="md-error text-danger small">{{ $qrDecideBag->first('returned_location_id') }}</div> @endif

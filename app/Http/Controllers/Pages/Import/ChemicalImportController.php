@@ -1113,6 +1113,15 @@ class ChemicalImportController extends Controller
      */
     private function writeHistory(int $id, string $action, ?string $note, ?string $reason = null): void
     {
+        self::recordHistory($id, $action, $note, $reason);
+    }
+
+    /**
+     * Như writeHistory() nhưng gọi được từ màn hình khác cũng sửa phiếu nhập - ví dụ Định khu
+     * nhanh ở Tồn Kho Hoá Chất (ChemicalInventoryController::assignLocation).
+     */
+    public static function recordHistory(int $id, string $action, ?string $note, ?string $reason = null): void
+    {
         $row = DB::table(self::TABLE)->where('id', $id)->first();
 
         if (! $row) {
@@ -1144,7 +1153,7 @@ class ChemicalImportController extends Controller
             'checked_at' => $row->checked_at,
             'change_note' => $note,
             'reason' => $reason,
-            'created_by' => $this->actor(),
+            'created_by' => \App\Support\Signer::actor(),
             'created_at' => now(),
         ]);
     }

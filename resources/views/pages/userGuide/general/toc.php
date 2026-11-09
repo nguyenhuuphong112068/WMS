@@ -17,10 +17,16 @@ return [
             'keywords' => 'doi mat khau lan dau het han 90 ngay do phuc tap chu hoa ky tu dac biet trung mat khau cu'],
         ['id' => 'khoa-het-phien', 'file' => 'lockTimeout', 'title' => 'Khoá Tài Khoản & Hết Phiên', 'icon' => 'fas fa-user-lock',
             'keywords' => 'khoa tai khoan 5 lan 15 phut tu dang xuat het phien khong thao tac vo hieu hoa'],
-        ['id' => 'tra-cuu-cong-khai', 'file' => 'publicLookup', 'title' => 'Tra Cứu Hoá Chất Không Cần Đăng Nhập', 'icon' => 'fas fa-search',
-            'path' => 'Trang đăng nhập › Tra cứu tồn kho hoá chất',
+        ['id' => 'tra-cuu-cong-khai', 'file' => 'publicLookup', 'title' => 'Tra Cứu Tồn Kho Không Cần Đăng Nhập', 'icon' => 'fas fa-search',
+            'path' => 'Trang đăng nhập › Tra cứu tồn kho',
             'route' => 'publicChemicalLookup',
-            'keywords' => 'tra cuu cong khai ton kho vi tri hoa chat khong dang nhap'],
+            'helpRoutes' => ['publicStandardLookup', 'publicMaterialLookup'],
+            'keywords' => 'tra cuu cong khai ton kho vi tri hoa chat chat chuan vat tu khong dang nhap mat bang 3d quet ma camera',
+            // Trang công khai (không có .content-wrapper): chụp cả trang khi chưa đăng nhập, tra một hoá chất ở chế độ Mặt bằng
+            'shots' => [['name' => 'public-lookup', 'url' => '/tra-cuu-hoa-chat?department_id=9&q=Acetonitril', 'user' => '-',
+                'clip' => 'body', 'maxHeight' => 1000, 'height' => 1000, 'width' => 1440, 'pad' => 0, 'afterJs' => 1500,
+                'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
+                    ." const b = document.querySelector('[data-mz-view=\"room\"]'); if (b) b.click(); await w(800); return true; })()"]]],
     ],
     'Trang Chủ' => [
         ['id' => 'trang-chu', 'file' => 'home', 'title' => 'Trang Chủ', 'icon' => 'fas fa-home',

@@ -10,6 +10,10 @@
             <input type="search" id="zs-filter" class="form-control form-control-sm" placeholder="Lọc theo mã, tên...">
             <span id="zs-total" class="zs-total" hidden></span>
             <span id="zs-dirty" class="zs-dirty" hidden><i class="fas fa-circle"></i> Có thay đổi chưa lưu</span>
+            <button type="button" id="zs-layout-btn" class="btn btn-sm btn-outline-primary" hidden
+                    title="Đặt các kệ/tủ vào đúng vị trí trong kho/phòng, xem cả phòng ở 3D">
+                <i class="fas fa-vector-square mr-1"></i> Mặt bằng kho/phòng
+            </button>
             <button type="button" id="zs-add" class="btn btn-sm btn-outline-primary"></button>
             <button type="button" id="zs-reset" class="btn btn-sm btn-outline-secondary" hidden>
                 <i class="fas fa-undo mr-1"></i> Hoàn tác
@@ -43,6 +47,9 @@
                 </div>
             </div>
         </div>
+
+        {{-- Mặt bằng kho/phòng: vị trí đặt các kệ/tủ trong phòng --}}
+        @include('pages.materData.Zone.layout')
 
         <div id="zs-warehouses" class="zs-cards" hidden></div>
         <div id="zs-shelves" class="zs-cards" hidden></div>
@@ -890,239 +897,35 @@
         opacity: 0.8;
     }
 
-    /* ---------- Mô hình 3D ---------- */
-    .zs-3d {
-        position: relative;
-        min-height: 420px;
-        border: 1px solid #e2e8f0;
-        border-radius: var(--border-radius-lg);
-        overflow: hidden;
-        background: radial-gradient(ellipse at 50% 30%, #fff 0%, var(--primary-soft) 100%);
-        box-shadow: var(--shadow-sm);
-        user-select: none;
-    }
-
-    .zs-3d-tools {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        right: 10px;
-        z-index: 2;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: space-between;
-        pointer-events: none;
-    }
-
-    .zs-3d-views {
-        display: inline-flex;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: var(--border-radius-md);
-        overflow: hidden;
-        box-shadow: var(--shadow-sm);
-        pointer-events: auto;
-    }
-
-    .zs-3d-views button {
-        border: none;
-        background: none;
-        padding: 4px 10px;
-        font-size: 0.74rem;
-        font-weight: 600;
-        color: #475569;
-        cursor: pointer;
-        transition: background 0.2s, color 0.2s;
-    }
-
-    .zs-3d-views button + button {
-        border-left: 1px solid #e2e8f0;
-    }
-
-    .zs-3d-views button:hover {
-        background: var(--primary-soft);
-        color: var(--primary);
-    }
-
-    .zs-3d-views button.active {
-        background: var(--primary);
-        color: #fff;
-    }
-
-    .zs-3d-scene {
-        position: absolute;
-        inset: 0;
-        perspective: 1600px;
-        perspective-origin: 50% 40%;
-        cursor: grab;
-        touch-action: none;
-    }
-
-    .zs-3d.is-dragging .zs-3d-scene {
-        cursor: grabbing;
-    }
-
-    .zs-3d-world {
-        position: absolute;
-        left: 50%;
-        top: 55%;
-        width: 0;
-        height: 0;
-        transform-style: preserve-3d;
-        transition: transform 0.35s ease;
-    }
-
-    .zs-3d.is-dragging .zs-3d-world {
-        transition: none;
-    }
-
-    .zs-3d-world > * {
-        position: absolute;
-        left: 0;
-        top: 0;
-        transform-origin: 0 0;
-    }
-
-    .zs-3d-floor {
-        background: radial-gradient(ellipse at center, rgba(var(--primary-rgb), 0.2) 0%, rgba(var(--primary-rgb), 0) 70%);
-    }
-
-    .zs-3d-back {
-        background: rgba(var(--primary-rgb), 0.04);
-        border: 1px solid rgba(var(--primary-rgb), 0.12);
-    }
-
-    /* vách giữa các cột: mép trước + mép sau là 2 trụ kệ */
-    .zs-3d-side {
-        background: rgba(var(--primary-rgb), 0.07);
-        border-left: 3px solid var(--primary-light);
-        border-right: 3px solid var(--primary-lighter);
-        transition: background 0.2s;
-    }
-
-    .zs-3d-cap {
-        background: rgba(var(--primary-rgb), 0.05);
-        border: 1px solid rgba(var(--primary-rgb), 0.25);
-    }
-
-    .zs-3d-board {
-        background: rgba(255, 255, 255, 0.88);
-        border: 1px solid var(--primary-light);
-        transition: background 0.2s;
-    }
-
-    .zs-3d-board.is-texture {
-        background-image:
-            linear-gradient(90deg, rgba(var(--primary-rgb), 0.35) 1px, transparent 1px),
-            linear-gradient(rgba(var(--primary-rgb), 0.35) 1px, transparent 1px);
-        background-size: var(--u) var(--u);
-        background-position: var(--pad) var(--pad);
-    }
-
-    /* nẹp mép trước của tầng; Tầng 01 tô đậm */
-    .zs-3d-lip {
-        background: var(--primary-lighter);
-    }
-
-    .zs-3d-lip.is-first {
-        background: var(--primary);
-    }
-
-    .zs-3d-cell {
-        position: absolute;
-        width: 16px;
-        height: 16px;
-        border-radius: 2px;
-        border: 1px solid;
-    }
-
-    .zs-3d-cell.is-plan {
+    /* ---------- Mô hình 3D (bộ vẽ chung pages/shared/shelf3d): màu ô theo trạng thái ---------- */
+    .zs-spec .w3d-cell.is-plan {
         background: var(--primary-soft);
         border-color: var(--primary);
     }
 
-    .zs-3d-cell.is-free {
+    .zs-spec .w3d-cell.is-free {
         background: #EEF2F6;
         border-color: #A9B4C2;
     }
 
-    .zs-3d-cell.is-busy {
+    .zs-spec .w3d-cell.is-busy {
         background: var(--primary);
         border-color: var(--primary-dark);
     }
 
-    .zs-3d-cell.is-off {
+    .zs-spec .w3d-cell.is-off {
         background: #CFD4D9;
         border-color: #9AA1A8;
     }
 
-    .zs-3d-cell.is-new {
+    .zs-spec .w3d-cell.is-new {
         background: #DCFCE7;
         border-color: #16A34A;
-    }
-
-    .zs-3d-label {
-        font-size: 11px;
-        font-weight: 700;
-        line-height: 1;
-        color: var(--primary-dark);
-        white-space: nowrap;
-        text-align: center;
-        pointer-events: none;
-    }
-
-    .zs-3d-tier-label {
-        width: 40px;
-        text-align: right;
-        color: #64748b;
-    }
-
-    .zs-3d-tier-label.is-first {
-        color: var(--primary);
-    }
-
-    .zs-3d-hint {
-        position: absolute;
-        right: 12px;
-        bottom: 8px;
-        font-size: 0.72rem;
-        color: #94a3b8;
-        pointer-events: none;
-    }
-
-    /* rê vào thẻ thông số nào thì chiều đó sáng lên trên mô hình */
-    .zs-3d[data-hl="columns"] .zs-3d-side {
-        background: rgba(var(--primary-rgb), 0.24);
-        border-color: var(--primary);
-    }
-
-    .zs-3d[data-hl="columns"] .zs-3d-col-label,
-    .zs-3d[data-hl="tiers"] .zs-3d-tier-label {
-        color: var(--accent);
-    }
-
-    .zs-3d[data-hl="tiers"] .zs-3d-lip {
-        background: var(--accent);
-    }
-
-    .zs-3d[data-hl="tiers"] .zs-3d-board {
-        background: rgba(23, 184, 212, 0.16);
-    }
-
-    .zs-3d[data-hl="max"] .zs-3d-cell.d1,
-    .zs-3d[data-hl="depth"] .zs-3d-cell.p1 {
-        background: var(--accent) !important;
-        border-color: #0E7F93 !important;
     }
 
     @media (max-width: 1100px) {
         .zs-spec-body {
             grid-template-columns: minmax(0, 1fr);
-        }
-
-        .zs-3d {
-            min-height: 340px;
         }
     }
 
@@ -1787,6 +1590,8 @@
     }
 </style>
 
+@include('pages.shared.shelf3d')
+
 <script type="application/json" id="zs-config">
 {
     "warehouses": @json(route('pages.materData.zone.structure.warehouses')),
@@ -1797,6 +1602,8 @@
     "apply": @json(route('pages.materData.zone.structure.apply')),
     "saveShelf": @json(route('pages.materData.zone.structure.saveShelf')),
     "saveLocations": @json(route('pages.materData.zone.structure.saveLocations')),
+    "layout": @json(route('pages.materData.zone.structure.layout')),
+    "saveLayout": @json(route('pages.materData.zone.structure.saveLayout')),
     "locationTypes": @json($locationTypes),
     "zoneTypes": @json(\App\Support\ZoneType::TYPES),
     "zoneColors": @json(\App\Support\ZoneType::DEFAULT_COLORS),
@@ -1829,6 +1636,8 @@
         total: byId('zs-total'),
         dirty: byId('zs-dirty'),
         add: byId('zs-add'),
+        layoutBtn: byId('zs-layout-btn'),
+        layout: byId('zs-layout'),
         reset: byId('zs-reset'),
         save: byId('zs-save'),
         note: byId('zs-note'),
@@ -2022,15 +1831,17 @@
 
         el.warehouses.hidden = view !== 'warehouses';
         el.shelves.hidden = view !== 'shelves';
+        el.layout.hidden = view !== 'layout';
+        el.layoutBtn.hidden = view !== 'shelves';
         el.editor.hidden = !isEditor;
         el.save.hidden = !isEditor;
         el.reset.hidden = !isEditor;
         el.total.hidden = !isEditor;
-        el.filter.hidden = isEditor;
+        el.filter.hidden = isEditor || view === 'layout';
         el.filter.value = '';
         el.note.hidden = true;
 
-        el.add.hidden = isEditor || !CFG.canCreate;
+        el.add.hidden = isEditor || view === 'layout' || !CFG.canCreate;
         el.add.innerHTML = '<i class="fas fa-plus mr-1"></i> ' + (view === 'warehouses' ? 'Kho/Phòng mới' : 'Kệ/Tủ mới');
 
         closeDrafts();
@@ -2054,6 +1865,11 @@
             parts.push('<span class="zs-crumb-sep">/</span>');
             parts.push('<button type="button" class="zs-crumb' + (state.view === 'shelves' ? ' is-current' : '')
                 + '" data-go="shelves">' + esc(state.warehouse.code) + ' - ' + esc(state.warehouse.name) + '</button>');
+        }
+
+        if (state.view === 'layout') {
+            parts.push('<span class="zs-crumb-sep">/</span>');
+            parts.push('<button type="button" class="zs-crumb is-current"><i class="fas fa-vector-square mr-1"></i>Mặt bằng</button>');
         }
 
         if (state.view === 'editor') {
@@ -2082,6 +1898,16 @@
     el.filter.addEventListener('input', function () {
         if (state.view === 'warehouses') renderWarehouses();
         else if (state.view === 'shelves') renderShelves();
+    });
+
+    // Mặt bằng kho/phòng (Zone/layout): đặt các kệ/tủ vào phòng, xem cả phòng ở 3D
+    el.layoutBtn.addEventListener('click', function () {
+        if (!state.warehouse || !window.ZoneLayout || !confirmLeave()) return;
+        show('layout');
+        window.ZoneLayout.open(state.warehouse, {
+            onDirty: setDirty,
+            onOpenShelf: function (id) { loadShelf(id); }
+        });
     });
 
     el.add.addEventListener('click', function () {
@@ -3228,48 +3054,16 @@
         }
     });
 
-    /* ---------- Mô hình 3D của kệ (CSS 3D, không cần thư viện) ---------- */
+    /* ---------- Mô hình 3D của kệ (bộ vẽ chung pages/shared/shelf3d) ---------- */
 
     // Kệ dựng theo đúng lưới sau khi lưu: vách giữa các cột, mặt từng tầng, từng ô Ngang × Sâu
-    // (dãy 1 sát mép trước). Kéo chuột để xoay; các nút đổi góc nhìn / phóng to.
-    var V3 = { U: 16, G: 3, PAD: 7, TH: 46, MAX_CELLS: 4000 };
-    var VIEWS3D = {
-        iso: { ax: -24, ay: -32 },
-        front: { ax: -12, ay: 0 },
-        top: { ax: -82, ay: 0 }
-    };
-    var view3d = { ax: VIEWS3D.iso.ax, ay: VIEWS3D.iso.ay, zoom: 1, fit: 1, preset: 'iso' };
+    // (dãy 1 sát mép trước). Kệ quá nhiều ô thì vẽ mặt tầng dạng lưới kẻ thay cho từng ô.
+    var MAX_3D_CELLS = 4000;
 
     function stage3dMarkup() {
-        return '<div class="zs-3d" title="Kéo chuột để xoay · nhấp đúp để về góc nghiêng">'
-            + '<div class="zs-3d-tools">'
-            +   '<div class="zs-3d-views" role="group" aria-label="Góc nhìn">'
-            +     '<button type="button" data-view3d="iso"><i class="fas fa-cube mr-1"></i>Nghiêng</button>'
-            +     '<button type="button" data-view3d="front"><i class="fas fa-border-all mr-1"></i>Chính diện</button>'
-            +     '<button type="button" data-view3d="top"><i class="fas fa-map mr-1"></i>Từ trên</button>'
-            +   '</div>'
-            +   '<div class="zs-3d-views" role="group" aria-label="Phóng to thu nhỏ">'
-            +     '<button type="button" data-zoom3d="-1" title="Thu nhỏ"><i class="fas fa-search-minus"></i></button>'
-            +     '<button type="button" data-zoom3d="1" title="Phóng to"><i class="fas fa-search-plus"></i></button>'
-            +   '</div>'
-            + '</div>'
-            + '<div class="zs-3d-scene"><div class="zs-3d-world"></div></div>'
-            + '<div class="zs-3d-hint"><i class="fas fa-arrows-alt mr-1"></i>Kéo để xoay</div>'
-            + '</div>';
+        return '<div class="w3d" title="Kéo chuột để xoay · nhấp đúp để về góc nghiêng">' + WmsShelf3d.markup() + '</div>';
     }
 
-    function px(n) {
-        return n.toFixed(1) + 'px';
-    }
-
-    // Một mặt phẳng trong không gian: đặt góc trên-trái tại (x, y, z) rồi xoay.
-    function plane(cls, x, y, z, w, h, rotate, extra) {
-        return '<div class="' + cls + '" style="width:' + px(w) + ';height:' + px(h)
-            + ';transform:translate3d(' + px(x) + ',' + px(y) + ',' + px(z) + ')' + (rotate ? ' ' + rotate : '') + '"'
-            + (extra || '') + '></div>';
-    }
-
-    // Trạng thái hiển thị của một ô trên mô hình (chỉ các ô còn trong lưới sau khi lưu).
     // Đang tô theo phân loại thì ô 3D cũng mang màu phân loại (ô có hàng đậm, ô trống nhạt) như lưới 2D.
     function cell3dStyle(tier, key, cls) {
         if (!state.shelf || state.cellView !== 'zone' || (cls !== 'is-free' && cls !== 'is-busy')) return '';
@@ -3279,6 +3073,7 @@
         return ';background:' + (cls === 'is-busy' ? color : soften(color)) + ';border-color:' + color;
     }
 
+    // Trạng thái hiển thị của một ô trên mô hình (chỉ các ô còn trong lưới sau khi lưu).
     function cell3dClass(tier, key) {
         if (!state.shelf) return 'is-plan';
         var k = splitKey(key);
@@ -3288,107 +3083,51 @@
         return 'is-free';
     }
 
-    function apply3dTransform(stage) {
-        var world = stage.querySelector('.zs-3d-world');
-        world.style.transform = 'scale(' + (view3d.fit * view3d.zoom).toFixed(3) + ') rotateX(' + view3d.ax + 'deg) rotateY(' + view3d.ay + 'deg)';
-        stage.querySelectorAll('[data-view3d]').forEach(function (btn) {
-            btn.classList.toggle('active', btn.dataset.view3d === view3d.preset);
-        });
-    }
-
     function render3d(node) {
-        var stage = node.querySelector('.zs-3d');
-        if (!stage) return;
-        var world = stage.querySelector('.zs-3d-world');
-        var U = V3.U, G = V3.G, PAD = V3.PAD, TH = V3.TH;
+        var stage = node && node.querySelector('.w3d');
+        if (!stage || !window.WmsShelf3d) return;
+
         var cols = liveColumns().filter(function (column) { return activeTiers(column).length; });
-
-        if (!cols.length) {
-            world.innerHTML = '';
-            return;
-        }
-
-        var span = function (n) { return n * U + (n - 1) * G + 2 * PAD; };
-        var maxDepth = 1, maxTiers = 1, total = 0;
-        var widths = cols.map(function (column) {
-            var widest = 1;
-            activeTiers(column).forEach(function (tier) {
-                widest = Math.max(widest, tier.max);
-                maxDepth = Math.max(maxDepth, tier.depth);
-                total += tier.max * tier.depth;
-            });
-            maxTiers = Math.max(maxTiers, activeTiers(column).length);
-            return span(widest);
-        });
-
-        var W = widths.reduce(function (a, b) { return a + b; }, 0);
-        var D = span(maxDepth);
-        var H = maxTiers * TH;
-        var x0 = -W / 2, top = -H / 2, floor = H / 2, back = -D / 2, front = D / 2;
-        var drawCells = total <= V3.MAX_CELLS;
+        var total = cols.reduce(function (sum, column) { return sum + columnCells(column); }, 0);
+        var drawCells = total <= MAX_3D_CELLS;
         var topDown = state.tierOrder === 'top_down';
-        var html = '';
+        var levels = cols.reduce(function (max, column) { return Math.max(max, activeTiers(column).length); }, 1);
 
-        html += plane('zs-3d-floor', x0 - 30, floor + 1, back - 30, W + 60, D + 60, 'rotateX(90deg)');
-        html += plane('zs-3d-back', x0, top, back, W, H);
-
-        var x = x0;
-        cols.forEach(function (column, ci) {
-            var w = widths[ci];
-            var tiers = liveTiers(column);
-
-            html += plane('zs-3d-side', x, top, front, D, H, 'rotateY(90deg)');
-            html += plane('zs-3d-cap', x, top, back, w, D, 'rotateX(90deg)');
-            html += '<div class="zs-3d-label zs-3d-col-label" style="width:' + px(w) + ';transform:translate3d('
-                + px(x) + ',' + px(top - 20) + ',' + px(front) + ')">' + esc(column.label) + '</div>';
-
-            tiers.forEach(function (tier, ti) {
-                // Hàng vật lý tính từ dưới lên; đánh số từ trên xuống thì Tầng 01 nằm trên cùng.
-                var level = topDown ? maxTiers - 1 - ti : ti;
-                var y = floor - level * TH;
-                var cells = '';
-
-                if (drawCells) {
-                    for (var d = 1; d <= tier.depth; d++) {
-                        for (var p = 1; p <= tier.max; p++) {
-                            var key = cellKey(p, d);
-                            var code = cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + letters(p) + d;
-                            var cls = cell3dClass(tier, key);
-                            cells += '<span class="zs-3d-cell ' + cls + (d === 1 ? ' d1' : '') + (p === 1 ? ' p1' : '')
-                                + '" style="left:' + px(PAD + (p - 1) * (U + G)) + ';top:' + px(D - PAD - d * U - (d - 1) * G)
-                                + cell3dStyle(tier, key, cls) + '"'
-                                + ' title="' + esc(code) + '"></span>';
+        WmsShelf3d.render(stage, {
+            unit: 16, gap: 3, pad: 7, tierHeight: 46,
+            levels: levels,
+            columns: cols.map(function (column) {
+                return {
+                    label: column.label,
+                    tiers: liveTiers(column).map(function (tier, ti) {
+                        var cells = [];
+                        if (drawCells) {
+                            for (var d = 1; d <= tier.depth; d++) {
+                                for (var p = 1; p <= tier.max; p++) {
+                                    var key = cellKey(p, d);
+                                    var cls = cell3dClass(tier, key);
+                                    cells.push({
+                                        p: p, d: d, cls: cls, style: cell3dStyle(tier, key, cls),
+                                        title: cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + letters(p) + d
+                                    });
+                                }
+                            }
                         }
-                    }
-                }
-
-                html += '<div class="zs-3d-board' + (drawCells ? '' : ' is-texture') + (tier.position === 1 ? ' is-first' : '') + '"'
-                    + ' style="width:' + px(w) + ';height:' + px(D) + ';transform:translate3d(' + px(x) + ',' + px(y) + ',' + px(back) + ') rotateX(90deg)'
-                    + (drawCells ? '' : ';--u:' + px(U + G) + ';--pad:' + px(PAD))
-                    + '" title="' + esc(column.label + ' · ' + tier.label + ' · ' + tier.max + ' ngang × ' + tier.depth + ' sâu') + '">'
-                    + cells + '</div>';
-                html += plane('zs-3d-lip' + (tier.position === 1 ? ' is-first' : ''), x, y, front, w, 5);
-
-                if (ci === 0) {
-                    html += '<div class="zs-3d-label zs-3d-tier-label' + (tier.position === 1 ? ' is-first' : '')
-                        + '" style="transform:translate3d(' + px(x - 46) + ',' + px(y - 16) + ',' + px(front) + ')">'
-                        + esc(tierSegment(tier)) + '</div>';
-                }
-            });
-
-            x += w;
+                        return {
+                            label: tierSegment(tier),
+                            first: tier.position === 1,
+                            // Hàng vật lý tính từ dưới lên; đánh số từ trên xuống thì Tầng 01 nằm trên cùng.
+                            level: topDown ? levels - 1 - ti : ti,
+                            max: tier.max,
+                            depth: tier.depth,
+                            texture: !drawCells,
+                            title: column.label + ' · ' + tier.label + ' · ' + tier.max + ' ngang × ' + tier.depth + ' sâu',
+                            cells: cells
+                        };
+                    })
+                };
+            })
         });
-        html += plane('zs-3d-side', x, top, front, D, H, 'rotateY(90deg)');
-
-        world.innerHTML = html;
-
-        // Cỡ vừa khung theo góc nhìn hiện tại (xoay tay không đổi cỡ, chỉ tính lại khi cấu trúc đổi).
-        var scene = stage.querySelector('.zs-3d-scene');
-        var ax = Math.abs(view3d.ax) * Math.PI / 180, ay = Math.abs(view3d.ay) * Math.PI / 180;
-        var projW = W * Math.cos(ay) + D * Math.sin(ay) + 120;
-        var projH = H * Math.cos(ax) + (W * Math.sin(ay) + D * Math.cos(ay)) * Math.sin(ax) + 90;
-        view3d.fit = Math.max(0.15, Math.min(scene.clientWidth / projW, scene.clientHeight / projH, 1.6));
-        apply3dTransform(stage);
     }
 
     function schedule3d(node) {
@@ -3400,63 +3139,13 @@
         });
     }
 
-    // Kéo để xoay; thả ra giữ nguyên góc. Không dựng lại mô hình khi xoay, chỉ đổi transform.
-    var drag3d = null;
-
-    el.editor.addEventListener('pointerdown', function (event) {
-        var scene = event.target.closest('.zs-3d-scene');
-        if (!scene || event.button !== 0) return;
-        event.preventDefault();
-        drag3d = { stage: scene.closest('.zs-3d'), x: event.clientX, y: event.clientY, ax: view3d.ax, ay: view3d.ay };
-        drag3d.stage.classList.add('is-dragging');
-    });
-
-    document.addEventListener('pointermove', function (event) {
-        if (!drag3d) return;
-        view3d.ay = Math.round(drag3d.ay + (event.clientX - drag3d.x) * 0.45);
-        view3d.ax = Math.round(Math.max(-88, Math.min(12, drag3d.ax - (event.clientY - drag3d.y) * 0.35)));
-        view3d.preset = null;
-        apply3dTransform(drag3d.stage);
-    });
-
-    document.addEventListener('pointerup', function () {
-        if (!drag3d) return;
-        drag3d.stage.classList.remove('is-dragging');
-        drag3d = null;
-    });
-
-    function setView3d(stage, preset) {
-        view3d.ax = VIEWS3D[preset].ax;
-        view3d.ay = VIEWS3D[preset].ay;
-        view3d.preset = preset;
-        render3d(stage.closest('.zs-spec'));
-    }
-
-    el.editor.addEventListener('dblclick', function (event) {
-        var scene = event.target.closest('.zs-3d-scene');
-        if (scene) setView3d(scene.closest('.zs-3d'), 'iso');
-    });
-
-    el.editor.addEventListener('click', function (event) {
-        var view = event.target.closest('[data-view3d]');
-        if (view) {
-            setView3d(view.closest('.zs-3d'), view.dataset.view3d);
-            return;
-        }
-        var zoom = event.target.closest('[data-zoom3d]');
-        if (zoom) {
-            view3d.zoom = Math.max(0.4, Math.min(3, view3d.zoom * (Number(zoom.dataset.zoom3d) > 0 ? 1.2 : 1 / 1.2)));
-            apply3dTransform(zoom.closest('.zs-3d'));
-        }
-    });
-
     // Rê vào thẻ thông số nào thì chiều đó sáng lên trên mô hình 3D.
     ['mouseover', 'focusin'].forEach(function (type) {
         el.editor.addEventListener(type, function (event) {
-            var card = event.target.closest('.zs-spec-card');
             var spec = event.target.closest('.zs-spec');
             if (!spec) return;
-            var stage = spec.querySelector('.zs-3d');
+            var card = event.target.closest('.zs-spec-card');
+            var stage = spec.querySelector('.w3d');
             if (stage) stage.dataset.hl = card ? card.dataset.dim : '';
         });
     });
@@ -3464,7 +3153,7 @@
     el.editor.addEventListener('mouseout', function (event) {
         var spec = event.target.closest('.zs-spec');
         if (!spec || spec.contains(event.relatedTarget)) return;
-        var stage = spec.querySelector('.zs-3d');
+        var stage = spec.querySelector('.w3d');
         if (stage && !spec.contains(document.activeElement)) stage.dataset.hl = '';
     });
 

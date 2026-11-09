@@ -157,7 +157,7 @@
                             <select name="dest_location_id" class="form-control wms-zone-select">
                                 <option value="">-- Chọn vị trí lưu trữ --</option>
                                 @foreach ($transferOwnLocations as $loc)
-                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}">
+                                    <option value="{{ $loc->id }}" data-zone="{{ $loc->zone_type ?? '' }}" data-shelf="{{ \App\Support\CategoryLookup::shelfKey($loc) }}">
                                         {{ $loc->code }}@if ($loc->warehouse_name) — {{ $loc->warehouse_name }} / {{ $loc->shelf_name }} /
                                             {{ $loc->column_name }} / {{ $loc->tier_name }}@endif
                                     </option>

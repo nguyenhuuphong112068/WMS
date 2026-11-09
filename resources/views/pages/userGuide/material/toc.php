@@ -114,6 +114,8 @@ return [
             'keywords' => 'doi tuong thiet bi tieu thu'],
     ],
     'Hỗ trợ' => [
+        ['id' => 'tra-cuu', 'file' => 'publicLookup', 'title' => 'Tra Cứu Không Cần Đăng Nhập', 'icon' => 'fas fa-search-location',
+            'keywords' => 'tim vi tri vat tu dang nhap mat bang 3d quet ma camera'],
         ['id' => 'loi-thuong-gap', 'file' => 'faq', 'title' => 'Lỗi Thường Gặp', 'icon' => 'fas fa-question-circle'],
     ],
 ];
