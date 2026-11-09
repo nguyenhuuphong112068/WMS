@@ -49,7 +49,7 @@
                         </tbody>
                     </table>
                 </div>
-                {{ $logs->links('pagination::bootstrap-4') }}
+                @include('pages.shared.paginator', ['pgItems' => $logs, 'pgUnit' => 'lượt đăng nhập'])
             </div>
         </div>
     </div>

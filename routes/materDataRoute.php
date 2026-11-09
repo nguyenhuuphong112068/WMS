@@ -22,11 +22,9 @@ use App\Http\Controllers\Pages\MaterData\InitialDataController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
 use App\Http\Controllers\Pages\MaterData\MaterialSignFlowController;
 use App\Http\Controllers\Pages\MaterData\TransferSignFlowController;
-use App\Http\Controllers\Pages\MaterData\MixtureHazardCategoryController;
 use App\Http\Controllers\Pages\MaterData\PackagingSpecificationController;
 use App\Http\Controllers\Pages\MaterData\ProductNameController;
 use App\Http\Controllers\Pages\MaterData\PurposeController;
-use App\Http\Controllers\Pages\MaterData\StatusController;
 use App\Http\Controllers\Pages\MaterData\StorageConditionController;
 use App\Http\Controllers\Pages\MaterData\UnitController;
 use App\Http\Controllers\Pages\MaterData\ZoneController;
@@ -81,14 +79,6 @@ Route::prefix('/materData')
             Route::post('deActive', 'deActive')->name('deActive');
         });
 
-        Route::prefix('/status')->name('status.')->controller(StatusController::class)->group(function () {
-            Route::get('', 'index')->name('list');
-            Route::get('history', 'history')->name('history');
-            Route::post('store', 'store')->name('store');
-            Route::post('update', 'update')->name('update');
-            Route::post('deActive', 'deActive')->name('deActive');
-        });
-
         // Định Khu - Cấu trúc kho: khai Kệ/Tủ -> Cột -> Tầng -> Vị Trí trên một lưới (API cho màn Định Khu)
         Route::prefix('/zone/structure')->name('zone.structure.')
             ->controller(ZoneStructureController::class)
@@ -129,18 +119,6 @@ Route::prefix('/materData')
         // Tên Hoạt Chất - danh mục hoạt chất phải xây dựng Kế hoạch phòng ngừa, ứng phó
         // sự cố hoá chất (Phụ lục IV NĐ 24/2026/NĐ-CP), kèm ngưỡng khối lượng tồn trữ.
         Route::prefix('/activeIngredient')->name('activeIngredient.')->controller(ActiveIngredientController::class)->group(function () {
-            Route::get('', 'index')->name('list');
-            Route::get('history', 'history')->name('history');
-            Route::post('store', 'store')->name('store');
-            Route::post('update', 'update')->name('update');
-            Route::post('deActive', 'deActive')->name('deActive');
-            Route::post('approve', 'approve')->name('approve');
-            Route::post('reject', 'reject')->name('reject');
-        });
-
-        // Nhóm Nguy Hại Bảng B - phân loại GHS + ngưỡng tồn trữ cho hỗn hợp
-        // (Phụ lục IV NĐ 24/2026/NĐ-CP - Bảng B).
-        Route::prefix('/mixtureHazardCategory')->name('mixtureHazardCategory.')->controller(MixtureHazardCategoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');

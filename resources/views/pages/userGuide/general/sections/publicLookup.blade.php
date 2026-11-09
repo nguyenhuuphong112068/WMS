@@ -1,5 +1,5 @@
-<p>Trang chỉ xem, mở được mà không cần đăng nhập, để ai cũng tra nhanh một hoá chất đang để ở đâu và còn bao nhiêu. Bấm liên kết
-    <b><i class="fas fa-search"></i> Tra cứu tồn kho hoá chất (không cần đăng nhập)</b> dưới khung đăng nhập.</p>
+<p>Trang chỉ xem, mở được mà không cần đăng nhập, để ai cũng tra nhanh một hoá chất đang để ở đâu và còn bao nhiêu. Bấm nút
+    <b><i class="fas fa-search"></i> Tra cứu tồn kho hoá chất</b> ở góc trên bên phải trang đăng nhập.</p>
 
 <h3>Các ô nhập</h3>
 @include('pages.userGuide.shared.fields', ['fields' => [

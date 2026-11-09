@@ -789,7 +789,7 @@
             language: {
                 search: 'Tìm kiếm:',
                 lengthMenu: 'Hiển thị _MENU_ dòng',
-                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                info: 'Hiển thị _START_–_END_ / _TOTAL_ dòng',
                 infoEmpty: 'Không có dữ liệu',
                 zeroRecords: 'Không tìm thấy dòng nào phù hợp',
                 emptyTable: 'Chưa có dữ liệu, hãy bấm "Thêm" để khai báo.',

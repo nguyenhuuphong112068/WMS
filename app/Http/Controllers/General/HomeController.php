@@ -1156,7 +1156,6 @@ class HomeController extends Controller
         $tables = [
             ['chem_names', 'chemical', 'chemName', 'Tên hoá chất', null, 'name'],
             ['active_ingredients', 'chemical', 'activeIngredient', 'Hoạt chất', 'code', 'name'],
-            ['mixture_hazard_categories', 'chemical', 'mixtureHazardCategory', 'Nhóm nguy hại hỗn hợp', 'code', 'name'],
             ['standard_names', 'standard', 'standardName', 'Tên chất chuẩn', null, 'name'],
             ['material_names', 'material', 'materialName', 'Tên vật tư', null, 'name'],
             ['manufacturers', 'common', 'chemManufacturer', 'Nhà sản xuất', 'short_name', 'name'],

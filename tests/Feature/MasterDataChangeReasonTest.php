@@ -47,7 +47,6 @@ class MasterDataChangeReasonTest extends TestCase
         $screens = [
             '/materData/company',
             '/materData/department',
-            '/materData/status',
             '/materData/unit',
             '/materData/chemName',
             '/materData/packagingSpecification',

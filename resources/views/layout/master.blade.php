@@ -534,7 +534,8 @@
             var STRETCHY_TAG = /<(select|textarea|img|canvas|svg|progress)\b/i;
             var PROGRESS_BOX = /class="[^"]*\bprogress\b/i;
             var INPUT_TAG = /<input\b[^>]*>/gi;
-            var HIDDEN_INPUT = /type\s*=\s*["']?hidden/i;
+            // Ô ẩn và ô tick (checkbox / radio) có kích thước cố định, không cần giãn cột
+            var HIDDEN_INPUT = /type\s*=\s*["']?(hidden|checkbox|radio)\b/i;
 
             function hasStretchy(v) {
                 if (typeof v !== 'string') return false;

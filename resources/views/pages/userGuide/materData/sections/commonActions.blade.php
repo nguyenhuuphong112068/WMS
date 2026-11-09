@@ -30,8 +30,7 @@
             </tr>
             <tr>
                 <td><span class="badge badge-pill badge-danger">3</span> Số lần sửa</td>
-                <td>Số nhỏ ở góc nút Sửa là số lần bản ghi đã thay đổi. Bấm vào để xem <b>lịch sử</b>: ai sửa, lúc nào,
-                    đổi từ giá trị nào sang giá trị nào và lý do.</td>
+                <td>Số nhỏ ở góc nút Sửa là số lần bản ghi đã thay đổi. Bấm vào để mở bảng <b>Lịch Sử Thay Đổi</b>: mỗi lần thay đổi là một dòng gồm người - thời điểm thay đổi, cột <b>Lý Do Điều Chỉnh</b> và các cột giống bảng danh sách; ô đã đổi so với lần trước được tô vàng, cột chữ nhạt là giá trị hiện tại của mục không lưu trong lịch sử.</td>
             </tr>
             <tr>
                 <td><span class="btn btn-sm btn-success ug-ui"><i class="fas fa-check"></i></span> Duyệt</td>
@@ -84,4 +83,15 @@
 
 <h3>Tìm kiếm, sắp xếp, phân trang</h3>
 <p class="mb-0">Gõ vào ô <b>Tìm kiếm</b> phía trên bảng để lọc theo bất kỳ cột nào. Bấm vào tiêu đề cột để sắp xếp
-    tăng hoặc giảm. Chọn số dòng mỗi trang ở ô <b>Hiển thị</b>.</p>
+    tăng hoặc giảm. Chọn số dòng mỗi trang ở ô <b>Hiển thị</b>. Khi cuộn xuống, hàng tiêu đề cột luôn dính ngay dưới
+    thanh trên cùng (hoặc ở đỉnh hộp thoại) để luôn biết đang xem cột nào.</p>
+<p class="mb-0 mt-2">Dưới bảng, bên trái là dòng <b>Hiển thị x–y / n dòng</b>; bên phải là cụm chuyển trang (dùng chung cho mọi
+    bảng của hệ thống):</p>
+<ul class="mb-0">
+    <li><i class="fas fa-angle-double-left"></i> / <i class="fas fa-angle-double-right"></i> về <b>trang đầu</b> / <b>trang
+        cuối</b>; <i class="fas fa-angle-left"></i> <b>Trước</b> / <b>Sau</b> <i class="fas fa-angle-right"></i> lùi / tiến một
+        trang. Nút mờ là đang ở trang đầu hoặc trang cuối.</li>
+    <li>Bấm số trang để nhảy tới trang đó; trang đang xem tô nền xanh, dấu <b>…</b> là các trang được thu gọn.</li>
+    <li>Bảng có trên 7 trang hiện thêm ô <b>Đến trang</b>: gõ số trang rồi bấm <kbd>Enter</kbd> (hoặc bấm ra ngoài ô).</li>
+    <li>Bảng chỉ có một trang thì không hiện cụm chuyển trang.</li>
+</ul>

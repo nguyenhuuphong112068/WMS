@@ -11,14 +11,14 @@
             @endperm
 
             <table id="data_table_department" class="table table-bordered table-striped">
-                <thead style="position: sticky; top: 60px; background-color: white; z-index: 1020">
+                <thead>
                     <tr>
                         <th>STT</th>
                         <th>Công Ty</th>
                         <th>Mã Bộ Phận</th>
                         <th>Tên Viết Tắt</th>
                         <th>Tên Phòng Ban</th>
-                        <th>Phân Loại</th>
+                        <th data-history-key="Phòng ban chung">Phân Loại</th>
                         <th>Trạng Thái</th>
                         <th>Người Tạo</th>
                         <th>Ngày Tạo</th>
@@ -186,7 +186,7 @@
             language: {
                 search: "Tìm kiếm:",
                 lengthMenu: "Hiển thị _MENU_ dòng",
-                info: "Hiển thị _START_ đến _END_ của _TOTAL_ dòng",
+                info: "Hiển thị _START_–_END_ / _TOTAL_ dòng",
                 paginate: {
                     previous: "Trước",
                     next: "Sau"

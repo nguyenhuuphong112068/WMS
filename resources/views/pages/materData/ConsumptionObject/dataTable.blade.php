@@ -117,7 +117,7 @@
             @php($frequencyOrder = array_flip(array_keys($frequencies)))
 
             <table id="data_table_consumption_object" class="table table-bordered table-striped" data-deferred>
-                <thead style="position: sticky; top: 60px; background-color: white; z-index: 1020">
+                <thead>
                     <tr>
                         <th>STT</th>
                         <th>Loại Đối Tượng</th>
@@ -347,7 +347,7 @@
             language: {
                 search: "Tìm kiếm:",
                 lengthMenu: "Hiển thị _MENU_ dòng",
-                info: "Hiển thị _START_ đến _END_ của _TOTAL_ dòng",
+                info: "Hiển thị _START_–_END_ / _TOTAL_ dòng",
                 infoFiltered: "(lọc từ _MAX_ dòng)",
                 zeroRecords: "Không tìm thấy dữ liệu phù hợp",
                 emptyTable: "Chưa có đối tượng nào",

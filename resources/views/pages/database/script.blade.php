@@ -1187,7 +1187,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var DT_LANG = {
         search: 'Tìm kiếm:',
         lengthMenu: 'Hiển thị _MENU_ dòng',
-        info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+        info: 'Hiển thị _START_–_END_ / _TOTAL_ dòng',
         infoEmpty: 'Không có dữ liệu',
         infoFiltered: '(lọc từ _MAX_ dòng)',
         zeroRecords: 'Không tìm thấy dữ liệu phù hợp',

@@ -27,6 +27,14 @@ class MixtureHazardThreshold
     public const LEVEL_WARN = 'warn';
     public const LEVEL_EXCEEDED = 'exceeded';
 
+    /** 4 phần của Bảng B (mixture_hazard_categories.hazard_group). Danh sách nhóm khai trực tiếp trên DB. */
+    public const GROUPS = [
+        'I' => 'Nguy hại sức khỏe',
+        'II' => 'Nguy hại vật chất',
+        'III' => 'Nguy hại cho môi trường',
+        'IV' => 'Nguy hại khác',
+    ];
+
     public static function warnRatio(): float
     {
         return (float) config('chemical.threshold_iv.warn_ratio', 0.8);

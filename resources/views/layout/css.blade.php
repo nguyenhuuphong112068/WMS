@@ -638,6 +638,245 @@
             .md-tablebar .btn {
                 white-space: nowrap;
             }
+
+            /* ----------------------------------------------------------------
+               Tiêu đề bảng dính khi cuộn - MỌI bảng .table / .dataTable
+               ----------------------------------------------------------------
+               JS mdStickyHeads (cuối layout/js.blade.php) chọn cách dính cho từng
+               bảng và gắn class:
+               - .md-sticky-head : position: sticky trên <th> (top do JS đặt theo
+                 chiều cao topNAV, hoặc 0 khi bảng nằm trong vùng cuộn riêng).
+               - .md-sticky-float: bảng rộng đang cuộn ngang - sticky bị khung cuộn
+                 chặn nên JS dịch <thead> theo trang.
+               - .md-sticky-open / .md-sticky-clip: khung bao (.table-responsive,
+                 card overflow: hidden...) được mở để sticky bám theo trang.
+               Bảng không muốn dính: thêm class md-no-sticky cho <table>.
+               ---------------------------------------------------------------- */
+            /* !important: DataTables đặt position: relative cho cột sắp xếp được (.sorting) */
+            table.md-sticky-head > thead > tr > th {
+                position: sticky !important;
+                z-index: 3;
+            }
+
+            table.md-sticky-float > thead {
+                position: relative;
+                z-index: 3;
+                will-change: transform;
+            }
+
+            :where(table.md-sticky-head, table.md-sticky-float) > thead > tr > th {
+                background-color: var(--primary-soft);
+                background-clip: padding-box;
+            }
+
+            /* Bảng border-collapse: collapse mất viền dưới khi tiêu đề dính - vẽ lại bằng bóng */
+            :where(table.md-sticky-collapse) > thead > tr:last-child > th {
+                box-shadow: inset 0 -2px 0 var(--primary-lighter);
+            }
+
+            table.md-sticky-float.md-sticky-on > thead {
+                box-shadow: 0 4px 8px -4px rgba(15, 23, 42, 0.18);
+            }
+
+            .md-sticky-open {
+                overflow: visible !important;
+            }
+
+            .md-sticky-clip {
+                overflow: clip !important;
+            }
+
+            /* ----------------------------------------------------------------
+               Chân bảng + phân trang dùng chung cho MỌI bảng DataTables
+               ----------------------------------------------------------------
+               Bộ render phân trang 'wms' khai ở layout/js.blade.php. Hàng chân
+               .md-tablefoot (dom mặc định) đặt "Hiển thị x–y / n dòng" bên trái,
+               cụm phân trang bên phải; màn hình nhỏ tự xuống dòng.
+               ---------------------------------------------------------------- */
+            .md-tablefoot {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 8px 16px;
+                margin-top: 12px;
+            }
+
+            .md-pager-info,
+            div.dataTables_wrapper div.dataTables_info {
+                padding: 0;
+                font-size: 0.82rem;
+                font-weight: 600;
+                color: #64748B;
+                white-space: normal;
+            }
+
+            div.dataTables_wrapper div.dataTables_paginate {
+                margin: 0;
+                padding: 0;
+                margin-left: auto;
+                text-align: right;
+            }
+
+            div.dataTables_wrapper div.dataTables_paginate.md-pager-single {
+                display: none;
+            }
+
+            .md-pager {
+                display: inline-flex;
+                align-items: center;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+                gap: 8px 14px;
+            }
+
+            .md-pager-list {
+                display: inline-flex;
+                align-items: center;
+                gap: 2px;
+                padding: 3px;
+                background: #fff;
+                border: 1px solid #E2E8F0;
+                border-radius: var(--border-radius-md, 8px);
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            }
+
+            .md-pager-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                min-width: 32px;
+                height: 32px;
+                padding: 0 9px;
+                border: 0;
+                border-radius: 6px;
+                background: transparent;
+                color: #475569;
+                font-size: 0.83rem;
+                font-weight: 600;
+                font-variant-numeric: tabular-nums;
+                line-height: 1;
+                cursor: pointer;
+                transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+            }
+
+            .md-pager-btn .fas {
+                font-size: 0.78rem;
+            }
+
+            a.md-pager-btn,
+            a.md-pager-btn:hover {
+                text-decoration: none;
+            }
+
+            .md-pager-btn:hover:not(:disabled):not(.is-active):not(.is-disabled) {
+                background: var(--primary-soft);
+                color: var(--primary);
+            }
+
+            .md-pager-btn:focus {
+                outline: none;
+            }
+
+            .md-pager-btn:focus-visible {
+                box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.35);
+            }
+
+            .md-pager-btn.is-active {
+                background: var(--primary);
+                color: #fff;
+                cursor: default;
+                box-shadow: 0 2px 6px rgba(var(--primary-rgb), 0.35);
+            }
+
+            .md-pager-btn:disabled,
+            .md-pager-btn.is-disabled {
+                color: #CBD5E1;
+                cursor: not-allowed;
+            }
+
+            .md-pager-gap {
+                display: inline-flex;
+                align-items: flex-end;
+                justify-content: center;
+                min-width: 22px;
+                height: 32px;
+                padding-bottom: 9px;
+                color: #94A3B8;
+                font-weight: 700;
+                letter-spacing: 1px;
+                user-select: none;
+            }
+
+            .md-pager-jump {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                margin: 0;
+                font-size: 0.82rem;
+                font-weight: 600;
+                color: #64748B;
+                white-space: nowrap;
+            }
+
+            .md-pager-input {
+                width: 58px;
+                height: 32px;
+                padding: 2px 6px;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                background: #fff;
+                color: var(--text-main);
+                font-size: 0.83rem;
+                font-weight: 600;
+                text-align: center;
+                -moz-appearance: textfield;
+                transition: border-color 0.2s, box-shadow 0.2s;
+            }
+
+            .md-pager-input::-webkit-outer-spin-button,
+            .md-pager-input::-webkit-inner-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+
+            .md-pager-input:focus {
+                border-color: var(--primary-light);
+                box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.12);
+                outline: none;
+            }
+
+            @media (max-width: 575.98px) {
+                .md-tablefoot {
+                    justify-content: center;
+                }
+
+                .md-pager-info,
+                div.dataTables_wrapper div.dataTables_info {
+                    width: 100%;
+                    text-align: center;
+                }
+
+                div.dataTables_wrapper div.dataTables_paginate {
+                    margin: 0 auto;
+                }
+
+                .md-pager {
+                    justify-content: center;
+                }
+
+                .md-pager-text,
+                .md-pager-first,
+                .md-pager-last {
+                    display: none;
+                }
+
+                .md-pager-btn {
+                    min-width: 30px;
+                    padding: 0 7px;
+                }
+            }
                 }
 
                 .md-tablebar .cls-filter .cls-select,

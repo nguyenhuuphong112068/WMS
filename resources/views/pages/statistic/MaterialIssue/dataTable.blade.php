@@ -461,7 +461,7 @@
             language: {
                 search: 'Tìm kiếm:',
                 lengthMenu: 'Hiển thị _MENU_ dòng',
-                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ lần cấp',
+                info: 'Hiển thị _START_–_END_ / _TOTAL_ lần cấp',
                 infoEmpty: 'Không có dữ liệu',
                 infoFiltered: '(lọc từ _MAX_ lần cấp)',
                 zeroRecords: 'Không tìm thấy dòng nào phù hợp',

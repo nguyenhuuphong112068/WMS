@@ -37,7 +37,7 @@
 
                 <div style="max-height: 65vh; overflow-y: auto">
                     <table class="table table-bordered" id="userPermissionTable" style="font-size: 15px">
-                        <thead style="position: sticky; top: 0; z-index: 1020">
+                        <thead>
                             <tr>
                                 <th style="min-width: 280px">Quyền</th>
                                 <th class="text-center" style="width: 140px">Từ Nhóm Quyền</th>

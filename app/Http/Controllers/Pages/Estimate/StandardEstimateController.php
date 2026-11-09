@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Estimate;
 
 use App\Http\Controllers\Concerns\EstimateItemAttachments;
+use App\Http\Controllers\Concerns\EstimateApprovedExport;
 use App\Http\Controllers\Concerns\EstimateItemCancel;
 use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
@@ -38,6 +39,7 @@ use Illuminate\Validation\Rule;
 class StandardEstimateController extends Controller
 {
     use EstimateItemAttachments;
+    use EstimateApprovedExport;
     use EstimateItemCancel;
     use EstimateSignFlow;
     use VerifiesSignature;
@@ -83,6 +85,19 @@ class StandardEstimateController extends Controller
 
     /** Chỉ hai trạng thái này mới được sửa đầu phiếu và chi tiết mặt hàng. */
     private const EDITABLE_STATUSES = ['draft', 'rejected'];
+
+    /** Xuất Excel tab "Đơn dự trù đã được phê duyệt" - xem App\Http\Controllers\Concerns\EstimateApprovedExport. */
+    protected function exportConfig(): array
+    {
+        return [
+            'amount_fk' => 'standard_estimate_item_id',
+            'title' => 'DỰ TRÙ CHẤT CHUẨN',
+            'file_prefix' => 'DuTruChatChuan',
+            'code_label' => 'Mã Chất Chuẩn',
+            'name_label' => 'Chất Chuẩn',
+            'extras' => ['Version' => 'standard_categories.version', 'CAS' => 'standard_categories.cas_no'],
+        ];
+    }
 
     /**
      * Huỷ mục cần xác nhận 2 bên - xem App\Http\Controllers\Concerns\EstimateItemCancel.

@@ -29,6 +29,8 @@ Route::prefix('/estimate')
             Route::get('', 'index')->name('list');
             Route::get('detail', 'detail')->name('detail');
             Route::get('history', 'history')->name('history');
+            // Tab "Đơn dự trù đã được phê duyệt": xuất Excel 1 phiếu hoặc nhiều phiếu (ids[]) vào cùng 1 file
+            Route::get('exportApproved', 'exportApproved')->name('exportApproved');
 
             // Tab "Danh sách hoá chất cần dự trù" (tồn dưới ngưỡng tối thiểu): chọn nhiều mã rồi lập phiếu
             Route::post('watchlistEstimateStore', 'watchlistEstimateStore')->name('watchlistEstimateStore');
@@ -76,6 +78,8 @@ Route::prefix('/estimate')
             Route::get('', 'index')->name('list');
             Route::get('detail', 'detail')->name('detail');
             Route::get('history', 'history')->name('history');
+            // Tab "Đơn dự trù đã được phê duyệt": xuất Excel 1 phiếu hoặc nhiều phiếu (ids[]) vào cùng 1 file
+            Route::get('exportApproved', 'exportApproved')->name('exportApproved');
 
             // Tab "Danh sách chất chuẩn cần dự trù" (tồn dưới ngưỡng tối thiểu): chọn nhiều mã rồi lập phiếu
             Route::post('watchlistEstimateStore', 'watchlistEstimateStore')->name('watchlistEstimateStore');
@@ -117,6 +121,8 @@ Route::prefix('/estimate')
             Route::get('', 'index')->name('list');
             Route::get('detail', 'detail')->name('detail');
             Route::get('history', 'history')->name('history');
+            // Tab "Đơn dự trù đã được phê duyệt": xuất Excel 1 phiếu hoặc nhiều phiếu (ids[]) vào cùng 1 file
+            Route::get('exportApproved', 'exportApproved')->name('exportApproved');
 
             // Tab "Danh sách vật tư cần dự trù" (vật tư Cung Ứng mua): chọn nhiều vật tư rồi lập
             // phiếu dự trù. Vật tư Hành Chính mua đề nghị kho VPP ở Sử Dụng Vật Tư (tab Đề nghị VPP).

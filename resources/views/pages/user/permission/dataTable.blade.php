@@ -67,7 +67,7 @@
             <!-- /.card-Body -->
             <div class="card-body" style="padding: 20px">
                 <table id="data_table_permission" class="table table-bordered table-striped" style="font-size: 15px">
-                    <thead style="position: sticky; top: 60px; z-index: 1020">
+                    <thead>
                         <tr>
                             <th style="width: 60px">STT</th>
                             <th style="width: 200px">Nhóm Quyền</th>

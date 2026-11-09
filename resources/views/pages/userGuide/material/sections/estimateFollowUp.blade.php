@@ -16,6 +16,17 @@
     </li>
 </ol>
 
+<h4>Xuất Excel đơn dự trù đã duyệt</h4>
+<ol class="ug-steps">
+    <li>Xuất <b>một phiếu</b>: bấm nút <span class="ug-key"><i class="fas fa-file-excel"></i></span> ở cột Thao Tác của dòng phiếu.</li>
+    <li>Xuất <b>nhiều phiếu vào cùng một file</b>: tick ô chọn đầu mỗi dòng (ô ở tiêu đề chọn tất cả đơn đang lọc theo Bộ phận / Tình trạng),
+        rồi bấm <span class="ug-key"><i class="fas fa-file-excel"></i> Xuất Excel</span>; số trên nút là số đơn đã chọn.</li>
+    <li>Sheet <b>Chi tiết</b>: mỗi dòng là một vật tư x một tháng cần (kèm Quy Cách, P/N), gồm bộ phận, mã phiếu, số lượng, ĐVT, ngày mong muốn,
+        ngày hẹn đáp ứng và tình trạng giao. Mặt hàng đã huỷ không xuất.</li>
+    <li>Khi xuất nhiều phiếu: các dòng xếp theo Mã Vật Tư, cột <b>Tổng SL Theo Mã</b> cộng số lượng các dòng cùng mã hàng và cùng ĐVT;
+        thêm sheet <b>Tổng hợp theo mã</b> (tổng số lượng, số phiếu, bộ phận, mã phiếu). Mặt hàng ngoài danh mục gộp theo tên.</li>
+</ol>
+
 <h3>Tab "Theo dõi dự trù"</h3>
 <p>Liệt kê từng mặt hàng: số lượng, ngày mong muốn, <b>ngày hẹn đáp ứng</b>, người tạo. Cột <b>Trao Đổi</b> để hai bên nhắn
     tin ngay trên từng mặt hàng (quyền <i>Trao Đổi Theo Dõi Dự Trù</i>). Phòng đề nghị đánh dấu <b>Hoàn thành</b> khi đã nhận đủ

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pages\Estimate;
 
 use App\Http\Controllers\Concerns\EstimateItemAttachments;
+use App\Http\Controllers\Concerns\EstimateApprovedExport;
 use App\Http\Controllers\Concerns\EstimateItemCancel;
 use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
@@ -39,6 +40,7 @@ use Illuminate\Support\Facades\Validator;
 class ChemicalEstimateController extends Controller
 {
     use EstimateItemAttachments;
+    use EstimateApprovedExport;
     use EstimateItemCancel;
     use EstimateSignFlow;
     use VerifiesSignature;
@@ -90,6 +92,19 @@ class ChemicalEstimateController extends Controller
 
     /** Cache ký hiệu đơn vị trong một request - xem unitLabels(). */
     private ?array $unitLabelCache = null;
+
+    /** Xuất Excel tab "Đơn dự trù đã được phê duyệt" - xem App\Http\Controllers\Concerns\EstimateApprovedExport. */
+    protected function exportConfig(): array
+    {
+        return [
+            'amount_fk' => 'estimate_item_id',
+            'title' => 'DỰ TRÙ HOÁ CHẤT',
+            'file_prefix' => 'DuTruHoaChat',
+            'code_label' => 'Mã Hoá Chất',
+            'name_label' => 'Tên Hoá Chất',
+            'extras' => [],
+        ];
+    }
 
     /**
      * Huỷ mục cần xác nhận 2 bên - xem App\Http\Controllers\Concerns\EstimateItemCancel.

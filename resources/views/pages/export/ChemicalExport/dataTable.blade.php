@@ -131,9 +131,8 @@
                                         $expLocked = $row->quarantine_id
                                             ? 'Sinh từ phiếu cách ly ' . $row->quarantine_code . ', chỉ điều chỉnh ở tab Cách ly - Loại bỏ - Huỷ'
                                             : ($row->disposal_id ? 'Đã nằm trong đợt xin quyết định huỷ trước đây' : '');
-                                        // Nút Sửa chỉ mở cho phiếu sử dụng TRONG NGÀY, qua ngày là chốt sổ
-                                        $expEditLocked = $expLocked ?: (\Carbon\Carbon::parse($row->exported_date)->isToday()
-                                            ? '' : 'Chỉ điều chỉnh được phiếu sử dụng trong ngày, phiếu ngày ' . $expDate($row->exported_date) . ' đã chốt');
+                                        // Phiếu ngày cũ vẫn sửa được, chỉ khoá dòng sinh từ phiếu cách ly / đợt huỷ cũ
+                                        $expEditLocked = $expLocked;
                                     @endphp
                                     {{-- data-classification để bộ lọc Phụ lục / Nhóm hoá chất nhận ra dòng này --}}
                                     <tr data-classification="{{ $expCls($row->category_id) }}">
@@ -429,7 +428,7 @@
             language: {
                 search: 'Tìm kiếm:',
                 lengthMenu: 'Hiển thị _MENU_ dòng',
-                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                info: 'Hiển thị _START_–_END_ / _TOTAL_ dòng',
                 infoEmpty: 'Không có dữ liệu',
                 zeroRecords: 'Không tìm thấy dòng nào phù hợp',
                 emptyTable: 'Chưa có dữ liệu Sổ Hoá chất Cấm.',

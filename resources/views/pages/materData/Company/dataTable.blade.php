@@ -13,7 +13,7 @@
 
 
             <table id="data_table_company" class="table table-bordered table-striped">
-                <thead style="position: sticky; top: 60px; background-color: white; z-index: 1020">
+                <thead>
                     <tr>
                         <th>STT</th>
                         <th>Mã</th>
@@ -180,7 +180,7 @@
             language: {
                 search: "Tìm kiếm:",
                 lengthMenu: "Hiển thị _MENU_ dòng",
-                info: "Hiển thị _START_ đến _END_ của _TOTAL_ dòng",
+                info: "Hiển thị _START_–_END_ / _TOTAL_ dòng",
                 paginate: {
                     previous: "Trước",
                     next: "Sau"

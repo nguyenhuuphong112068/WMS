@@ -17,6 +17,7 @@
 --}}
 
 @once
+    @include('pages.shared.historyTable')
 
     <style>
         /* ---------- Badge số lần thay đổi, gắn ở góc trên bên phải nút Sửa ---------- */
@@ -103,101 +104,7 @@
             font-weight: 400;
         }
 
-        /* ---------- Danh sách lịch sử ---------- */
-        .md-history-body {
-            max-height: 62vh;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-
-        .md-history-item {
-            border: 1px solid var(--primary-soft);
-            border-left: 3px solid var(--primary);
-            border-radius: var(--border-radius-md);
-            padding: 12px 14px;
-            margin-bottom: 12px;
-            background: #fff;
-            transition: box-shadow var(--transition-fast);
-        }
-
-        .md-history-item:hover {
-            box-shadow: var(--shadow-sm);
-        }
-
-        .md-history-item.create {
-            border-left-color: #16A34A;
-        }
-
-        .md-history-item.lock {
-            border-left-color: #94A3B8;
-        }
-
-        .md-history-item.approve {
-            border-left-color: #17B8D4;
-        }
-
-        .md-history-item.reject {
-            border-left-color: #DC2626;
-        }
-
-        .md-history-head {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-
-        .md-history-action {
-            font-weight: 700;
-            color: var(--primary-dark);
-            font-size: 0.9rem;
-        }
-
-        .md-history-meta {
-            color: #94a3b8;
-            font-size: 0.78rem;
-        }
-
-        .md-history-note {
-            background: var(--primary-soft);
-            border-radius: 6px;
-            padding: 7px 10px;
-            font-size: 0.83rem;
-            color: var(--primary-dark);
-            margin-bottom: 8px;
-            word-break: break-word;
-        }
-
-        .md-history-reason {
-            background: #FFF7ED;
-            border: 1px solid #FED7AA;
-            border-radius: 6px;
-            padding: 7px 10px;
-            font-size: 0.83rem;
-            color: #9A3412;
-            margin-bottom: 8px;
-            word-break: break-word;
-        }
-
-        .md-history-reason b {
-            color: #7C2D12;
-        }
-
-        .md-history-snapshot {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 4px 16px;
-            font-size: 0.82rem;
-            color: #64748b;
-        }
-
-        .md-history-snapshot b {
-            color: #475569;
-            font-weight: 600;
-        }
-
+        /* ---------- Bảng lịch sử: pages.shared.historyTable ---------- */
         .md-history-empty {
             text-align: center;
             color: #94a3b8;
@@ -207,7 +114,7 @@
     </style>
 
     <div class="modal fade" id="mdHistoryModal" tabindex="-1" role="dialog">
-        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-dialog modal-dialog-centered wms-history-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
@@ -236,6 +143,7 @@
 
             /* ---------- Bấm badge để xem lịch sử thay đổi ---------- */
             $(document).on('click', '.btn-md-history', function() {
+                var $trigger = $(this);
                 var url = $(this).data('url');
                 var $modal = $('#mdHistoryModal');
 
@@ -255,7 +163,7 @@
                         return response.json();
                     })
                     .then(function(data) {
-                        renderHistory(data.rows || []);
+                        wmsHistoryTable($modal.find('.md-history-body'), data, $trigger, 'Bản ghi này chưa có lần thay đổi nào được lưu.');
                     })
                     .catch(function() {
                         $modal.find('.md-history-body').html(
@@ -264,58 +172,6 @@
                     });
             });
 
-            /* Dựng danh sách bằng thao tác DOM để nội dung dữ liệu luôn được escape */
-            function renderHistory(rows) {
-                var $body = $('#mdHistoryModal').find('.md-history-body').empty();
-
-                if (!rows.length) {
-                    $body.html(
-                        '<div class="md-history-empty">Bản ghi này chưa có lần thay đổi nào được lưu.</div>');
-                    return;
-                }
-
-                var themes = {
-                    'Thêm mới': 'create',
-                    'Khoá': 'lock',
-                    'Mở khoá': 'lock',
-                    'Phê duyệt': 'approve',
-                    'Từ chối duyệt': 'reject',
-                    'Xoá': 'reject'
-                };
-
-                rows.forEach(function(row) {
-                    var $item = $('<div>').addClass('md-history-item ' + (themes[row.action] || ''));
-
-                    $('<div>').addClass('md-history-head')
-                        .append($('<span>').addClass('md-history-action').text(row.action))
-                        .append($('<span>').addClass('md-history-meta').text(row.created_by + ' · ' + row
-                            .created_at))
-                        .appendTo($item);
-
-                    if (row.change_note) {
-                        $('<div>').addClass('md-history-note').text(row.change_note).appendTo($item);
-                    }
-
-                    if (row.change_reason) {
-                        $('<div>').addClass('md-history-reason')
-                            .append($('<b>').text('Lý do điều chỉnh: '))
-                            .append(document.createTextNode(row.change_reason))
-                            .appendTo($item);
-                    }
-
-                    var $snapshot = $('<div>').addClass('md-history-snapshot');
-
-                    Object.keys(row.snapshot || {}).forEach(function(field) {
-                        $('<div>')
-                            .append($('<b>').text(field + ': '))
-                            .append(document.createTextNode(row.snapshot[field]))
-                            .appendTo($snapshot);
-                    });
-
-                    $snapshot.appendTo($item);
-                    $item.appendTo($body);
-                });
-            }
         });
     </script>
 

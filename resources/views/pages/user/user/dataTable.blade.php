@@ -18,7 +18,7 @@
 
             <table id="example1" class="table table-bordered table-striped">
 
-                <thead style = "position: sticky; top: 60px; background-color: white; z-index: 1020">
+                <thead>
 
                     <tr>
                         <th>STT</th>

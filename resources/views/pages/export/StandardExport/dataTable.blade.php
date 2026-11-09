@@ -172,9 +172,32 @@
                                         <td class="md-sub">{{ $row->updated_by ?: $row->created_by ?: '—' }}</td>
                                         <td>
                                             <div class="md-actions text-center">
-                                                @php $expAdjust = (int) ($adjustCounts[$row->id] ?? 0); @endphp
+                                                @php
+                                                    $expAdjust = (int) ($adjustCounts[$row->id] ?? 0);
+                                                    // Lý do khoá nút Sửa (chuỗi rỗng = sửa được, kể cả phiếu ngày cũ)
+                                                    $expEditLocked = $row->quarantine_id
+                                                        ? 'Sinh từ phiếu cách ly ' . $row->quarantine_code . ', chỉ điều chỉnh ở tab Cách ly - Loại bỏ - Huỷ'
+                                                        : ($row->type === 'transfer_out' ? 'Cấp phát liên phòng ban, xử lý ở tab Đề nghị cấp phát chuẩn liên phòng ban' : '');
+                                                @endphp
                                                 <span class="exp-btn-wrap">
-
+                                                    @perm(\App\Http\Controllers\Pages\Export\StandardExportController::UPDATE_PERMISSION)
+                                                        <button type="button" class="btn btn-sm btn-warning btn-md-edit"
+                                                            {{ $expEditLocked ? 'disabled' : '' }}
+                                                            title="{{ $expEditLocked ?: 'Sửa' }}"
+                                                            data-row="{{ json_encode([
+                                                                'id' => $row->id,
+                                                                'import_id' => $row->import_id,
+                                                                'group_id' => $row->group_id,
+                                                                'amount' => $row->amount,
+                                                                'type' => $row->type,
+                                                                'product_name' => $row->product_name,
+                                                                'batch_no' => $row->batch_no,
+                                                                'testing' => $row->testing,
+                                                                'reason' => $row->reason,
+                                                            ]) }}">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                    @endperm
 
                                                     @if ($expAdjust > 0)
                                                         <button type="button" class="exp-count-badge btn-exp-history"

@@ -39,7 +39,7 @@
 <ul>
     <li><span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span> <b>Điều chỉnh</b>: sửa thông tin phiếu.
         Không đổi gì thì hệ thống không ghi nhận. Lô chưa kiểm tra vẫn chỉ được đặt trong khu Biệt Trữ. Ngày nhập không sửa
-        được. Số nhỏ ở góc nút là số lần đã điều chỉnh, bấm vào để xem lịch sử.</li>
+        được. Số nhỏ ở góc nút là số lần đã điều chỉnh, bấm vào để mở bảng <b>Lịch Sử Điều Chỉnh</b>: mỗi lần thay đổi là một dòng gồm người - thời điểm thay đổi, cột <b>Lý Do Điều Chỉnh</b> và các cột giống bảng danh sách; ô đã đổi so với lần trước được tô vàng, cột chữ nhạt là giá trị hiện tại của mục không lưu trong lịch sử.</li>
     <li><span class="btn btn-sm btn-outline-secondary ug-ui"><i class="fas fa-qrcode"></i></span> <b>In nhãn</b>: in nhãn dán lô
         có mã QR (tên vật tư, vị trí, người nhập, ngày nhập, hạn dùng, mục đích sử dụng), chọn số nhãn cần in (tối đa 100). Mỗi lần in được ghi vào Audit Trail.</li>
 </ul>

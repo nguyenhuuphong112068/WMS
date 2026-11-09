@@ -560,12 +560,10 @@
             ['storageCondition', 'Điều Kiện Bảo Quản', 'fas fa-temperature-low', md_perm('storageCondition', 'view')],
             ['chemManufacturer', 'Nhà Sản Xuất', 'fas fa-industry', md_perm('chemManufacturer', 'view')],
             ['chemSupplier', 'Nhà Cung Cấp', 'fas fa-truck', md_perm('chemSupplier', 'view')],
-            ['status', 'Trạng Thái', 'fas fa-toggle-on', md_perm('status', 'view')],
             ['productName', 'Tên Sản Phẩm', 'fas fa-pills', md_perm('productName', 'view')],
         ],
         'Hoá chất' => [
             ['activeIngredient', 'Đơn Chất', 'fas fa-atom', md_perm('activeIngredient', 'view')],
-            ['mixtureHazardCategory', 'Nhóm Nguy Hại Bảng B', 'fas fa-exclamation-triangle', md_perm('mixtureHazardCategory', 'view')],
             ['chemName', 'Hoá Chất', 'fas fa-flask', md_perm('chemName', 'view')],
         ],
         'Chất chuẩn' => [

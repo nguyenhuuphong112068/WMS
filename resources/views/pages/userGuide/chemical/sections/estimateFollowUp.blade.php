@@ -5,6 +5,9 @@
 <ul>
     <li><b>Đơn dự trù đã được phê duyệt</b> (bộ phận mua hàng, quyền <i>Tiếp Nhận Xử Lý Dự Trù Hoá Chất</i>): bấm <b>Tiếp nhận</b>
         phiếu mới duyệt, rồi cập nhật <b>Ngày Hẹn Đáp Ứng</b> cho từng tháng của từng mặt hàng. Mỗi lần đổi hẹn đều lưu lịch sử.</li>
+    <li><b>Xuất Excel</b> ở tab Đơn dự trù đã được phê duyệt: nút <span class="ug-key"><i class="fas fa-file-excel"></i></span> trên dòng xuất một phiếu;
+        tick chọn nhiều đơn rồi bấm <span class="ug-key"><i class="fas fa-file-excel"></i> Xuất Excel</span> để xuất chung một file. Xuất nhiều phiếu thì mặt hàng
+        cùng mã + cùng ĐVT có cột <b>Tổng SL Theo Mã</b> và thêm sheet <b>Tổng hợp theo mã</b>.</li>
     <li><b>Theo dõi dự trù</b>: từng mặt hàng với ngày mong muốn và ngày hẹn; cột <b>Trao Đổi</b> để hai bên nhắn tin trên từng mặt
         hàng. Phòng đề nghị đánh dấu <b>Hoàn thành</b> khi đã nhận đủ hàng.</li>
     <li><b>Huỷ một mặt hàng</b>: phòng đề nghị bấm Huỷ, bộ phận mua hàng <b>Đồng ý huỷ</b> hoặc <b>Không đồng ý</b>. Đủ cả hai bên mới huỷ.</li>

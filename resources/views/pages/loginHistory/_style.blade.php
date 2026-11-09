@@ -24,8 +24,6 @@
     .lh-page .btn:hover { transform: translateY(-1px); }
     .lh-page .btn-primary { background: var(--primary); border-color: var(--primary); }
     .lh-page .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
-    .lh-page .pagination .page-item.active .page-link { background: var(--primary); border-color: var(--primary); }
-    .lh-page .pagination .page-link { color: var(--primary); }
 </style>
 <script>
     document.addEventListener('DOMContentLoaded', function () { document.body.style.overflowY = 'auto'; });

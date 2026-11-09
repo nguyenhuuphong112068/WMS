@@ -46,9 +46,13 @@ class StandardExportController extends Controller
 
     private const LABEL = 'phiếu sử dụng chất chuẩn';
 
+    /** Quyền sửa một dòng đã ghi ở tab Sổ sử dụng chất chuẩn (nút Sửa + chặn ở update()). */
+    public const UPDATE_PERMISSION = 'export_standard_update';
+
     /** Các trường được theo dõi thay đổi, dùng làm nhãn trong lịch sử điều chỉnh. */
     private const FIELDS = [
         'code' => 'Mã ống chuẩn',
+        'group_id' => 'Tổ',
         'amount' => 'Số lượng',
         'type' => 'Loại phiếu',
         'product_name' => 'Tên sản phẩm',
@@ -2228,6 +2232,12 @@ class StandardExportController extends Controller
 
     public function update(Request $request)
     {
+        // Phiếu đã ghi là đã trừ tồn: chặn ở server, không chỉ ẩn nút ở giao diện.
+        // Phiếu ngày cũ vẫn điều chỉnh được, mỗi lần sửa đều lưu lịch sử điều chỉnh.
+        if (! user_can(self::UPDATE_PERMISSION)) {
+            return redirect()->back()->with('error', 'Bạn không có quyền điều chỉnh sổ sử dụng chất chuẩn!')->with('activeTab', 'book');
+        }
+
         $departmentId = $this->departmentId();
 
         $current = DB::table(self::TABLE)
@@ -2236,8 +2246,20 @@ class StandardExportController extends Controller
             ->first();
 
         if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!');
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!')->with('activeTab', 'book');
         }
+
+        // Dòng cấp phát liên phòng ban chỉ xử lý qua Nhận / Từ chối nhận ở tab Đề nghị liên phòng ban
+        if ($current->type === 'transfer_out') {
+            return redirect()->back()->with(
+                'error',
+                'Phiếu '.$current->code.' là cấp phát chuẩn liên phòng ban, không cập nhật được ở Sổ sử dụng. '
+                .'Xử lý ở tab "Đề nghị cấp phát chuẩn liên phòng ban".'
+            )->with('activeTab', 'book');
+        }
+
+        // Loại phiếu không đổi được khi điều chỉnh (Sử dụng không chuyển thành Loại bỏ)
+        $request->merge(['type' => $current->type]);
 
         // Dòng loại bỏ sinh từ phiếu cách ly chỉ điều chỉnh qua phiếu cách ly, sửa ở đây làm tồn lệch phiếu
         if (! empty($current->quarantine_id)) {
@@ -2245,7 +2267,7 @@ class StandardExportController extends Controller
                 'error',
                 'Phiếu loại bỏ '.$current->code.' sinh từ phiếu cách ly chất chuẩn hỏng, không cập nhật được ở Sổ sử dụng. '
                 .'Điều chỉnh ở tab "Cách ly - Loại bỏ - Huỷ".'
-            );
+            )->with('activeTab', 'book');
         }
 
         $import = $this->findImport($request->import_id, $departmentId);
@@ -2261,16 +2283,18 @@ class StandardExportController extends Controller
         $this->checkImport($validator, $request, $import, (int) $current->id, (int) $current->import_id);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'updateErrors')->withInput()->with('activeTab', 'book');
         }
 
         $payload = $this->payload($request, $import);
+        // Form sửa không gửi dòng đề nghị: giữ nguyên liên kết của phiếu với đề nghị cấp phát
+        $payload['request_item_id'] = $current->request_item_id;
 
         // Dựng mô tả thay đổi TRƯỚC khi ghi đè, lúc này còn cả giá trị cũ lẫn mới
         $note = $this->changeNote($current, $payload, $request->adjust_reason);
 
         if ($note === '') {
-            return redirect()->back()->with('error', 'Không có thông tin nào thay đổi nên chưa cập nhật '.self::LABEL.'.');
+            return redirect()->back()->with('error', 'Không có thông tin nào thay đổi nên chưa cập nhật '.self::LABEL.'.')->with('activeTab', 'book');
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
@@ -2282,7 +2306,7 @@ class StandardExportController extends Controller
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->code, $note);
 
-        return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
+        return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!')->with('activeTab', 'book');
     }
 
     /**
@@ -2308,44 +2332,75 @@ class StandardExportController extends Controller
     public function history(Request $request)
     {
         $rows = DB::table(self::HISTORY_TABLE)
+            ->join(self::TABLE, self::HISTORY_TABLE.'.standard_export_id', '=', self::TABLE.'.id')
             ->leftJoin('standard_imports', self::HISTORY_TABLE.'.import_id', '=', 'standard_imports.id')
             ->leftJoin('standard_categories', 'standard_imports.category_id', '=', 'standard_categories.id')
             ->leftJoin('standard_names', 'standard_categories.chem_names_id', '=', 'standard_names.id')
+            ->leftJoin('groups', self::HISTORY_TABLE.'.group_id', '=', 'groups.id')
             ->tap(fn ($query) => DepartmentStandard::joinUnit($query, $this->departmentId(), 'standard_imports.category_id'))
             ->select(
                 self::HISTORY_TABLE.'.*',
+                self::TABLE.'.created_at as export_created_at',
                 'standard_names.name as standard_name',
+                'standard_categories.code as category_code',
+                'standard_imports.batch_no as standard_batch_no',
+                'standard_imports.group_code',
+                'groups.name as group_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )
             // Chỉ cho xem lịch sử của phiếu thuộc phòng ban đang chọn
-            ->whereIn(self::HISTORY_TABLE.'.standard_export_id', function ($query) {
-                $query->select('id')
-                    ->from(self::TABLE)
-                    ->where('department_id', $this->departmentId());
-            })
+            ->where(self::TABLE.'.department_id', $this->departmentId())
             ->where(self::HISTORY_TABLE.'.standard_export_id', $request->id)
             ->orderBy(self::HISTORY_TABLE.'.id', 'desc')
             ->get();
 
+        $groupShort = collect(config('standard.groups'))->mapWithKeys(fn ($group) => [$group['code'] => $group['short']]);
+
+        // Đúng các cột của bảng Sổ sử dụng (bỏ STT / Thao Tác), mỗi lần thay đổi là một dòng
         return response()->json([
-            'rows' => $rows->map(function ($row) {
+            'columns' => [
+                ['title' => 'Mã Ống Chuẩn'],
+                ['title' => 'Chất Chuẩn'],
+                ['title' => 'Tổ'],
+                ['title' => 'Số Lượng', 'align' => 'right'],
+                ['title' => 'Loại Phiếu', 'align' => 'center'],
+                ['title' => 'Thời Gian', 'align' => 'center'],
+                ['title' => 'Sản Phẩm / Lô / Chỉ Tiêu'],
+                ['title' => 'Người Thực Hiện'],
+            ],
+            'rows' => $rows->map(function ($row) use ($groupShort) {
                 $unit = $row->unit_short_name ?: $row->unit_name;
+                $usageSub = implode(' · ', array_filter([
+                    $row->batch_no ? 'Lô SP: '.$row->batch_no : null,
+                    $row->testing ? 'CT: '.$row->testing : null,
+                ]));
+                $usage = $row->type === 'cancel'
+                    ? ['text' => 'Lý do: '.($row->reason ?: '—'), 'tone' => 'danger']
+                    : ['text' => $row->product_name ?: ($usageSub !== '' ? '' : '—'), 'sub' => $usageSub ?: null];
 
                 return [
                     'action' => $row->action,
                     'change_note' => $row->change_note,
                     'created_by' => $row->created_by ?: 'NA',
                     'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
-                    'snapshot' => [
-                        'Mã ống chuẩn' => $row->code ?: '—',
-                        'Chất chuẩn' => $row->standard_name ?: '—',
-                        'Số lượng' => $row->amount !== null ? $this->number((float) $row->amount).' '.$unit : '—',
-                        'Loại phiếu' => self::TYPES[$row->type] ?? ($row->type ?: '—'),
-                        'Tên sản phẩm' => $row->product_name ?: '—',
-                        'Số lô SP' => $row->batch_no ?: '—',
-                        'Chỉ tiêu' => $row->testing ?: '—',
-                        'Lý do loại bỏ' => $row->reason ?: '—',
+                    'cells' => [
+                        ['text' => $row->code ?: '—', 'sub' => $row->category_code, 'strong' => true, 'nowrap' => true],
+                        [
+                            'text' => $row->standard_name ?: '—',
+                            'strong' => true,
+                            'sub' => implode(' · ', array_filter([
+                                $groupShort[$row->group_code] ?? $row->group_code,
+                                $row->standard_batch_no ? 'Lô '.$row->standard_batch_no : null,
+                            ])) ?: null,
+                        ],
+                        ['text' => $row->group_name ?: '—'],
+                        ['text' => $row->amount !== null ? $this->number((float) $row->amount) : '—', 'sub' => $unit, 'inline' => true],
+                        ['text' => self::TYPES[$row->type] ?? ($row->type ?: '—'), 'badge' => $row->type === 'cancel' ? 'danger' : 'success'],
+                        ['text' => $row->export_created_at ? \Carbon\Carbon::parse($row->export_created_at)->format('d/m/Y') : '—'],
+                        $usage,
+                        // Sổ hiện người sửa sau cùng, nên ảnh chụp lấy người thực hiện lần thay đổi đó
+                        ['text' => $row->created_by ?: '—'],
                     ],
                 ];
             })->values(),
@@ -2376,6 +2431,7 @@ class StandardExportController extends Controller
             'batch_no' => $row->batch_no ?? null,
             'testing' => $row->testing ?? null,
             'reason' => $row->reason ?? null,
+            'group_id' => $row->group_id ?? null,
             'change_note' => $note,
             'created_by' => $this->actor(),
             'created_at' => now(),
@@ -2413,6 +2469,13 @@ class StandardExportController extends Controller
 
             if ($field === 'type') {
                 $parts[] = $title.': '.(self::TYPES[$old] ?? '—').' -> '.(self::TYPES[$new] ?? '—');
+
+                continue;
+            }
+
+            if ($field === 'group_id') {
+                $names = DB::table('groups')->whereIn('id', array_filter([$old, $new]))->pluck('name', 'id');
+                $parts[] = $title.': '.($names[$old] ?? '—').' -> '.($names[$new] ?? '—');
 
                 continue;
             }

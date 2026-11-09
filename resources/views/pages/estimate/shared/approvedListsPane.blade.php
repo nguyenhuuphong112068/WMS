@@ -6,6 +6,9 @@
 | vừa duyệt (lưu người + ngày tiếp nhận), phiếu chờ tiếp nhận lên đầu. Nút chi tiết mở trang phiếu ở chế
 | độ chỉ đọc khi phiếu thuộc phòng khác (xem EstimateItemCancel::canViewAsPurchaser()).
 |
+| Xuất Excel (EstimateApprovedExport::exportApproved): nút Excel trên từng dòng, hoặc tick chọn nhiều
+| phiếu rồi bấm "Xuất Excel" - cùng 1 file, mục cùng mã hàng có cột tổng số lượng.
+|
 | Biến vào: $lists (EstimateItemCancel::approvedLists()), $signRows, $itemCounts, $itemLabel, $estRoute
 --}}
 @php
@@ -39,12 +42,21 @@
             @endforeach
         </select>
     </div>
+    <div class="ap-export">
+        <button type="button" id="apExportBtn" class="btn btn-sm btn-success" disabled
+            data-url="{{ route($estRoute . 'exportApproved') }}" title="Xuất các đơn đã chọn vào cùng 1 file Excel">
+            <i class="fas fa-file-excel mr-1"></i>Xuất Excel <span class="badge badge-light" id="apExportCount">0</span>
+        </button>
+    </div>
 </div>
 
 <div class="table-responsive">
     <table id="approvedListTable" class="table table-bordered table-hover w-100">
         <thead>
             <tr>
+                <th class="text-center" style="width: 36px">
+                    <input type="checkbox" id="apCheckAll" title="Chọn tất cả đơn đang lọc">
+                </th>
                 <th class="text-center" style="width: 55px">STT</th>
                 <th style="width: 150px">Bộ Phận</th>
                 <th style="width: 140px">Mã Phiếu</th>
@@ -55,7 +67,7 @@
                 <th style="width: 330px">Theo Dõi Trình Ký</th>
                 <th style="width: 130px">Người Lập</th>
                 <th class="text-center" style="width: 160px">Tiếp Nhận</th>
-                <th class="text-center" style="width: 110px">Thao Tác</th>
+                <th class="text-center" style="width: 140px">Thao Tác</th>
             </tr>
         </thead>
         <tbody>
@@ -65,6 +77,9 @@
                     $apApprovedAt = $apSigns->max('signed_at');
                 @endphp
                 <tr data-dept="{{ $row->department_id }}" data-status="{{ $row->approved_status['key'] }}">
+                    <td class="text-center">
+                        <input type="checkbox" class="ap-check" value="{{ $row->id }}" title="Chọn để xuất Excel">
+                    </td>
                     <td class="text-center">{{ $loop->iteration }}</td>
                     <td>
                         <span class="est-code">{{ $row->department_short_name }}</span>
@@ -125,6 +140,10 @@
                                 data-title="Phiếu {{ $row->code }}">
                                 <i class="fas fa-route"></i>
                             </button>
+                            <a href="{{ route($estRoute . 'exportApproved', ['ids' => [$row->id]]) }}" class="btn btn-sm btn-success"
+                                title="Xuất Excel phiếu {{ $row->code }}">
+                                <i class="fas fa-file-excel"></i>
+                            </a>
                         </div>
                     </td>
                 </tr>
@@ -152,11 +171,14 @@
         var apTable = $('#approvedListTable').DataTable({
             order: [], // giữ thứ tự server: phiếu có mục chờ xác nhận huỷ lên đầu
             pageLength: 25,
-            columnDefs: [{ orderable: false, targets: [0, 7, 10] }],
+            columnDefs: [
+                { orderable: false, targets: [0, 1, 8, 11] },
+                { width: '36px', targets: 0 }
+            ],
             language: {
                 search: 'Tìm kiếm:',
                 lengthMenu: 'Hiển thị _MENU_ dòng',
-                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                info: 'Hiển thị _START_–_END_ / _TOTAL_ dòng',
                 infoEmpty: 'Không có dữ liệu',
                 zeroRecords: 'Không tìm thấy dữ liệu phù hợp',
                 emptyTable: 'Chưa có đơn dự trù nào được phê duyệt',
@@ -167,6 +189,37 @@
         $('#apFilterDept, #apFilterStatus').on('change', function() {
             $(this).toggleClass('is-active', !!$(this).val());
             apTable.draw();
+        });
+
+        // ----- Chọn nhiều đơn rồi xuất cùng 1 file Excel -----
+        // Dòng ở trang khác vẫn nằm trong apTable.rows().nodes() nên đếm / gửi đủ mọi đơn đã tick
+        function apSelectedIds() {
+            return $(apTable.rows().nodes()).find('.ap-check:checked').map(function() {
+                return this.value;
+            }).get();
+        }
+
+        function apSyncExport() {
+            var ids = apSelectedIds();
+            var visible = $(apTable.rows({ search: 'applied' }).nodes()).find('.ap-check');
+            $('#apExportCount').text(ids.length);
+            $('#apExportBtn').prop('disabled', !ids.length);
+            $('#apCheckAll').prop('checked', visible.length > 0 && visible.filter(':checked').length === visible.length);
+        }
+
+        $(apTable.table().node()).on('change', '.ap-check', apSyncExport);
+
+        $('#apCheckAll').on('change', function() {
+            $(apTable.rows({ search: 'applied' }).nodes()).find('.ap-check').prop('checked', this.checked);
+            apSyncExport();
+        });
+
+        apTable.on('draw', apSyncExport);
+
+        $('#apExportBtn').on('click', function() {
+            var ids = apSelectedIds();
+            if (!ids.length) return;
+            window.location.href = $(this).data('url') + '?' + $.param({ ids: ids });
         });
     });
 </script>
@@ -198,6 +251,18 @@
         min-width: 200px;
         border-radius: var(--border-radius-md, 8px);
         transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .ap-export {
+        margin-left: auto;
+    }
+
+    #approvedListTable .ap-check,
+    #apCheckAll {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        accent-color: var(--primary);
     }
 
     .ap-filter select.is-active {

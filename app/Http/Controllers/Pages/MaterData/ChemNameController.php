@@ -109,7 +109,7 @@ class ChemNameController extends Controller
             'hazardCategories' => $this->hazardCategoryOptions(
                 $hazardByChem->flatMap(fn ($c) => $c->pluck('id'))->unique()->values()->all()
             ),
-            'hazardGroups' => MixtureHazardCategoryController::GROUPS,
+            'hazardGroups' => \App\Support\MixtureHazardThreshold::GROUPS,
             'groupLabels' => ChemicalClassification::GROUPS,
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
             'historyCounts' => DataMasterHistory::counts(self::TABLE),

@@ -9,7 +9,7 @@
 <h3>Điều chỉnh</h3>
 <ul>
     <li>Người có quyền <b>Điều Chỉnh Sổ Sử Dụng Vật Tư</b> bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span>
-        để sửa hoặc khoá một dòng ghi sai. Mọi lần điều chỉnh đều lưu lịch sử.</li>
+        để sửa hoặc khoá một dòng ghi sai. Mọi lần điều chỉnh đều lưu lịch sử - số nhỏ ở góc nút Sửa là số lần đã điều chỉnh, bấm vào để mở bảng <b>Lịch Sử Điều Chỉnh</b>: mỗi lần thay đổi là một dòng gồm người - thời điểm thay đổi, cột <b>Lý Do Điều Chỉnh</b> và các cột giống bảng sổ; ô đã đổi so với lần trước được tô vàng.</li>
     <li>Dòng <b>sinh từ phiếu cách ly</b> chỉ xử lý ở tab <a href="#cach-ly">Cách ly - Loại bỏ - Huỷ</a>.</li>
     <li>Dòng <b>cấp phát liên phòng ban</b> không sửa được, vì số lượng đã thành tồn của phòng nhận.</li>
 </ul>

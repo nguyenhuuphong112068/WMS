@@ -19,6 +19,8 @@
 
 @include('pages.materData.shared.assets')
 
+@include('pages.shared.historyTable')
+
 <style>
     /* ---------- Phiếu Tạm: dòng đang vượt hạn mức 105% ---------- */
     .draft-row-over>td {
@@ -699,77 +701,6 @@
     }
 
     /* ---------- Modal lịch sử điều chỉnh ---------- */
-    .exp-history-body {
-        max-height: 62vh;
-        overflow-y: auto;
-        padding-right: 4px;
-    }
-
-    .exp-history-item {
-        border: 1px solid var(--primary-soft);
-        border-left: 3px solid var(--primary);
-        border-radius: var(--border-radius-md);
-        padding: 12px 14px;
-        margin-bottom: 12px;
-        background: #fff;
-        transition: box-shadow var(--transition-fast);
-    }
-
-    .exp-history-item:hover {
-        box-shadow: var(--shadow-sm);
-    }
-
-    .exp-history-item.create {
-        border-left-color: #16A34A;
-    }
-
-    .exp-history-item.lock {
-        border-left-color: #94A3B8;
-    }
-
-    .exp-history-head {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 8px;
-    }
-
-    .exp-history-action {
-        font-weight: 700;
-        color: var(--primary-dark);
-        font-size: 0.9rem;
-    }
-
-    .exp-history-meta {
-        color: #94a3b8;
-        font-size: 0.78rem;
-    }
-
-    .exp-history-note {
-        background: var(--primary-soft);
-        border-radius: 6px;
-        padding: 7px 10px;
-        font-size: 0.83rem;
-        color: var(--primary-dark);
-        margin-bottom: 8px;
-        word-break: break-word;
-    }
-
-    .exp-history-snapshot {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-        gap: 4px 16px;
-        font-size: 0.82rem;
-        color: #64748b;
-    }
-
-    .exp-history-snapshot b {
-        color: #475569;
-        font-weight: 600;
-    }
-
     .exp-history-empty {
         text-align: center;
         color: #94a3b8;
@@ -1157,7 +1088,7 @@
             language: {
                 search: 'Tìm kiếm:',
                 lengthMenu: 'Hiển thị _MENU_ dòng',
-                info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                info: 'Hiển thị _START_–_END_ / _TOTAL_ dòng',
                 infoEmpty: 'Không có dữ liệu',
                 zeroRecords: 'Không tìm thấy dòng nào phù hợp',
                 emptyTable: 'Không có phiếu sử dụng nào trong khoảng thời gian đã chọn.',
@@ -1170,6 +1101,7 @@
 
         /* ---------- Xem lịch sử điều chỉnh ---------- */
         $(document).on('click', '.btn-exp-history', function() {
+            var $trigger = $(this);
             var url = $(this).data('url');
 
             $('#historyModal').find('.exp-history-subtitle').text($(this).data('title') || '');
@@ -1188,7 +1120,7 @@
                     return response.json();
                 })
                 .then(function(data) {
-                    renderHistory(data.rows || []);
+                    wmsHistoryTable($('#historyModal').find('.exp-history-body'), data, $trigger, 'Phiếu này chưa có lần điều chỉnh nào được lưu.');
                 })
                 .catch(function() {
                     $('#historyModal').find('.exp-history-body').html(
@@ -1196,47 +1128,6 @@
                     );
                 });
         });
-
-        /* Dựng danh sách lịch sử bằng thao tác DOM để nội dung dữ liệu luôn được escape */
-        function renderHistory(rows) {
-            var $body = $('#historyModal').find('.exp-history-body').empty();
-
-            if (!rows.length) {
-                $body.html('<div class="exp-history-empty">Phiếu này chưa có lần điều chỉnh nào được lưu.</div>');
-                return;
-            }
-
-            var themes = {
-                'Thêm mới': 'create',
-                'Khoá': 'lock',
-                'Mở khoá': 'lock'
-            };
-
-            rows.forEach(function(row) {
-                var $item = $('<div>').addClass('exp-history-item ' + (themes[row.action] || ''));
-
-                $('<div>').addClass('exp-history-head')
-                    .append($('<span>').addClass('exp-history-action').text(row.action))
-                    .append($('<span>').addClass('exp-history-meta').text(row.created_by + ' · ' + row.created_at))
-                    .appendTo($item);
-
-                if (row.change_note) {
-                    $('<div>').addClass('exp-history-note').text(row.change_note).appendTo($item);
-                }
-
-                var $snapshot = $('<div>').addClass('exp-history-snapshot');
-
-                Object.keys(row.snapshot || {}).forEach(function(field) {
-                    $('<div>')
-                        .append($('<b>').text(field + ': '))
-                        .append(document.createTextNode(row.snapshot[field]))
-                        .appendTo($snapshot);
-                });
-
-                $snapshot.appendTo($item);
-                $body.append($item);
-            });
-        }
 
         /* ---------- Thu gọn/mở rộng card đề nghị đã gửi đi / gửi đến ---------- */
         $(document).on('click', '.exp-req-card-header', function() {

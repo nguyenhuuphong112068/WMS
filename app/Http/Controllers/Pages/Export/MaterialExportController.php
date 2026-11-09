@@ -1742,41 +1742,73 @@ class MaterialExportController extends Controller
     public function history(Request $request)
     {
         $rows = DB::table(self::HISTORY_TABLE)
+            ->join(self::TABLE, self::HISTORY_TABLE.'.material_export_id', '=', self::TABLE.'.id')
             ->leftJoin('material_imports', self::HISTORY_TABLE.'.import_id', '=', 'material_imports.id')
             ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
             ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin(self::REQ_ITEM, self::TABLE.'.request_item_id', '=', self::REQ_ITEM.'.id')
+            ->leftJoin(self::REQ_LIST, self::REQ_ITEM.'.request_list_id', '=', self::REQ_LIST.'.id')
+            ->leftJoin(self::TRANSFER_ITEM_TABLE, self::TABLE.'.transfer_item_id', '=', self::TRANSFER_ITEM_TABLE.'.id')
+            ->leftJoin(self::TRANSFER_REQUEST_TABLE, self::TRANSFER_ITEM_TABLE.'.transfer_request_id', '=', self::TRANSFER_REQUEST_TABLE.'.id')
+            ->leftJoin('deparments', self::TABLE.'.to_department_id', '=', 'deparments.id')
             ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $this->departmentId(), 'material_imports.category_id'))
             ->select(
                 self::HISTORY_TABLE.'.*',
+                self::TABLE.'.created_at as export_created_at',
                 'material_names.name as material_name',
+                'material_categories.code as category_code',
+                'material_categories.technical_specification',
                 'units.short_name as unit_short_name',
-                'units.name as unit_name'
+                'units.name as unit_name',
+                'deparments.name as to_department_name',
+                DB::raw('COALESCE('.self::REQ_LIST.'.code, '.self::TRANSFER_REQUEST_TABLE.'.code) as request_code')
             )
-            ->whereIn(self::HISTORY_TABLE.'.material_export_id', function ($query) {
-                $query->select('id')->from(self::TABLE)->where('department_id', $this->departmentId());
-            })
+            ->where(self::TABLE.'.department_id', $this->departmentId())
             ->where(self::HISTORY_TABLE.'.material_export_id', $request->id)
             ->orderBy(self::HISTORY_TABLE.'.id', 'desc')
             ->get();
 
+        // Đúng các cột của bảng Sổ Cấp Phát (bỏ STT / Thao Tác), mỗi lần thay đổi là một dòng
         return response()->json([
+            'columns' => [
+                ['title' => 'Mã Xuất Nhập'],
+                ['title' => 'Mã Phiếu Đề Nghị'],
+                ['title' => 'Vật Tư'],
+                ['title' => 'Số Lượng', 'align' => 'right'],
+                ['title' => 'Loại', 'align' => 'center'],
+                ['title' => 'Thời Gian', 'align' => 'center'],
+                ['title' => 'Mục Đích'],
+                ['title' => 'Người Thực Hiện'],
+            ],
             'rows' => $rows->map(function ($row) {
                 $unit = $row->unit_short_name ?: $row->unit_name;
+
+                if ($row->type === self::TYPE_TRANSFER_OUT) {
+                    $purpose = 'Cấp phát liên phòng ban đến '.($row->to_department_name ?: '—');
+                } elseif ($row->type === 'cancel') {
+                    $purpose = $row->reason;
+                } else {
+                    $purpose = $row->purpose;
+                }
 
                 return [
                     'action' => $row->action,
                     'change_note' => $row->change_note,
                     'created_by' => $row->created_by ?: 'NA',
                     'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
-                    'snapshot' => [
-                        'Mã xuất nhập' => $row->code ?: '—',
-                        'Vật tư' => $row->material_name ?: '—',
-                        'Số lượng' => $row->amount !== null ? $this->number((float) $row->amount).' '.$unit : '—',
-                        'Loại phiếu' => self::TYPES[$row->type] ?? ($row->type ?: '—'),
-                        'Thiết bị liên quan' => $row->product_name ?: '—',
-                        'Số phiếu kiểm nghiệm' => $row->test_report_no ?: '—',
-                        'Lý do loại bỏ' => $row->reason ?: '—',
-                        'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
+                    'cells' => [
+                        ['text' => $row->code ?: '—', 'sub' => $row->category_code, 'strong' => true, 'nowrap' => true],
+                        ['text' => $row->request_code ?: '—', 'strong' => (bool) $row->request_code, 'nowrap' => true],
+                        ['text' => $row->material_name ?: '—', 'sub' => $row->technical_specification, 'strong' => true],
+                        ['text' => $row->amount !== null ? $this->number((float) $row->amount) : '—', 'sub' => $unit, 'inline' => true],
+                        [
+                            'text' => $row->type === self::TYPE_TRANSFER_OUT ? 'Chuyển đi' : (self::TYPES[$row->type] ?? ($row->type ?: '—')),
+                            'badge' => $row->type === 'cancel' ? 'danger' : ($row->type === self::TYPE_TRANSFER_OUT ? 'primary' : 'success'),
+                            'sub' => $row->status_id ? null : 'Đã khoá',
+                        ],
+                        ['text' => $row->export_created_at ? \Carbon\Carbon::parse($row->export_created_at)->format('d/m/Y') : '—'],
+                        ['text' => $purpose ?: '—', 'tone' => $row->type === 'cancel' ? 'danger' : null],
+                        ['text' => $row->used_by ?: '—'],
                     ],
                 ];
             })->values(),
@@ -3636,6 +3668,10 @@ class MaterialExportController extends Controller
             'product_name' => $row->product_name,
             'test_report_no' => $row->test_report_no,
             'reason' => $row->reason,
+            // Mục đích nằm ở dòng đề nghị nhưng vẫn chụp lại để lịch sử hiện đúng cột Mục Đích của sổ
+            'purpose' => $row->request_item_id
+                ? DB::table(self::REQ_ITEM)->where('id', $row->request_item_id)->value('purpose')
+                : null,
             'used_by' => $row->used_by,
             'status_id' => $row->status_id,
             'change_note' => $note,

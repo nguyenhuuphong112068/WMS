@@ -321,7 +321,161 @@
         <script src="{{ asset('dataTable/dist/js/pages/dashboard3.js') }}?v={{ filemtime(public_path('dataTable/dist/js/pages/dashboard3.js')) }}"></script>
 
         <!-- DataTables JS (Local) -->
-        <script src="{{ asset('dataTable/plugins/datatables/jquery.dataTables.min.js') }}"></script>  
+        <script src="{{ asset('dataTable/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+
+        {{--
+        |--------------------------------------------------------------------------
+        | Phân trang + chữ tiếng Việt dùng chung cho MỌI bảng DataTables
+        |--------------------------------------------------------------------------
+        | Dòng trên nạp lại jquery.dataTables.min.js nên bộ render phân trang Bootstrap
+        | (dataTables.bootstrap4) bị xoá - nút trang thành chữ trơn "Previous1234Next".
+        | Khai một bộ render riêng 'wms' NGAY SAU lần nạp cuối để mọi bảng tự nhận:
+        |   « ‹ Trước  1 … 4 5 6 … 20  Sau › »   Đến trang [ 5 ] / 20
+        | - Trang đầu / cuối, trước / sau; số trang có dấu … khi nhiều trang.
+        | - Ô "Đến trang" chỉ hiện khi bảng có trên 7 trang (Enter hoặc rời ô để nhảy).
+        | - Chỉ 1 trang thì ẩn cả cụm phân trang.
+        | - Dòng "Hiển thị x–y / n dòng" và cụm phân trang nằm chung hàng .md-tablefoot
+        |   (dom mặc định), màn hình tự khai dom vẫn nhận kiểu nút.
+        | Chữ hiển thị (Tìm kiếm, Hiển thị N dòng...) đặt mặc định tiếng Việt; màn hình
+        | khai language riêng thì phần đó đè lên.
+        | Kiểu dáng ở layout/css.blade.php (khối .md-pager).
+        --}}
+        <script>
+            (function ($) {
+                var DT = $ && $.fn.dataTable;
+                if (!DT) return;
+
+                var BUTTONS = {
+                    first:    { icon: 'fa-angle-double-left',  label: 'Trang đầu' },
+                    previous: { icon: 'fa-angle-left',         label: 'Trang trước', text: 'Trước' },
+                    next:     { icon: 'fa-angle-right',        label: 'Trang sau',   text: 'Sau', after: true },
+                    last:     { icon: 'fa-angle-double-right', label: 'Trang cuối' }
+                };
+
+                function flatten(list, out) {
+                    for (var i = 0; i < list.length; i++) {
+                        if ($.isArray(list[i])) flatten(list[i], out);
+                        else out.push(list[i]);
+                    }
+                    return out;
+                }
+
+                DT.ext.renderer.pageButton.wms = function (settings, host, idx, buttons, page, pages) {
+                    var api = new DT.Api(settings);
+                    var $host = $(host);
+                    var focused = $host.find(document.activeElement).data('dt-idx');
+
+                    $host.empty().toggleClass('md-pager-single', pages <= 1);
+                    if (pages <= 1) return;
+
+                    var $pager = $('<nav class="md-pager" aria-label="Phân trang"></nav>');
+                    var $list = $('<div class="md-pager-list"></div>').appendTo($pager);
+                    var seq = 0;
+
+                    flatten(buttons, []).forEach(function (btn) {
+                        if (btn === 'ellipsis') {
+                            $list.append('<span class="md-pager-gap" aria-hidden="true">…</span>');
+                            return;
+                        }
+
+                        var $btn = $('<button type="button" class="md-pager-btn"></button>')
+                            .attr('data-dt-idx', seq++);
+                        var target;
+
+                        if (typeof btn === 'number') {
+                            target = btn;
+                            $btn.text(btn + 1).attr('aria-label', 'Trang ' + (btn + 1));
+                            if (btn === page) {
+                                $btn.addClass('is-active').attr('aria-current', 'page');
+                            }
+                        } else if (BUTTONS[btn]) {
+                            var def = BUTTONS[btn];
+                            var atStart = btn === 'first' || btn === 'previous';
+                            var disabled = atStart ? page === 0 : page >= pages - 1;
+
+                            target = btn;
+                            $btn.addClass('md-pager-nav md-pager-' + btn)
+                                .attr({ 'aria-label': def.label, title: def.label })
+                                .prop('disabled', disabled);
+
+                            var $icon = $('<i class="fas" aria-hidden="true"></i>').addClass(def.icon);
+                            var $text = def.text ? $('<span class="md-pager-text"></span>').text(def.text) : null;
+                            if (def.after) $btn.append($text, $icon);
+                            else $btn.append($icon, $text);
+                        } else {
+                            return;
+                        }
+
+                        $btn.on('click', function () {
+                            if (this.disabled || target === page) return;
+                            api.page(target).draw('page');
+                        });
+
+                        $list.append($btn);
+                    });
+
+                    if (pages > 7) {
+                        var $input = $('<input type="number" class="md-pager-input" inputmode="numeric">')
+                            .attr({ min: 1, max: pages, 'data-dt-idx': 'jump', 'aria-label': 'Đến trang' })
+                            .val(page + 1);
+
+                        var go = function () {
+                            var n = parseInt($input.val(), 10);
+                            if (isNaN(n)) { $input.val(page + 1); return; }
+                            n = Math.min(Math.max(n, 1), pages);
+                            $input.val(n);
+                            if (n - 1 !== page) api.page(n - 1).draw('page');
+                        };
+
+                        $input.on('keydown', function (e) {
+                            if (e.key === 'Enter') { e.preventDefault(); go(); }
+                        }).on('change', go);
+
+                        $('<label class="md-pager-jump"></label>')
+                            .append('<span>Đến trang</span>', $input, $('<span></span>').text('/ ' + pages))
+                            .appendTo($pager);
+                    }
+
+                    $host.append($pager);
+
+                    if (focused !== undefined) {
+                        $host.find('[data-dt-idx="' + focused + '"]').trigger('focus');
+                    }
+                };
+
+                // Ô "Đến trang" của phân trang phía server (pages.shared.paginator): data-url chứa __PAGE__
+                $(document).on('keydown change', '.md-pager-input[data-url]', function (e) {
+                    if (e.type === 'keydown' && e.key !== 'Enter') return;
+                    e.preventDefault();
+
+                    var $input = $(this);
+                    var max = parseInt($input.attr('max'), 10) || 1;
+                    var n = Math.min(Math.max(parseInt($input.val(), 10) || 1, 1), max);
+                    if (String(n) === $input.prop('defaultValue')) { $input.val(n); return; }
+
+                    window.location.href = $input.data('url').replace('__PAGE__', n);
+                });
+
+                $.extend(true, DT.defaults, {
+                    sDom: 'lfrt<"md-tablefoot"ip>',
+                    sPaginationType: 'full_numbers',
+                    renderer: { pageButton: 'wms' },
+                    oLanguage: {
+                        sSearch: 'Tìm kiếm:',
+                        sLengthMenu: 'Hiển thị _MENU_ dòng',
+                        sInfo: 'Hiển thị _START_–_END_ / _TOTAL_ dòng',
+                        sInfoEmpty: 'Không có dữ liệu',
+                        sInfoFiltered: '(lọc từ _MAX_ dòng)',
+                        sInfoThousands: '.',
+                        sZeroRecords: 'Không tìm thấy dòng nào phù hợp',
+                        sEmptyTable: 'Không có dữ liệu',
+                        sLoadingRecords: 'Đang tải...',
+                        sProcessing: 'Đang xử lý...',
+                        oPaginate: { sFirst: 'Trang đầu', sPrevious: 'Trước', sNext: 'Sau', sLast: 'Trang cuối' }
+                    }
+                });
+            })(window.jQuery);
+        </script>
 
 
         {{-- Chống double submit --}}
@@ -550,6 +704,9 @@
                         });
                 })(window.jQuery);
         </script>
+
+        {{-- Tiêu đề bảng dính khi cuộn (mọi bảng) --}}
+        @include('layout.stickyHead')
 
         {{-- Sửa / Khoá / Duyệt / Từ chối ở Dữ Liệu Gốc + Danh Mục: gửi ngầm, giữ bộ lọc & vị trí cuộn --}}
         @if (request()->routeIs('pages.materData.*', 'pages.category.*'))

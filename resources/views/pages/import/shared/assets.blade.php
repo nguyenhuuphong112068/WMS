@@ -24,6 +24,8 @@
 
 @include('pages.materData.shared.assets')
 
+@include('pages.shared.historyTable')
+
 <style>
     /* ---------- Ô chọn Select2 trong modal ---------- */
     .md-modal .select2-container--bootstrap4 .select2-selection {
@@ -487,77 +489,16 @@
     }
 
     /* ---------- Lịch sử điều chỉnh ---------- */
-    .imp-history-item {
-        border: 1px solid #e2e8f0;
-        border-left: 3px solid var(--primary-lighter);
-        border-radius: var(--border-radius-md);
-        padding: 11px 14px;
-        margin-bottom: 10px;
-        background: #fff;
-    }
 
-    .imp-history-item.create {
-        border-left-color: #16A34A;
-    }
 
-    .imp-history-item.lock {
-        border-left-color: #94A3B8;
-    }
 
-    .imp-history-head {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 7px;
-    }
 
-    .imp-history-action {
-        font-weight: 700;
-        color: var(--primary-dark);
-        font-size: 0.9rem;
-    }
 
-    .imp-history-meta {
-        color: #94a3b8;
-        font-size: 0.78rem;
-    }
 
-    .imp-history-note {
-        background: var(--primary-soft);
-        border-radius: 6px;
-        padding: 7px 10px;
-        font-size: 0.83rem;
-        color: var(--primary-dark);
-        margin-bottom: 7px;
-        word-break: break-word;
-    }
 
     /* Lý do do người dùng nhập - tách khỏi nội dung đã đổi cho dễ đọc */
-    .imp-history-reason {
-        border-left: 3px solid #FCD34D;
-        background: #FEF9E7;
-        border-radius: 6px;
-        padding: 7px 10px;
-        font-size: 0.83rem;
-        color: #92400E;
-        margin-bottom: 8px;
-        word-break: break-word;
-    }
 
-    .imp-history-snapshot {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-        gap: 4px 16px;
-        font-size: 0.82rem;
-        color: #64748b;
-    }
 
-    .imp-history-snapshot b {
-        color: #475569;
-        font-weight: 600;
-    }
 
     .imp-history-empty {
         text-align: center;
@@ -1128,6 +1069,7 @@
 
         /* ---------- Modal Lịch Sử Điều Chỉnh ---------- */
         $(document).on('click', '.btn-imp-history', function() {
+            var $trigger = $(this);
             var url = $(this).data('url');
             var $modal = $('#historyModal');
 
@@ -1148,7 +1090,7 @@
                     return response.json();
                 })
                 .then(function(data) {
-                    renderImportHistory(data.rows || []);
+                    wmsHistoryTable($('#historyModal').find('.imp-history-body'), data, $trigger, 'Phiếu này chưa có lần điều chỉnh nào được lưu.');
                 })
                 .catch(function() {
                     $modal.find('.imp-history-body').html(
@@ -1156,55 +1098,6 @@
                     );
                 });
         });
-
-        /* Dựng danh sách bằng thao tác DOM để nội dung dữ liệu luôn được escape */
-        function renderImportHistory(rows) {
-            var $body = $('#historyModal').find('.imp-history-body').empty();
-
-            if (!rows.length) {
-                $body.html('<div class="imp-history-empty">Phiếu này chưa có lần điều chỉnh nào được lưu.</div>');
-
-                return;
-            }
-
-            var themes = {
-                'Thêm mới': 'create',
-                'Khoá': 'lock',
-                'Mở khoá': 'lock'
-            };
-
-            rows.forEach(function(row) {
-                var $item = $('<div>').addClass('imp-history-item ' + (themes[row.action] || ''));
-
-                $('<div>').addClass('imp-history-head')
-                    .append($('<span>').addClass('imp-history-action').text(row.action))
-                    .append($('<span>').addClass('imp-history-meta').text(row.created_by + ' · ' + row.created_at))
-                    .appendTo($item);
-
-                if (row.change_note) {
-                    $('<div>').addClass('imp-history-note').text(row.change_note).appendTo($item);
-                }
-
-                if (row.reason) {
-                    $('<div>').addClass('imp-history-reason')
-                        .append($('<b>').text('Lý do: '))
-                        .append(document.createTextNode(row.reason))
-                        .appendTo($item);
-                }
-
-                var $snapshot = $('<div>').addClass('imp-history-snapshot');
-
-                Object.keys(row.snapshot || {}).forEach(function(field) {
-                    $('<div>')
-                        .append($('<b>').text(field + ': '))
-                        .append(document.createTextNode(row.snapshot[field]))
-                        .appendTo($snapshot);
-                });
-
-                $snapshot.appendTo($item);
-                $item.appendTo($body);
-            });
-        }
 
         /* ---------- Bảng báo cáo nhập theo khoảng thời gian (mua + nhận chuyển) ---------- */
         $('.imp-report-table').each(function() {
@@ -1222,7 +1115,7 @@
                 language: {
                     search: 'Tìm kiếm:',
                     lengthMenu: 'Hiển thị _MENU_ dòng',
-                    info: 'Hiển thị _START_ đến _END_ của _TOTAL_ dòng',
+                    info: 'Hiển thị _START_–_END_ / _TOTAL_ dòng',
                     infoEmpty: 'Không có dữ liệu',
                     zeroRecords: 'Không tìm thấy dòng nào phù hợp',
                     emptyTable: $(this).data('empty') || 'Không có phiếu nhập nào trong khoảng thời gian đã chọn.',

@@ -73,8 +73,8 @@
                         <thead>
                             <tr>
                                 <th class="text-center" style="width: 60px">STT</th>
-                                <th>Tên khoa học (danh pháp IUPAC)</th>
-                                <th>Tên chất</th>
+                                <th data-history-key="Tên hoạt chất">Tên khoa học (danh pháp IUPAC)</th>
+                                <th data-history-key="Tên tiếng Anh">Tên chất</th>
                                 <th style="width: 120px">Mã số CAS</th>
                                 <th style="width: 130px">Công Thức</th>
                                 <th style="width: 90px">Phụ Lục</th>

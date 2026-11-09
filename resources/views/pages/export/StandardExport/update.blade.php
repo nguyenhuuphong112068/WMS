@@ -1,5 +1,16 @@
 @php $bag = $errors->getBag('updateErrors'); @endphp
 
+<style>
+    /* Loại phiếu chỉ hiển thị, không đổi được: ẩn lựa chọn còn lại */
+    #updateModal .exp-type-fixed {
+        pointer-events: none;
+    }
+
+    #updateModal .exp-type-fixed:not(.is-checked) {
+        display: none;
+    }
+</style>
+
 {{--
 | Modal cập nhật một phiếu sử dụng chất chuẩn.
 |
@@ -97,7 +108,8 @@
                             <label>Loại Phiếu <span class="text-danger">*</span></label>
                             <div class="exp-types">
                                 @foreach ($types as $value => $label)
-                                    <label class="exp-type {{ old('type') == $value ? 'is-checked' : '' }}">
+                                    {{-- Loại phiếu chỉ hiển thị, không đổi được khi điều chỉnh (Controller giữ loại cũ) --}}
+                                    <label class="exp-type exp-type-fixed {{ old('type') == $value ? 'is-checked' : '' }}">
                                         <input type="radio" name="type" value="{{ $value }}"
                                             {{ old('type') == $value ? 'checked' : '' }}>
                                         <span>{{ $label }}</span>

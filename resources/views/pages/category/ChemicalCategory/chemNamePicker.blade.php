@@ -279,7 +279,7 @@
                     ],
                     dom: 'rt<"cnp-foot"ip>',
                     language: {
-                        info: 'Hiện _START_–_END_ / _TOTAL_ hoá chất',
+                        info: 'Hiển thị _START_–_END_ / _TOTAL_ hoá chất',
                         infoEmpty: 'Không có hoá chất',
                         infoFiltered: '(lọc từ _MAX_)',
                         zeroRecords: 'Không tìm thấy hoá chất phù hợp',

@@ -310,7 +310,7 @@
                         ordering: false,
                         dom: 'rt<"dmc-foot"ip>',
                         language: {
-                            info: 'Hiện _START_–_END_ / _TOTAL_ vật tư',
+                            info: 'Hiển thị _START_–_END_ / _TOTAL_ vật tư',
                             infoEmpty: 'Không có vật tư',
                             infoFiltered: '(lọc từ _MAX_)',
                             zeroRecords: 'Không tìm thấy vật tư phù hợp',

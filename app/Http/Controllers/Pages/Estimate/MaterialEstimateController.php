@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\Estimate;
 
+use App\Http\Controllers\Concerns\EstimateApprovedExport;
 use App\Http\Controllers\Concerns\EstimateItemCancel;
 use App\Http\Controllers\Concerns\EstimateSignFlow;
 use App\Http\Controllers\Concerns\VerifiesSignature;
@@ -35,6 +36,7 @@ use Illuminate\Support\Facades\Validator;
  */
 class MaterialEstimateController extends Controller
 {
+    use EstimateApprovedExport;
     use EstimateItemCancel;
     use EstimateSignFlow;
     use VerifiesSignature;
@@ -77,6 +79,19 @@ class MaterialEstimateController extends Controller
     private const ITEM_LABEL = 'vật tư dự trù';
 
     private const EDITABLE_STATUSES = ['draft', 'rejected'];
+
+    /** Xuất Excel tab "Đơn dự trù đã được phê duyệt" - xem App\Http\Controllers\Concerns\EstimateApprovedExport. */
+    protected function exportConfig(): array
+    {
+        return [
+            'amount_fk' => 'material_estimate_item_id',
+            'title' => 'DỰ TRÙ VẬT TƯ',
+            'file_prefix' => 'DuTruVatTu',
+            'code_label' => 'Mã Vật Tư',
+            'name_label' => 'Vật Tư',
+            'extras' => ['Quy Cách' => 'material_categories.technical_specification', 'P/N' => 'COALESCE(material_estimate_items.part_number, material_categories.part_number)'],
+        ];
+    }
 
     /** Huỷ mục cần xác nhận 2 bên - xem App\Http\Controllers\Concerns\EstimateItemCancel. */
     protected function cancelConfig(): array

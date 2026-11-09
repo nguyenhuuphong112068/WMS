@@ -1,4 +1,5 @@
-<p>Đổi mật khẩu ngay trên trang đăng nhập, bấm liên kết <b>Đổi mật khẩu</b> dưới nút Đăng Nhập. Hệ thống tự mở khung này
+<p>Đổi mật khẩu ngay trên trang đăng nhập, bấm thẻ <b><i class="fas fa-key"></i> Đổi mật khẩu</b> trên thanh chọn đầu khung đăng nhập
+    (bấm lại thẻ <b>Đăng nhập</b> để quay về). Hệ thống tự mở khung này
     trong hai trường hợp bắt buộc bên dưới; đổi xong là vào thẳng hệ thống, không cần đăng nhập lại.</p>
 
 <h3>Khi nào phải đổi</h3>

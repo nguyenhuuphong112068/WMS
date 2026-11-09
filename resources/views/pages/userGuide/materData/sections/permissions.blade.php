@@ -13,11 +13,11 @@
             <tr>
                 <td>Dùng chung</td>
                 <td>Công Ty, Phòng Ban, Tổ, Đơn Vị Tính, Quy Cách Đóng Gói, Điều Kiện Bảo Quản, Nhà Sản Xuất, Nhà Cung
-                    Cấp, Trạng Thái, Tên Sản Phẩm, Định Khu, Đối Tượng</td>
+                    Cấp, Tên Sản Phẩm, Định Khu, Đối Tượng</td>
             </tr>
             <tr>
                 <td>Hoá chất</td>
-                <td>Đơn Chất, Nhóm Nguy Hại Bảng B, Hoá Chất</td>
+                <td>Đơn Chất, Hoá Chất</td>
             </tr>
             <tr>
                 <td>Chất chuẩn</td>

@@ -612,14 +612,7 @@ class ChemicalExportController extends Controller
             return $blocked;
         }
 
-        // Chỉ điều chỉnh được phiếu sử dụng TRONG NGÀY - qua ngày là chốt sổ, không sửa nữa
-        if (! \Carbon\Carbon::parse($current->exported_date)->isToday()) {
-            return redirect()->back()->with(
-                'error',
-                'Chỉ điều chỉnh được '.self::LABEL.' trong ngày. Phiếu '.$current->code.' ngày '
-                    .\Carbon\Carbon::parse($current->exported_date)->format('d/m/Y').' đã chốt, không sửa được nữa.'
-            );
-        }
+        // Phiếu ngày cũ vẫn điều chỉnh được (không chốt sổ theo ngày) - mỗi lần sửa đều lưu lịch sử điều chỉnh
 
         // Loại phiếu không đổi được khi điều chỉnh (Sử dụng không chuyển thành Loại bỏ)
         $request->merge(['type' => $current->type]);
@@ -776,12 +769,17 @@ class ChemicalExportController extends Controller
             ->leftJoin('chemical_imports', self::HISTORY_TABLE.'.import_id', '=', 'chemical_imports.id')
             ->leftJoin('chemical_categories', 'chemical_imports.category_id', '=', 'chemical_categories.id')
             ->leftJoin('chem_names', 'chemical_categories.chem_names_id', '=', 'chem_names.id')
+            ->leftJoin('deparments', self::HISTORY_TABLE.'.to_department_id', '=', 'deparments.id')
             ->tap(fn ($query) => DepartmentChemical::joinUnit($query, $this->departmentId(), 'chemical_imports.category_id'))
             ->select(
                 self::HISTORY_TABLE.'.*',
                 'chem_names.name as chem_name',
+                'chemical_categories.code as category_code',
+                'chemical_imports.batch_no',
                 'units.short_name as unit_short_name',
-                'units.name as unit_name'
+                'units.name as unit_name',
+                'deparments.name as to_department_name',
+                'deparments.shortName as to_department_short'
             )
             // Chỉ cho xem lịch sử của phiếu thuộc phòng ban đang chọn
             ->whereIn(self::HISTORY_TABLE.'.export_id', function ($query) {
@@ -793,26 +791,44 @@ class ChemicalExportController extends Controller
             ->orderBy(self::HISTORY_TABLE.'.id', 'desc')
             ->get();
 
+        // Đúng các cột của bảng Sổ sử dụng (bỏ STT / Thao Tác), mỗi lần thay đổi là một dòng
         return response()->json([
+            'columns' => [
+                ['title' => 'Mã Xuất Nhập'],
+                ['title' => 'Hoá Chất'],
+                ['title' => 'Số Lượng', 'align' => 'right'],
+                ['title' => 'Loại', 'align' => 'center'],
+                ['title' => 'Ngày Sử Dụng', 'align' => 'center'],
+                ['title' => 'Mục Đích Sử Dụng'],
+                ['title' => 'Người Sử Dụng'],
+                ['title' => 'Người Kiểm Tra'],
+            ],
             'rows' => $rows->map(function ($row) {
                 $unit = $row->unit_short_name ?: $row->unit_name;
+                $transfer = $row->type === 'transfer_out';
+                $sub = array_filter([
+                    $transfer ? '→ '.($row->to_department_short ?: $row->to_department_name ?: '—') : null,
+                    $row->status_id == 1 ? null : 'Đã khoá',
+                ]);
 
                 return [
                     'action' => $row->action,
                     'change_note' => $row->change_note,
                     'created_by' => $row->created_by ?: 'NA',
                     'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
-                    'snapshot' => [
-                        'Mã xuất nhập' => $row->code ?: '—',
-                        'Hoá chất' => $row->chem_name ?: '—',
-                        'Số lượng' => $row->amount !== null ? $this->number((float) $row->amount).' '.$unit : '—',
-                        'Loại phiếu' => self::TYPES[$row->type] ?? ($row->type ?: '—'),
-                        'Ngày sử dụng' => $row->exported_date ? \Carbon\Carbon::parse($row->exported_date)->format('d/m/Y') : '—',
-                        'Người sử dụng' => $row->exported_by ?: '—',
-                        'Người kiểm tra' => $row->checked_by ?: '—',
-                        'Mục đích sử dụng' => $row->purpose ?: '—',
-                        'Số phiếu KN, OOS, BCSL' => $row->test_report_no ?: '—',
-                        'Trạng thái' => $row->status_id == 1 ? 'Hiệu lực' : 'Đã khoá',
+                    'cells' => [
+                        ['text' => $row->code ?: '—', 'sub' => $row->category_code, 'strong' => true, 'nowrap' => true],
+                        ['text' => $row->chem_name ?: '—', 'sub' => $row->batch_no ? 'Lô '.$row->batch_no : null, 'strong' => true],
+                        ['text' => $row->amount !== null ? $this->number((float) $row->amount) : '—', 'sub' => $unit, 'inline' => true],
+                        [
+                            'text' => $transfer ? 'Chuyển liên phòng ban' : (self::TYPES[$row->type] ?? ($row->type ?: '—')),
+                            'badge' => $row->type === 'cancel' ? 'danger' : ($transfer ? 'primary' : 'success'),
+                            'sub' => $sub ? implode(' · ', $sub) : null,
+                        ],
+                        ['text' => $row->exported_date ? \Carbon\Carbon::parse($row->exported_date)->format('d/m/Y') : '—'],
+                        ['text' => $row->purpose ?: '—'],
+                        ['text' => $row->exported_by ?: '—'],
+                        ['text' => $row->checked_by ?: '—'],
                     ],
                 ];
             })->values(),

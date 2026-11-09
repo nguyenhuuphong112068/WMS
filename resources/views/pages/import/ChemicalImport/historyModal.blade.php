@@ -4,7 +4,7 @@
 --}}
 
 <div class="modal fade md-modal" id="historyModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-dialog modal-dialog-centered wms-history-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
@@ -16,12 +16,6 @@
             </div>
 
             <div class="modal-body">
-                <div class="md-hint mb-3">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Mỗi dòng là một lần thay đổi phiếu nhập, hiển thị nội dung đã đổi, lý do và giá trị của
-                    phiếu ngay sau lần đó. Mới nhất nằm trên cùng. Bản ghi lịch sử không sửa và không xoá.
-                </div>
-
                 <div class="imp-history-body"></div>
             </div>
 
