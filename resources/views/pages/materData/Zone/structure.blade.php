@@ -108,41 +108,11 @@
                         <label for="zs-name">Tên kệ/tủ <span class="text-danger">*</span></label>
                         <input type="text" id="zs-name" class="form-control form-control-sm zs-name-input" maxlength="255" placeholder="VD: Kệ/Tủ 05">
                     </div>
-                    <div class="form-group mb-0" id="zs-tier-order-group">
-                        <label for="zs-tier-order">Đánh số tầng</label>
-                        <select id="zs-tier-order" class="form-control form-control-sm">
-                            <option value="bottom_up">Từ dưới lên (Tầng 01 dưới cùng)</option>
-                            <option value="top_down">Từ trên xuống (Tầng 01 trên cùng)</option>
-                        </select>
-                    </div>
                     <div id="zs-preview" class="zs-preview" hidden></div>
                 </div>
 
-                {{-- Lưới chọn nhanh kiểu chèn bảng của Word, chỉ hiện khi kệ chưa có cột nào --}}
-                <div id="zs-picker" class="zs-picker" hidden>
-                    <div class="zs-picker-title">
-                        Chọn chiều đánh số tầng, rê chuột chọn số tầng (dọc) × số ô ngang mỗi tầng cho mỗi cột, nhập số dãy sâu, rồi bấm để xác nhận.
-                    </div>
-                    <div class="zs-picker-row">
-                        <div id="zs-picker-grid" class="zs-picker-grid"></div>
-                        <div class="zs-picker-side">
-                            <label class="mb-1">Đánh số tầng</label>
-                            <div class="zs-order-pick" role="group" aria-label="Chiều đánh số tầng">
-                                <button type="button" class="zs-order-btn" data-order="bottom_up">
-                                    <i class="fas fa-arrow-up"></i><span>Từ dưới lên<small>Tầng 01 dưới cùng</small></span>
-                                </button>
-                                <button type="button" class="zs-order-btn" data-order="top_down">
-                                    <i class="fas fa-arrow-down"></i><span>Từ trên xuống<small>Tầng 01 trên cùng</small></span>
-                                </button>
-                            </div>
-                            <label for="zs-picker-cols" class="mb-1 mt-2">Số cột</label>
-                            <input type="number" id="zs-picker-cols" class="form-control form-control-sm" min="1" value="1">
-                            <label for="zs-picker-depth" class="mb-1 mt-2" title="Số dãy tính từ cửa vào trong của mỗi tầng">Số dãy sâu</label>
-                            <input type="number" id="zs-picker-depth" class="form-control form-control-sm" min="1" value="1">
-                            <span id="zs-picker-readout" class="zs-picker-readout">Chưa chọn</span>
-                        </div>
-                    </div>
-                </div>
+                {{-- Thông số kệ: 4 thẻ cùng kiểu Cột/kệ × Tầng/cột × Ngang/tầng × Sâu/tầng, đổi số là lưới bên dưới đổi theo --}}
+                <div id="zs-spec" class="zs-spec"></div>
 
                 <div id="zs-columns" class="zs-columns"></div>
             </section>
@@ -633,136 +603,537 @@
         color: #B91C1C;
     }
 
-    .zs-picker {
+    /* ---------- Thông số kệ: 4 thẻ cùng kiểu ---------- */
+    .zs-spec {
         margin-top: 16px;
+        padding: 14px 16px 16px;
+        border: 1px solid var(--primary-soft);
+        border-radius: var(--border-radius-lg);
+        background: var(--bg-neutral);
     }
 
-    .zs-picker-title {
+    .zs-spec:empty {
+        display: none;
+    }
+
+    .zs-spec-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    .zs-spec-title {
+        font-weight: 700;
+        color: var(--primary);
+        font-size: 0.9rem;
+    }
+
+    .zs-spec-title i {
+        margin-right: 6px;
+    }
+
+    .zs-spec-formula {
         font-size: 0.82rem;
         color: #475569;
-        margin-bottom: 8px;
-    }
-
-    .zs-picker-row {
-        display: flex;
-        gap: 18px;
-        flex-wrap: wrap;
-        align-items: flex-start;
-    }
-
-    .zs-picker-grid {
-        display: grid;
-        gap: 2px;
-        /* cột đầu = số tầng của các hàng đang chọn, theo chiều đánh số */
-        grid-template-columns: 20px repeat(var(--cols), 14px);
-        width: max-content;
-        max-width: 100%;
-        overflow-x: auto;
-        padding: 6px;
-        border: 1px solid #dee2e6;
-        border-radius: var(--border-radius-md);
         background: #fff;
+        border: 1px solid var(--primary-soft);
+        border-radius: 999px;
+        padding: 4px 14px;
     }
 
-    .zs-pcell {
-        width: 14px;
-        height: 14px;
-        border: 1px solid #cbd5e1;
-        border-radius: 2px;
-        background: #f8fafc;
-        cursor: pointer;
+    .zs-spec-formula b {
+        color: var(--primary);
     }
 
-    .zs-pcell.is-on {
-        background: var(--primary-lighter);
-        border-color: var(--primary);
+    .zs-spec-formula .is-mixed {
+        color: #B45309;
     }
 
-    .zs-plabel {
-        font-size: 9px;
-        font-weight: 700;
-        line-height: 14px;
-        text-align: right;
-        padding-right: 3px;
-        color: var(--primary-dark);
-        user-select: none;
+    .zs-spec-formula.is-over,
+    .zs-spec-formula.is-over b {
+        color: #B91C1C;
+        border-color: #FECACA;
     }
 
-    .zs-plabel.is-first {
-        color: #fff;
-        background: var(--primary);
-        border-radius: 3px;
-        text-align: center;
-        padding-right: 0;
+    /* Trái: 4 thẻ thông số (2 × 2) · Phải: mô hình 3D */
+    .zs-spec-body {
+        display: grid;
+        grid-template-columns: minmax(380px, 460px) minmax(0, 1fr);
+        gap: 18px;
+        align-items: stretch;
     }
 
-    /* Hai nút chọn chiều đánh số tầng ngay trong khung tạo kệ */
-    .zs-order-pick {
+    .zs-spec-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 22px;
+        align-content: start;
+    }
+
+    .zs-spec-card {
+        position: relative;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 12px 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--border-radius-lg);
+        background: #fff;
+        box-shadow: var(--shadow-sm);
+        transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
     }
 
-    .zs-order-btn {
+    .zs-spec-card:hover,
+    .zs-spec-card:focus-within {
+        border-color: var(--primary-light);
+        box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
+        transform: translateY(-1px);
+    }
+
+    /* dấu × nối các thẻ: kệ = cột × tầng × ngang × sâu */
+    .zs-spec-card:nth-child(even)::before {
+        content: '×';
+        position: absolute;
+        left: -17px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--primary-lighter);
+    }
+
+    .zs-spec-card.is-mixed {
+        border-style: dashed;
+        border-color: #F59E0B;
+    }
+
+    .zs-spec-label {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 6px 10px;
+        gap: 8px;
+        align-self: stretch;
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .zs-spec-no {
+        flex: 0 0 auto;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-size: 0.72rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .zs-spec-label small {
+        display: block;
+        font-weight: 500;
+        color: #64748b;
+        font-size: 0.72rem;
+    }
+
+    .zs-fig {
+        width: 100%;
+        max-width: 170px;
+        height: 84px;
+    }
+
+    .zs-fig .f-post {
+        stroke: var(--primary-lighter);
+        stroke-width: 2;
+        stroke-linecap: round;
+        fill: none;
+    }
+
+    .zs-fig .f-line {
+        stroke: var(--primary-lighter);
+        stroke-width: 1;
+    }
+
+    .zs-fig .f-box {
+        fill: var(--primary-soft);
+        stroke: var(--primary);
+        stroke-width: 1.2;
+    }
+
+    .zs-fig .f-box.is-first {
+        fill: var(--primary-lighter);
+    }
+
+    .zs-fig .f-ghost {
+        fill: #fff;
+        stroke: var(--primary-lighter);
+        stroke-width: 1;
+    }
+
+    .zs-fig .f-front {
+        stroke: var(--primary-dark);
+        stroke-width: 2.5;
+        stroke-linecap: round;
+    }
+
+    .zs-fig text {
+        font-size: 8px;
+        font-weight: 700;
+        fill: #64748b;
+        font-family: inherit;
+    }
+
+    .zs-fig text.is-first {
+        fill: var(--primary-dark);
+    }
+
+    .zs-stepper {
+        display: flex;
+        align-items: stretch;
         border: 1px solid #cbd5e1;
         border-radius: var(--border-radius-md);
+        overflow: hidden;
         background: #fff;
-        color: var(--text-main);
-        text-align: left;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .zs-stepper:focus-within {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.15);
+    }
+
+    .zs-stepper button {
+        width: 34px;
+        border: none;
+        background: var(--primary-soft);
+        color: var(--primary);
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .zs-stepper button:hover:not(:disabled) {
+        background: var(--primary);
+        color: #fff;
+    }
+
+    .zs-stepper button:disabled {
+        color: #cbd5e1;
+        cursor: not-allowed;
+    }
+
+    .zs-stepper input {
+        width: 64px;
+        border: none;
+        text-align: center;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--primary);
+        padding: 2px 0;
+        outline: none;
+        -moz-appearance: textfield;
+    }
+
+    .zs-stepper input::-webkit-outer-spin-button,
+    .zs-stepper input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .zs-stepper input::placeholder {
+        color: #F59E0B;
+    }
+
+    .zs-stepper input:disabled {
+        background: #fff;
+    }
+
+    .zs-spec-cap {
+        min-height: 18px;
+        font-size: 0.74rem;
+        color: #64748b;
+        text-align: center;
+    }
+
+    .zs-spec-cap b {
+        color: var(--primary-dark);
+    }
+
+    .zs-spec-card.is-mixed .zs-spec-cap {
+        color: #B45309;
+    }
+
+    .zs-spec-order {
+        border: 1px solid var(--primary-lighter);
+        background: #fff;
+        color: var(--primary-dark);
+        border-radius: 999px;
+        padding: 1px 10px;
+        font-size: 0.74rem;
+        font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
     }
 
-    .zs-order-btn i {
-        width: 14px;
-        color: #94a3b8;
+    .zs-spec-order:hover:not(:disabled) {
+        background: var(--primary-soft);
+        border-color: var(--primary);
     }
 
-    .zs-order-btn span {
+    .zs-spec-order:disabled {
+        cursor: default;
+        opacity: 0.8;
+    }
+
+    /* ---------- Mô hình 3D ---------- */
+    .zs-3d {
+        position: relative;
+        min-height: 420px;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        background: radial-gradient(ellipse at 50% 30%, #fff 0%, var(--primary-soft) 100%);
+        box-shadow: var(--shadow-sm);
+        user-select: none;
+    }
+
+    .zs-3d-tools {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        z-index: 2;
         display: flex;
-        flex-direction: column;
-        font-size: 0.8rem;
-        font-weight: 600;
-        line-height: 1.2;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: space-between;
+        pointer-events: none;
     }
 
-    .zs-order-btn small {
-        font-size: 0.72rem;
-        font-weight: 500;
+    .zs-3d-views {
+        display: inline-flex;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--border-radius-md);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+        pointer-events: auto;
+    }
+
+    .zs-3d-views button {
+        border: none;
+        background: none;
+        padding: 4px 10px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .zs-3d-views button + button {
+        border-left: 1px solid #e2e8f0;
+    }
+
+    .zs-3d-views button:hover {
+        background: var(--primary-soft);
+        color: var(--primary);
+    }
+
+    .zs-3d-views button.active {
+        background: var(--primary);
+        color: #fff;
+    }
+
+    .zs-3d-scene {
+        position: absolute;
+        inset: 0;
+        perspective: 1600px;
+        perspective-origin: 50% 40%;
+        cursor: grab;
+        touch-action: none;
+    }
+
+    .zs-3d.is-dragging .zs-3d-scene {
+        cursor: grabbing;
+    }
+
+    .zs-3d-world {
+        position: absolute;
+        left: 50%;
+        top: 55%;
+        width: 0;
+        height: 0;
+        transform-style: preserve-3d;
+        transition: transform 0.35s ease;
+    }
+
+    .zs-3d.is-dragging .zs-3d-world {
+        transition: none;
+    }
+
+    .zs-3d-world > * {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform-origin: 0 0;
+    }
+
+    .zs-3d-floor {
+        background: radial-gradient(ellipse at center, rgba(var(--primary-rgb), 0.2) 0%, rgba(var(--primary-rgb), 0) 70%);
+    }
+
+    .zs-3d-back {
+        background: rgba(var(--primary-rgb), 0.04);
+        border: 1px solid rgba(var(--primary-rgb), 0.12);
+    }
+
+    /* vách giữa các cột: mép trước + mép sau là 2 trụ kệ */
+    .zs-3d-side {
+        background: rgba(var(--primary-rgb), 0.07);
+        border-left: 3px solid var(--primary-light);
+        border-right: 3px solid var(--primary-lighter);
+        transition: background 0.2s;
+    }
+
+    .zs-3d-cap {
+        background: rgba(var(--primary-rgb), 0.05);
+        border: 1px solid rgba(var(--primary-rgb), 0.25);
+    }
+
+    .zs-3d-board {
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid var(--primary-light);
+        transition: background 0.2s;
+    }
+
+    .zs-3d-board.is-texture {
+        background-image:
+            linear-gradient(90deg, rgba(var(--primary-rgb), 0.35) 1px, transparent 1px),
+            linear-gradient(rgba(var(--primary-rgb), 0.35) 1px, transparent 1px);
+        background-size: var(--u) var(--u);
+        background-position: var(--pad) var(--pad);
+    }
+
+    /* nẹp mép trước của tầng; Tầng 01 tô đậm */
+    .zs-3d-lip {
+        background: var(--primary-lighter);
+    }
+
+    .zs-3d-lip.is-first {
+        background: var(--primary);
+    }
+
+    .zs-3d-cell {
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border-radius: 2px;
+        border: 1px solid;
+    }
+
+    .zs-3d-cell.is-plan {
+        background: var(--primary-soft);
+        border-color: var(--primary);
+    }
+
+    .zs-3d-cell.is-free {
+        background: #EEF2F6;
+        border-color: #A9B4C2;
+    }
+
+    .zs-3d-cell.is-busy {
+        background: var(--primary);
+        border-color: var(--primary-dark);
+    }
+
+    .zs-3d-cell.is-off {
+        background: #CFD4D9;
+        border-color: #9AA1A8;
+    }
+
+    .zs-3d-cell.is-new {
+        background: #DCFCE7;
+        border-color: #16A34A;
+    }
+
+    .zs-3d-label {
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--primary-dark);
+        white-space: nowrap;
+        text-align: center;
+        pointer-events: none;
+    }
+
+    .zs-3d-tier-label {
+        width: 40px;
+        text-align: right;
         color: #64748b;
     }
 
-    .zs-order-btn:hover {
-        border-color: var(--primary-light);
-        background: var(--primary-soft);
+    .zs-3d-tier-label.is-first {
+        color: var(--primary);
     }
 
-    .zs-order-btn.active {
+    .zs-3d-hint {
+        position: absolute;
+        right: 12px;
+        bottom: 8px;
+        font-size: 0.72rem;
+        color: #94a3b8;
+        pointer-events: none;
+    }
+
+    /* rê vào thẻ thông số nào thì chiều đó sáng lên trên mô hình */
+    .zs-3d[data-hl="columns"] .zs-3d-side {
+        background: rgba(var(--primary-rgb), 0.24);
         border-color: var(--primary);
-        background: var(--primary-soft);
-        box-shadow: 0 0 0 1px var(--primary);
     }
 
-    .zs-order-btn.active i {
-        color: var(--primary);
+    .zs-3d[data-hl="columns"] .zs-3d-col-label,
+    .zs-3d[data-hl="tiers"] .zs-3d-tier-label {
+        color: var(--accent);
     }
 
-    .zs-picker-side {
-        display: flex;
-        flex-direction: column;
-        width: 190px;
-        font-size: 0.82rem;
-        font-weight: 600;
+    .zs-3d[data-hl="tiers"] .zs-3d-lip {
+        background: var(--accent);
     }
 
-    .zs-picker-readout {
-        margin-top: 10px;
-        color: var(--primary);
-        font-weight: 700;
+    .zs-3d[data-hl="tiers"] .zs-3d-board {
+        background: rgba(23, 184, 212, 0.16);
+    }
+
+    .zs-3d[data-hl="max"] .zs-3d-cell.d1,
+    .zs-3d[data-hl="depth"] .zs-3d-cell.p1 {
+        background: var(--accent) !important;
+        border-color: #0E7F93 !important;
+    }
+
+    @media (max-width: 1100px) {
+        .zs-spec-body {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .zs-3d {
+            min-height: 340px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .zs-spec-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .zs-spec-card::before {
+            display: none;
+        }
     }
 
     /* ---------- Kệ tạo thêm cùng lượt ---------- */
@@ -1434,6 +1805,7 @@
     "maxLocations": {{ (int) $structureLimits['maxLocations'] }},
     "maxDepth": {{ (int) $structureLimits['maxDepth'] }},
     "maxBatch": {{ (int) $structureLimits['maxBatch'] }},
+    "maxCells": {{ (int) $structureLimits['maxCells'] }},
     "canCreate": @json(user_can(md_perm('zone', 'create'))),
     "canUpdate": @json(user_can(md_perm('zone', 'update'))),
     "csrf": @json(csrf_token())
@@ -1481,23 +1853,14 @@
         shelfTitle: byId('zs-shelf-title'),
         code: byId('zs-code'),
         name: byId('zs-name'),
-        tierOrder: byId('zs-tier-order'),
-        tierOrderGroup: byId('zs-tier-order-group'),
         preview: byId('zs-preview'),
         drafts: byId('zs-drafts'),
         addShelf: byId('zs-add-shelf'),
-        picker: byId('zs-picker'),
-        pickerGrid: byId('zs-picker-grid'),
-        pickerCols: byId('zs-picker-cols'),
-        pickerDepth: byId('zs-picker-depth'),
-        readout: byId('zs-picker-readout'),
+        spec: byId('zs-spec'),
         columns: byId('zs-columns'),
         foot: byId('zs-foot'),
         summary: byId('zs-summary')
     };
-
-    el.pickerCols.max = CFG.maxColumns;
-    el.pickerDepth.max = CFG.maxDepth;
 
     /*
      | view: 'warehouses' | 'shelves' | 'editor'
@@ -2019,17 +2382,11 @@
         syncName();
         setTierOrder(state.tierOrder);
 
-        if (template && template.length) {
-            state.columns = template.map(function (tiers, index) { return newColumn(index + 1, tiers); });
-            showPicker(false);
-            renderColumns();
-            setDirty(true);
-        } else {
-            state.columns = [];
-            openPicker();
-            renderColumns();
-            setDirty(false);
-        }
+        // Kệ mới dựng sẵn theo thông số lần trước (hoặc mặc định), chỉ cần chỉnh 4 con số ở khung Thông số.
+        var fresh = !(template && template.length);
+        state.columns = (fresh ? specTemplate(lastSpec()) : template).map(function (tiers, index) { return newColumn(index + 1, tiers); });
+        renderColumns();
+        setDirty(!fresh);
 
         initDrafts();
         refreshCodeCheck();
@@ -2043,7 +2400,7 @@
         state.shelf = null;
         show('editor');
         el.columns.innerHTML = '';
-        showPicker(false);
+        el.spec.innerHTML = '';
         el.foot.hidden = true;
         el.note.textContent = 'Đang tải cấu trúc kệ/tủ...';
         el.note.hidden = false;
@@ -2057,7 +2414,6 @@
                 el.name.value = data.shelf.name;
                 el.preview.hidden = true;
                 setTierOrder(data.shelf.tier_order);
-                el.tierOrder.disabled = !CFG.canUpdate;
 
                 state.columns = data.columns.map(function (column) {
                     var removed = Number(column.status_id) !== 1;
@@ -2096,10 +2452,14 @@
                 el.note.hidden = true;
                 el.locBar.hidden = !CFG.canUpdate;
                 updatePicked();
-                if (!state.columns.length) openPicker();
+                // Kệ chưa có cột nào: dựng sẵn theo thông số mặc định để chỉnh tiếp ở khung Thông số.
+                var empty = !state.columns.length && CFG.canUpdate;
+                if (empty) {
+                    state.columns = specTemplate(lastSpec()).map(function (tiers, index) { return newColumn(index + 1, tiers); });
+                }
                 renderColumns();
                 renderCrumbs();
-                setDirty(false);
+                setDirty(empty);
             })
             .catch(function (error) {
                 el.note.textContent = error.message || 'Không tải được cấu trúc kệ/tủ.';
@@ -2188,7 +2548,7 @@
     }
 
     // Kệ đầu tiên dùng khung cố định trong HTML; kệ thêm sau được dựng trong #zs-drafts.
-    var MAIN = { columns: el.columns, code: el.code, name: el.name, preview: el.preview };
+    var MAIN = { columns: el.columns, code: el.code, name: el.name, preview: el.preview, spec: el.spec };
 
     function creatingMany() {
         return !state.shelf && state.drafts.length > 0;
@@ -2201,7 +2561,8 @@
             columns: card.querySelector('.zs-columns'),
             code: card.querySelector('.zs-code-input'),
             name: card.querySelector('.zs-name-input'),
-            preview: card.querySelector('.zs-preview')
+            preview: card.querySelector('.zs-preview'),
+            spec: card.querySelector('.zs-spec')
         };
     }
 
@@ -2228,6 +2589,7 @@
         el.code = ctx.code;
         el.name = ctx.name;
         el.preview = ctx.preview;
+        el.spec = ctx.spec;
         state.columns = draft.columns;
         state.nameTouched = draft.nameTouched;
     }
@@ -2290,6 +2652,7 @@
                 +     '<input type="text" class="form-control form-control-sm zs-name-input" maxlength="255" value="' + esc(draft.name) + '"></div>'
                 +   '<div class="zs-preview" hidden></div>'
                 + '</div>'
+                + '<div class="zs-spec"></div>'
                 + '<div class="zs-columns"></div>'
                 + '</section>';
         }).join('');
@@ -2423,130 +2786,686 @@
         }, 250);
     }
 
-    /* lưới chọn nhanh kiểu Word */
+    /* ---------- Thông số kệ: Cột/kệ × Tầng/cột × Ngang/tầng × Sâu/tầng ---------- */
 
-    var PICKER_MAX_ROWS = Math.min(CFG.maxTiers, 20);
-    var PICKER_MAX_COLS = Math.min(CFG.maxLocations, 60);
-    var pickerRows = 6;
-    var pickerCols = 20;
+    // Bốn thông số khai cùng một kiểu thẻ; đổi một số chỉ áp đúng chiều đó cho cả kệ đang thao tác,
+    // các chiều khác (và chỗ đã chỉnh riêng ở từng cột/tầng) giữ nguyên.
+    var SPEC_DIMS = [
+        { key: 'columns', label: 'Số cột', sub: 'của một kệ/tủ', min: 1, limit: 'maxColumns' },
+        { key: 'tiers', label: 'Số tầng', sub: 'của mỗi cột', min: 1, limit: 'maxTiers' },
+        { key: 'max', label: 'Vị trí ngang', sub: 'mỗi tầng · A, B, C...', min: 1, limit: 'maxLocations' },
+        { key: 'depth', label: 'Vị trí sâu', sub: 'mỗi tầng · dãy 1 sát cửa', min: 1, limit: 'maxDepth' }
+    ];
+    var SPEC_DEFAULT = { columns: 1, tiers: 4, max: 5, depth: 1 };
+    var SPEC_KEY = 'wms.zone.spec';
 
-    var pickerHover = { r: 0, c: 0 };
-
-    // Khung chọn nhanh có ô chọn chiều tầng riêng, nên lúc đang mở thì ẩn ô "Đánh số tầng" ở đầu form.
-    function showPicker(on) {
-        el.picker.hidden = !on;
-        el.tierOrderGroup.hidden = on;
+    // Thông số lần tạo kệ trước của người dùng này (chỉ để gợi ý, đọc hỏng thì dùng mặc định).
+    function lastSpec() {
+        var saved = null;
+        try { saved = JSON.parse(localStorage.getItem(SPEC_KEY) || 'null'); } catch (err) { saved = null; }
+        var spec = {};
+        SPEC_DIMS.forEach(function (dim) {
+            var value = saved ? Number(saved[dim.key]) : 0;
+            spec[dim.key] = value >= dim.min && value <= CFG[dim.limit] ? value : SPEC_DEFAULT[dim.key];
+        });
+        return spec;
     }
 
-    function openPicker() {
-        pickerRows = 6;
-        pickerCols = 20;
-        pickerHover = { r: 0, c: 0 };
-        el.pickerCols.value = 1;
-        el.pickerDepth.value = 1;
-        el.readout.textContent = 'Chưa chọn';
-        showPicker(true);
-        drawPicker(0, 0);
+    function rememberSpec() {
+        if (state.shelf) return;
+        var values = specValues();
+        var spec = {};
+        SPEC_DIMS.forEach(function (dim) { spec[dim.key] = values[dim.key] || values.sample[dim.key]; });
+        try { localStorage.setItem(SPEC_KEY, JSON.stringify(spec)); } catch (err) { /* bỏ qua */ }
     }
 
-    // Số tầng của hàng thứ r (tính từ trên) khi đang chọn `rows` hàng, theo chiều đánh số.
-    function pickerTier(r, rows) {
-        return state.tierOrder === 'top_down' ? r : rows - r + 1;
+    // Mẫu tầng cho `spec.columns` cột: [[{position, max, depth}...], ...]
+    function specTemplate(spec) {
+        var tiers = [];
+        for (var p = 1; p <= spec.tiers; p++) tiers.push({ position: p, max: spec.max, depth: spec.depth });
+        var list = [];
+        for (var c = 0; c < spec.columns; c++) list.push(tiers);
+        return list;
     }
 
-    function drawPicker(hoverRow, hoverCol) {
-        el.pickerGrid.style.setProperty('--cols', pickerCols);
-        var html = '';
-        for (var r = 1; r <= pickerRows; r++) {
-            html += '<span class="zs-plabel" data-r="' + r + '"></span>';
-            for (var c = 1; c <= pickerCols; c++) {
-                html += '<span class="zs-pcell" data-r="' + r + '" data-c="' + c + '"></span>';
-            }
+    function liveColumns() {
+        return state.columns.filter(function (column) { return !column.removed; })
+            .sort(function (a, b) { return a.position - b.position; });
+    }
+
+    function liveTiers(column) {
+        return activeTiers(column).sort(function (a, b) { return a.position - b.position; });
+    }
+
+    // Giá trị hiện tại của từng chiều: số nếu cả kệ đồng đều, null nếu các cột/tầng khác nhau.
+    // `sample` = giá trị của cột/tầng đầu tiên, dùng để vẽ hình minh hoạ khi chiều đó không đều.
+    function specValues() {
+        var cols = liveColumns();
+        var sets = { tiers: {}, max: {}, depth: {} };
+        var sample = { columns: cols.length, tiers: 0, max: 0, depth: 0 };
+
+        cols.forEach(function (column) {
+            var tiers = activeTiers(column);
+            sets.tiers[tiers.length] = true;
+            if (!sample.tiers) sample.tiers = tiers.length;
+            tiers.forEach(function (tier) {
+                sets.max[tier.max] = true;
+                sets.depth[tier.depth] = true;
+                if (!sample.max) { sample.max = tier.max; sample.depth = tier.depth; }
+            });
+        });
+
+        function one(set) {
+            var keys = Object.keys(set);
+            return keys.length > 1 ? null : Number(keys[0] || 0);
         }
-        el.pickerGrid.innerHTML = html;
-        paintPicker(hoverRow, hoverCol);
+
+        return {
+            columns: cols.length,
+            tiers: one(sets.tiers),
+            max: one(sets.max),
+            depth: one(sets.depth),
+            sample: {
+                columns: sample.columns || 1,
+                tiers: sample.tiers || 1,
+                max: sample.max || 1,
+                depth: sample.depth || 1
+            }
+        };
     }
 
-    // Tô vùng đang chọn và ghi số tầng cạnh từng hàng (Tầng 01 tô đậm để thấy ngay nằm trên hay dưới).
-    function paintPicker(r, c) {
-        pickerHover = { r: r, c: c };
-        el.pickerGrid.querySelectorAll('.zs-pcell').forEach(function (node) {
-            node.classList.toggle('is-on', Number(node.dataset.r) <= r && Number(node.dataset.c) <= c);
-        });
-        el.pickerGrid.querySelectorAll('.zs-plabel').forEach(function (node) {
-            var row = Number(node.dataset.r);
-            var tier = row <= r ? pickerTier(row, r) : 0;
-            node.textContent = tier ? seg(tier) : '';
-            node.classList.toggle('is-first', tier === 1);
-        });
-        paintReadout();
+    /* hình minh hoạ: cùng khung, cùng màu, mỗi thẻ tô đậm đúng chiều nó đếm */
+
+    var FIG = { w: 160, h: 84 };
+
+    function svg(body) {
+        return '<svg class="zs-fig" viewBox="0 0 ' + FIG.w + ' ' + FIG.h + '" aria-hidden="true">' + body + '</svg>';
     }
 
-    function paintReadout() {
-        var r = pickerHover.r;
-        var c = pickerHover.c;
-        if (!r || !c) {
-            el.readout.textContent = state.tierOrder === 'top_down' ? 'Tầng 01 nằm trên cùng' : 'Tầng 01 nằm dưới cùng';
+    function rect(x, y, w, h, cls) {
+        return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + Math.max(w, 1).toFixed(1)
+            + '" height="' + Math.max(h, 1).toFixed(1) + '" rx="1.5" class="' + cls + '"/>';
+    }
+
+    function line(x1, y1, x2, y2, cls) {
+        return '<line class="' + cls + '" x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1)
+            + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"/>';
+    }
+
+    function text(x, y, value, cls, anchor) {
+        return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="' + (anchor || 'middle') + '"'
+            + (cls ? ' class="' + cls + '"' : '') + '>' + esc(value) + '</text>';
+    }
+
+    // Nhãn thứ i (0-based) khi chỉ vẽ `shown` trên tổng `total` mục: mục áp chót thành "…", mục cuối là số thật.
+    function capLabel(i, shown, total, format) {
+        if (total > shown && i === shown - 1) return format(total);
+        if (total > shown && i === shown - 2) return '…';
+        return format(i + 1);
+    }
+
+    // Mặt trước kệ: các cột (khoang) đứng cạnh nhau, vạch mờ là các tầng.
+    function figColumns(v) {
+        var n = Math.min(v.columns, 6);
+        var t = Math.min(v.tiers, 5);
+        var x0 = 10, y0 = 14, w = 140, h = 58, bw = w / n, out = '';
+
+        for (var i = 0; i < n; i++) {
+            var x = x0 + i * bw;
+            out += rect(x + 2, y0, bw - 4, h, 'f-box' + (i === 0 ? ' is-first' : ''));
+            for (var j = 1; j < t; j++) {
+                out += line(x + 2, y0 + h * j / t, x + bw - 2, y0 + h * j / t, 'f-line');
+            }
+            out += text(x + bw / 2, y0 - 4, capLabel(i, n, v.columns, seg), i === 0 ? 'is-first' : '');
+        }
+        out += line(6, y0 + h + 4, 154, y0 + h + 4, 'f-post');
+        return svg(out);
+    }
+
+    // Một cột: các tầng xếp chồng, Tầng 01 tô đậm ở dưới hoặc trên theo chiều đánh số.
+    function figTiers(v) {
+        var n = Math.min(v.tiers, 6);
+        var x0 = 58, y0 = 6, w = 48, h = 70, th = h / n, out = '';
+        var topDown = state.tierOrder === 'top_down';
+
+        out += line(x0 - 3, 2, x0 - 3, y0 + h + 4, 'f-post');
+        out += line(x0 + w + 3, 2, x0 + w + 3, y0 + h + 4, 'f-post');
+
+        for (var i = 0; i < n; i++) {
+            // i = 0 là hàng trên cùng của hình
+            var index = topDown ? i : n - 1 - i;
+            var y = y0 + i * th;
+            out += rect(x0, y + 1.5, w, th - 3, 'f-box' + (index === 0 ? ' is-first' : ''));
+            out += text(x0 - 9, y + th / 2 + 3, capLabel(index, n, v.tiers, seg), index === 0 ? 'is-first' : '', 'end');
+        }
+        return svg(out);
+    }
+
+    // Mặt trước một tầng: các vị trí ngang A, B, C... dọc mép trước.
+    function figMax(v) {
+        var n = Math.min(v.max, 8);
+        var x0 = 8, y0 = 20, w = 144, h = 34, bw = w / n, out = '';
+
+        out += line(4, y0 + h + 3, 156, y0 + h + 3, 'f-post');
+        for (var i = 0; i < n; i++) {
+            out += rect(x0 + i * bw + 1.5, y0, bw - 3, h, 'f-box' + (i === 0 ? ' is-first' : ''));
+            out += text(x0 + i * bw + bw / 2, y0 + h + 15, capLabel(i, n, v.max, letters), i === 0 ? 'is-first' : '');
+        }
+        return svg(out);
+    }
+
+    // Nhìn từ trên xuống một tầng (phối cảnh): dãy 1 sát cửa ở trước, các dãy sâu dần vào trong.
+    function figDepth(v) {
+        var rows = Math.min(v.depth, 5);
+        var cols = Math.min(v.max, 6);
+        var dy = Math.min(54 / rows, 13), dx = dy * 0.75;
+        var front = 12 + (54 + rows * dy) / 2;
+        var x0 = 22, cw = (124 - rows * dx) / cols, out = '';
+
+        function pt(c, r) {
+            return (x0 + c * cw + r * dx).toFixed(1) + ',' + (front - r * dy).toFixed(1);
+        }
+
+        for (var r = rows - 1; r >= 0; r--) {
+            for (var c = 0; c < cols; c++) {
+                out += '<polygon class="f-box' + (r === 0 ? ' is-first' : '') + '" points="'
+                    + pt(c, r) + ' ' + pt(c + 1, r) + ' ' + pt(c + 1, r + 1) + ' ' + pt(c, r + 1) + '"/>';
+            }
+            out += text(x0 + (r + 0.5) * dx - 5, front - (r + 0.5) * dy + 3, capLabel(r, rows, v.depth, String),
+                r === 0 ? 'is-first' : '', 'end');
+        }
+        out += line(x0, front + 1, x0 + cols * cw, front + 1, 'f-front');
+        out += text(x0 + cols * cw / 2, front + 14, 'Cửa / mép trước', 'is-first');
+        return svg(out);
+    }
+
+    var FIGS = { columns: figColumns, tiers: figTiers, max: figMax, depth: figDepth };
+
+    function specCaption(key, value) {
+        if (value === null) return 'Đang khác nhau giữa các ' + (key === 'tiers' ? 'cột' : 'tầng');
+        if (key === 'columns') return 'Cột <b>01</b> → <b>' + seg(value) + '</b>';
+        if (key === 'max') return 'Ô <b>A</b> → <b>' + letters(value) + '</b> dọc mép trước';
+        if (key === 'depth') return 'Dãy <b>1</b> (sát cửa) → <b>' + value + '</b>';
+        return '';
+    }
+
+    function specEditable() {
+        return state.shelf ? CFG.canUpdate : CFG.canCreate;
+    }
+
+    // Khung tĩnh của 4 thẻ; số, hình, chú thích được vẽ lại ở paintSpec.
+    function specSkeleton(node) {
+        var off = specEditable() ? '' : ' disabled';
+        node.innerHTML = '<div class="zs-spec-head">'
+            +   '<span class="zs-spec-title"><i class="fas fa-ruler-combined"></i>Thông số kệ/tủ</span>'
+            +   '<span class="zs-spec-formula"></span>'
+            + '</div>'
+            + '<div class="zs-spec-body">'
+            + '<div class="zs-spec-grid">'
+            + SPEC_DIMS.map(function (dim, i) {
+                return '<div class="zs-spec-card" data-dim="' + dim.key + '">'
+                    + '<div class="zs-spec-label"><span class="zs-spec-no">' + (i + 1) + '</span>'
+                    +   '<span>' + dim.label + '<small>' + dim.sub + '</small></span></div>'
+                    + '<div class="zs-spec-fig"></div>'
+                    + '<div class="zs-stepper">'
+                    +   '<button type="button" class="zs-spec-step" data-step="-1" title="Bớt 1"' + off + '><i class="fas fa-minus"></i></button>'
+                    +   '<input type="number" class="zs-spec-input" min="' + dim.min + '" max="' + CFG[dim.limit] + '"'
+                    +     ' aria-label="' + esc(dim.label + ' ' + dim.sub) + '"' + off + '>'
+                    +   '<button type="button" class="zs-spec-step" data-step="1" title="Thêm 1"' + off + '><i class="fas fa-plus"></i></button>'
+                    + '</div>'
+                    + '<div class="zs-spec-cap">' + (dim.key === 'tiers'
+                        ? '<button type="button" class="zs-spec-order" title="Bấm để đổi chiều đánh số tầng"' + off + '></button>'
+                        : '') + '</div>'
+                    + '</div>';
+            }).join('')
+            + '</div>'
+            + stage3dMarkup()
+            + '</div>';
+        node.dataset.ready = specEditable() ? 'edit' : 'view';
+    }
+
+    function paintSpec() {
+        var node = el.spec;
+        if (!node || state.view !== 'editor') return;
+        if (node.dataset.ready !== (specEditable() ? 'edit' : 'view') || !node.querySelector('.zs-spec-card')) specSkeleton(node);
+
+        var v = specValues();
+        var focused = document.activeElement;
+        var figValues = {
+            columns: v.columns || 1,
+            tiers: v.tiers || v.sample.tiers,
+            max: v.max || v.sample.max,
+            depth: v.depth || v.sample.depth
+        };
+
+        SPEC_DIMS.forEach(function (dim) {
+            var card = node.querySelector('.zs-spec-card[data-dim="' + dim.key + '"]');
+            var value = v[dim.key];
+            var input = card.querySelector('.zs-spec-input');
+
+            card.classList.toggle('is-mixed', value === null);
+            if (input !== focused) input.value = value === null ? '' : value;
+            input.placeholder = value === null ? '≠' : '';
+            input.title = value === null ? 'Đang khác nhau - nhập số để đặt chung cho cả kệ' : '';
+
+            if (specEditable()) {
+                var shown = value === null ? v.sample[dim.key] : value;
+                card.querySelector('[data-step="-1"]').disabled = value !== null && shown <= dim.min;
+                card.querySelector('[data-step="1"]').disabled = value !== null && shown >= CFG[dim.limit];
+            }
+
+            card.querySelector('.zs-spec-fig').innerHTML = FIGS[dim.key](figValues);
+
+            var cap = card.querySelector('.zs-spec-cap');
+            if (dim.key === 'tiers') {
+                cap.querySelector('.zs-spec-order').innerHTML = '<i class="fas fa-arrow-'
+                    + (state.tierOrder === 'top_down' ? 'down' : 'up') + ' mr-1"></i>'
+                    + (state.tierOrder === 'top_down' ? 'Tầng 01 trên cùng' : 'Tầng 01 dưới cùng');
+            } else {
+                cap.innerHTML = specCaption(dim.key, value);
+            }
+        });
+
+        var cells = state.columns.reduce(function (sum, column) { return sum + columnCells(column); }, 0);
+        var parts = [[v.columns, 'cột'], [v.tiers, 'tầng'], [v.max, 'ngang'], [v.depth, 'sâu']].map(function (part) {
+            return part[0] === null ? '<span class="is-mixed">≠ ' + part[1] + '</span>' : '<b>' + part[0] + '</b> ' + part[1];
+        });
+        var formula = node.querySelector('.zs-spec-formula');
+        formula.classList.toggle('is-over', cells > CFG.maxCells);
+        formula.innerHTML = parts.join(' × ') + ' = <b>' + num(cells) + '</b> vị trí'
+            + (cells > CFG.maxCells ? ' (vượt mức ' + num(CFG.maxCells) + ' mỗi lượt lưu)' : '');
+
+        schedule3d(node);
+    }
+
+    // Đặt số cột đang dùng: thêm thì mở lại cột cũ đang khoá trước rồi mới tạo cột mới (giống cột cuối),
+    // bớt thì gỡ từ cột bên phải; cột đang có lô hàng thì dừng lại.
+    function setColumnCount(count, warnings) {
+        var live = liveColumns();
+
+        while (live.length < count) {
+            var dormant = state.columns.filter(function (column) { return column.removed; })
+                .sort(function (a, b) { return a.position - b.position; })[0];
+            if (dormant) {
+                dormant.removed = false;
+                if (dormant.wasRemoved) {
+                    dormant.tiers.forEach(function (tier) { tier.removed = false; });
+                    if (!dormant.tiers.length) dormant.tiers.push(newTier(1, 10, 1));
+                }
+            } else {
+                if (maxPosition(state.columns) >= 99) break;
+                var last = live[live.length - 1];
+                var template = last ? templateOf(last) : specTemplate(lastSpec())[0];
+                state.columns.push(newColumn(maxPosition(state.columns) + 1, template));
+            }
+            live = liveColumns();
+        }
+
+        while (live.length > count) {
+            var column = live[live.length - 1];
+            if (columnBusy(column)) {
+                warnings.push(column.label + ' đang có lô hàng, không gỡ được');
+                break;
+            }
+            if (column.existing) column.removed = true;
+            else dropNew(state.columns, column, function (x) { if (!x.custom) x.label = 'Cột ' + seg(x.position); });
+            live = liveColumns();
+        }
+    }
+
+    // Đặt số tầng đang dùng cho mọi cột: thêm ở trên cùng (giống tầng cao nhất), bớt từ tầng cao nhất.
+    function setTierCount(count, warnings) {
+        liveColumns().forEach(function (column) {
+            var live = liveTiers(column);
+
+            while (live.length < count) {
+                var dormant = column.tiers.filter(function (tier) { return tier.removed; })
+                    .sort(function (a, b) { return a.position - b.position; })[0];
+                if (dormant) {
+                    dormant.removed = false;
+                } else {
+                    var highest = maxPosition(column.tiers);
+                    if (highest >= 99) break;
+                    var top = live[live.length - 1];
+                    column.tiers.push(newTier(highest + 1, top ? top.max : SPEC_DEFAULT.max, top ? top.depth : 1));
+                }
+                live = liveTiers(column);
+            }
+
+            while (live.length > count) {
+                var tier = live[live.length - 1];
+                if (tier.lastBusy) {
+                    warnings.push(column.label + ' - ' + tier.label + ' đang có lô hàng, không gỡ được');
+                    break;
+                }
+                if (tier.existing) tier.removed = true;
+                else dropNew(column.tiers, tier, function (x) { if (!x.custom) x.label = 'Tầng ' + seg(x.position); });
+                live = liveTiers(column);
+            }
+        });
+    }
+
+    // Đặt số vị trí ngang / sâu cho mọi tầng; không thu nhỏ qua ô đang có lô hàng.
+    function setCellCount(key, count, warnings) {
+        liveColumns().forEach(function (column) {
+            activeTiers(column).forEach(function (tier) {
+                var next = key === 'max' ? clampMax(tier, count) : clampDepth(tier, count);
+                if (next > count && tier.lastBusy) {
+                    warnings.push(column.label + ' - ' + tier.label + ' giữ ' + next + (key === 'max' ? ' ô ngang' : ' dãy sâu'));
+                }
+                tier[key] = next;
+            });
+        });
+    }
+
+    function applySpec(key, value) {
+        var dim = SPEC_DIMS.find(function (item) { return item.key === key; });
+        if (!dim || !specEditable()) return;
+
+        value = Math.round(Number(value));
+        if (!value || value < dim.min) value = dim.min;
+        if (value > CFG[dim.limit]) {
+            toast('warning', 'Tối đa ' + CFG[dim.limit] + ' - ' + dim.label.toLowerCase() + ' ' + dim.sub.split(' · ')[0] + '.');
+            value = CFG[dim.limit];
+        }
+
+        var warnings = [];
+        if (key === 'columns') setColumnCount(value, warnings);
+        else if (key === 'tiers') setTierCount(value, warnings);
+        else setCellCount(key, value, warnings);
+
+        setDirty(true);
+        renderColumns();
+        rememberSpec();
+
+        if (warnings.length) {
+            toast('warning', 'Không thu nhỏ được chỗ đang có lô hàng: ' + warnings.join('; ') + '. Hãy chuyển hàng đi trước.');
+        }
+    }
+
+    function specCurrent(key) {
+        var v = specValues();
+        return v[key] === null ? v.sample[key] : v[key];
+    }
+
+    el.editor.addEventListener('click', function (event) {
+        var order = event.target.closest('.zs-spec-order');
+        if (order) {
+            setTierOrder(state.tierOrder === 'top_down' ? 'bottom_up' : 'top_down');
+            renderAllColumns();
+            setDirty(true);
             return;
         }
-        var cols = pickerColumns();
-        var depth = pickerDepth();
-        el.readout.textContent = cols + ' cột × ' + r + ' tầng × ' + c + ' ngang × ' + depth + ' sâu = ' + num(cols * r * c * depth) + ' ô';
+
+        var step = event.target.closest('.zs-spec-step');
+        if (!step) return;
+        var key = step.closest('.zs-spec-card').dataset.dim;
+        applySpec(key, specCurrent(key) + Number(step.dataset.step));
+    });
+
+    el.editor.addEventListener('change', function (event) {
+        var input = event.target.closest('.zs-spec-input');
+        if (!input) return;
+        if (input.value === '') {
+            paintSpec();
+            return;
+        }
+        applySpec(input.closest('.zs-spec-card').dataset.dim, input.value);
+    });
+
+    el.editor.addEventListener('keydown', function (event) {
+        var input = event.target.closest('.zs-spec-input');
+        if (!input) return;
+        // Mũi tên lên/xuống tăng giảm như nút +/-, Enter để áp số vừa gõ.
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            var key = input.closest('.zs-spec-card').dataset.dim;
+            applySpec(key, specCurrent(key) + (event.key === 'ArrowUp' ? 1 : -1));
+            input.value = specCurrent(key);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            input.blur();
+        }
+    });
+
+    /* ---------- Mô hình 3D của kệ (CSS 3D, không cần thư viện) ---------- */
+
+    // Kệ dựng theo đúng lưới sau khi lưu: vách giữa các cột, mặt từng tầng, từng ô Ngang × Sâu
+    // (dãy 1 sát mép trước). Kéo chuột để xoay; các nút đổi góc nhìn / phóng to.
+    var V3 = { U: 16, G: 3, PAD: 7, TH: 46, MAX_CELLS: 4000 };
+    var VIEWS3D = {
+        iso: { ax: -24, ay: -32 },
+        front: { ax: -12, ay: 0 },
+        top: { ax: -82, ay: 0 }
+    };
+    var view3d = { ax: VIEWS3D.iso.ax, ay: VIEWS3D.iso.ay, zoom: 1, fit: 1, preset: 'iso' };
+
+    function stage3dMarkup() {
+        return '<div class="zs-3d" title="Kéo chuột để xoay · nhấp đúp để về góc nghiêng">'
+            + '<div class="zs-3d-tools">'
+            +   '<div class="zs-3d-views" role="group" aria-label="Góc nhìn">'
+            +     '<button type="button" data-view3d="iso"><i class="fas fa-cube mr-1"></i>Nghiêng</button>'
+            +     '<button type="button" data-view3d="front"><i class="fas fa-border-all mr-1"></i>Chính diện</button>'
+            +     '<button type="button" data-view3d="top"><i class="fas fa-map mr-1"></i>Từ trên</button>'
+            +   '</div>'
+            +   '<div class="zs-3d-views" role="group" aria-label="Phóng to thu nhỏ">'
+            +     '<button type="button" data-zoom3d="-1" title="Thu nhỏ"><i class="fas fa-search-minus"></i></button>'
+            +     '<button type="button" data-zoom3d="1" title="Phóng to"><i class="fas fa-search-plus"></i></button>'
+            +   '</div>'
+            + '</div>'
+            + '<div class="zs-3d-scene"><div class="zs-3d-world"></div></div>'
+            + '<div class="zs-3d-hint"><i class="fas fa-arrows-alt mr-1"></i>Kéo để xoay</div>'
+            + '</div>';
     }
 
-    document.querySelectorAll('.zs-order-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            setTierOrder(btn.dataset.order);
-            paintPicker(pickerHover.r, pickerHover.c);
-            renderAllColumns();
+    function px(n) {
+        return n.toFixed(1) + 'px';
+    }
+
+    // Một mặt phẳng trong không gian: đặt góc trên-trái tại (x, y, z) rồi xoay.
+    function plane(cls, x, y, z, w, h, rotate, extra) {
+        return '<div class="' + cls + '" style="width:' + px(w) + ';height:' + px(h)
+            + ';transform:translate3d(' + px(x) + ',' + px(y) + ',' + px(z) + ')' + (rotate ? ' ' + rotate : '') + '"'
+            + (extra || '') + '></div>';
+    }
+
+    // Trạng thái hiển thị của một ô trên mô hình (chỉ các ô còn trong lưới sau khi lưu).
+    // Đang tô theo phân loại thì ô 3D cũng mang màu phân loại (ô có hàng đậm, ô trống nhạt) như lưới 2D.
+    function cell3dStyle(tier, key, cls) {
+        if (!state.shelf || state.cellView !== 'zone' || (cls !== 'is-free' && cls !== 'is-busy')) return '';
+        var attr = tier.attrs[key];
+        var color = attr && attr.zone_type && CFG.zoneColors[attr.zone_type];
+        if (!color) return '';
+        return ';background:' + (cls === 'is-busy' ? color : soften(color)) + ';border-color:' + color;
+    }
+
+    function cell3dClass(tier, key) {
+        if (!state.shelf) return 'is-plan';
+        var k = splitKey(key);
+        if (!inOld(tier, k.p, k.d)) return 'is-new';
+        if (tier.busy.has(key)) return 'is-busy';
+        if (tier.off.has(key)) return 'is-off';
+        return 'is-free';
+    }
+
+    function apply3dTransform(stage) {
+        var world = stage.querySelector('.zs-3d-world');
+        world.style.transform = 'scale(' + (view3d.fit * view3d.zoom).toFixed(3) + ') rotateX(' + view3d.ax + 'deg) rotateY(' + view3d.ay + 'deg)';
+        stage.querySelectorAll('[data-view3d]').forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.view3d === view3d.preset);
+        });
+    }
+
+    function render3d(node) {
+        var stage = node.querySelector('.zs-3d');
+        if (!stage) return;
+        var world = stage.querySelector('.zs-3d-world');
+        var U = V3.U, G = V3.G, PAD = V3.PAD, TH = V3.TH;
+        var cols = liveColumns().filter(function (column) { return activeTiers(column).length; });
+
+        if (!cols.length) {
+            world.innerHTML = '';
+            return;
+        }
+
+        var span = function (n) { return n * U + (n - 1) * G + 2 * PAD; };
+        var maxDepth = 1, maxTiers = 1, total = 0;
+        var widths = cols.map(function (column) {
+            var widest = 1;
+            activeTiers(column).forEach(function (tier) {
+                widest = Math.max(widest, tier.max);
+                maxDepth = Math.max(maxDepth, tier.depth);
+                total += tier.max * tier.depth;
+            });
+            maxTiers = Math.max(maxTiers, activeTiers(column).length);
+            return span(widest);
+        });
+
+        var W = widths.reduce(function (a, b) { return a + b; }, 0);
+        var D = span(maxDepth);
+        var H = maxTiers * TH;
+        var x0 = -W / 2, top = -H / 2, floor = H / 2, back = -D / 2, front = D / 2;
+        var drawCells = total <= V3.MAX_CELLS;
+        var topDown = state.tierOrder === 'top_down';
+        var html = '';
+
+        html += plane('zs-3d-floor', x0 - 30, floor + 1, back - 30, W + 60, D + 60, 'rotateX(90deg)');
+        html += plane('zs-3d-back', x0, top, back, W, H);
+
+        var x = x0;
+        cols.forEach(function (column, ci) {
+            var w = widths[ci];
+            var tiers = liveTiers(column);
+
+            html += plane('zs-3d-side', x, top, front, D, H, 'rotateY(90deg)');
+            html += plane('zs-3d-cap', x, top, back, w, D, 'rotateX(90deg)');
+            html += '<div class="zs-3d-label zs-3d-col-label" style="width:' + px(w) + ';transform:translate3d('
+                + px(x) + ',' + px(top - 20) + ',' + px(front) + ')">' + esc(column.label) + '</div>';
+
+            tiers.forEach(function (tier, ti) {
+                // Hàng vật lý tính từ dưới lên; đánh số từ trên xuống thì Tầng 01 nằm trên cùng.
+                var level = topDown ? maxTiers - 1 - ti : ti;
+                var y = floor - level * TH;
+                var cells = '';
+
+                if (drawCells) {
+                    for (var d = 1; d <= tier.depth; d++) {
+                        for (var p = 1; p <= tier.max; p++) {
+                            var key = cellKey(p, d);
+                            var code = cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + letters(p) + d;
+                            var cls = cell3dClass(tier, key);
+                            cells += '<span class="zs-3d-cell ' + cls + (d === 1 ? ' d1' : '') + (p === 1 ? ' p1' : '')
+                                + '" style="left:' + px(PAD + (p - 1) * (U + G)) + ';top:' + px(D - PAD - d * U - (d - 1) * G)
+                                + cell3dStyle(tier, key, cls) + '"'
+                                + ' title="' + esc(code) + '"></span>';
+                        }
+                    }
+                }
+
+                html += '<div class="zs-3d-board' + (drawCells ? '' : ' is-texture') + (tier.position === 1 ? ' is-first' : '') + '"'
+                    + ' style="width:' + px(w) + ';height:' + px(D) + ';transform:translate3d(' + px(x) + ',' + px(y) + ',' + px(back) + ') rotateX(90deg)'
+                    + (drawCells ? '' : ';--u:' + px(U + G) + ';--pad:' + px(PAD))
+                    + '" title="' + esc(column.label + ' · ' + tier.label + ' · ' + tier.max + ' ngang × ' + tier.depth + ' sâu') + '">'
+                    + cells + '</div>';
+                html += plane('zs-3d-lip' + (tier.position === 1 ? ' is-first' : ''), x, y, front, w, 5);
+
+                if (ci === 0) {
+                    html += '<div class="zs-3d-label zs-3d-tier-label' + (tier.position === 1 ? ' is-first' : '')
+                        + '" style="transform:translate3d(' + px(x - 46) + ',' + px(y - 16) + ',' + px(front) + ')">'
+                        + esc(tierSegment(tier)) + '</div>';
+                }
+            });
+
+            x += w;
+        });
+        html += plane('zs-3d-side', x, top, front, D, H, 'rotateY(90deg)');
+
+        world.innerHTML = html;
+
+        // Cỡ vừa khung theo góc nhìn hiện tại (xoay tay không đổi cỡ, chỉ tính lại khi cấu trúc đổi).
+        var scene = stage.querySelector('.zs-3d-scene');
+        var ax = Math.abs(view3d.ax) * Math.PI / 180, ay = Math.abs(view3d.ay) * Math.PI / 180;
+        var projW = W * Math.cos(ay) + D * Math.sin(ay) + 120;
+        var projH = H * Math.cos(ax) + (W * Math.sin(ay) + D * Math.cos(ay)) * Math.sin(ax) + 90;
+        view3d.fit = Math.max(0.15, Math.min(scene.clientWidth / projW, scene.clientHeight / projH, 1.6));
+        apply3dTransform(stage);
+    }
+
+    function schedule3d(node) {
+        if (!node || node.dataset.raf) return;
+        node.dataset.raf = '1';
+        requestAnimationFrame(function () {
+            delete node.dataset.raf;
+            render3d(node);
+        });
+    }
+
+    // Kéo để xoay; thả ra giữ nguyên góc. Không dựng lại mô hình khi xoay, chỉ đổi transform.
+    var drag3d = null;
+
+    el.editor.addEventListener('pointerdown', function (event) {
+        var scene = event.target.closest('.zs-3d-scene');
+        if (!scene || event.button !== 0) return;
+        event.preventDefault();
+        drag3d = { stage: scene.closest('.zs-3d'), x: event.clientX, y: event.clientY, ax: view3d.ax, ay: view3d.ay };
+        drag3d.stage.classList.add('is-dragging');
+    });
+
+    document.addEventListener('pointermove', function (event) {
+        if (!drag3d) return;
+        view3d.ay = Math.round(drag3d.ay + (event.clientX - drag3d.x) * 0.45);
+        view3d.ax = Math.round(Math.max(-88, Math.min(12, drag3d.ax - (event.clientY - drag3d.y) * 0.35)));
+        view3d.preset = null;
+        apply3dTransform(drag3d.stage);
+    });
+
+    document.addEventListener('pointerup', function () {
+        if (!drag3d) return;
+        drag3d.stage.classList.remove('is-dragging');
+        drag3d = null;
+    });
+
+    function setView3d(stage, preset) {
+        view3d.ax = VIEWS3D[preset].ax;
+        view3d.ay = VIEWS3D[preset].ay;
+        view3d.preset = preset;
+        render3d(stage.closest('.zs-spec'));
+    }
+
+    el.editor.addEventListener('dblclick', function (event) {
+        var scene = event.target.closest('.zs-3d-scene');
+        if (scene) setView3d(scene.closest('.zs-3d'), 'iso');
+    });
+
+    el.editor.addEventListener('click', function (event) {
+        var view = event.target.closest('[data-view3d]');
+        if (view) {
+            setView3d(view.closest('.zs-3d'), view.dataset.view3d);
+            return;
+        }
+        var zoom = event.target.closest('[data-zoom3d]');
+        if (zoom) {
+            view3d.zoom = Math.max(0.4, Math.min(3, view3d.zoom * (Number(zoom.dataset.zoom3d) > 0 ? 1.2 : 1 / 1.2)));
+            apply3dTransform(zoom.closest('.zs-3d'));
+        }
+    });
+
+    // Rê vào thẻ thông số nào thì chiều đó sáng lên trên mô hình 3D.
+    ['mouseover', 'focusin'].forEach(function (type) {
+        el.editor.addEventListener(type, function (event) {
+            var card = event.target.closest('.zs-spec-card');
+            var spec = event.target.closest('.zs-spec');
+            if (!spec) return;
+            var stage = spec.querySelector('.zs-3d');
+            if (stage) stage.dataset.hl = card ? card.dataset.dim : '';
         });
     });
 
-    el.pickerGrid.addEventListener('mousemove', function (event) {
-        var cell = event.target.closest('.zs-pcell');
-        if (!cell) return;
-
-        var r = Number(cell.dataset.r);
-        var c = Number(cell.dataset.c);
-
-        // Nở thêm khi con trỏ chạm mép, giống lưới chèn bảng của Word.
-        var grew = false;
-        if (r === pickerRows && pickerRows < PICKER_MAX_ROWS) { pickerRows = Math.min(pickerRows + 2, PICKER_MAX_ROWS); grew = true; }
-        if (c === pickerCols && pickerCols < PICKER_MAX_COLS) { pickerCols = Math.min(pickerCols + 5, PICKER_MAX_COLS); grew = true; }
-
-        if (grew) {
-            drawPicker(r, c);
-        } else {
-            paintPicker(r, c);
-        }
-    });
-
-    function pickerColumns() {
-        return Math.min(Math.max(Number(el.pickerCols.value) || 1, 1), CFG.maxColumns);
-    }
-
-    function pickerDepth() {
-        return Math.min(Math.max(Number(el.pickerDepth.value) || 1, 1), CFG.maxDepth);
-    }
-
-    el.pickerGrid.addEventListener('click', function (event) {
-        var cell = event.target.closest('.zs-pcell');
-        if (!cell) return;
-
-        var rows = Number(cell.dataset.r);
-        var cols = Number(cell.dataset.c);
-        var template = [];
-        var depth = pickerDepth();
-        for (var p = 1; p <= rows; p++) template.push({ position: p, max: cols, depth: depth });
-
-        var start = maxPosition(state.columns);
-        for (var i = 1; i <= pickerColumns(); i++) {
-            state.columns.push(newColumn(start + i, template));
-        }
-
-        showPicker(false);
-        renderColumns();
-        setDirty(true);
+    el.editor.addEventListener('mouseout', function (event) {
+        var spec = event.target.closest('.zs-spec');
+        if (!spec || spec.contains(event.relatedTarget)) return;
+        var stage = spec.querySelector('.zs-3d');
+        if (stage && !spec.contains(document.activeElement)) stage.dataset.hl = '';
     });
 
     /* các khối cột */
@@ -2743,6 +3662,7 @@
         byId('zs-legend-zone').hidden = state.cellView !== 'zone';
         byId('zs-legend-status').hidden = state.cellView !== 'status';
         renderZoneLegend();
+        schedule3d(el.spec);
     }
 
     // Chú thích phân loại kèm số vị trí đang mở; bấm vào để chọn nhanh các ô thuộc phân loại đó.
@@ -2797,20 +3717,8 @@
 
     function setTierOrder(order) {
         state.tierOrder = order === 'top_down' ? 'top_down' : 'bottom_up';
-        el.tierOrder.value = state.tierOrder;
-        el.tierOrder.disabled = false;
         el.editor.classList.toggle('zs-top-down', state.tierOrder === 'top_down');
-        document.querySelectorAll('.zs-order-btn').forEach(function (btn) {
-            btn.classList.toggle('active', btn.dataset.order === state.tierOrder);
-        });
     }
-
-    // Đổi chiều đánh số: chỉ xếp lại lưới, mã tầng giữ theo số thứ tự; áp cho mọi kệ đang tạo.
-    el.tierOrder.addEventListener('change', function () {
-        setTierOrder(el.tierOrder.value);
-        renderAllColumns();
-        setDirty(true);
-    });
 
     function renderColumns() {
         state.columns.sort(function (a, b) { return a.position - b.position; });
@@ -2860,6 +3768,7 @@
 
         el.summary.textContent = text;
         el.total.textContent = text;
+        paintSpec();
     }
 
     function columnAt(target) {

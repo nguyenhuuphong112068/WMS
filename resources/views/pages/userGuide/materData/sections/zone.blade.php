@@ -14,12 +14,33 @@
 <ol class="ug-steps">
     <li>Chọn thẻ <b>kho/phòng</b> có sẵn hoặc bấm nút thêm kho để tạo mới (nhập <b>Mã</b>, ví dụ <span class="ug-key">03</span>,
         và <b>Tên</b>, ví dụ <i>Kho 03</i>), rồi bấm <b>Lưu kho/phòng</b>.</li>
-    <li>Trong kho, bấm <b>Thêm kệ</b>, nhập <b>Mã kệ/tủ</b> và <b>Tên kệ/tủ</b>. Hệ thống báo ngay nếu mã kệ đã tồn tại.
-        Trong khung chọn nhanh, bấm chọn <b>Đánh số tầng</b> trước: <i>Từ dưới lên</i> (Tầng 01 nằm dưới cùng) hoặc
-        <i>Từ trên xuống</i> (Tầng 01 nằm trên cùng); số tầng hiện ngay cạnh từng hàng của khung, Tầng 01 tô đậm. Rồi rê
-        chuột chọn số tầng × số ô ngang, nhập <b>Số cột</b>, <b>Số dãy sâu</b> và bấm vào ô để xác nhận. Tầng 01 mang mã
-        <span class="ug-key">01</span> ở đúng vị trí đã chọn nên không cần đổi tên / mã từng tầng. Sau khi xác nhận, ô
-        <b>Đánh số tầng</b> hiện ở góc phải đầu form để đổi lại nếu cần; lựa chọn áp cho mọi kệ tạo cùng lượt.</li>
+    <li>Trong kho, bấm <b>Kệ/Tủ mới</b>, nhập <b>Mã kệ/tủ</b> và <b>Tên kệ/tủ</b>. Hệ thống báo ngay nếu mã kệ đã tồn tại.</li>
+    <li>Khai cả kệ ở khung <b>Thông số kệ/tủ</b>: bốn thẻ cùng một kiểu, mỗi thẻ có hình minh hoạ, ô số và hai nút
+        <span class="ug-key">−</span> / <span class="ug-key">+</span>:
+        <ol class="mb-1">
+            <li><b>Số cột</b> của một kệ/tủ (Cột 01, 02, 03... từ trái sang).</li>
+            <li><b>Số tầng</b> của mỗi cột. Nút dưới ô số đổi chiều đánh số: <i>Tầng 01 dưới cùng</i> hoặc
+                <i>Tầng 01 trên cùng</i>; lựa chọn áp cho mọi kệ tạo cùng lượt.</li>
+            <li><b>Vị trí ngang</b> mỗi tầng: các ô <span class="ug-key">A</span>, <span class="ug-key">B</span>,
+                <span class="ug-key">C</span>... dọc mép trước tầng.</li>
+            <li><b>Vị trí sâu</b> mỗi tầng: các dãy <span class="ug-key">1</span>, <span class="ug-key">2</span>... từ cửa vào
+                trong (dãy 1 sát cửa). Tầng chỉ có một dãy thì để 1.</li>
+        </ol>
+        Gõ số rồi bấm <span class="ug-key">Enter</span>, bấm <span class="ug-key">−</span> / <span class="ug-key">+</span>, hoặc
+        dùng phím mũi tên lên/xuống trong ô số. Đổi số ở thẻ nào thì chỉ chiều đó đổi cho cả kệ, các chiều khác giữ nguyên.
+        Dòng phía trên các thẻ tính sẵn tổng, ví dụ <i>3 cột × 4 tầng × 5 ngang × 2 sâu = 120 vị trí</i>. Kệ mới mở ra đã
+        điền sẵn thông số của lần tạo kệ trước.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/dinh-khu-thong-so.png', 'caption' => 'Khung Thông số kệ/tủ và mô hình 3D khi tạo kệ mới'])
+    </li>
+    <li>Bên phải khung là <b>mô hình 3D</b> của kệ, vẽ lại ngay khi đổi số: vách giữa các cột, mặt từng tầng (nẹp đậm là
+        Tầng 01), các ô vị trí trên mặt tầng (mép trước là dãy 1). <b>Kéo chuột</b> trên mô hình để xoay, nhấp đúp để về góc
+        nghiêng; các nút <b>Nghiêng</b>, <b>Chính diện</b>, <b>Từ trên</b> đổi góc nhìn, <i class="fas fa-search-minus"></i>
+        / <i class="fas fa-search-plus"></i> thu nhỏ / phóng to. Rê chuột vào thẻ thông số nào thì phần tương ứng sáng lên
+        trên mô hình (ví dụ thẻ Vị trí ngang tô các ô ở mép trước). Khi sửa kệ đã có, ô trên mô hình tô màu như lưới bên
+        dưới (theo phân loại hoặc trạng thái tuỳ nút <b>Tô màu theo</b>).</li>
+    <li>Kệ có chỗ khác thường (một cột ít tầng hơn, một tầng rộng hơn...) thì chỉnh riêng ở lưới bên dưới. Khi đó thẻ của
+        chiều bị lệch viền nét đứt màu cam, ô số hiện <span class="ug-key">≠</span> (<i>Đang khác nhau giữa các tầng</i>);
+        nhập một số vào thẻ đó sẽ đặt lại cùng một giá trị cho cả kệ.</li>
     <li>Trên lưới, mỗi <b>cột</b> là một khối, mỗi <b>tầng</b> là một lưới nhỏ nhìn từ trên xuống, giống mặt kệ thật:
         chiều <b>Ngang</b> là các ô <span class="ug-key">A</span>, <span class="ug-key">B</span>, <span class="ug-key">C</span>...
         dọc mép trước tầng, chiều <b>Sâu</b> là các dãy <span class="ug-key">1</span>, <span class="ug-key">2</span>,
@@ -119,6 +140,8 @@
         <ul class="mb-0 pl-3">
             <li>Không thu nhỏ (cả chiều Ngang lẫn Sâu) hoặc gỡ được vị trí <b>đang có lô hàng</b>. Hãy chuyển hàng đi trước.</li>
             <li>Thu nhỏ lưới thì vị trí thừa bị <b>khoá</b> chứ không xoá; nới lại sẽ mở đúng các vị trí đó.</li>
+            <li>Bớt <b>Số cột</b> / <b>Số tầng</b> ở khung Thông số sẽ gỡ cột bên phải nhất / tầng có số lớn nhất (cột, tầng
+                đã lưu thì bị khoá); thêm lại thì mở lại cột, tầng đang khoá trước rồi mới tạo mới.</li>
             <li>Chỉ xoá được một cấp khi cấp đó <b>chưa có cấp con</b> (ví dụ kệ không còn cột nào).</li>
         </ul>
     </div>

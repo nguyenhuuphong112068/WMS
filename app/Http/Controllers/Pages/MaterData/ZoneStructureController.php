@@ -53,6 +53,7 @@ class ZoneStructureController extends Controller
             'maxLocations' => self::MAX_LOCATIONS,
             'maxDepth' => self::MAX_DEPTH,
             'maxBatch' => self::MAX_BATCH,
+            'maxCells' => self::MAX_CELLS,
         ];
     }
 

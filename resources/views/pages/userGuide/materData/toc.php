@@ -71,7 +71,17 @@ return [
     'Kho & đối tượng' => [
         ['id' => 'dinh-khu', 'file' => 'zone', 'title' => 'Định Khu', 'icon' => 'fas fa-sitemap',
             'route' => 'pages.materData.zone.list', 'perm' => md_perm('zone', 'view'), 'chips' => [$byDept],
-            'keywords' => 'kho phong ke tu cot tang vi tri cau truc kho biet tru du phong'],
+            // Phòng có sẵn kho/kệ; ảnh thêm = khung Thông số kệ/tủ + mô hình 3D khi tạo kệ mới
+            'shotDept' => 4,
+            'extraShots' => [
+                ['name' => 'dinh-khu-thong-so', 'clip' => '#zoneStructure', 'maxHeight' => 1150, 'pad' => 0, 'afterJs' => 1500,
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
+                        ." try { localStorage.setItem('wms.zone.spec', JSON.stringify({columns: 3, tiers: 4, max: 5, depth: 2})); } catch (e) {}"
+                        ." for (let i = 0; i < 20 && !document.querySelector('#zs-warehouses .zs-tile'); i++) await w(300);"
+                        ." document.querySelector('#zs-warehouses .zs-tile').click(); await w(1500);"
+                        ." document.querySelector('#zs-add').click(); await w(800); return true; })()"],
+            ],
+            'keywords' => 'kho phong ke tu cot tang vi tri cau truc kho biet tru du phong thong so 3d'],
         ['id' => 'doi-tuong', 'file' => 'consumptionObject', 'title' => 'Đối Tượng', 'icon' => 'fas fa-cogs',
             'route' => 'pages.materData.consumptionObject.list', 'perm' => md_perm('consumptionObject', 'view'),
             'keywords' => 'thiet bi cal dong bo tan suat'],
