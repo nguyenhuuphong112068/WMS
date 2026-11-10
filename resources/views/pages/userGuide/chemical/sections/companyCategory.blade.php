@@ -33,7 +33,6 @@
     ['Phân Loại NĐ 24/2026', false, 'Hiện ngay dưới tên sau khi chọn, hệ thống tự suy từ hoạt chất thành phần. Muốn đổi thì sửa ở Dữ Liệu Gốc.'],
     ['Cảnh Báo An Toàn', false, 'Ô chọn nhiều nhóm GHS (lỏng dễ cháy, ăn mòn, oxy hoá, độc...), mỗi nhóm kèm hình đồ. In ra dải giữa của nhãn dán lô và dùng để xét tương kỵ. Nút <b>Sơ đồ tương kỵ</b> trên thanh công cụ mở sơ đồ lưu trữ GHS.'],
     ['Hàm Lượng Hoạt Chất (%)', false, 'Chỉ có ở form <b>Sửa</b>. Dùng khi đối chiếu ngưỡng PL IV: khối lượng hoạt chất = khối lượng hoá chất × %.'],
-    ['Số Hồ Sơ', false, 'Chỉ có ở form Sửa. Tối đa 20 ký tự.'],
 ]])
 
 <h3>Các cột cần chú ý trên bảng</h3>

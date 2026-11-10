@@ -85,7 +85,7 @@ class MaterialInventoryController extends Controller
             'summaries' => $this->stockByMaterial($datas),
             'balancings' => $this->balancingHistory($departmentId),
             'zones' => $zones,
-            'zoneMap' => $this->zoneMap($datas, $zones, $this->quarantineZoneRows($departmentId, $period['to'])),
+            'zoneRows' => $this->zoneRows($datas, $this->quarantineZoneRows($departmentId, $period['to'])),
             // Tab KIỂM KÊ ĐỊNH KỲ - chu kỳ 1 tháng 1 lần, xem MaterialStocktakeController
             'stocktake' => MaterialStocktakeController::panel($departmentId),
             // Tab KHẢ DỤNG THÁNG TỚI - xem App\Support\MaterialAvailabilityForecast
@@ -754,6 +754,7 @@ class MaterialInventoryController extends Controller
             'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
             'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']),
             'locations' => $this->locationOptions($departmentId),
+            'foreign' => \App\Support\RoomLayout::foreign($departmentId, self::LOCATION_TYPE),
         ];
     }
 
@@ -846,216 +847,44 @@ class MaterialInventoryController extends Controller
      ========================================================== */
 
     /**
-     * Dựng sơ đồ Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí để vẽ dạng thẻ (card - grid).
+     * Dòng tồn CÒN TỒN cho sơ đồ Theo vị trí (pages.inventory.shared.zoneGrid - cùng bộ vẽ với Hoá Chất / Chất Chuẩn).
      *
-     * Khung lấy từ DANH MỤC ĐỊNH KHU nên ô đang trống vẫn hiện ra - người dùng nhìn được
-     * chỗ nào còn xếp được hàng. Định khu đã ngừng hoạt động mà vẫn còn tồn thì lấy tên
-     * ngay trên dòng tồn để không rơi khỏi sơ đồ. Mã chưa xếp vị trí gom thành khối riêng.
-     *
-     * Chỉ đếm các mã CÒN TỒN (remaining > 0): sơ đồ trả lời "chỗ này đang có gì", mã đã
-     * dùng hết không còn nằm ở đó nữa.
+     * Hàng cách ly / chờ huỷ đã trừ khỏi tồn của lô nhưng vẫn nằm vật lý ở khu Chờ Quyết Định / Loại Bỏ
+     * nên được đưa vào như một dòng tồn ở đúng vị trí đó (đỏ cam trên sơ đồ: cách ly = 'low', chờ huỷ = 'expired').
+     * Mã chưa có vị trí rơi vào khối "Chưa xếp vị trí" do zoneGrid dựng.
      */
-    private function zoneMap($datas, array $zones, $quarantineRows = null): array
+    private function zoneRows($datas, $quarantineRows = null): array
     {
-        // Hàng cách ly / chờ huỷ đã trừ khỏi tồn của lô nhưng vẫn nằm vật lý ở khu Chờ Quyết
-        // Định / Loại Bỏ - đưa vào sơ đồ như một dòng tồn ở đúng vị trí đó
-        $datas = $datas->concat($quarantineRows ?? collect());
-
-        $warehouses = $zones['warehouses']->keyBy('id');
-        $shelves = $zones['shelves']->keyBy('id');
-        $columns = $zones['columns']->keyBy('id');
-        $tiers = $zones['tiers']->keyBy('id');
-        $locations = $zones['locations']->keyBy('id');
-
-        $rowsByLocation = $datas->filter(fn ($row) => $row->location_id)->groupBy('location_id');
-
-        // Định khu đã ngừng hoạt động nhưng còn hàng đứng ở đó -> vá lại từ chính dòng tồn
-        foreach ($rowsByLocation as $locationId => $rows) {
-            $first = $rows->first();
-
-            if (! $locations->has($locationId)) {
-                $locations[$locationId] = (object) [
-                    'id' => (int) $locationId,
-                    'code' => $first->location_code,
-                    'warehouse_id' => $first->warehouse_id,
-                    'shelf_id' => $first->shelf_id,
-                    'column_id' => $first->column_id,
-                    'tier_id' => $first->tier_id,
-                    'zone_type' => $first->location_zone_type ?? null,
-                    'color' => $first->location_color ?? null,
-                ];
-            }
-            if ($first->warehouse_id && ! $warehouses->has($first->warehouse_id)) {
-                $warehouses[$first->warehouse_id] = (object) ['id' => $first->warehouse_id, 'code' => null, 'name' => $first->warehouse_name];
-            }
-            if ($first->shelf_id && ! $shelves->has($first->shelf_id)) {
-                $shelves[$first->shelf_id] = (object) ['id' => $first->shelf_id, 'code' => null, 'name' => $first->shelf_name];
-            }
-            if ($first->column_id && ! $columns->has($first->column_id)) {
-                $columns[$first->column_id] = (object) ['id' => $first->column_id, 'code' => null, 'name' => $first->column_name];
-            }
-            if ($first->tier_id && ! $tiers->has($first->tier_id)) {
-                $tiers[$first->tier_id] = (object) ['id' => $first->tier_id, 'code' => null, 'name' => $first->tier_name];
-            }
-        }
-
-        // Gom vị trí vào đúng nhánh Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng (khoá 0 = chưa gán cấp đó)
-        $tree = [];
-        $index = [];
-
-        foreach ($locations->sortBy('code') as $loc) {
-            $wKey = (int) ($loc->warehouse_id ?: 0);
-            $sKey = (int) ($loc->shelf_id ?: 0);
-            $cKey = (int) ($loc->column_id ?: 0);
-            $tKey = (int) ($loc->tier_id ?: 0);
-
-            $w = $warehouses->get($wKey);
-            $s = $shelves->get($sKey);
-            $c = $columns->get($cKey);
-            $t = $tiers->get($tKey);
-
-            $tree[$wKey] ??= [
-                'id' => $wKey ?: null,
-                'code' => $w->code ?? null,
-                'name' => $w->name ?? 'Chưa gán kho/phòng',
-                'shelves' => [],
-            ];
-            $tree[$wKey]['shelves'][$sKey] ??= [
-                'id' => $sKey ?: null,
-                'code' => $s->code ?? null,
-                'name' => $s->name ?? 'Chưa gán kệ/tủ',
-                'columns' => [],
-            ];
-            $tree[$wKey]['shelves'][$sKey]['columns'][$cKey] ??= [
-                'id' => $cKey ?: null,
-                'code' => $c->code ?? null,
-                'name' => $c->name ?? 'Chưa gán cột',
-                'tiers' => [],
-            ];
-            $tree[$wKey]['shelves'][$sKey]['columns'][$cKey]['tiers'][$tKey] ??= [
-                'id' => $tKey ?: null,
-                'code' => $t->code ?? null,
-                'name' => $t->name ?? 'Chưa gán tầng',
-                'locations' => [],
-            ];
-
-            // Nhánh sâu nhất (tầng) - trỏ thẳng vào để khỏi viết lại cả đường dẫn bốn cấp
-            $branch = &$tree[$wKey]['shelves'][$sKey]['columns'][$cKey]['tiers'][$tKey];
-
-            $node = $this->zoneNode($loc, $rowsByLocation->get($loc->id, collect()));
-            $node['path'] = $tree[$wKey]['name']
-                .' / '.$tree[$wKey]['shelves'][$sKey]['name']
-                .' / '.$tree[$wKey]['shelves'][$sKey]['columns'][$cKey]['name']
-                .' / '.$branch['name'];
-
-            $index[$node['key']] = [
-                'code' => $node['code'],
-                'path' => $node['path'],
-                'lots' => $node['stat']['lots'],
-                'materials' => $node['stat']['materials'],
-                'alerts' => $node['stat']['alerts'],
-                'items' => $node['items'],
-                // Sơ đồ 3D (inventory/shared/zone3d) tô màu, lọc và tìm kiếm theo các trường này
-                'state' => $node['state'],
-                'zoneType' => $node['zoneType'],
-                'badge' => $node['zoneBadge'],
-                'search' => mb_strtolower(trim($node['code'].' '.$node['path'].' '
-                    .implode(' ', array_column($node['items'], 'material_name')).' '
-                    .implode(' ', array_column($node['items'], 'code')))),
-            ];
-
-            $branch['locations'][] = $node;
-            unset($branch);
-        }
-
-        // Cộng dồn ngược từ vị trí lên tầng -> cột -> kệ/tủ -> kho
-        $blank = ['locations' => 0, 'filled' => 0, 'lots' => 0, 'alerts' => 0, 'categories' => []];
-        $add = function (array $acc, array $stat): array {
-            $acc['locations'] += $stat['locations'];
-            $acc['filled'] += $stat['filled'];
-            $acc['lots'] += $stat['lots'];
-            $acc['alerts'] += $stat['alerts'];
-            $acc['categories'] = array_merge($acc['categories'], $stat['categories']);
-
-            return $acc;
-        };
-        $close = function (array $acc): array {
-            $acc['materials'] = count(array_unique($acc['categories']));
-            unset($acc['categories']);
-
-            return $acc;
-        };
-
-        $tops = $blank + ['shelves' => 0, 'columns' => 0, 'tiers' => 0];
-        $outWarehouses = [];
-
-        foreach (collect($tree)->sortBy('name') as $w) {
-            $wAcc = $blank;
-            $wShelves = [];
-
-            foreach (collect($w['shelves'])->sortBy('name') as $s) {
-                $sAcc = $blank;
-                $sColumns = [];
-
-                foreach (collect($s['columns'])->sortBy('name') as $c) {
-                    $cAcc = $blank;
-                    $cTiers = [];
-
-                    foreach (collect($c['tiers'])->sortBy('name') as $t) {
-                        $tAcc = $blank;
-
-                        foreach ($t['locations'] as $loc) {
-                            $tAcc = $add($tAcc, $loc['stat']);
-                        }
-
-                        $cAcc = $add($cAcc, $tAcc);
-                        $t['stat'] = $close($tAcc);
-                        $t['locations'] = array_map(function ($loc) {
-                            unset($loc['stat']['categories']);
-
-                            return $loc;
-                        }, $t['locations']);
-                        $cTiers[] = $t;
-                    }
-
-                    $sAcc = $add($sAcc, $cAcc);
-                    $c['tiers'] = $cTiers;
-                    $c['stat'] = $close($cAcc) + ['tiers' => count($cTiers)];
-                    $tops['tiers'] += count($cTiers);
-                    $sColumns[] = $c;
-                }
-
-                $wAcc = $add($wAcc, $sAcc);
-                $s['columns'] = $sColumns;
-                $s['stat'] = $close($sAcc) + ['columns' => count($sColumns)];
-                $tops['columns'] += count($sColumns);
-                $wShelves[] = $s;
-            }
-
-            $tops = $add($tops, $wAcc);
-            $tops['shelves'] += count($wShelves);
-            $w['shelves'] = $wShelves;
-            $w['stat'] = $close($wAcc) + ['shelves' => count($wShelves)];
-            $outWarehouses[] = $w;
-        }
-
-        // Mã còn tồn nhưng chưa xếp vị trí - phải nhìn thấy để còn bổ sung định khu
-        $unzoned = $datas
-            ->filter(fn ($row) => ! $row->location_id && $row->remaining > self::EPSILON)
-            ->sortByDesc('remaining')
-            ->values();
-
-        $totals = $close($tops) + [
-            'warehouses' => count($outWarehouses),
-            'unzoned' => $unzoned->count(),
-        ];
-
-        return [
-            'warehouses' => $outWarehouses,
-            'unzoned' => $this->zoneItems($unzoned),
-            'totals' => $totals,
-            'index' => $index,
-        ];
+        return $datas->concat($quarantineRows ?? collect())
+            ->filter(fn ($row) => $row->remaining > self::EPSILON)
+            ->map(fn ($row) => [
+                'code' => $row->code,
+                'category_id' => (int) $row->category_id,
+                'name' => $row->material_name ?: '—',
+                'sub' => trim(implode(' · ', array_filter([
+                    $row->manufacturer_short_name,
+                    $row->technical_specification,
+                    \App\Support\MaterialClassification::summary($row->classification),
+                ]))),
+                'remaining' => (float) $row->remaining,
+                'unit' => $row->unit_short_name ?: $row->unit_name,
+                'expired' => $row->expired_date ? \Carbon\Carbon::parse($row->expired_date)->format('d/m/Y') : '—',
+                'state' => ['quarantine' => 'low', 'rejected' => 'expired'][$row->state] ?? $row->state,
+                'state_label' => $row->state_label,
+                'location_id' => $row->location_id ? (int) $row->location_id : null,
+                'location_code' => $row->location_code,
+                'location_zone_type' => $row->location_zone_type ?? null,
+                'warehouse_id' => $row->warehouse_id,
+                'shelf_id' => $row->shelf_id,
+                'column_id' => $row->column_id,
+                'tier_id' => $row->tier_id,
+                'warehouse_name' => $row->warehouse_name,
+                'shelf_name' => $row->shelf_name,
+                'column_name' => $row->column_name,
+                'tier_name' => $row->tier_name,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -1121,97 +950,6 @@ class MaterialInventoryController extends Controller
 
                 return $row;
             });
-    }
-
-    /** Một ô vị trí trên sơ đồ: đang chứa mã nào, cảnh báo gì, trạng thái để tô màu. */
-    private function zoneNode($loc, $rows): array
-    {
-        $inStock = $rows->filter(fn ($row) => $row->remaining > self::EPSILON)->sortByDesc('remaining')->values();
-        $categories = $inStock->pluck('category_id')->unique()->values()->all();
-        $alerts = $inStock->whereIn('state', ['low', 'near', 'expired', 'over'])->count();
-
-        if ($inStock->whereIn('state', ['expired', 'over'])->count() > 0) {
-            $state = 'danger';
-        } elseif ($alerts > 0) {
-            $state = 'warn';
-        } elseif ($inStock->count() > 0) {
-            $state = 'ok';
-        } else {
-            $state = 'empty';
-        }
-
-        return [
-            'key' => 'L'.$loc->id,
-            'id' => (int) $loc->id,
-            'code' => $loc->code,
-            'path' => '',
-            'state' => $state,
-            // Màu nền của thẻ theo định khu (App\Support\ZoneType::badge()) - độc lập với
-            // $state ở trên, vốn chỉ nói về tình trạng hàng đang đứng ở vị trí này.
-            'zoneBadge' => \App\Support\ZoneType::badge($loc->id, $loc->zone_type ?? null, $loc->color ?? null),
-            // Loại định khu của ô - dùng cho bộ lọc "Loại định khu" trên sơ đồ ('' = chưa phân loại).
-            'zoneType' => isset(\App\Support\ZoneType::TYPES[$loc->zone_type ?? '']) ? $loc->zone_type : '',
-            'stat' => [
-                'locations' => 1,
-                'filled' => $inStock->count() > 0 ? 1 : 0,
-                'lots' => $inStock->count(),
-                'alerts' => $alerts,
-                'materials' => count($categories),
-                'categories' => $categories,
-            ],
-            'preview' => $this->zonePreview($inStock),
-            'items' => $this->zoneItems($inStock),
-        ];
-    }
-
-    /**
-     * Vài vật tư tiêu biểu đang nằm ở một ô vị trí, kèm SỐ LƯỢNG TỒN để nhìn thẻ là biết
-     * chỗ đó đang giữ bao nhiêu, khỏi phải mở modal xem chi tiết.
-     *
-     * Một vật tư có thể nằm ở nhiều mã xuất nhập trong cùng một ô nên phải cộng dồn theo
-     * vật tư; vật tư chưa gắn danh mục thì gom theo tên để không dồn nhầm vào một cục.
-     */
-    private function zonePreview($inStock): array
-    {
-        return $inStock
-            ->groupBy(fn ($row) => $row->category_id ? 'c'.$row->category_id : 'n'.$row->material_name)
-            ->map(function ($rows) {
-                $first = $rows->first();
-
-                return [
-                    'name' => $first->material_name ?: '—',
-                    'remaining' => (float) $rows->sum('remaining'),
-                    'unit' => $first->unit_short_name ?: $first->unit_name,
-                ];
-            })
-            ->sortByDesc('remaining')
-            ->take(3)
-            ->map(fn ($item) => [
-                'name' => $item['name'],
-                'amount' => $this->number($item['remaining']),
-                'unit' => $item['unit'],
-            ])
-            ->values()
-            ->all();
-    }
-
-    /** Danh sách mã xuất nhập của một ô vị trí, đã format sẵn để đổ thẳng ra modal. */
-    private function zoneItems($rows): array
-    {
-        return $rows->map(fn ($row) => [
-            'code' => $row->code,
-            'material_name' => $row->material_name ?: '—',
-            'sub' => trim(implode(' · ', array_filter([
-                $row->manufacturer_short_name,
-                $row->technical_specification,
-                \App\Support\MaterialClassification::summary($row->classification),
-            ]))),
-            'remaining' => $this->number($row->remaining),
-            'unit' => $row->unit_short_name ?: $row->unit_name,
-            'expired_date' => $row->expired_date ? \Carbon\Carbon::parse($row->expired_date)->format('d/m/Y') : '—',
-            'state' => $row->state,
-            'state_label' => $row->state_label,
-        ])->values()->all();
     }
 
     /** Các lần NHẬP của một vật tư, tính đến hết ngày cuối kỳ (kể cả trước kỳ, để tính tồn đầu kỳ). */

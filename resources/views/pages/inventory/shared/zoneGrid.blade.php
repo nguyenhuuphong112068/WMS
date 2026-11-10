@@ -1736,7 +1736,7 @@
                 // Nút Thẻ | 3D: dựng kệ 3D từ cùng khung định khu và các ô vừa gom ở trên
                 if (window.invZone3d) {
                     window.invZone3d.init($root[0], {
-                        zones: { warehouses: warehouses, shelves: shelves, columns: columns, tiers: tiers, locations: locations },
+                        zones: { warehouses: warehouses, shelves: shelves, columns: columns, tiers: tiers, locations: locations, foreign: zones.foreign || {} },
                         nodes: index,
                         compat: compat
                     });

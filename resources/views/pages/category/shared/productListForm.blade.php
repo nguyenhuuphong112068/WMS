@@ -71,9 +71,19 @@
 
                     <div class="form-group">
                         <label>Thêm {{ $plConfig['title'] }} <span class="text-danger">*</span></label>
-                        <select class="form-control pl-item-picker" title="Chỉ gồm {{ $plNoun }} đang khai ở tab {{ ucfirst($plNoun) }} của phòng">
-                            <option value="">-- Gõ mã danh mục hoặc tên {{ $plNoun }} để thêm --</option>
-                        </select>
+                        <div class="input-group">
+                            <div style="flex: 1 1 0; min-width: 0">
+                                <select class="form-control pl-item-picker" title="Chỉ gồm {{ $plNoun }} đang khai ở tab {{ ucfirst($plNoun) }} của phòng">
+                                    <option value="">-- Gõ mã danh mục, tên {{ $plNoun }} hoặc nhà sản xuất để thêm --</option>
+                                </select>
+                            </div>
+                            <div class="input-group-append">
+                                <button type="button" class="btn btn-outline-primary btn-pl-pick"
+                                    title="Mở danh mục {{ $plNoun }} của phòng để chọn nhiều cùng lúc">
+                                    <i class="fas fa-list-check mr-1"></i> Danh mục phòng
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="table-responsive">
@@ -83,6 +93,7 @@
                                     <th class="text-center" style="width: 44px">#</th>
                                     <th style="width: 110px">Mã DM</th>
                                     <th>{{ $plType === \App\Support\ProductList::STANDARD ? 'Chất Chuẩn' : 'Tên Hoá Chất' }}</th>
+                                    <th style="width: 150px">Nhà Sản Xuất</th>
                                     <th style="width: 220px" title="Lượng gợi ý điền sẵn khi dùng gói, để trống thì người dùng tự nhập">
                                         {{ $plType === \App\Support\ProductList::STANDARD ? 'Số Lượng ĐN Gợi Ý' : 'Lượng Dùng Gợi Ý' }}
                                     </th>
@@ -128,6 +139,42 @@
 </div>
 
 @once
+    {{-- Hộp chọn nhiều từ danh mục của phòng (dùng chung cho modal Thêm / Cập nhật) --}}
+    <div class="modal fade md-modal" id="plPickModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered modal-lg" style="max-width: 860px" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-list-check"></i> Danh mục {{ $plNoun }} của phòng</h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control mb-2" id="plPickSearch" autocomplete="off"
+                        placeholder="Tìm theo mã, tên hoặc nhà sản xuất...">
+                    <div class="table-responsive" style="max-height: 55vh; overflow-y: auto">
+                        <table class="table table-bordered table-sm md-table mb-0" data-no-datatable>
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 40px"><input type="checkbox" id="plPickAll"></th>
+                                    <th style="width: 110px">Mã DM</th>
+                                    <th>{{ $plType === \App\Support\ProductList::STANDARD ? 'Chất Chuẩn' : 'Tên Hoá Chất' }}</th>
+                                    <th style="width: 180px">Nhà Sản Xuất</th>
+                                    <th style="width: 80px">ĐVT</th>
+                                </tr>
+                            </thead>
+                            <tbody id="plPickBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-primary" id="plPickAdd">
+                        <i class="fas fa-plus mr-1"></i> Thêm đã chọn (<span id="plPickCount">0</span>)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var options = @json($plOptions);
@@ -174,8 +221,8 @@
                     '<td class="text-center align-middle pl-row-no"></td>' +
                     '<td class="align-middle"><span class="md-tag">' + esc(item.code) + '</span>' +
                     '<input type="hidden" data-field="category_id" value="' + esc(categoryId) + '"></td>' +
-                    '<td class="align-middle' + (byId[categoryId] ? '' : ' text-danger') + '">' + esc(item.name) +
-                    (item.manufacturer ? ' <span class="md-sub">· ' + esc(item.manufacturer) + '</span>' : '') + '</td>' +
+                    '<td class="align-middle' + (byId[categoryId] ? '' : ' text-danger') + '">' + esc(item.name) + '</td>' +
+                    '<td class="align-middle md-sub">' + esc(item.manufacturer || '—') + '</td>' +
                     '<td><div class="input-group input-group-sm">' +
                     '<input type="text" inputmode="decimal" data-field="amount" class="form-control js-decimal pl-amount" ' +
                     'autocomplete="off" placeholder="Không bắt buộc" value="' + esc(amount == null ? '' : amount) + '">' +
@@ -220,6 +267,68 @@
                 });
 
                 sync($modal);
+            });
+
+            // ---- Chọn nhiều từ danh mục phòng ----
+            var $pick = $('#plPickModal');
+            var $pickBody = $('#plPickBody');
+            var $pickTarget = null;
+
+            function pickCount() {
+                $('#plPickCount').text($pickBody.find('.pl-pick-check:checked:not(:disabled)').length);
+            }
+
+            function pickRender() {
+                var html = options.map(function(item) {
+                    var taken = $pickTarget.find('.pl-items-body tr[data-category-id="' + item.id + '"]').length > 0;
+                    var hay = (item.code + ' ' + item.name + ' ' + (item.manufacturer || '')).toLowerCase();
+
+                    return '<tr data-hay="' + esc(hay) + '">' +
+                        '<td class="text-center"><input type="checkbox" class="pl-pick-check" value="' + esc(item.id) + '"' +
+                        (taken ? ' checked disabled' : '') + '></td>' +
+                        '<td><span class="md-tag">' + esc(item.code) + '</span></td>' +
+                        '<td>' + esc(item.name) + (taken ? ' <span class="md-sub">(đã thêm)</span>' : '') + '</td>' +
+                        '<td class="md-sub">' + esc(item.manufacturer || '—') + '</td>' +
+                        '<td class="md-sub">' + esc(item.unit || '—') + '</td></tr>';
+                }).join('');
+
+                $pickBody.html(html || '<tr><td colspan="5" class="text-center md-empty">Danh mục của phòng chưa có ' + noun + ' nào đang dùng.</td></tr>');
+                $('#plPickAll').prop('checked', false);
+                pickCount();
+            }
+
+            $(document).on('click', '.btn-pl-pick', function() {
+                $pickTarget = $(this).closest('.pl-modal');
+                $('#plPickSearch').val('');
+                pickRender();
+                $pick.modal('show');
+            });
+
+            $('#plPickSearch').on('input', function() {
+                var keyword = this.value.toLowerCase().trim();
+
+                $pickBody.find('tr[data-hay]').each(function() {
+                    $(this).toggle(!keyword || String($(this).data('hay')).indexOf(keyword) !== -1);
+                });
+            });
+
+            $('#plPickAll').on('change', function() {
+                $pickBody.find('tr:visible .pl-pick-check:not(:disabled)').prop('checked', this.checked);
+                pickCount();
+            });
+
+            $pickBody.on('change', '.pl-pick-check', pickCount);
+
+            $('#plPickAdd').on('click', function() {
+                $pickBody.find('.pl-pick-check:checked:not(:disabled)').each(function() {
+                    addRow($pickTarget, this.value, null);
+                });
+                $pick.modal('hide');
+            });
+
+            // Đóng hộp con thì modal cha vẫn phải cuộn được
+            $pick.on('hidden.bs.modal', function() {
+                if ($('.modal.show').length) $('body').addClass('modal-open');
             });
 
             $(document).on('click', '.pl-row-remove', function() {

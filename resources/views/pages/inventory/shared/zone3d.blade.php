@@ -449,6 +449,23 @@
         box-shadow: 0 0 0 2px rgba(23, 184, 212, 0.35);
     }
 
+    /* kệ của module khác: mờ xám, không bấm được */
+    .mz-plan-shelf.is-ghost {
+        border-color: #94A3B8;
+        background: repeating-linear-gradient(45deg, rgba(148, 163, 184, 0.28) 0 4px, rgba(148, 163, 184, 0.1) 4px 8px);
+        cursor: default;
+    }
+
+    .mz-plan-shelf.is-ghost:hover {
+        box-shadow: none;
+    }
+
+    .mz-plan-shelf.is-ghost > span {
+        color: #64748B;
+        text-align: center;
+        line-height: 1.1;
+    }
+
     .mz-plan-shelf.is-miss {
         opacity: 0.4;
     }
@@ -639,6 +656,40 @@
                 return s;
             }).sort(function(a, b) {
                 return String(a.warehouse.name).localeCompare(String(b.warehouse.name), 'vi') || byCode(a, b);
+            });
+        }
+
+        // Kệ/tủ chỉ có ô của module khác (zones.foreign = { shelf_id: "Vật tư" }): dựng khung cột/tầng rỗng để vẽ mờ xám
+        // trên Mặt bằng / 3D cho khớp Định Khu. Không vào ctx.shelves nên không tính tồn, không bấm được.
+        function buildGhosts(zones, taken) {
+            var foreign = zones.foreign || {};
+            var warehouses = asMap(zones.warehouses);
+            var shelves = asMap(zones.shelves);
+            var columns = values(asMap(zones.columns));
+            var tiers = values(asMap(zones.tiers));
+
+            return Object.keys(foreign).filter(function(id) { return shelves[id] && !taken[id]; }).map(function(id) {
+                var s = $.extend({}, shelves[id]);
+                s.ghost = String(foreign[id]);
+                s.warehouseKey = String(s.warehouse_id || 0);
+                s.warehouse = warehouses[s.warehouseKey] || { name: 'Chưa gán kho/phòng' };
+                var levels = 0;
+                s.columnList = columns.filter(function(c) { return String(c.shelf_id) === String(id); }).sort(byPosition).map(function(col) {
+                    var c = $.extend({}, col), rank = 0;
+                    c.tierList = tiers.filter(function(t) { return String(t.column_id) === String(c.id); }).sort(byPosition).map(function(tier) {
+                        var t = $.extend({}, tier);
+                        rank = Number(t.position) > rank ? Number(t.position) : rank + 1;
+                        t.rank = rank;
+                        t.cells = [];
+                        t.max = 1;
+                        t.depth = 1;
+                        return t;
+                    });
+                    levels = Math.max(levels, rank);
+                    return c;
+                });
+                s.levels = levels;
+                return s;
             });
         }
 
@@ -879,6 +930,11 @@
                 var room = rooms[key] = rooms[key] || { key: key, wh: shelf.warehouse, shelves: [] };
                 room.shelves.push(shelf);
             });
+            // Kệ của module khác chỉ vẽ mờ trong kho/phòng đã có kệ của loại này
+            (ctx.ghosts || []).forEach(function(shelf) {
+                var room = rooms[shelf.warehouseKey || '0'];
+                if (room) (room.ghosts = room.ghosts || []).push(shelf);
+            });
 
             return values(rooms).map(function(room) {
                 var wh = room.wh;
@@ -895,12 +951,13 @@
                     room.polygon = plan ? plan.polygon : [[0, 0], [width, 0], [width, depth], [0, depth]];
                     room.door = plan ? plan.door : (wh.layout_door_wall ? { wall: wh.layout_door_wall, offset: Number(wh.layout_door_offset) || 0, width: 1 } : null);
                     room.shaped = plan ? !plan.is_rectangle : false;
-                    room.shelves.forEach(function(shelf) {
+                    room.shelves.concat(room.ghosts || []).forEach(function(shelf) {
                         if (shelf.layout_x == null || shelf.layout_x === '') {
-                            room.unplaced.push(shelf);
+                            if (!shelf.ghost) room.unplaced.push(shelf);
                             return;
                         }
                         room.items.push({
+                            ghost: !!shelf.ghost,
                             shelf: shelf, x: Number(shelf.layout_x), y: Number(shelf.layout_y),
                             width: Number(shelf.layout_width) || defaultSize(shelf).width,
                             depth: Number(shelf.layout_depth) || defaultSize(shelf).depth,
@@ -910,9 +967,9 @@
                 } else {
                     room.virtual = true;
                     var x = 0.5, deepest = 0.4;
-                    room.shelves.forEach(function(shelf) {
+                    room.shelves.concat(room.ghosts || []).forEach(function(shelf) {
                         var size = defaultSize(shelf);
-                        room.items.push({ shelf: shelf, x: x + size.width / 2, y: 0.5 + size.depth / 2, width: size.width, depth: size.depth, rotation: 0 });
+                        room.items.push({ ghost: !!shelf.ghost, shelf: shelf, x: x + size.width / 2, y: 0.5 + size.depth / 2, width: size.width, depth: size.depth, rotation: 0 });
                         x += size.width + 0.6;
                         deepest = Math.max(deepest, size.depth);
                     });
@@ -994,7 +1051,8 @@
                 (room.wh.code ? '<span class="tag">' + esc(room.wh.code) + '</span>' : '') +
                 '<span class="tag">' + (room.virtual ? 'Chưa khai mặt bằng' : 'Phòng ' + room.width + ' × ' + room.depth + ' m' +
                     (room.shaped ? ' · ' + room.polygon.length + ' góc' : '')) + '</span>' +
-                '<span class="tag">' + room.items.length + ' kệ/tủ</span>' +
+                '<span class="tag">' + room.shelves.length + ' kệ/tủ</span>' +
+                (room.items.length > room.shelves.length ? '<span class="tag">' + (room.items.length - room.shelves.length) + ' kệ module khác (mờ)</span>' : '') +
                 '<span class="tag">' + st.filled + '/' + st.locations + ' vị trí có hàng · ' + st.lots + ' mã</span>' +
                 (st.alerts ? '<span class="tag is-alert">' + st.alerts + ' cần chú ý</span>' : '') +
                 compatTag(st) +
@@ -1007,6 +1065,14 @@
                 width: room.width, depth: room.depth, polygon: room.polygon, door: room.door, tierMetre: 0.4,
                 empty: 'Kho/phòng này chưa đặt kệ/tủ nào trên mặt bằng.',
                 shelves: room.items.map(function(item) {
+                    if (item.ghost) {
+                        return {
+                            ghost: true,
+                            label: (item.shelf.code || item.shelf.name || '') + ' · ' + item.shelf.ghost,
+                            x: item.x, y: item.y, width: item.width, depth: item.depth, rotation: item.rotation,
+                            model: shelfModel(ctx, item.shelf, f, true)
+                        };
+                    }
                     var hits = st.byShelf[item.shelf.id].hits;
                     var clashes = st.byShelf[item.shelf.id].compat;
                     return {
@@ -1060,6 +1126,14 @@
             }
 
             room.items.forEach(function(item) {
+                if (item.ghost) {
+                    html += '<span class="mz-plan-shelf is-ghost" title="' + esc((item.shelf.code || '') + ' - ' + (item.shelf.name || '') + ' · kệ của module ' + item.shelf.ghost + ', không thuộc màn hình này') + '"' +
+                        ' style="left:' + ((item.x - item.width / 2) * sc) + 'px;top:' + ((item.y - item.depth / 2) * sc) + 'px;width:' +
+                        (item.width * sc) + 'px;height:' + (item.depth * sc) + 'px;transform:rotate(' + item.rotation + 'deg)">' +
+                        '<span style="transform:translate(-50%,-50%) rotate(' + (-item.rotation) + 'deg)">' + esc(item.shelf.code || '') +
+                        '<br>' + esc(item.shelf.ghost) + '</span></span>';
+                    return;
+                }
                 var ss = st.byShelf[item.shelf.id];
                 var cls = f.active ? (ss.hits ? ' is-hit' : ' is-miss') : (ss.compat ? ' is-compat' : (ss.alerts ? ' is-alert' : (ss.filled ? ' is-stocked' : '')));
                 html += '<button type="button" class="mz-plan-shelf' + cls + '" data-plan-shelf="' + esc(item.shelf.id) + '"' +
@@ -1343,6 +1417,9 @@
             var firstStocked = ctx.shelves.find(function(s) { return statOf(ctx, s, { active: false }).filled > 0; });
             ctx.current = (firstStocked || ctx.shelves[0] || {}).id;
             if (ctx.current === undefined) ctx.current = null;
+            var taken = {};
+            ctx.shelves.forEach(function(sh) { taken[sh.id] = true; });
+            ctx.ghosts = buildGhosts(opts.zones || {}, taken);
             ctx.rooms = buildRooms(ctx);
             ctx.room = firstStocked ? firstStocked.warehouseKey : (ctx.rooms[0] ? ctx.rooms[0].key : null);
 

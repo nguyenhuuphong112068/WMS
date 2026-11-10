@@ -278,6 +278,7 @@ class PublicStockLookupController extends Controller
                 ->where(fn ($q) => $q->whereNull('item_type')->orWhere('item_type', $kind))
                 ->orderBy('code', 'asc')
                 ->get(),
+            'foreign' => \App\Support\RoomLayout::foreign($departmentId, $kind),
         ];
     }
 

@@ -11,17 +11,17 @@
             <div class="card-body">
 
                 <div class="imp-tabs">
-                    @tab('import_material', 'book')
-                    <button type="button" class="imp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}" data-pane="impPaneBook">
-                        <i class="fas fa-book mr-1"></i> Sổ nhập vật tư
-                    </button>
-                    @endtab
                     @tab('import_material', 'check')
                     <button type="button" class="imp-tab {{ $activeTab === 'check' ? 'is-active' : '' }}" data-pane="impPaneCheck">
-                        <i class="fas fa-clipboard-check mr-1"></i> Chờ kiểm tra
+                        <i class="fas fa-clipboard-check mr-1"></i> Nhập Vật Tư
                         @if ($pendingCount > 0)
                             <span class="imp-tab-count">{{ $pendingCount }}</span>
                         @endif
+                    </button>
+                    @endtab
+                    @tab('import_material', 'book')
+                    <button type="button" class="imp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}" data-pane="impPaneBook">
+                        <i class="fas fa-book mr-1"></i> Sổ nhập vật tư
                     </button>
                     @endtab
                 </div>
@@ -30,13 +30,6 @@
                 @tab('import_material', 'book')
                 <div class="imp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="impPaneBook">
 
-                <div class="md-toolbar">
-                    @perm('import_material_create')
-                        <button type="button" class="btn btn-primary btn-md-create">
-                            <i class="fas fa-plus mr-1"></i> Nhập vật tư
-                        </button>
-                    @endperm
-                </div>
                 @endtab
 
                 @include('pages.shared.rangeFilter', [
@@ -92,6 +85,13 @@
                 {{-- ============ CHỜ KIỂM TRA ============ --}}
                 @tab('import_material', 'check')
                 <div class="imp-pane {{ $activeTab === 'check' ? 'is-active' : '' }}" id="impPaneCheck">
+                    <div class="md-toolbar">
+                        @perm('import_material_create')
+                            <button type="button" class="btn btn-primary btn-md-create">
+                                <i class="fas fa-plus mr-1"></i> Nhập vật tư
+                            </button>
+                        @endperm
+                    </div>
                     <div class="table-responsive">
                         <table id="mdTableCheck" class="table table-bordered table-hover w-100 md-table">
                             <thead>

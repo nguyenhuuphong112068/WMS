@@ -591,6 +591,35 @@
         border: 1px solid var(--primary-lighter);
     }
 
+    /* kệ của module khác: xám mờ, không tương tác */
+    .w3d-unit.is-ghost {
+        cursor: default;
+        pointer-events: none;
+    }
+
+    .w3d-unit.is-ghost .w3d-side,
+    .w3d-unit.is-ghost .w3d-cap,
+    .w3d-unit.is-ghost .w3d-back {
+        background: rgba(148, 163, 184, 0.14);
+        border-color: #94A3B8;
+    }
+
+    .w3d-unit.is-ghost .w3d-board {
+        background: rgba(148, 163, 184, 0.3);
+        border-color: #94A3B8;
+    }
+
+    .w3d-unit.is-ghost .w3d-lip {
+        background: #94A3B8;
+    }
+
+    .w3d-unit-label.is-ghost {
+        color: #64748B;
+        background: rgba(241, 245, 249, 0.92);
+        border: 1px dashed #94A3B8;
+        pointer-events: none;
+    }
+
     /* ---------- xuyên tủ: đi bộ góc nhìn thứ nhất trong phòng (như game 3D) ---------- */
     .w3d-walk {
         display: none;
@@ -1218,7 +1247,7 @@
 
                 if (built) {
                     var sx = s.width * PPM / built.W, sz = s.depth * PPM / built.D, sy = height / built.H;
-                    html += '<div data-w3d-i="' + si + '" class="w3d-unit' + (s.selected ? ' is-selected' : '') + (s.clash ? ' is-clash' : '') + '"' +
+                    html += '<div data-w3d-i="' + si + '" class="w3d-unit' + (s.selected ? ' is-selected' : '') + (s.clash ? ' is-clash' : '') + (s.ghost ? ' is-ghost' : '') + '"' +
                         (s.key ? ' data-w3d-shelf="' + esc(s.key) + '"' : '') + (s.label ? ' title="' + esc(s.label) + '"' : '') +
                         ' style="transform:translate3d(' + px(X) + ',0px,' + px(Z) + ') rotateY(' + (-(s.rotation || 0)) + 'deg) scale3d(' +
                         sx.toFixed(4) + ',' + sy.toFixed(4) + ',' + sz.toFixed(4) + ') translateY(' + px(-built.H / 2) + ')">' +
@@ -1236,7 +1265,7 @@
                     html += cardMarkup(s, X, -height - 10, Z).replace('<div ', '<div data-w3d-i="' + si + '" ');
                 } else if (s.label) {
                     html += '<div data-w3d-i="' + si + '" class="w3d-label w3d-unit-label w3d-bb' + (s.selected ? ' is-selected' : '') +
-                        (s.clash ? ' is-clash' : '') + '" style="transform:' +
+                        (s.clash ? ' is-clash' : '') + (s.ghost ? ' is-ghost' : '') + '" style="transform:' +
                         billboard(X, -height - 8, Z, 0.85) + '">' + esc(s.label) + '</div>';
                 }
             });

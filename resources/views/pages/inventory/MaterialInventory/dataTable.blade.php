@@ -340,7 +340,20 @@
                 {{-- ============ THEO VỊ TRÍ (SƠ ĐỒ THẺ) ============ --}}
                 @tab('inventory_material', 'zone')
                 <div class="mi-pane {{ $activeTab === 'zone' ? 'is-active' : '' }}" id="miPaneZone">
-                    @include('pages.inventory.MaterialInventory.zoneMap')
+                    {{-- Sơ đồ thẻ Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí, cùng bộ vẽ với Tồn Kho Hoá Chất --}}
+                    @include('pages.inventory.shared.zoneGrid', [
+                        'zgId' => 'invZoneMap',
+                        'zgItem' => 'vật tư',
+                        'zgCode' => 'Mã xuất nhập',
+                    ])
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            window.invZoneGrid('#invZoneMap', {
+                                zones: @json($zones),
+                                rows: @json($zoneRows)
+                            });
+                        });
+                    </script>
                 </div>
                 @endtab
 
@@ -417,112 +430,6 @@
             }
             $('#balancingHistoryModal').modal('show');
         });
-
-        /* ---------- Sơ đồ tồn theo vị trí ---------- */
-        var mzIndex = @json($zoneMap['index']);
-        var mzState = '';
-        var mzZoneType = '*';
-
-        // Lọc ô vị trí theo tình trạng + từ khoá, rồi ẩn luôn tầng/cột/kệ/kho không còn ô nào
-        function mzApply() {
-            var q = ($('#mzSearch').val() || '').toString().trim().toLowerCase();
-
-            $('#miPaneZone .mz-cell[data-state]').each(function () {
-                var state = $(this).data('state');
-                var okState = mzState === ''
-                    || (mzState === 'empty' && state === 'empty')
-                    || (mzState === 'stocked' && state !== 'empty')
-                    || (mzState === 'alert' && (state === 'warn' || state === 'danger'));
-                var okText = q === '' || ($(this).data('search') || '').toString().indexOf(q) >= 0;
-                var okZone = mzZoneType === '*' || ($(this).attr('data-zone-type') || '') === mzZoneType;
-                $(this).css('display', okState && okText && okZone ? '' : 'none');
-            });
-
-            // Đếm theo style.display (không dùng :visible) để kho đang thu gọn không bị coi là rỗng
-            function mzShown($els) {
-                return $els.filter(function () { return this.style.display !== 'none'; }).length;
-            }
-            $('#miPaneZone .mz-tier').each(function () {
-                $(this).css('display', mzShown($(this).find('.mz-cell[data-state]')) ? '' : 'none');
-            });
-            $('#miPaneZone .mz-column').each(function () {
-                $(this).css('display', mzShown($(this).find('.mz-tier')) ? '' : 'none');
-            });
-            $('#miPaneZone .mz-shelf').each(function () {
-                $(this).css('display', mzShown($(this).find('.mz-column')) ? '' : 'none');
-            });
-            $('#miPaneZone .mz-wh').each(function () {
-                $(this).css('display', mzShown($(this).find('.mz-shelf')) ? '' : 'none');
-            });
-
-            var total = $('#miPaneZone .mz-wh').length;
-            var shown = mzShown($('#miPaneZone .mz-wh'));
-            $('#miPaneZone .mz-noresult').css('display', total > 0 && shown === 0 ? 'block' : 'none');
-        }
-
-        $('#miPaneZone .mz-filter[data-state]').on('click', function () {
-            $('#miPaneZone .mz-filter[data-state]').removeClass('is-active');
-            $(this).addClass('is-active');
-            mzState = $(this).data('state') || '';
-            mzApply();
-        });
-        $('#miPaneZone .mz-zt-filter').on('click', function () {
-            $('#miPaneZone .mz-zt-filter').removeClass('is-active');
-            $(this).addClass('is-active');
-            mzZoneType = $(this).attr('data-zone-type');
-            mzApply();
-        });
-        $('#mzSearch').on('input', mzApply);
-
-        // Thu gọn / mở từng kho
-        $(document).on('click', '#miPaneZone .mz-wh-head', function () {
-            $(this).closest('.mz-wh').toggleClass('is-closed');
-        });
-        $('#mzToggleAll').on('click', function () {
-            var closeAll = $('#miPaneZone .mz-wh').not('.is-closed').length > 0;
-            $('#miPaneZone .mz-wh').toggleClass('is-closed', closeAll);
-            $(this).html(closeAll
-                ? '<i class="fas fa-expand mr-1"></i> Mở tất cả'
-                : '<i class="fas fa-compress mr-1"></i> Thu gọn tất cả');
-        });
-
-        // Bấm một ô vị trí -> xem đủ các mã đang nằm ở đó
-        $(document).on('click', '#miPaneZone .mz-cell[data-key]', function () {
-            var d = mzIndex[$(this).data('key')];
-            if (!d) return;
-
-            $('#zoneDetailModal .mz-d-name').text(d.code || '—');
-            $('#zoneDetailModal .mz-d-path').text(d.path || '—');
-            $('#zoneDetailModal .mz-d-code').text(d.code || '—');
-            $('#zoneDetailModal .mz-d-lots').text(d.lots);
-            $('#zoneDetailModal .mz-d-materials').text(d.materials);
-
-            var $tb = $('#zoneDetailModal tbody').empty();
-            if (!d.items || !d.items.length) {
-                $tb.append('<tr><td colspan="6" class="text-center text-muted">Vị trí này đang trống.</td></tr>');
-            } else {
-                d.items.forEach(function (x, i) {
-                    var $tr = $('<tr></tr>');
-                    $tr.append($('<td class="text-center"></td>').text(i + 1));
-                    $tr.append($('<td class="font-weight-bold"></td>').text(x.code));
-                    var $mat = $('<td></td>').append($('<div class="font-weight-bold"></div>').text(x.material_name));
-                    if (x.sub) $mat.append($('<div class="md-sub small text-muted"></div>').text(x.sub));
-                    $tr.append($mat);
-                    $tr.append($('<td class="text-right font-weight-bold"></td>').text(x.remaining + ' ' + (x.unit || '')));
-                    $tr.append($('<td class="text-center md-sub"></td>').text(x.expired_date));
-                    $tr.append($('<td class="text-center"></td>').append(
-                        $('<span></span>').addClass('mi-badge ' + x.state).text(x.state_label)
-                    ));
-                    $tb.append($tr);
-                });
-            }
-            $('#zoneDetailModal').modal('show');
-        });
-
-        // Nút Thẻ | 3D: kệ dựng 3D theo lưới Định Khu, thùng hàng = vị trí đang có hàng
-        if (window.invZone3d) {
-            window.invZone3d.init(document.getElementById('miPaneZone'), { zones: @json($zones), nodes: mzIndex });
-        }
 
         if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([1, 'asc']).draw();
 

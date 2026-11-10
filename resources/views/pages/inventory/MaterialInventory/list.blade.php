@@ -88,7 +88,6 @@
 @section('model')
     @include('pages.inventory.MaterialInventory.balancing')
     @include('pages.inventory.MaterialInventory.balancingHistory')
-    @include('pages.inventory.MaterialInventory.zoneDetail')
     @include('pages.inventory.MaterialInventory.chart')
     @include('pages.inventory.shared.movementDetail', [
         'movementUrl' => route('pages.inventory.materialInventory.movements'),

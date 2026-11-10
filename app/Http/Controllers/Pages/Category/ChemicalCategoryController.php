@@ -435,7 +435,6 @@ class ChemicalCategoryController extends Controller
                     'Hàm lượng hoạt chất (%)' => $this->formatDensity($row->ai_content_percent),
                     'Hạn dùng (tháng)' => $row->shelf_life_months ?: '—',
                     'Điều kiện bảo quản' => $row->storage_condition_name ?: '—',
-                    'Số tài liệu' => $row->doc_no ?: '—',
                     'Thời gian đặt hàng' => $row->lead_time_days === null ? '—' : $row->lead_time_days . ' ngày',
                     'Phân loại' => $codes ? implode(', ', $codes) : '—',
                     'Cảnh báo an toàn' => $warningCodes
@@ -906,7 +905,6 @@ class ChemicalCategoryController extends Controller
             'ai_content_percent' => ['nullable', 'numeric', 'gt:0', 'max:100'],
             'shelf_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'storage_condition_id' => ['nullable', 'integer', 'exists:storage_conditions,id'],
-            'doc_no' => ['nullable', 'max:20'],
             'safety_warning' => ['nullable', 'array'],
             'safety_warning.*' => [Rule::in(array_keys(config('chemical.safety_warnings')))],
         ] + \App\Support\MaterialClassification::leadTimeRules();
@@ -916,7 +914,6 @@ class ChemicalCategoryController extends Controller
     private function payload(array $input): array
     {
         $type = trim((string) ($input['type'] ?? ''));
-        $docNo = trim((string) ($input['doc_no'] ?? ''));
         $density = trim((string) ($input['density'] ?? ''));
         $aiContentPercent = trim((string) ($input['ai_content_percent'] ?? ''));
         $shelfLife = trim((string) ($input['shelf_life_months'] ?? ''));
@@ -933,7 +930,6 @@ class ChemicalCategoryController extends Controller
             'ai_content_percent' => $aiContentPercent === '' ? null : $aiContentPercent,
             'shelf_life_months' => $shelfLife === '' ? null : (int) $shelfLife,
             'storage_condition_id' => $storageConditionId === '' ? null : (int) $storageConditionId,
-            'doc_no' => $docNo === '' ? null : $docNo,
             'safety_warning' => $warningCodes ? json_encode($warningCodes, JSON_UNESCAPED_UNICODE) : null,
             // Không nhận từ form: người có quyền khai sau qua updateLeadTime(), update() giữ giá trị cũ
             'lead_time_days' => null,
@@ -957,7 +953,6 @@ class ChemicalCategoryController extends Controller
             'shelf_life_months.min' => 'Hạn dùng tối thiểu 1 tháng.',
             'shelf_life_months.max' => 'Hạn dùng tối đa 1200 tháng (100 năm).',
             'storage_condition_id.exists' => 'Điều kiện bảo quản không hợp lệ.',
-            'doc_no.max' => 'Số tài liệu tối đa 20 ký tự.',
             'safety_warning.*.in' => 'Cảnh báo an toàn không hợp lệ.',
         ] + \App\Support\MaterialClassification::leadTimeMessages();
     }

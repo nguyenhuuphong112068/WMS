@@ -127,20 +127,6 @@
                             </div>
 
                             <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Số Hồ Sơ</label>
-                                        <input type="text" name="doc_no" maxlength="20"
-                                            class="form-control {{ $bag->has('doc_no') ? 'is-invalid' : '' }}"
-                                            value="{{ $old('doc_no') }}" placeholder="Nhập số hồ sơ">
-                                        @if ($bag->has('doc_no'))
-                                            <span class="md-error">{{ $bag->first('doc_no') }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
                                 <div class="col-md-12">
                                     <div class="form-group">
                                         <label>Điều Kiện Bảo Quản</label>

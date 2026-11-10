@@ -1594,6 +1594,7 @@ class ChemicalInventoryController extends Controller
             'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
             'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']),
             'locations' => $this->locationOptions($departmentId),
+            'foreign' => \App\Support\RoomLayout::foreign($departmentId, self::LOCATION_TYPE),
         ];
     }
 

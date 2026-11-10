@@ -93,6 +93,41 @@ class RoomLayout
         });
     }
 
+    /** Nhãn module của loại lưu trữ ở bảng locations.item_type. */
+    private const TYPE_LABELS = ['chemical' => 'Hoá chất', 'standard' => 'Chất chuẩn', 'material' => 'Vật tư'];
+
+    /**
+     * Kệ/tủ chỉ có ô dành cho module KHÁC (không có ô dùng chung hay ô của loại $ownType): màn Tồn Kho không có
+     * hàng ở đây nhưng vẫn vẽ mờ xám trên Mặt bằng / 3D cho khớp Định Khu.
+     *
+     * @return array<int, string> shelf_id => nhãn module (vd. "Vật tư")
+     */
+    public static function foreign(int $departmentId, string $ownType): array
+    {
+        $rows = \Illuminate\Support\Facades\DB::table('locations')
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->whereNotNull('shelf_id')
+            ->groupBy('shelf_id', 'item_type')
+            ->select('shelf_id', 'item_type')
+            ->get()
+            ->groupBy('shelf_id');
+
+        $out = [];
+
+        foreach ($rows as $shelfId => $types) {
+            $types = $types->pluck('item_type')->all();
+
+            if (in_array(null, $types, true) || in_array($ownType, $types, true)) {
+                continue;
+            }
+
+            $out[$shelfId] = implode(' / ', array_map(fn ($t) => self::TYPE_LABELS[$t] ?? $t, $types));
+        }
+
+        return $out;
+    }
+
     public static function door($row, array $polygon): ?array
     {
         $data = is_string($row->layout_door ?? null) ? json_decode($row->layout_door, true) : null;

@@ -46,3 +46,27 @@ Mỗi mục: ngày · màn hình / tab · thay đổi · mục hướng dẫn b�
   [Đổi vị trí] trên thanh = gộp vào một vị trí chọn ở ô Vị trí mới. Bảng trong hộp có thêm cột Vị trí hiện tại / Vị trí mới.
 - Server: `moveLocation` nhận thêm `location_ids[]` (song song import_ids), một transaction; phản hồi có `groups`.
 - Hướng dẫn: `chemical#ton-kho` (thêm bước chọn nhiều ô + 2 kiểu dời). Ảnh: thanh vùng chọn + hộp Đổi Vị Trí kiểu Dời nguyên khối.
+
+### 10/11/2026 - Bỏ ô "Số Hồ Sơ" khỏi form Sửa Danh Mục Hoá Chất Công Ty
+- Dữ Liệu Gốc/Danh Mục › Hoá Chất Công Ty: form Cập Nhật không còn ô Số Hồ Sơ (doc_no); bỏ khỏi validate, payload, message và
+  dòng "Số tài liệu" trong chi tiết. Cột DB `doc_no` giữ nguyên (giá trị cũ không bị xoá khi sửa).
+- Code: `ChemicalCategory/update.blade.php`, `ChemicalCategoryController.php`.
+- Hướng dẫn: `chemical/sections/companyCategory.blade.php` đã xoá dòng 'Số Hồ Sơ' ở bảng trường (cần soát lại cùng đợt) +
+  kiểm tra ảnh form Sửa có ô Số Hồ Sơ cần chụp lại.
+
+### 10/11/2026 - Bỏ dòng mã hoạt chất (Axxxx) ở tab Tồn - Đối Chiếu Ngưỡng
+- Tồn Kho Hoá Chất › tab Đối chiếu ngưỡng PL IV: cột Hoạt Chất không còn dòng mã A (vd. A00076) dưới tên + badge Nhóm 9;
+  vẫn còn dòng "Gộp tồn của: ..." và cảnh báo lô chưa quy đổi.
+- Code: `ThresholdReconciliation/pane.blade.php`.
+- Hướng dẫn: `chemical#ton-kho` (đoạn tab Đối chiếu ngưỡng nếu nhắc mã A). Ảnh: chụp lại ảnh tab Đối chiếu ngưỡng.
+
+### 10/11/2026 - Nhập Vật Tư: đổi tab + nút; modal Sản Phẩm - Chỉ Tiêu: cột NSX + chọn nhiều từ danh mục phòng
+- Nhập › Nhập Vật Tư: tab "Chờ kiểm tra" đổi tên "Nhập Vật Tư" và đứng TRƯỚC tab "Sổ nhập vật tư"; nút [Nhập vật tư] chuyển từ tab Sổ nhập sang tab "Nhập Vật Tư".
+- Danh Mục (HC + CC) › tab Danh sách theo sản phẩm, modal Thêm/Cập nhật Sản Phẩm - Chỉ Tiêu: bảng có cột Nhà Sản Xuất (ô chọn cũng tìm theo NSX);
+  thêm nút "Danh mục phòng" mở hộp chọn nhiều hoá chất/chất chuẩn cùng lúc (tìm kiếm, tick, Thêm đã chọn).
+- Code: `import/MaterialImport/dataTable.blade.php`, `category/shared/productListForm.blade.php`, `Support/ProductList.php`.
+- Hướng dẫn: `import_material` (tên tab, vị trí nút), `chemical/standard#danh-sach-theo-san-pham`. Ảnh: chụp lại trang Nhập Vật Tư + modal Sản Phẩm - Chỉ Tiêu.
+
+- Tồn › Tồn Kho Vật Tư, tab "Tồn kho theo vị trí": đổi sang sơ đồ lưới giống Tồn Kho Hoá Chất/Chất Chuẩn (dùng chung `inventory/shared/zoneGrid`: ô vị trí màu theo trạng thái, nút Thẻ | 3D | Mặt bằng, khối Chưa xếp vị trí thu gọn được, hộp chi tiết vị trí). Hàng cách ly/chờ huỷ hiện ở khu tương ứng (cách ly = vàng, chờ huỷ = đỏ).
+- Code: `MaterialInventoryController` (zoneMap -> zoneRows), `MaterialInventory/dataTable.blade.php`, xoá `zoneMap.blade.php` + `zoneDetail.blade.php`.
+- Hướng dẫn: `material` mục Tồn kho (pane miPaneZone). Ảnh: chụp lại tab Tồn kho theo vị trí.

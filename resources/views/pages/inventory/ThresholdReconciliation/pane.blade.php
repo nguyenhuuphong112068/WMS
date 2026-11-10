@@ -235,9 +235,6 @@
                                 <span class="font-weight-bold">{{ $row->ai_name }}</span>
                                 <span class="badge badge-danger ml-1"
                                     title="Nhóm 9 · Phụ lục IV Bảng A NĐ 24/2026/NĐ-CP">Nhóm 9</span>
-                                @if ($row->ai_code)
-                                    <div class="md-sub">{{ $row->ai_code }}</div>
-                                @endif
                                 @if (!empty($row->members))
                                     <div class="md-sub"
                                         title="Mục gộp của nghị định - tồn của các chất thành viên được cộng chung vào ngưỡng này">

@@ -113,7 +113,7 @@ class ProductList
         $nameField = $type === self::STANDARD ? 'standard_name' : 'chem_name';
 
         return collect($departmentRows)->where('status_id', 1)->map(function ($row) use ($type, $nameField) {
-            $manufacturer = $type === self::STANDARD ? ($row->manufacturer_short_name ?: $row->manufacturer_name) : null;
+            $manufacturer = ($row->manufacturer_short_name ?? null) ?: ($row->manufacturer_name ?? null);
 
             return [
                 'id' => (string) $row->category_id,
