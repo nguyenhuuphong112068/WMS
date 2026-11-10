@@ -45,8 +45,8 @@ use Illuminate\Support\Facades\DB;
  *     giống cách Bảng B cộng tồn thô ở App\Support\MixtureHazardThreshold.
  *   - Nhân thêm active_ingredients.equiv_factor của chất thành viên (mặc định 1). Chỉ đổi
  *     hệ số này khi muốn quy về phần nguyên tố (ví dụ 0,738 cho Hg trong HgCl₂).
- * Chất vừa có ngưỡng RIÊNG vừa thuộc mục gộp thì được cộng ở CẢ HAI chỗ (đúng nghị định:
- * nó vừa bị liệt kê đích danh vừa nằm trong nhóm).
+ * Chất vừa có ngưỡng RIÊNG vừa thuộc mục gộp (đã liên kết parent_id) thì CHỈ cộng vào mục
+ * gộp, không đứng riêng nữa - tránh tính trùng vào tổng tỉ lệ nhóm 9 (sửa 10/11/2026).
  *
  * Đơn vị đếm (chai/thùng…): quy ra kg theo "Khối lượng quy đổi" phòng khai ở tab Hoá Chất
  * Của Phòng (chemical_department_categories.pack_weight_kg). Chưa khai con số này, hoặc đơn
@@ -646,12 +646,16 @@ class ActiveIngredientThreshold
         $out = [];
 
         foreach ($rows as $row) {
-            if (in_array((int) $row->ai_id, $ivAIds, true)) {
-                $out[] = self::ownerRow($row, false);
-            }
-
+            // Đã liên kết vào mục gộp thuộc Bảng A -> CHỈ cộng vào mục gộp, không đứng riêng
+            // nữa (tránh tính trùng 2 lần vào tổng tỉ lệ nhóm 9).
             if ($row->parent_ai_id !== null && in_array((int) $row->parent_ai_id, $ivAIds, true)) {
                 $out[] = self::ownerRow($row, true);
+
+                continue;
+            }
+
+            if (in_array((int) $row->ai_id, $ivAIds, true)) {
+                $out[] = self::ownerRow($row, false);
             }
         }
 
