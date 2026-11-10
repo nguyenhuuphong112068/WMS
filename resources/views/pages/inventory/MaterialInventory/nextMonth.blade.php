@@ -140,6 +140,14 @@
                         @if ($row->suggest > 0)
                             <span class="mf-num is-out">{{ $invNum($row->suggest) }}</span>
                             <span class="mf-unit">{{ $row->unit_short_name }}</span>
+                            <div class="small text-muted" style="line-height:1.25">
+                                @if ($row->gap < 0)
+                                    Thiếu {{ $invNum(abs($row->gap)) }} so với nhu cầu
+                                    @if ($row->min_stock) + giữ ngưỡng tối thiểu {{ $invNum($row->min_stock) }} @endif
+                                @else
+                                    Dư {{ $invNum($row->gap) }} &lt; ngưỡng tối thiểu {{ $invNum($row->min_stock) }}
+                                @endif
+                            </div>
                         @else
                             <span class="mf-num is-muted">—</span>
                         @endif

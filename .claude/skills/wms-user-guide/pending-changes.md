@@ -81,3 +81,8 @@ Mỗi mục: ngày · màn hình / tab · thay đổi · mục hướng dẫn b�
 - Tab mới `expiring` (pane `miPaneExpiring`) giống Tồn Kho Hoá Chất/Chất Chuẩn: lô còn tồn có hạn dùng dưới 6 tháng (kể cả quá hạn), chip lọc ≤ 3 tháng / 1 tháng / 2 tuần / 1 tuần, lọc theo phân loại vật tư; quyền con `inventory_material_tab_expiring`.
 - Code: `PageTabs`, migration `seed_material_inventory_expiring_tab`, `MaterialInventoryController` (expiringFilters), `MaterialInventory/{list,dataTable,classificationFilter}.blade.php`.
 - Hướng dẫn: `material` mục Tồn kho (bảng "Ba tab xem tồn" -> bốn tab, pane thêm miPaneExpiring). Ảnh: chụp lại.
+
+### 10/11/2026 - Tồn Kho Vật Tư, tab Khả dụng: thêm lý do dưới cột "Cần Dự Trù"
+- Dưới số lượng cần dự trù hiện dòng nhỏ: "Thiếu X so với nhu cầu (+ giữ ngưỡng tối thiểu Y)" hoặc "Dư X < ngưỡng tối thiểu Y".
+- Code: `MaterialInventory/nextMonth.blade.php`.
+- Hướng dẫn: `material` mục Khả dụng tháng tới (giải thích cột Cần Dự Trù).
