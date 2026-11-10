@@ -70,3 +70,9 @@ Mỗi mục: ngày · màn hình / tab · thay đổi · mục hướng dẫn b�
 - Tồn › Tồn Kho Vật Tư, tab "Tồn kho theo vị trí": đổi sang sơ đồ lưới giống Tồn Kho Hoá Chất/Chất Chuẩn (dùng chung `inventory/shared/zoneGrid`: ô vị trí màu theo trạng thái, nút Thẻ | 3D | Mặt bằng, khối Chưa xếp vị trí thu gọn được, hộp chi tiết vị trí). Hàng cách ly/chờ huỷ hiện ở khu tương ứng (cách ly = vàng, chờ huỷ = đỏ).
 - Code: `MaterialInventoryController` (zoneMap -> zoneRows), `MaterialInventory/dataTable.blade.php`, xoá `zoneMap.blade.php` + `zoneDetail.blade.php`.
 - Hướng dẫn: `material` mục Tồn kho (pane miPaneZone). Ảnh: chụp lại tab Tồn kho theo vị trí.
+
+### 10/11/2026 - Danh Mục Vật Tư: Tổ quản lý cho DS đề nghị nội bộ theo chu kỳ
+- Modal Thêm/Cập nhật "Danh Sách Đề Nghị Nội Bộ Theo Chu Kỳ": thêm ô chọn bắt buộc "Tổ Quản Lý" (tổ đang hoạt động của phòng); đề nghị tự tạo mang tổ này (material_request_lists.group_id).
+- Tab "DS đề nghị nội bộ theo chu kỳ": thêm cột Tổ Quản Lý + bộ lọc "Tổ quản lý" ở toolbar. Danh sách cũ chưa có tổ phải chọn tổ khi sửa.
+- Code: migration `add_group_id_to_material_periodic_request_list_table`, `Support/MaterialPeriodicRequest.php`, `PeriodicRequestController`, `category/PeriodicRequest/{form,dataTable,assets}.blade.php`.
+- Hướng dẫn: `material` mục Danh Mục › DS đề nghị nội bộ theo chu kỳ (bảng ô nhập, cột bảng, lỗi "Vui lòng chọn tổ quản lý"). Ảnh: chụp lại tab + modal.

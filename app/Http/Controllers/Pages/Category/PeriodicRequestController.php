@@ -407,6 +407,15 @@ class PeriodicRequestController extends Controller
             // Danh sách nội bộ có thể không gắn với Đối tượng nào; giữ nguyên đối tượng cũ (dù đã khoá) thì cho qua
             $keepObject = $current && (int) $request->consumption_object_id === (int) $current->consumption_object_id;
 
+            // Tổ quản lý: tổ đang hoạt động của phòng; giữ nguyên tổ cũ (dù đã khoá) thì cho qua
+            $allowedGroupIds = MaterialPeriodicRequest::groupOptions($departmentId)->pluck('id')->all();
+
+            if ($current && $current->group_id) {
+                $allowedGroupIds[] = (int) $current->group_id;
+            }
+
+            $rules['group_id'] = ['required', 'integer', Rule::in($allowedGroupIds)];
+
             $rules['consumption_object_id'] = $keepObject
                 ? ['nullable', 'integer']
                 : ['nullable', 'integer', Rule::exists('consumption_objects', 'id')->where('status_id', 1)];
@@ -501,6 +510,8 @@ class PeriodicRequestController extends Controller
             'start_date.after_or_equal' => 'Ngày bắt đầu chu kỳ đầu tiên không được trước hôm nay.',
             'to_department_id.required' => 'Vui lòng chọn phòng cấp phát.',
             'to_department_id.in' => 'Phòng cấp phát không hợp lệ.',
+            'group_id.required' => 'Vui lòng chọn tổ quản lý.',
+            'group_id.in' => 'Tổ quản lý không thuộc phòng ban đang chọn hoặc đã bị khoá.',
             'consumption_object_id.required' => 'Vui lòng chọn đối tượng.',
             'consumption_object_id.integer' => 'Đối tượng không hợp lệ.',
             'consumption_object_id.exists' => 'Đối tượng không tồn tại hoặc đã bị khoá.',
@@ -549,6 +560,7 @@ class PeriodicRequestController extends Controller
                 ? (int) $request->consumption_object_id
                 : null,
             'frequency' => $isInternal ? (string) $request->frequency : null,
+            'group_id' => $isInternal && $request->filled('group_id') ? (int) $request->group_id : null,
         ];
     }
 

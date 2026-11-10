@@ -1077,6 +1077,7 @@
             prApplyCycle($form, 1);
             $form.find('select[name="to_department_id"]').val('').trigger('change');
             $form.find('select[name="consumption_object_id"]').val('').trigger('change');
+            $form.find('select.pr-group').val('');
             $form.find('.pr-estimate-offset').val(@json(\App\Support\MaterialPeriodicRequest::ESTIMATE_MONTH_OFFSET_DEFAULT));
 
             prFillRows($modal, []);
@@ -1105,6 +1106,11 @@
             $form.find('select[name="to_department_id"]').val(row.to_department_id ? String(row.to_department_id) : '').trigger('change');
             $form.find('.pr-estimate-offset').val(row.estimate_month_offset != null ? String(row.estimate_month_offset) : '1');
             $form.find('select[name="consumption_object_id"]').val(row.consumption_object_id ? String(row.consumption_object_id) : '').trigger('change');
+            var $group = $form.find('select.pr-group');
+            if (row.group_id && !$group.find('option[value="' + row.group_id + '"]').length) {
+                $group.append($('<option>').val(row.group_id).text((row.group_name || 'Tổ #' + row.group_id) + ' (đã khoá)'));
+            }
+            $group.val(row.group_id ? String(row.group_id) : '');
             prFillFrequencies($form, row.frequency, row.cycle_day);
             // Dựng tần suất xong mới đọc lịch CAL, giữ đúng cách chọn ngày đã lưu
             prLoadCal($form, row.cycle_day_mode);

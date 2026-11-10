@@ -156,6 +156,7 @@ class MaterialCategoryController extends Controller
             'periodicExternalCategories' => MaterialPeriodicRequest::categoryOptions(MaterialPeriodicRequest::TYPE_EXTERNAL, $departmentId),
             'periodicUnits' => DepartmentMaterial::unitOptions(),
             'periodicDepartments' => MaterialPeriodicRequest::departmentOptions($departmentId),
+            'periodicGroups' => MaterialPeriodicRequest::groupOptions($departmentId),
             // Tiêu đề đã đặt ở từng loại danh sách - gợi ý cho ô Tiêu Đề
             'periodicTitles' => collect([MaterialPeriodicRequest::TYPE_INTERNAL, MaterialPeriodicRequest::TYPE_EXTERNAL, MaterialPeriodicRequest::TYPE_ESTIMATE])
                 ->mapWithKeys(fn ($type) => [$type => TitleSuggestions::recent(MaterialPeriodicRequest::LIST_TABLE, $departmentId, 'title',

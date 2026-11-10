@@ -329,6 +329,7 @@
             'categories' => $prCategories,
             'units' => $periodicUnits,
             'departments' => $periodicDepartments,
+            'groups' => $periodicGroups,
             'objects' => $periodicObjects,
         ])
         @include('pages.category.PeriodicRequest.update', [
@@ -336,6 +337,7 @@
             'categories' => $prCategories,
             'units' => $periodicUnits,
             'departments' => $periodicDepartments,
+            'groups' => $periodicGroups,
             'objects' => $periodicObjects,
         ])
         @include('pages.category.PeriodicRequest.picker', [

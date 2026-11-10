@@ -446,8 +446,10 @@ class MaterialPeriodicRequest
         $lists = DB::table(self::LIST_TABLE)
             ->leftJoin('deparments as pr_to_dept', self::LIST_TABLE.'.to_department_id', '=', 'pr_to_dept.id')
             ->leftJoin('consumption_objects as pr_object', self::LIST_TABLE.'.consumption_object_id', '=', 'pr_object.id')
+            ->leftJoin('groups as pr_group', self::LIST_TABLE.'.group_id', '=', 'pr_group.id')
             ->select(
                 self::LIST_TABLE.'.*',
+                'pr_group.name as group_name',
                 'pr_to_dept.name as to_department_name',
                 'pr_to_dept.shortName as to_department_short',
                 'pr_object.type as object_type',
@@ -798,6 +800,14 @@ class MaterialPeriodicRequest
         try {
             $schedules = self::calPendingSchedules($object, $frequency) ?? [];
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Đọc lịch CAL lỗi', [
+                'connection' => $object->cal_connection ?? null,
+                'suffix' => $object->cal_table_suffix ?? null,
+                'inst_id' => $object->cal_inst_id ?? null,
+                'frequency' => $frequency,
+                'error' => $e->getMessage(),
+            ]);
+
             return $fail('Không đọc được lịch từ phần mềm CAL, vui lòng thử lại sau.');
         }
 
@@ -896,7 +906,8 @@ class MaterialPeriodicRequest
     {
         $list = DB::table(self::LIST_TABLE)
             ->leftJoin('deparments as pr_to_dept', self::LIST_TABLE.'.to_department_id', '=', 'pr_to_dept.id')
-            ->select(self::LIST_TABLE.'.*', 'pr_to_dept.name as to_department_name')
+            ->leftJoin('groups as pr_group', self::LIST_TABLE.'.group_id', '=', 'pr_group.id')
+            ->select(self::LIST_TABLE.'.*', 'pr_to_dept.name as to_department_name', 'pr_group.name as group_name')
             ->where(self::LIST_TABLE.'.id', $id)
             ->first();
 
@@ -916,6 +927,7 @@ class MaterialPeriodicRequest
             'Tiêu đề' => $list->title,
             'Loại đề nghị' => $isEstimate ? 'Dự trù' : ($isExternal ? 'Liên phòng ban' : 'Nội bộ'),
             'Đối tượng' => $isExternal || $isEstimate ? null : (self::objectLabel($list->consumption_object_id) ?? '—'),
+            'Tổ quản lý' => $isExternal || $isEstimate ? null : ($list->group_name ?: '—'),
             'Dự trù cho' => $isEstimate ? self::ESTIMATE_MONTH_OFFSETS[self::estimateMonthOffset($list)] : null,
             'Phòng cấp phát' => $isExternal ? ($list->to_department_name ?: '—') : null,
             'Chu kỳ' => self::scheduleLabel($list->periodic, $list->cycle_length, $list->frequency),
@@ -1155,6 +1167,16 @@ class MaterialPeriodicRequest
         };
     }
 
+    /** Tổ đang hoạt động của phòng - ô chọn Tổ Quản Lý của danh sách nội bộ. */
+    public static function groupOptions(int $departmentId)
+    {
+        return DB::table('groups')
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
     /** Đề nghị cấp phát NỘI BỘ - cùng cách sinh mã với MaterialExportController::requestStore(). */
     private static function createInternal($list, $items, string $actor, ?int $userId): array
     {
@@ -1171,7 +1193,7 @@ class MaterialPeriodicRequest
         $requestId = DB::table('material_request_lists')->insertGetId([
             'code' => $code,
             'department_id' => $list->department_id,
-            'group_id' => null,
+            'group_id' => $list->group_id ?: null,
             'name' => Str::limit($list->title.' - kỳ '.$now->format('d/m/Y'), 255, ''),
             'type' => 'periodic',
             'needed_date' => null, // Chưa biết ngày mong muốn cụ thể - người lập tự điền khi mở phiếu

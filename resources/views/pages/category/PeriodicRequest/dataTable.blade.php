@@ -9,6 +9,7 @@
     $prKey = \App\Support\MaterialPeriodicRequest::typeKey($type);
     $isExternal = $type === 'external';
     $isEstimate = $type === 'estimate';
+    $isInternal = ! $isExternal && ! $isEstimate;
     // Danh sách dự trù tạo "phiếu dự trù", hai loại kia tạo "đề nghị"
     $prDoc = $isEstimate ? 'phiếu dự trù' : 'đề nghị';
     $prSupport = \App\Support\MaterialPeriodicRequest::class;
@@ -25,6 +26,21 @@
                     <i class="fas fa-plus mr-1"></i> Thêm danh sách {{ $isEstimate ? 'dự trù' : ($isExternal ? 'liên phòng ban' : 'nội bộ') }}
                 </button>
             @endperm
+
+            @if ($isInternal)
+                <div class="pr-group-filter">
+                    <label for="prGroupFilter"><i class="fas fa-filter mr-1"></i> Tổ quản lý</label>
+                    <select id="prGroupFilter" class="form-control form-control-sm">
+                        <option value="">Tất cả</option>
+                        @foreach ($lists->pluck('group_name')->filter()->unique()->sort()->values() as $prGroupName)
+                            <option value="{{ $prGroupName }}">{{ $prGroupName }}</option>
+                        @endforeach
+                        @if ($lists->contains(fn ($row) => ! $row->group_name))
+                            <option value="__none">Chưa có tổ</option>
+                        @endif
+                    </select>
+                </div>
+            @endif
         </div>
 
         <div class="table-responsive">
@@ -33,6 +49,9 @@
                     <tr>
                         <th class="text-center" style="width: 46px">STT</th>
                         <th style="width: 190px">Tiêu Đề</th>
+                        @if ($isInternal)
+                            <th style="width: 130px">Tổ Quản Lý</th>
+                        @endif
                         @if ($isEstimate)
                             <th style="width: 150px">Dự Trù Cho</th>
                         @elseif ($isExternal)
@@ -49,9 +68,12 @@
                 </thead>
                 <tbody>
                     @foreach ($lists as $row)
-                        <tr>
+                        <tr data-group="{{ $row->group_name ?: '__none' }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td class="font-weight-bold">{{ $row->title }}</td>
+                            @if ($isInternal)
+                                <td>{{ $row->group_name ?: '—' }}</td>
+                            @endif
                             @if ($isEstimate)
                                 @php $prPeriod = $prSupport::estimatePeriod($row, $row->next_run_date ?: now()); @endphp
                                 <td data-order="{{ $prSupport::estimateMonthOffset($row) }}">
@@ -153,6 +175,8 @@
                                                 'estimate_month_offset' => $prSupport::estimateMonthOffset($row),
                                                 'consumption_object_id' => $row->consumption_object_id,
                                                 'frequency' => $row->frequency,
+                                'group_id' => $row->group_id,
+                                'group_name' => $row->group_name,
                                                 'items' => $row->items->map(fn ($item) => [
                                                     'category_id' => $item->category_id,
                                                     'requested_amount' => $prNum($item->requested_amount),
@@ -207,3 +231,28 @@
         </div>
     </div>
 </div>
+
+@if ($isInternal)
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            $.fn.dataTable.ext.search.push(function(settings, data, index) {
+                if (settings.nTable.id !== 'periodic{{ $prKey }}Table') return true;
+
+                var want = $('#prGroupFilter').val();
+                if (!want) return true;
+
+                return $(settings.aoData[index].nTr).attr('data-group') === want;
+            });
+
+            $(document).on('change', '#prGroupFilter', function() {
+                $('#periodic{{ $prKey }}Table').DataTable().draw();
+            });
+        });
+    </script>
+@endif
+
+<style>
+    .pr-group-filter { display: flex; align-items: center; gap: 6px; }
+    .pr-group-filter label { margin: 0; font-size: 0.83rem; font-weight: 700; color: var(--primary-dark); white-space: nowrap; }
+    .pr-group-filter .form-control { width: auto; min-width: 150px; }
+</style>

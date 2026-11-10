@@ -43,6 +43,7 @@
         'cycle_day' => old('cycle_day'),
         'cycle_day_mode' => old('cycle_day_mode'),
         'frequency' => old('frequency'),
+        'group_id' => old('group_id'),
         'items' => array_values((array) old('items', [])),
     ] : null) }}">
     <div class="modal-dialog pr-dialog" role="document">
@@ -153,6 +154,21 @@
                             </div>
                         @endif
                     </div>
+
+                    @if ($isInternal)
+                        <div class="form-row">
+                            <div class="form-group col-md-5">
+                                <label>Tổ Quản Lý <span class="text-danger">*</span></label>
+                                <select name="group_id" required
+                                    class="form-control pr-group {{ $bag->has('group_id') ? 'is-invalid' : '' }}">
+                                    <option value="">-- Chọn tổ quản lý --</option>
+                                    @foreach ($groups as $group)
+                                        <option value="{{ $group->id }}" {{ (string) $old('group_id') === (string) $group->id ? 'selected' : '' }}>{{ $group->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    @endif
 
                     <div class="form-row pr-cycle-row">
                         @unless ($isInternal)
