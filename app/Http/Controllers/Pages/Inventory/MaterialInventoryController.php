@@ -44,6 +44,14 @@ class MaterialInventoryController extends Controller
 
     private const EXPIRING_SOON_MONTHS = 6;
 
+    /** Mốc lọc nhanh tab "Cận hạn dùng": hạn dùng <= hôm nay + mốc (kể cả đã quá hạn). */
+    private const EXPIRING_FILTERS = [
+        '3m' => ['label' => '≤ 3 tháng', 'months' => 3],
+        '1m' => ['label' => '≤ 1 tháng', 'months' => 1],
+        '2w' => ['label' => '≤ 2 tuần', 'days' => 14],
+        '1w' => ['label' => '≤ 1 tuần', 'days' => 7],
+    ];
+
     private const LOW_STOCK_RATIO = 0.2;
 
     private const EPSILON = 0.00005;
@@ -94,9 +102,25 @@ class MaterialInventoryController extends Controller
             'period' => $period,
             'nearExpiryDays' => self::NEAR_EXPIRY_DAYS,
             'expiringSoonMonths' => self::EXPIRING_SOON_MONTHS,
+            'expiringFilters' => $this->expiringFilters(),
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
             'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
         ]);
+    }
+
+    /** Mốc lọc của tab "Cận hạn dùng" kèm ngày chặn (Y-m-d) tính từ hôm nay. */
+    private function expiringFilters(): array
+    {
+        $today = now()->startOfDay();
+
+        return collect(self::EXPIRING_FILTERS)
+            ->map(fn ($filter) => [
+                'label' => $filter['label'],
+                'until' => isset($filter['months'])
+                    ? $today->copy()->addMonthsNoOverflow($filter['months'])->format('Y-m-d')
+                    : $today->copy()->addDays($filter['days'])->format('Y-m-d'),
+            ])
+            ->all();
     }
 
     private function period(Request $request): array

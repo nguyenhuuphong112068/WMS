@@ -73,6 +73,14 @@
         ->map(fn($preset) => $preset + ['active' => $preset['from'] === $period['from'] && $preset['to'] === $period['to']])
         ->all();
 
+    // Tab Cận hạn dùng: còn tồn và hạn dùng dưới 6 tháng (kể cả đã quá hạn), gấp nhất lên đầu
+    $invExpiringSoon = $datas->filter(fn($row) => $row->is_expiring_soon)->sortBy('expired_date')->values();
+    $invExpiringCounts = collect($expiringFilters)
+        ->map(fn($filter) => $invExpiringSoon
+            ->filter(fn($row) => substr((string) $row->expired_date, 0, 10) <= $filter['until'])
+            ->count())
+        ->all();
+
     // [import_id => [{balancing_amount, balancing_by, balancing_at}]] cho modal lịch sử cân đối
     $invBalancingMap = $balancings->map(fn($rows) => $rows->map(fn($r) => [
         'balancing_amount' => (float) $r->balancing_amount,

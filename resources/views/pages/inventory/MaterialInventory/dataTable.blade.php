@@ -114,6 +114,12 @@
                     @tab('inventory_material', 'zone')
                     <button type="button" class="mi-tab {{ $activeTab === 'zone' ? 'is-active' : '' }}" data-pane="miPaneZone"><i class="fas fa-map-marked-alt mr-1"></i>Tồn kho theo vị trí</button>
                     @endtab
+                    @tab('inventory_material', 'expiring')
+                    <button type="button" class="mi-tab {{ $activeTab === 'expiring' ? 'is-active' : '' }}" data-pane="miPaneExpiring">
+                        <i class="fas fa-calendar-xmark mr-1"></i>Cận hạn dùng
+                        <span class="badge badge-light ml-1">{{ $invExpiringSoon->count() }}</span>
+                    </button>
+                    @endtab
                     @tab('inventory_material', 'next')
                     <button type="button" class="mi-tab {{ $activeTab === 'next' ? 'is-active' : '' }}" data-pane="miPaneNext">
                         <i class="fas fa-calendar-check mr-1"></i>Khả dụng {{ $forecast['month']['label'] }}
@@ -357,6 +363,86 @@
                 </div>
                 @endtab
 
+                {{-- ============ CẬN HẠN DÙNG (HẠN DƯỚI 6 THÁNG) ============ --}}
+                @tab('inventory_material', 'expiring')
+                <div class="mi-pane {{ $activeTab === 'expiring' ? 'is-active' : '' }}" id="miPaneExpiring">
+
+                    <div class="mb-2">
+                        <span class="mi-chip is-active" data-expiry="all"
+                            title="Còn tồn và hạn dùng dưới {{ $expiringSoonMonths }} tháng, kể cả đã quá hạn">
+                            <i class="fas fa-layer-group"></i> Dưới {{ $expiringSoonMonths }} tháng
+                            ({{ $invExpiringSoon->count() }})
+                        </span>
+                        @foreach ($expiringFilters as $key => $filter)
+                            <span class="mi-chip" data-expiry="{{ $key }}" data-until="{{ $filter['until'] }}"
+                                title="Hạn dùng đến hết {{ $invDate($filter['until']) }}, kể cả đã quá hạn">
+                                <i class="fas fa-hourglass-end"></i> {{ $filter['label'] }}
+                                ({{ $invExpiringCounts[$key] }})
+                            </span>
+                        @endforeach
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="miExpiringTable" class="table table-bordered table-hover w-100" data-deferred>
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width:45px">STT</th>
+                                    <th style="width:150px">Mã Xuất Nhập</th>
+                                    <th>Vật Tư</th>
+                                    <th style="width:120px">Nhà Sản Xuất</th>
+                                    <th style="width:150px">Vị Trí</th>
+                                    <th class="text-center" style="width:70px">Đơn Vị</th>
+                                    <th class="text-right" style="width:95px">Tồn Cuối Kỳ</th>
+                                    <th class="text-right" style="width:100px">Tổng Tồn Vật Tư</th>
+                                    <th class="text-center" style="width:130px">Hạn Dùng</th>
+                                    <th class="text-center" style="width:95px">Trạng Thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @deferredRows('miExpiringTable')
+                                @foreach ($invExpiringSoon as $row)
+                                    <tr data-classification="{{ \App\Support\MaterialClassification::filterKeys($row->classification, $row->purchasing_department) }}"
+                                        data-effective="{{ substr((string) $row->expired_date, 0, 10) }}">
+                                        <td class="text-center">{{ $loop->iteration }}</td>
+                                        <td data-order="{{ $row->code }}">
+                                            <span class="inv-code font-weight-bold">{{ $row->code }}</span>
+                                            <div class="md-sub"><span class="md-tag">{{ $row->category_code ?: '—' }}</span></div>
+                                        </td>
+                                        <td>
+                                            <div class="font-weight-bold">{{ $row->material_name ?: '—' }}</div>
+                                            @if ($row->technical_specification)
+                                                <div class="md-sub small text-muted">{{ $row->technical_specification }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="md-sub" title="{{ $row->manufacturer_name }}">
+                                            {{ $row->manufacturer_short_name ?: '—' }}
+                                        </td>
+                                        <td class="md-sub">
+                                            @if ($row->location_code)
+                                                {{ \App\Support\ZoneType::tag($row->location_code, $row->location_zone_type ?? null) }}
+                                            @else <span class="text-muted">—</span> @endif
+                                        </td>
+                                        <td class="text-center md-sub">{{ $row->unit_short_name ?: ($row->unit_name ?: '—') }}</td>
+                                        <td class="text-right font-weight-bold" data-order="{{ $row->gap }}">{{ $invNum($row->gap) }}</td>
+                                        <td class="text-right" data-order="{{ $row->category_remaining }}">{{ $invNum($row->category_remaining) }}</td>
+                                        <td class="text-center" data-order="{{ $row->expired_date ?: '9999-12-31' }}">
+                                            <div class="font-weight-bold">{{ $invDate($row->expired_date) }}</div>
+                                            @if ($row->days_to_expiry < 0)
+                                                <span class="inv-countdown is-over">Quá {{ abs($row->days_to_expiry) }} ngày</span>
+                                            @else
+                                                <span class="inv-countdown {{ $row->days_to_expiry <= $nearExpiryDays ? 'is-near' : '' }}">Còn {{ $row->days_to_expiry }} ngày</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center"><span class="mi-badge {{ $row->state }}">{{ $row->state_label }}</span></td>
+                                    </tr>
+                                @endforeach
+                                @enddeferredRows
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @endtab
+
                 {{-- ============ KHẢ DỤNG THÁNG TỚI ============ --}}
                 @tab('inventory_material', 'next')
                 <div class="mi-pane {{ $activeTab === 'next' ? 'is-active' : '' }}" id="miPaneNext">
@@ -385,7 +471,7 @@
             $('.mi-pane').removeClass('is-active');
             $('#' + $(this).data('pane')).addClass('is-active');
             // Badge phân loại chỉ áp cho các tab dạng bảng tồn
-            $('#miClassBar').toggle(['miPaneCode', 'miPaneMat', 'miPaneNext'].indexOf($(this).data('pane')) !== -1);
+            $('#miClassBar').toggle(['miPaneCode', 'miPaneMat', 'miPaneExpiring', 'miPaneNext'].indexOf($(this).data('pane')) !== -1);
             $($.fn.dataTable.tables(true)).DataTable().columns.adjust();
         });
 
@@ -432,6 +518,21 @@
         });
 
         if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([1, 'asc']).draw();
+
+        // Tab Cận hạn dùng: chip lọc theo mốc hạn dùng
+        var miExpiryUntil = null;
+        $.fn.dataTable.ext.search.push(function (settings, data, index, rowData) {
+            if (settings.nTable.id !== 'miExpiringTable' || !miExpiryUntil) return true;
+            var effective = mdDeferred.rowAttr(rowData, settings.aoData[index].nTr, 'effective');
+            return String(effective || '9999-12-31') <= miExpiryUntil;
+        });
+        $(document).on('click', '.mi-chip[data-expiry]', function () {
+            miExpiryUntil = $(this).data('until') || null;
+            $('.mi-chip[data-expiry]').removeClass('is-active');
+            $(this).addClass('is-active');
+            if ($.fn.DataTable.isDataTable('#miExpiringTable')) $('#miExpiringTable').DataTable().draw();
+        });
+        mdDeferred.setEmpty('#miExpiringTable', 'Không có mã xuất nhập nào còn tồn mà sắp hết hạn.');
 
         // Đổi tháng ở tab "Khả dụng tháng tới" nạp lại trang - mở lại đúng tab đó
         if (location.search.indexOf('tab=forecast') >= 0) {

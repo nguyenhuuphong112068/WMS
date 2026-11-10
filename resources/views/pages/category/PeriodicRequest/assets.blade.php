@@ -478,7 +478,12 @@
                 $body.append($row);
             });
 
-            $('#periodicItemsModal').modal('show');
+            // Modal được in 1 lần trong tab đầu tiên (ẩn khi đang ở tab khác) -> chuyển ra body để hiện được
+            var $modal = $('#periodicItemsModal');
+            if (!$modal.parent().is('body')) {
+                $modal.appendTo('body');
+            }
+            $modal.modal('show');
         });
 
         /** 10.5000 -> "10.5"; trống giữ trống */

@@ -90,6 +90,7 @@ class PageTabs
             'code' => 'Theo mã xuất nhập',
             'material' => 'Tồn theo mã vật tư',
             'zone' => 'Tồn kho theo vị trí',
+            'expiring' => 'Cận hạn dùng',
             'next' => 'Khả dụng tháng tới',
             'check' => 'Kiểm kê định kỳ',
         ]],

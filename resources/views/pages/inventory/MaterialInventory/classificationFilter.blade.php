@@ -26,7 +26,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        var miClassTables = ['mdTable', 'miSummaryTable', 'mfTable'];
+        var miClassTables = ['mdTable', 'miSummaryTable', 'miExpiringTable', 'mfTable'];
         var miClassWant = [];
 
         $.fn.dataTable.ext.search.push(function (settings, data, dataIndex, rowData) {

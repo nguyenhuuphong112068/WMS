@@ -76,3 +76,8 @@ Mỗi mục: ngày · màn hình / tab · thay đổi · mục hướng dẫn b�
 - Tab "DS đề nghị nội bộ theo chu kỳ": thêm cột Tổ Quản Lý + bộ lọc "Tổ quản lý" ở toolbar. Danh sách cũ chưa có tổ phải chọn tổ khi sửa.
 - Code: migration `add_group_id_to_material_periodic_request_list_table`, `Support/MaterialPeriodicRequest.php`, `PeriodicRequestController`, `category/PeriodicRequest/{form,dataTable,assets}.blade.php`.
 - Hướng dẫn: `material` mục Danh Mục › DS đề nghị nội bộ theo chu kỳ (bảng ô nhập, cột bảng, lỗi "Vui lòng chọn tổ quản lý"). Ảnh: chụp lại tab + modal.
+
+### 10/11/2026 - Tồn Kho Vật Tư: thêm tab "Cận hạn dùng"
+- Tab mới `expiring` (pane `miPaneExpiring`) giống Tồn Kho Hoá Chất/Chất Chuẩn: lô còn tồn có hạn dùng dưới 6 tháng (kể cả quá hạn), chip lọc ≤ 3 tháng / 1 tháng / 2 tuần / 1 tuần, lọc theo phân loại vật tư; quyền con `inventory_material_tab_expiring`.
+- Code: `PageTabs`, migration `seed_material_inventory_expiring_tab`, `MaterialInventoryController` (expiringFilters), `MaterialInventory/{list,dataTable,classificationFilter}.blade.php`.
+- Hướng dẫn: `material` mục Tồn kho (bảng "Ba tab xem tồn" -> bốn tab, pane thêm miPaneExpiring). Ảnh: chụp lại.
