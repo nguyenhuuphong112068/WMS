@@ -1,8 +1,8 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
 
-<p>Danh sách các lô vừa nhập, đang nằm trong khu Biệt Trữ chờ kiểm tra. Kiểm tra xong, lô mới được vào tồn và được đề
+<p>Tab <b>Nhập Vật Tư</b> (trước đây là "Chờ kiểm tra", nay đứng trước tab Sổ nhập vật tư) liệt kê các lô vừa nhập, đang nằm trong khu Biệt Trữ chờ kiểm tra; dưới mỗi mã xuất nhập có <b>mã vật tư</b>. Nút <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Nhập vật tư</span> để <a href="#nhap-vat-tu">tạo phiếu nhập</a> nằm ở tab này. Kiểm tra xong, lô mới được vào tồn và được đề
     nghị, cấp phát.</p>
-@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/cho-kiem-tra.png', 'caption' => 'Màn hình Nhập › Vật Tư › tab Chờ kiểm tra'])
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/cho-kiem-tra.png', 'caption' => 'Màn hình Nhập › Vật Tư › tab Nhập Vật Tư'])
 
 <h3>Xác nhận kiểm tra</h3>
 <ol class="ug-steps">

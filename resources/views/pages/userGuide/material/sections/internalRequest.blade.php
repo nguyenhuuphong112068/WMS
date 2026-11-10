@@ -14,7 +14,7 @@
     <li>Nhập <b>Tiêu đề đề nghị</b>, <b>Ngày mong muốn</b> (ngày cần có vật tư) và <b>Ghi chú chung</b> nếu cần.</li>
     <li>Mỗi dòng: chọn <b>Vật tư (danh mục)</b>, hoặc gõ <b>tên tự nhập</b> cho vật tư ngoài danh mục. Nhập <b>SL đề nghị</b>,
         đơn vị, và <b>Đối tượng / Mục đích</b> (bấm <i>Gắn đối tượng</i> để chọn thiết bị tiêu thụ). Cột <b>Tồn</b> cho
-        biết tồn khả dụng hiện tại.</li>
+        biết tồn khả dụng hiện tại. Trong hộp chi tiết đề nghị, dưới số <b>Tồn khả dụng</b> có diễn giải <i>Tồn hiện tại X − Đề nghị chưa cấp Y</i>.</li>
     <li>Bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-save mr-1"></i> Lưu tạm</span> để lưu nháp, hoặc
         <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-paper-plane mr-1"></i> Trình ký</span> để gửi đi ký.</li>
 </ol>

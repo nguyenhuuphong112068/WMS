@@ -37,14 +37,14 @@ return [
             'keywords' => 'dinh ky tu dong tao de nghi du tru hang thang cal'],
     ],
     'Nhập › Vật Tư' => [
+        ['id' => 'cho-kiem-tra', 'file' => 'importCheck', 'title' => 'Tab Nhập Vật Tư (Chờ Kiểm Tra)', 'icon' => 'fas fa-clipboard-check',
+            'path' => 'Nhập › Vật Tư › tab Nhập Vật Tư',
+            'route' => 'pages.import.materialImport.list', 'pane' => 'impPaneCheck', 'perm' => 'import_material_view',
+            'keywords' => 'biet tru dat khong dat tra hang'],
         ['id' => 'nhap-vat-tu', 'file' => 'importBook', 'title' => 'Nhập Vật Tư & Sổ Nhập', 'icon' => 'fas fa-dolly',
             'path' => 'Nhập › Vật Tư › tab Sổ nhập vật tư',
             'route' => 'pages.import.materialImport.list', 'pane' => 'impPaneBook', 'perm' => 'import_material_view', 'chips' => [$byDept],
             'keywords' => 'phieu nhap ma xuat nhap in nhan qr han su dung hoa don'],
-        ['id' => 'cho-kiem-tra', 'file' => 'importCheck', 'title' => 'Chờ Kiểm Tra', 'icon' => 'fas fa-clipboard-check',
-            'path' => 'Nhập › Vật Tư › tab Chờ kiểm tra',
-            'route' => 'pages.import.materialImport.list', 'pane' => 'impPaneCheck', 'perm' => 'import_material_view',
-            'keywords' => 'biet tru dat khong dat tra hang'],
     ],
     'Đề Nghị - Sử Dụng › Vật Tư' => [
         ['id' => 'de-nghi-noi-bo', 'file' => 'internalRequest', 'title' => 'Đề Nghị Cấp Phát Nội Bộ', 'icon' => 'fas fa-file-signature',
@@ -82,7 +82,7 @@ return [
     'Tồn Kho › Vật Tư' => [
         ['id' => 'ton-kho', 'file' => 'inventory', 'title' => 'Xem Tồn Kho & Cân Đối', 'icon' => 'fas fa-boxes',
             'path' => 'Tồn Kho › Vật Tư › tab Theo mã xuất nhập / Tồn theo mã vật tư / Tồn kho theo vị trí',
-            'route' => 'pages.inventory.materialInventory.list', 'pane' => ['miPaneCode', 'miPaneMat', 'miPaneZone'], 'perm' => 'inventory_material_view', 'chips' => [$byDept],
+            'route' => 'pages.inventory.materialInventory.list', 'pane' => ['miPaneCode', 'miPaneMat', 'miPaneZone', 'miPaneExpiring'], 'perm' => 'inventory_material_view', 'chips' => [$byDept],
             'keywords' => 'ton dau ky cuoi ky can doi bieu do vi tri'],
         ['id' => 'kha-dung-thang-toi', 'file' => 'nextMonth', 'title' => 'Khả Dụng Tháng Tới', 'icon' => 'fas fa-calendar-alt',
             'path' => 'Tồn Kho › Vật Tư › tab Khả dụng tháng tới',

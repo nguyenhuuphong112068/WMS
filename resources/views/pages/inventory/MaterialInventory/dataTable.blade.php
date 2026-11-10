@@ -351,6 +351,17 @@
                         'zgId' => 'invZoneMap',
                         'zgItem' => 'vật tư',
                         'zgCode' => 'Mã xuất nhập',
+                        // Định khu nhanh + Thêm vật tư vào ô + Đổi vị trí - MaterialInventoryController::assignLocation / moveLocation
+                        'zgAssign' => user_can('inventory_material_location') ? [
+                            'url' => route('pages.inventory.materialInventory.assignLocation'),
+                            'moveUrl' => route('pages.inventory.materialInventory.moveLocation'),
+                            'lookup' => route('pages.category.lookup.locations', [
+                                'type' => 'material',
+                                'except_zone' => implode(',', \App\Http\Controllers\Pages\Inventory\MaterialInventoryController::ASSIGN_EXCEPT_ZONES),
+                            ]),
+                            'max' => \App\Http\Controllers\Pages\Inventory\MaterialInventoryController::ASSIGN_MAX,
+                            'except' => \App\Http\Controllers\Pages\Inventory\MaterialInventoryController::ASSIGN_EXCEPT_ZONES,
+                        ] : null,
                     ])
                     <script>
                         document.addEventListener('DOMContentLoaded', function () {

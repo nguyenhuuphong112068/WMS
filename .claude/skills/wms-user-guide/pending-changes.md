@@ -96,3 +96,9 @@ Mỗi mục: ngày · màn hình / tab · thay đổi · mục hướng dẫn b�
 - (bổ sung) Nhãn nguồn Dự báo trên từng dòng nay ghi lý do cụ thể: "Thiếu X so với nhu cầu tháng MM/YYYY (+ giữ ngưỡng tối thiểu Y)" hoặc "Hết tháng MM/YYYY dư X < ngưỡng tối thiểu Y"; lý do này cũng điền sẵn vào Lý do dự trù. Bộ lọc Nguồn vẫn dùng nhãn chung "Thiếu tồn khả dụng cho tháng ...". Code: `MaterialEstimate/watchlistTable.blade.php`.
 
 - 10/11/2026 — Sử Dụng Vật Tư, modal chi tiết đề nghị: dưới số "Tồn khả dụng" hiện diễn giải "Tồn hiện tại X − Đề nghị chưa cấp Y".
+
+### 10/11/2026 - Tồn Kho Vật Tư: tab Tồn kho theo vị trí thêm Định khu / Thêm vật tư / Đổi vị trí như Hoá Chất
+- Quyền mới `inventory_material_location` (Định Khu Vật Tư), cấp sẵn theo `import_material_update`.
+- Có quyền: khối "Chưa xếp vị trí" có ô chọn + [Định khu]; bấm ô vị trí → [Thêm vật tư] / chọn mã → [Đổi vị trí] (bắt lý do); kéo thả giữa các ô.
+- Server: `MaterialInventoryController::assignLocation` / `moveLocation`, ghi lịch sử phiếu nhập VT + Audit Trail.
+- Hướng dẫn: `material#ton-kho` (đoạn tab Tồn kho theo vị trí).

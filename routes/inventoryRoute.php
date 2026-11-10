@@ -102,6 +102,9 @@ Route::prefix('/inventory')
             // Dữ liệu JSON cho modal "Chi Tiết Con Số" (bấm badge trên bảng tồn)
             Route::get('movements', 'movements')->name('movements');
             Route::post('balancing', 'balancing')->name('balancing');
+            // Định khu nhanh mã "Chưa xếp vị trí" + Đổi vị trí ở tab Tồn kho theo vị trí (AJAX, trả JSON)
+            Route::post('assignLocation', 'assignLocation')->name('assignLocation');
+            Route::post('moveLocation', 'moveLocation')->name('moveLocation');
             // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');

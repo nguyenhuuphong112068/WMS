@@ -17,7 +17,8 @@
     <li><b>Nhu cầu</b> lấy từ các <a href="#danh-sach-chu-ky">danh sách theo chu kỳ</a> ăn vào kho của phòng: danh sách nội bộ của
         phòng, và danh sách liên phòng ban của phòng khác <b>gửi tới</b> phòng mình. Danh sách mình gửi đi xin phòng khác không tính.</li>
     <li>Cột <b>lượng nên dự trù</b> gợi ý số cần mua để đủ nhu cầu và vẫn giữ được ngưỡng tồn tối thiểu. Các dòng
-        <b>Không đáp ứng</b> tự xuất hiện ở <a href="#can-du-tru">Danh sách vật tư cần dự trù</a>.</li>
+        <b>Không đáp ứng</b>, và dòng <b>Vừa đủ</b> mà vẫn cần dự trù để giữ ngưỡng tối thiểu, tự xuất hiện ở <a href="#can-du-tru">Danh sách vật tư cần dự trù</a>.</li>
+    <li>Dưới số ở cột <b>Cần Dự Trù</b> có dòng lý do: <i>Thiếu X so với nhu cầu (+ giữ ngưỡng tối thiểu Y)</i> hoặc <i>Dư X &lt; ngưỡng tối thiểu Y</i>.</li>
     <li>Bấm vào số nhu cầu để xem danh sách chu kỳ nào tạo ra nó.</li>
 </ul>
 

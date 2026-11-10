@@ -9,7 +9,7 @@
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Tên Sản Phẩm', true, 'Gõ tìm trong Dữ Liệu Gốc › Tên Sản Phẩm (chỉ tên đang hoạt động).'],
     ['Chỉ Tiêu', true, 'Chọn trong Dữ Liệu Gốc › Chỉ Tiêu Kiểm. Trong một phòng, cặp <b>Sản phẩm + Chỉ tiêu</b> chỉ có một gói đang dùng.'],
-    ['Thêm Hoá Chất', true, 'Gõ mã danh mục hoặc tên để thêm từng hoá chất vào bảng bên dưới. Chỉ gồm hoá chất phòng đang khai ở tab <a href="#hoa-chat-cua-phong">Hoá chất của phòng</a>; mỗi hoá chất chỉ thêm một lần. Gói phải có ít nhất 1, tối đa 100 hoá chất.'],
+    ['Thêm Hoá Chất', true, 'Gõ mã danh mục hoặc tên để thêm từng hoá chất vào bảng bên dưới. Chỉ gồm hoá chất phòng đang khai ở tab <a href="#hoa-chat-cua-phong">Hoá chất của phòng</a>; mỗi hoá chất chỉ thêm một lần. Gói phải có ít nhất 1, tối đa 100 hoá chất. Bảng có cột <b>Nhà Sản Xuất</b> (ô chọn tìm được cả theo NSX). Nút <b>Danh mục phòng</b> mở hộp chọn nhiều hoá chất cùng lúc: tìm, tick rồi bấm <b>Thêm đã chọn</b>.'],
     ['Lượng Dùng Gợi Ý', false, 'Lượng thường dùng cho một lần (theo đơn vị của phòng). Có nhập thì phiếu Sử Dụng điền sẵn vào Số Lượng Dùng; để trống thì người dùng tự nhập.'],
     ['Ghi Chú', false, 'Tối đa 500 ký tự.'],
     ['Lý Do Điều Chỉnh', true, 'Chỉ có khi sửa gói; được ghi vào Audit Trail cùng nội dung trước và sau khi sửa.'],

@@ -9,7 +9,7 @@
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Tên Sản Phẩm', true, 'Gõ tìm trong Dữ Liệu Gốc › Tên Sản Phẩm (chỉ tên đang hoạt động).'],
     ['Chỉ Tiêu', true, 'Chọn trong Dữ Liệu Gốc › Chỉ Tiêu Kiểm. Trong một phòng, cặp <b>Sản phẩm + Chỉ tiêu</b> chỉ có một gói đang dùng.'],
-    ['Thêm Chất Chuẩn', true, 'Gõ mã danh mục, tên hoặc nhà sản xuất để thêm từng chất chuẩn vào bảng bên dưới. Chỉ gồm chất chuẩn phòng đang khai ở tab <a href="#chuan-cua-phong">Chất chuẩn của phòng</a>; mỗi chất chuẩn chỉ thêm một lần. Gói phải có ít nhất 1, tối đa 100 chất chuẩn.'],
+    ['Thêm Chất Chuẩn', true, 'Gõ mã danh mục, tên hoặc nhà sản xuất để thêm từng chất chuẩn vào bảng bên dưới. Chỉ gồm chất chuẩn phòng đang khai ở tab <a href="#chuan-cua-phong">Chất chuẩn của phòng</a>; mỗi chất chuẩn chỉ thêm một lần. Gói phải có ít nhất 1, tối đa 100 chất chuẩn. Bảng có cột <b>Nhà Sản Xuất</b> (ô chọn tìm được cả theo NSX). Nút <b>Danh mục phòng</b> mở hộp chọn nhiều chất chuẩn cùng lúc: tìm, tick rồi bấm <b>Thêm đã chọn</b>.'],
     ['Số Lượng ĐN Gợi Ý', false, 'Số lượng thường đề nghị cho chỉ tiêu (theo đơn vị của phòng). Có nhập thì đề nghị điền sẵn vào Số Lượng ĐN; để trống thì người lập tự nhập.'],
     ['Ghi Chú', false, 'Tối đa 500 ký tự.'],
     ['Lý Do Điều Chỉnh', true, 'Chỉ có khi sửa gói; được ghi vào Audit Trail cùng nội dung trước và sau khi sửa.'],

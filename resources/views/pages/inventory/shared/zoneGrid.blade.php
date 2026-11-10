@@ -350,7 +350,7 @@
                         <div class="form-group mb-0">
                             <label>Lý do đổi vị trí <span class="text-danger">*</span></label>
                             <textarea class="form-control mz-mv-reason" rows="2" maxlength="255"
-                                placeholder="Ví dụ: tách hoá chất tương kỵ, sắp xếp lại tủ..."></textarea>
+                                placeholder="{{ $zgCompat ? 'Ví dụ: tách hoá chất tương kỵ, sắp xếp lại tủ...' : 'Ví dụ: sắp xếp lại kệ/tủ...' }}"></textarea>
                             <span class="md-error mz-mv-error" hidden></span>
                         </div>
                     </div>

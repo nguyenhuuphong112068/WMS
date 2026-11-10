@@ -7,7 +7,7 @@
 
 <h3>Tạo phiếu nhập</h3>
 <ol class="ug-steps">
-    <li>Ở tab <b>Sổ nhập vật tư</b>, bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Nhập vật tư</span>.</li>
+    <li>Ở tab <b>Nhập Vật Tư</b>, bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Nhập vật tư</span>.</li>
     <li>Bấm vào ô <b>Vật tư</b> để mở danh sách vật tư <b>phòng đang dùng</b>. Có thể lọc theo nhà sản xuất, phân loại,
         tình trạng tồn. Vật tư chưa có trong danh sách thì khai ở <a href="#vat-tu-cua-phong">Vật Tư Của Phòng</a> trước.</li>
     <li>Nhập <b>Số lượng / lô</b> theo đơn vị của phòng. Nhập nhiều lô cùng thông tin thì tăng <b>Số lần nhập</b> (tối đa 50),

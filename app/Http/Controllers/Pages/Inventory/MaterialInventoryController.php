@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * TỒN - TỒN KHO VẬT TƯ
@@ -60,6 +61,12 @@ class MaterialInventoryController extends Controller
 
     /** Loại lưu trữ của định khu mà màn hình này quan tâm - xem locations.item_type. */
     private const LOCATION_TYPE = 'material';
+
+    /** Loại định khu KHÔNG nhận Định khu nhanh / Đổi vị trí (hàng cách ly đi theo luồng Cách ly). */
+    public const ASSIGN_EXCEPT_ZONES = ['quarantine', 'pending', 'rejected'];
+
+    /** Số mã xuất nhập tối đa mỗi lượt định khu. */
+    public const ASSIGN_MAX = 200;
 
     /** Phiếu cách ly còn nằm trong kho (trạng thái MaterialQuarantineController) -> nhãn trên sơ đồ vị trí. */
     private const QUARANTINE_STATES = [
@@ -882,6 +889,8 @@ class MaterialInventoryController extends Controller
         return $datas->concat($quarantineRows ?? collect())
             ->filter(fn ($row) => $row->remaining > self::EPSILON)
             ->map(fn ($row) => [
+                // id phiếu nhập cho Định khu / Đổi vị trí; dòng phiếu cách ly không có id (không xếp được)
+                'id' => isset($row->id) ? (int) $row->id : null,
                 'code' => $row->code,
                 'category_id' => (int) $row->category_id,
                 'name' => $row->material_name ?: '—',
@@ -1107,6 +1116,316 @@ class MaterialInventoryController extends Controller
         );
 
         return response()->json(['success' => true, 'is_active' => $newActive]);
+    }
+
+    /**
+     * ĐỊNH KHU NHANH - xếp mã xuất nhập CHƯA CÓ định khu vào một vị trí (tab Tồn kho theo vị trí, AJAX).
+     * Cùng quy tắc với ChemicalInventoryController::assignLocation (vật tư không xét tương kỵ).
+     */
+    public function assignLocation(Request $request)
+    {
+        if (! user_can('inventory_material_location')) {
+            return response()->json(['message' => 'Bạn chưa được cấp quyền Định Khu Vật Tư.'], 403);
+        }
+
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), [
+            'import_ids' => ['required', 'array', 'min:1', 'max:'.self::ASSIGN_MAX],
+            'import_ids.*' => ['integer'],
+            'location_id' => $this->assignTargetRule($departmentId),
+        ], $this->assignMessages());
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $request->input('import_ids', []))));
+        $locationId = (int) $request->location_id;
+        $imports = $this->assignImports($ids, $departmentId);
+
+        if ($imports->count() !== count($ids)) {
+            return response()->json([
+                'message' => 'Có mã xuất nhập đã bị khoá, chưa kiểm tra Đạt hoặc không thuộc phòng ban đang chọn - vui lòng tải lại trang.',
+            ], 422);
+        }
+
+        $placed = $imports->filter(fn ($import) => $import->location_id);
+
+        if ($placed->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đã có định khu: '
+                    .$placed->map(fn ($import) => $import->code.' ('.($import->location_code ?: '—').')')->implode(', ')
+                    .'. Muốn đổi chỗ vui lòng dùng Đổi vị trí (ghi lý do), hoặc tải lại trang.',
+            ], 422);
+        }
+
+        $location = $this->assignLocationRow($locationId);
+        $note = 'Vị trí lưu trữ: — -> '.$location->code.' (Định khu nhanh ở Tồn Kho Vật Tư)';
+        $conflict = null;
+
+        try {
+            DB::transaction(function () use ($imports, $locationId, $note, &$conflict) {
+                foreach ($imports as $import) {
+                    // whereNull: hai người cùng định khu một mã thì chỉ lượt đầu được ghi
+                    $updated = DB::table('material_imports')
+                        ->where('id', $import->id)
+                        ->whereNull('location_id')
+                        ->update([
+                            'location_id' => $locationId,
+                            'updated_by' => $this->actor(),
+                            'updated_at' => now(),
+                        ]);
+
+                    if (! $updated) {
+                        $conflict = 'Mã xuất nhập '.$import->code.' vừa được người khác định khu - vui lòng tải lại trang.';
+
+                        throw new \RuntimeException($conflict);
+                    }
+
+                    \App\Http\Controllers\Pages\Import\MaterialImportController::recordHistory((int) $import->id, 'Định khu', $note);
+                }
+            });
+        } catch (\RuntimeException $e) {
+            if ($conflict === null) {
+                throw $e;
+            }
+
+            return response()->json(['message' => $conflict], 422);
+        }
+
+        foreach ($imports as $import) {
+            AuditTrialController::log('Định khu', 'material_imports', $import->id, $import->code, $import->code.' | '.$note);
+        }
+
+        return $this->assignResponse([[$imports, $location]], 'Đã định khu');
+    }
+
+    /**
+     * ĐỔI VỊ TRÍ - chuyển mã xuất nhập ĐANG CÓ định khu sang vị trí khác, bắt buộc lý do (hộp chi tiết / kéo thả).
+     * `location_id` = gộp mọi mã vào một vị trí; `location_ids[]` (song song import_ids) = mỗi mã một vị trí.
+     */
+    public function moveLocation(Request $request)
+    {
+        if (! user_can('inventory_material_location')) {
+            return response()->json(['message' => 'Bạn chưa được cấp quyền Định Khu Vật Tư.'], 403);
+        }
+
+        $departmentId = $this->departmentId();
+        $batch = is_array($request->input('location_ids'));
+
+        $validator = Validator::make($request->all(), [
+            'import_ids' => ['required', 'array', 'min:1', 'max:'.self::ASSIGN_MAX],
+            'import_ids.*' => ['integer'],
+            'location_id' => $batch ? ['nullable'] : $this->assignTargetRule($departmentId),
+            'location_ids' => $batch ? ['array', 'size:'.count((array) $request->input('import_ids', []))] : ['nullable'],
+            'location_ids.*' => $batch ? $this->assignTargetRule($departmentId) : ['nullable'],
+            'reason' => ['required', 'string', 'max:255'],
+        ], $this->assignMessages() + [
+            'location_ids.size' => 'Danh sách vị trí mới không khớp số mã xuất nhập - vui lòng tải lại trang.',
+            'location_ids.*.required' => 'Vui lòng chọn vị trí lưu trữ.',
+            'location_ids.*.exists' => 'Có vị trí mới không còn hoạt động, không thuộc phòng ban đang chọn, hoặc là khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ.',
+            'reason.required' => 'Vui lòng nhập lý do đổi vị trí.',
+            'reason.max' => 'Lý do đổi vị trí tối đa 255 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $rawIds = array_map('intval', $request->input('import_ids', []));
+        $targetOf = $batch
+            ? array_combine($rawIds, array_map('intval', $request->input('location_ids', [])))
+            : array_fill_keys($rawIds, (int) $request->location_id);
+        $ids = array_keys($targetOf);
+        $reason = trim((string) $request->reason);
+        $imports = $this->assignImports($ids, $departmentId);
+
+        if ($imports->count() !== count($ids)) {
+            return response()->json([
+                'message' => 'Có mã xuất nhập đã bị khoá, chưa kiểm tra Đạt hoặc không thuộc phòng ban đang chọn - vui lòng tải lại trang.',
+            ], 422);
+        }
+
+        $unplaced = $imports->filter(fn ($import) => ! $import->location_id);
+        if ($unplaced->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập chưa có định khu: '.$unplaced->pluck('code')->implode(', ').' - vui lòng dùng Định khu / Thêm vật tư.',
+            ], 422);
+        }
+
+        $locked = $imports->filter(fn ($import) => in_array($import->location_zone_type, self::ASSIGN_EXCEPT_ZONES, true));
+        if ($locked->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đang ở khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ: '.$locked->pluck('code')->implode(', ')
+                    .' - xử lý theo luồng Cách ly ở Sử Dụng Vật Tư.',
+            ], 422);
+        }
+
+        $same = $imports->filter(fn ($import) => (int) $import->location_id === $targetOf[(int) $import->id]);
+        if ($same->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đã nằm ở vị trí này: '.$same->pluck('code')->implode(', ').'.',
+            ], 422);
+        }
+
+        $locations = collect(array_unique(array_values($targetOf)))
+            ->mapWithKeys(fn ($id) => [$id => $this->assignLocationRow($id)]);
+        $notes = [];
+        $conflict = null;
+
+        try {
+            DB::transaction(function () use ($imports, $targetOf, $locations, $reason, &$notes, &$conflict) {
+                foreach ($imports as $import) {
+                    $location = $locations[$targetOf[(int) $import->id]];
+                    $updated = DB::table('material_imports')
+                        ->where('id', $import->id)
+                        ->where('location_id', $import->location_id)
+                        ->update([
+                            'location_id' => $location->id,
+                            'updated_by' => $this->actor(),
+                            'updated_at' => now(),
+                        ]);
+
+                    if (! $updated) {
+                        $conflict = 'Mã xuất nhập '.$import->code.' vừa được người khác đổi vị trí - vui lòng tải lại trang.';
+
+                        throw new \RuntimeException($conflict);
+                    }
+
+                    $notes[$import->id] = 'Vị trí lưu trữ: '.($import->location_code ?: '—').' -> '.$location->code
+                        .' (Đổi vị trí ở Tồn Kho Vật Tư) - Lý do: '.$reason;
+                    \App\Http\Controllers\Pages\Import\MaterialImportController::recordHistory((int) $import->id, 'Đổi vị trí', $notes[$import->id]);
+                }
+            });
+        } catch (\RuntimeException $e) {
+            if ($conflict === null) {
+                throw $e;
+            }
+
+            return response()->json(['message' => $conflict], 422);
+        }
+
+        foreach ($imports as $import) {
+            AuditTrialController::log('Đổi vị trí', 'material_imports', $import->id, $import->location_code, $import->code.' | '.$notes[$import->id]);
+        }
+
+        return $this->assignResponse(
+            $imports->groupBy(fn ($import) => $targetOf[(int) $import->id])
+                ->map(fn ($group, $locationId) => [$group, $locations[$locationId]])
+                ->values()->all(),
+            'Đã chuyển'
+        );
+    }
+
+    /** Vị trí đích: thuộc phòng, đang mở, lưu Vật tư / Dùng chung, không phải khu cách ly. */
+    private function assignTargetRule(int $departmentId): array
+    {
+        return [
+            'required',
+            Rule::exists('locations', 'id')
+                ->where('department_id', $departmentId)
+                ->where('status_id', 1)
+                ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
+                ->where(fn ($query) => $query->whereNull('zone_type')->orWhereNotIn('zone_type', self::ASSIGN_EXCEPT_ZONES)),
+        ];
+    }
+
+    private function assignMessages(): array
+    {
+        return [
+            'import_ids.required' => 'Vui lòng chọn mã xuất nhập cần định khu.',
+            'import_ids.min' => 'Vui lòng chọn mã xuất nhập cần định khu.',
+            'import_ids.max' => 'Mỗi lần định khu tối đa '.self::ASSIGN_MAX.' mã xuất nhập.',
+            'location_id.required' => 'Vui lòng chọn vị trí lưu trữ.',
+            'location_id.exists' => 'Vị trí được chọn không còn hoạt động, không thuộc phòng ban đang chọn, hoặc là khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ.',
+        ];
+    }
+
+    /** Mã xuất nhập xếp / đổi chỗ được (đang mở, đã kiểm tra Đạt, thuộc phòng) kèm vị trí hiện tại. */
+    private function assignImports(array $ids, int $departmentId)
+    {
+        return DB::table('material_imports')
+            ->leftJoin('locations', 'material_imports.location_id', '=', 'locations.id')
+            ->select(
+                'material_imports.id',
+                'material_imports.code',
+                'material_imports.location_id',
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type'
+            )
+            ->whereIn('material_imports.id', $ids)
+            ->where('material_imports.department_id', $departmentId)
+            ->where('material_imports.status_id', 1)
+            ->where('material_imports.is_checked', 1)
+            ->orderBy('material_imports.code', 'asc')
+            ->get();
+    }
+
+    private function assignLocationRow(int $locationId)
+    {
+        return DB::table('locations')
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            ->select(
+                'locations.id',
+                'locations.code',
+                'locations.zone_type',
+                'locations.warehouse_id',
+                'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
+            ->where('locations.id', $locationId)
+            ->first();
+    }
+
+    /** JSON chung Định khu / Đổi vị trí: `groups` [{import_ids, location}] để trình duyệt vá dòng rồi dựng lại sơ đồ. */
+    private function assignResponse(array $groups, string $verb)
+    {
+        $payloads = [];
+        $count = 0;
+
+        foreach ($groups as [$imports, $location]) {
+            $count += $imports->count();
+            $payloads[] = [
+                'import_ids' => $imports->pluck('id')->map(fn ($id) => (int) $id)->values(),
+                'location' => [
+                    'location_id' => (int) $location->id,
+                    'location_code' => $location->code,
+                    'location_zone_type' => $location->zone_type,
+                    'warehouse_id' => $location->warehouse_id ? (int) $location->warehouse_id : null,
+                    'shelf_id' => $location->shelf_id ? (int) $location->shelf_id : null,
+                    'column_id' => $location->column_id ? (int) $location->column_id : null,
+                    'tier_id' => $location->tier_id ? (int) $location->tier_id : null,
+                    'warehouse_name' => $location->warehouse_name,
+                    'shelf_name' => $location->shelf_name,
+                    'column_name' => $location->column_name,
+                    'tier_name' => $location->tier_name,
+                ],
+            ];
+        }
+
+        [$firstImports, $firstLocation] = $groups[0];
+        $message = count($groups) === 1
+            ? $verb.' '.($count === 1 ? 'mã xuất nhập '.$firstImports->first()->code : $count.' mã xuất nhập')
+                .' vào '.(\App\Support\CategoryLookup::locationLabel($firstLocation) ?: (string) $firstLocation->code).'.'
+            : $verb.' '.$count.' mã xuất nhập sang '.count($groups).' vị trí mới.';
+
+        return response()->json([
+            'success' => true,
+            'warning' => null,
+            'message' => $message,
+            'groups' => $payloads,
+            'import_ids' => $payloads[0]['import_ids'],
+            'location' => $payloads[0]['location'],
+        ]);
     }
 
     private function departmentId(): int

@@ -18,7 +18,7 @@
             <tr>
                 <td>DS đề nghị nội bộ theo chu kỳ</td>
                 <td style="font-weight: 400">Đề nghị cấp phát nội bộ (tab <a href="#de-nghi-noi-bo">Đề nghị Theo Định Kỳ</a>). Có thể gắn
-                    với một <b>Đối Tượng</b> (thiết bị); khi đó chỉ chọn được tần suất của đối tượng đó.</td>
+                    với một <b>Đối Tượng</b> (thiết bị); khi đó chỉ chọn được tần suất của đối tượng đó. Bắt buộc chọn <b>Tổ Quản Lý</b>; đề nghị tự tạo mang tổ này. Bảng có cột Tổ Quản Lý và bộ lọc <i>Tổ quản lý</i> trên thanh công cụ.</td>
             </tr>
             <tr>
                 <td>DS đề nghị liên phòng ban theo chu kỳ</td>
@@ -41,6 +41,7 @@
     ['Tiêu Đề', true, 'Ví dụ: <i>Vật tư bảo trì hằng tháng</i>.'],
     ['Chu Kỳ', true, 'Hằng tuần, Hằng tháng, 2 tháng/lần, Hằng quý, 6 tháng/lần, Theo số năm, Theo số ngày. Danh sách nội bộ không chọn chu kỳ mà chọn <b>Tần Suất Đề Nghị</b> (hằng ngày ... 7 năm/lần).'],
     ['Ngày Tạo Đề Nghị Trong Chu Kỳ', true, '<b>Ngày Cụ Thể</b>: ví dụ ngày 5 hằng tháng; ngày vượt độ dài kỳ (31 ở tháng 30 ngày) thì lấy ngày cuối kỳ. Đối tượng đồng bộ từ CAL có thể chọn <b>theo hạn lịch CAL</b> và <b>Tạo Trước</b> 0 - 30 ngày.'],
+    ['Tổ Quản Lý', true, 'Chỉ ở <b>DS đề nghị nội bộ theo chu kỳ</b>: chọn một tổ đang hoạt động của phòng; đề nghị tự tạo mang tổ này. Danh sách cũ chưa có tổ phải chọn tổ khi sửa, bỏ trống báo <i>Vui lòng chọn tổ quản lý</i>.'],
     ['Ngày Bắt Đầu Chu Kỳ Đầu Tiên', true, 'Không được lùi về quá khứ. Hệ thống không bao giờ tạo phiếu trước ngày này.'],
     ['Vật Tư Đề Nghị / Dự Trù', true, 'Chọn vật tư, số lượng, đơn vị, mục đích. Phiếu dự trù bắt buộc có đơn vị cho từng dòng.'],
 ]])

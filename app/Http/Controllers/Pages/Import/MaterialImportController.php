@@ -903,6 +903,12 @@ class MaterialImportController extends Controller
      |  HÀM DÙNG CHUNG
      ========================================================== */
 
+    /** Ghi lịch sử phiếu nhập từ màn khác (Định khu / Đổi vị trí ở Tồn Kho Vật Tư). */
+    public static function recordHistory(int $id, string $action, ?string $note, ?string $reason = null): void
+    {
+        (new static)->writeHistory($id, $action, $note, $reason);
+    }
+
     private function writeHistory(int $id, string $action, ?string $note, ?string $reason = null): void
     {
         $row = DB::table(self::TABLE)->where('id', $id)->first();
