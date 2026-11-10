@@ -199,13 +199,15 @@ class MaterialWatchlist
             $rows[$key]->sources[] = self::SOURCE_USER;
         }
 
-        // Chỉ dòng "Không đáp ứng" - dòng "Vừa đủ" vẫn đủ nhu cầu tháng tới, phần hụt ngưỡng
-        // tối thiểu đã có nguồn "Dưới ngưỡng" lo khi tồn thực sự xuống thấp
+        // Dòng "Không đáp ứng" + dòng "Vừa đủ" còn lượng cần dự trù (sau tháng tới hụt ngưỡng tối thiểu)
+        // - khớp cột "Cần Dự Trù" của tab Khả dụng ở Tồn Kho Vật Tư
         $forecast = MaterialAvailabilityForecast::build($departmentId, self::forecastMonth());
         $locked = self::lockedCategoryIds($departmentId);
 
         foreach ($forecast['rows'] as $f) {
-            if ($f->state !== 'short' || isset($locked[(int) $f->category_id])) {
+            $needed = $f->state === 'short' || ($f->state === 'tight' && $f->suggest > 0);
+
+            if (! $needed || isset($locked[(int) $f->category_id])) {
                 continue;
             }
 

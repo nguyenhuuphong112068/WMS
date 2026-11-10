@@ -31,6 +31,18 @@
         'category' => 'Danh Mục Vật Tư Của Phòng',
         default => null,
     };
+    // Lý do của nguồn Dự báo: thiếu nhu cầu tháng tới, hay vẫn dư nhưng hụt ngưỡng tối thiểu
+    $wlForecastReason = function ($item) use ($wlNum) {
+        $f = $item->forecast;
+        $label = $f->month_label;
+
+        if ($f->gap < 0) {
+            return 'Thiếu ' . $wlNum(-$f->gap) . ' so với nhu cầu ' . mb_strtolower($label)
+                . ($item->min_stock ? ' + giữ ngưỡng tối thiểu ' . $wlNum($item->min_stock) : '');
+        }
+
+        return 'Hết ' . mb_strtolower($label) . ' dư ' . $wlNum($f->gap) . ' < ngưỡng tối thiểu ' . $wlNum($item->min_stock);
+    };
 @endphp
 
 <div class="md-toolbar">
@@ -107,7 +119,7 @@
                     data-unit-id="{{ $item->unit_id }}"
                     {{-- Chưa có SL đề nghị thì mặc định bằng ngưỡng tối thiểu của phòng --}}
                     data-quantity="{{ $item->quantity !== null ? $wlNum($item->quantity) : ($item->min_stock ? $wlNum($item->min_stock) : '') }}"
-                    data-note="{{ $item->note ?: ($item->forecast ? $wlSources[MaterialWatchlist::SOURCE_FORECAST] : '') }}"
+                    data-note="{{ $item->note ?: ($item->forecast ? $wlForecastReason($item) : '') }}"
                     data-progress="{{ $item->in_progress ? 'done' : 'open' }}"
                     class="{{ $item->in_progress ? 'is-wl-progress' : '' }}">
                     <td class="text-center">
@@ -163,8 +175,8 @@
                         @if ($item->forecast)
                             <div class="md-sub mt-1">
                                 <span class="md-badge wl-forecast"
-                                    title="Khả dụng {{ $wlNum($item->forecast->available) }} - Nhu cầu chu kỳ {{ $wlNum($item->forecast->demand) }} = Thiếu {{ $wlNum(-$item->forecast->gap) }}">
-                                    {{ $wlSources[MaterialWatchlist::SOURCE_FORECAST] }}
+                                    title="Khả dụng {{ $wlNum($item->forecast->available) }} - Nhu cầu chu kỳ {{ $wlNum($item->forecast->demand) }} = {{ $item->forecast->gap < 0 ? 'Thiếu ' . $wlNum(-$item->forecast->gap) : 'Dư ' . $wlNum($item->forecast->gap) }}">
+                                    {{ $wlForecastReason($item) }}
                                 </span>
                             </div>
                         @endif

@@ -126,7 +126,7 @@
                                         <td>
                                             <div class="imp-code font-weight-bold"
                                                 style="--chip: {{ $pendingCodeBadge['bg'] }}; --chip-text: {{ $pendingCodeBadge['text'] }}">{{ $row->code }}</div>
-                                            <span class="badge badge-warning mt-1">Chờ kiểm tra</span>
+                                            <div class="md-sub small text-muted mt-1">{{ $row->category_code ?: '—' }}</div>
                                         </td>
                                         <td>
                                             <div class="font-weight-bold">{{ $row->material_name ?: '—' }}</div>

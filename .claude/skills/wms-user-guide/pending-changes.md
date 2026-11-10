@@ -86,3 +86,11 @@ Mỗi mục: ngày · màn hình / tab · thay đổi · mục hướng dẫn b�
 - Dưới số lượng cần dự trù hiện dòng nhỏ: "Thiếu X so với nhu cầu (+ giữ ngưỡng tối thiểu Y)" hoặc "Dư X < ngưỡng tối thiểu Y".
 - Code: `MaterialInventory/nextMonth.blade.php`.
 - Hướng dẫn: `material` mục Khả dụng tháng tới (giải thích cột Cần Dự Trù).
+
+### 10/11/2026 - Dự Trù Vật Tư, tab "Vật tư cần dự trù": nguồn Dự báo thêm dòng "Vừa đủ"
+- Nguồn Dự báo nay gồm dòng "Không đáp ứng" VÀ dòng "Vừa đủ" có Cần Dự Trù > 0 (sau tháng tới tồn hụt ngưỡng tối thiểu), số lượng gợi ý = Cần Dự Trù.
+- Code: `App\Support\MaterialWatchlist::forTab`.
+- Hướng dẫn: `material` mục Dự trù (mô tả nguồn Dự báo).
+
+- 10/11/2026 Nhập Vật Tư › tab Nhập Vật Tư: dưới Mã xuất nhập hiện Mã vật tư (category_code), bỏ badge "Chờ kiểm tra".
+- (bổ sung) Nhãn nguồn Dự báo trên từng dòng nay ghi lý do cụ thể: "Thiếu X so với nhu cầu tháng MM/YYYY (+ giữ ngưỡng tối thiểu Y)" hoặc "Hết tháng MM/YYYY dư X < ngưỡng tối thiểu Y"; lý do này cũng điền sẵn vào Lý do dự trù. Bộ lọc Nguồn vẫn dùng nhãn chung "Thiếu tồn khả dụng cho tháng ...". Code: `MaterialEstimate/watchlistTable.blade.php`.
