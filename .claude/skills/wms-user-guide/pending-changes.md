@@ -37,3 +37,12 @@ Mỗi mục: ngày · màn hình / tab · thay đổi · mục hướng dẫn b�
   chỗ ... Điều chỉnh phiếu nhập" nếu có), `standard#ton-kho...` (đoạn chế độ Thẻ của Tồn Kho Chất Chuẩn).
 - Ảnh: chụp lại ảnh tab Theo định khu Hoá Chất (phòng QC2 (9)) + Chất Chuẩn; nên thêm ảnh hộp chi tiết có nút Thêm / Đổi
   vị trí và hộp Đổi Vị Trí.
+
+### 10/11/2026 - Chọn nhiều ô bằng Shift + quét để đổi vị trí cùng lúc (Tồn Kho Hoá Chất › Theo định khu › Thẻ)
+- Shift + giữ chuột kéo khung quét trên sơ đồ (hoặc Shift / Ctrl + bấm từng ô) chọn các ô có hàng (viền vàng); Esc bỏ chọn.
+  Thanh nổi "Đã chọn N ô · M mã [Đổi vị trí] [Bỏ chọn]".
+- Kéo một ô đã chọn thả vào ô đích → hộp Đổi Vị Trí có 2 kiểu: **Dời nguyên khối** (mỗi ô sang ô tương ứng theo cùng độ lệch
+  cột / tầng / ngang / sâu, báo "không đủ chỗ" nếu ra ngoài kệ hoặc rơi vào khu cách ly) hoặc **Gộp vào một vị trí**. Nút
+  [Đổi vị trí] trên thanh = gộp vào một vị trí chọn ở ô Vị trí mới. Bảng trong hộp có thêm cột Vị trí hiện tại / Vị trí mới.
+- Server: `moveLocation` nhận thêm `location_ids[]` (song song import_ids), một transaction; phản hồi có `groups`.
+- Hướng dẫn: `chemical#ton-kho` (thêm bước chọn nhiều ô + 2 kiểu dời). Ảnh: thanh vùng chọn + hộp Đổi Vị Trí kiểu Dời nguyên khối.

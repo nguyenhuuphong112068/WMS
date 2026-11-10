@@ -183,6 +183,36 @@
     .mz-root.is-dragging .mz-slot:not(.is-drop) { opacity: .35; }
     .mz-slot.is-over { transform: scale(1.18); outline: 2px solid #16A34A !important; box-shadow: 0 0 0 4px rgba(22, 163, 74, .25); }
     .mz-ucard[draggable="true"] { cursor: grab; }
+    /* Vùng chọn nhiều ô (Shift + quét): ô đã chọn viền vàng đậm + nhấp nháy nhẹ, khung quét nét đứt */
+    .mz-slot.is-picked { outline: 3px solid #F59E0B !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(245, 158, 11, .25); }
+    .mz-root.has-picked .mz-wh-body { user-select: none; }
+    .mz-marquee {
+        position: fixed; z-index: 1050; pointer-events: none;
+        border: 1px dashed var(--primary); background: rgba(var(--primary-rgb), .12); border-radius: 3px;
+    }
+    .mz-pickbar {
+        position: sticky; bottom: 12px; z-index: 20; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        width: max-content; max-width: 100%; margin: 12px auto 0; padding: 8px 12px 8px 16px;
+        background: #fff; border: 1px solid var(--primary-lighter); border-radius: 999px; box-shadow: var(--shadow-md);
+        font-size: .85rem; color: var(--text-main);
+    }
+    .mz-pickbar[hidden] { display: none; }
+    .mz-pickbar b { color: var(--primary); }
+    .mz-pickbar .btn { border-radius: 999px; transition: all .2s; }
+    .mz-pickbar .btn:hover { transform: translateY(-1px); }
+    .modal-dialog.mz-mv-dialog { max-width: min(1040px, 96vw); }
+    .mz-mv-modes { display: flex; flex-direction: column; gap: 6px; }
+    .mz-mv-mode {
+        display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 12px; cursor: pointer;
+        border: 1px solid #DCE7F3; border-radius: var(--border-radius-md); transition: all .2s;
+    }
+    .mz-mv-mode:hover { border-color: var(--primary-light); background: var(--primary-soft); }
+    .mz-mv-mode input { margin-top: 3px; accent-color: var(--primary); }
+    .mz-mv-mode input:disabled + span { color: #94A3B8; }
+    .mz-mv-mode small { color: #64748B; }
+    .mz-mv-mode input:disabled + span small { color: #DC2626; }
+    .mz-as-list.mz-mv-list td:nth-child(4) { white-space: nowrap; }
+    .mz-as-list.mz-mv-list td:nth-child(5), .mz-as-list.mz-mv-list td:nth-child(6) { white-space: nowrap; font-size: .82rem; }
     .mz-d-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .mz-d-actions .btn:not(:disabled):hover { transform: translateY(-1px); }
 

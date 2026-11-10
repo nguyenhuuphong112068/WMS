@@ -19,7 +19,7 @@
 <p><b>Thẻ</b> liệt kê từng <b>vị trí</b> (Kho / Phòng / Kệ-Tủ / Vị trí) kèm mặt hàng và số lượng tồn tính đến hiện tại; viền đầu thẻ
     vàng = có lô còn dưới 30 ngày hạn dùng, đỏ = có lô đã hết hạn. <b>3D</b> dựng từng kệ/tủ, <b>Mặt bằng</b> xem cả kho/phòng theo
     mặt bằng đã khai ở Định Khu; vị trí khớp từ khoá sáng lên và nhấp nháy (ở 3D khung tự phóng tới; ở Mặt bằng hiện thẻ chi tiết hàng hoá trên đầu kệ,
-    nút <b><i class="fas fa-tags"></i> Nhãn vị trí</b> in mã ô (A1, B1…) trên mọi ô của tủ, nút <b><i class="fas fa-walking"></i> Xuyên tủ</b> để đi bộ trong kho như game 3D (W A S D đi, Shift chạy, bấm vào khung rồi rê chuột để nhìn quanh, Esc thả chuột; đi xuyên qua tủ, không phóng to; nút 80° / 100° / 120° chọn độ rộng góc nhìn), <span class="ug-key">Shift</span> + lăn chuột để phóng to / thu nhỏ,
+    nút <b><i class="fas fa-tags"></i> Nhãn vị trí</b> in mã ô (A1, B1…) trên mọi ô của tủ, nút <b><i class="fas fa-walking"></i> Di chuyển vào kho</b> để đi bộ trong kho như game 3D (W A S D đi, Space / E lên, C / Q xuống, Shift chạy, bấm vào khung rồi rê chuột để nhìn quanh, Esc thả chuột; đi xuyên qua tủ, không phóng to; nút 80° / 100° / 120° chọn độ rộng góc nhìn), <span class="ug-key">Shift</span> + lăn chuột để phóng to / thu nhỏ,
     kéo thanh ở mép dưới khung để đổi chiều cao). Phòng ban chưa khai định khu chỉ
     có kiểu Thẻ. Ô <b>Lọc nhanh</b> lọc tiếp trong kết quả theo vị trí, kệ/tủ, tên hoặc mã.</p>
 

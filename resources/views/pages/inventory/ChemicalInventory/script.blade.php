@@ -559,12 +559,15 @@
                     }),
                     // Định khu nhanh xong: vá vị trí mới vào dòng tồn gốc để mọi tab (cột Định khu ở
                     // Theo mã xuất nhập...) cùng cập nhật, rồi dựng lại - không tải lại cả kỳ
+                    // (Đổi vị trí dời nguyên khối trả nhiều nhóm res.groups - mỗi nhóm một vị trí mới)
                     onAssigned: function(res) {
-                        var ids = {};
+                        var locationOf = {};
 
-                        (res.import_ids || []).forEach(function(id) { ids[id] = true; });
+                        (res.groups || [res]).forEach(function(group) {
+                            (group.import_ids || []).forEach(function(id) { locationOf[id] = group.location; });
+                        });
                         source.rows.forEach(function(row) {
-                            if (ids[row.id]) $.extend(row, res.location);
+                            if (locationOf[row.id]) $.extend(row, locationOf[row.id]);
                         });
 
                         reloadBuilt();

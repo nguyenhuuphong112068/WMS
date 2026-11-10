@@ -22,7 +22,7 @@
 | Shift + lăn chuột (khung mở to: lăn chuột) phóng to / thu nhỏ quanh con trỏ.
 | Đặt stage.dataset.hl = columns|tiers|max|depth để làm sáng một chiều của kệ.
 | Cả phòng (WmsShelf3d.renderRoom): sàn đa giác + tường + cửa trên một cạnh, nhãn kệ / thẻ chi tiết hàng luôn hướng về
-| người xem (billboard) và giữ cỡ chữ khi phóng to thu nhỏ. Nút Xuyên tủ (chỉ cả phòng): mặt cắt tiến dần vào phòng, kệ đã
+| người xem (billboard) và giữ cỡ chữ khi phóng to thu nhỏ. Nút Di chuyển vào kho (chỉ cả phòng): đi bộ góc nhìn thứ nhất, kệ đã
 | đi qua ẩn hẳn, tỉ lệ phóng to / góc nhìn giữ nguyên.
 | Tìm kiếm: thêm class is-seek vào stage để thùng / ô is-hit nhấp nháy; WmsShelf3d.focus(stage, { maxZoom })
 | phóng to + dời khung tới các ô đó (có hiệu ứng bay tới), focus(stage, { reset: true }) bay về toàn cảnh.
@@ -787,9 +787,9 @@
                 '<button type="button" data-w3d-view="front"><i class="fas fa-border-all mr-1"></i>Chính diện</button>' +
                 '<button type="button" data-w3d-view="top"><i class="fas fa-map mr-1"></i>Từ trên</button>' +
                 '</div>' + (opts.tools || '') +
-                '<div class="w3d-group w3d-walk" role="group" aria-label="Xuyên tủ">' +
+                '<div class="w3d-group w3d-walk" role="group" aria-label="Di chuyển vào kho">' +
                 '<button type="button" data-w3d-walk title="Đi bộ trong phòng như game 3D: W A S D di chuyển, chuột nhìn quanh, đi xuyên qua tủ">' +
-                '<i class="fas fa-walking mr-1"></i>Xuyên tủ</button>' +
+                '<i class="fas fa-walking mr-1"></i>Di chuyển vào kho</button>' +
                 [80, 100, 120].map(function(f) {
                     return '<button type="button" class="w3d-fov" data-w3d-fov="' + f + '" title="Góc nhìn ' + f + '° - số càng lớn càng thấy rộng (như camera góc rộng), không phóng to">' + f + '°</button>';
                 }).join('') +
@@ -803,7 +803,7 @@
                 '<div class="w3d-scene"><div class="w3d-world"></div></div><div class="w3d-cross"></div>' +
                 '<div class="w3d-legend">' + (opts.legend || '') + '</div>' +
                 '<div class="w3d-hint"><span class="orbit"><i class="fas fa-arrows-alt mr-1"></i>Kéo để xoay · Shift + kéo để dời · Shift + lăn chuột để phóng to</span>' +
-                '<span class="fp"><i class="fas fa-walking mr-1"></i>W A S D đi · Shift chạy · bấm vào khung rồi rê chuột để nhìn quanh (hoặc kéo) · lăn chuột tiến / lùi · Esc thả chuột</span></div>';
+                '<span class="fp"><i class="fas fa-walking mr-1"></i>W A S D đi · Space / E lên · C / Q xuống · Shift chạy · bấm vào khung rồi rê chuột để nhìn quanh (hoặc kéo) · lăn chuột tiến / lùi · Esc thả chuột</span></div>';
         }
 
         function cellMarkup(c, x, y, U, H, compact) {
@@ -863,7 +863,7 @@
         }
 
         /*
-         | Xuyên tủ = đi bộ góc nhìn thứ nhất trong cả phòng (như game 3D bắn súng): người đứng ở cửa, mắt cao 1,6 m,
+         | Di chuyển vào kho = đi bộ góc nhìn thứ nhất trong cả phòng (như game 3D bắn súng): người đứng ở cửa, mắt cao 1,6 m,
          | góc nhìn cố định (mặc định 100° như camera góc rộng, chọn 80 / 100 / 120°, máy nhớ; không phóng to); W A S D / phím mũi tên đi, Shift chạy, chuột nhìn quanh (bấm vào khung
          | để khoá chuột - Pointer Lock, Esc thả; hoặc kéo chuột), lăn chuột tiến / lùi. Đi xuyên qua tủ được (tủ đi qua
          | nằm sau lưng nên trình duyệt không vẽ), ra ngoài phòng tối đa 2 m. Khi khoá chuột, bấm = bấm vào thùng hàng ở
@@ -1246,11 +1246,11 @@
             units.forEach(function(u, i) { u.labels = Array.prototype.slice.call(world.querySelectorAll('.w3d-bb[data-w3d-i="' + i + '"]')); });
             stage._w3dUnits = units;
 
-            // Khung phòng cho chế độ đi bộ (Xuyên tủ): giới hạn đi lại + chỗ đứng ở cửa, hướng nhìn vào trong phòng
+            // Khung phòng cho chế độ đi bộ (Di chuyển vào kho): giới hạn đi lại + chỗ đứng ở cửa, hướng nhìn vào trong phòng
             var pts = poly.map(function(p) { return [p[0] * PPM - RW / 2, p[1] * PPM - RD / 2]; });
             var xs = pts.map(function(p) { return p[0]; }), zs = pts.map(function(p) { return p[1]; });
             var fpRoom = {
-                ppm: PPM, sig: JSON.stringify(poly), door: null,
+                ppm: PPM, tallest: tallest, sig: JSON.stringify(poly), door: null,
                 minX: Math.min.apply(null, xs), maxX: Math.max.apply(null, xs), minZ: Math.min.apply(null, zs), maxZ: Math.max.apply(null, zs)
             };
             if (door) {
@@ -1465,8 +1465,10 @@
             stage.dispatchEvent(new CustomEvent('w3d:full', { detail: { on: on } }));
         }
 
-        /* ---------- Xuyên tủ: đi bộ bằng bàn phím + chuột ---------- */
-        var FP_KEYS = { w: 'f', arrowup: 'f', s: 'b', arrowdown: 'b', a: 'l', arrowleft: 'l', d: 'r', arrowright: 'r' };
+        /* ---------- Di chuyển vào kho: đi bộ bằng bàn phím + chuột; Space / E lên, C / Q xuống ---------- */
+        var FP_KEYS = { w: 'f', arrowup: 'f', s: 'b', arrowdown: 'b', a: 'l', arrowleft: 'l', d: 'r', arrowright: 'r',
+            ' ': 'u', e: 'u', pageup: 'u', c: 'd', q: 'd', pagedown: 'd' };
+        var FP_LIFT = 1.0; // m/giây khi bay lên / hạ xuống
 
         function fpActive() {
             if (!fpStage || !document.body.contains(fpStage) || !viewOf(fpStage).fp) return null;
@@ -1478,14 +1480,24 @@
         function fpLoop(now) {
             var stage = fpActive();
             var f = (fpKeys.f ? 1 : 0) - (fpKeys.b ? 1 : 0), r = (fpKeys.r ? 1 : 0) - (fpKeys.l ? 1 : 0);
-            if (!stage || (!f && !r)) {
+            var up = (fpKeys.u ? 1 : 0) - (fpKeys.d ? 1 : 0);
+            if (!stage || (!f && !r && !up)) {
                 fpLast = 0;
                 return;
             }
             var dt = fpLast ? Math.min(0.1, (now - fpLast) / 1000) : 0.016;
             fpLast = now;
-            var len = Math.hypot(f, r);
-            fpMove(stage, f / len, r / len, (fpKeys.run ? FP_RUN : FP_SPEED) * stage._w3dRoom.ppm * dt);
+            var room = stage._w3dRoom;
+            if (f || r) {
+                var len = Math.hypot(f, r);
+                fpMove(stage, f / len, r / len, (fpKeys.run ? FP_RUN : FP_SPEED) * room.ppm * dt);
+            }
+            if (up) {
+                // Tầm mắt từ 0,3 m tới đỉnh tủ cao nhất + 1 m (ít nhất 3 m); trục y hướng xuống nên lên = trừ
+                var v = viewOf(stage);
+                var top = Math.max(3 * room.ppm, room.tallest + room.ppm);
+                v.cy = Math.max(-top, Math.min(-0.3 * room.ppm, v.cy - up * (fpKeys.run ? 2 : 1) * FP_LIFT * room.ppm * dt));
+            }
             apply(stage);
             requestAnimationFrame(fpLoop);
         }
@@ -1497,7 +1509,7 @@
             if (event.target.closest && event.target.closest('input, textarea, select, [contenteditable]')) return;
             if (!fpActive() || document.querySelector('.modal.show, .swal2-container')) return;
             event.preventDefault();
-            var moving = fpKeys.f || fpKeys.b || fpKeys.l || fpKeys.r;
+            var moving = fpKeys.f || fpKeys.b || fpKeys.l || fpKeys.r || fpKeys.u || fpKeys.d;
             fpKeys[FP_KEYS[key]] = true;
             if (!moving) requestAnimationFrame(fpLoop);
         });
@@ -1506,6 +1518,7 @@
             var key = (event.key || '').toLowerCase();
             if (key === 'shift') fpKeys.run = false;
             if (FP_KEYS[key]) fpKeys[FP_KEYS[key]] = false;
+            if (key === ' ' && fpActive() && !(event.target.closest && event.target.closest('input, textarea, select, [contenteditable]'))) event.preventDefault();
         });
 
         window.addEventListener('blur', function() { fpKeys = {}; });
@@ -1600,6 +1613,8 @@
             var walk = event.target.closest('[data-w3d-walk]');
             if (walk) {
                 var walkStage = walk.closest('.w3d');
+                // bỏ focus khỏi nút để Space (bay lên) không "bấm" lại nút này
+                walk.blur();
                 setWalk(walkStage, !viewOf(walkStage).fp);
                 return;
             }

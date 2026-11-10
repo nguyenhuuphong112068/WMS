@@ -100,6 +100,19 @@
         <i class="fas fa-search"></i>
         Không có vị trí nào khớp với điều kiện đang lọc.
     </div>
+
+    @if (! empty($zgAssign['moveUrl']))
+        {{-- Thanh vùng chọn: Shift + kéo quét (hoặc Shift + bấm) chọn nhiều ô có hàng để dời cùng lúc --}}
+        <div class="mz-pickbar" hidden>
+            <span><i class="fas fa-object-group mr-1"></i> Đã chọn <b class="mz-pk-cells">0</b> ô · <b class="mz-pk-lots">0</b> mã</span>
+            <button type="button" class="btn btn-sm btn-primary mz-pk-move" title="Gộp tất cả mã đã chọn vào một vị trí - hoặc kéo một ô đã chọn thả vào ô đích để dời nguyên khối">
+                <i class="fas fa-exchange-alt mr-1"></i> Đổi vị trí
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary mz-pk-clear" title="Bỏ chọn (Esc)">
+                <i class="fas fa-times mr-1"></i> Bỏ chọn
+            </button>
+        </div>
+    @endif
 </div>
 
 {{-- Chi tiết một ô vị trí --}}
@@ -282,7 +295,7 @@
     @if (! empty($zgAssign['moveUrl']))
         {{-- Đổi vị trí các mã đang nằm ở một ô (từ hộp chi tiết hoặc kéo ô thả sang ô khác) - bắt buộc lý do --}}
         <div class="modal fade md-modal" id="{{ $zgId }}Move" tabindex="-1" role="dialog">
-            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+            <div class="modal-dialog modal-dialog-centered modal-lg mz-mv-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title"><i class="fas fa-exchange-alt"></i> Đổi Vị Trí</h5>
@@ -300,22 +313,35 @@
                             </div>
                         </div>
 
-                        <div class="mz-as-list mb-3">
+                        {{-- Chọn nhiều ô (Shift + quét) rồi thả vào một ô: dời nguyên khối hoặc gộp vào ô đó --}}
+                        <div class="mz-mv-modes mb-3" hidden>
+                            <label class="mz-mv-mode">
+                                <input type="radio" name="{{ $zgId }}MoveMode" value="block">
+                                <span><b>Dời nguyên khối</b> <small class="mz-mv-mode-note"></small></span>
+                            </label>
+                            <label class="mz-mv-mode">
+                                <input type="radio" name="{{ $zgId }}MoveMode" value="merge">
+                                <span><b>Gộp vào một vị trí</b> <small class="mz-mv-merge-note"></small></span>
+                            </label>
+                        </div>
+
+                        <div class="mz-as-list mz-mv-list mb-3">
                             <table class="table table-bordered table-sm mb-0 md-no-sticky">
                                 <thead>
                                     <tr>
                                         <th class="text-center" style="width:50px">STT</th>
-                                        <th style="width:160px">{{ $zgCode }}</th>
+                                        <th style="width:150px">{{ $zgCode }}</th>
                                         <th>{{ \Illuminate\Support\Str::ucfirst($zgItem) }}</th>
-                                        <th class="text-right" style="width:120px">Tồn</th>
-                                        <th class="text-center" style="width:105px">Hạn Áp Dụng</th>
+                                        <th class="text-right" style="width:110px">Tồn</th>
+                                        <th style="width:150px">Vị trí hiện tại</th>
+                                        <th style="width:150px">Vị trí mới</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
                             </table>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group mz-mv-target">
                             <label>Vị trí mới <span class="text-danger">*</span></label>
                             <select class="form-control mz-mv-location" data-lookup-url="{{ $zgAssign['lookup'] }}" data-zone-filter>
                                 <option value="">-- Chọn vị trí lưu trữ --</option>
@@ -730,7 +756,7 @@
                     var drag = canEdit(n) && n.lots > 0;
 
                     return '<span role="button" tabindex="0" class="mz-slot is-' + n.state + (zt ? ' has-zone' : '') +
-                        (clash ? ' is-compat' : '') + (canEdit(n) ? ' is-drop' : '') + '"' +
+                        (clash ? ' is-compat' : '') + (canEdit(n) ? ' is-drop' : '') + (drag && assign.moveUrl ? ' is-pickable' : '') + '"' +
                         ' data-key="' + n.key + '" data-state="' + n.state + '" data-zone-type="' + esc(n.zoneType) + '"' +
                         (clash ? ' data-compat="1"' : '') + (drag ? ' draggable="true"' : '') +
                         ' data-search="' + esc(n.search) + '"' +
@@ -756,8 +782,12 @@
                     return code ? ' <span class="tag">' + esc(code) + '</span>' : '';
                 }
 
+                var shelfNo = 0;
+                var gridAt = {};
+                function gridKey(s, ci, ti, p, d) { return [s, ci, ti, p, d].join('|'); }
+
                 var html = '';
-                var codeLabel = String($root.data('code-label') || '').toLowerCase();
+                var codeLabel =String($root.data('code-label') || '').toLowerCase();
                 var unzonedKey = 'wms.zoneGrid.unzonedClosed.' + ($root.attr('id') || '');
                 var unzonedById = {};
 
@@ -816,6 +846,17 @@
                         '</div></div><div class="mz-wh-body is-grid">';
 
                     w.list.forEach(function(s) {
+                        // Toạ độ lưới của từng ô (kệ, cột, tầng, ngang, sâu) - dùng để Dời nguyên khối
+                        var sk = ++shelfNo;
+                        s.list.forEach(function(c, ci) {
+                            c.list.forEach(function(t, ti) {
+                                t.locations.forEach(function(n) {
+                                    n.grid = { s: sk, ci: ci, ti: ti, p: n.p, d: n.d };
+                                    gridAt[gridKey(sk, ci, ti, n.p, n.d)] = n;
+                                });
+                            });
+                        });
+
                         html += '<div class="mz-shelf"><div class="mz-shelf-head"><i class="fas fa-layer-group"></i> ' +
                             esc(s.name) + codeTag(s.code) + '<span class="tag">' + s.list.length + ' cột</span>' +
                             '<span class="tag">' + s.stat.lots + ' mã</span></div><div class="mz-cols">';
@@ -980,8 +1021,10 @@
                     }
 
                     // Trang không tự xử lý: vá vị trí vào dòng tồn rồi dựng lại sơ đồ
-                    (res.import_ids || []).forEach(function(id) {
-                        rows.forEach(function(r) { if (String(r.id) === String(id)) $.extend(r, res.location); });
+                    (res.groups || [res]).forEach(function(group) {
+                        (group.import_ids || []).forEach(function(id) {
+                            rows.forEach(function(r) { if (String(r.id) === String(id)) $.extend(r, group.location); });
+                        });
                     });
                     window.invZoneGrid(selector, opts);
                     $root.find('.mz-filter[data-state].is-active, .mz-zt-filter.is-active').trigger('click');
@@ -1094,6 +1137,28 @@
                     });
                 }
 
+                /* ---------- Vùng chọn nhiều ô (Shift + quét) ---------- */
+                var suppressClick = false;
+
+                function pickedSlots() {
+                    return $root.find('.mz-slot.is-picked').map(function() { return $(this).attr('data-key'); }).get();
+                }
+
+                function syncPickbar() {
+                    var keys = pickedSlots();
+                    var lots = keys.reduce(function(sum, k) { return sum + (index[k] ? index[k].lots : 0); }, 0);
+
+                    $root.find('.mz-pickbar').prop('hidden', keys.length === 0);
+                    $root.find('.mz-pk-cells').text(keys.length);
+                    $root.find('.mz-pk-lots').text(lots);
+                    $root.toggleClass('has-picked', keys.length > 0);
+                }
+
+                function clearPicked() {
+                    $root.find('.mz-slot.is-picked').removeClass('is-picked');
+                    syncPickbar();
+                }
+
                 /** Đóng modal đang mở rồi mới mở modal kế (Bootstrap 4 không chồng 2 modal) */
                 function swapModal($from, next) {
                     $from.one('hidden.bs.modal', next).modal('hide');
@@ -1129,32 +1194,103 @@
                     $modal.find('.mz-d-all').prop('checked', total > 0 && count === total);
                 }
 
-                /** Mở modal Đổi vị trí cho các mã ids đang ở ô from; target = ô đích đã thả (kéo thả) hoặc null */
-                function openMove(from, ids, target) {
+                /**
+                 * Kế hoạch "Dời nguyên khối": mỗi ô nguồn dời theo cùng độ lệch (cột, tầng, ô ngang, dãy sâu) như từ ô
+                 * neo (ô đang kéo) tới ô đích, trên kệ của ô đích. Trả {dest: {key: ô đích}} hoặc {error: lý do}.
+                 */
+                function blockPlan(sources, anchor, target) {
+                    var a = anchor.grid, t = target.grid, dest = {}, bad = [];
+                    if (!a || !t) return { error: 'vị trí chưa có toạ độ trên lưới' };
+
+                    sources.forEach(function(n) {
+                        var g = n.grid;
+                        var to = g && gridAt[gridKey(t.s, t.ci + g.ci - a.ci, t.ti + g.ti - a.ti, t.p + g.p - a.p, t.d + g.d - a.d)];
+                        if (!to) bad.push(n.code + ' → (ngoài kệ)');
+                        else if (!canEdit(to)) bad.push(n.code + ' → ' + to.code + ' (khu không nhận hàng)');
+                        else dest[n.key] = to;
+                    });
+
+                    return bad.length ? { error: 'không đủ chỗ: ' + bad.slice(0, 3).join('; ') + (bad.length > 3 ? '...' : '') } : { dest: dest };
+                }
+
+                /** Vẽ lại cột "Vị trí mới" + ẩn / hiện ô chọn vị trí theo kiểu dời đang chọn */
+                function syncMoveMode() {
+                    var st = $move.data('state');
+                    if (!st) return;
+
+                    var mode = $move.find('input[type="radio"]:checked').val() || 'merge';
+                    var targetCode = $move.find('.mz-mv-location option:selected').text();
+                    var hasTarget = !!$move.find('.mz-mv-location').val();
+
+                    st.mode = mode;
+                    $move.find('.mz-mv-target').prop('hidden', mode === 'block');
+                    $move.find('tbody tr').each(function(i) {
+                        var row = st.rows[i];
+                        var to = mode === 'block' ? st.plan.dest[row.from.key] : null;
+                        $(this).find('.mz-mv-to').html(mode === 'block' ? '<b>' + esc(to.code) + '</b>' :
+                            (hasTarget ? '<b>' + esc(targetCode) + '</b>' : '<span class="text-muted">—</span>'));
+                    });
+                }
+
+                /**
+                 * Mở modal Đổi vị trí. sources = các ô nguồn (mỗi ô [{node, ids?}], ids bỏ trống = mọi mã trong ô);
+                 * target = ô đích đã thả (kéo thả) hoặc null; anchor = ô đang kéo khi kéo cả vùng chọn (để dời nguyên khối).
+                 */
+                function openMove(sources, target, anchor) {
                     if (!$move.length || !assign.moveUrl) return;
 
-                    var want = {};
-                    ids.forEach(function(id) { want[String(id)] = true; });
-                    var list = from.items.filter(function(r) { return want[String(r.id)]; });
+                    var rows = [];
+                    sources.forEach(function(src) {
+                        var want = null;
+                        if (src.ids) {
+                            want = {};
+                            src.ids.forEach(function(id) { want[String(id)] = true; });
+                        }
+                        src.node.items.forEach(function(r) {
+                            if (!want || want[String(r.id)]) rows.push({ r: r, from: src.node });
+                        });
+                    });
+
+                    var nodes = uniq(sources.map(function(s) { return s.node; }));
+                    var plan = target && anchor && nodes.length > 1 ? blockPlan(nodes, anchor, target) : null;
+                    // Gộp: mã đang nằm sẵn ở ô đích thì không cần đổi
+                    var mergeRows = target ? rows.filter(function(x) { return x.from !== target; }) : rows;
+                    if (!mergeRows.length && !(plan && plan.dest)) return;
+
                     var categories = {};
                     var $tb = $move.find('tbody').empty();
+                    var st = { rows: plan && plan.dest ? rows : mergeRows, plan: plan, mode: 'merge' };
 
-                    list.forEach(function(r, i) {
+                    st.rows.forEach(function(x, i) {
+                        var r = x.r;
                         categories[r.category_id ? 'c' + r.category_id : 'n' + r.name] = r.category_id || null;
                         $tb.append('<tr><td class="text-center">' + (i + 1) + '</td>' +
                             '<td class="font-weight-bold">' + esc(r.code) + '</td>' +
                             '<td><div class="font-weight-bold">' + esc(r.name || '—') + '</div>' +
                             (r.sub ? '<div class="md-sub small text-muted">' + esc(r.sub) + '</div>' : '') + '</td>' +
                             '<td class="text-right font-weight-bold">' + num(r.remaining) + ' ' + esc(r.unit) + '</td>' +
-                            '<td class="text-center md-sub">' + date(r.expired) + '</td></tr>');
+                            '<td>' + esc(x.from.code) + '</td><td class="mz-mv-to"></td></tr>');
                     });
 
-                    $move.data('ids', list.map(function(r) { return r.id; }));
+                    $move.data('state', st);
                     $move.data('categoryIds', values(categories).filter(Boolean));
-                    $move.find('.mz-mv-from').text(from.code);
-                    $move.find('.mz-mv-count').text(list.length);
+                    $move.find('.mz-mv-from').text(nodes.length === 1 ? nodes[0].code : nodes.length + ' ô vị trí');
+                    $move.find('.mz-mv-count').text(st.rows.length);
                     $move.find('.mz-mv-reason').val('');
                     $move.find('.mz-mv-error').prop('hidden', true).text('');
+
+                    // Nhiều ô + có ô đích: cho chọn Dời nguyên khối (mặc định nếu đủ chỗ) hoặc Gộp vào ô đích
+                    var $modes = $move.find('.mz-mv-modes').prop('hidden', !plan);
+                    if (plan) {
+                        var ok = !!plan.dest;
+                        $modes.find('input[value="block"]').prop('disabled', !ok).prop('checked', ok);
+                        $modes.find('input[value="merge"]').prop('checked', !ok);
+                        $modes.find('.mz-mv-mode-note').text(ok ? '- mỗi ô sang ô tương ứng, giữ nguyên bố cục' : '- ' + plan.error);
+                        $modes.find('.mz-mv-merge-note').text('- mọi mã vào ' + target.code);
+                        if (!ok) st.rows = mergeRows;
+                    } else {
+                        $modes.find('input').prop('checked', false);
+                    }
 
                     var $select = $move.find('.mz-mv-location');
                     $select.val(null).find('option[value!=""]').remove();
@@ -1163,18 +1299,30 @@
                             .attr('data-zone', target.zoneType || ''));
                     }
                     $select.trigger('change');
+                    syncMoveMode();
 
                     $move.modal('show');
                 }
 
                 function saveMove() {
-                    var ids = $move.data('ids') || [];
+                    var st = $move.data('state') || { rows: [] };
+                    var block = st.mode === 'block' && st.plan && st.plan.dest;
                     var locationId = $move.find('.mz-mv-location').val();
                     var reason = String($move.find('.mz-mv-reason').val() || '').trim();
                     var $error = $move.find('.mz-mv-error');
                     var $btn = $move.find('.mz-mv-submit');
+                    var data = { _token: assign.token, import_ids: st.rows.map(function(x) { return x.r.id; }), reason: reason };
 
-                    if (!locationId) return $error.text('Vui lòng chọn vị trí mới.').prop('hidden', false);
+                    if (block) {
+                        data.location_ids = st.rows.map(function(x) { return st.plan.dest[x.from.key].id; });
+                    } else {
+                        if (!locationId) return $error.text('Vui lòng chọn vị trí mới.').prop('hidden', false);
+                        // Gộp: bỏ các mã đang nằm sẵn ở vị trí mới
+                        var keep = st.rows.filter(function(x) { return String(x.from.id) !== String(locationId); });
+                        if (!keep.length) return $error.text('Các mã đã nằm ở vị trí này.').prop('hidden', false);
+                        data.import_ids = keep.map(function(x) { return x.r.id; });
+                        data.location_id = locationId;
+                    }
                     if (!reason) return $error.text('Vui lòng nhập lý do đổi vị trí.').prop('hidden', false);
 
                     $error.prop('hidden', true).text('');
@@ -1184,7 +1332,7 @@
                         url: assign.moveUrl,
                         method: 'POST',
                         dataType: 'json',
-                        data: { _token: assign.token, import_ids: ids, location_id: locationId, reason: reason }
+                        data: data
                     }).done(function(res) {
                         $move.modal('hide');
                         assigned(res);
@@ -1375,7 +1523,7 @@
                     $modal.on('click.mz', '.mz-d-move', function() {
                         var n = $modal.data('node');
                         var ids = $modal.find('.mz-d-pick:checked').map(function() { return $(this).val(); }).get();
-                        if (n && ids.length) swapModal($modal, function() { openMove(n, ids, null); });
+                        if (n && ids.length) swapModal($modal, function() { openMove([{ node: n, ids: ids }], null, null); });
                     });
                     $modal.on('change.mz', '.mz-d-pick', syncDetail);
                     $modal.on('change.mz', '.mz-d-all', function() {
@@ -1389,6 +1537,7 @@
                     $move.on('change.mz input.mz', '.mz-mv-location, .mz-mv-reason', function() {
                         $move.find('.mz-mv-error').prop('hidden', true).text('');
                     });
+                    $move.on('change.mz', '.mz-mv-location, input[type="radio"]', syncMoveMode);
                     $move.on('shown.bs.modal.mz', function() {
                         var $select = $move.find('.mz-mv-location');
                         lookupSelect($select, $move, function() { return $move.data('categoryIds') || []; });
@@ -1403,6 +1552,9 @@
                         if ($el.hasClass('mz-ucard')) {
                             var ids = $el.hasClass('is-picked') ? pickedIds() : [$el.attr('data-id')];
                             dragging = { kind: 'unzoned', ids: ids };
+                        } else if ($el.hasClass('is-picked') && pickedSlots().length > 1) {
+                            // Kéo một ô trong vùng chọn = kéo cả vùng (ô này làm neo để dời nguyên khối)
+                            dragging = { kind: 'block', keys: pickedSlots(), key: $el.attr('data-key') };
                         } else {
                             dragging = { kind: 'move', key: $el.attr('data-key') };
                         }
@@ -1430,12 +1582,65 @@
 
                         if (drag.kind === 'move') {
                             var from = index[drag.key];
-                            if (from && from !== target) openMove(from, from.items.map(function(r) { return String(r.id); }), target);
+                            if (from && from !== target) openMove([{ node: from }], target, null);
+                            return;
+                        }
+                        if (drag.kind === 'block') {
+                            openMove(drag.keys.map(function(k) { return { node: index[k] }; }), target, index[drag.key]);
                             return;
                         }
 
                         dropUnzoned(drag.ids, target);
                     });
+
+                    /* ----- Vùng chọn nhiều ô: Shift (Ctrl) + bấm, hoặc Shift + kéo quét; Esc bỏ chọn ----- */
+                    if (assign.moveUrl) {
+                        $root.on('click.mz', '.mz-pk-clear', clearPicked);
+                        $root.on('click.mz', '.mz-pk-move', function() {
+                            var keys = pickedSlots();
+                            if (keys.length) openMove(keys.map(function(k) { return { node: index[k] }; }), null, null);
+                        });
+                        $(document).off('keydown.mzpick').on('keydown.mzpick', function(e) {
+                            if (e.key === 'Escape' && pickedSlots().length && !$('.modal.show').length) clearPicked();
+                        });
+
+                        // Shift + giữ chuột kéo trên vùng sơ đồ = khung quét; thả ra chọn thêm mọi ô có hàng nằm trong khung
+                        $root.on('mousedown.mz', '.mz-wh-body', function(e) {
+                            if (!e.shiftKey || e.button !== 0) return;
+                            e.preventDefault();
+
+                            var x0 = e.clientX, y0 = e.clientY, moved = false;
+                            var $box = $('<div class="mz-marquee">').appendTo(document.body);
+                            var rect = function(ev) {
+                                return {
+                                    left: Math.min(x0, ev.clientX), top: Math.min(y0, ev.clientY),
+                                    right: Math.max(x0, ev.clientX), bottom: Math.max(y0, ev.clientY)
+                                };
+                            };
+
+                            $(document).on('mousemove.mzmarquee', function(ev) {
+                                var r = rect(ev);
+                                moved = moved || (r.right - r.left > 4 || r.bottom - r.top > 4);
+                                $box.css({ left: r.left, top: r.top, width: r.right - r.left, height: r.bottom - r.top });
+                            }).on('mouseup.mzmarquee', function(ev) {
+                                $(document).off('.mzmarquee');
+                                $box.remove();
+                                if (!moved) return;   // Shift + bấm (không kéo) do click xử lý
+
+                                var r = rect(ev);
+                                $root.find('.mz-slot.is-pickable').each(function() {
+                                    var b = this.getBoundingClientRect();
+                                    if (b.right >= r.left && b.left <= r.right && b.bottom >= r.top && b.top <= r.bottom) {
+                                        $(this).addClass('is-picked');
+                                    }
+                                });
+                                // Chặn click sinh ra ngay sau khi thả chuột
+                                suppressClick = true;
+                                setTimeout(function() { suppressClick = false; }, 0);
+                                syncPickbar();
+                            });
+                        });
+                    }
 
                     $place.off('.mz');
                     $place.on('click.mz', '.mz-pl-submit', savePlace);
@@ -1472,8 +1677,16 @@
                     $(this).trigger('click');
                 });
 
-                // Bấm một ô vị trí -> xem đủ các mã đang nằm ở đó; có quyền thì Thêm hoá chất / Đổi vị trí ngay trong hộp
-                $root.on('click.mz', '.mz-slot', function() {
+                // Bấm một ô vị trí -> xem đủ các mã đang nằm ở đó; có quyền thì Thêm hoá chất / Đổi vị trí ngay trong hộp.
+                // Shift / Ctrl + bấm = chọn / bỏ chọn ô (để dời nhiều ô cùng lúc)
+                $root.on('click.mz', '.mz-slot', function(e) {
+                    if (suppressClick) return;
+                    if ((e.shiftKey || e.ctrlKey || e.metaKey) && $(this).hasClass('is-pickable')) {
+                        $(this).toggleClass('is-picked');
+                        syncPickbar();
+                        return;
+                    }
+
                     var n = index[$(this).attr('data-key')];
                     if (!n) return;
                     // Ô trống mà không có quyền thêm thì không có gì để xem
@@ -1517,6 +1730,7 @@
                     $modal.modal('show');
                 });
 
+                syncPickbar();
                 apply();
 
                 // Nút Thẻ | 3D: dựng kệ 3D từ cùng khung định khu và các ô vừa gom ở trên

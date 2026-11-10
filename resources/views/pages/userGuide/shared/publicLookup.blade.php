@@ -15,7 +15,7 @@
     <li>Kết quả có nút <b>Thẻ | 3D | Mặt bằng</b> như tab Theo định khu của màn hình Tồn Kho: <b>Thẻ</b> liệt kê vị trí kèm số tồn,
         <b>3D</b> dựng từng kệ/tủ, <b>Mặt bằng</b> xem cả kho/phòng. Vị trí khớp từ khoá tô <b>xanh ngọc</b> và <b>nhấp nháy</b>;
         ở chế độ 3D khung tự phóng tới chỗ đó, ở chế độ Mặt bằng trên đầu kệ có hàng khớp hiện thẻ chi tiết (tên, mã, tồn, vị trí)
-        luôn quay về phía người xem, nút <b><i class="fas fa-tags"></i> Nhãn vị trí</b> in mã ô (A1, B1…) trên mọi ô của tủ, nút <b><i class="fas fa-walking"></i> Xuyên tủ</b> để đi bộ trong kho như game 3D (W A S D đi, Shift chạy, bấm vào khung rồi rê chuột để nhìn quanh, Esc thả chuột; đi xuyên qua tủ, không phóng to; nút 80° / 100° / 120° chọn độ rộng góc nhìn),
+        luôn quay về phía người xem, nút <b><i class="fas fa-tags"></i> Nhãn vị trí</b> in mã ô (A1, B1…) trên mọi ô của tủ, nút <b><i class="fas fa-walking"></i> Di chuyển vào kho</b> để đi bộ trong kho như game 3D (W A S D đi, Space / E lên, C / Q xuống, Shift chạy, bấm vào khung rồi rê chuột để nhìn quanh, Esc thả chuột; đi xuyên qua tủ, không phóng to; nút 80° / 100° / 120° chọn độ rộng góc nhìn),
         <span class="ug-key">Shift</span> + lăn chuột để phóng to / thu nhỏ, kéo thanh ở mép dưới khung để đổi chiều cao. Bấm thẻ hoặc thùng hàng để xem chi tiết: tồn, số lô, {{ $ugLookup['lot'] }}, hạn gần nhất.
         Phòng ban chưa khai định khu chỉ có kiểu Thẻ.</li>
 </ol>

@@ -706,7 +706,7 @@ class ChemicalInventoryController extends Controller
             AuditTrialController::log('Định khu', 'chemical_imports', $import->id, $import->code, $import->code.' | '.$note);
         }
 
-        return $this->assignResponse($imports, $location, 'Đã định khu');
+        return $this->assignResponse([[$imports, $location]], 'Đã định khu');
     }
 
     /**
@@ -718,6 +718,8 @@ class ChemicalInventoryController extends Controller
      *   - mã nguồn đang có vị trí, không nằm ở khu ASSIGN_EXCEPT_ZONES (lô cách ly / loại bỏ đi theo luồng Cách ly);
      *   - vị trí đích cùng điều kiện với Định khu nhanh và khác vị trí hiện tại;
      *   - tương kỵ cùng tầng không chặn, chỉ trả 'warning'.
+     * Hai kiểu gửi lên: `location_id` = gộp mọi mã vào một vị trí; `location_ids[]` (song song import_ids) = mỗi mã
+     * một vị trí đích - "Dời nguyên khối" khi Shift + quét chọn nhiều ô rồi kéo thả. Cả lượt chung một transaction.
      */
     public function moveLocation(Request $request)
     {
@@ -726,13 +728,19 @@ class ChemicalInventoryController extends Controller
         }
 
         $departmentId = $this->departmentId();
+        $batch = is_array($request->input('location_ids'));
 
         $validator = Validator::make($request->all(), [
             'import_ids' => ['required', 'array', 'min:1', 'max:'.self::ASSIGN_MAX],
             'import_ids.*' => ['integer'],
-            'location_id' => $this->assignTargetRule($departmentId),
+            'location_id' => $batch ? ['nullable'] : $this->assignTargetRule($departmentId),
+            'location_ids' => $batch ? ['array', 'size:'.count((array) $request->input('import_ids', []))] : ['nullable'],
+            'location_ids.*' => $batch ? $this->assignTargetRule($departmentId) : ['nullable'],
             'reason' => ['required', 'string', 'max:255'],
         ], $this->assignMessages() + [
+            'location_ids.size' => 'Danh sách vị trí mới không khớp số mã xuất nhập - vui lòng tải lại trang.',
+            'location_ids.*.required' => 'Vui lòng chọn vị trí lưu trữ.',
+            'location_ids.*.exists' => 'Có vị trí mới không còn hoạt động, không thuộc phòng ban đang chọn, hoặc là khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ.',
             'reason.required' => 'Vui lòng nhập lý do đổi vị trí.',
             'reason.max' => 'Lý do đổi vị trí tối đa 255 ký tự.',
         ]);
@@ -741,8 +749,12 @@ class ChemicalInventoryController extends Controller
             return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
-        $ids = array_values(array_unique(array_map('intval', $request->input('import_ids', []))));
-        $locationId = (int) $request->location_id;
+        // Vị trí đích của từng mã
+        $rawIds = array_map('intval', $request->input('import_ids', []));
+        $targetOf = $batch
+            ? array_combine($rawIds, array_map('intval', $request->input('location_ids', [])))
+            : array_fill_keys($rawIds, (int) $request->location_id);
+        $ids = array_keys($targetOf);
         $reason = trim((string) $request->reason);
         $imports = $this->assignImports($ids, $departmentId);
 
@@ -767,26 +779,28 @@ class ChemicalInventoryController extends Controller
             ], 422);
         }
 
-        $same = $imports->filter(fn ($import) => (int) $import->location_id === $locationId);
+        $same = $imports->filter(fn ($import) => (int) $import->location_id === $targetOf[(int) $import->id]);
         if ($same->isNotEmpty()) {
             return response()->json([
                 'message' => 'Mã xuất nhập đã nằm ở vị trí này: '.$same->pluck('code')->implode(', ').'.',
             ], 422);
         }
 
-        $location = $this->assignLocationRow($locationId);
+        $locations = collect(array_unique(array_values($targetOf)))
+            ->mapWithKeys(fn ($id) => [$id => $this->assignLocationRow($id)]);
         $notes = [];
         $conflict = null;
 
         try {
-            DB::transaction(function () use ($imports, $locationId, $location, $reason, &$notes, &$conflict) {
+            DB::transaction(function () use ($imports, $targetOf, $locations, $reason, &$notes, &$conflict) {
                 foreach ($imports as $import) {
+                    $location = $locations[$targetOf[(int) $import->id]];
                     // where location_id cũ: người khác vừa đổi chỗ mã này thì huỷ cả lượt
                     $updated = DB::table('chemical_imports')
                         ->where('id', $import->id)
                         ->where('location_id', $import->location_id)
                         ->update([
-                            'location_id' => $locationId,
+                            'location_id' => $location->id,
                             'updated_by' => $this->actor(),
                             'updated_at' => now(),
                         ]);
@@ -814,7 +828,12 @@ class ChemicalInventoryController extends Controller
             AuditTrialController::log('Đổi vị trí', 'chemical_imports', $import->id, $import->location_code, $import->code.' | '.$notes[$import->id]);
         }
 
-        return $this->assignResponse($imports, $location, 'Đã chuyển');
+        return $this->assignResponse(
+            $imports->groupBy(fn ($import) => $targetOf[(int) $import->id])
+                ->map(fn ($group, $locationId) => [$group, $locations[$locationId]])
+                ->values()->all(),
+            'Đã chuyển'
+        );
     }
 
     /** Vị trí đích của Định khu nhanh / Đổi vị trí: thuộc phòng, đang mở, lưu Hoá chất / Dùng chung, không phải khu cách ly. */
@@ -887,38 +906,57 @@ class ChemicalInventoryController extends Controller
     }
 
     /** JSON chung của Định khu nhanh / Đổi vị trí: thông báo, cảnh báo tương kỵ, vị trí mới để trình duyệt vá dòng tồn. */
-    private function assignResponse($imports, $location, string $verb)
+    /**
+     * JSON chung của Định khu nhanh / Đổi vị trí. $groups = [[mã xuất nhập (collection), vị trí đích], ...]:
+     * thông báo, cảnh báo tương kỵ, và `groups` [{import_ids, location}] để trình duyệt vá dòng tồn rồi dựng lại sơ đồ
+     * (import_ids / location ở gốc = nhóm đầu, giữ cho trang cũ).
+     */
+    private function assignResponse(array $groups, string $verb)
     {
-        $codes = $imports->pluck('code');
-        $locationLabel = \App\Support\CategoryLookup::locationLabel($location) ?: (string) $location->code;
+        $payloads = [];
+        $warnings = [];
+        $count = 0;
 
-        // Tương kỵ không chặn: xếp xong mới đối chiếu với các hoá chất đang nằm trên cùng tầng (tính cả các mã
-        // vừa xếp cùng lượt), mỗi hoá chất một câu cảnh báo
-        $warnings = \App\Support\ChemicalCompatibility::placementWarnings($imports->unique('category_id')
-            ->map(fn ($import) => [(int) $import->category_id, (int) $location->id, 'Mã xuất nhập '.$import->code])
-            ->values()->all());
+        foreach ($groups as [$imports, $location]) {
+            $count += $imports->count();
+            // Tương kỵ không chặn: xếp xong mới đối chiếu với các hoá chất đang nằm trên cùng tầng (tính cả các mã
+            // vừa xếp cùng lượt), mỗi hoá chất một câu cảnh báo
+            $warnings = array_merge($warnings, \App\Support\ChemicalCompatibility::placementWarnings($imports->unique('category_id')
+                ->map(fn ($import) => [(int) $import->category_id, (int) $location->id, 'Mã xuất nhập '.$import->code])
+                ->values()->all()));
+            $payloads[] = [
+                'import_ids' => $imports->pluck('id')->map(fn ($id) => (int) $id)->values(),
+                // Cùng tên trường với rowPayload() để trình duyệt vá thẳng vào dòng tồn
+                'location' => [
+                    'location_id' => (int) $location->id,
+                    'location_code' => $location->code,
+                    'location_zone_type' => $location->zone_type,
+                    'location_order' => $location->warehouse_name.'/'.$location->shelf_name.'/'.$location->column_name.'/'.$location->tier_name.'/'.$location->code,
+                    'warehouse_id' => $location->warehouse_id ? (int) $location->warehouse_id : null,
+                    'shelf_id' => $location->shelf_id ? (int) $location->shelf_id : null,
+                    'column_id' => $location->column_id ? (int) $location->column_id : null,
+                    'tier_id' => $location->tier_id ? (int) $location->tier_id : null,
+                    'warehouse_name' => $location->warehouse_name,
+                    'shelf_name' => $location->shelf_name,
+                    'column_name' => $location->column_name,
+                    'tier_name' => $location->tier_name,
+                ],
+            ];
+        }
+
+        [$firstImports, $firstLocation] = $groups[0];
+        $message = count($groups) === 1
+            ? $verb.' '.($count === 1 ? 'mã xuất nhập '.$firstImports->first()->code : $count.' mã xuất nhập')
+                .' vào '.(\App\Support\CategoryLookup::locationLabel($firstLocation) ?: (string) $firstLocation->code).'.'
+            : $verb.' '.$count.' mã xuất nhập sang '.count($groups).' vị trí mới.';
 
         return response()->json([
             'success' => true,
-            'warning' => $warnings ? 'Cảnh báo tương kỵ: '.implode(' | ', $warnings) : null,
-            'message' => $verb.' '.($codes->count() === 1 ? 'mã xuất nhập '.$codes->first() : $codes->count().' mã xuất nhập')
-                .' vào '.$locationLabel.'.',
-            'import_ids' => $imports->pluck('id')->map(fn ($id) => (int) $id)->values(),
-            // Cùng tên trường với rowPayload() để trình duyệt vá thẳng vào dòng tồn rồi dựng lại sơ đồ
-            'location' => [
-                'location_id' => (int) $location->id,
-                'location_code' => $location->code,
-                'location_zone_type' => $location->zone_type,
-                'location_order' => $location->warehouse_name.'/'.$location->shelf_name.'/'.$location->column_name.'/'.$location->tier_name.'/'.$location->code,
-                'warehouse_id' => $location->warehouse_id ? (int) $location->warehouse_id : null,
-                'shelf_id' => $location->shelf_id ? (int) $location->shelf_id : null,
-                'column_id' => $location->column_id ? (int) $location->column_id : null,
-                'tier_id' => $location->tier_id ? (int) $location->tier_id : null,
-                'warehouse_name' => $location->warehouse_name,
-                'shelf_name' => $location->shelf_name,
-                'column_name' => $location->column_name,
-                'tier_name' => $location->tier_name,
-            ],
+            'warning' => $warnings ? 'Cảnh báo tương kỵ: '.implode(' | ', array_unique($warnings)) : null,
+            'message' => $message,
+            'groups' => $payloads,
+            'import_ids' => $payloads[0]['import_ids'],
+            'location' => $payloads[0]['location'],
         ]);
     }
 

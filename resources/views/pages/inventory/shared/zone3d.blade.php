@@ -1383,7 +1383,7 @@
                 renderMain(ctx);
             });
             // Chế độ Mặt bằng: chọn kho/phòng; NHẤP ĐÚP kệ trên sơ đồ thu nhỏ hoặc trên 3D (ngoài thùng hàng) = xem 3D riêng kệ
-            // đó (nhấp một lần không chuyển, để đang xoay / đi Xuyên tủ lỡ tay bấm trúng tủ không bị đổi khung).
+            // đó (nhấp một lần không chuyển, để đang xoay / đi Di chuyển vào kho lỡ tay bấm trúng tủ không bị đổi khung).
             $root.on('click.z3d', '[data-z3d-room]', function() {
                 ctx.room = this.getAttribute('data-z3d-room');
                 refresh(ctx);
