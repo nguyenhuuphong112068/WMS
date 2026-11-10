@@ -44,6 +44,6 @@
         'hint' => 'Chỉ chọn được hoá chất đã duyệt trong danh mục công ty và <b>phòng chưa khai</b>. Bản chất hoá chất '
             . '(tên, nhà sản xuất, tỉ trọng, phân loại) khai ở <b>Danh Mục Hoá Chất Công Ty</b>; ở đây chỉ khai phần '
             . '<b>riêng của phòng</b>, ô để trống tự chạy theo danh mục. Đơn vị đếm / bao bì thì khai thêm khối lượng '
-            . 'quy đổi (kg). Định khu cùng kệ/tủ với hoá chất tương kỵ - kể cả giữa các dòng trong bảng - không lưu được.',
+            . 'quy đổi (kg). Định khu cùng tầng với hoá chất tương kỵ vẫn lưu được nhưng có cảnh báo.',
     ],
 ])

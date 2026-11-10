@@ -34,6 +34,36 @@
     .mz-filter-label { align-self: center; font-size: .68rem; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: #64748B; margin-right: 2px; }
     .mz-filter-sep { width: 1px; height: 20px; align-self: center; background: #DCE7F3; margin: 0 4px; }
 
+    /* ---------- Tương kỵ hoá chất cùng tầng (chỉ Tồn Kho Hoá Chất) ---------- */
+    .mz-filter-compat { color: #B91C1C; border-color: #FECACA; }
+    .mz-filter-compat i { margin-right: 4px; }
+    .mz-filter-compat b { margin-left: 4px; padding: 0 6px; border-radius: 999px; background: #FEE2E2; color: #991B1B; }
+    .mz-filter-compat.is-zero { color: #94A3B8; border-color: #DCE7F3; }
+    .mz-filter-compat.is-zero b { background: #EEF2F6; color: #94A3B8; }
+    .mz-filter-compat.is-active { background: #DC2626; border-color: #DC2626; color: #fff; }
+    .mz-filter-compat.is-active b { background: rgba(255, 255, 255, .25); color: #fff; }
+    .mz-cell.is-compat { box-shadow: 0 0 0 2px #DC2626; }
+    .mz-cell-compat {
+        flex: none; width: 18px; height: 18px; border-radius: 50%; background: #DC2626; color: #fff;
+        font-size: .62rem; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .mz-d-compat {
+        border: 1px solid #FECACA; background: #FEF2F2; border-radius: var(--border-radius-md);
+        padding: 10px 12px; margin-bottom: 12px; font-size: .82rem; color: #7F1D1D;
+    }
+    .mz-d-compat-head { font-weight: 700; color: #B91C1C; margin-bottom: 4px; }
+    .mz-d-compat ol { margin: 0; padding-left: 18px; }
+    .mz-d-compat li + li { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #FECACA; }
+    .mz-d-compat .concl { line-height: 1.7; }
+    .mz-d-compat .attr {
+        display: inline-block; padding: 0 7px; border-radius: 999px; background: #fff; border: 1px solid #FCA5A5;
+        color: #991B1B; font-weight: 600; font-size: .76rem; line-height: 1.5;
+    }
+    .mz-d-compat .vs { color: #B91C1C; }
+    .mz-d-compat .pairs { color: #B91C1C; font-size: .76rem; margin-top: 2px; }
+    .mz-d-compat .pairs::before { content: 'Chi tiết: '; color: #64748B; }
+    .mz-d-compat .md-sub { color: #64748B; }
+
     /* ---------- Kho ---------- */
     .mz-wh {
         background: #fff; border: 1px solid #DCE7F3; border-radius: var(--border-radius-lg);

@@ -627,12 +627,12 @@ class ZoneStructureController extends Controller
                 'id' => (int) $warehouse->id,
                 'code' => $warehouse->code,
                 'name' => $warehouse->name,
-                'layout' => $warehouse->layout_width === null ? null : [
-                    'width' => (float) $warehouse->layout_width,
-                    'depth' => (float) $warehouse->layout_depth,
-                    'door_wall' => $warehouse->layout_door_wall,
-                    'door_offset' => $warehouse->layout_door_offset === null ? null : (float) $warehouse->layout_door_offset,
-                ],
+                'layout' => ($room = \App\Support\RoomLayout::payload($warehouse)) ? [
+                    'width' => $room['width'],
+                    'depth' => $room['depth'],
+                    'polygon' => $room['polygon'],
+                    'door' => $room['door'],
+                ] : null,
             ],
             'shelves' => $out->values(),
             'limits' => self::layoutLimits(),
@@ -649,30 +649,33 @@ class ZoneStructureController extends Controller
         $max = self::LAYOUT_MAX_ROOM;
         $validator = Validator::make($request->all(), [
             'warehouse_id' => ['required', 'integer'],
-            'room.width' => ['required', 'numeric', 'min:1', 'max:'.$max],
-            'room.depth' => ['required', 'numeric', 'min:1', 'max:'.$max],
-            'room.door_wall' => ['nullable', Rule::in(array_keys(self::DOOR_WALLS))],
-            'room.door_offset' => ['nullable', 'numeric', 'min:0', 'max:'.$max],
+            'room.polygon' => ['required', 'array', 'min:3', 'max:' . \App\Support\RoomLayout::MAX_POINTS],
+            'room.polygon.*' => ['required', 'array', 'size:2'],
+            'room.polygon.*.*' => ['required', 'numeric', 'min:0', 'max:' . $max],
+            'room.door' => ['nullable', 'array'],
+            'room.door.edge' => ['required_with:room.door', 'integer', 'min:0'],
+            'room.door.offset' => ['required_with:room.door', 'numeric', 'min:0', 'max:' . $max],
+            'room.door.width' => ['required_with:room.door', 'numeric', 'min:' . \App\Support\RoomLayout::DOOR_MIN, 'max:' . \App\Support\RoomLayout::DOOR_MAX],
             'shelves' => ['array'],
             'shelves.*.id' => ['required', 'integer'],
             'shelves.*.placed' => ['required', 'boolean'],
-            'shelves.*.x' => ['nullable', 'numeric', 'min:0', 'max:'.$max],
-            'shelves.*.y' => ['nullable', 'numeric', 'min:0', 'max:'.$max],
-            'shelves.*.width' => ['nullable', 'numeric', 'min:'.self::LAYOUT_MIN_SHELF, 'max:'.self::LAYOUT_MAX_SHELF],
-            'shelves.*.depth' => ['nullable', 'numeric', 'min:'.self::LAYOUT_MIN_SHELF, 'max:'.self::LAYOUT_MAX_SHELF],
+            'shelves.*.x' => ['nullable', 'numeric', 'min:0', 'max:' . $max],
+            'shelves.*.y' => ['nullable', 'numeric', 'min:0', 'max:' . $max],
+            'shelves.*.width' => ['nullable', 'numeric', 'min:' . self::LAYOUT_MIN_SHELF, 'max:' . self::LAYOUT_MAX_SHELF],
+            'shelves.*.depth' => ['nullable', 'numeric', 'min:' . self::LAYOUT_MIN_SHELF, 'max:' . self::LAYOUT_MAX_SHELF],
             'shelves.*.rotation' => ['nullable', Rule::in(self::ROTATIONS)],
         ], [
-            'room.width.required' => 'Chưa nhập chiều ngang phòng.',
-            'room.depth.required' => 'Chưa nhập chiều sâu phòng.',
-            'room.width.min' => 'Phòng phải rộng ít nhất 1 m.',
-            'room.depth.min' => 'Phòng phải sâu ít nhất 1 m.',
-            'room.width.max' => 'Chiều ngang phòng tối đa '.$max.' m.',
-            'room.depth.max' => 'Chiều sâu phòng tối đa '.$max.' m.',
-            'room.door_wall.in' => 'Tường có cửa không hợp lệ.',
-            'shelves.*.width.min' => 'Bề ngang kệ tối thiểu '.self::LAYOUT_MIN_SHELF.' m.',
-            'shelves.*.depth.min' => 'Bề sâu kệ tối thiểu '.self::LAYOUT_MIN_SHELF.' m.',
-            'shelves.*.width.max' => 'Bề ngang kệ tối đa '.self::LAYOUT_MAX_SHELF.' m.',
-            'shelves.*.depth.max' => 'Bề sâu kệ tối đa '.self::LAYOUT_MAX_SHELF.' m.',
+            'room.polygon.required' => 'Chưa vẽ hình dạng phòng.',
+            'room.polygon.min' => 'Hình dạng phòng cần ít nhất 3 góc.',
+            'room.polygon.max' => 'Hình dạng phòng tối đa ' . \App\Support\RoomLayout::MAX_POINTS . ' góc.',
+            'room.polygon.*.*.max' => 'Phòng tối đa ' . $max . ' m mỗi chiều.',
+            'room.polygon.*.*.min' => 'Toạ độ góc phòng không được âm.',
+            'room.door.width.min' => 'Cửa rộng tối thiểu ' . \App\Support\RoomLayout::DOOR_MIN . ' m.',
+            'room.door.width.max' => 'Cửa rộng tối đa ' . \App\Support\RoomLayout::DOOR_MAX . ' m.',
+            'shelves.*.width.min' => 'Bề ngang kệ tối thiểu ' . self::LAYOUT_MIN_SHELF . ' m.',
+            'shelves.*.depth.min' => 'Bề sâu kệ tối thiểu ' . self::LAYOUT_MIN_SHELF . ' m.',
+            'shelves.*.width.max' => 'Bề ngang kệ tối đa ' . self::LAYOUT_MAX_SHELF . ' m.',
+            'shelves.*.depth.max' => 'Bề sâu kệ tối đa ' . self::LAYOUT_MAX_SHELF . ' m.',
             'shelves.*.rotation.in' => 'Hướng mặt trước của kệ không hợp lệ.',
         ]);
 
@@ -686,19 +689,61 @@ class ZoneStructureController extends Controller
             return $this->fail('Không tìm thấy kho/phòng.', 404);
         }
 
-        $room = [
-            'layout_width' => $this->metre($request->input('room.width')),
-            'layout_depth' => $this->metre($request->input('room.depth')),
-            'layout_door_wall' => $request->input('room.door_wall') ?: null,
-            'layout_door_offset' => $request->input('room.door_wall') ? $this->metre($request->input('room.door_offset') ?? 0) : null,
-        ];
+        $polygon = \App\Support\RoomLayout::decodePolygon($request->input('room.polygon'));
+        $door = $request->input('room.door');
 
-        if ($room['layout_door_wall']) {
-            $wall = in_array($room['layout_door_wall'], ['top', 'bottom'], true) ? $room['layout_width'] : $room['layout_depth'];
-            if ((float) $room['layout_door_offset'] + self::DOOR_WIDTH > (float) $wall + 0.001) {
-                return $this->fail('Cửa ra vào (rộng '.self::DOOR_WIDTH.' m) vượt ra ngoài tường. Hãy giảm vị trí cửa.');
+        if (! $polygon || ! \App\Support\RoomLayout::isSimple($polygon)) {
+            return $this->fail('Hình dạng phòng không hợp lệ: các cạnh không được cắt nhau hoặc trùng góc. Hãy kéo lại các góc phòng.');
+        }
+
+        // Quy ước chạy theo chiều kim đồng hồ: đa giác vẽ ngược thì đảo thứ tự góc và đổi chỉ số cạnh của cửa.
+        if (\App\Support\RoomLayout::signedArea($polygon) < 0) {
+            $n = count($polygon);
+            $polygon = array_reverse($polygon);
+            if ($door) {
+                $door['edge'] = ($n - 2 - (int) $door['edge'] + $n) % $n;
+                $door['offset'] = max(0, \App\Support\RoomLayout::edgeLength($polygon, (int) $door['edge']) - (float) $door['offset'] - (float) $door['width']);
             }
         }
+
+        if (abs(\App\Support\RoomLayout::signedArea($polygon)) < 1.0) {
+            return $this->fail('Phòng quá nhỏ (diện tích dưới 1 m²).');
+        }
+
+        if (min(array_column($polygon, 0)) > 0.001 || min(array_column($polygon, 1)) > 0.001) {
+            return $this->fail('Mặt bằng chưa được căn về góc (0,0). Hãy mở lại màn hình mặt bằng rồi lưu lần nữa.');
+        }
+
+        [$roomWidth, $roomDepth] = \App\Support\RoomLayout::bounds($polygon);
+        $doorJson = null;
+
+        if ($door) {
+            $edge = (int) $door['edge'];
+
+            if ($edge >= count($polygon)) {
+                return $this->fail('Cửa ra vào không nằm trên cạnh nào của phòng.');
+            }
+
+            $len = \App\Support\RoomLayout::edgeLength($polygon, $edge);
+            $width = round((float) $door['width'], 2);
+            $offset = round((float) $door['offset'], 2);
+
+            if ($offset + $width > $len + 0.01) {
+                return $this->fail('Cửa ra vào (rộng ' . $width . ' m) vượt ra ngoài cạnh tường dài ' . round($len, 2) . ' m. Hãy kéo cửa vào trong hoặc thu hẹp cửa.');
+            }
+
+            $doorJson = json_encode(['edge' => $edge, 'offset' => max(0, $offset), 'width' => $width]);
+        }
+
+        $room = [
+            'layout_width' => $this->metre($roomWidth),
+            'layout_depth' => $this->metre($roomDepth),
+            // Hình chữ nhật thì không lưu đa giác (giữ nguyên cách lưu cũ)
+            'layout_polygon' => \App\Support\RoomLayout::isRectangle($polygon) ? null : \App\Support\RoomLayout::encode($polygon),
+            'layout_door_wall' => null,
+            'layout_door_offset' => null,
+            'layout_door' => $doorJson,
+        ];
 
         $current = DB::table('shelves')
             ->where('department_id', $this->departmentId())
@@ -730,9 +775,8 @@ class ZoneStructureController extends Controller
                 continue;
             }
             $box = $this->footprint($plan);
-            if ($box[0] < -0.001 || $box[1] < -0.001
-                || $box[2] > (float) $room['layout_width'] + 0.001 || $box[3] > (float) $room['layout_depth'] + 0.001) {
-                return $this->fail('Kệ/tủ '.$current[$id]->code.' nằm ra ngoài phòng. Hãy kéo kệ vào trong hoặc nới kích thước phòng.');
+            if (! \App\Support\RoomLayout::contains($polygon, $box)) {
+                return $this->fail('Kệ/tủ ' . $current[$id]->code . ' nằm ra ngoài phòng. Hãy kéo kệ vào trong hoặc chỉnh lại hình dạng phòng.');
             }
             foreach ($boxes as $otherId => $other) {
                 if ($box[0] < $other[2] - 0.001 && $other[0] < $box[2] - 0.001 && $box[1] < $other[3] - 0.001 && $other[1] < $box[3] - 0.001) {
@@ -744,17 +788,18 @@ class ZoneStructureController extends Controller
 
         $roomFields = [
             'layout_width' => 'Chiều ngang phòng (m)', 'layout_depth' => 'Chiều sâu phòng (m)',
-            'layout_door_wall' => 'Tường có cửa', 'layout_door_offset' => 'Vị trí cửa (m)',
+            'layout_polygon' => 'Hình dạng phòng (toạ độ các góc, m)', 'layout_door' => 'Cửa ra vào (cạnh / cách góc / rộng)',
+            'layout_door_wall' => 'Tường có cửa (cũ)', 'layout_door_offset' => 'Vị trí cửa (cũ, m)',
         ];
         $shelfFields = [
             'layout_x' => 'Mặt bằng - tâm kệ theo chiều ngang (m)', 'layout_y' => 'Mặt bằng - tâm kệ theo chiều sâu (m)',
             'layout_width' => 'Mặt bằng - bề ngang kệ (m)', 'layout_depth' => 'Mặt bằng - bề sâu kệ (m)',
             'layout_rotation' => 'Mặt bằng - hướng mặt trước',
         ];
-        $roomMaps = ['layout_door_wall' => ['' => 'Chưa khai'] + self::DOOR_WALLS];
+        $roomMaps = ['layout_door_wall' => ['' => 'Chưa khai'] + self::DOOR_WALLS, 'layout_polygon' => ['' => 'Hình chữ nhật'], 'layout_door' => ['' => 'Chưa có cửa']];
         $shelfMaps = ['layout_rotation' => ['' => 'Chưa đặt'] + self::ROTATION_LABELS];
 
-        $changed = DB::transaction(function () use ($warehouse, $room, $plans, $current, $roomFields, $shelfFields, $roomMaps, $shelfMaps) {
+        $changed = DB::transaction(function () use ($warehouse, $room, $plans, $current, $roomFields, $shelfFields, $roomMaps, $shelfMaps, $polygon) {
             $actor = $this->actor();
             $now = now();
             $changed = 0;
@@ -779,7 +824,7 @@ class ZoneStructureController extends Controller
             if ($changed) {
                 $placed = count(array_filter($plans, fn ($plan) => $plan['layout_x'] !== null));
                 AuditTrialController::log('Cập nhật mặt bằng', 'warehouses', $warehouse->id, $warehouse->code.' - '.$warehouse->name,
-                    'Phòng '.$room['layout_width'].' × '.$room['layout_depth'].' m, đặt '.$placed.' kệ/tủ');
+                    'Phòng '.$room['layout_width'].' × '.$room['layout_depth'].' m'.($room['layout_polygon'] ? ' ('.count($polygon).' góc)' : '').', đặt '.$placed.' kệ/tủ');
             }
 
             return $changed;
@@ -797,7 +842,10 @@ class ZoneStructureController extends Controller
             'maxRoom' => self::LAYOUT_MAX_ROOM,
             'minShelf' => self::LAYOUT_MIN_SHELF,
             'maxShelf' => self::LAYOUT_MAX_SHELF,
-            'doorWidth' => self::DOOR_WIDTH,
+            'doorWidth' => \App\Support\RoomLayout::DOOR_DEFAULT,
+            'doorMin' => \App\Support\RoomLayout::DOOR_MIN,
+            'doorMax' => \App\Support\RoomLayout::DOOR_MAX,
+            'maxPoints' => \App\Support\RoomLayout::MAX_POINTS,
         ];
     }
 

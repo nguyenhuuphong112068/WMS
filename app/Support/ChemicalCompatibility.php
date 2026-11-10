@@ -12,13 +12,17 @@ use Illuminate\Support\Facades\DB;
  * các ô "x" của sơ đồ. Hai hoá chất TƯƠNG KỴ khi có ít nhất một cặp nhóm (một của chất này, một
  * của chất kia) rơi vào ô "x". Chất chưa khai cảnh báo thì không xét được.
  *
- * "Gần nhau" = cùng một cấp định khu khai ở config('chemical.incompatibility_scope') (mặc định
- * cùng Kệ/Tủ). Hoá chất đang ở một chỗ gồm:
+ * "Gần nhau" = cùng một cấp định khu khai ở config('chemical.incompatibility_scope') (đang dùng
+ * cùng TẦNG). Hoá chất đang ở một chỗ gồm:
  *   - dòng "Hoá Chất Của Phòng" đang hoạt động có định khu ở đó
  *     (chemical_department_categories.default_location_id)
  *   - lô đang còn tồn ở đó (chemical_imports.location_id; tồn = nhập + cân bằng - xuất > 0,
  *     tính cả lô "Chờ kiểm tra" vì hàng đã nằm trên kệ)
  * Cùng một mã danh mục thì bỏ qua - một chất để cạnh chính nó.
+ *
+ * KHÔNG CHẶN khi xếp: đặt vào tầng đã có sẵn hoá chất tương kỵ vẫn lưu được, chỉ hiện cảnh báo
+ * (ô chọn định khu, khung cảnh báo modal, thông báo sau khi lưu). Sơ đồ 3D Tồn Kho Hoá Chất đánh
+ * dấu các lô đang nằm chung tầng với hoá chất tương kỵ (clientConfig() + inventory/shared/zoneGrid).
  *
  * Query Builder thuần, không Eloquent.
  */
@@ -225,8 +229,8 @@ class ChemicalCompatibility
     }
 
     /**
-     * Gắn cờ tương kỵ cho các dòng kết quả tìm định khu (Select2): dòng tương kỵ có
-     * disabled = true + warning = câu giải thích, để người dùng không chọn được.
+     * Gắn cảnh báo tương kỵ cho các dòng kết quả tìm định khu (Select2): dòng tương kỵ có
+     * warning = câu giải thích (vẫn chọn được - chỉ cảnh báo, không chặn).
      *
      * @param  array  $items  [{id, text}, ...]
      */
@@ -255,7 +259,6 @@ class ChemicalCompatibility
             $conflicts = self::conflictsOf($category['warnings'], self::groupOccupants($occupants));
 
             if ($conflicts) {
-                $item['disabled'] = true;
                 $item['warning'] = 'Tương kỵ: '.implode('; ', array_map(
                     fn ($conflict) => $conflict['code'].' '.$conflict['chem_name']
                         .' ('.self::pairsText($conflict['pairs']).')',
@@ -267,18 +270,60 @@ class ChemicalCompatibility
         return $items;
     }
 
-    /** Câu báo lỗi khi lưu: "Không được đặt cùng Kệ/Tủ với ...". */
-    public static function message(array $result): string
+    /**
+     * Câu cảnh báo sau khi lưu: "<subject> nằm cùng Tầng "..." với hoá chất tương kỵ ...".
+     * $subject: tên chỗ đang xếp (mã danh mục / mã xuất nhập), rỗng = "Hoá chất này".
+     */
+    public static function message(array $result, string $subject = ''): string
     {
         $names = array_map(
             fn ($conflict) => $conflict['code'].' - '.$conflict['chem_name'].' ('.self::pairsText($conflict['pairs']).')',
             $result['conflicts']
         );
 
-        return 'Không được đặt hoá chất này cùng '.$result['scope_label']
+        return ($subject !== '' ? $subject : 'Hoá chất này').' nằm cùng '.$result['scope_label']
             .($result['area'] ? ' "'.$result['area'].'"' : '')
             .' với hoá chất tương kỵ theo Sơ đồ lưu trữ GHS: '.implode('; ', $names)
-            .'. Vui lòng chọn định khu khác.';
+            .'. Nên chuyển sang chỗ khác.';
+    }
+
+    /**
+     * Cảnh báo cho một loạt chỗ vừa xếp (sau khi đã lưu): [[category_id, location_id, subject], ...]
+     * -> mảng câu cảnh báo, chỉ chỗ nào tầng đó đã có hoá chất tương kỵ.
+     */
+    public static function placementWarnings(array $placements): array
+    {
+        $out = [];
+
+        foreach ($placements as [$categoryId, $locationId, $subject]) {
+            if (! $categoryId || ! $locationId) {
+                continue;
+            }
+
+            $result = self::checkPlacement((int) $categoryId, (int) $locationId);
+
+            if ($result['conflicts']) {
+                $out[] = self::message($result, (string) $subject);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Cấu hình cho trình duyệt (sơ đồ Tồn Kho Hoá Chất tự đối chiếu các lô trên cùng tầng):
+     * matrix [mã => [mã tương kỵ]], labels [mã => nhãn ngắn], scope (cấp định khu đang xét).
+     */
+    public static function clientConfig(): array
+    {
+        $scope = self::scope();
+
+        return [
+            'matrix' => array_map('array_keys', self::matrix()),
+            'labels' => collect(self::labels())->keys()->mapWithKeys(fn ($code) => [$code => self::shortLabel($code)])->all(),
+            'scope' => $scope['key'],
+            'scope_label' => $scope['label'],
+        ];
     }
 
     /** "Lỏng dễ cháy ✕ Oxy hoá, Ăn mòn nhóm axit ✕ Độc" */

@@ -21,8 +21,11 @@
     <a href="#ton-kho">Cân đối</a>. Riêng lô nhận lẻ từ phòng khác thì không được vượt.</p>
 
 <h3>Tương kỵ khi lưu trữ</h3>
-<p>Dựa vào <b>Cảnh Báo An Toàn</b> (hình đồ GHS) khai ở danh mục, hệ thống chặn việc xếp hai hoá chất tương kỵ (ví dụ chất lỏng dễ
-    cháy với chất oxy hoá) vào <b>cùng một tầng</b> của kệ/tủ. Hoá chất chưa khai cảnh báo an toàn thì không xét được.</p>
+<p>Dựa vào <b>Cảnh Báo An Toàn</b> (hình đồ GHS) khai ở danh mục, hệ thống <b>cảnh báo</b> khi hai hoá chất tương kỵ (ví dụ chất
+    lỏng dễ cháy với chất oxy hoá) nằm <b>cùng một tầng</b> của kệ/tủ. Hệ thống <b>không chặn</b> việc xếp: chọn vị trí trên tầng đã có
+    hoá chất tương kỵ vẫn lưu được, nhưng ô chọn vị trí hiện lý do màu đỏ và sau khi lưu có thông báo cảnh báo. Ở tab
+    <a href="#ton-kho">Theo định khu</a> của Tồn Kho Hoá Chất, các vị trí đang có lô tương kỵ cùng tầng được đánh dấu đỏ trên sơ đồ
+    Thẻ, 3D và Mặt bằng. Chỉ xét hoá chất (vật tư, chất chuẩn không xét). Hoá chất chưa khai cảnh báo an toàn thì không xét được.</p>
 
 <h3>Chọn định khu (vị trí lưu trữ)</h3>
 <p>Mọi ô chọn định khu đều gõ tìm được theo tên hoặc mã của kho, kệ/tủ, cột, tầng, vị trí. Trong khung tìm có hai hàng chip lọc

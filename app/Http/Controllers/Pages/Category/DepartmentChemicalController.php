@@ -68,10 +68,7 @@ class DepartmentChemicalController extends Controller
             $prefix = 'items.'.$index.'.';
             $this->checkConversions($validator, $item, (int) $item['category_id'], $departmentId, $prefix);
             $this->checkStockRange($validator, $item, $prefix);
-            $this->checkCompatibility($validator, $item, (int) $item['category_id'], 0, $prefix);
         }
-
-        $this->checkBatchCompatibility($validator, $items);
 
         if ($validator->fails()) {
             // Gửi lại đúng các dòng đã kiểm tra để số "Dòng N" khớp với bảng
@@ -101,10 +98,16 @@ class DepartmentChemicalController extends Controller
             }
         });
 
+        // Tương kỵ không chặn: lưu xong mới đối chiếu (đã thấy cả các dòng vừa khai) và cảnh báo
+        $warning = $this->compatibilityWarning(array_map(
+            fn ($item) => [(int) $item['category_id'], (int) ($item['default_location_id'] ?? 0)],
+            $items
+        ));
+
         return $this->backToTab()->with(
             'success',
             count($items) === 1 ? 'Đã khai '.self::LABEL.' thành công!' : 'Đã khai '.count($items).' '.self::LABEL.' thành công!'
-        );
+        )->with('warning', $warning);
     }
 
     public function update(Request $request)
@@ -136,8 +139,6 @@ class DepartmentChemicalController extends Controller
 
         $this->checkStockRange($validator, $request->all());
 
-        $this->checkCompatibility($validator, $request->all(), (int) $current->category_id, (int) $current->default_location_id);
-
         if ($validator->fails()) {
             return $this->backToTab()->withErrors($validator, 'dcUpdateErrors')->withInput();
         }
@@ -168,7 +169,13 @@ class DepartmentChemicalController extends Controller
                 .' | Lý do: '.$this->changeReason($request)
         );
 
-        return $this->backToTab()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
+        // Đổi sang định khu mới mà tầng đó đã có hoá chất tương kỵ: lưu bình thường, kèm cảnh báo
+        $newLocation = (int) ($request->default_location_id ?? 0);
+        $warning = $newLocation && $newLocation !== (int) $current->default_location_id
+            ? $this->compatibilityWarning([[(int) $current->category_id, $newLocation]])
+            : null;
+
+        return $this->backToTab()->with('success', 'Cập nhật '.self::LABEL.' thành công!')->with('warning', $warning);
     }
 
     public function deActive(Request $request)
@@ -268,78 +275,29 @@ class DepartmentChemicalController extends Controller
     }
 
     /**
-     * Không cho đặt hoá chất cùng kệ/tủ với hoá chất tương kỵ theo Sơ đồ lưu trữ hoá chất theo
-     * hình đồ cảnh báo (GHS) - xem App\Support\ChemicalCompatibility.
+     * Cảnh báo (không chặn) khi đặt hoá chất vào tầng đã có hoá chất tương kỵ theo Sơ đồ lưu trữ
+     * hoá chất theo hình đồ cảnh báo (GHS) - xem App\Support\ChemicalCompatibility. Gọi SAU khi lưu.
      *
-     * Chỉ chặn khi ĐẶT MỚI: khai mới, hoặc sửa mà đổi định khu. Sửa ô khác mà giữ nguyên định khu
-     * cũ thì cho lưu - chỗ cũ có thể thành tương kỵ do lô khác được xếp vào sau, lỗi đó không nằm
-     * ở dòng này (modal vẫn hiện cảnh báo để phòng chuyển chỗ).
+     * @param  array  $placements  [[category_id, location_id], ...]
      */
-    private function checkCompatibility($validator, array $input, int $categoryId, int $currentLocationId = 0, string $prefix = ''): void
+    private function compatibilityWarning(array $placements): ?string
     {
-        $validator->after(function ($validator) use ($input, $categoryId, $currentLocationId, $prefix) {
-            $locationId = (int) ($input['default_location_id'] ?? 0);
+        $placements = array_values(array_filter($placements, fn ($row) => $row[0] && $row[1]));
 
-            if (! $locationId || ! $categoryId || $locationId === $currentLocationId
-                || $validator->errors()->has($prefix.'default_location_id') || $validator->errors()->has($prefix.'category_id')) {
-                return;
-            }
+        if (! $placements) {
+            return null;
+        }
 
-            $result = ChemicalCompatibility::checkPlacement($categoryId, $locationId);
+        $codes = DB::table('chemical_categories')
+            ->whereIn('id', array_column($placements, 0))
+            ->pluck('code', 'id');
 
-            if ($result['conflicts']) {
-                $validator->errors()->add($prefix.'default_location_id', ChemicalCompatibility::message($result));
-            }
-        });
-    }
+        $messages = ChemicalCompatibility::placementWarnings(array_map(
+            fn ($row) => [$row[0], $row[1], (string) ($codes[$row[0]] ?? '')],
+            $placements
+        ));
 
-    /**
-     * Tương kỵ GIỮA CÁC DÒNG của cùng một lần khai: checkPlacement() chỉ thấy hoá chất đã lưu, hai
-     * dòng mới đặt cùng kệ/tủ mà tương kỵ nhau thì phải bắt ở đây. Báo ở dòng sau.
-     */
-    private function checkBatchCompatibility($validator, array $items): void
-    {
-        $validator->after(function ($validator) use ($items) {
-            $placed = collect($items)
-                ->map(fn ($item, $index) => [
-                    'index' => $index,
-                    'category' => (int) ($item['category_id'] ?? 0),
-                    'location' => (int) ($item['default_location_id'] ?? 0),
-                ])
-                ->filter(fn ($row) => $row['category'] && $row['location']
-                    && ! $validator->errors()->has('items.'.$row['index'].'.default_location_id'))
-                ->values();
-
-            if ($placed->count() < 2) {
-                return;
-            }
-
-            $warnings = DB::table('chemical_categories')
-                ->whereIn('id', $placed->pluck('category')->unique()->all())
-                ->pluck('safety_warning', 'id')
-                ->map(fn ($value) => ChemicalCompatibility::decode($value));
-            $neighbours = ChemicalCompatibility::neighbourIds($placed->pluck('location')->all());
-
-            foreach ($placed as $i => $row) {
-                foreach ($placed->slice(0, $i) as $before) {
-                    if (! in_array($before['location'], $neighbours[$row['location']] ?? [$row['location']], true)) {
-                        continue;
-                    }
-
-                    $pairs = ChemicalCompatibility::pairs($warnings[$row['category']] ?? [], $warnings[$before['category']] ?? []);
-
-                    if ($pairs) {
-                        $validator->errors()->add(
-                            'items.'.$row['index'].'.default_location_id',
-                            'Tương kỵ với hoá chất ở dòng '.($before['index'] + 1).' ('.ChemicalCompatibility::pairsText($pairs)
-                            .') nhưng cùng '.ChemicalCompatibility::scope()['label'].'. Vui lòng chọn định khu khác.'
-                        );
-
-                        break;
-                    }
-                }
-            }
-        });
+        return $messages ? 'Cảnh báo tương kỵ: '.implode(' | ', array_unique($messages)) : null;
     }
 
     /**

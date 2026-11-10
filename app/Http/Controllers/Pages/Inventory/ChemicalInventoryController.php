@@ -238,6 +238,10 @@ class ChemicalInventoryController extends Controller
             'category_id' => (int) $row->category_id,
             'category_code' => $row->category_code,
             'category_type' => $row->category_type,
+            // Nhóm cảnh báo GHS - sơ đồ Theo định khu tự đối chiếu tương kỵ giữa các lô cùng tầng
+            'sw' => \App\Support\ChemicalCompatibility::comparableCodes(
+                \App\Support\ChemicalCompatibility::decode($row->safety_warning ?? null)
+            ),
             'chem_name' => $row->chem_name,
             // Hoá chất VS (vi sinh) - cờ của phiếu nhập, dùng cho bộ lọc VS
             'vs' => (int) $row->is_microbiological_chemicals,
@@ -622,9 +626,8 @@ class ChemicalInventoryController extends Controller
      *     (đổi chỗ lô đã có định khu thì Điều chỉnh phiếu nhập, bắt buộc ghi lý do);
      *   - vị trí phải thuộc phòng ban, đang hoạt động, loại lưu trữ Hoá chất / Dùng chung và KHÔNG thuộc
      *     ASSIGN_EXCEPT_ZONES;
-     *   - đối chiếu tương kỵ (Sơ đồ lưu trữ GHS) lần lượt từng mã TRONG transaction: mã xếp trước được
-     *     tính là "hàng xóm" của mã xếp sau, nên chọn hai hoá chất tương kỵ cùng lúc cũng bị chặn.
-     *     Một mã vướng thì huỷ cả lượt, không xếp dở dang.
+     *   - tương kỵ (Sơ đồ lưu trữ GHS, xét cùng tầng) KHÔNG chặn: xếp xong mới đối chiếu, trả thêm
+     *     'warning' khi tầng đó có hoá chất tương kỵ (tính cả các mã vừa xếp cùng lượt).
      * Mỗi mã ghi một dòng lịch sử phiếu nhập ("Định khu") và Audit Trail.
      */
     public function assignLocation(Request $request)
@@ -714,14 +717,6 @@ class ChemicalInventoryController extends Controller
         try {
             DB::transaction(function () use ($imports, $locationId, $note, &$conflict) {
                 foreach ($imports as $import) {
-                    $check = \App\Support\ChemicalCompatibility::checkPlacement((int) $import->category_id, $locationId);
-
-                    if ($check['conflicts']) {
-                        $conflict = $import->code.': '.\App\Support\ChemicalCompatibility::message($check);
-
-                        throw new \RuntimeException($conflict);
-                    }
-
                     // whereNull: hai người cùng định khu một mã thì chỉ lượt đầu được ghi
                     $updated = DB::table('chemical_imports')
                         ->where('id', $import->id)
@@ -755,8 +750,15 @@ class ChemicalInventoryController extends Controller
 
         $codes = $imports->pluck('code');
 
+        // Tương kỵ không chặn: xếp xong mới đối chiếu với các hoá chất đang nằm trên cùng tầng (tính cả các mã
+        // vừa xếp cùng lượt), mỗi hoá chất một câu cảnh báo
+        $warnings = \App\Support\ChemicalCompatibility::placementWarnings($imports->unique('category_id')
+            ->map(fn ($import) => [(int) $import->category_id, $locationId, 'Mã xuất nhập '.$import->code])
+            ->values()->all());
+
         return response()->json([
             'success' => true,
+            'warning' => $warnings ? 'Cảnh báo tương kỵ: '.implode(' | ', $warnings) : null,
             'message' => 'Đã định khu '.($codes->count() === 1 ? 'mã xuất nhập '.$codes->first() : $codes->count().' mã xuất nhập')
                 .' vào '.$locationLabel.'.',
             'import_ids' => $imports->pluck('id')->map(fn ($id) => (int) $id)->values(),
@@ -1081,6 +1083,7 @@ class ChemicalInventoryController extends Controller
                 'chemical_imports.note',
                 'chemical_categories.code as category_code',
                 'chemical_categories.type as category_type',
+                'chemical_categories.safety_warning',
                 DepartmentChemical::shelfLifeColumn(),
                 DepartmentChemical::minStockColumn(),
                 'chem_names.name as chem_name',
@@ -1406,7 +1409,7 @@ class ChemicalInventoryController extends Controller
             ->get();
 
         return [
-            'warehouses' => $of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_door_wall', 'layout_door_offset']),
+            'warehouses' => \App\Support\RoomLayout::attach($of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_polygon', 'layout_door_wall', 'layout_door_offset', 'layout_door'])),
             'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']),
             'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
             'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']),

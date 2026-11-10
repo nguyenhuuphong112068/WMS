@@ -267,7 +267,7 @@ class PublicStockLookupController extends Controller
             ->get();
 
         return [
-            'warehouses' => $of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_door_wall', 'layout_door_offset']),
+            'warehouses' => \App\Support\RoomLayout::attach($of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_polygon', 'layout_door_wall', 'layout_door_offset', 'layout_door'])),
             'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']),
             'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
             'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']),

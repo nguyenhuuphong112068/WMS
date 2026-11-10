@@ -3099,6 +3099,7 @@
             columns: cols.map(function (column) {
                 return {
                     label: column.label,
+                    code: columnCode(column),
                     tiers: liveTiers(column).map(function (tier, ti) {
                         var cells = [];
                         if (drawCells) {
@@ -3106,9 +3107,10 @@
                                 for (var p = 1; p <= tier.max; p++) {
                                     var key = cellKey(p, d);
                                     var cls = cell3dClass(tier, key);
+                                    var code = cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + letters(p) + d;
                                     cells.push({
                                         p: p, d: d, cls: cls, style: cell3dStyle(tier, key, cls),
-                                        title: cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + letters(p) + d
+                                        title: code, label: code.split('/').pop()
                                     });
                                 }
                             }

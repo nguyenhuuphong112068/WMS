@@ -158,7 +158,7 @@
                         <i class="fas fa-info-circle mr-1"></i>
                         Mã danh mục sinh tự động. Không khai báo trùng tổ hợp <b>Tên hoá chất - Loại - Nhà sản xuất</b>
                         (kể cả giữa các dòng). Nhóm NĐ 24/2026 hiện dưới tên sau khi chọn. Cảnh báo an toàn chọn nhiều
-                        được, in ra nhãn lô hàng và dùng để chặn xếp chung kệ/tủ với hoá chất tương kỵ. Bản ghi mới ở
+                        được, in ra nhãn lô hàng và dùng để cảnh báo khi xếp chung tầng với hoá chất tương kỵ. Bản ghi mới ở
                         trạng thái <b>Chờ duyệt</b>, cần được duyệt trước khi dùng.
                     </div>
                 </div>

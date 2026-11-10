@@ -237,7 +237,7 @@
             modal: '#' + @json($cfg['modalId']),
             template: '#' + prefix + 'RowTpl',
             initRow: function($root) {
-                // Danh sách định khu gửi kèm mã đang khai để server khoá chỗ tương kỵ (hoá chất)
+                // Danh sách định khu gửi kèm mã đang khai để server cảnh báo chỗ tương kỵ (hoá chất)
                 if (!compat) return;
                 $root.find('.cbt-location').each(function() {
                     var $select = $(this);

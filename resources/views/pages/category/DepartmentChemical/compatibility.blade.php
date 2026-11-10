@@ -2,10 +2,10 @@
 | KHUNG CẢNH BÁO TƯƠNG KỴ Ở Ô "ĐỊNH KHU" - modal Khai / Sửa Hoá Chất Cho Phòng
 |
 | Đối chiếu theo Sơ đồ lưu trữ hoá chất theo hình đồ cảnh báo (GHS) - App\Support\ChemicalCompatibility.
-|   - Danh sách định khu (Select2 AJAX) gửi kèm category_id: chỗ cùng kệ/tủ với hoá chất tương kỵ
-|     bị khoá, có dòng lý do màu đỏ.
+|   - Danh sách định khu (Select2 AJAX) gửi kèm category_id: chỗ cùng tầng với hoá chất tương kỵ
+|     có dòng cảnh báo màu đỏ (vẫn chọn được).
 |   - Chọn xong một định khu: gọi lookup.chemicalCompatibility, đổ kết quả vào .dc-compat.
-| Controller vẫn chặn lại lúc lưu (DepartmentChemicalController::checkCompatibility), khung này chỉ
+| KHÔNG chặn khi lưu: lưu xong DepartmentChemicalController::compatibilityWarning báo thêm cảnh báo, khung này
 | để người dùng thấy trước.
 |
 | Modal Khai (bảng nhiều dòng - shared/deptBatch) đối chiếu theo TỪNG DÒNG: gọi window.dcCompatCheck($dòng),
@@ -171,8 +171,8 @@
                     $('<span>').text(isCurrent ?
                         'Định khu đang lưu nằm cùng ' + area + ' với ' + data.conflicts.length +
                         ' hoá chất tương kỵ - nên chuyển sang chỗ khác.' :
-                        'Không được đặt ở đây: cùng ' + area + ' có ' + data.conflicts.length +
-                        ' hoá chất tương kỵ. Hệ thống sẽ không cho lưu, vui lòng chọn định khu khác.')
+                        'Cảnh báo: cùng ' + area + ' đã có ' + data.conflicts.length +
+                        ' hoá chất tương kỵ. Vẫn lưu được, nhưng nên chọn định khu khác.')
                 ));
 
                 var $list = $('<ul class="dc-compat-list">');
@@ -252,7 +252,7 @@
         $forms.each(function() {
             var $form = $(this);
 
-            // Danh sách định khu gửi kèm hoá chất đang khai để server khoá chỗ tương kỵ
+            // Danh sách định khu gửi kèm hoá chất đang khai để server gắn cảnh báo chỗ tương kỵ
             $form.find('select[name="default_location_id"]').data('lookupParams', function() {
                 var category = categoryOf($form);
                 return category ? {

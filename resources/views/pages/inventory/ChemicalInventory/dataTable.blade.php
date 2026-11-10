@@ -236,6 +236,8 @@
                         'zgId' => 'invZoneMap',
                         'zgItem' => 'hoá chất',
                         'zgCode' => 'Mã xuất nhập',
+                        // Đánh dấu lô nằm cùng tầng với hoá chất tương kỵ (Sơ đồ lưu trữ GHS) - chỉ module Hoá Chất
+                        'zgCompat' => \App\Support\ChemicalCompatibility::clientConfig(),
                         // Định khu nhanh các mã "Chưa xếp vị trí" - ChemicalInventoryController::assignLocation
                         'zgAssign' => user_can('inventory_chemical_location') ? [
                             'url' => route('pages.inventory.chemicalInventory.assignLocation'),

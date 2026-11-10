@@ -66,7 +66,7 @@
         }
     }
 
-    /* Dòng kết quả Select2 bị khoá kèm lý do (định khu tương kỵ với hoá chất đang khai) */
+    /* Dòng kết quả Select2 kèm lý do cảnh báo (định khu tương kỵ với hoá chất đang khai) */
     .cat-opt-warn small {
         display: block;
         color: #DC2626;

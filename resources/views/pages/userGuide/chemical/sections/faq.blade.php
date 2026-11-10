@@ -49,8 +49,9 @@
                     giữ để lưu hoặc xoá phiếu tạm.</td>
             </tr>
             <tr>
-                <td>Không lưu được định khu ở Hoá Chất Của Phòng</td>
-                <td style="font-weight: 400">Chỗ đó cùng tầng với hoá chất <b>tương kỵ</b>. Chọn tầng khác.</td>
+                <td>Lưu định khu xong hiện "Cảnh báo tương kỵ"</td>
+                <td style="font-weight: 400">Tầng đó đã có hoá chất <b>tương kỵ</b> (Sơ đồ lưu trữ GHS). Dữ liệu vẫn được lưu; nên chuyển
+                    sang tầng khác. Xem các chỗ đang tương kỵ bằng chip <b>Tương kỵ</b> ở tab Theo định khu của Tồn Kho Hoá Chất.</td>
             </tr>
             <tr>
                 <td>Không lưu được phiếu dùng hoá chất cấm</td>

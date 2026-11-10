@@ -23,7 +23,7 @@ return [
             'helpRoutes' => ['publicStandardLookup', 'publicMaterialLookup'],
             'keywords' => 'tra cuu cong khai ton kho vi tri hoa chat chat chuan vat tu khong dang nhap mat bang 3d quet ma camera',
             // Trang công khai (không có .content-wrapper): chụp cả trang khi chưa đăng nhập, tra một hoá chất ở chế độ Mặt bằng
-            'shots' => [['name' => 'public-lookup', 'url' => '/tra-cuu-hoa-chat?department_id=9&q=Acetonitril', 'user' => '-',
+            'shots' => [['name' => 'public-lookup', 'url' => '/tra-cuu-hoa-chat?department_id=9&q=Dodecyl', 'user' => '-',
                 'clip' => 'body', 'maxHeight' => 1000, 'height' => 1000, 'width' => 1440, 'pad' => 0, 'afterJs' => 1500,
                 'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
                     ." const b = document.querySelector('[data-mz-view=\"room\"]'); if (b) b.click(); await w(800); return true; })()"]]],

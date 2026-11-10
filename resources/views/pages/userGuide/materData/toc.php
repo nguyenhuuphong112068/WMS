@@ -86,8 +86,11 @@ return [
                         ." for (let i = 0; i < 20 && !document.querySelector('#zs-warehouses .zs-tile'); i++) await w(300);"
                         ." document.querySelector('#zs-warehouses .zs-tile').click(); await w(1500);"
                         ." document.querySelector('#zs-layout-btn').click(); await w(2000);"
-                        ." const door = document.querySelector('.zl-door-wall'); if (!door.value) { door.value = 'bottom';"
-                        ." door.dispatchEvent(new Event('change', { bubbles: true })); }"
+                        ." const add = document.querySelector('.zl-door-add'); if (add && !add.hidden) add.click(); await w(300);"
+                        ." const mid = document.querySelector('[data-mid=\"2\"]'); if (mid) { const r = mid.getBoundingClientRect();"
+                        ." mid.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: r.left + 8, clientY: r.top + 8 }));"
+                        ." document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: r.left + 8, clientY: r.top - 40 }));"
+                        ." document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); await w(300); }"
                         ." const auto = document.querySelector('.zl-auto'); if (!auto.disabled) auto.click(); await w(400);"
                         ." const shelf = document.querySelector('.zl-shelf'); if (shelf) { shelf.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));"
                         ." document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); } return true; })()"],

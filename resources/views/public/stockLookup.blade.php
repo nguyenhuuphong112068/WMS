@@ -52,7 +52,7 @@
             font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             color: var(--text-main);
             background: linear-gradient(135deg, #EAF3FC 0%, #D6E8F9 45%, #C3DDF5 100%);
-            padding: 28px 16px 60px;
+            padding: 28px 24px 60px;
         }
 
         body::before {
@@ -69,7 +69,6 @@
         .clk-shell {
             position: relative;
             width: 100%;
-            max-width: 1320px;
             margin: 0 auto;
         }
 
@@ -618,6 +617,21 @@
         $(function () {
             var nodes = @json($result ? (object) $result['nodes'] : new \stdClass);
             var lotLabel = @json($cfg['lot']);
+
+            // Nhớ phòng ban đã chọn lần trước trên máy này (theo từng trang tra cứu)
+            var depKey = 'wms_lookup_department:' + location.pathname;
+            var $dep = $('#department_id');
+            try {
+                if (!$dep.val()) {
+                    var saved = localStorage.getItem(depKey);
+                    if (saved && $dep.find('option[value="' + saved + '"]').length) $dep.val(saved);
+                } else {
+                    localStorage.setItem(depKey, $dep.val());
+                }
+            } catch (e) {}
+            $dep.on('change', function () {
+                try { if (this.value) localStorage.setItem(depKey, this.value); } catch (e) {}
+            });
 
             // Quét mã bằng camera (pages.shared.cameraScan) điền vào ô rồi bắn phím Enter giả -> gửi form tra cứu
             $('#q').on('keydown', function (e) {

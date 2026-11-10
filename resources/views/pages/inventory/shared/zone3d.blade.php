@@ -18,7 +18,10 @@
 |
 | zones: warehouses/shelves/columns/tiers/locations (mảng hoặc map theo id) - cột position/depth/
 |        tier_order lấy từ zoneOptions() của controller.
-| nodes: { 'L<id vị trí>': { code, state, zoneType, badge {bg}, lots, alerts, search, preview|items } }
+| nodes: { 'L<id vị trí>': { code, state, zoneType, badge {bg}, lots, alerts, search, preview|items, conflicts } }
+| compat (chỉ Tồn Kho Hoá Chất): có thì node.conflicts (zoneGrid đối chiếu tương kỵ GHS cùng tầng) được vẽ: thùng hàng
+| viền đỏ + dấu "!", kệ có tương kỵ tô đỏ trong Mặt bằng / sơ đồ thu nhỏ, đếm ở danh sách và dòng tiêu đề; chip lọc
+| "Tương kỵ" (data-state="compat") làm mờ các vị trí khác.
 --}}
 @include('pages.shared.shelf3d')
 
@@ -57,11 +60,81 @@
         color: #fff;
     }
 
+    /* cột danh sách | tay kéo đổi bề ngang | khung 3D; bề ngang danh sách do người dùng kéo (--mz3d-side) */
     .mz-3d {
         display: none;
-        grid-template-columns: 260px minmax(0, 1fr);
-        gap: 14px;
+        grid-template-columns: var(--mz3d-side, 260px) 12px minmax(0, 1fr);
+        column-gap: 2px;
+        row-gap: 14px;
         margin-top: 4px;
+    }
+
+    .mz-3d.is-side-off .mz-3d-list {
+        visibility: hidden;
+        padding: 0;
+        border: 0;
+        overflow: hidden;
+    }
+
+    /* tay kéo: dọc = đổi bề ngang danh sách, ngang (dưới khung 3D) = đổi chiều cao khung */
+    .mz-3d-split,
+    .mz-3d-grip {
+        position: relative;
+        touch-action: none;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+
+    .mz-3d-split {
+        cursor: ew-resize;
+    }
+
+    .mz-3d-grip {
+        height: 12px;
+        margin-top: -6px;
+        cursor: ns-resize;
+    }
+
+    .mz-3d-split::before,
+    .mz-3d-grip::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        border-radius: 999px;
+        background: #CBD5E1;
+        transform: translate(-50%, -50%);
+        transition: background 0.2s;
+    }
+
+    .mz-3d-split::before {
+        width: 4px;
+        height: 56px;
+        top: min(50%, 220px);
+    }
+
+    .mz-3d-grip::before {
+        width: 56px;
+        height: 4px;
+    }
+
+    .mz-3d-split:hover,
+    .mz-3d-grip:hover,
+    .mz-3d-split.is-active,
+    .mz-3d-grip.is-active {
+        background: var(--primary-soft);
+    }
+
+    .mz-3d-split:hover::before,
+    .mz-3d-grip:hover::before,
+    .mz-3d-split.is-active::before,
+    .mz-3d-grip.is-active::before {
+        background: var(--primary);
+    }
+
+    body.mz-resizing,
+    body.mz-resizing * {
+        user-select: none !important;
     }
 
     .mz-mode-3d .mz-3d {
@@ -157,6 +230,22 @@
         font-weight: 700;
     }
 
+    .mz-3d-shelf .sub .compat,
+    .mz-3d-room .sub .compat {
+        color: #B91C1C;
+        font-weight: 700;
+    }
+
+    .mz-3d-title .tag.is-compat {
+        background: #FEE2E2;
+        color: #991B1B;
+    }
+
+    .mz-plan-shelf.is-compat {
+        background: rgba(220, 38, 38, 0.25);
+        border-color: #DC2626;
+    }
+
     .mz-3d-bar {
         height: 4px;
         border-radius: 999px;
@@ -217,8 +306,30 @@
         margin-left: 3px;
     }
 
+    /* nút Nhãn vị trí chỉ có ở chế độ Mặt bằng */
+    .mz-codes-group {
+        display: none !important;
+    }
+
+    .mz-mode-room .mz-codes-group {
+        display: inline-flex !important;
+    }
+
     .mz-3d-main .w3d {
         height: var(--mz3d-h, 560px);
+        min-height: 320px;
+    }
+
+    .mz-plan-svg {
+        position: absolute;
+        inset: 0;
+        overflow: visible;
+        pointer-events: none;
+    }
+
+    .mz-plan.is-poly {
+        background: none !important;
+        border: none !important;
     }
 
     .mz-3d-none {
@@ -385,6 +496,17 @@
             grid-template-columns: minmax(0, 1fr);
         }
 
+        .mz-3d-split {
+            display: none;
+        }
+
+        .mz-3d.is-side-off .mz-3d-list {
+            visibility: visible;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            overflow-y: auto;
+        }
+
         .mz-3d-list {
             max-height: 220px;
         }
@@ -404,6 +526,10 @@
         var NONE_COLOR = '#94A3B8';
         var MODE_KEY = 'wms.inv.zoneView';
         var COLOR_KEY = 'wms.inv.zone3dColor';
+        var CODES_KEY = 'wms.inv.zoneRoomCodes';
+        var HEIGHT_KEY = 'wms.inv.zone3dHeight';
+        var SIDE_KEY = 'wms.inv.zone3dSide';
+        var MIN_HEIGHT = 320;
 
         function esc(value) {
             return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
@@ -535,11 +661,17 @@
         function matches(f, node) {
             var st = node ? node.state : 'empty';
             var okState = f.state === '' || (f.state === 'empty' && st === 'empty') ||
-                (f.state === 'stocked' && st !== 'empty') || (f.state === 'alert' && (st === 'warn' || st === 'danger'));
+                (f.state === 'stocked' && st !== 'empty') || (f.state === 'alert' && (st === 'warn' || st === 'danger')) ||
+                (f.state === 'compat' && clashOf(node));
             var okZone = f.zone === '*' || ((node && node.zoneType) || '') === f.zone;
             var okText = f.q === '' || (!!node && String(node.search || '').indexOf(f.q) >= 0);
             var okKey = f.k === '' || (!!node && !!node.match);
             return okState && okZone && okText && okKey;
+        }
+
+        // Vị trí có hoá chất tương kỵ cùng tầng (node.conflicts do zoneGrid gắn khi trang bật đối chiếu tương kỵ)
+        function clashOf(node) {
+            return !!(node && node.conflicts && node.conflicts.length);
         }
 
         function names(node) {
@@ -549,7 +681,7 @@
         }
 
         function statOf(ctx, shelf, f) {
-            var st = { locations: 0, filled: 0, lots: 0, alerts: 0, hits: 0 };
+            var st = { locations: 0, filled: 0, lots: 0, alerts: 0, hits: 0, compat: 0 };
             shelf.columnList.forEach(function(c) {
                 c.tierList.forEach(function(t) {
                     t.cells.forEach(function(cell) {
@@ -558,6 +690,7 @@
                         if (node && node.state !== 'empty') st.filled++;
                         st.lots += node ? Number(node.lots) || 0 : 0;
                         st.alerts += node ? Number(node.alerts) || 0 : 0;
+                        if (clashOf(node)) st.compat++;
                         if (f.active && matches(f, node)) st.hits++;
                     });
                 });
@@ -567,6 +700,10 @@
 
         /* ---------- vẽ ---------- */
         function legend(ctx) {
+            return legendBase(ctx) + (ctx.compat ? '<span><i style="background:#fff;border:2px solid #DC2626"></i>Tương kỵ cùng tầng</span>' : '');
+        }
+
+        function legendBase(ctx) {
             if (ctx.color === 'zone') {
                 return Object.keys(ctx.zoneTypes).map(function(type) {
                     return '<span><i style="background:' + esc(ctx.zoneTypes[type].bg) + '"></i>' + esc(ctx.zoneLabels[type] || type) + '</span>';
@@ -592,9 +729,12 @@
                 ? (node.lots || 0) + ' mã' + (list.length ? ': ' + list.join(', ') : '') + (node.alerts ? ' · ' + node.alerts + ' cần chú ý' : '')
                 : 'Đang trống');
             var hit = f.active && matches(f, node);
+            var clash = stocked && clashOf(node);
+            if (clash) title += '\n⚠ ' + (window.wmsConflictTitle ? window.wmsConflictTitle(node) : 'Tương kỵ cùng tầng');
 
             return {
-                p: cell.p, d: cell.d, key: stocked ? 'L' + cell.loc.id : null, title: title,
+                p: cell.p, d: cell.d, key: stocked ? 'L' + cell.loc.id : null, title: title, flag: clash,
+                label: cell.loc.code ? String(cell.loc.code).split('/').pop() : '',
                 color: color, box: stocked, dim: f.active && !hit, hit: hit
             };
         }
@@ -605,12 +745,16 @@
 
         function shelfModel(ctx, shelf, f, room) {
             var topDown = shelf.tier_order === 'top_down';
+            var allCells = !room || ctx.codes;
             return {
                 unit: 22, gap: 4, pad: 8, tierHeight: 54, boxHeight: room ? 34 : 17,
+                // Mặt bằng + Nhãn vị trí: in mã ô (A1, B2...) như 3D Định Khu
+                codes: room && ctx.codes,
                 levels: shelf.levels,
                 columns: shelf.columnList.map(function(c) {
                     return {
                         label: c.name || c.code || '',
+                        code: c.code || '',
                         tiers: c.tierList.map(function(t) {
                             return {
                                 label: t.name || t.code || '',
@@ -620,7 +764,7 @@
                                 depth: t.depth,
                                 title: (c.name || '') + ' · ' + (t.name || ''),
                                 cells: t.cells.map(function(cell) { return cellOf(ctx, cell, f); })
-                                    .filter(function(cell) { return !room || cell.box; })
+                                    .filter(function(cell) { return allCells || cell.box; })
                                     .map(function(cell) {
                                         if (room && cell.hit && cell.box) cell.color = HIT_COLOR;
                                         return cell;
@@ -632,20 +776,27 @@
             };
         }
 
+        function compatTag(st) {
+            return st.compat ? '<span class="tag is-compat"><i class="fas fa-exclamation-triangle mr-1"></i>' + st.compat +
+                ' vị trí tương kỵ</span>' : '';
+        }
+
         function unzonedTag(ctx) {
             return ctx.unzoned ? '<button type="button" class="tag is-alert mz-3d-unzoned" title="Chuyển sang chế độ Thẻ, mở khối Chưa xếp vị trí">' +
                 ctx.unzoned + ' mã chưa xếp vị trí <i class="fas fa-arrow-right"></i></button>' : '';
         }
 
         // Khung 3D / Mặt bằng cao tới gần đáy cửa sổ (khi trang ở đầu), tối thiểu 560px (380px trên màn hình hẹp);
-        // danh sách bên trái cao bằng khung. Gọi sau khi đã viết dòng tiêu đề (tiêu đề xuống dòng thì khung lùi xuống).
+        // người dùng đã kéo tay kéo dưới khung thì dùng chiều cao đó. Danh sách bên trái cao bằng khung.
+        // Gọi sau khi đã viết dòng tiêu đề (tiêu đề xuống dòng thì khung lùi xuống).
         function fitHeight(ctx) {
             if (ctx.mode === 'cards' || !ctx.panel.getClientRects().length) return;
             var title = ctx.panel.querySelector('.mz-3d-title');
             var list = ctx.panel.querySelector('.mz-3d-list');
             var scrollY = window.pageYOffset || 0;
             var stageTop = title.getBoundingClientRect().bottom + 8 + scrollY;
-            var height = Math.max(window.innerWidth <= 992 ? 380 : 560, Math.round(window.innerHeight - stageTop - 16));
+            var height = ctx.userHeight >= MIN_HEIGHT ? Math.round(ctx.userHeight)
+                : Math.max(window.innerWidth <= 992 ? 380 : 560, Math.round(window.innerHeight - stageTop - 16));
             var listHeight = Math.max(220, Math.round(stageTop + height - (list.getBoundingClientRect().top + scrollY)));
 
             if (ctx.panel.style.getPropertyValue('--mz3d-h') !== height + 'px') ctx.panel.style.setProperty('--mz3d-h', height + 'px');
@@ -694,6 +845,7 @@
                 '<span class="tag">' + shelf.columnList.length + ' cột</span>' +
                 '<span class="tag">' + st.filled + '/' + st.locations + ' vị trí có hàng · ' + st.lots + ' mã</span>' +
                 (st.alerts ? '<span class="tag is-alert">' + st.alerts + ' cần chú ý</span>' : '') +
+                compatTag(st) +
                 (f.active ? '<span class="tag">' + st.hits + ' vị trí khớp bộ lọc</span>' : '') +
                 unzonedTag(ctx);
 
@@ -730,14 +882,19 @@
 
             return values(rooms).map(function(room) {
                 var wh = room.wh;
-                var width = Number(wh.layout_width) || 0, depth = Number(wh.layout_depth) || 0;
+                // layout_room = App\Support\RoomLayout::payload(): đa giác các góc phòng + cửa trên một cạnh
+                var plan = wh.layout_room || null;
+                var width = plan ? Number(plan.width) : Number(wh.layout_width) || 0;
+                var depth = plan ? Number(plan.depth) : Number(wh.layout_depth) || 0;
                 room.items = [];
                 room.unplaced = [];
 
                 if (width > 0 && depth > 0) {
                     room.width = width;
                     room.depth = depth;
-                    room.door = wh.layout_door_wall ? { wall: wh.layout_door_wall, offset: Number(wh.layout_door_offset) || 0, width: 1 } : null;
+                    room.polygon = plan ? plan.polygon : [[0, 0], [width, 0], [width, depth], [0, depth]];
+                    room.door = plan ? plan.door : (wh.layout_door_wall ? { wall: wh.layout_door_wall, offset: Number(wh.layout_door_offset) || 0, width: 1 } : null);
+                    room.shaped = plan ? !plan.is_rectangle : false;
                     room.shelves.forEach(function(shelf) {
                         if (shelf.layout_x == null || shelf.layout_x === '') {
                             room.unplaced.push(shelf);
@@ -761,6 +918,7 @@
                     });
                     room.width = Math.max(Math.ceil(x - 0.1), 4);
                     room.depth = Math.max(Math.ceil(deepest + 2), 3);
+                    room.polygon = [[0, 0], [room.width, 0], [room.width, room.depth], [0, room.depth]];
                     room.door = null;
                 }
                 return room;
@@ -770,17 +928,53 @@
         }
 
         function roomStat(ctx, room, f) {
-            var acc = { locations: 0, filled: 0, lots: 0, alerts: 0, hits: 0, byShelf: {} };
+            var acc = { locations: 0, filled: 0, lots: 0, alerts: 0, hits: 0, compat: 0, byShelf: {} };
             room.shelves.forEach(function(shelf) {
                 var st = statOf(ctx, shelf, f);
                 acc.byShelf[shelf.id] = st;
-                ['locations', 'filled', 'lots', 'alerts', 'hits'].forEach(function(k) { acc[k] += st[k]; });
+                ['locations', 'filled', 'lots', 'alerts', 'hits', 'compat'].forEach(function(k) { acc[k] += st[k]; });
             });
             return acc;
         }
 
         function currentRoom(ctx) {
             return ctx.rooms.find(function(room) { return room.key === String(ctx.room); }) || ctx.rooms[0] || null;
+        }
+
+        // Hàng hoá khớp từ khoá trên một kệ: tên, mã xuất nhập, tồn, vị trí - để hiện thẻ chi tiết trên đầu kệ ở Mặt bằng.
+        // Vị trí khớp theo mã vị trí / tên kệ (không theo tên hàng) thì liệt kê mọi hàng đang nằm ở vị trí đó.
+        var CARD_LINES = 4;
+
+        function hitCard(ctx, shelf, f) {
+            var lines = [];
+            shelf.columnList.forEach(function(c) {
+                c.tierList.forEach(function(t) {
+                    t.cells.forEach(function(cell) {
+                        var node = ctx.nodes['L' + cell.loc.id];
+                        if (!node || node.state === 'empty' || !matches(f, node)) return;
+                        var items = node.items || node.preview || [];
+                        var own = f.q ? items.filter(function(x) {
+                            return [x.name, x.material_name, x.code, x.sub].join(' ').toLowerCase().indexOf(f.q) >= 0;
+                        }) : items;
+                        (own.length ? own : items).forEach(function(x) {
+                            lines.push({
+                                name: x.name || x.material_name || x.chem_name || '—',
+                                code: x.code || '',
+                                qty: x.remaining != null && x.remaining !== '' ? (typeof x.remaining === 'number' || /^-?[\d.]+$/.test(String(x.remaining))
+                                    ? Number(x.remaining).toLocaleString('en-US', { maximumFractionDigits: 4 }) : String(x.remaining)) + (x.unit ? ' ' + x.unit : '') : '',
+                                loc: cell.loc.code || node.code || ''
+                            });
+                        });
+                    });
+                });
+            });
+            if (!lines.length) return null;
+            return {
+                title: shelf.code || shelf.name || '',
+                count: lines.length + ' khớp',
+                lines: lines.slice(0, CARD_LINES),
+                more: Math.max(0, lines.length - CARD_LINES)
+            };
         }
 
         function renderRoomStage(ctx) {
@@ -798,24 +992,32 @@
             var st = roomStat(ctx, room, f);
             title.innerHTML = '<i class="fas fa-vector-square"></i> ' + esc(room.wh.name || 'Kho/Phòng') +
                 (room.wh.code ? '<span class="tag">' + esc(room.wh.code) + '</span>' : '') +
-                '<span class="tag">' + (room.virtual ? 'Chưa khai mặt bằng' : 'Phòng ' + room.width + ' × ' + room.depth + ' m') + '</span>' +
+                '<span class="tag">' + (room.virtual ? 'Chưa khai mặt bằng' : 'Phòng ' + room.width + ' × ' + room.depth + ' m' +
+                    (room.shaped ? ' · ' + room.polygon.length + ' góc' : '')) + '</span>' +
                 '<span class="tag">' + room.items.length + ' kệ/tủ</span>' +
                 '<span class="tag">' + st.filled + '/' + st.locations + ' vị trí có hàng · ' + st.lots + ' mã</span>' +
                 (st.alerts ? '<span class="tag is-alert">' + st.alerts + ' cần chú ý</span>' : '') +
+                compatTag(st) +
                 (f.active ? '<span class="tag">' + st.hits + ' vị trí khớp bộ lọc</span>' : '') +
                 unzonedTag(ctx);
 
             fitHeight(ctx);
+            var seeking = f.q !== '' || f.k !== '';
             WmsShelf3d.renderRoom(ctx.stage, {
-                width: room.width, depth: room.depth, door: room.door, tierMetre: 0.4,
+                width: room.width, depth: room.depth, polygon: room.polygon, door: room.door, tierMetre: 0.4,
                 empty: 'Kho/phòng này chưa đặt kệ/tủ nào trên mặt bằng.',
                 shelves: room.items.map(function(item) {
                     var hits = st.byShelf[item.shelf.id].hits;
+                    var clashes = st.byShelf[item.shelf.id].compat;
                     return {
                         key: String(item.shelf.id),
-                        label: (item.shelf.code || item.shelf.name || '') + (f.active && hits ? ' · ' + hits + ' khớp' : ''),
+                        label: (clashes ? '⚠ ' : '') + (item.shelf.code || item.shelf.name || '') + (f.active && hits ? ' · ' + hits + ' khớp' : '') +
+                            (clashes ? ' · ' + clashes + ' tương kỵ' : ''),
+                        clash: clashes > 0,
                         x: item.x, y: item.y, width: item.width, depth: item.depth, rotation: item.rotation,
                         selected: f.active && hits > 0,
+                        // Đang tìm (gõ / quét mã): thẻ chi tiết hàng khớp thay cho nhãn mã kệ
+                        card: seeking && hits ? hitCard(ctx, item.shelf, f) : null,
                         model: shelfModel(ctx, item.shelf, f, true)
                     };
                 })
@@ -827,10 +1029,28 @@
         // Sơ đồ mặt bằng thu nhỏ: kệ khớp bộ lọc sáng lên, bấm vào kệ để xem 3D riêng kệ đó.
         function planMarkup(ctx, room, st, f, width) {
             var sc = Math.min(width / room.width, 200 / room.depth);
-            var html = '<div class="mz-plan' + (f.q || f.k ? ' is-seek' : '') + '" style="width:' + (room.width * sc) + 'px;height:' + (room.depth * sc) +
-                'px;background-size:' + sc + 'px ' + sc + 'px">';
+            var shaped = room.polygon && !room.virtual;
+            var html = '<div class="mz-plan' + (shaped ? ' is-poly' : '') + (f.q || f.k ? ' is-seek' : '') + '" style="width:' + (room.width * sc) +
+                'px;height:' + (room.depth * sc) + 'px;background-size:' + sc + 'px ' + sc + 'px">';
 
-            if (room.door) {
+            if (shaped) {
+                var pts = room.polygon.map(function(p) { return (p[0] * sc).toFixed(1) + ',' + (p[1] * sc).toFixed(1); }).join(' ');
+                var id = 'mzg' + Math.random().toString(36).slice(2, 8);
+                html += '<svg class="mz-plan-svg" width="' + (room.width * sc) + '" height="' + (room.depth * sc) + '">' +
+                    '<defs><pattern id="' + id + '" width="' + sc + '" height="' + sc + '" patternUnits="userSpaceOnUse">' +
+                    '<path d="M ' + sc + ' 0 L 0 0 0 ' + sc + '" fill="none" stroke="rgba(46,123,196,0.16)" stroke-width="1"/></pattern></defs>' +
+                    '<polygon points="' + pts + '" fill="#fff"/><polygon points="' + pts + '" fill="url(#' + id + ')" stroke="#2E7BC4" stroke-width="2"/>';
+                var door = room.door;
+                if (door && door.edge != null && room.polygon[door.edge]) {
+                    var P = room.polygon[door.edge], Q = room.polygon[(door.edge + 1) % room.polygon.length];
+                    var len = Math.hypot(Q[0] - P[0], Q[1] - P[1]) || 1;
+                    var a0 = door.offset / len, a1 = (door.offset + door.width) / len;
+                    html += '<line x1="' + ((P[0] + (Q[0] - P[0]) * a0) * sc).toFixed(1) + '" y1="' + ((P[1] + (Q[1] - P[1]) * a0) * sc).toFixed(1) +
+                        '" x2="' + ((P[0] + (Q[0] - P[0]) * a1) * sc).toFixed(1) + '" y2="' + ((P[1] + (Q[1] - P[1]) * a1) * sc).toFixed(1) +
+                        '" stroke="#17B8D4" stroke-width="5" stroke-dasharray="3 2"><title>Cửa ra vào</title></line>';
+                }
+                html += '</svg>';
+            } else if (room.door && room.door.wall) {
                 var dw = room.door.width * sc, off = room.door.offset * sc, t = 6, pos;
                 if (room.door.wall === 'top') pos = 'left:' + off + 'px;top:-4px;width:' + dw + 'px;height:' + t + 'px';
                 if (room.door.wall === 'bottom') pos = 'left:' + off + 'px;bottom:-4px;width:' + dw + 'px;height:' + t + 'px';
@@ -841,10 +1061,11 @@
 
             room.items.forEach(function(item) {
                 var ss = st.byShelf[item.shelf.id];
-                var cls = f.active ? (ss.hits ? ' is-hit' : ' is-miss') : (ss.alerts ? ' is-alert' : (ss.filled ? ' is-stocked' : ''));
+                var cls = f.active ? (ss.hits ? ' is-hit' : ' is-miss') : (ss.compat ? ' is-compat' : (ss.alerts ? ' is-alert' : (ss.filled ? ' is-stocked' : '')));
                 html += '<button type="button" class="mz-plan-shelf' + cls + '" data-plan-shelf="' + esc(item.shelf.id) + '"' +
                     ' title="' + esc((item.shelf.code || '') + ' - ' + (item.shelf.name || '') + ' · ' + ss.filled + '/' + ss.locations +
-                    ' vị trí có hàng' + (f.active ? ' · ' + ss.hits + ' khớp' : '') + ' · bấm để xem 3D kệ này') + '"' +
+                    ' vị trí có hàng' + (ss.compat ? ' · ' + ss.compat + ' vị trí tương kỵ' : '') +
+                    (f.active ? ' · ' + ss.hits + ' khớp' : '') + ' · nhấp đúp để xem 3D kệ này') + '"' +
                     ' style="left:' + ((item.x - item.width / 2) * sc) + 'px;top:' + ((item.y - item.depth / 2) * sc) + 'px;width:' +
                     (item.width * sc) + 'px;height:' + (item.depth * sc) + 'px;transform:rotate(' + item.rotation + 'deg)">' +
                     '<span style="transform:translate(-50%,-50%) rotate(' + (-item.rotation) + 'deg)">' + esc(item.shelf.code || '') + '</span></button>';
@@ -881,7 +1102,8 @@
                     '<span class="nm"><i class="fas fa-warehouse" style="color: var(--primary-light)"></i>' + esc(r.wh.name || 'Kho/Phòng') +
                     (f.active && st.hits ? '<span class="hit">' + st.hits + '</span>' : '') + '</span>' +
                     '<span class="sub">' + (r.wh.code ? esc(r.wh.code) + ' · ' : '') + r.shelves.length + ' kệ/tủ · ' +
-                    st.filled + '/' + st.locations + ' vị trí có hàng</span>' +
+                    st.filled + '/' + st.locations + ' vị trí có hàng' +
+                    (st.compat ? ' · <span class="compat">' + st.compat + ' tương kỵ</span>' : '') + '</span>' +
                     '</button>';
             }).join('');
 
@@ -931,7 +1153,8 @@
                     '<span class="nm"><i class="fas fa-layer-group" style="color: var(--primary-light)"></i>' +
                     esc(s.name || s.code || 'Kệ/Tủ') + (f.active && st.hits ? '<span class="hit">' + st.hits + '</span>' : '') + '</span>' +
                     '<span class="sub">' + (s.code ? esc(s.code) + ' · ' : '') + st.filled + '/' + st.locations + ' vị trí có hàng' +
-                    (st.alerts ? ' · <span class="alert">' + st.alerts + ' cần chú ý</span>' : '') + '</span>' +
+                    (st.alerts ? ' · <span class="alert">' + st.alerts + ' cần chú ý</span>' : '') +
+                    (st.compat ? ' · <span class="compat"><i class="fas fa-exclamation-triangle"></i> ' + st.compat + ' tương kỵ</span>' : '') + '</span>' +
                     '<span class="mz-3d-bar"><span style="width:' + pct + '%"></span></span>' +
                     '</button>';
             });
@@ -961,6 +1184,86 @@
             refresh(ctx);
         }
 
+        // Bề ngang cột danh sách kệ/tủ: '' = mặc định 260px, 0 = ẩn hẳn (tay kéo vẫn còn để kéo ra lại).
+        function applySide(ctx, value) {
+            var width = value === '' || value == null ? null : Number(value);
+            ctx.panel.classList.toggle('is-side-off', width === 0);
+            if (width == null || isNaN(width)) ctx.panel.style.removeProperty('--mz3d-side');
+            else ctx.panel.style.setProperty('--mz3d-side', width + 'px');
+        }
+
+        // Tay kéo dưới khung 3D (chiều cao) và giữa danh sách / khung (bề ngang danh sách); máy nhớ cỡ đã kéo,
+        // nhấp đúp tay kéo trả về tự động.
+        function bindResize(ctx) {
+            var panel = ctx.panel;
+            if (panel._z3dResizeBound) {
+                panel._z3dResizeBound.ctx = ctx;
+                return;
+            }
+            var bound = panel._z3dResizeBound = { ctx: ctx };
+            var drag = null;
+
+            panel.addEventListener('pointerdown', function(event) {
+                var grip = event.target.closest('.mz-3d-grip, .mz-3d-split');
+                if (!grip || event.button !== 0) return;
+                event.preventDefault();
+                var stage = panel.querySelector('.mz-3d-main .w3d');
+                var list = panel.querySelector('.mz-3d-list');
+                drag = {
+                    el: grip,
+                    height: grip.classList.contains('mz-3d-grip'),
+                    x: event.clientX,
+                    y: event.clientY,
+                    start: grip.classList.contains('mz-3d-grip') ? stage.getBoundingClientRect().height
+                        : (panel.classList.contains('is-side-off') ? 0 : list.getBoundingClientRect().width)
+                };
+                grip.classList.add('is-active');
+                document.body.classList.add('mz-resizing');
+                try { grip.setPointerCapture(event.pointerId); } catch (err) { /* sự kiện giả lập không có con trỏ thật */ }
+            });
+
+            panel.addEventListener('pointermove', function(event) {
+                if (!drag) return;
+                var c = bound.ctx;
+                if (drag.height) {
+                    c.userHeight = Math.max(MIN_HEIGHT, Math.min(3000, Math.round(drag.start + event.clientY - drag.y)));
+                    fitHeight(c);
+                } else {
+                    var max = Math.max(160, panel.getBoundingClientRect().width * 0.5);
+                    var width = Math.round(drag.start + event.clientX - drag.x);
+                    // kéo gần hết sang trái thì ẩn danh sách, khung 3D chiếm cả bề ngang
+                    drag.side = width < 120 ? 0 : Math.min(max, Math.max(160, width));
+                    applySide(c, drag.side);
+                }
+            });
+
+            var end = function() {
+                if (!drag) return;
+                var c = bound.ctx;
+                drag.el.classList.remove('is-active');
+                document.body.classList.remove('mz-resizing');
+                if (drag.height) write(HEIGHT_KEY, String(c.userHeight));
+                else if (drag.side != null) write(SIDE_KEY, String(drag.side));
+                drag = null;
+            };
+            panel.addEventListener('pointerup', end);
+            panel.addEventListener('pointercancel', end);
+
+            panel.addEventListener('dblclick', function(event) {
+                var grip = event.target.closest('.mz-3d-grip, .mz-3d-split');
+                if (!grip) return;
+                var c = bound.ctx;
+                if (grip.classList.contains('mz-3d-grip')) {
+                    c.userHeight = 0;
+                    write(HEIGHT_KEY, '0');
+                    fitHeight(c);
+                } else {
+                    write(SIDE_KEY, '');
+                    applySide(c, '');
+                }
+            });
+        }
+
         function init(root, opts) {
             if (!root || !window.WmsShelf3d) return;
             var $root = $(root);
@@ -984,13 +1287,19 @@
                 var holder = document.createElement('div');
                 holder.className = 'mz-3d';
                 holder.innerHTML = '<aside class="mz-3d-list"></aside>' +
+                    '<div class="mz-3d-split" title="Kéo để đổi bề ngang danh sách kệ/tủ (kéo hết sang trái để ẩn) · nhấp đúp về mặc định"></div>' +
                     '<div class="mz-3d-main"><div class="mz-3d-title"></div>' +
                     '<div class="w3d" title="Kéo chuột để xoay · bấm thùng hàng để xem chi tiết">' +
                     WmsShelf3d.markup({
                         tools: '<div class="w3d-group" role="group" aria-label="Tô màu theo">' +
                             '<button type="button" data-z3d-color="state">Tình trạng</button>' +
-                            '<button type="button" data-z3d-color="zone">Loại định khu</button></div>'
-                    }) + '</div></div>';
+                            '<button type="button" data-z3d-color="zone">Loại định khu</button></div>' +
+                            // Nhãn vị trí (mã ô A1, B2...) trên mọi ô của tủ - chỉ có ở chế độ Mặt bằng
+                            '<div class="w3d-group mz-codes-group" role="group" aria-label="Nhãn vị trí">' +
+                            '<button type="button" data-z3d-codes title="Bật / tắt mã vị trí trên từng ô của tủ (vẽ cả ô trống)">' +
+                            '<i class="fas fa-tags mr-1"></i>Nhãn vị trí</button></div>'
+                    }) + '</div>' +
+                    '<div class="mz-3d-grip" title="Kéo để đổi chiều cao khung · nhấp đúp về chiều cao tự động"></div></div>';
                 if (filters) filters.insertAdjacentElement('afterend', holder);
                 else root.appendChild(holder);
                 panel = holder;
@@ -1011,17 +1320,24 @@
                 panel: panel,
                 stage: panel.querySelector('.w3d'),
                 nodes: opts.nodes || {},
+                // Trang bật đối chiếu tương kỵ (Tồn Kho Hoá Chất): chú thích thêm "Tương kỵ cùng tầng"
+                compat: !!opts.compat,
                 zoneTypes: zoneTypes,
                 zoneLabels: zoneLabels,
                 shelves: buildShelves(opts.zones || {}),
                 color: read(COLOR_KEY, 'state') === 'zone' ? 'zone' : 'state',
+                codes: read(CODES_KEY, '1') !== '0',
                 mode: 'cards',
                 // Trang khác (tra cứu công khai) nhớ kiểu xem riêng, không lẫn với màn hình Tồn Kho
                 modeKey: opts.modeKey || MODE_KEY,
                 current: null,
                 // Mã còn tồn chưa xếp vị trí (khối riêng ở chế độ Thẻ) - nhắc ở tiêu đề khung 3D
-                unzoned: root.querySelectorAll('.mz-unzoned .mz-cell').length
+                unzoned: root.querySelectorAll('.mz-unzoned .mz-cell').length,
+                // Chiều cao khung / bề ngang danh sách người dùng đã kéo (0 / rỗng = tự động)
+                userHeight: Number(read(HEIGHT_KEY, '0')) || 0
             };
+            applySide(ctx, read(SIDE_KEY, ''));
+            bindResize(ctx);
 
             // Mặc định mở kệ đầu tiên đang có hàng, và kho/phòng chứa kệ đó.
             var firstStocked = ctx.shelves.find(function(s) { return statOf(ctx, s, { active: false }).filled > 0; });
@@ -1048,6 +1364,16 @@
                 ctx.current = this.getAttribute('data-shelf');
                 refresh(ctx);
             });
+            var syncCodes = function() {
+                panel.querySelectorAll('[data-z3d-codes]').forEach(function(btn) { btn.classList.toggle('active', ctx.codes); });
+            };
+            syncCodes();
+            $root.on('click.z3d', '[data-z3d-codes]', function() {
+                ctx.codes = !ctx.codes;
+                write(CODES_KEY, ctx.codes ? '1' : '0');
+                syncCodes();
+                renderMain(ctx);
+            });
             $root.on('click.z3d', '[data-z3d-color]', function() {
                 ctx.color = this.getAttribute('data-z3d-color') === 'zone' ? 'zone' : 'state';
                 write(COLOR_KEY, ctx.color);
@@ -1056,16 +1382,17 @@
                 });
                 renderMain(ctx);
             });
-            // Chế độ Mặt bằng: chọn kho/phòng; bấm kệ trên sơ đồ thu nhỏ hoặc trên 3D (ngoài thùng hàng) = xem 3D riêng kệ đó.
+            // Chế độ Mặt bằng: chọn kho/phòng; NHẤP ĐÚP kệ trên sơ đồ thu nhỏ hoặc trên 3D (ngoài thùng hàng) = xem 3D riêng kệ
+            // đó (nhấp một lần không chuyển, để đang xoay / đi Xuyên tủ lỡ tay bấm trúng tủ không bị đổi khung).
             $root.on('click.z3d', '[data-z3d-room]', function() {
                 ctx.room = this.getAttribute('data-z3d-room');
                 refresh(ctx);
             });
-            $root.on('click.z3d', '[data-plan-shelf]', function() {
+            $root.on('dblclick.z3d', '[data-plan-shelf]', function() {
                 ctx.current = this.getAttribute('data-plan-shelf');
                 setMode(ctx, '3d');
             });
-            $root.on('click.z3d', '[data-w3d-shelf]', function(event) {
+            $root.on('dblclick.z3d', '[data-w3d-shelf]', function(event) {
                 if ($(event.target).closest('[data-w3d-key]').length) return;
                 ctx.current = this.getAttribute('data-w3d-shelf');
                 setMode(ctx, '3d');

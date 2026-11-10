@@ -72,13 +72,13 @@ class CategoryLookupController extends Controller
         }
 
         // Ô Định khu của modal "Khai Hoá Chất Cho Phòng" gửi kèm hoá chất đang khai: định khu nằm
-        // cùng kệ/tủ với hoá chất tương kỵ bị khoá lại, kèm câu giải thích.
+        // cùng tầng với hoá chất tương kỵ kèm câu cảnh báo (vẫn chọn được, không chặn).
         if ($type === 'chemical' && (int) $request->category_id > 0) {
             $result['results'] = ChemicalCompatibility::annotateLocationOptions($result['results'], (int) $request->category_id);
         }
 
         // Định khu nhanh nhiều mã cùng lúc (Tồn Kho Hoá Chất) gửi category_ids[]: chỗ tương kỵ với BẤT KỲ
-        // hoá chất nào đang xếp đều bị khoá, gộp lý do của từng hoá chất
+        // hoá chất nào đang xếp đều có cảnh báo, gộp lý do của từng hoá chất (vẫn chọn được)
         $categoryIds = array_slice(array_values(array_unique(array_filter(
             array_map('intval', (array) $request->input('category_ids', []))
         ))), 0, 20);
@@ -88,11 +88,11 @@ class CategoryLookupController extends Controller
 
             foreach ($categoryIds as $categoryId) {
                 foreach (ChemicalCompatibility::annotateLocationOptions($result['results'], $categoryId) as $i => $item) {
-                    if (empty($item['warning'])) {
+                    // Nhiều hoá chất cùng vướng một chỗ y hệt nhau thì chỉ ghi một lần
+                    if (empty($item['warning']) || str_contains($results[$i]['warning'] ?? '', $item['warning'])) {
                         continue;
                     }
 
-                    $results[$i]['disabled'] = true;
                     $results[$i]['warning'] = isset($results[$i]['warning'])
                         ? $results[$i]['warning'].' | '.$item['warning']
                         : $item['warning'];

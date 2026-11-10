@@ -14,6 +14,9 @@
 |        warehouse_id, shelf_id, column_id, tier_id, *_name}. Chỉ mã CÒN TỒN được đếm.
 |
 | Tham số: $zgId (id khung), $zgItem (tên loại hàng, chữ thường), $zgCode (nhãn cột mã).
+| $zgCompat (chỉ Hoá Chất) = App\Support\ChemicalCompatibility::clientConfig(): đối chiếu tương kỵ GHS giữa các lô
+| CÒN TỒN nằm cùng tầng (rows[].sw = nhóm cảnh báo của lô) - ô có tương kỵ viền đỏ + dấu ⚠, chip lọc "Tương kỵ",
+| hộp chi tiết liệt kê hoá chất tương kỵ; node.conflicts dùng chung cho 3D / Mặt bằng (zone3d).
 |
 | KHỐI "CHƯA XẾP VỊ TRÍ" thu gọn / mở được (nhớ theo trình duyệt), ô tìm kiếm lọc cả thẻ trong khối.
 | $zgAssign (tuỳ chọn, null = chỉ xem) bật ĐỊNH KHU NHANH: mỗi thẻ có ô chọn + nút [Định khu], đầu khối
@@ -31,6 +34,7 @@
     $zgItem = $zgItem ?? 'hoá chất';
     $zgCode = $zgCode ?? 'Mã xuất nhập';
     $zgAssign = ! empty($zgAssign) ? $zgAssign + ['token' => csrf_token(), 'max' => 200] : null;
+    $zgCompat = $zgCompat ?? null;
     $zgZoneTypes = collect(\App\Support\ZoneType::TYPES)
         ->map(function ($label, $type) {
             $color = \App\Support\ZoneType::color($type);
@@ -41,7 +45,8 @@
 @endphp
 
 <div class="mz-root" id="{{ $zgId }}" data-item="{{ $zgItem }}" data-code-label="{{ $zgCode }}"
-    data-zone-types="{{ json_encode($zgZoneTypes) }}" @if ($zgAssign) data-assign="{{ json_encode($zgAssign) }}" @endif>
+    data-zone-types="{{ json_encode($zgZoneTypes) }}" @if ($zgAssign) data-assign="{{ json_encode($zgAssign) }}" @endif
+    @if ($zgCompat) data-compat="{{ json_encode($zgCompat) }}" @endif>
     {{-- Một dòng: chip lọc bên trái, công cụ (Thẻ | 3D | Mặt bằng, tìm kiếm) bên phải - hẹp thì tự xuống dòng --}}
     <div class="mz-head">
         <div class="mz-filters">
@@ -49,6 +54,11 @@
             <button type="button" class="mz-filter" data-state="stocked"><span class="dot ok"></span>Đang có hàng</button>
             <button type="button" class="mz-filter" data-state="alert"><span class="dot warn"></span>Cần chú ý</button>
             <button type="button" class="mz-filter" data-state="empty"><span class="dot empty"></span>Còn trống</button>
+            @if ($zgCompat)
+                <button type="button" class="mz-filter mz-filter-compat is-zero" data-state="compat"
+                    title="Vị trí có hoá chất nằm cùng {{ \Illuminate\Support\Str::lower($zgCompat['scope_label']) }} với hoá chất tương kỵ (Sơ đồ lưu trữ GHS)"><i
+                        class="fas fa-exclamation-triangle"></i>Tương kỵ<b class="mz-compat-count">0</b></button>
+            @endif
 
             <span class="mz-filter-sep"></span>
             <span class="mz-filter-label">Loại định khu</span>
@@ -116,6 +126,8 @@
                         <div class="font-weight-bold mz-d-items">0</div>
                     </div>
                 </div>
+
+                <div class="mz-d-compat" hidden></div>
 
                 <table class="table table-bordered table-sm mb-0">
                     <thead>
@@ -291,6 +303,119 @@
                 return Object.keys(stat.cats).length;
             }
 
+            /**
+             * Tương kỵ GHS giữa các lô CÒN TỒN nằm cùng phạm vi (compat.scope, đang dùng: cùng tầng). Gắn vào từng
+             * node: conflicts = [{ownId, own, ownCode, ownPlaces, otherId, other, otherCode, places, pairs: [[thuộc tính
+             * của own, thuộc tính của other]]}] - hoá chất own (có ở ô này) tương kỵ với hoá chất other đang nằm ở các vị
+             * trí places trên cùng tầng. Trả số vị trí có tương kỵ.
+             */
+            function markConflicts(nodes, compat) {
+                var matrix = {};
+                Object.keys(compat.matrix || {}).forEach(function(a) {
+                    matrix[a] = {};
+                    (compat.matrix[a] || []).forEach(function(b) { matrix[a][b] = true; });
+                });
+                var label = function(code) { return (compat.labels || {})[code] || code; };
+                var groups = {};
+
+                nodes.forEach(function(n) {
+                    n.conflicts = [];
+                    n.items.forEach(function(r) {
+                        if (!r.category_id || !r.sw || !r.sw.length) return;
+                        var g = groups[n.scopeKey] = groups[n.scopeKey] || {};
+                        var c = g[r.category_id] = g[r.category_id] ||
+                            { id: r.category_id, name: r.name || '—', code: r.category_code || '', sw: r.sw, nodes: [], places: {} };
+                        if (c.nodes.indexOf(n) < 0) c.nodes.push(n);
+                        c.places[n.code] = true;
+                    });
+                });
+
+                function pairsOf(a, b) {
+                    var out = [];
+                    a.sw.forEach(function(x) {
+                        b.sw.forEach(function(y) {
+                            if (matrix[x] && matrix[x][y]) out.push([label(x), label(y)]);
+                        });
+                    });
+                    return out;
+                }
+
+                function flag(a, b, pairs) {
+                    a.nodes.forEach(function(n) {
+                        n.conflicts.push({
+                            ownId: a.id, own: a.name, ownCode: a.code, ownPlaces: Object.keys(a.places).sort(),
+                            otherId: b.id, other: b.name, otherCode: b.code, places: Object.keys(b.places).sort(), pairs: pairs
+                        });
+                    });
+                }
+
+                Object.keys(groups).forEach(function(key) {
+                    var cats = values(groups[key]);
+                    for (var i = 0; i < cats.length; i++) {
+                        for (var j = i + 1; j < cats.length; j++) {
+                            var ab = pairsOf(cats[i], cats[j]);
+                            if (!ab.length) continue;
+                            flag(cats[i], cats[j], ab);
+                            flag(cats[j], cats[i], pairsOf(cats[j], cats[i]));
+                        }
+                    }
+                });
+
+                return nodes.filter(function(n) { return n.conflicts.length > 0; }).length;
+            }
+
+            /** "Tương kỵ cùng tầng: A ✕ B (vị trí); ..." - tooltip ngắn của một ô */
+            function conflictTitle(n) {
+                return 'Tương kỵ cùng tầng: ' + n.conflicts.map(function(c) {
+                    return c.own + ' ✕ ' + c.other + ' (' + c.places.join(', ') + ')';
+                }).join('; ');
+            }
+            window.wmsConflictTitle = conflictTitle;
+
+            function uniq(list) {
+                return list.filter(function(x, i) { return list.indexOf(x) === i; });
+            }
+
+            /**
+             * Kết luận tương kỵ của một vị trí: mỗi CẶP hoá chất một dòng (A ✕ B và B ✕ A gộp làm một) -
+             * "A (thuộc tính ...) tương kỵ với B (thuộc tính ...)" + chi tiết thuộc tính nào của A kỵ thuộc tính nào của B.
+             */
+            function conflictConclusion(n, scopeLabel) {
+                var seen = {};
+                var list = n.conflicts.filter(function(c) {
+                    var key = [c.ownId, c.otherId].sort().join('-');
+                    if (seen[key]) return false;
+                    seen[key] = true;
+                    return true;
+                });
+                var chips = function(attrs) {
+                    return attrs.map(function(a) { return '<span class="attr">' + esc(a) + '</span>'; }).join(' ');
+                };
+                var who = function(name, code, places) {
+                    return '<b>' + esc(name) + '</b>' + (code ? ' <span class="md-sub">' + esc(code) + '</span>' : '') +
+                        ' <span class="md-sub">(ở ' + esc(places.join(', ')) + ')</span>';
+                };
+
+                var html = '<div class="mz-d-compat-head"><i class="fas fa-exclamation-triangle mr-1"></i>Kết luận: ' +
+                    list.length + ' cặp hoá chất tương kỵ nằm cùng ' + esc(String(scopeLabel || 'tầng').toLowerCase()) +
+                    ' (Sơ đồ lưu trữ GHS) - nên tách ra tầng khác</div><ol>';
+
+                list.forEach(function(c) {
+                    // Thuộc tính của hoá chất này -> các thuộc tính của hoá chất kia mà nó kỵ
+                    var byOwn = {};
+                    c.pairs.forEach(function(p) { (byOwn[p[0]] = byOwn[p[0]] || []).push(p[1]); });
+
+                    html += '<li><div class="concl">' + who(c.own, c.ownCode, c.ownPlaces) + ' có thuộc tính ' +
+                        chips(uniq(c.pairs.map(function(p) { return p[0]; }))) + ' <b class="vs">tương kỵ với</b> thuộc tính ' +
+                        chips(uniq(c.pairs.map(function(p) { return p[1]; }))) + ' của ' + who(c.other, c.otherCode, c.places) + '</div>' +
+                        '<div class="pairs">' + Object.keys(byOwn).map(function(attr) {
+                            return esc(attr) + ' ✕ ' + esc(uniq(byOwn[attr]).join(', '));
+                        }).join(' · ') + '</div></li>';
+                });
+
+                return html + '</ol>';
+            }
+
             window.invZoneGrid = function(selector, opts) {
                 var $root = $(selector);
                 var $modal = $(selector + 'Modal');
@@ -300,6 +425,8 @@
                 var zoneTypes = $root.data('zone-types') || {};
                 // Định khu nhanh: chỉ bật khi trang khai $zgAssign (có quyền)
                 var assign = $root.data('assign') || null;
+                // Đối chiếu tương kỵ (chỉ Tồn Kho Hoá Chất khai $zgCompat)
+                var compat = $root.data('compat') || null;
                 var $assign = $(selector + 'Assign');
 
                 var find = function(list) {
@@ -354,6 +481,9 @@
 
                     var node = nodeOf(loc, byLocation[loc.id] || [], zoneTypes);
                     node.path = [wn.name, sn.name, cn.name, tn.name].join(' / ');
+                    // Vùng "gần nhau" để xét tương kỵ (vị trí chưa gán cấp đang xét thì chỉ xét chính nó)
+                    var scopeId = compat ? (compat.scope === 'location' ? loc.id : loc[compat.scope + '_id']) : null;
+                    node.scopeKey = scopeId ? compat.scope + scopeId : 'location' + loc.id;
                     node.search = [node.code, sn.name, cn.name, tn.name].concat(node.items.map(function(r) {
                         return r.name + ' ' + r.code;
                     })).join(' ').toLowerCase();
@@ -361,6 +491,10 @@
                     index[node.key] = node;
                     tn.locations.push(node);
                 });
+
+                var compatCount = compat ? markConflicts(values(index), compat) : 0;
+                $root.find('.mz-compat-count').text(compatCount);
+                $root.find('.mz-filter-compat').toggleClass('is-zero', compatCount === 0);
 
                 // Cộng dồn ngược từ vị trí lên tầng -> cột -> kệ/tủ -> kho
                 var totals = blank();
@@ -410,12 +544,15 @@
                 function cell(n) {
                     var zoned = n.badge.bg !== '#FFFFFF';
                     var more = n.cats.length - n.preview.length;
-                    var html = '<button type="button" class="mz-cell is-' + n.state + (zoned ? ' is-zoned' : '') + '"' +
+                    var clash = n.conflicts && n.conflicts.length > 0;
+                    var html = '<button type="button" class="mz-cell is-' + n.state + (zoned ? ' is-zoned' : '') + (clash ? ' is-compat' : '') + '"' +
                         ' data-key="' + n.key + '" data-state="' + n.state + '" data-zone-type="' + esc(n.zoneType) + '"' +
+                        (clash ? ' data-compat="1"' : '') +
                         ' data-search="' + esc(n.search) + '"' +
                         ' style="--chip: ' + esc(n.badge.bg) + '; --chip-text: ' + esc(n.badge.text) + '"' +
                         (n.state === 'empty' ? ' disabled' : '') + '>' +
                         '<div class="mz-cell-top"><span class="mz-cell-code">' + esc(n.code) + '</span>' +
+                        (clash ? '<span class="mz-cell-compat" title="' + esc(conflictTitle(n)) + '"><i class="fas fa-exclamation"></i></span>' : '') +
                         '<span class="mz-cell-lots">' + n.lots + '</span></div><div class="mz-cell-items">';
 
                     if (!n.preview.length) html += '<span class="mz-cell-empty-note">Đang trống</span>';
@@ -542,7 +679,8 @@
                         var okState = state === '' ||
                             (state === 'empty' && st === 'empty') ||
                             (state === 'stocked' && st !== 'empty') ||
-                            (state === 'alert' && (st === 'warn' || st === 'danger'));
+                            (state === 'alert' && (st === 'warn' || st === 'danger')) ||
+                            (state === 'compat' && $(this).attr('data-compat') === '1');
                         var okText = q === '' || ($(this).attr('data-search') || '').indexOf(q) >= 0;
                         var okZone = zoneType === '*' || ($(this).attr('data-zone-type') || '') === zoneType;
 
@@ -567,7 +705,9 @@
                         });
                         cardsShown = shown($cards);
                         $root.find('.mz-unzoned-count').text((q ? cardsShown + '/' : '') + $cards.length + ' ' + codeLabel);
-                        $root.find('.mz-unzoned').css('display', q && !cardsShown ? 'none' : '');
+                        // Lọc Tương kỵ: mã chưa xếp vị trí không nằm trên tầng nào nên ẩn cả khối
+                        if (state === 'compat') cardsShown = 0;
+                        $root.find('.mz-unzoned').css('display', (q && !cardsShown) || state === 'compat' ? 'none' : '');
                         syncPicked();
                     }
 
@@ -626,7 +766,7 @@
                     $assign.find('.mz-as-items').text(Object.keys(categories).length);
                     $assign.find('.mz-as-error').prop('hidden', true).text('');
                     $assign.data('ids', list.map(function(r) { return r.id; }));
-                    // Danh sách vị trí khoá sẵn chỗ tương kỵ với bất kỳ hoá chất nào đang xếp
+                    // Danh sách vị trí cảnh báo sẵn chỗ tương kỵ với bất kỳ hoá chất nào đang xếp
                     $assign.data('categoryIds', values(categories).filter(Boolean));
 
                     var $select = $assign.find('.mz-as-location');
@@ -658,7 +798,11 @@
                     }).done(function(res) {
                         $assign.modal('hide');
 
-                        if (window.Swal) {
+                        // Tương kỵ không chặn: vẫn lưu, báo cảnh báo để thủ kho cân nhắc chuyển chỗ
+                        if (window.Swal && res.warning) {
+                            Swal.fire({ icon: 'warning', title: 'Đã lưu - có tương kỵ', html: esc(res.message) + '<br><br>' +
+                                esc(res.warning).split(' | ').join('<br>'), confirmButtonColor: '#2E7BC4' });
+                        } else if (window.Swal) {
                             Swal.fire({ icon: 'success', title: 'Thành công!', text: res.message, timer: 1800, showConfirmButton: false });
                         }
 
@@ -759,7 +903,7 @@
                                 dropdownParent: $assign,
                                 placeholder: '-- Chọn vị trí lưu trữ --',
                                 ajax: window.wmsLookupAjax($select),
-                                // Vị trí tương kỵ: khoá lại, hiện lý do màu đỏ bên dưới
+                                // Vị trí tương kỵ: vẫn chọn được, hiện lý do cảnh báo bên dưới
                                 templateResult: function(row) {
                                     if (!row.id || !row.warning) return window.wmsZoneTemplate(row);
 
@@ -785,6 +929,10 @@
                     $modal.find('.mz-d-lots').text(n.lots);
                     $modal.find('.mz-d-items').text(n.cats.length);
 
+                    var clash = n.conflicts && n.conflicts.length > 0;
+                    var $compat = $modal.find('.mz-d-compat').empty().prop('hidden', !clash);
+                    if (clash) $compat.html(conflictConclusion(n, compat.scope_label));
+
                     var $tb = $modal.find('tbody').empty();
                     n.items.forEach(function(r, i) {
                         $tb.append('<tr><td class="text-center">' + (i + 1) + '</td>' +
@@ -805,7 +953,8 @@
                 if (window.invZone3d) {
                     window.invZone3d.init($root[0], {
                         zones: { warehouses: warehouses, shelves: shelves, columns: columns, tiers: tiers, locations: locations },
-                        nodes: index
+                        nodes: index,
+                        compat: compat
                     });
                 }
             };

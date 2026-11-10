@@ -196,7 +196,7 @@
                                     @endforeach
                                 </div>
                                 <small class="md-sub">Cho phép chọn nhiều cảnh báo. In ra dải giữa của nhãn dán lô
-                                    hàng ở màn hình Nhập Hoá Chất và dùng để chặn xếp chung kệ/tủ với hoá chất tương kỵ.</small>
+                                    hàng ở màn hình Nhập Hoá Chất và dùng để cảnh báo khi xếp chung tầng với hoá chất tương kỵ.</small>
                                 @if ($bag->has('safety_warning'))
                                     <span class="md-error">{{ $bag->first('safety_warning') }}</span>
                                 @endif

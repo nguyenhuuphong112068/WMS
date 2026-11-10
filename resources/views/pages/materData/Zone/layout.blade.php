@@ -1,7 +1,9 @@
 {{--
 | ĐỊNH KHU - MẶT BẰNG KHO/PHÒNG
-| Khai kích thước phòng + cửa ra vào, rồi đặt các kệ/tủ đã xây vào phòng: kéo thả trên sơ đồ nhìn
-| từ trên xuống, xoay hướng mặt trước, chỉnh kích thước; bên phải là cả phòng ở 3D (pages/shared/shelf3d).
+| Vẽ hình dạng phòng (đa giác: kéo chấm tròn ở góc, bấm dấu + giữa cạnh để thêm góc, nhấp đúp vào góc để xoá),
+| đặt cửa ra vào (kéo dọc tường, kéo hai đầu để đổi bề rộng), rồi đặt các kệ/tủ đã xây vào phòng: kéo thả trên sơ đồ
+| nhìn từ trên xuống, xoay hướng mặt trước, chỉnh kích thước; bên phải là cả phòng ở 3D (pages/shared/shelf3d).
+| Phòng lưu dạng đa giác toạ độ mét (App\Support\RoomLayout), cửa = { cạnh, cách góc đầu cạnh, rộng }.
 | Dữ liệu tải/lưu qua ZoneStructureController::layout() / saveLayout(). Mở từ màn Cấu trúc kho:
 |   window.ZoneLayout.open(warehouse, { onDirty(bool), onOpenShelf(id) })
 --}}
@@ -32,20 +34,32 @@
                 </div>
             </div>
             <div class="zl-field">
-                <label for="zl-door-wall">Cửa ra vào</label>
-                <select id="zl-door-wall" class="form-control form-control-sm zl-door-wall">
-                    <option value="">Chưa khai</option>
-                    @foreach (\App\Http\Controllers\Pages\MaterData\ZoneStructureController::DOOR_WALLS as $wall => $label)
-                        <option value="{{ $wall }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="zl-field zl-door-offset">
-                <label>Cách góc tường</label>
+                <label>Hình dạng phòng</label>
                 <div class="zl-row">
-                    <div class="zs-stepper zl-step" data-field="room.door_offset" data-step="0.1">
+                    <button type="button" class="btn btn-sm btn-outline-secondary zl-rect"
+                        title="Đưa phòng về hình chữ nhật theo khung bao hiện tại">
+                        <i class="far fa-square mr-1"></i> Hình chữ nhật
+                    </button>
+                    <small class="zl-corners"></small>
+                </div>
+            </div>
+            <div class="zl-field">
+                <label>Cửa ra vào</label>
+                <div class="zl-row">
+                    <button type="button" class="btn btn-sm btn-outline-primary zl-door-add" title="Đặt cửa vào giữa bức tường dài nhất">
+                        <i class="fas fa-door-open mr-1"></i> Thêm cửa
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger zl-door-del" title="Bỏ cửa ra vào">
+                        <i class="fas fa-times mr-1"></i> Bỏ cửa
+                    </button>
+                </div>
+            </div>
+            <div class="zl-field zl-door-size">
+                <label>Rộng cửa</label>
+                <div class="zl-row">
+                    <div class="zs-stepper zl-step" data-field="room.door_width" data-step="0.1">
                         <button type="button" data-delta="-1" title="Bớt 0,1 m"><i class="fas fa-minus"></i></button>
-                        <input type="number" step="0.1" min="0" aria-label="Khoảng cách từ góc tường tới mép cửa (m)">
+                        <input type="number" step="0.1" min="0.5" aria-label="Bề rộng cửa (m)">
                         <button type="button" data-delta="1" title="Thêm 0,1 m"><i class="fas fa-plus"></i></button>
                     </div>
                     <small>m</small>
@@ -70,7 +84,8 @@
     <div class="zl-body">
         <section class="zl-card">
             <div class="zl-card-head">
-                <span><i class="fas fa-vector-square mr-1"></i> Sơ đồ mặt bằng <small>(nhìn từ trên xuống)</small></span>
+                <span><i class="fas fa-vector-square mr-1"></i> Sơ đồ mặt bằng <small>(nhìn từ trên xuống)</small>
+                    <i class="fas fa-question-circle zl-help" title="Kéo chấm tròn ở góc để đổi hình dạng phòng · bấm dấu + giữa một cạnh để thêm góc · nhấp đúp vào một góc để xoá góc · kéo cửa dọc theo tường, kéo hai đầu cửa để đổi bề rộng"></i></span>
                 <small class="zl-scale"></small>
             </div>
             <div class="zl-plan-wrap">
@@ -224,17 +239,119 @@
         border-radius: var(--border-radius-md);
     }
 
+    /* phòng vẽ bằng SVG (đa giác), khung .zl-plan chỉ là khung bao gốc (0,0) */
     .zl-plan {
         position: relative;
-        background-color: #fff;
-        background-image:
-            linear-gradient(90deg, rgba(var(--primary-rgb), 0.12) 1px, transparent 1px),
-            linear-gradient(rgba(var(--primary-rgb), 0.12) 1px, transparent 1px);
-        border: 3px solid var(--primary);
-        border-radius: 2px;
-        box-sizing: content-box;
         user-select: none;
         touch-action: none;
+    }
+
+    .zl-svg {
+        position: absolute;
+        left: 0;
+        top: 0;
+        overflow: visible;
+        pointer-events: none;
+    }
+
+    .zl-svg-floor {
+        z-index: 0;
+    }
+
+    .zl-svg-ui {
+        z-index: 5;
+    }
+
+    .zl-svg-ui .zl-v,
+    .zl-svg-ui .zl-mid,
+    .zl-svg-ui .zl-dh {
+        pointer-events: all;
+    }
+
+    .zl-v {
+        fill: #fff;
+        stroke: var(--primary);
+        stroke-width: 2.5;
+        cursor: move;
+        transition: fill 0.2s;
+    }
+
+    .zl-v:hover,
+    .zl-v.is-active {
+        fill: var(--accent);
+        stroke: #0E7F93;
+    }
+
+    .zl-mid circle {
+        fill: rgba(var(--primary-rgb), 0.12);
+        stroke: var(--primary-light);
+        stroke-width: 1.5;
+        stroke-dasharray: 2 2;
+    }
+
+    .zl-mid text {
+        font-size: 12px;
+        font-weight: 700;
+        fill: var(--primary);
+        pointer-events: none;
+    }
+
+    .zl-mid {
+        cursor: copy;
+        opacity: 0.55;
+        transition: opacity 0.2s;
+    }
+
+    .zl-mid:hover {
+        opacity: 1;
+    }
+
+    .zl-door-line {
+        stroke: #fff;
+        stroke-width: 9;
+    }
+
+    .zl-door-mark {
+        stroke: var(--accent);
+        stroke-width: 7;
+        stroke-dasharray: 5 3;
+    }
+
+    .zl-dh.is-move {
+        stroke: transparent;
+        stroke-width: 16;
+        cursor: grab;
+    }
+
+    .zl-dh.is-end {
+        fill: #fff;
+        stroke: #0E7F93;
+        stroke-width: 2;
+        cursor: ew-resize;
+    }
+
+    .zl-door-text {
+        font-size: 10px;
+        font-weight: 700;
+        fill: #0E7F93;
+        paint-order: stroke;
+        stroke: #fff;
+        stroke-width: 3px;
+        pointer-events: none;
+    }
+
+    .zl-help {
+        color: var(--primary-lighter);
+        margin-left: 4px;
+        cursor: help;
+    }
+
+    .zl-corners {
+        white-space: nowrap;
+    }
+
+    .zl-readonly .zl-svg-ui {
+        display: none;
     }
 
     .zl-rule {
@@ -516,8 +633,11 @@
             stage: root.querySelector('.zl-3d'),
             status: root.querySelector('.zl-status'),
             scale: root.querySelector('.zl-scale'),
-            doorWall: root.querySelector('.zl-door-wall'),
-            doorOffset: root.querySelector('.zl-door-offset'),
+            doorAdd: root.querySelector('.zl-door-add'),
+            doorDel: root.querySelector('.zl-door-del'),
+            doorSize: root.querySelector('.zl-door-size'),
+            rect: root.querySelector('.zl-rect'),
+            corners: root.querySelector('.zl-corners'),
             save: root.querySelector('.zl-save'),
             reset: root.querySelector('.zl-reset'),
             auto: root.querySelector('.zl-auto')
@@ -525,7 +645,7 @@
 
         var S = {
             warehouse: null, hooks: {}, room: null, shelves: [], selected: null,
-            limits: { maxRoom: 200, minShelf: 0.2, maxShelf: 50, doorWidth: 1 },
+            limits: { maxRoom: 200, minShelf: 0.2, maxShelf: 50, doorWidth: 1, doorMin: 0.5, doorMax: 4, maxPoints: 48 },
             scale: 40, drag: null, raf: 0
         };
 
@@ -588,17 +708,153 @@
             return a[0] < b[2] - EPS && b[0] < a[2] - EPS && a[1] < b[3] - EPS && b[1] < a[3] - EPS;
         }
 
+        /* ---- đa giác phòng (toạ độ mét, chạy theo chiều kim đồng hồ khi nhìn từ trên) ---- */
+
+        function bounds() {
+            var p = S.room.polygon;
+            var b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+            p.forEach(function(v) {
+                b.minX = Math.min(b.minX, v[0]); b.minY = Math.min(b.minY, v[1]);
+                b.maxX = Math.max(b.maxX, v[0]); b.maxY = Math.max(b.maxY, v[1]);
+            });
+            return b;
+        }
+
+        // Cập nhật kích thước khung bao (ô Chiều ngang / Chiều sâu phòng)
+        function syncBox() {
+            var b = bounds();
+            S.room.width = round(b.maxX - b.minX);
+            S.room.depth = round(b.maxY - b.minY);
+        }
+
+        function rectPolygon(w, d) {
+            return [[0, 0], [w, 0], [w, d], [0, d]];
+        }
+
+        function isRect() {
+            var p = S.room.polygon, b = bounds();
+            if (p.length !== 4) return false;
+            var want = [[b.minX, b.minY], [b.maxX, b.minY], [b.maxX, b.maxY], [b.minX, b.maxY]];
+            return want.every(function(w, i) { return Math.abs(w[0] - p[i][0]) < EPS && Math.abs(w[1] - p[i][1]) < EPS; });
+        }
+
+        function edgeOf(i) {
+            var p = S.room.polygon;
+            var a = p[i], b = p[(i + 1) % p.length];
+            return { a: a, b: b, len: Math.hypot(b[0] - a[0], b[1] - a[1]) };
+        }
+
+        function cross(a, b, c) {
+            return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+        }
+
+        function properCross(p1, p2, q1, q2) {
+            var e = 1e-9, d1 = cross(q1, q2, p1), d2 = cross(q1, q2, p2), d3 = cross(p1, p2, q1), d4 = cross(p1, p2, q2);
+            return ((d1 > e && d2 < -e) || (d1 < -e && d2 > e)) && ((d3 > e && d4 < -e) || (d3 < -e && d4 > e));
+        }
+
+        function onSeg(a, b, c) {
+            return Math.abs(cross(a, b, c)) < 0.0005 && c[0] >= Math.min(a[0], b[0]) - 0.0005 && c[0] <= Math.max(a[0], b[0]) + 0.0005 &&
+                c[1] >= Math.min(a[1], b[1]) - 0.0005 && c[1] <= Math.max(a[1], b[1]) + 0.0005;
+        }
+
+        function pointIn(pt) {
+            var p = S.room.polygon, inside = false;
+            for (var i = 0, j = p.length - 1; i < p.length; j = i++) {
+                if (onSeg(p[i], p[j], pt)) return true;
+                if ((p[i][1] > pt[1]) !== (p[j][1] > pt[1]) && pt[0] < (p[j][0] - p[i][0]) * (pt[1] - p[i][1]) / (p[j][1] - p[i][1]) + p[i][0]) inside = !inside;
+            }
+            return inside;
+        }
+
+        // Đa giác đơn: không trùng góc liên tiếp, hai cạnh không kề nhau không chạm nhau.
+        function simple() {
+            var p = S.room.polygon, n = p.length;
+            for (var i = 0; i < n; i++) {
+                var q = p[(i + 1) % n];
+                if (Math.abs(p[i][0] - q[0]) < 0.005 && Math.abs(p[i][1] - q[1]) < 0.005) return false;
+            }
+            for (i = 0; i < n; i++) {
+                for (var j = i + 1; j < n; j++) {
+                    if (j === i + 1 || (i === 0 && j === n - 1)) continue;
+                    var a1 = p[i], a2 = p[(i + 1) % n], b1 = p[j], b2 = p[(j + 1) % n];
+                    if (properCross(a1, a2, b1, b2) || onSeg(a1, a2, b1) || onSeg(a1, a2, b2) || onSeg(b1, b2, a1) || onSeg(b1, b2, a2)) return false;
+                }
+            }
+            return true;
+        }
+
+        function area() {
+            var p = S.room.polygon, sum = 0;
+            for (var i = 0; i < p.length; i++) {
+                var q = p[(i + 1) % p.length];
+                sum += p[i][0] * q[1] - q[0] * p[i][1];
+            }
+            return sum / 2;
+        }
+
+        // Khung [trái, trên, phải, dưới] nằm trọn trong phòng (chạm tường được) - cùng cách xét với RoomLayout::contains().
         function inside(b) {
-            return b[0] >= -EPS && b[1] >= -EPS && b[2] <= S.room.width + EPS && b[3] <= S.room.depth + EPS;
+            var p = S.room.polygon, n = p.length;
+            var c = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
+            for (var i = 0; i < 4; i++) {
+                var u = c[i], v = c[(i + 1) % 4];
+                for (var k = 0; k <= 6; k++) {
+                    if (!pointIn([u[0] + (v[0] - u[0]) * k / 6, u[1] + (v[1] - u[1]) * k / 6])) return false;
+                }
+                for (var j = 0; j < n; j++) {
+                    if (properCross(u, v, p[j], p[(j + 1) % n])) return false;
+                }
+            }
+            return !p.some(function(w) { return w[0] > b[0] + EPS && w[0] < b[2] - EPS && w[1] > b[1] + EPS && w[1] < b[3] - EPS; });
+        }
+
+        /* ---- cửa ra vào: nằm trên cạnh `edge`, cách góc đầu cạnh `offset` m, rộng `width` m ---- */
+
+        function clampDoor() {
+            var d = S.room.door;
+            if (!d) return;
+            if (d.edge >= S.room.polygon.length) d.edge = 0;
+            var len = edgeOf(d.edge).len;
+            d.width = round(clamp(d.width, Math.min(S.limits.doorMin, len), Math.min(S.limits.doorMax, len)));
+            d.offset = round(clamp(d.offset, 0, Math.max(len - d.width, 0)));
+        }
+
+        // Điểm gần nhất trên tường: { edge, t (m tính từ góc đầu cạnh), dist }
+        function nearestWall(pt) {
+            var best = null;
+            for (var i = 0; i < S.room.polygon.length; i++) {
+                var e = edgeOf(i);
+                if (e.len < EPS) continue;
+                var ux = (e.b[0] - e.a[0]) / e.len, uy = (e.b[1] - e.a[1]) / e.len;
+                var t = clamp((pt[0] - e.a[0]) * ux + (pt[1] - e.a[1]) * uy, 0, e.len);
+                var dist = Math.hypot(e.a[0] + ux * t - pt[0], e.a[1] + uy * t - pt[1]);
+                if (!best || dist < best.dist) best = { edge: i, t: t, dist: dist };
+            }
+            return best;
+        }
+
+        function doorCentre() {
+            var d = S.room.door, e = edgeOf(d.edge), k = (d.offset + d.width / 2) / (e.len || 1);
+            return [e.a[0] + (e.b[0] - e.a[0]) * k, e.a[1] + (e.b[1] - e.a[1]) * k];
+        }
+
+        // Đặt cửa sao cho tâm cửa ở gần điểm pt nhất (dùng khi kéo cửa, hoặc sau khi thêm / xoá góc phòng)
+        function doorAt(pt) {
+            var w = nearestWall(pt);
+            if (!w) return;
+            S.room.door.edge = w.edge;
+            S.room.door.offset = w.t - S.room.door.width / 2;
+            clampDoor();
         }
 
         // Giữ tâm kệ để khung chiếm chỗ nằm trọn trong phòng (kệ lớn hơn phòng thì đặt giữa).
         function clampCenter(s, x, y, rot) {
-            var b = box(s, 0, 0, rot);
+            var b = box(s, 0, 0, rot), bb = bounds();
             var hw = -b[0], hd = -b[1];
             return {
-                x: hw * 2 > S.room.width ? S.room.width / 2 : clamp(x, hw, S.room.width - hw),
-                y: hd * 2 > S.room.depth ? S.room.depth / 2 : clamp(y, hd, S.room.depth - hd)
+                x: hw * 2 > bb.maxX - bb.minX ? (bb.minX + bb.maxX) / 2 : clamp(x, bb.minX + hw, bb.maxX - hw),
+                y: hd * 2 > bb.maxY - bb.minY ? (bb.minY + bb.maxY) / 2 : clamp(y, bb.minY + hd, bb.maxY - hd)
             };
         }
 
@@ -641,10 +897,11 @@
             var others = S.shelves.filter(function(o) { return o.placed && o !== s; }).map(function(o) { return box(o); });
             var b0 = box(s, 0, 0);
             var hw = -b0[0], hd = -b0[1];
-            for (var y = hd; y <= S.room.depth - hd + EPS; y += 0.25) {
-                for (var x = hw; x <= S.room.width - hw + EPS; x += 0.25) {
+            var bb = bounds();
+            for (var y = bb.minY + hd; y <= bb.maxY - hd + EPS; y += 0.25) {
+                for (var x = bb.minX + hw; x <= bb.maxX - hw + EPS; x += 0.25) {
                     var b = box(s, x, y);
-                    if (!others.some(function(o) { return overlaps(b, o); })) return { x: round(x), y: round(y) };
+                    if (inside(b) && !others.some(function(o) { return overlaps(b, o); })) return { x: round(x), y: round(y) };
                 }
             }
             return null;
@@ -664,32 +921,72 @@
         }
 
         function renderPlan() {
+            var bb = bounds();
             var wrapW = Math.max(el.wrap.clientWidth - 52, 200);
-            S.scale = clamp(Math.min(wrapW / S.room.width, 540 / S.room.depth), 6, 140);
+            // Đang kéo góc / cửa thì giữ nguyên tỉ lệ, khỏi giật sơ đồ
+            if (!S.drag || !S.drag.lockScale) S.scale = clamp(Math.min(wrapW / Math.max(bb.maxX, 1), 540 / Math.max(bb.maxY, 1)), 6, 140);
             var sc = S.scale;
+            var W = Math.max(bb.maxX, 0.5) * sc, H = Math.max(bb.maxY, 0.5) * sc;
             var html = '';
 
-            el.plan.style.width = (S.room.width * sc) + 'px';
-            el.plan.style.height = (S.room.depth * sc) + 'px';
-            el.plan.style.backgroundSize = sc + 'px ' + sc + 'px';
-            el.scale.textContent = 'Phòng ' + fmt(S.room.width) + ' × ' + fmt(S.room.depth) + ' m · mỗi ô lưới 1 m';
+            el.plan.style.width = W + 'px';
+            el.plan.style.height = H + 'px';
+            el.scale.textContent = 'Phòng ' + fmt(S.room.width) + ' × ' + fmt(S.room.depth) + ' m' +
+                (isRect() ? '' : ' · ' + S.room.polygon.length + ' góc') + ' · ' + fmt(Math.abs(area())) + ' m² · mỗi ô lưới 1 m';
             root.classList.toggle('zl-readonly', !editable());
 
             var step = niceStep(sc);
-            for (var m = 0; m <= S.room.width + EPS; m += step) {
+            for (var m = 0; m <= bb.maxX + EPS; m += step) {
                 html += '<span class="zl-rule is-top" style="left:' + (m * sc) + 'px">' + fmt(m) + '</span>';
             }
-            for (m = 0; m <= S.room.depth + EPS; m += step) {
+            for (m = 0; m <= bb.maxY + EPS; m += step) {
                 html += '<span class="zl-rule is-left" style="top:' + (m * sc) + 'px">' + fmt(m) + '</span>';
             }
 
-            if (S.room.door_wall) {
-                var dw = S.limits.doorWidth * sc, off = (S.room.door_offset || 0) * sc, t = 10, st;
-                if (S.room.door_wall === 'top') st = 'left:' + off + 'px;top:' + (-t / 2 - 2) + 'px;width:' + dw + 'px;height:' + t + 'px';
-                if (S.room.door_wall === 'bottom') st = 'left:' + off + 'px;bottom:' + (-t / 2 - 2) + 'px;width:' + dw + 'px;height:' + t + 'px';
-                if (S.room.door_wall === 'left') st = 'top:' + off + 'px;left:' + (-t / 2 - 2) + 'px;height:' + dw + 'px;width:' + t + 'px';
-                if (S.room.door_wall === 'right') st = 'top:' + off + 'px;right:' + (-t / 2 - 2) + 'px;height:' + dw + 'px;width:' + t + 'px';
-                html += '<div class="zl-door" style="' + st + '"><span>Cửa</span></div>';
+            var pts = S.room.polygon.map(function(v) { return (v[0] * sc).toFixed(1) + ',' + (v[1] * sc).toFixed(1); }).join(' ');
+            var bad0 = !simple();
+            html += '<svg class="zl-svg zl-svg-floor" width="' + W + '" height="' + H + '">' +
+                '<defs><pattern id="zl-grid" width="' + sc + '" height="' + sc + '" patternUnits="userSpaceOnUse">' +
+                '<path d="M ' + sc + ' 0 L 0 0 0 ' + sc + '" fill="none" stroke="rgba(46,123,196,0.13)" stroke-width="1"/></pattern></defs>' +
+                '<polygon points="' + pts + '" fill="#fff"/>' +
+                '<polygon points="' + pts + '" fill="url(#zl-grid)" stroke="' + (bad0 ? '#DC2626' : '#2E7BC4') + '" stroke-width="3" stroke-linejoin="round"/>' +
+                '</svg>';
+
+            // Lớp điều khiển: chấm góc, dấu + giữa cạnh, cửa (kéo / co giãn)
+            var ui = '';
+            var n = S.room.polygon.length;
+            if (editable() && n < S.limits.maxPoints) {
+                for (var i = 0; i < n; i++) {
+                    var e = edgeOf(i);
+                    if (e.len * sc < 34) continue;
+                    var mx = (e.a[0] + e.b[0]) / 2 * sc, my = (e.a[1] + e.b[1]) / 2 * sc;
+                    ui += '<g class="zl-mid" data-mid="' + i + '"><title>Thêm góc ở giữa cạnh này</title><circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) +
+                        '" r="8"/><text x="' + mx.toFixed(1) + '" y="' + (my + 4).toFixed(1) + '" text-anchor="middle">+</text></g>';
+                }
+            }
+            if (S.room.door) {
+                var d = S.room.door, de = edgeOf(d.edge);
+                var ux = (de.b[0] - de.a[0]) / (de.len || 1), uy = (de.b[1] - de.a[1]) / (de.len || 1);
+                var x1 = (de.a[0] + ux * d.offset) * sc, y1 = (de.a[1] + uy * d.offset) * sc;
+                var x2 = (de.a[0] + ux * (d.offset + d.width)) * sc, y2 = (de.a[1] + uy * (d.offset + d.width)) * sc;
+                var line = 'x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"';
+                // pháp tuyến hướng vào trong phòng (đa giác chạy theo chiều kim đồng hồ: bên phải chiều đi)
+                var nx = -uy, ny = ux;
+                ui += '<line class="zl-door-line" ' + line + '/><line class="zl-door-mark" ' + line + '/>' +
+                    '<text class="zl-door-text" x="' + ((x1 + x2) / 2 + nx * 14).toFixed(1) + '" y="' + ((y1 + y2) / 2 + ny * 14 + 3).toFixed(1) +
+                    '" text-anchor="middle">Cửa ' + fmt(d.width) + ' m</text>';
+                if (editable()) {
+                    ui += '<line class="zl-dh is-move" data-door="move" ' + line + '><title>Kéo để dời cửa dọc theo tường</title></line>' +
+                        '<rect class="zl-dh is-end" data-door="a" x="' + (x1 - 5).toFixed(1) + '" y="' + (y1 - 5).toFixed(1) + '" width="10" height="10" rx="2"><title>Kéo để đổi bề rộng cửa</title></rect>' +
+                        '<rect class="zl-dh is-end" data-door="b" x="' + (x2 - 5).toFixed(1) + '" y="' + (y2 - 5).toFixed(1) + '" width="10" height="10" rx="2"><title>Kéo để đổi bề rộng cửa</title></rect>';
+                }
+            }
+            if (editable()) {
+                S.room.polygon.forEach(function(v, i) {
+                    ui += '<circle class="zl-v' + (S.drag && S.drag.vertex === i ? ' is-active' : '') + '" data-vertex="' + i + '" cx="' + (v[0] * sc).toFixed(1) +
+                        '" cy="' + (v[1] * sc).toFixed(1) + '" r="7"><title>Góc ' + (i + 1) + ' (' + fmt(v[0]) + '; ' + fmt(v[1]) +
+                        ' m) · kéo để đổi hình · nhấp đúp để xoá góc</title></circle>';
+                });
             }
 
             var bad = problems();
@@ -708,7 +1005,7 @@
                     (s.total ? '<small>' + s.used + '/' + s.total + ' có hàng</small>' : '') + '</span></div>';
             });
 
-            el.plan.innerHTML = html;
+            el.plan.innerHTML = html + '<svg class="zl-svg zl-svg-ui" width="' + W + '" height="' + H + '">' + ui + '</svg>';
 
             var waiting = S.shelves.filter(function(s) { return !s.placed; });
             el.unplaced.innerHTML = waiting.length
@@ -721,7 +1018,8 @@
             var placed = S.shelves.length - waiting.length;
             var counts = { clash: 0, out: 0 };
             Object.keys(bad).forEach(function(id) { counts[bad[id]]++; });
-            el.status.innerHTML = 'Đã đặt ' + placed + '/' + S.shelves.length + ' kệ/tủ' +
+            el.status.innerHTML = (bad0 ? '<span class="bad">Các cạnh phòng đang cắt nhau</span> · ' : '') +
+                'Đã đặt ' + placed + '/' + S.shelves.length + ' kệ/tủ' +
                 (counts.clash ? ' · <span class="bad">' + counts.clash + ' kệ chồng nhau</span>' : '') +
                 (counts.out ? ' · <span class="bad">' + counts.out + ' kệ ra ngoài phòng</span>' : '');
             el.auto.disabled = !waiting.length;
@@ -758,8 +1056,8 @@
                     ? '<div class="zl-sel-grid">' +
                         stepper('shelf.width', 'Bề ngang kệ (mặt trước)', s.width, 0.1, S.limits.minShelf, S.limits.maxShelf) +
                         stepper('shelf.depth', 'Bề sâu kệ', s.depth, 0.1, S.limits.minShelf, S.limits.maxShelf) +
-                        stepper('shelf.left', 'Cách tường trái', b[0], 0.1, 0, S.room.width) +
-                        stepper('shelf.top', 'Cách tường trên', b[1], 0.1, 0, S.room.depth) +
+                        stepper('shelf.left', 'Cách mép trái', b[0], 0.1, 0, S.limits.maxRoom) +
+                        stepper('shelf.top', 'Cách mép trên', b[1], 0.1, 0, S.limits.maxRoom) +
                         '</div>' +
                         '<div class="zl-field mt-2"><label>Mặt trước (phía lấy hàng) hướng</label><div class="zl-face">' +
                         [0, 90, 180, 270].map(function(rot) {
@@ -775,22 +1073,23 @@
         }
 
         function renderAll() {
-            S.room.door_offset = S.room.door_wall ? clamp(S.room.door_offset || 0, 0, Math.max(doorWall() - S.limits.doorWidth, 0)) : 0;
+            syncBox();
+            clampDoor();
             root.querySelector('[data-field="room.width"] input').value = round(S.room.width);
             root.querySelector('[data-field="room.depth"] input').value = round(S.room.depth);
-            root.querySelector('[data-field="room.door_offset"] input').value = round(S.room.door_offset || 0);
-            el.doorWall.value = S.room.door_wall || '';
-            el.doorOffset.hidden = !S.room.door_wall;
-            root.querySelectorAll('.zl-bar input, .zl-bar select, .zl-bar .zl-step button').forEach(function(node) {
-                node.disabled = !editable();
+            root.querySelector('[data-field="room.door_width"] input').value = S.room.door ? round(S.room.door.width) : '';
+            el.doorSize.hidden = !S.room.door;
+            el.doorAdd.hidden = !!S.room.door;
+            el.doorDel.hidden = !S.room.door;
+            el.rect.disabled = isRect();
+            el.corners.textContent = isRect() ? '' : S.room.polygon.length + ' góc';
+            root.querySelectorAll('.zl-bar input, .zl-bar select, .zl-bar .zl-step button, .zl-bar .zl-room .btn').forEach(function(node) {
+                if (!editable()) node.disabled = true;
             });
+            if (editable()) el.rect.disabled = isRect();
             el.save.hidden = el.reset.hidden = el.auto.hidden = !editable();
             renderPlan();
             renderSelected();
-        }
-
-        function doorWall() {
-            return S.room.door_wall === 'left' || S.room.door_wall === 'right' ? S.room.depth : S.room.width;
         }
 
         /* ---------- 3D cả phòng ---------- */
@@ -839,8 +1138,8 @@
             var cells = total <= MAX_3D_CELLS;
 
             WmsShelf3d.renderRoom(el.stage, {
-                width: S.room.width, depth: S.room.depth, tierMetre: TIER_METRE,
-                door: S.room.door_wall ? { wall: S.room.door_wall, offset: S.room.door_offset || 0, width: S.limits.doorWidth } : null,
+                width: bounds().maxX, depth: bounds().maxY, polygon: S.room.polygon, tierMetre: TIER_METRE,
+                door: S.room.door ? { edge: S.room.door.edge, offset: S.room.door.offset, width: S.room.door.width } : null,
                 empty: 'Chưa đặt kệ/tủ nào vào phòng.',
                 shelves: placed.map(function(s) {
                     return {
@@ -885,11 +1184,14 @@
 
                     var layout = data.warehouse.layout;
                     if (layout) {
-                        S.room = { width: layout.width, depth: layout.depth, door_wall: layout.door_wall || '', door_offset: layout.door_offset || 0 };
+                        S.room = {
+                            polygon: (layout.polygon || rectPolygon(layout.width, layout.depth)).map(function(v) { return [Number(v[0]), Number(v[1])]; }),
+                            door: layout.door ? { edge: Number(layout.door.edge), offset: Number(layout.door.offset), width: Number(layout.door.width) } : null
+                        };
                     } else {
                         // Phòng chưa khai: gợi ý đủ rộng để xếp các kệ thành một hàng
                         var row = S.shelves.reduce(function(sum, s) { return sum + s.width + 0.5; }, 1);
-                        S.room = { width: clamp(Math.ceil(Math.max(row, 8)), 1, S.limits.maxRoom), depth: 6, door_wall: '', door_offset: 0 };
+                        S.room = { polygon: rectPolygon(clamp(Math.ceil(Math.max(row, 8)), 1, S.limits.maxRoom), 6), door: null };
                     }
                     S.selected = null;
                     renderAll();
@@ -900,7 +1202,29 @@
                 });
         }
 
+        // Dời cả phòng + kệ về gốc (0,0) trước khi lưu: góc trên-trái của khung bao luôn là (0,0)
+        function normalize() {
+            var bb = bounds();
+            if (Math.abs(bb.minX) < EPS && Math.abs(bb.minY) < EPS) return;
+            S.room.polygon = S.room.polygon.map(function(v) { return [round(v[0] - bb.minX), round(v[1] - bb.minY)]; });
+            S.shelves.forEach(function(s) {
+                if (!s.placed) return;
+                s.x = round(s.x - bb.minX);
+                s.y = round(s.y - bb.minY);
+            });
+        }
+
         el.save.addEventListener('click', function() {
+            if (!simple()) {
+                toast('warning', 'Các cạnh của phòng đang cắt nhau hoặc có hai góc trùng nhau. Hãy kéo lại các góc phòng trước khi lưu.');
+                return;
+            }
+            if (Math.abs(area()) < 1) {
+                toast('warning', 'Phòng quá nhỏ (dưới 1 m²).');
+                return;
+            }
+            normalize();
+            renderAll();
             var bad = problems();
             var names = Object.keys(bad).map(function(id) { return byId(id).code; });
             if (names.length) {
@@ -914,7 +1238,10 @@
                 headers: { 'X-CSRF-TOKEN': CFG.csrf, Accept: 'application/json', 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     warehouse_id: S.warehouse.id,
-                    room: { width: S.room.width, depth: S.room.depth, door_wall: S.room.door_wall || null, door_offset: S.room.door_wall ? S.room.door_offset : null },
+                    room: {
+                        polygon: S.room.polygon.map(function(v) { return [round(v[0]), round(v[1])]; }),
+                        door: S.room.door ? { edge: S.room.door.edge, offset: round(S.room.door.offset), width: round(S.room.door.width) } : null
+                    },
                     shelves: S.shelves.map(function(s) {
                         return { id: s.id, placed: s.placed, x: s.x, y: s.y, width: s.width, depth: s.depth, rotation: s.rotation };
                     })
@@ -959,9 +1286,23 @@
             if (!isFinite(value)) return;
 
             if (field === 'room.width' || field === 'room.depth') {
-                S.room[field.slice(5)] = clamp(round(value, 0.1), 1, S.limits.maxRoom);
-            } else if (field === 'room.door_offset') {
-                S.room.door_offset = clamp(round(value), 0, Math.max(doorWall() - S.limits.doorWidth, 0));
+                // Co giãn cả hình dạng phòng theo chiều đó (phòng chữ nhật = đổi cạnh như trước)
+                var bb = bounds(), axis = field === 'room.width' ? 0 : 1;
+                var from = axis ? bb.maxY - bb.minY : bb.maxX - bb.minX, origin = axis ? bb.minY : bb.minX;
+                var to = clamp(round(value, 0.1), 1, S.limits.maxRoom);
+                if (from < EPS) return;
+                var centre = S.room.door ? doorCentre() : null;
+                S.room.polygon.forEach(function(v) { v[axis] = round(origin + (v[axis] - origin) * to / from); });
+                if (centre) {
+                    centre[axis] = origin + (centre[axis] - origin) * to / from;
+                    doorAt(centre);
+                }
+            } else if (field === 'room.door_width') {
+                if (!S.room.door) return;
+                var mid = S.room.door.offset + S.room.door.width / 2;
+                S.room.door.width = round(value, 0.1);
+                S.room.door.offset = mid - S.room.door.width / 2;
+                clampDoor();
             } else if (s && (field === 'shelf.width' || field === 'shelf.depth')) {
                 s[field.slice(6)] = clamp(round(value), S.limits.minShelf, S.limits.maxShelf);
                 var c = clampCenter(s, s.x, s.y);
@@ -981,6 +1322,7 @@
 
         function currentOf(field) {
             var s = byId(S.selected);
+            if (field === 'room.door_width') return S.room.door ? S.room.door.width : 0;
             if (field.indexOf('room.') === 0) return Number(S.room[field.slice(5)]) || 0;
             if (!s) return 0;
             var b = box(s);
@@ -993,6 +1335,34 @@
                 var wrap = stepBtn.closest('.zl-step');
                 var field = wrap.dataset.field;
                 setField(field, currentOf(field) + Number(stepBtn.dataset.delta) * Number(wrap.dataset.step));
+                return;
+            }
+
+            if (event.target.closest('.zl-rect') && editable()) {
+                var bb = bounds();
+                var c0 = S.room.door ? doorCentre() : null;
+                S.room.polygon = [[bb.minX, bb.minY], [bb.maxX, bb.minY], [bb.maxX, bb.maxY], [bb.minX, bb.maxY]];
+                if (c0) doorAt(c0);
+                dirty(true);
+                renderAll();
+                return;
+            }
+
+            if (event.target.closest('.zl-door-add') && editable()) {
+                var longest = 0;
+                for (var i = 1; i < S.room.polygon.length; i++) if (edgeOf(i).len > edgeOf(longest).len) longest = i;
+                var w0 = Math.min(S.limits.doorWidth, edgeOf(longest).len);
+                S.room.door = { edge: longest, offset: (edgeOf(longest).len - w0) / 2, width: w0 };
+                clampDoor();
+                dirty(true);
+                renderAll();
+                return;
+            }
+
+            if (event.target.closest('.zl-door-del') && editable()) {
+                S.room.door = null;
+                dirty(true);
+                renderAll();
                 return;
             }
 
@@ -1027,17 +1397,24 @@
         });
 
         root.addEventListener('change', function(event) {
-            if (event.target === el.doorWall) {
-                S.room.door_wall = el.doorWall.value;
-                dirty(true);
-                renderAll();
-                return;
-            }
             var input = event.target.closest('.zl-step input');
             if (input) setField(input.closest('.zl-step').dataset.field, input.value);
         });
 
         root.addEventListener('dblclick', function(event) {
+            var vertex = event.target.closest('[data-vertex]');
+            if (vertex && editable()) {
+                if (S.room.polygon.length <= 3) {
+                    toast('warning', 'Phòng cần ít nhất 3 góc.');
+                    return;
+                }
+                var c1 = S.room.door ? doorCentre() : null;
+                S.room.polygon.splice(Number(vertex.getAttribute('data-vertex')), 1);
+                if (c1) doorAt(c1);
+                dirty(true);
+                renderAll();
+                return;
+            }
             var target = event.target.closest('.zl-shelf, [data-w3d-shelf]');
             if (!target || !S.hooks.onOpenShelf) return;
             S.hooks.onOpenShelf(target.dataset.id || target.getAttribute('data-w3d-shelf'));
@@ -1078,13 +1455,92 @@
         // Kéo kệ trên sơ đồ (bước 0,05 m), hoặc kéo chip "kệ chưa đặt" vào sơ đồ.
         function pointAt(event) {
             var r = el.plan.getBoundingClientRect();
-            var border = 3;
+            var border = 0;
             return {
                 x: (event.clientX - r.left - border) / S.scale,
                 y: (event.clientY - r.top - border) / S.scale,
                 inside: event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom
             };
         }
+
+        // Kéo góc phòng (bước 0,05 m, hút thẳng hàng với góc bên cạnh), thêm góc từ dấu + giữa cạnh, kéo / co giãn cửa.
+        root.addEventListener('pointerdown', function(event) {
+            if (event.button !== 0 || !editable()) return;
+            var vertex = event.target.closest('[data-vertex]');
+            var mid = event.target.closest('[data-mid]');
+            var door = event.target.closest('[data-door]');
+            if (!vertex && !mid && !door) return;
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (mid) {
+                var i = Number(mid.getAttribute('data-mid'));
+                var e = edgeOf(i);
+                var c2 = S.room.door ? doorCentre() : null;
+                S.room.polygon.splice(i + 1, 0, [round((e.a[0] + e.b[0]) / 2, 0.05), round((e.a[1] + e.b[1]) / 2, 0.05)]);
+                if (c2) doorAt(c2);
+                S.drag = { vertex: i + 1, lockScale: true, moved: true };
+                dirty(true);
+                renderPlan();
+                return;
+            }
+            if (vertex) {
+                S.drag = { vertex: Number(vertex.getAttribute('data-vertex')), lockScale: true, moved: false };
+                return;
+            }
+            var d = S.room.door;
+            S.drag = { door: door.getAttribute('data-door'), lockScale: true, moved: false, end: d.offset + d.width };
+        }, true);
+
+        document.addEventListener('pointermove', function(event) {
+            var drag = S.drag;
+            if (!drag || (drag.vertex == null && !drag.door)) return;
+            var p = pointAt(event);
+            var pt = [Math.max(0, p.x), Math.max(0, p.y)];
+
+            if (drag.vertex != null) {
+                var poly = S.room.polygon, n = poly.length, k = drag.vertex;
+                var x = clamp(round(pt[0], 0.05), 0, S.limits.maxRoom), y = clamp(round(pt[1], 0.05), 0, S.limits.maxRoom);
+                // hút thẳng hàng với hai góc kề (vẽ tường vuông góc cho dễ)
+                [poly[(k + n - 1) % n], poly[(k + 1) % n]].forEach(function(o) {
+                    if (Math.abs(o[0] - x) < 0.12) x = o[0];
+                    if (Math.abs(o[1] - y) < 0.12) y = o[1];
+                });
+                if (Math.abs(poly[k][0] - x) < EPS && Math.abs(poly[k][1] - y) < EPS) return;
+                poly[k] = [x, y];
+                clampDoor();
+            } else {
+                var dd = S.room.door;
+                if (drag.door === 'move') {
+                    var w = nearestWall(pt);
+                    dd.edge = w.edge;
+                    dd.offset = round(w.t - dd.width / 2, 0.05);
+                } else {
+                    var e2 = edgeOf(dd.edge);
+                    var ux = (e2.b[0] - e2.a[0]) / (e2.len || 1), uy = (e2.b[1] - e2.a[1]) / (e2.len || 1);
+                    var t = clamp(round((pt[0] - e2.a[0]) * ux + (pt[1] - e2.a[1]) * uy, 0.05), 0, e2.len);
+                    if (drag.door === 'a') {
+                        t = clamp(t, Math.max(0, drag.end - S.limits.doorMax), drag.end - S.limits.doorMin);
+                        dd.offset = t;
+                        dd.width = drag.end - t;
+                    } else {
+                        dd.width = clamp(t - dd.offset, S.limits.doorMin, Math.min(S.limits.doorMax, e2.len - dd.offset));
+                    }
+                }
+                clampDoor();
+            }
+            drag.moved = true;
+            dirty(true);
+            syncBox();
+            renderPlan();
+        });
+
+        document.addEventListener('pointerup', function() {
+            var drag = S.drag;
+            if (!drag || (drag.vertex == null && !drag.door)) return;
+            S.drag = null;
+            renderAll();
+        }, true);
 
         root.addEventListener('pointerdown', function(event) {
             if (event.button !== 0) return;
@@ -1112,7 +1568,7 @@
 
         document.addEventListener('pointermove', function(event) {
             var drag = S.drag;
-            if (!drag) return;
+            if (!drag || !drag.shelf) return;
             var p = pointAt(event);
             var s = drag.shelf;
 
@@ -1145,7 +1601,7 @@
 
         document.addEventListener('pointerup', function() {
             var drag = S.drag;
-            if (!drag) return;
+            if (!drag || !drag.shelf) return;
             S.drag = null;
             // Bấm chip mà không kéo vào sơ đồ = đặt vào chỗ trống đầu tiên
             if (drag.chip && !drag.shelf.placed) {
