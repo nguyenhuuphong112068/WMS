@@ -94,3 +94,5 @@ Mỗi mục: ngày · màn hình / tab · thay đổi · mục hướng dẫn b�
 
 - 10/11/2026 Nhập Vật Tư › tab Nhập Vật Tư: dưới Mã xuất nhập hiện Mã vật tư (category_code), bỏ badge "Chờ kiểm tra".
 - (bổ sung) Nhãn nguồn Dự báo trên từng dòng nay ghi lý do cụ thể: "Thiếu X so với nhu cầu tháng MM/YYYY (+ giữ ngưỡng tối thiểu Y)" hoặc "Hết tháng MM/YYYY dư X < ngưỡng tối thiểu Y"; lý do này cũng điền sẵn vào Lý do dự trù. Bộ lọc Nguồn vẫn dùng nhãn chung "Thiếu tồn khả dụng cho tháng ...". Code: `MaterialEstimate/watchlistTable.blade.php`.
+
+- 10/11/2026 — Sử Dụng Vật Tư, modal chi tiết đề nghị: dưới số "Tồn khả dụng" hiện diễn giải "Tồn hiện tại X − Đề nghị chưa cấp Y".

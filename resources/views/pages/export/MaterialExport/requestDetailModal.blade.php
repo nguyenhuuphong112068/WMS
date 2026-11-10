@@ -163,6 +163,14 @@
                                                 title="{{ !$isDone && $available + 0.00005 < $shortAmount ? 'Không đủ cho số còn phải cấp' : '' }}">
                                                 {{ $expNum($available) }}
                                             </span>
+                                            @php
+                                                $onHand = (float) (($liveStockByCategory ?? [])[$it->category_id]['remaining'] ?? 0);
+                                                $othersHeld = max($onHand - $available, 0);
+                                            @endphp
+                                            <div class="md-sub small text-nowrap" title="Tồn hiện tại trong kho trừ số lượng các đề nghị khác đã lập nhưng chưa được cấp phát (đang giữ chỗ)">
+                                                Tồn hiện tại {{ $expNum($onHand) }}<br>
+                                                − Đề nghị chưa cấp {{ $expNum($othersHeld) }}
+                                            </div>
                                         @else
                                             <span class="md-sub">—</span>
                                         @endif
