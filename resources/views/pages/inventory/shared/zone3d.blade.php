@@ -1438,7 +1438,7 @@
                     opts.open(key);
                     return;
                 }
-                var card = root.querySelector('.mz-cell[data-key="' + key + '"]');
+                var card = root.querySelector('.mz-slot[data-key="' + key + '"]');
                 if (card) $(card).trigger('click');
             });
 

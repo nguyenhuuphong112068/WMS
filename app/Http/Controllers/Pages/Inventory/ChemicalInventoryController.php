@@ -641,21 +641,8 @@ class ChemicalInventoryController extends Controller
         $validator = Validator::make($request->all(), [
             'import_ids' => ['required', 'array', 'min:1', 'max:'.self::ASSIGN_MAX],
             'import_ids.*' => ['integer'],
-            'location_id' => [
-                'required',
-                Rule::exists('locations', 'id')
-                    ->where('department_id', $departmentId)
-                    ->where('status_id', 1)
-                    ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
-                    ->where(fn ($query) => $query->whereNull('zone_type')->orWhereNotIn('zone_type', self::ASSIGN_EXCEPT_ZONES)),
-            ],
-        ], [
-            'import_ids.required' => 'Vui lòng chọn mã xuất nhập cần định khu.',
-            'import_ids.min' => 'Vui lòng chọn mã xuất nhập cần định khu.',
-            'import_ids.max' => 'Mỗi lần định khu tối đa '.self::ASSIGN_MAX.' mã xuất nhập.',
-            'location_id.required' => 'Vui lòng chọn vị trí lưu trữ.',
-            'location_id.exists' => 'Vị trí được chọn không còn hoạt động, không thuộc phòng ban đang chọn, hoặc là khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ.',
-        ]);
+            'location_id' => $this->assignTargetRule($departmentId),
+        ], $this->assignMessages());
 
         if ($validator->fails()) {
             return response()->json(['message' => $validator->errors()->first()], 422);
@@ -663,16 +650,7 @@ class ChemicalInventoryController extends Controller
 
         $ids = array_values(array_unique(array_map('intval', $request->input('import_ids', []))));
         $locationId = (int) $request->location_id;
-
-        $imports = DB::table('chemical_imports')
-            ->leftJoin('locations', 'chemical_imports.location_id', '=', 'locations.id')
-            ->select('chemical_imports.id', 'chemical_imports.code', 'chemical_imports.category_id', 'chemical_imports.location_id', 'locations.code as location_code')
-            ->whereIn('chemical_imports.id', $ids)
-            ->where('chemical_imports.department_id', $departmentId)
-            ->where('chemical_imports.status_id', 1)
-            ->where('chemical_imports.is_checked', 1)
-            ->orderBy('chemical_imports.code', 'asc')
-            ->get();
+        $imports = $this->assignImports($ids, $departmentId);
 
         if ($imports->count() !== count($ids)) {
             return response()->json([
@@ -686,31 +664,11 @@ class ChemicalInventoryController extends Controller
             return response()->json([
                 'message' => 'Mã xuất nhập đã có định khu: '
                     .$placed->map(fn ($import) => $import->code.' ('.($import->location_code ?: '—').')')->implode(', ')
-                    .'. Muốn đổi chỗ vui lòng Điều chỉnh phiếu nhập (ghi lý do), hoặc tải lại trang.',
+                    .'. Muốn đổi chỗ vui lòng dùng Đổi vị trí (ghi lý do), hoặc tải lại trang.',
             ], 422);
         }
 
-        $location = DB::table('locations')
-            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
-            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
-            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
-            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
-            ->select(
-                'locations.id',
-                'locations.code',
-                'locations.zone_type',
-                'locations.warehouse_id',
-                'locations.shelf_id',
-                'locations.column_id',
-                'locations.tier_id',
-                'warehouses.name as warehouse_name',
-                'shelves.name as shelf_name',
-                'columns.name as column_name',
-                'tiers.name as tier_name'
-            )
-            ->where('locations.id', $locationId)
-            ->first();
-        $locationLabel = \App\Support\CategoryLookup::locationLabel($location) ?: (string) $location->code;
+        $location = $this->assignLocationRow($locationId);
         $note = 'Vị trí lưu trữ: — -> '.$location->code.' (Định khu nhanh ở Tồn Kho Hoá Chất)';
         $conflict = null;
 
@@ -748,18 +706,202 @@ class ChemicalInventoryController extends Controller
             AuditTrialController::log('Định khu', 'chemical_imports', $import->id, $import->code, $import->code.' | '.$note);
         }
 
+        return $this->assignResponse($imports, $location, 'Đã định khu');
+    }
+
+    /**
+     * ĐỔI VỊ TRÍ - chuyển một hoặc nhiều mã xuất nhập ĐANG CÓ định khu sang vị trí khác (AJAX, trả JSON).
+     *
+     * Mở từ hộp chi tiết vị trí (chọn mã -> Đổi vị trí) hoặc kéo ô có hàng thả sang ô khác ở sơ đồ Thẻ tab
+     * Theo định khu. Cùng quyền inventory_chemical_location với Định khu nhanh nhưng BẮT BUỘC lý do (ghi lịch sử
+     * phiếu nhập + Audit Trail):
+     *   - mã nguồn đang có vị trí, không nằm ở khu ASSIGN_EXCEPT_ZONES (lô cách ly / loại bỏ đi theo luồng Cách ly);
+     *   - vị trí đích cùng điều kiện với Định khu nhanh và khác vị trí hiện tại;
+     *   - tương kỵ cùng tầng không chặn, chỉ trả 'warning'.
+     */
+    public function moveLocation(Request $request)
+    {
+        if (! user_can('inventory_chemical_location')) {
+            return response()->json(['message' => 'Bạn chưa được cấp quyền Định Khu Hoá Chất.'], 403);
+        }
+
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), [
+            'import_ids' => ['required', 'array', 'min:1', 'max:'.self::ASSIGN_MAX],
+            'import_ids.*' => ['integer'],
+            'location_id' => $this->assignTargetRule($departmentId),
+            'reason' => ['required', 'string', 'max:255'],
+        ], $this->assignMessages() + [
+            'reason.required' => 'Vui lòng nhập lý do đổi vị trí.',
+            'reason.max' => 'Lý do đổi vị trí tối đa 255 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $request->input('import_ids', []))));
+        $locationId = (int) $request->location_id;
+        $reason = trim((string) $request->reason);
+        $imports = $this->assignImports($ids, $departmentId);
+
+        if ($imports->count() !== count($ids)) {
+            return response()->json([
+                'message' => 'Có mã xuất nhập đã bị khoá, chưa kiểm tra Đạt hoặc không thuộc phòng ban đang chọn - vui lòng tải lại trang.',
+            ], 422);
+        }
+
+        $unplaced = $imports->filter(fn ($import) => ! $import->location_id);
+        if ($unplaced->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập chưa có định khu: '.$unplaced->pluck('code')->implode(', ').' - vui lòng dùng Định khu / Thêm hoá chất.',
+            ], 422);
+        }
+
+        $locked = $imports->filter(fn ($import) => in_array($import->location_zone_type, self::ASSIGN_EXCEPT_ZONES, true));
+        if ($locked->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đang ở khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ: '.$locked->pluck('code')->implode(', ')
+                    .' - xử lý theo luồng Cách ly ở Sử Dụng Hoá Chất.',
+            ], 422);
+        }
+
+        $same = $imports->filter(fn ($import) => (int) $import->location_id === $locationId);
+        if ($same->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đã nằm ở vị trí này: '.$same->pluck('code')->implode(', ').'.',
+            ], 422);
+        }
+
+        $location = $this->assignLocationRow($locationId);
+        $notes = [];
+        $conflict = null;
+
+        try {
+            DB::transaction(function () use ($imports, $locationId, $location, $reason, &$notes, &$conflict) {
+                foreach ($imports as $import) {
+                    // where location_id cũ: người khác vừa đổi chỗ mã này thì huỷ cả lượt
+                    $updated = DB::table('chemical_imports')
+                        ->where('id', $import->id)
+                        ->where('location_id', $import->location_id)
+                        ->update([
+                            'location_id' => $locationId,
+                            'updated_by' => $this->actor(),
+                            'updated_at' => now(),
+                        ]);
+
+                    if (! $updated) {
+                        $conflict = 'Mã xuất nhập '.$import->code.' vừa được người khác đổi vị trí - vui lòng tải lại trang.';
+
+                        throw new \RuntimeException($conflict);
+                    }
+
+                    $notes[$import->id] = 'Vị trí lưu trữ: '.($import->location_code ?: '—').' -> '.$location->code
+                        .' (Đổi vị trí ở Tồn Kho Hoá Chất) - Lý do: '.$reason;
+                    \App\Http\Controllers\Pages\Import\ChemicalImportController::recordHistory((int) $import->id, 'Đổi vị trí', $notes[$import->id]);
+                }
+            });
+        } catch (\RuntimeException $e) {
+            if ($conflict === null) {
+                throw $e;
+            }
+
+            return response()->json(['message' => $conflict], 422);
+        }
+
+        foreach ($imports as $import) {
+            AuditTrialController::log('Đổi vị trí', 'chemical_imports', $import->id, $import->location_code, $import->code.' | '.$notes[$import->id]);
+        }
+
+        return $this->assignResponse($imports, $location, 'Đã chuyển');
+    }
+
+    /** Vị trí đích của Định khu nhanh / Đổi vị trí: thuộc phòng, đang mở, lưu Hoá chất / Dùng chung, không phải khu cách ly. */
+    private function assignTargetRule(int $departmentId): array
+    {
+        return [
+            'required',
+            Rule::exists('locations', 'id')
+                ->where('department_id', $departmentId)
+                ->where('status_id', 1)
+                ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
+                ->where(fn ($query) => $query->whereNull('zone_type')->orWhereNotIn('zone_type', self::ASSIGN_EXCEPT_ZONES)),
+        ];
+    }
+
+    private function assignMessages(): array
+    {
+        return [
+            'import_ids.required' => 'Vui lòng chọn mã xuất nhập cần định khu.',
+            'import_ids.min' => 'Vui lòng chọn mã xuất nhập cần định khu.',
+            'import_ids.max' => 'Mỗi lần định khu tối đa '.self::ASSIGN_MAX.' mã xuất nhập.',
+            'location_id.required' => 'Vui lòng chọn vị trí lưu trữ.',
+            'location_id.exists' => 'Vị trí được chọn không còn hoạt động, không thuộc phòng ban đang chọn, hoặc là khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ.',
+        ];
+    }
+
+    /** Mã xuất nhập xếp / đổi chỗ được (đang mở, đã kiểm tra Đạt, thuộc phòng) kèm vị trí hiện tại. */
+    private function assignImports(array $ids, int $departmentId)
+    {
+        return DB::table('chemical_imports')
+            ->leftJoin('locations', 'chemical_imports.location_id', '=', 'locations.id')
+            ->select(
+                'chemical_imports.id',
+                'chemical_imports.code',
+                'chemical_imports.category_id',
+                'chemical_imports.location_id',
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type'
+            )
+            ->whereIn('chemical_imports.id', $ids)
+            ->where('chemical_imports.department_id', $departmentId)
+            ->where('chemical_imports.status_id', 1)
+            ->where('chemical_imports.is_checked', 1)
+            ->orderBy('chemical_imports.code', 'asc')
+            ->get();
+    }
+
+    private function assignLocationRow(int $locationId)
+    {
+        return DB::table('locations')
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            ->select(
+                'locations.id',
+                'locations.code',
+                'locations.zone_type',
+                'locations.warehouse_id',
+                'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
+            ->where('locations.id', $locationId)
+            ->first();
+    }
+
+    /** JSON chung của Định khu nhanh / Đổi vị trí: thông báo, cảnh báo tương kỵ, vị trí mới để trình duyệt vá dòng tồn. */
+    private function assignResponse($imports, $location, string $verb)
+    {
         $codes = $imports->pluck('code');
+        $locationLabel = \App\Support\CategoryLookup::locationLabel($location) ?: (string) $location->code;
 
         // Tương kỵ không chặn: xếp xong mới đối chiếu với các hoá chất đang nằm trên cùng tầng (tính cả các mã
         // vừa xếp cùng lượt), mỗi hoá chất một câu cảnh báo
         $warnings = \App\Support\ChemicalCompatibility::placementWarnings($imports->unique('category_id')
-            ->map(fn ($import) => [(int) $import->category_id, $locationId, 'Mã xuất nhập '.$import->code])
+            ->map(fn ($import) => [(int) $import->category_id, (int) $location->id, 'Mã xuất nhập '.$import->code])
             ->values()->all());
 
         return response()->json([
             'success' => true,
             'warning' => $warnings ? 'Cảnh báo tương kỵ: '.implode(' | ', $warnings) : null,
-            'message' => 'Đã định khu '.($codes->count() === 1 ? 'mã xuất nhập '.$codes->first() : $codes->count().' mã xuất nhập')
+            'message' => $verb.' '.($codes->count() === 1 ? 'mã xuất nhập '.$codes->first() : $codes->count().' mã xuất nhập')
                 .' vào '.$locationLabel.'.',
             'import_ids' => $imports->pluck('id')->map(fn ($id) => (int) $id)->values(),
             // Cùng tên trường với rowPayload() để trình duyệt vá thẳng vào dòng tồn rồi dựng lại sơ đồ

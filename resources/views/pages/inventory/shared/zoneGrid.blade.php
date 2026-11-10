@@ -22,7 +22,10 @@
 | $zgAssign (tuỳ chọn, null = chỉ xem) bật ĐỊNH KHU NHANH: mỗi thẻ có ô chọn + nút [Định khu], đầu khối
 | có [Chọn tất cả] và [Định khu N mã đã chọn], mở modal #<zgId>Assign chọn một vị trí (Select2 AJAX)
 | rồi POST {import_ids[], location_id} về $zgAssign['url']. Khai báo:
-|   ['url' => route POST, 'lookup' => route tra cứu định khu (CategoryLookup), 'max' => số mã tối đa/lượt]
+|   ['url' => route POST, 'lookup' => route tra cứu định khu (CategoryLookup), 'max' => số mã tối đa/lượt,
+|    'except' => loại định khu không nhận hàng (zone_type)]
+| Mỗi thẻ vị trí (trừ loại 'except') có thêm nút [Đặt <hàng>] mở modal #<zgId>Place: chọn nhiều mã Chưa xếp vị trí
+| (tìm kiếm, cảnh báo tương kỵ cùng tầng) để đặt vào chính vị trí đó - cùng url POST.
 | Lưu xong gọi opts.onAssigned(res) để trang tự vá dữ liệu rồi dựng lại; không có thì tự vá rows và dựng lại.
 --}}
 @include('pages.inventory.shared.zoneMapStyles')
@@ -33,7 +36,7 @@
 @php
     $zgItem = $zgItem ?? 'hoá chất';
     $zgCode = $zgCode ?? 'Mã xuất nhập';
-    $zgAssign = ! empty($zgAssign) ? $zgAssign + ['token' => csrf_token(), 'max' => 200] : null;
+    $zgAssign = ! empty($zgAssign) ? $zgAssign + ['token' => csrf_token(), 'max' => 200, 'except' => []] : null;
     $zgCompat = $zgCompat ?? null;
     $zgZoneTypes = collect(\App\Support\ZoneType::TYPES)
         ->map(function ($label, $type) {
@@ -132,6 +135,10 @@
                 <table class="table table-bordered table-sm mb-0">
                     <thead>
                         <tr>
+                            @if ($zgAssign)
+                                <th class="text-center mz-d-pickcol" style="width:40px"><input type="checkbox" class="mz-d-all"
+                                        title="Chọn tất cả"></th>
+                            @endif
                             <th class="text-center" style="width:50px">STT</th>
                             <th style="width:160px">{{ $zgCode }}</th>
                             <th>{{ \Illuminate\Support\Str::ucfirst($zgItem) }}</th>
@@ -144,6 +151,17 @@
                 </table>
             </div>
             <div class="modal-footer">
+                @if ($zgAssign)
+                    <div class="mz-d-actions mr-auto">
+                        <button type="button" class="btn btn-outline-primary mz-d-add">
+                            <i class="fas fa-plus mr-1"></i> Thêm {{ $zgItem }}
+                        </button>
+                        <button type="button" class="btn btn-outline-primary mz-d-move" disabled
+                            title="Chọn mã trong bảng để chuyển sang vị trí khác">
+                            <i class="fas fa-exchange-alt mr-1"></i> Đổi vị trí <b>0</b> mã đã chọn
+                        </button>
+                    </div>
+                @endif
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
             </div>
         </div>
@@ -203,6 +221,123 @@
             </div>
         </div>
     </div>
+
+    {{-- Thêm các mã "Chưa xếp vị trí" vào MỘT vị trí - mở từ nút [Thêm ...] trong hộp chi tiết vị trí --}}
+    <div class="modal fade md-modal" id="{{ $zgId }}Place" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus"></i> Thêm {{ $zgItem }} vào vị trí <span class="mz-pl-code"></span></h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <small class="text-muted">Đường dẫn định khu</small>
+                            <div class="font-weight-bold mz-pl-path">—</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <small class="text-muted">{{ $zgCode }} đang có</small>
+                            <div class="font-weight-bold mz-pl-lots">0</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <small class="text-muted">Đã chọn</small>
+                            <div class="font-weight-bold text-primary"><span class="mz-pl-count">0</span> mã</div>
+                        </div>
+                    </div>
+
+                    <div class="mz-search mb-2">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control form-control-sm mz-pl-search" autocomplete="off"
+                            placeholder="Tìm {{ \Illuminate\Support\Str::lower($zgCode) }} hoặc tên {{ $zgItem }} chưa xếp vị trí...">
+                    </div>
+
+                    <div class="mz-as-list mz-pl-list">
+                        <table class="table table-bordered table-sm mb-0 md-no-sticky">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width:40px"><input type="checkbox" class="mz-pl-all" title="Chọn tất cả mã đang hiện"></th>
+                                    <th class="text-center" style="width:50px">STT</th>
+                                    <th style="width:160px">{{ $zgCode }}</th>
+                                    <th>{{ \Illuminate\Support\Str::ucfirst($zgItem) }}</th>
+                                    <th class="text-right" style="width:120px">Tồn</th>
+                                    <th class="text-center" style="width:105px">Hạn Áp Dụng</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <span class="md-error mz-pl-error" hidden></span>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
+                    <button type="button" class="btn btn-primary mz-pl-submit" disabled>
+                        <i class="fas fa-map-marker-alt mr-1"></i> Thêm vào vị trí
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (! empty($zgAssign['moveUrl']))
+        {{-- Đổi vị trí các mã đang nằm ở một ô (từ hộp chi tiết hoặc kéo ô thả sang ô khác) - bắt buộc lý do --}}
+        <div class="modal fade md-modal" id="{{ $zgId }}Move" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-exchange-alt"></i> Đổi Vị Trí</h5>
+                        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-2">
+                            <div class="col-6 col-md-4">
+                                <small class="text-muted">Vị trí hiện tại</small>
+                                <div class="font-weight-bold mz-mv-from">—</div>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <small class="text-muted">{{ $zgCode }}</small>
+                                <div class="font-weight-bold mz-mv-count">0</div>
+                            </div>
+                        </div>
+
+                        <div class="mz-as-list mb-3">
+                            <table class="table table-bordered table-sm mb-0 md-no-sticky">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center" style="width:50px">STT</th>
+                                        <th style="width:160px">{{ $zgCode }}</th>
+                                        <th>{{ \Illuminate\Support\Str::ucfirst($zgItem) }}</th>
+                                        <th class="text-right" style="width:120px">Tồn</th>
+                                        <th class="text-center" style="width:105px">Hạn Áp Dụng</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Vị trí mới <span class="text-danger">*</span></label>
+                            <select class="form-control mz-mv-location" data-lookup-url="{{ $zgAssign['lookup'] }}" data-zone-filter>
+                                <option value="">-- Chọn vị trí lưu trữ --</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label>Lý do đổi vị trí <span class="text-danger">*</span></label>
+                            <textarea class="form-control mz-mv-reason" rows="2" maxlength="255"
+                                placeholder="Ví dụ: tách hoá chất tương kỵ, sắp xếp lại tủ..."></textarea>
+                            <span class="md-error mz-mv-error" hidden></span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
+                        <button type="button" class="btn btn-primary mz-mv-submit">
+                            <i class="fas fa-exchange-alt mr-1"></i> Lưu đổi vị trí
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 @endif
 
 @once
@@ -244,6 +379,25 @@
 
             function values(obj) {
                 return Object.keys(obj).map(function(k) { return obj[k]; });
+            }
+
+            /** Theo thứ tự đã khai ở Định Khu (position), mục chưa có thứ tự xếp sau theo tên */
+            function byPosition(a, b) {
+                var pa = Number(a.position) || 0, pb = Number(b.position) || 0;
+                if (pa && pb && pa !== pb) return pa - pb;
+                if (!pa !== !pb) return pa ? -1 : 1;
+                return byText('name')(a, b);
+            }
+
+            /** 1 -> A, 26 -> Z, 27 -> AA (giống mã ô ở Cấu trúc kho) */
+            function letters(n) {
+                var out = '';
+                while (n > 0) {
+                    var r = (n - 1) % 26;
+                    out = String.fromCharCode(65 + r) + out;
+                    n = Math.floor((n - 1) / 26);
+                }
+                return out;
             }
 
             /** Gom mã của một ô: đang có gì, cảnh báo gì, tô màu theo tình trạng như zoneNode() của Vật Tư */
@@ -428,6 +582,8 @@
                 // Đối chiếu tương kỵ (chỉ Tồn Kho Hoá Chất khai $zgCompat)
                 var compat = $root.data('compat') || null;
                 var $assign = $(selector + 'Assign');
+                var $place = $(selector + 'Place');
+                var $move = $(selector + 'Move');
 
                 var find = function(list) {
                     var map = {};
@@ -473,13 +629,17 @@
                     var wn = tree[loc.warehouse_id || 0] = tree[loc.warehouse_id || 0] ||
                         { code: w.code, name: w.name || 'Chưa gán kho/phòng', children: {} };
                     var sn = wn.children[loc.shelf_id || 0] = wn.children[loc.shelf_id || 0] ||
-                        { code: s.code, name: s.name || 'Chưa gán kệ/tủ', children: {} };
+                        { code: s.code, name: s.name || 'Chưa gán kệ/tủ', topDown: s.tier_order === 'top_down', children: {} };
                     var cn = sn.children[loc.column_id || 0] = sn.children[loc.column_id || 0] ||
-                        { code: c.code, name: c.name || 'Chưa gán cột', children: {} };
+                        { code: c.code, name: c.name || 'Chưa gán cột', position: c.position, children: {} };
                     var tn = cn.children[loc.tier_id || 0] = cn.children[loc.tier_id || 0] ||
-                        { code: t.code, name: t.name || 'Chưa gán tầng', locations: [] };
+                        { code: t.code, name: t.name || 'Chưa gán tầng', position: t.position, locations: [] };
 
                     var node = nodeOf(loc, byLocation[loc.id] || [], zoneTypes);
+                    node.id = loc.id;
+                    // Toạ độ ô trên lưới tầng: ngang (A, B...) × dãy sâu (1 = sát cửa) như Cấu trúc kho
+                    node.p = Number(loc.position) > 0 ? Number(loc.position) : 0;
+                    node.d = Math.max(1, Number(loc.depth) || 1);
                     node.path = [wn.name, sn.name, cn.name, tn.name].join(' / ');
                     // Vùng "gần nhau" để xét tương kỵ (vị trí chưa gán cấp đang xét thì chỉ xét chính nó)
                     var scopeId = compat ? (compat.scope === 'location' ? loc.id : loc[compat.scope + '_id']) : null;
@@ -506,12 +666,17 @@
                     var wAcc = blank();
                     w.list = values(w.children).sort(byText('name')).map(function(s) {
                         var sAcc = blank();
-                        s.list = values(s.children).sort(byText('name')).map(function(c) {
+                        s.list = values(s.children).sort(byPosition).map(function(c) {
                             var cAcc = blank();
-                            c.list = values(c.children).sort(byText('name')).map(function(t) {
+                            c.list = values(c.children).sort(byPosition).map(function(t) {
                                 var tAcc = blank();
                                 t.locations.forEach(function(n) { add(tAcc, n); });
                                 t.stat = tAcc;
+                                // Ô khai lẻ chưa có toạ độ: xếp tiếp sau ô ngang xa nhất, theo mã
+                                var next = t.locations.reduce(function(m, n) { return Math.max(m, n.p); }, 0);
+                                t.locations.filter(function(n) { return !n.p; }).forEach(function(n) { n.p = ++next; });
+                                t.width = t.locations.reduce(function(m, n) { return Math.max(m, n.p); }, 1);
+                                t.depth = t.locations.reduce(function(m, n) { return Math.max(m, n.d); }, 1);
                                 add(cAcc, t);
 
                                 return t;
@@ -541,29 +706,50 @@
                 /* ---------- Vẽ ---------- */
                 // (Đã bỏ hàng thẻ thống kê đầu sơ đồ - nhường chỗ cho khung 3D / Mặt bằng; số vị trí có hàng,
                 //  số mã từng kho / kệ vẫn hiện ở đầu khối kho và dòng tiêu đề khung 3D.)
-                function cell(n) {
-                    var zoned = n.badge.bg !== '#FFFFFF';
-                    var more = n.cats.length - n.preview.length;
+                /** Vị trí nhận thêm / đổi hàng được (có quyền, không phải khu Biệt trữ / Cách ly / Loại bỏ) */
+                function canEdit(n) {
+                    return !!assign && (assign.except || []).indexOf(n.zoneType) < 0;
+                }
+
+                /** Tooltip một ô: mã vị trí, phân loại, các hoá chất đang có */
+                function slotTitle(n) {
+                    var lines = [n.code + (n.zoneType ? ' · ' + ($root.find('.mz-zt-filter[data-zone-type="' + n.zoneType + '"]').text().trim()) : '')];
+                    if (!n.items.length) lines.push('Đang trống');
+                    n.preview.forEach(function(p) { lines.push('· ' + p.name + ': ' + num(p.remaining) + ' ' + p.unit); });
+                    if (n.cats.length > n.preview.length) lines.push('· +' + (n.cats.length - n.preview.length) + ' ' + item + ' khác');
+                    if (n.alerts > 0) lines.push(n.alerts + ' mã cần chú ý');
+                    if (n.conflicts && n.conflicts.length) lines.push('⚠ ' + conflictTitle(n));
+
+                    return lines.join('\n');
+                }
+
+                /** Một ô vị trí trên lưới tầng (kiểu Cấu trúc kho): màu theo tình trạng, số = số mã đang có */
+                function slot(n) {
                     var clash = n.conflicts && n.conflicts.length > 0;
-                    var html = '<button type="button" class="mz-cell is-' + n.state + (zoned ? ' is-zoned' : '') + (clash ? ' is-compat' : '') + '"' +
+                    var zt = n.zoneType && zoneTypes[n.zoneType] ? zoneTypes[n.zoneType].bg : '';
+                    var drag = canEdit(n) && n.lots > 0;
+
+                    return '<span role="button" tabindex="0" class="mz-slot is-' + n.state + (zt ? ' has-zone' : '') +
+                        (clash ? ' is-compat' : '') + (canEdit(n) ? ' is-drop' : '') + '"' +
                         ' data-key="' + n.key + '" data-state="' + n.state + '" data-zone-type="' + esc(n.zoneType) + '"' +
-                        (clash ? ' data-compat="1"' : '') +
+                        (clash ? ' data-compat="1"' : '') + (drag ? ' draggable="true"' : '') +
                         ' data-search="' + esc(n.search) + '"' +
-                        ' style="--chip: ' + esc(n.badge.bg) + '; --chip-text: ' + esc(n.badge.text) + '"' +
-                        (n.state === 'empty' ? ' disabled' : '') + '>' +
-                        '<div class="mz-cell-top"><span class="mz-cell-code">' + esc(n.code) + '</span>' +
-                        (clash ? '<span class="mz-cell-compat" title="' + esc(conflictTitle(n)) + '"><i class="fas fa-exclamation"></i></span>' : '') +
-                        '<span class="mz-cell-lots">' + n.lots + '</span></div><div class="mz-cell-items">';
+                        ' style="grid-column:' + n.p + ';grid-row:' + n.row + (zt ? ';--zt:' + esc(zt) : '') + '"' +
+                        ' title="' + esc(slotTitle(n)) + '">' + (n.lots || '') + '</span>';
+                }
 
-                    if (!n.preview.length) html += '<span class="mz-cell-empty-note">Đang trống</span>';
-                    n.preview.forEach(function(p) {
-                        html += '<div><span class="nm" title="' + esc(p.name) + '">· ' + esc(p.name) + '</span>' +
-                            '<span class="qty">' + num(p.remaining) + ' <span class="u">' + esc(p.unit) + '</span></span></div>';
-                    });
-                    if (more > 0) html += '<div><span class="nm">· +' + more + ' ' + esc(item) + ' khác</span></div>';
+                /** Khối một tầng: thước số dãy bên trái, lưới ô, thước chữ ô ngang dọc mép trước */
+                function tierBlock(t) {
+                    var depthRule = '';
+                    var frontRule = '';
+                    for (var d = t.depth; d >= 1; d--) depthRule += '<span>' + d + '</span>';
+                    for (var p = 1; p <= t.width; p++) frontRule += '<span>' + letters(p) + '</span>';
+                    t.locations.forEach(function(n) { n.row = t.depth - n.d + 1; });
 
-                    return html + '</div><div class="mz-cell-foot">' + n.cats.length + ' ' + esc(item) +
-                        (n.alerts > 0 ? ' · <span class="alert">' + n.alerts + ' cần chú ý</span>' : '') + '</div></button>';
+                    return '<div class="mz-tblock" style="--cols:' + t.width + ';--rows:' + t.depth + '">' +
+                        '<div class="mz-depth-rule" title="Dãy tính từ cửa vào trong (1 = sát cửa)">' + depthRule + '</div>' +
+                        '<div class="mz-slots">' + t.locations.map(slot).join('') + '</div>' +
+                        '<div class="mz-front-rule" title="Ô ngang dọc mép trước tầng">' + frontRule + '</div></div>';
                 }
 
                 function codeTag(code) {
@@ -588,6 +774,7 @@
                 /** Thẻ một mã chưa xếp vị trí; có quyền định khu thì kèm ô chọn + nút [Định khu] */
                 function unzonedCard(r) {
                     return '<div class="mz-cell mz-ucard is-warn' + (assign ? ' is-pickable' : '') + '" data-id="' + esc(r.id) + '"' +
+                        (assign ? ' draggable="true" title="Kéo thả vào một ô vị trí bên dưới để định khu"' : '') +
                         ' data-search="' + esc([r.code, r.name, r.sub].join(' ').toLowerCase()) + '">' +
                         '<div class="mz-cell-top">' +
                         (assign ? '<input type="checkbox" class="mz-ucard-pick" title="Chọn để định khu cùng lúc">' : '') +
@@ -626,31 +813,31 @@
                         '<span class="mz-pill">' + w.stat.lots + ' mã</span>' +
                         '<span class="mz-pill">' + itemCount(w.stat) + ' ' + esc(item) + '</span>' +
                         (w.stat.alerts > 0 ? '<span class="mz-pill is-alert">' + w.stat.alerts + ' cần chú ý</span>' : '') +
-                        '</div></div><div class="mz-wh-body">';
+                        '</div></div><div class="mz-wh-body is-grid">';
 
                     w.list.forEach(function(s) {
                         html += '<div class="mz-shelf"><div class="mz-shelf-head"><i class="fas fa-layer-group"></i> ' +
                             esc(s.name) + codeTag(s.code) + '<span class="tag">' + s.list.length + ' cột</span>' +
-                            '<span class="tag">' + s.stat.lots + ' mã</span></div>';
+                            '<span class="tag">' + s.stat.lots + ' mã</span></div><div class="mz-cols">';
 
+                        // Mỗi Cột (cánh) một khối lưới như Cấu trúc kho: hàng = Tầng (Tầng 01 dưới cùng trừ khi kệ
+                        // khai đánh số từ trên xuống), mỗi tầng = lưới ô Ngang × Sâu
                         s.list.forEach(function(c) {
-                            html += '<div class="mz-column"><div class="mz-column-head">' +
-                                '<i class="fas fa-grip-lines-vertical" style="color: var(--primary-light)"></i> ' +
-                                esc(c.name) + (c.code ? ' <span class="md-tag">' + esc(c.code) + '</span>' : '') +
-                                '<span class="sub">' + c.list.length + ' tầng · ' + c.stat.filled + '/' + c.stat.locations +
-                                ' vị trí có hàng · ' + c.stat.lots + ' mã</span></div>';
+                            html += '<div class="mz-col"><div class="mz-col-head">' +
+                                '<div class="mz-col-title"><i class="fas fa-grip-lines-vertical"></i> ' + esc(c.name) +
+                                (c.code ? ' <span class="md-tag">' + esc(c.code) + '</span>' : '') + '</div>' +
+                                '<div class="mz-col-meta">' + c.list.length + ' tầng · ' + c.stat.filled + '/' + c.stat.locations +
+                                ' vị trí có hàng · ' + c.stat.lots + ' mã</div></div><div class="mz-col-body">';
 
-                            c.list.forEach(function(t) {
-                                html += '<div class="mz-tier"><div class="mz-tier-head"><i class="fas fa-bars"></i> ' +
-                                    esc(t.name) + codeTag(t.code) + '<span class="sub">' + t.stat.filled + '/' +
-                                    t.stat.locations + ' vị trí có hàng · ' + t.stat.lots + ' mã</span></div>' +
-                                    '<div class="mz-grid">' + t.locations.map(cell).join('') + '</div></div>';
+                            (s.topDown ? c.list : c.list.slice().reverse()).forEach(function(t) {
+                                html += '<div class="mz-trow"><div class="mz-tlabel" title="' + esc(t.code || t.name) + '">' + esc(t.name) +
+                                    (t.stat.lots ? '<small>' + t.stat.lots + ' mã</small>' : '') + '</div>' + tierBlock(t) + '</div>';
                             });
 
-                            html += '</div>';
+                            html += '</div></div>';
                         });
 
-                        html += '</div>';
+                        html += '</div></div>';
                     });
 
                     html += '</div></section>';
@@ -674,7 +861,9 @@
                 function apply() {
                     var q = ($root.find('.mz-search-input').val() || '').toString().trim().toLowerCase();
 
-                    $root.find('.mz-cell[data-state]').each(function() {
+                    // Ô không khớp chỉ làm mờ (giữ nguyên hình lưới tầng); tầng / cột / kệ / kho không còn ô khớp thì ẩn
+                    var filtering = state !== '' || zoneType !== '*' || q !== '';
+                    $root.find('.mz-slot').each(function() {
                         var st = $(this).attr('data-state');
                         var okState = state === '' ||
                             (state === 'empty' && st === 'empty') ||
@@ -683,15 +872,14 @@
                             (state === 'compat' && $(this).attr('data-compat') === '1');
                         var okText = q === '' || ($(this).attr('data-search') || '').indexOf(q) >= 0;
                         var okZone = zoneType === '*' || ($(this).attr('data-zone-type') || '') === zoneType;
+                        var ok = okState && okText && okZone;
 
-                        this.style.display = okState && okText && okZone ? '' : 'none';
+                        $(this).toggleClass('is-dim', !ok).toggleClass('is-hit', ok && filtering);
                     });
 
-                    ['.mz-tier|.mz-cell[data-state]', '.mz-column|.mz-tier', '.mz-shelf|.mz-column', '.mz-wh|.mz-shelf']
-                    .forEach(function(pair) {
-                        var p = pair.split('|');
-                        $root.find(p[0]).each(function() {
-                            this.style.display = shown($(this).find(p[1])) ? '' : 'none';
+                    ['.mz-trow', '.mz-col', '.mz-shelf', '.mz-wh'].forEach(function(sel) {
+                        $root.find(sel).each(function() {
+                            this.style.display = !filtering || $(this).find('.mz-slot:not(.is-dim)').length ? '' : 'none';
                         });
                     });
 
@@ -776,6 +964,285 @@
                     $assign.modal('show');
                 }
 
+                /** Lưu định khu xong (khối Chưa xếp vị trí hoặc nút Đặt hoá chất trên thẻ vị trí): báo kết quả + dựng lại */
+                function assigned(res) {
+                    // Tương kỵ không chặn: vẫn lưu, báo cảnh báo để thủ kho cân nhắc chuyển chỗ
+                    if (window.Swal && res.warning) {
+                        Swal.fire({ icon: 'warning', title: 'Đã lưu - có tương kỵ', html: esc(res.message) + '<br><br>' +
+                            esc(res.warning).split(' | ').join('<br>'), confirmButtonColor: '#2E7BC4' });
+                    } else if (window.Swal) {
+                        Swal.fire({ icon: 'success', title: 'Thành công!', text: res.message, timer: 1800, showConfirmButton: false });
+                    }
+
+                    if (typeof opts.onAssigned === 'function') {
+                        opts.onAssigned(res);
+                        return;
+                    }
+
+                    // Trang không tự xử lý: vá vị trí vào dòng tồn rồi dựng lại sơ đồ
+                    (res.import_ids || []).forEach(function(id) {
+                        rows.forEach(function(r) { if (String(r.id) === String(id)) $.extend(r, res.location); });
+                    });
+                    window.invZoneGrid(selector, opts);
+                    $root.find('.mz-filter[data-state].is-active, .mz-zt-filter.is-active').trigger('click');
+                }
+
+                /* ---------- Đặt hoá chất vào một vị trí: chọn trong các mã Chưa xếp vị trí ---------- */
+                var compatPairs = {};
+                if (compat) {
+                    Object.keys(compat.matrix || {}).forEach(function(a) {
+                        compatPairs[a] = {};
+                        (compat.matrix[a] || []).forEach(function(b) { compatPairs[a][b] = true; });
+                    });
+                }
+
+                /** Hoá chất đang nằm cùng phạm vi (tầng) với vị trí n mà mã r tương kỵ - chỉ cảnh báo, không chặn */
+                function clashesAt(n, r) {
+                    if (!compat || !r.sw || !r.sw.length) return [];
+
+                    var names = {};
+                    values(index).forEach(function(m) {
+                        if (m.scopeKey !== n.scopeKey) return;
+                        m.items.forEach(function(x) {
+                            if (!x.sw || !x.sw.length || (r.category_id && x.category_id === r.category_id)) return;
+                            var hit = r.sw.some(function(a) {
+                                return x.sw.some(function(b) { return compatPairs[a] && compatPairs[a][b]; });
+                            });
+                            if (hit) names[x.name || '—'] = (names[x.name || '—'] || []).concat(m.code);
+                        });
+                    });
+
+                    return Object.keys(names).map(function(name) { return name + ' (' + uniq(names[name]).join(', ') + ')'; });
+                }
+
+                function placePickedIds() {
+                    return $place.find('.mz-pl-pick:checked').map(function() { return $(this).val(); }).get();
+                }
+
+                function syncPlace() {
+                    var count = placePickedIds().length;
+                    var $visible = $place.find('tbody tr').filter(function() { return this.style.display !== 'none'; });
+
+                    $place.find('.mz-pl-count').text(count);
+                    $place.find('.mz-pl-submit').prop('disabled', count === 0);
+                    $place.find('.mz-pl-all').prop('checked', $visible.length > 0 && $visible.find('.mz-pl-pick:not(:checked)').length === 0);
+                }
+
+                function openPlace(n) {
+                    if (!$place.length) return;
+
+                    $place.data('node', n);
+                    $place.find('.mz-pl-code').text(n.code);
+                    $place.find('.mz-pl-path').text(n.path);
+                    $place.find('.mz-pl-lots').text(n.lots);
+                    $place.find('.mz-pl-search').val('');
+                    $place.find('.mz-pl-error').prop('hidden', true).text('');
+
+                    var $tb = $place.find('tbody').empty();
+                    unzoned.forEach(function(r, i) {
+                        var clashes = clashesAt(n, r);
+                        $tb.append('<tr data-search="' + esc([r.code, r.name, r.sub].join(' ').toLowerCase()) + '"' +
+                            (clashes.length ? ' class="is-clash"' : '') + '>' +
+                            '<td class="text-center"><input type="checkbox" class="mz-pl-pick" value="' + esc(r.id) + '"></td>' +
+                            '<td class="text-center">' + (i + 1) + '</td>' +
+                            '<td class="font-weight-bold">' + esc(r.code) + '</td>' +
+                            '<td><div class="font-weight-bold">' + esc(r.name || '—') + '</div>' +
+                            (r.sub ? '<div class="md-sub small text-muted">' + esc(r.sub) + '</div>' : '') +
+                            (clashes.length ? '<div class="mz-pl-clash"><i class="fas fa-exclamation-triangle mr-1"></i>Tương kỵ cùng tầng: ' +
+                                esc(clashes.join('; ')) + '</div>' : '') + '</td>' +
+                            '<td class="text-right font-weight-bold">' + num(r.remaining) + ' ' + esc(r.unit) + '</td>' +
+                            '<td class="text-center md-sub">' + date(r.expired) + '</td></tr>');
+                    });
+                    syncPlace();
+
+                    $place.modal('show');
+                }
+
+                function savePlace() {
+                    var n = $place.data('node');
+                    var ids = placePickedIds();
+                    var max = Number(assign.max) || 200;
+                    var $error = $place.find('.mz-pl-error');
+                    var $btn = $place.find('.mz-pl-submit');
+
+                    if (!n || !ids.length) {
+                        $error.text('Vui lòng chọn ' + codeLabel + ' cần đặt vào vị trí này.').prop('hidden', false);
+                        return;
+                    }
+                    if (ids.length > max) {
+                        $error.text('Mỗi lần định khu tối đa ' + max + ' ' + codeLabel + ', vui lòng bỏ bớt mã đã chọn.').prop('hidden', false);
+                        return;
+                    }
+
+                    $error.prop('hidden', true).text('');
+                    $btn.prop('disabled', true).find('i').attr('class', 'fas fa-circle-notch fa-spin mr-1');
+
+                    $.ajax({
+                        url: assign.url,
+                        method: 'POST',
+                        dataType: 'json',
+                        data: { _token: assign.token, import_ids: ids, location_id: String(n.key).replace(/^L/, '') }
+                    }).done(function(res) {
+                        $place.modal('hide');
+                        assigned(res);
+                    }).fail(function(xhr) {
+                        var message = (xhr.responseJSON && xhr.responseJSON.message) ||
+                            'Không lưu được định khu, vui lòng tải lại trang rồi thử lại.';
+                        $error.text(message).prop('hidden', false);
+                    }).always(function() {
+                        $btn.prop('disabled', placePickedIds().length === 0).find('i').attr('class', 'fas fa-map-marker-alt mr-1');
+                    });
+                }
+
+                /** Đóng modal đang mở rồi mới mở modal kế (Bootstrap 4 không chồng 2 modal) */
+                function swapModal($from, next) {
+                    $from.one('hidden.bs.modal', next).modal('hide');
+                }
+
+                /** Ô chọn vị trí đích (Select2 AJAX tra cứu định khu, chip lọc phân loại, cảnh báo tương kỵ) */
+                function lookupSelect($select, $parent, categoryIds) {
+                    if ($select.hasClass('select2-hidden-accessible')) return;
+
+                    $select.data('lookupParams', function() { return { category_ids: categoryIds() }; });
+                    $select.select2({
+                        theme: 'bootstrap4',
+                        width: '100%',
+                        dropdownParent: $parent,
+                        placeholder: '-- Chọn vị trí lưu trữ --',
+                        ajax: window.wmsLookupAjax($select),
+                        templateResult: function(row) {
+                            if (!row.id || !row.warning) return window.wmsZoneTemplate(row);
+
+                            return $('<div class="mz-opt-warn">').append(
+                                $('<div>').append(window.wmsZoneTemplate(row)),
+                                $('<small>').text(row.warning)
+                            );
+                        }
+                    });
+                }
+
+                function syncDetail() {
+                    var count = $modal.find('.mz-d-pick:checked').length;
+                    var total = $modal.find('.mz-d-pick').length;
+
+                    $modal.find('.mz-d-move').prop('disabled', count === 0).find('b').text(count);
+                    $modal.find('.mz-d-all').prop('checked', total > 0 && count === total);
+                }
+
+                /** Mở modal Đổi vị trí cho các mã ids đang ở ô from; target = ô đích đã thả (kéo thả) hoặc null */
+                function openMove(from, ids, target) {
+                    if (!$move.length || !assign.moveUrl) return;
+
+                    var want = {};
+                    ids.forEach(function(id) { want[String(id)] = true; });
+                    var list = from.items.filter(function(r) { return want[String(r.id)]; });
+                    var categories = {};
+                    var $tb = $move.find('tbody').empty();
+
+                    list.forEach(function(r, i) {
+                        categories[r.category_id ? 'c' + r.category_id : 'n' + r.name] = r.category_id || null;
+                        $tb.append('<tr><td class="text-center">' + (i + 1) + '</td>' +
+                            '<td class="font-weight-bold">' + esc(r.code) + '</td>' +
+                            '<td><div class="font-weight-bold">' + esc(r.name || '—') + '</div>' +
+                            (r.sub ? '<div class="md-sub small text-muted">' + esc(r.sub) + '</div>' : '') + '</td>' +
+                            '<td class="text-right font-weight-bold">' + num(r.remaining) + ' ' + esc(r.unit) + '</td>' +
+                            '<td class="text-center md-sub">' + date(r.expired) + '</td></tr>');
+                    });
+
+                    $move.data('ids', list.map(function(r) { return r.id; }));
+                    $move.data('categoryIds', values(categories).filter(Boolean));
+                    $move.find('.mz-mv-from').text(from.code);
+                    $move.find('.mz-mv-count').text(list.length);
+                    $move.find('.mz-mv-reason').val('');
+                    $move.find('.mz-mv-error').prop('hidden', true).text('');
+
+                    var $select = $move.find('.mz-mv-location');
+                    $select.val(null).find('option[value!=""]').remove();
+                    if (target) {
+                        $select.append($('<option>', { value: target.id, text: target.code, selected: true })
+                            .attr('data-zone', target.zoneType || ''));
+                    }
+                    $select.trigger('change');
+
+                    $move.modal('show');
+                }
+
+                function saveMove() {
+                    var ids = $move.data('ids') || [];
+                    var locationId = $move.find('.mz-mv-location').val();
+                    var reason = String($move.find('.mz-mv-reason').val() || '').trim();
+                    var $error = $move.find('.mz-mv-error');
+                    var $btn = $move.find('.mz-mv-submit');
+
+                    if (!locationId) return $error.text('Vui lòng chọn vị trí mới.').prop('hidden', false);
+                    if (!reason) return $error.text('Vui lòng nhập lý do đổi vị trí.').prop('hidden', false);
+
+                    $error.prop('hidden', true).text('');
+                    $btn.prop('disabled', true).find('i').attr('class', 'fas fa-circle-notch fa-spin mr-1');
+
+                    $.ajax({
+                        url: assign.moveUrl,
+                        method: 'POST',
+                        dataType: 'json',
+                        data: { _token: assign.token, import_ids: ids, location_id: locationId, reason: reason }
+                    }).done(function(res) {
+                        $move.modal('hide');
+                        assigned(res);
+                    }).fail(function(xhr) {
+                        $error.text((xhr.responseJSON && xhr.responseJSON.message) ||
+                            'Không đổi được vị trí, vui lòng tải lại trang rồi thử lại.').prop('hidden', false);
+                    }).always(function() {
+                        $btn.prop('disabled', false).find('i').attr('class', 'fas fa-exchange-alt mr-1');
+                    });
+                }
+
+                /** Thả thẻ Chưa xếp vị trí (hoặc các thẻ đang chọn) vào một ô: hỏi lại rồi định khu luôn */
+                function dropUnzoned(ids, target) {
+                    var list = ids.map(function(id) { return unzonedById[id]; }).filter(Boolean);
+                    if (!list.length) return;
+
+                    var max = Number(assign.max) || 200;
+                    var clashes = [];
+                    list.forEach(function(r) {
+                        clashesAt(target, r).forEach(function(c) { clashes.push(r.code + ' ✕ ' + c); });
+                    });
+                    var label = list.length === 1 ? codeLabel + ' ' + list[0].code : list.length + ' ' + codeLabel;
+                    var send = function() {
+                        $.ajax({
+                            url: assign.url,
+                            method: 'POST',
+                            dataType: 'json',
+                            data: { _token: assign.token, import_ids: list.map(function(r) { return r.id; }), location_id: target.id }
+                        }).done(assigned).fail(function(xhr) {
+                            var text = (xhr.responseJSON && xhr.responseJSON.message) || 'Không lưu được định khu, vui lòng tải lại trang rồi thử lại.';
+                            return window.Swal ? Swal.fire({ icon: 'error', title: 'Không lưu được', text: text, confirmButtonColor: '#2E7BC4' }) :
+                                window.alert(text);
+                        });
+                    };
+
+                    if (list.length > max) {
+                        var tooMany = 'Mỗi lần định khu tối đa ' + max + ' ' + codeLabel + ', vui lòng bỏ bớt mã đã chọn.';
+                        return window.Swal ? Swal.fire({ icon: 'info', title: 'Chọn quá nhiều', text: tooMany, confirmButtonColor: '#2E7BC4' }) :
+                            window.alert(tooMany);
+                    }
+                    if (!window.Swal) {
+                        if (window.confirm('Định khu ' + label + ' vào ' + target.code + '?')) send();
+                        return;
+                    }
+
+                    Swal.fire({
+                        icon: clashes.length ? 'warning' : 'question',
+                        title: 'Định khu vào ' + target.code + '?',
+                        html: 'Xếp ' + esc(label) + ' vào vị trí <b>' + esc(target.code) + '</b>.' +
+                            (clashes.length ? '<div class="text-left text-danger mt-2 small"><b>Tương kỵ cùng tầng:</b><br>' +
+                                clashes.map(esc).join('<br>') + '</div>' : ''),
+                        showCancelButton: true,
+                        confirmButtonText: 'Định khu',
+                        cancelButtonText: 'Huỷ',
+                        confirmButtonColor: '#2E7BC4'
+                    }).then(function(r) { if (r.isConfirmed || r.value) send(); });
+                }
+
                 function saveAssign() {
                     var ids = $assign.data('ids') || [];
                     var locationId = $assign.find('.mz-as-location').val();
@@ -797,26 +1264,7 @@
                         data: { _token: assign.token, import_ids: ids, location_id: locationId }
                     }).done(function(res) {
                         $assign.modal('hide');
-
-                        // Tương kỵ không chặn: vẫn lưu, báo cảnh báo để thủ kho cân nhắc chuyển chỗ
-                        if (window.Swal && res.warning) {
-                            Swal.fire({ icon: 'warning', title: 'Đã lưu - có tương kỵ', html: esc(res.message) + '<br><br>' +
-                                esc(res.warning).split(' | ').join('<br>'), confirmButtonColor: '#2E7BC4' });
-                        } else if (window.Swal) {
-                            Swal.fire({ icon: 'success', title: 'Thành công!', text: res.message, timer: 1800, showConfirmButton: false });
-                        }
-
-                        if (typeof opts.onAssigned === 'function') {
-                            opts.onAssigned(res);
-                            return;
-                        }
-
-                        // Trang không tự xử lý: vá vị trí vào dòng tồn rồi dựng lại sơ đồ
-                        (res.import_ids || []).forEach(function(id) {
-                            rows.forEach(function(r) { if (String(r.id) === String(id)) $.extend(r, res.location); });
-                        });
-                        window.invZoneGrid(selector, opts);
-                        $root.find('.mz-filter[data-state].is-active, .mz-zt-filter.is-active').trigger('click');
+                        assigned(res);
                     }).fail(function(xhr) {
                         var message = (xhr.responseJSON && xhr.responseJSON.message) ||
                             'Không lưu được định khu, vui lòng tải lại trang rồi thử lại.';
@@ -917,13 +1365,122 @@
 
                         $select.select2('open');
                     });
+
+                    /* ----- Hộp chi tiết vị trí: [Thêm hoá chất] + chọn mã -> [Đổi vị trí] ----- */
+                    $modal.off('.mz');
+                    $modal.on('click.mz', '.mz-d-add', function() {
+                        var n = $modal.data('node');
+                        if (n) swapModal($modal, function() { openPlace(n); });
+                    });
+                    $modal.on('click.mz', '.mz-d-move', function() {
+                        var n = $modal.data('node');
+                        var ids = $modal.find('.mz-d-pick:checked').map(function() { return $(this).val(); }).get();
+                        if (n && ids.length) swapModal($modal, function() { openMove(n, ids, null); });
+                    });
+                    $modal.on('change.mz', '.mz-d-pick', syncDetail);
+                    $modal.on('change.mz', '.mz-d-all', function() {
+                        $modal.find('.mz-d-pick').prop('checked', this.checked);
+                        syncDetail();
+                    });
+
+                    /* ----- Modal Đổi vị trí ----- */
+                    $move.off('.mz');
+                    $move.on('click.mz', '.mz-mv-submit', saveMove);
+                    $move.on('change.mz input.mz', '.mz-mv-location, .mz-mv-reason', function() {
+                        $move.find('.mz-mv-error').prop('hidden', true).text('');
+                    });
+                    $move.on('shown.bs.modal.mz', function() {
+                        var $select = $move.find('.mz-mv-location');
+                        lookupSelect($select, $move, function() { return $move.data('categoryIds') || []; });
+                        if (!$select.val()) $select.select2('open');
+                        else $move.find('.mz-mv-reason').trigger('focus');
+                    });
+
+                    /* ----- Kéo thả: thẻ Chưa xếp vị trí -> ô (định khu); ô có hàng -> ô khác (đổi vị trí) ----- */
+                    var dragging = null;
+                    $root.on('dragstart.mz', '.mz-ucard[draggable], .mz-slot[draggable]', function(e) {
+                        var $el = $(this);
+                        if ($el.hasClass('mz-ucard')) {
+                            var ids = $el.hasClass('is-picked') ? pickedIds() : [$el.attr('data-id')];
+                            dragging = { kind: 'unzoned', ids: ids };
+                        } else {
+                            dragging = { kind: 'move', key: $el.attr('data-key') };
+                        }
+                        $root.addClass('is-dragging');
+                        try { e.originalEvent.dataTransfer.setData('text/plain', $el.attr('data-id') || $el.attr('data-key')); } catch (x) {}
+                        e.originalEvent.dataTransfer.effectAllowed = 'move';
+                    });
+                    $root.on('dragend.mz', function() {
+                        dragging = null;
+                        $root.removeClass('is-dragging').find('.mz-slot.is-over').removeClass('is-over');
+                    });
+                    $root.on('dragover.mz', '.mz-slot.is-drop', function(e) {
+                        if (!dragging || (dragging.kind === 'move' && dragging.key === $(this).attr('data-key'))) return;
+                        e.preventDefault();
+                        e.originalEvent.dataTransfer.dropEffect = 'move';
+                        $(this).addClass('is-over');
+                    });
+                    $root.on('dragleave.mz', '.mz-slot', function() { $(this).removeClass('is-over'); });
+                    $root.on('drop.mz', '.mz-slot.is-drop', function(e) {
+                        e.preventDefault();
+                        var drag = dragging;
+                        var target = index[$(this).attr('data-key')];
+                        $root.trigger('dragend.mz');
+                        if (!drag || !target) return;
+
+                        if (drag.kind === 'move') {
+                            var from = index[drag.key];
+                            if (from && from !== target) openMove(from, from.items.map(function(r) { return String(r.id); }), target);
+                            return;
+                        }
+
+                        dropUnzoned(drag.ids, target);
+                    });
+
+                    $place.off('.mz');
+                    $place.on('click.mz', '.mz-pl-submit', savePlace);
+                    $place.on('change.mz', '.mz-pl-pick', syncPlace);
+                    // Bấm cả dòng = chọn / bỏ chọn
+                    $place.on('click.mz', 'tbody tr', function(e) {
+                        if ($(e.target).is('.mz-pl-pick')) return;
+                        var $cb = $(this).find('.mz-pl-pick');
+                        $cb.prop('checked', !$cb.prop('checked'));
+                        syncPlace();
+                    });
+                    $place.on('change.mz', '.mz-pl-all', function() {
+                        var on = this.checked;
+                        $place.find('tbody tr').filter(function() { return this.style.display !== 'none'; })
+                            .find('.mz-pl-pick').prop('checked', on);
+                        syncPlace();
+                    });
+                    $place.on('input.mz', '.mz-pl-search', function() {
+                        var q = ($(this).val() || '').toString().trim().toLowerCase();
+                        $place.find('tbody tr').each(function() {
+                            this.style.display = q === '' || ($(this).attr('data-search') || '').indexOf(q) >= 0 ? '' : 'none';
+                        });
+                        syncPlace();
+                    });
+                    $place.on('shown.bs.modal.mz', function() {
+                        $place.find('.mz-pl-search').trigger('focus');
+                    });
                 }
 
-                // Bấm một ô vị trí -> xem đủ các mã đang nằm ở đó
-                $root.on('click.mz', '.mz-cell[data-key]', function() {
+                // Ô vị trí là <span role="button">: Enter / Space cũng mở như bấm chuột
+                $root.on('keydown.mz', '.mz-slot', function(e) {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    $(this).trigger('click');
+                });
+
+                // Bấm một ô vị trí -> xem đủ các mã đang nằm ở đó; có quyền thì Thêm hoá chất / Đổi vị trí ngay trong hộp
+                $root.on('click.mz', '.mz-slot', function() {
                     var n = index[$(this).attr('data-key')];
                     if (!n) return;
+                    // Ô trống mà không có quyền thêm thì không có gì để xem
+                    if (!n.lots && !(assign && canEdit(n))) return;
 
+                    var editable = !!assign && canEdit(n);
+                    $modal.data('node', n);
                     $modal.find('.mz-d-name, .mz-d-code').text(n.code);
                     $modal.find('.mz-d-path').text(n.path);
                     $modal.find('.mz-d-lots').text(n.lots);
@@ -934,8 +1491,14 @@
                     if (clash) $compat.html(conflictConclusion(n, compat.scope_label));
 
                     var $tb = $modal.find('tbody').empty();
+                    $modal.find('.mz-d-pickcol').toggle(editable);
+                    $modal.find('.mz-d-all').prop('checked', false);
+                    if (!n.items.length) {
+                        $tb.append('<tr><td colspan="7" class="text-center text-muted font-italic">Vị trí đang trống</td></tr>');
+                    }
                     n.items.forEach(function(r, i) {
-                        $tb.append('<tr><td class="text-center">' + (i + 1) + '</td>' +
+                        $tb.append('<tr>' + (editable ? '<td class="text-center"><input type="checkbox" class="mz-d-pick" value="' +
+                            esc(r.id) + '" title="Chọn để đổi vị trí"></td>' : '') + '<td class="text-center">' + (i + 1) + '</td>' +
                             '<td class="font-weight-bold">' + esc(r.code) + '</td>' +
                             '<td><div class="font-weight-bold">' + esc(r.name || '—') + '</div>' +
                             (r.sub ? '<div class="md-sub small text-muted">' + esc(r.sub) + '</div>' : '') + '</td>' +
@@ -944,6 +1507,13 @@
                             '<td class="text-center"><span class="inv-badge inv-badge-' + esc(r.state) + '">' +
                             esc(r.state_label) + '</span></td></tr>');
                     });
+
+                    // Nút ở chân hộp: chỉ hiện khi có quyền và vị trí không thuộc khu Biệt trữ / Cách ly / Loại bỏ
+                    $modal.find('.mz-d-actions').toggle(editable);
+                    $modal.find('.mz-d-add').prop('disabled', !unzoned.length)
+                        .attr('title', unzoned.length ? 'Chọn ' + codeLabel + ' chưa xếp vị trí để thêm vào ' + n.code :
+                            'Không còn ' + codeLabel + ' nào chưa xếp vị trí');
+                    syncDetail();
                     $modal.modal('show');
                 });
 

@@ -120,6 +120,84 @@
         appearance: none; -webkit-appearance: none;
     }
     .mz-cell:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--primary-light); }
+
+    /* ---------- Sơ đồ Thẻ dựng ở trình duyệt (shared/zoneGrid): lưới kiểu Cấu trúc kho ----------
+       Kệ -> các Cột xếp ngang (khối .mz-col), mỗi cột: hàng = Tầng, mỗi tầng = lưới ô Ngang (A, B...) × Sâu (1 = sát cửa) */
+    .mz-cols { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+    .mz-col {
+        background: #fff; border: 1px solid #E2EAF4; border-radius: var(--border-radius-lg); padding: 10px 14px 12px;
+        box-shadow: var(--shadow-sm); max-width: 100%; overflow-x: auto;
+    }
+    .mz-col-head { margin-bottom: 8px; }
+    .mz-col-title { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: .9rem; color: var(--text-main); white-space: nowrap; }
+    .mz-col-title > i { color: var(--primary-light); }
+    .mz-col-title .md-tag { font-family: var(--font-mono, monospace); font-size: .72rem; }
+    .mz-col-meta { font-size: .7rem; color: #64748B; font-weight: 600; margin-top: 2px; }
+    .mz-col-body { display: flex; flex-direction: column; gap: 6px; }
+    .mz-trow { display: flex; align-items: center; gap: 8px; }
+    .mz-tlabel { width: 58px; flex: none; text-align: right; font-size: .78rem; font-weight: 600; color: #334155; line-height: 1.2; }
+    .mz-tlabel small { display: block; font-size: .64rem; font-weight: 700; color: var(--primary); }
+    .mz-tblock {
+        --slot: 30px;
+        display: grid; grid-template-columns: 12px auto; grid-template-rows: auto auto; gap: 2px 3px; flex: none;
+    }
+    .mz-depth-rule {
+        grid-column: 1; grid-row: 1; display: grid; grid-auto-rows: var(--slot); gap: 3px;
+        font-size: 9px; line-height: var(--slot); text-align: right; color: #64748B; user-select: none;
+    }
+    .mz-slots {
+        grid-column: 2; grid-row: 1; display: grid; gap: 3px;
+        grid-template-columns: repeat(var(--cols), var(--slot)); grid-template-rows: repeat(var(--rows), var(--slot));
+    }
+    .mz-front-rule {
+        grid-column: 2; grid-row: 2; display: grid; grid-template-columns: repeat(var(--cols), var(--slot)); gap: 3px;
+        font-size: 9px; font-weight: 700; line-height: 11px; text-align: center; color: #64748B; user-select: none;
+    }
+    .mz-front-rule span { border-top: 2px solid #CBD5E1; }
+
+    /* Ô vị trí: trống = nền nhạt (viền màu phân loại), có hàng = màu tình trạng, số = số mã đang có */
+    .mz-slot {
+        position: relative; display: flex; align-items: center; justify-content: center;
+        width: var(--slot); height: var(--slot); border-radius: 5px; cursor: pointer; user-select: none;
+        font-size: .74rem; font-weight: 800; color: #fff; background: #EEF2F6; border: 1px solid #D6DCE4;
+        transition: transform .15s, box-shadow .2s, opacity .2s;
+    }
+    .mz-slot.has-zone { box-shadow: inset 0 -4px 0 var(--zt); }
+    .mz-slot.is-empty.has-zone { border-color: var(--zt); }
+    .mz-slot.is-ok { background: var(--primary); border-color: var(--primary-dark); }
+    .mz-slot.is-warn { background: #F59E0B; border-color: #D97706; }
+    .mz-slot.is-danger { background: #DC2626; border-color: #B91C1C; }
+    .mz-slot.is-compat::after {
+        content: '!'; position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; border-radius: 50%;
+        background: #DC2626; color: #fff; font-size: 9px; line-height: 14px; text-align: center; border: 1.5px solid #fff;
+    }
+    .mz-slot.is-compat { outline: 2px solid #DC2626; outline-offset: 1px; }
+    .mz-slot:hover { transform: translateY(-1px) scale(1.08); box-shadow: var(--shadow-md); z-index: 1; }
+    .mz-slot.has-zone:hover { box-shadow: inset 0 -4px 0 var(--zt), var(--shadow-md); }
+    .mz-slot:focus-visible { outline: 2px solid var(--primary-dark); outline-offset: 2px; }
+    .mz-slot.is-dim { opacity: .22; }
+    .mz-slot.is-hit { outline: 2px solid #F59E0B; outline-offset: 1px; }
+    .mz-slot[draggable="true"] { cursor: grab; }
+    /* Kéo thả: ô nhận được sáng viền, ô đang rê vào phóng to */
+    .mz-root.is-dragging .mz-slot.is-drop { outline: 1px dashed var(--primary-light); outline-offset: 1px; }
+    .mz-root.is-dragging .mz-slot:not(.is-drop) { opacity: .35; }
+    .mz-slot.is-over { transform: scale(1.18); outline: 2px solid #16A34A !important; box-shadow: 0 0 0 4px rgba(22, 163, 74, .25); }
+    .mz-ucard[draggable="true"] { cursor: grab; }
+    .mz-d-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mz-d-actions .btn:not(:disabled):hover { transform: translateY(-1px); }
+
+    .mz-as-list.mz-pl-list { max-height: 52vh; }
+    .mz-as-list.mz-pl-list td:nth-child(4) { white-space: normal; }
+    .mz-as-list.mz-pl-list td:nth-child(3), .mz-as-list.mz-pl-list td:nth-child(5) { white-space: nowrap; }
+    /* Các kệ trong một kho xếp ngang cạnh nhau, hẹp thì tự xuống dòng */
+    .mz-wh-body.is-grid { display: flex; flex-wrap: wrap; gap: 4px 24px; align-items: flex-start; }
+    .mz-wh-body.is-grid > .mz-shelf { max-width: 100%; }
+    .mz-pl-list tbody tr { cursor: pointer; }
+    .mz-pl-list tbody tr:hover { background: var(--primary-soft); }
+    .mz-pl-list tbody tr.is-clash { background: #FFF9F9; }
+    .mz-pl-list input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary); cursor: pointer; }
+    .mz-pl-clash { margin-top: 2px; font-size: .74rem; font-weight: 600; color: #B91C1C; }
+    .modal .mz-search input { width: 100%; padding-left: 32px !important; }
     .mz-cell.is-ok { border-top-color: #16A34A; }
     .mz-cell.is-warn { border-top-color: #F59E0B; background: #FFFCF5; }
     .mz-cell.is-danger { border-top-color: #DC2626; background: #FFF9F9; }

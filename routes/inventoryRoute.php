@@ -52,6 +52,8 @@ Route::prefix('/inventory')
             Route::post('internalExpiry', 'internalExpiry')->name('internalExpiry');
             // Định khu nhanh mã xuất nhập "Chưa xếp vị trí" ở tab Theo định khu (AJAX, trả JSON)
             Route::post('assignLocation', 'assignLocation')->name('assignLocation');
+            // Đổi vị trí mã xuất nhập đã có định khu (bắt buộc lý do) - hộp chi tiết / kéo thả ở sơ đồ Thẻ
+            Route::post('moveLocation', 'moveLocation')->name('moveLocation');
             // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
             Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
             Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');

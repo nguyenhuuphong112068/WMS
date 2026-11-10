@@ -241,11 +241,15 @@
                         // Định khu nhanh các mã "Chưa xếp vị trí" - ChemicalInventoryController::assignLocation
                         'zgAssign' => user_can('inventory_chemical_location') ? [
                             'url' => route('pages.inventory.chemicalInventory.assignLocation'),
+                            // Đổi vị trí mã đã có định khu (hộp chi tiết vị trí / kéo ô thả sang ô khác)
+                            'moveUrl' => route('pages.inventory.chemicalInventory.moveLocation'),
                             'lookup' => route('pages.category.lookup.locations', [
                                 'type' => 'chemical',
                                 'except_zone' => implode(',', \App\Http\Controllers\Pages\Inventory\ChemicalInventoryController::ASSIGN_EXCEPT_ZONES),
                             ]),
                             'max' => \App\Http\Controllers\Pages\Inventory\ChemicalInventoryController::ASSIGN_MAX,
+                            // Thẻ vị trí thuộc các khu này không có nút [Đặt hoá chất]
+                            'except' => \App\Http\Controllers\Pages\Inventory\ChemicalInventoryController::ASSIGN_EXCEPT_ZONES,
                         ] : null,
                     ])
                 </div>
