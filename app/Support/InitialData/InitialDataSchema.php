@@ -103,6 +103,24 @@ class InitialDataSchema
     public const SHARED_STAGES = [1, 2];
 
     /**
+     * Sheet có dòng điền sẵn SỬA ĐƯỢC (chỉ khoá cột khoá): _DS ghi số dòng điền sẵn = 0 để bộ nạp
+     * đọc cả các dòng đó, bản ghi đã có thì CẬP NHẬT theo file thay vì bỏ qua.
+     */
+    public const EDITABLE_PREFILL_SHEETS = ['users' => ['user_name']];
+
+    /**
+     * TẠM ẨN với user khác Admin (12/11/2026): chưa mở giai đoạn này cho phòng ban - không hiện ở ô
+     * chọn giai đoạn / bảng theo dõi, không tải mẫu / đính kèm / đánh dấu được. Mở lại: để mảng rỗng.
+     */
+    public const ADMIN_ONLY_STAGES = [3, 4];
+
+    /** Giai đoạn user thấy được: Admin thấy đủ, user khác bỏ các giai đoạn đang tạm ẩn. */
+    public static function stagesFor(bool $isAdmin): array
+    {
+        return $isAdmin ? self::STAGES : array_diff_key(self::STAGES, array_flip(self::ADMIN_ONLY_STAGES));
+    }
+
+    /**
      * Sheet thuộc giai đoạn 1 (tổ chức - Admin chuẩn bị) / 2 (người dùng + tổ - nhóm, các phòng bổ sung
      * tổ còn thiếu ngay trong file người dùng) / 4 (tồn đầu kỳ); sheet còn
      * lại (dữ liệu gốc, tên hàng, danh mục, định khu, hàng của phòng) là giai đoạn 3.

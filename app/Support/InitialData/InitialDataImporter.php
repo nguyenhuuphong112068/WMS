@@ -135,7 +135,7 @@ class InitialDataImporter
             foreach (InitialDataSchema::importSheets($this->module, $this->stage) as $key => $sheet) {
                 $this->sheetKey = $key;
                 $prefilled = $this->prefilled[$key] ?? 0;
-                $this->stats[$key] = ['title' => $sheet['title'], 'rows' => count($data[$key]) + $prefilled, 'inserted' => 0, 'existing' => $prefilled];
+                $this->stats[$key] = ['title' => $sheet['title'], 'rows' => count($data[$key]) + $prefilled, 'inserted' => 0, 'updated' => 0, 'existing' => $prefilled];
 
                 $valid = array_values(array_filter($data[$key], fn ($row) => empty($row['_invalid'])));
                 $this->{'import'.str_replace('_', '', ucwords($key, '_'))}($valid);
@@ -405,7 +405,10 @@ class InitialDataImporter
                         $row['_invalid'] = $this->error($r, $label, 'Tối đa '.$col['max'].' ký tự (đang có '.mb_strlen($text).').');
                         break;
                     }
-                    if (isset($col['min_len']) && mb_strlen($text) < $col['min_len']) {
+                    // Mã đăng nhập đã có trên hệ thống (dòng điền sẵn, vd. tài khoản xem "QA") không xét độ dài tối thiểu
+                    $existingLogin = $this->sheetKey === 'users' && $col['key'] === 'user_name'
+                        && DB::table('user_management')->where('userName', $text)->exists();
+                    if (isset($col['min_len']) && mb_strlen($text) < $col['min_len'] && ! $existingLogin) {
                         $row['_invalid'] = $this->error($r, $label, 'Tối thiểu '.$col['min_len'].' ký tự.');
                         break;
                     }
@@ -609,8 +612,9 @@ class InitialDataImporter
         $passwordChecked = false;
 
         $this->eachUnique($rows, ['user_name'], function ($row) use (&$passwordChecked) {
-            if ($this->lookup('user_management', 'userName', $row['user_name'])) {
-                return $this->existing();
+            $existingId = $this->lookup('user_management', 'userName', $row['user_name']);
+            if ($existingId) {
+                return $this->updateUser($existingId, $row);
             }
 
             if (! $passwordChecked) {
@@ -693,6 +697,120 @@ class InitialDataImporter
             $this->inserted();
             $this->remember('user_management', 'userName', $row['user_name'], $id);
         });
+    }
+
+    /**
+     * Tài khoản đã có (dòng điền sẵn sửa được hoặc gõ lại mã đã có): cập nhật họ tên, email, phòng ban,
+     * vai trò, tổ chính theo file. Không đổi mật khẩu. Vai trò còn giữ thì giữ nguyên phạm vi phòng đã
+     * gán (vd. BGĐ gán nhiều phòng); vai trò mới gán theo phòng của người dùng; vai trò bỏ khỏi file thì gỡ.
+     */
+    private function updateUser(int $id, array $row): void
+    {
+        $user = DB::table('user_management')->where('id', $id)->first();
+
+        $deptId = $this->department($row);
+        $roleIds = [];
+        foreach (array_keys(InitialDataSchema::ROLE_COLUMNS) as $key) {
+            foreach ($row[$key] as $name) {
+                $roleId = $this->lookup('roles', 'name', $name);
+                if ($roleId) {
+                    $roleIds[$roleId] = $roleId;
+                }
+            }
+        }
+        if (! $roleIds) {
+            $this->error($row['_row'], 'Phân quyền', 'Cần ít nhất một vai trò ở các cột Phân quyền.');
+        }
+        $groupId = null;
+        if ($deptId && $row['group'] !== null) {
+            $groupId = $this->scopedId('groups', $deptId, $row['group']);
+            if (! $groupId) {
+                $this->error($row['_row'], 'Tổ / nhóm', 'Tổ "'.$row['group'].'" không thuộc phòng ban '.$row['department'].' (sheet 03).');
+            }
+        }
+        if (! $deptId || ! $roleIds || ($row['group'] !== null && ! $groupId)) {
+            return;
+        }
+
+        $roleIds = array_values(array_map('intval', $roleIds));
+        $primary = (int) $user->role_id;
+        $currentIds = collect([$primary])->merge(DB::table('user_role')->where('user_id', $id)->pluck('role_id'))
+            ->filter()->map(fn ($v) => (int) $v)->unique()->sort()->values()->all();
+        $targetIds = collect($roleIds)->sort()->values()->all();
+
+        $roleName = fn (array $ids) => collect($ids)->map(fn ($rid) => DB::table('roles')->where('id', $rid)->value('name'))->implode(', ');
+        $deptName = fn ($did) => $did ? DB::table('deparments')->where('id', $did)->value('shortName') : '—';
+        $groupName = fn ($gid) => $gid ? DB::table('groups')->where('id', $gid)->value('name') : '—';
+        $mail = $row['mail'] ?? 'NA';
+
+        $changes = [];
+        if ((string) $user->fullName !== (string) $row['full_name']) {
+            $changes['Họ tên'] = [$user->fullName, $row['full_name']];
+        }
+        $normMail = fn ($m) => ($m === null || trim((string) $m) === '' || strtoupper(trim((string) $m)) === 'NA') ? 'NA' : trim((string) $m);
+        if ($normMail($user->mail) !== $normMail($mail)) {
+            $changes['Email'] = [$user->mail, $mail];
+        }
+        if ((int) $user->deparment_id !== $deptId) {
+            $changes['Phòng ban'] = [$deptName($user->deparment_id), $deptName($deptId)];
+        }
+        if ($currentIds !== $targetIds || $primary !== $roleIds[0]) {
+            $changes['Phân quyền'] = [$roleName(array_values(array_unique(array_merge([$primary], $currentIds)))), $roleName($roleIds)];
+        }
+        if ((int) $user->group_id !== (int) $groupId) {
+            $changes['Tổ chính'] = [$groupName($user->group_id), $groupName($groupId)];
+        }
+
+        if (! $changes) {
+            $this->existing();
+
+            return;
+        }
+
+        DB::table('user_management')->where('id', $id)->update([
+            'fullName' => $row['full_name'],
+            'mail' => $mail,
+            'deparment_id' => $deptId,
+            'company_id' => DB::table('deparments')->where('id', $deptId)->value('company_id'),
+            'role_id' => $roleIds[0],
+            'group_id' => $groupId,
+            'updated_at' => $this->now,
+        ]);
+
+        // Đổi phòng: vai trò đang gán theo phòng cũ chuyển sang phòng mới
+        if ((int) $user->deparment_id !== $deptId && $user->deparment_id) {
+            DB::table('user_role')->where('user_id', $id)->where('department_id', $user->deparment_id)->update(['department_id' => $deptId]);
+        }
+        $adminId = $this->lookup('roles', 'name', 'Admin');
+        DB::table('user_role')->where('user_id', $id)->whereNotIn('role_id', $roleIds)->delete();
+        $kept = DB::table('user_role')->where('user_id', $id)->pluck('role_id')->map(fn ($v) => (int) $v)->all();
+        foreach (array_diff($roleIds, $kept) as $roleId) {
+            DB::table('user_role')->insert([
+                'user_id' => $id,
+                'role_id' => $roleId,
+                'department_id' => $roleId === $adminId ? null : $deptId,
+            ]);
+        }
+
+        if ((int) $user->group_id !== (int) $groupId) {
+            if ($user->group_id) {
+                DB::table('user_group')->where('user_id', $id)->where('group_id', $user->group_id)->delete();
+            }
+            if ($groupId && ! DB::table('user_group')->where('user_id', $id)->where('group_id', $groupId)->exists()) {
+                DB::table('user_group')->insert(['user_id' => $id, 'group_id' => $groupId, 'created_at' => $this->now, 'updated_at' => $this->now]);
+            }
+        }
+
+        AuditTrialController::log('Cập nhật', 'user_management', $id,
+            collect($changes)->map(fn ($c, $k) => $k.': '.($c[0] ?? '—'))->implode('; '),
+            'Khởi tạo dữ liệu - '.$row['user_name'].' - '.collect($changes)->map(fn ($c, $k) => $k.': '.($c[1] ?? '—'))->implode('; '),
+            $this->actorUserName);
+
+        // Báo rõ từng thay đổi để người nạp soát lại trước khi nạp thật
+        $this->warning($row['_row'], 'Mã số nhân viên', 'Cập nhật tài khoản '.$row['user_name'].' - '
+            .collect($changes)->map(fn ($c, $k) => $k.': '.($c[0] ?? '—').' → '.($c[1] ?? '—'))->implode('; '));
+
+        $this->stats[$this->sheetKey]['updated']++;
     }
 
     public static function validPassword(?string $password): bool
@@ -1931,20 +2049,20 @@ class InitialDataImporter
         $total = 0;
 
         foreach ($this->stats as $key => $stat) {
-            if (! $stat['inserted']) {
+            if (! $stat['inserted'] && ! ($stat['updated'] ?? 0)) {
                 continue;
             }
-            $total += $stat['inserted'];
+            $total += $stat['inserted'] + ($stat['updated'] ?? 0);
             AuditTrialController::log(
                 'Khởi tạo dữ liệu',
                 $sheets[$key]['table'],
                 'NA',
                 'NA',
-                'Nạp '.$stat['title'].' từ file "'.$fileName.'": thêm '.$stat['inserted'].', đã có sẵn '.$stat['existing'].'.',
+                'Nạp '.$stat['title'].' từ file "'.$fileName.'": thêm '.$stat['inserted'].(($stat['updated'] ?? 0) ? ', cập nhật '.$stat['updated'] : '').', đã có sẵn '.$stat['existing'].'.',
                 $this->actorUserName
             );
         }
 
-        AuditTrialController::log('Khởi tạo dữ liệu', 'NA', 'NA', 'NA', 'Nạp file khởi tạo dữ liệu "'.$fileName.'": tổng cộng thêm mới '.$total.' bản ghi.', $this->actorUserName);
+        AuditTrialController::log('Khởi tạo dữ liệu', 'NA', 'NA', 'NA', 'Nạp file khởi tạo dữ liệu "'.$fileName.'": tổng cộng thêm mới / cập nhật '.$total.' bản ghi.', $this->actorUserName);
     }
 }

@@ -260,6 +260,8 @@ Route::prefix('/materData')
             Route::get('download/{id}', 'download')->whereNumber('id')->name('download');
             Route::get('preview/{id}', 'preview')->whereNumber('id')->name('preview');
             Route::post('review', 'review')->name('review');
+            // Chỉ Admin (kiểm cứng trong controller, không qua bảng quyền)
+            Route::post('delete', 'destroy')->name('delete');
             Route::post('skip', 'skip')->name('skip');
             Route::post('deadline', 'deadline')->name('deadline');
         });

@@ -438,6 +438,14 @@
                                                 data-row="{{ json_encode(['id' => $latest->id, 'review_status' => $latest->review_status, 'review_note' => $latest->review_note]) }}">
                                                 <i class="fas fa-clipboard-check"></i>
                                             </button>
+                                            <form class="form-md-confirm d-inline" action="{{ route('pages.materData.initialData.delete') }}" method="POST"
+                                                data-title="Xoá hẳn file lần nộp {{ $latest->submission_no }} &quot;{{ $latest->original_name }}&quot;?">
+                                                @csrf
+                                                <input type="hidden" name="id" value="{{ $latest->id }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Xoá file nộp mới nhất (lần nộp trước nếu có sẽ được dùng lại)">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </form>
                                         @endif
                                         @if (($isAdmin || $task['department']) && $task['state'] !== 'done')
                                             <form class="form-md-confirm d-inline" action="{{ route('pages.materData.initialData.skip') }}" method="POST"
@@ -478,6 +486,16 @@
                                                         data-file="Lần nộp {{ $f->submission_no }} · {{ $f->original_name }}"><i class="fas fa-eye"></i></a>
                                                     <a href="{{ route('pages.materData.initialData.download', $f->id) }}"
                                                         title="Tải file lần nộp {{ $f->submission_no }}"><i class="fas fa-download"></i></a>
+                                                    @if ($isAdmin)
+                                                        <form class="form-md-confirm d-inline" action="{{ route('pages.materData.initialData.delete') }}" method="POST"
+                                                            data-title="Xoá hẳn file lần nộp {{ $f->submission_no }} &quot;{{ $f->original_name }}&quot;?">
+                                                            @csrf
+                                                            <input type="hidden" name="id" value="{{ $f->id }}">
+                                                            <button type="submit" class="btn btn-link btn-sm p-0 text-danger" title="Xoá file lần nộp {{ $f->submission_no }}">
+                                                                <i class="fas fa-trash-alt"></i>
+                                                            </button>
+                                                        </form>
+                                                    @endif
                                                 </div>
                                             @endforeach
                                         </div>

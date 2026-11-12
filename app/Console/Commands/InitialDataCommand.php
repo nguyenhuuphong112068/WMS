@@ -81,9 +81,9 @@ class InitialDataCommand extends Command
             ->run($file, $action === 'import', basename($file));
 
         $this->table(
-            ['Sheet', 'Số dòng', $report['committed'] ? 'Đã thêm mới' : 'Sẽ thêm mới', 'Đã có sẵn'],
+            ['Sheet', 'Số dòng', $report['committed'] ? 'Đã thêm mới' : 'Sẽ thêm mới', $report['committed'] ? 'Đã cập nhật' : 'Sẽ cập nhật', 'Đã có sẵn'],
             collect($report['stats'])->where('rows', '>', 0)
-                ->map(fn ($s) => [$s['title'], $s['rows'], $s['inserted'], $s['existing']])->all()
+                ->map(fn ($s) => [$s['title'], $s['rows'], $s['inserted'], $s['updated'] ?? 0, $s['existing']])->all()
         );
 
         foreach ($report['warnings'] as $w) {

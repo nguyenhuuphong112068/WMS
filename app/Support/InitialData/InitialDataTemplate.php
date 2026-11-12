@@ -117,7 +117,8 @@ class InitialDataTemplate
         self::$roles = InitialDataSchema::fileSheets($module, $stage);
         self::$lastRows = [];
         self::$prefillCounts = [];
-        self::$department = $departmentId && ! $shared
+        // GĐ2 vẫn chia module chung nhưng nhận phạm vi phòng ban: điền sẵn tổ + người dùng của phòng đó
+        self::$department = $departmentId && $stage !== 1
             ? DB::table('deparments')->where('id', $departmentId)->first(['id', 'shortName'])
             : null;
 
@@ -390,7 +391,9 @@ class InitialDataTemplate
             ],
             2 => [
                 ['Mục đích', 'Khai tài khoản người dùng của các phòng ban và bổ sung tổ - nhóm còn thiếu.'],
-                ['Người điền', 'Các phòng ban - MỘT file chung: mỗi phòng điền tổ và người dùng của phòng mình vào cùng file này.'],
+                ['Người điền', $ownDepartment
+                    ? $ownDepartment.' Tổ và người dùng phòng đã có trên hệ thống được điền sẵn (dòng xám): người dùng sửa được thông tin / phân quyền, thêm người / tổ mới bên dưới.'
+                    : 'Các phòng ban - MỘT file chung: mỗi phòng điền tổ và người dùng của phòng mình vào cùng file này.'],
                 ['Cần có trước', 'Giai đoạn 1 đã nạp.'],
                 ['Bước tiếp theo', 'Admin nạp file và nhập mật khẩu khởi tạo chung; người dùng đăng nhập bằng mã số nhân viên và phải đổi mật khẩu ở lần đầu.'],
             ],
@@ -467,6 +470,9 @@ class InitialDataTemplate
             'Điền theo đúng thứ tự các bước ở mục B: sheet sau chỉ chọn lại được dữ liệu đã khai ở sheet trước hoặc đã có trên hệ thống.',
             $hasPrefill
                 ? 'Dòng NỀN XÁM ở đầu sheet là dữ liệu đang có trên hệ thống, đã khoá - chỉ để xem / chọn lại. Điền dữ liệu mới ở các dòng trắng ngay bên dưới.'
+                : null,
+            isset($visible['users'])
+                ? 'Sheet 05 Người dùng: dòng nền xám là tài khoản đang có - SỬA ĐƯỢC họ tên, phòng ban, email, phân quyền, tổ (cột Mã số nhân viên khoá); khi nạp hệ thống cập nhật theo file. Người mới điền ở dòng trắng bên dưới.'
                 : null,
             'Dòng 3 là tên cột, dòng 4 là gợi ý / ví dụ. KHÔNG đổi tên sheet, KHÔNG chèn / xoá / đổi thứ tự cột.',
             'Cột có dấu * (nền xanh đậm) là bắt buộc; cột còn lại để trống nếu không có thông tin.',
@@ -577,7 +583,9 @@ class InitialDataTemplate
         $prefill = self::prefill($key);
         $newRow = $first + count($prefill);
         $maxRow = $newRow + InitialDataSchema::MAX_ROWS - 1;
-        self::$prefillCounts[$key] = count($prefill);
+        $editable = InitialDataSchema::EDITABLE_PREFILL_SHEETS[$key] ?? null;
+        // Sheet sửa được: bộ nạp đọc cả dòng điền sẵn, ô chọn / kiểm tra áp từ dòng đầu
+        self::$prefillCounts[$key] = $editable === null ? count($prefill) : 0;
         self::$lastRows[$key] = $maxRow;
 
         $ws->getTabColor()->setRGB(self::GROUP_TAB_COLORS[$sheet['group']] ?? self::PRIMARY);
@@ -666,7 +674,7 @@ class InitialDataTemplate
             }
         }
 
-        self::protect($ws, $columns, $prefill ? $newRow - 1 : null, $last, self::hidden($key));
+        self::protect($ws, $columns, $prefill ? $newRow - 1 : null, $last, self::hidden($key), $editable);
     }
 
     /**
@@ -674,7 +682,7 @@ class InitialDataTemplate
      * theo style của cả cột (không tạo hàng nghìn ô). $readOnly = khoá cả sheet (sheet chỉ Admin
      * khai, trong file của phòng ban).
      */
-    private static function protect(Worksheet $ws, array $columns, ?int $lastPrefillRow, string $last, bool $readOnly = false): void
+    private static function protect(Worksheet $ws, array $columns, ?int $lastPrefillRow, string $last, bool $readOnly = false, ?array $editableKeys = null): void
     {
         $hasAuto = collect($columns)->contains(fn ($c) => $c['type'] === 'auto');
         if ($lastPrefillRow === null && ! $hasAuto && ! $readOnly) {
@@ -688,14 +696,26 @@ class InitialDataTemplate
             }
         }
 
-        // Tiêu đề, gợi ý và dòng điền sẵn khoá lại (ghi đè style cột)
-        $ws->getStyle('A1:'.$last.($lastPrefillRow ?? InitialDataSchema::HINT_ROW))
+        // Tiêu đề, gợi ý và dòng điền sẵn khoá lại (ghi đè style cột); sheet sửa được chỉ khoá cột khoá
+        $ws->getStyle('A1:'.$last.($editableKeys === null ? ($lastPrefillRow ?? InitialDataSchema::HINT_ROW) : InitialDataSchema::HINT_ROW))
             ->getProtection()->setLocked(Protection::PROTECTION_PROTECTED);
+        if ($editableKeys !== null && $lastPrefillRow !== null) {
+            foreach ($columns as $i => $col) {
+                if (in_array($col['key'], $editableKeys, true)) {
+                    $letter = InitialDataSchema::letter($i);
+                    $ws->getStyle($letter.InitialDataSchema::FIRST_DATA_ROW.':'.$letter.$lastPrefillRow)
+                        ->getProtection()->setLocked(Protection::PROTECTION_PROTECTED);
+                }
+            }
+        }
 
         if ($lastPrefillRow !== null) {
             $range = 'A'.InitialDataSchema::FIRST_DATA_ROW.':'.$last.$lastPrefillRow;
             $ws->getStyle($range)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB(self::PREFILL_FILL);
-            $ws->getStyle($range)->getFont()->getColor()->setRGB(self::MUTED);
+            // Dòng sửa được giữ chữ thường để phân biệt với dòng khoá (chữ xám)
+            if ($editableKeys === null) {
+                $ws->getStyle($range)->getFont()->getColor()->setRGB(self::MUTED);
+            }
         }
 
         // Vẫn cho lọc, chỉnh độ rộng cột / cao dòng và xoá dòng mới điền nhầm
@@ -755,6 +775,7 @@ class InitialDataTemplate
                 return self::ownDepartment(self::active($table))->orderBy('department_id')->orderBy('name')->get()
                     ->map(fn ($r) => [$depts[$r->department_id] ?? null, $r->name]);
             })(),
+            'users' => self::prefillUsers($dept()),
             'roles' => DB::table($table)->orderBy('id')->get()
                 ->map(fn ($r) => [$r->name, $r->description]),
             'units' => self::active($table)->orderBy('unit_group')->orderBy('factor_to_base')->get()
@@ -852,6 +873,48 @@ class InitialDataTemplate
         };
 
         return $rows->map(fn ($row) => array_map(fn ($v) => $v === null ? null : (string) $v, $row))->all();
+    }
+
+    /**
+     * Người dùng đang hoạt động (của phòng nếu là file phòng ban): vai trò xếp vào đúng cột Phân quyền
+     * theo roleLists() (vai trò chính đứng đầu), tổ = tổ chính.
+     *
+     * @param  \Illuminate\Support\Collection  $depts  id => shortName
+     */
+    private static function prefillUsers($depts): \Illuminate\Support\Collection
+    {
+        $users = DB::table('user_management')->where('isActive', 1)
+            ->when(self::$department, fn ($q) => $q->where('deparment_id', self::$department->id))
+            ->orderBy('deparment_id')->orderBy('userName')->get();
+        if ($users->isEmpty()) {
+            return collect();
+        }
+
+        $roleNames = DB::table('roles')->pluck('name', 'id');
+        $groupNames = DB::table('groups')->pluck('name', 'id');
+        $userRoles = DB::table('user_role')->whereIn('user_id', $users->pluck('id'))->orderBy('id')->get()->groupBy('user_id');
+        // Cột đầu tiên chứa vai trò (vai trò nhiều loại phụ trách chỉ ghi một lần)
+        $columnOf = [];
+        foreach (InitialDataSchema::roleLists() as $column => $names) {
+            foreach ($names as $name) {
+                $columnOf[$name] ??= $column;
+            }
+        }
+
+        return $users->map(function ($u) use ($depts, $roleNames, $groupNames, $userRoles, $columnOf) {
+            $roles = collect([$u->role_id])->merge(($userRoles[$u->id] ?? collect())->pluck('role_id'))
+                ->filter()->unique()->map(fn ($id) => $roleNames[$id] ?? null)->filter();
+            $cells = array_fill_keys(array_keys(InitialDataSchema::ROLE_COLUMNS), []);
+            foreach ($roles as $name) {
+                $cells[$columnOf[$name] ?? 'role_general'][] = $name;
+            }
+
+            return array_merge(
+                [$u->userName, $u->fullName, $depts[$u->deparment_id] ?? null, $u->mail ?: 'NA'],
+                array_map(fn ($names) => $names ? implode(', ', $names) : null, array_values($cells)),
+                [$groupNames[$u->group_id] ?? null],
+            );
+        });
     }
 
     /** Bản ghi đang sử dụng (và đã duyệt nếu bảng có luồng duyệt). */

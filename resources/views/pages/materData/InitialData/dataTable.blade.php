@@ -63,7 +63,7 @@
 </style>
 
 @php
-    $stages = \App\Support\InitialData\InitialDataSchema::STAGES;
+    $stages = \App\Support\InitialData\InitialDataSchema::stagesFor($isAdmin);
     $modules = \App\Support\InitialData\InitialDataSchema::MODULES;
     $reviewStatuses = \App\Http\Controllers\Pages\MaterData\InitialDataController::REVIEW_STATUSES;
 @endphp
@@ -129,11 +129,13 @@
 
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                // Giai đoạn 1, 2 là file chung cho mọi phòng ban: không chọn module / phòng ban
+                // Giai đoạn 1, 2 không chia module; GĐ1 là file toàn hệ thống (không chọn phòng ban),
+                // GĐ2 chọn phòng ban để điền sẵn tổ + người dùng phòng đã có
                 var shared = @json(\App\Support\InitialData\InitialDataSchema::SHARED_STAGES);
                 $('#idtStage').on('change', function() {
-                    var isShared = shared.indexOf(parseInt(this.value, 10)) !== -1;
-                    $('#idtModule, #idtDepartment').prop('disabled', isShared);
+                    var stage = parseInt(this.value, 10);
+                    $('#idtModule').prop('disabled', shared.indexOf(stage) !== -1);
+                    $('#idtDepartment').prop('disabled', stage === 1);
                 }).trigger('change');
             });
         </script>

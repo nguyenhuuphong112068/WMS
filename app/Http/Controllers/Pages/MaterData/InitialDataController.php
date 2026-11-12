@@ -129,7 +129,7 @@ class InitialDataController extends Controller
         };
 
         $stages = [];
-        foreach (InitialDataSchema::STAGES as $stage => $label) {
+        foreach (InitialDataSchema::stagesFor($isAdmin) as $stage => $label) {
             // Việc gom theo công ty -> phòng ban, để lọc / so tiến độ từng nhà máy
             $companies = [];
             if ($stage === 1) {
@@ -178,7 +178,7 @@ class InitialDataController extends Controller
         $this->authorizeView();
 
         $stage = $request->integer('stage');
-        abort_unless(isset(InitialDataSchema::STAGES[$stage]), 404, 'Không có giai đoạn này.');
+        abort_unless(isset(InitialDataSchema::stagesFor($this->isAdmin())[$stage]), 404, 'Không có giai đoạn này.');
         $module = $request->input('module') ?: null;
         $departmentId = $request->filled('department_id') ? $request->integer('department_id') : null;
         // Phòng ban tự đánh dấu việc của phòng mình (module / giai đoạn phòng không dùng)
@@ -232,19 +232,22 @@ class InitialDataController extends Controller
         abort_if($module !== null && ! isset(InitialDataSchema::MODULES[$module]), 404, 'Không có module này.');
 
         $stage = $request->filled('stage') ? $request->integer('stage') : null;
-        abort_if($stage !== null && ! isset(InitialDataSchema::STAGES[$stage]), 404, 'Không có giai đoạn này.');
+        abort_if($stage !== null && ! isset(InitialDataSchema::stagesFor($isAdmin)[$stage]), 404, 'Không có giai đoạn này.');
 
         // Giai đoạn Tổ chức / Người dùng: một file chung cho mọi phòng ban, không chia phòng / module
         $shared = in_array($stage, InitialDataSchema::SHARED_STAGES, true);
         if ($shared) {
-            $department = null;
             $module = null;
+        }
+        // GĐ1 Tổ chức là file toàn hệ thống; GĐ2 file phòng ban được điền sẵn tổ + người dùng của phòng
+        if ($stage === 1) {
+            $department = null;
         }
 
         // Phòng ban chỉ tải file của một giai đoạn 2 - 4; GĐ3 / GĐ4 phải chọn một module và phòng mình
         if (! $isAdmin) {
             abort_if($stage === null || $stage === 1, 403, 'Chỉ Admin được tải file mẫu giai đoạn 1 hoặc cả 4 giai đoạn.');
-            abort_if(! $shared && ($module === null || $department === null), 403, 'Chọn một module và phòng ban để tải file mẫu.');
+            abort_if($department === null || (! $shared && $module === null), 403, 'Chọn một module và phòng ban để tải file mẫu.');
             abort_if($department && ! $this->uploadDepartments()->pluck('id')->contains($department->id), 403, 'Bạn không thuộc phòng ban này.');
         }
 
@@ -271,7 +274,7 @@ class InitialDataController extends Controller
         $this->authorizeView();
 
         $validator = Validator::make($request->all(), [
-            'stage' => ['nullable', 'integer', 'in:'.implode(',', array_keys(InitialDataSchema::STAGES))],
+            'stage' => ['nullable', 'integer', 'in:'.implode(',', array_keys(InitialDataSchema::stagesFor($this->isAdmin())))],
             'module' => ['nullable', 'in:'.implode(',', array_keys(InitialDataSchema::MODULES))],
             'department_id' => ['required', 'integer', 'in:'.$this->uploadDepartments()->pluck('id')->implode(',')],
             'excel_file' => ['required', 'file', 'mimes:xlsx', 'max:51200'],
@@ -417,6 +420,49 @@ class InitialDataController extends Controller
             self::REVIEW_STATUSES[$request->input('review_status')]['label'].($request->input('review_note') ? ' - '.$request->input('review_note') : ''));
 
         return redirect()->back()->with('success', 'Đã cập nhật trạng thái file "'.$row->original_name.'".');
+    }
+
+    /**
+     * Admin xoá hẳn một lần nộp (bản ghi + file trên đĩa). Quyền cứng: chỉ role Admin, không qua bảng
+     * permissions. Xoá file đang hiệu lực thì lần nộp trước nó (bị nó thay thế) được dùng lại.
+     */
+    public function destroy(Request $request)
+    {
+        $this->authorizeAdmin();
+
+        $row = DB::table('initial_data_files')->where('id', $request->integer('id'))->first();
+        abort_unless($row, 404, 'Không tìm thấy file.');
+
+        $department = $row->department_id ? DB::table('deparments')->where('id', $row->department_id)->value('shortName') : null;
+        $actor = Signer::actor();
+
+        DB::transaction(function () use ($row, $actor) {
+            $previous = DB::table('initial_data_files')->where('replaced_by_id', $row->id)
+                ->orderByDesc('submission_no')->orderByDesc('id')->first();
+
+            if ($previous) {
+                // Lần nộp trước nối sang file thay thế của file bị xoá (nếu có), hoặc hiệu lực lại
+                DB::table('initial_data_files')->where('id', $previous->id)->update([
+                    'status_id' => (int) $row->status_id === 1 ? 1 : $previous->status_id,
+                    'replaced_by_id' => (int) $row->status_id === 1 ? null : $row->replaced_by_id,
+                    'updated_by' => $actor,
+                    'updated_at' => now(),
+                ]);
+                DB::table('initial_data_files')->where('replaced_by_id', $row->id)->where('id', '!=', $previous->id)
+                    ->update(['replaced_by_id' => $previous->id]);
+            }
+
+            DB::table('initial_data_files')->where('id', $row->id)->delete();
+        });
+
+        if ($row->stored_path && Storage::disk('local')->exists($row->stored_path)) {
+            Storage::disk('local')->delete($row->stored_path);
+        }
+
+        AuditTrialController::log('Xoá file khởi tạo dữ liệu', 'initial_data_files', $row->id,
+            $this->describe($row->stage, $row->module, $department ?? 'Toàn hệ thống').' - lần nộp '.$row->submission_no.' - "'.$row->original_name.'"', 'Đã xoá');
+
+        return redirect()->back()->with('success', 'Đã xoá file "'.$row->original_name.'" (lần nộp '.$row->submission_no.').');
     }
 
     /** Admin đặt / đổi / xoá hạn nộp của giai đoạn 2 - 4 (để trống = không giới hạn). */

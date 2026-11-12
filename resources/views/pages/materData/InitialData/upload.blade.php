@@ -1,6 +1,6 @@
 @php
     $uploadErrors = $errors->getBag('uploadErrors');
-    $stages = \App\Support\InitialData\InitialDataSchema::STAGES;
+    $stages = \App\Support\InitialData\InitialDataSchema::stagesFor($isAdmin ?? false);
     $modules = \App\Support\InitialData\InitialDataSchema::MODULES;
     $sharedStages = \App\Support\InitialData\InitialDataSchema::SHARED_STAGES;
 @endphp
@@ -23,7 +23,9 @@
                         <div class="form-group col-md-4">
                             <label for="idtUpStage">Giai Đoạn</label>
                             <select name="stage" id="idtUpStage" class="form-control" title="Giai đoạn của file mẫu đã điền">
-                                <option value="">Cả 4 giai đoạn</option>
+                                @if ($isAdmin ?? false)
+                                    <option value="">Cả 4 giai đoạn</option>
+                                @endif
                                 @foreach ($stages as $no => $label)
                                     <option value="{{ $no }}" @selected((string) old('stage') === (string) $no)>{{ $no }}. {{ $label }}</option>
                                 @endforeach
