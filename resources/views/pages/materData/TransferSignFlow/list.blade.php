@@ -3,7 +3,7 @@
 @php
     /*
     |--------------------------------------------------------------------------
-    | DỮ LIỆU GỐC - TRÌNH KÝ ĐỀ NGHỊ LIÊN PHÒNG BAN (gồm Đề nghị VPP)
+    | DỮ LIỆU GỐC - TRÌNH KÝ ĐỀ NGHỊ LIÊN PHÒNG BAN
     |--------------------------------------------------------------------------
     | Mỗi dòng một bước ký: loại đề nghị + công ty của phòng đề nghị + thứ tự + vai trò +
     | phạm vi phòng ban. Xem App\Support\MaterialTransferSignFlow.

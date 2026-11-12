@@ -5,8 +5,7 @@
 | - $idx     : chỉ số của dòng trong items[...]; template JS truyền chuỗi '__i__'
 | - $item    : dòng đã lưu (modal điều chỉnh) hoặc null (dòng trống)
 | - $onlyRow : true khi đây là dòng duy nhất đang có -> khoá nút xoá
-| - $rowCategories : (tuỳ chọn) danh sách vật tư của ô chọn - đề nghị VPP chỉ truyền vật tư
-|                    Hành Chánh mua ($vppCategories); bỏ trống thì dùng $transferCategories
+| - $rowCategories : (tuỳ chọn) danh sách vật tư của ô chọn; bỏ trống thì dùng $transferCategories
 |
 | Mã vật tư nằm ở cột đầu, đổ theo data-code của mã đang chọn (xem JS trong
 | transferRequestModal). Dòng đã lưu thì in sẵn mã từ server.

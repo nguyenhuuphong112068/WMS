@@ -55,14 +55,13 @@
     {{-- Tab "Cách ly - Loại Bỏ - Huỷ" --}}
     @include('pages.export.MaterialExport.quarantineModals')
 
-    {{-- Tab "Đề nghị chuyển liên phòng ban" + tab "Đề nghị VPP" (cùng bộ bảng, khác phòng nhận) --}}
+    {{-- Tab "Đề nghị chuyển liên phòng ban" --}}
     @include('pages.export.MaterialExport.transferRequestModal')
     @include('pages.export.MaterialExport.transferRequestEditModal')
     @include('pages.export.MaterialExport.transferDetailModal')
     @include('pages.export.MaterialExport.transferReceiveCheckModal')
     @include('pages.export.MaterialExport.transferStockPickerModal')
     @include('pages.export.MaterialExport.transferImportPickerModal')
-    @include('pages.export.MaterialExport.vppWatchlistModal')
 
     {{--
     | Link "chờ bạn ký duyệt" ở Trang chủ mở thẳng phiếu: ?open=<id modal chi tiết>

@@ -91,6 +91,7 @@ class ZoneController extends Controller
      */
     public const LOCATION_TYPES = [
         'material' => 'Vật tư',
+        'vpp' => 'VPP',
         'chemical' => 'Hoá chất',
         'standard' => 'Chất chuẩn',
     ];

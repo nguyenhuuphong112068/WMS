@@ -85,6 +85,9 @@ class DepartmentController extends Controller
 
         DataMasterHistory::record(self::TABLE, $id, 'Thêm mới', 'Khai báo mới phòng ban: ' . $request->name . '.', self::FIELDS, $this->maps());
 
+        // Phòng mới có ngay đủ danh mục VPP của phòng theo Danh Mục VPP Công Ty
+        \App\Support\DepartmentVpp::syncRows(null, $this->actor());
+
         return redirect()->back()->with('success', 'Đã thêm thành công!');
     }
 

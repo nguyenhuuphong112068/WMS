@@ -46,7 +46,7 @@
     $prepPrintQuery = array_filter(['prep_from' => $prepRange['from'], 'prep_to' => $prepRange['to']]);
 
     $prepCanIssue = user_can('export_material_issue');
-    // Dòng đề nghị liên phòng ban / VPP: quyền cấp phát liên phòng ban (transferIssueStore)
+    // Dòng đề nghị liên phòng ban: quyền cấp phát liên phòng ban (transferIssueStore)
     $prepCanTransfer = user_can('export_material_transfer');
     // Không có quyền điều chỉnh: khoá lô theo đề xuất, chỉ sửa được số lượng (issueStore kiểm lại)
     $prepLotLocked = !user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::LOT_ADJUST_PERMISSION);
@@ -202,7 +202,7 @@
                     $isShort = $shortage > 0.00005;
                     $due = $g['needed_date'] ? \Carbon\Carbon::parse($g['needed_date'])->startOfDay() : null;
                     $isLate = $due && $due->lt($prepToday);
-                    // Mục đề nghị liên phòng ban / VPP phòng khác gửi tới: cấp ở modal chi tiết phiếu đó
+                    // Mục đề nghị liên phòng ban phòng khác gửi tới: cấp ở modal chi tiết phiếu đó
                     $isTransfer = ($g['kind'] ?? 'internal') === 'transfer';
                     $transferModal = $isTransfer ? 'matTransferDetailModal_' . $g['transfer_request_id'] : null;
                     $transferHref = $isTransfer ? route($expRoute . 'list', ['tab' => $g['transfer_tab'], 'open' => $transferModal]) : null;

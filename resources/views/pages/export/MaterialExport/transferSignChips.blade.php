@@ -1,5 +1,5 @@
 {{--
-| Tiến trình ký của một đề nghị liên phòng ban / VPP (dưới trạng thái phiếu). Phiếu bị từ chối
+| Tiến trình ký của một đề nghị liên phòng ban (dưới trạng thái phiếu). Phiếu bị từ chối
 | ký (về Lưu tạm) thì hiện lý do. Biến vào: $mtSigns (các bước, theo step_no), $mtReq (đầu phiếu).
 --}}
 @if ($mtSigns->count())

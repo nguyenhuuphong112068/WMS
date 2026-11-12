@@ -22,6 +22,7 @@ class PermissionMatrix
     public const MODELS = [
         'common'   => ['label' => 'Quyền Chung', 'icon' => 'fa-layer-group'],
         'material' => ['label' => 'Vật Tư', 'icon' => 'fa-box'],
+        'vpp'      => ['label' => 'VPP', 'icon' => 'fa-paperclip'],
         'chemical' => ['label' => 'Hoá Chất', 'icon' => 'fa-flask'],
         'standard' => ['label' => 'Chất Chuẩn', 'icon' => 'fa-vial'],
     ];
@@ -42,11 +43,12 @@ class PermissionMatrix
     ];
 
     /** Loại hàng nhóm quyền phụ trách, chọn khi tạo / sửa nhóm quyền (roles.kinds) */
-    public const ROLE_KINDS = ['material' => 'Vật Tư', 'chemical' => 'Hoá Chất', 'standard' => 'Chất Chuẩn'];
+    public const ROLE_KINDS = ['material' => 'Vật Tư', 'vpp' => 'VPP', 'chemical' => 'Hoá Chất', 'standard' => 'Chất Chuẩn'];
 
     /** Loại hàng của dòng nhóm con trong card module, dùng cho bộ lọc Vật Tư / Hoá Chất / Chất Chuẩn */
     public const KINDS = [
         'material' => ['label' => 'Vật Tư', 'icon' => 'fa-box'],
+        'vpp'      => ['label' => 'VPP', 'icon' => 'fa-paperclip'],
         'chemical' => ['label' => 'Hoá Chất', 'icon' => 'fa-flask'],
         'standard' => ['label' => 'Chất Chuẩn', 'icon' => 'fa-vial'],
         'common'   => ['label' => 'Dùng Chung', 'icon' => 'fa-layer-group'],
@@ -57,8 +59,8 @@ class PermissionMatrix
 
     /** Thứ tự dòng nhóm con trong một card module */
     private const SUB_GROUP_ORDER = [
-        'Vật Tư', 'Hoá Chất', 'Chất Chuẩn', 'Dùng Chung',
-        'Trình Ký Liên Phòng Ban', 'Khởi Tạo Dữ Liệu', 'Phân Quyền', 'Lịch Sử & Audit Trail',
+        'Vật Tư', 'VPP', 'Hoá Chất', 'Chất Chuẩn', 'Dùng Chung',
+        'Trình Ký Liên Phòng Ban', 'Trình Ký Liên Phòng Ban VPP', 'Khởi Tạo Dữ Liệu', 'Phân Quyền', 'Lịch Sử & Audit Trail',
     ];
 
     /**
@@ -106,7 +108,7 @@ class PermissionMatrix
             'kinds' => self::KINDS,
             'roleKinds' => self::ROLE_KINDS,
             // Dòng nhóm con nào không phải Vật Tư / Hoá Chất / Chất Chuẩn thì tính là Dùng Chung
-            'kindOfGroup' => array_flip(array_map(fn ($kind) => $kind['label'], array_slice(self::KINDS, 0, 3))),
+            'kindOfGroup' => array_flip(array_map(fn ($kind) => $kind['label'], array_slice(self::KINDS, 0, 4))),
             'assigned' => self::assigned(),
         ];
     }
@@ -126,7 +128,7 @@ class PermissionMatrix
             $modules[$key] = ['label' => $meta['label'], 'icon' => $meta['icon'], 'groups' => []];
         }
 
-        $modelLabels = ['material' => 'Vật Tư', 'chemical' => 'Hoá Chất', 'standard' => 'Chất Chuẩn', 'common' => 'Dùng Chung'];
+        $modelLabels = ['material' => 'Vật Tư', 'vpp' => 'VPP', 'chemical' => 'Hoá Chất', 'standard' => 'Chất Chuẩn', 'common' => 'Dùng Chung'];
 
         foreach ($permissions as $permission) {
             $moduleKey = $moduleOfGroup[$permission->group_name] ?? 'other';
@@ -167,7 +169,7 @@ class PermissionMatrix
             }
         }
 
-        $kindOrder = array_flip(['common', 'material', 'chemical', 'standard']);
+        $kindOrder = array_flip(['common', 'material', 'vpp', 'chemical', 'standard']);
 
         return $roles->map(function ($role) use ($counts, $business) {
             $chosen = in_array($role->name, self::COMMON_ROLES, true)
@@ -198,7 +200,7 @@ class PermissionMatrix
             return 'common';
         }
 
-        $business = array_intersect_key($counts, array_flip(['material', 'chemical', 'standard']));
+        $business = array_intersect_key($counts, array_flip(['material', 'vpp', 'chemical', 'standard']));
         $total = array_sum($business);
         arsort($business);
 
@@ -209,6 +211,7 @@ class PermissionMatrix
 
         // Tên nói rõ loại thì theo tên, tránh nhóm mới tick vài quyền lệch loại bị xếp sai
         return match (true) {
+            (bool) preg_match('/\bVPP\b|văn phòng phẩm/iu', $role->name) => 'vpp',
             (bool) preg_match('/vật tư/iu', $role->name) => 'material',
             (bool) preg_match('/hoá chất|hóa chất/iu', $role->name) => 'chemical',
             (bool) preg_match('/chuẩn/iu', $role->name) => 'standard',
@@ -223,6 +226,7 @@ class PermissionMatrix
         if (str_starts_with($name, 'materData_')) {
             return match (self::materDataScopeLabel($name)) {
                 'Vật Tư' => 'material',
+                'VPP', 'Trình Ký Liên Phòng Ban VPP' => 'vpp',
                 'Hoá Chất' => 'chemical',
                 'Chất Chuẩn' => 'standard',
                 default => 'common',
@@ -325,6 +329,9 @@ class PermissionMatrix
         if (str_contains($name, '_material_') || str_starts_with($name, 'material_')) {
             return 'material';
         }
+        if (str_contains($name, '_vpp_') || str_ends_with($name, '_vpp')) {
+            return 'vpp';
+        }
         if (str_contains($name, '_chemical_') || str_starts_with($name, 'chemical_')) {
             return 'chemical';
         }
@@ -343,8 +350,10 @@ class PermissionMatrix
         return match (true) {
             // Màn Trình Ký Đề Nghị Liên Phòng Ban có bộ quyền riêng (materData_transferSign_*)
             str_contains($name, '_transferSign_') => 'Trình Ký Liên Phòng Ban',
+            str_contains($name, '_vppTransferSign_') => 'Trình Ký Liên Phòng Ban VPP',
             str_contains($name, '_initialData_') => 'Khởi Tạo Dữ Liệu',
             str_contains($name, '_material_') => 'Vật Tư',
+            str_contains($name, '_vpp_') => 'VPP',
             str_contains($name, '_chemical_') => 'Hoá Chất',
             str_contains($name, '_standard_') => 'Chất Chuẩn',
             default => 'Dùng Chung',

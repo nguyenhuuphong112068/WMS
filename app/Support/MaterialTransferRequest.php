@@ -7,14 +7,11 @@ use Illuminate\Support\Facades\DB;
 /**
  * ĐỀ NGHỊ CHUYỂN VẬT TƯ LIÊN PHÒNG BAN - phần dùng chung giữa hai màn hình lập đề nghị.
  *
- * Phiếu được lập ở hai nơi, cùng ghi vào một bộ bảng:
- *   1. SỬ DỤNG VẬT TƯ, tab "Đề nghị chuyển liên phòng ban" - lập thủ công từ đầu
- *      (App\Http\Controllers\Pages\Export\MaterialExportController).
- *   2. SỬ DỤNG VẬT TƯ, tab "Đề nghị VPP" > "Danh sách vật tư cần đề nghị Hành Chính" - gom
- *      các vật tư do Hành Chính mua rồi gửi thẳng cho kho VPP của phòng Hành Chính, thay vì
- *      lập phiếu dự trù (MaterialExportController::vppWatchlistStore, App\Support\MaterialVpp).
+ * Phiếu lập ở SỬ DỤNG VẬT TƯ, tab "Đề nghị chuyển liên phòng ban" (MaterialExportController) và
+ * tự sinh từ danh sách đề nghị liên phòng ban theo chu kỳ (App\Support\MaterialPeriodicRequest).
+ * Đề nghị VPP gửi Hành Chính đã sang module VPP (App\Support\VppTransferRequest).
  *
- * Gom ở đây để mã phiếu và cách ghi dòng đề nghị của hai màn hình không lệch nhau. Ba bước
+ * Gom ở đây để mã phiếu và cách ghi dòng đề nghị không lệch nhau. Ba bước
  * tiếp theo (phòng nhận cấp phát -> phòng đề nghị nhận hàng) vẫn do màn Sử Dụng Vật Tư xử lý.
  */
 class MaterialTransferRequest

@@ -1,0 +1,137 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| VPP - DỮ LIỆU CỐ ĐỊNH
+|--------------------------------------------------------------------------
+| Khai báo tập trung để Controller (kiểm tra luồng, phân quyền) và View (đổ
+| nhãn, tô màu trạng thái) cùng đọc một nguồn.
+*/
+
+return [
+
+    /*
+     | TRÌNH KÝ ĐỀ NGHỊ CẤP PHÁT VPP - cột vpp_request_lists.app_status.
+     |
+     | Luồng: draft -> pending_sign -> approved
+     |   Người lập phiếu tự khai SỐ BƯỚC KÝ và NGƯỜI KÝ từng bước (bảng
+     |   vpp_request_signs). Khai 0 bước thì trình ký là duyệt luôn, phiếu đi
+     |   thẳng đến người cấp phát.
+     |   Bị từ chối ở bước nào cũng đưa về rejected, sửa lại rồi trình ký lại từ đầu.
+     */
+    'request_app_statuses' => [
+        'draft' => 'Nháp',
+        'pending_sign' => 'Chờ ký duyệt',
+        'approved' => 'Đã duyệt',
+        'rejected' => 'Bị từ chối',
+        'canceled' => 'Đã huỷ',
+    ],
+
+    /*
+     | Trạng thái một BƯỚC KÝ - cột vpp_request_signs.status. Bước đang chờ ký là
+     | bước 'pending' có step_no nhỏ nhất, trùng với vpp_request_lists.current_step.
+     */
+    'request_sign_statuses' => [
+        'pending' => 'Chờ ký',
+        'signed' => 'Đã ký',
+        'rejected' => 'Từ chối',
+    ],
+
+    /*
+     | Cấp phát của kho sau khi đề nghị được duyệt - cột vpp_request_lists.issue_status
+     | và vpp_request_items.status.
+     */
+    'request_issue_statuses' => [
+        'waiting' => 'Chờ cấp phát',
+        'partial' => 'Cấp phát một phần',
+        'completed' => 'Đã cấp phát',
+    ],
+    /*
+     | Vòng đời một dòng đề nghị. Kho CẤP PHÁT là trừ tồn ngay (sinh luôn phiếu sử dụng),
+     | sau đó Tổ chốt lại: ghi nhận đã dùng bao nhiêu, hoặc trả toàn bộ về kho.
+     |
+     | Kho thiếu hàng thì cấp được bao nhiêu hay bấy nhiêu: dòng chuyển sang PARTIAL và
+     | vẫn cấp thêm được cho tới khi đủ số đề nghị, lúc đó mới thành ISSUED.
+     |      pending -> partial* -> issued -> used | returned
+     |      pending -> rejected
+     */
+    'request_item_statuses' => [
+        'pending' => 'Chờ cấp phát',
+        'partial' => 'Cấp phát một phần',
+        'issued' => 'Đã cấp phát',
+        'used' => 'Đã sử dụng',
+        'returned' => 'Đã trả về kho',
+        'rejected' => 'Bị từ chối',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | XUẤT KHO THÔNG MINH - ĐỢT LẤY HÀNG
+    |--------------------------------------------------------------------------
+    */
+
+    /*
+     | Vòng đời một ĐỢT LẤY HÀNG - cột vpp_pick_waves.status.
+     |
+     |      new -> picking -> picked -> packed -> shipped
+     |      (bất kỳ bước nào trước shipped) -> canceled
+     |
+     | TRỪ TỒN chỉ xảy ra ở bước shipped, đúng lúc hàng rời kho. Bốn trạng thái trước đó
+     | chỉ GIỮ CHỖ tồn qua các dòng vpp_pick_lines còn treo.
+     */
+    'pick_wave_statuses' => [
+        'new' => 'Chờ xuất',
+        'picking' => 'Đang lấy',
+        'picked' => 'Đã lấy',
+        'packed' => 'Đã đóng gói',
+        'shipped' => 'Đã xuất',
+        'canceled' => 'Đã huỷ',
+    ],
+
+    /*
+     | Vòng đời một DÒNG lấy hàng - cột vpp_pick_lines.status.
+     | Lấy thiếu (short) vẫn cho xuất đợt, phần còn thiếu treo lại chờ đợt sau.
+     */
+    'pick_line_statuses' => [
+        'pending' => 'Chờ lấy',
+        'picked' => 'Đã lấy đủ',
+        'short' => 'Lấy thiếu',
+        'canceled' => 'Đã bỏ',
+    ],
+
+    /*
+     | NGƯỠNG CẬN HẠN - số ngày còn lại tới hạn dùng, tính theo hai mức:
+     |
+     |      warning  (vàng) : nhắc dùng trước, và kịp đặt mua bù
+     |      critical (đỏ)   : sát hạn, ưu tiên xuất ngay
+     |
+     | Ngưỡng nên >= thời gian đặt mua VPP về tới kho, vì mục đích của cảnh báo là kịp
+     | phản ứng chứ không phải để biết. Đổi ở đây, Pick List và ô chọn lô tự đổi theo.
+     */
+    'near_expiry_days' => [
+        'warning' => 60,
+        'critical' => 30,
+    ],
+
+    /*
+     | NHÃN LÔ VPP - in từ màn hình Nhập VPP. Mã vạch dạng QR (App\Support\QrCode).
+     | Đổi khổ nhãn thì sửa ở đây, trang in tự co giãn theo.
+     */
+    'label' => [
+        'sop_no' => 'QC-SOP-031',
+        'form_no' => 'QC/F/106-03',
+        // Khung nhãn - nhỏ hơn cuộn tem, canh giữa nên chừa lề trắng đều 1mm.
+        'width_mm' => 58,
+        'height_mm' => 38,
+        // Khổ cuộn tem thực đang nạp trên máy in.
+        'media_width_mm' => 60,
+        'media_height_mm' => 40,
+        // Cạnh phần MÃ QR (mm, chưa tính vùng trắng). QR Model 2, mức sửa lỗi Q,
+        // nằm ở góc dưới bên phải nhãn, giữa QR có logo Stella. 12mm như nhãn hoá chất
+        // (đã quét ổn) để nhường chỗ cho bảng thông tin.
+        'qr_size_mm' => 12,
+        // Độ phân giải đầu in Zebra (ZD421: bản 203 hoặc 300 dpi - xem tem dưới đáy máy).
+        // Dùng để render nhãn ra ảnh đúng số chấm khi in thẳng bằng ZPL.
+        'dpi' => 300,
+    ],
+];

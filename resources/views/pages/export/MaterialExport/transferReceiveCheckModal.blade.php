@@ -1,5 +1,5 @@
 {{--
-| Modal XÁC NHẬN KIỂM TRA LÔ VẬT TƯ ở bước NHẬN của đề nghị chuyển liên phòng ban / VPP.
+| Modal XÁC NHẬN KIỂM TRA LÔ VẬT TƯ ở bước NHẬN của đề nghị chuyển liên phòng ban.
 |
 | Bước Nhận chính là bước Kiểm tra: lô nhận chuyển không qua tab "Chờ kiểm tra" của màn Nhập.
 |   - Kiểm tra Đạt   : chọn định khu thật -> transferReceiveStore (lô vào tồn ngay, thông tin lô lấy từ lô nguồn).

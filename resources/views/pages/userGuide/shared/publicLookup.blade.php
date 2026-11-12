@@ -5,7 +5,7 @@
 | Trang tra cứu: General\PublicStockLookupController + public/stockLookup.blade.php.
 --}}
 <p>Trang <b>Tra cứu tồn kho</b> mở được <b>không cần đăng nhập</b>, từ nút <b>Tra cứu tồn kho</b> ở góc trên bên phải trang đăng
-    nhập. Dùng khi cần biết nhanh một {{ $ugLookup['item'] }} đang nằm ở đâu. Đầu trang có 3 nút <b>Hoá chất | Chất chuẩn | Vật tư</b>
+    nhập. Dùng khi cần biết nhanh một {{ $ugLookup['item'] }} đang nằm ở đâu. Đầu trang có 4 nút <b>Hoá chất | Chất chuẩn | Vật tư | VPP</b>
     để chuyển loại hàng (giữ nguyên phòng ban và từ khoá đang tra).</p>
 <ol class="ug-steps">
     <li>Ở trang đăng nhập, bấm <b>Tra cứu tồn kho</b> rồi chọn nút <b>{{ $ugLookup['tab'] }}</b> (hoặc mở thẳng

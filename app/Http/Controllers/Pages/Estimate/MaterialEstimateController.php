@@ -149,7 +149,7 @@ class MaterialEstimateController extends Controller
             : collect();
 
         // Vật tư tồn dưới ngưỡng tối thiểu + vật tư người dùng bấm "Ghi nhớ" bên Sử Dụng Vật Tư.
-        // Chỉ vật tư Cung Ứng mua - vật tư Hành Chính mua đề nghị kho VPP ở Sử Dụng Vật Tư
+        // Mọi vật tư do Cung Ứng mua - văn phòng phẩm ở module VPP (VppWatchlist)
         $watchlistItems = $tabAllowed['watchlist'] ? MaterialWatchlist::forEstimate($departmentId) : collect();
 
 
@@ -268,8 +268,8 @@ class MaterialEstimateController extends Controller
      * Nháp, mỗi vật tư một material_estimate_items kèm ĐÚNG MỘT dòng số lượng. Lưu xong mở
      * thẳng trang chi tiết để người lập bổ sung thêm tháng / mặt hàng rồi trình ký.
      *
-     * Tab chỉ còn vật tư Cung Ứng mua (MaterialWatchlist::forEstimate()) - vật tư Hành Chính mua
-     * gửi đề nghị kho VPP ở Sử Dụng Vật Tư (MaterialExportController::vppWatchlistStore()).
+     * Dòng của tab theo MaterialWatchlist::forEstimate() - mọi vật tư do Cung Ứng mua; văn phòng phẩm
+     * xin kho VPP ở module VPP (VppExportController::vppWatchlistStore()).
      */
     public function watchlistEstimateStore(Request $request)
     {

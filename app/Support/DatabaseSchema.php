@@ -27,6 +27,7 @@ class DatabaseSchema
 {
     const GROUPS = [
         'material' => 'Vật tư',
+        'vpp'      => 'VPP',
         'chemical' => 'Hoá chất',
         'standard' => 'Chất chuẩn',
         'master'   => 'Dữ liệu gốc',
@@ -52,6 +53,7 @@ class DatabaseSchema
 
     const GROUP_PREFIXES = [
         'material_'         => 'material',
+        'vpp_'              => 'vpp',
         'chemical_'         => 'chemical',
         'chem_'             => 'chemical',
         'active_ingredient' => 'chemical',

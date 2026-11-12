@@ -1,0 +1,1874 @@
+<?php
+
+namespace App\Http\Controllers\Pages\Estimate;
+
+use App\Http\Controllers\Concerns\EstimateApprovedExport;
+use App\Http\Controllers\Concerns\EstimateItemCancel;
+use App\Http\Controllers\Concerns\EstimateSignFlow;
+use App\Http\Controllers\Concerns\VerifiesSignature;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\AttachmentBackup;
+use App\Support\DepartmentVpp;
+use App\Support\VppLeadTime;
+use App\Support\VppWatchlist;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+
+/**
+ * DỰ TRÙ - DỰ TRÙ VPP
+ *
+ * Phòng ban lập phiếu dự trù VPP cho một tháng/năm (vpp_estimates), khai từng vật
+ * tư cần dùng (vpp_estimate_items) và số lượng cần cho từng tháng
+ * (vpp_estimate_item_amounts).
+ *
+ * Mặt hàng chọn từ Danh Mục VPP, hoặc tự gõ tên khi VPP chưa có trong danh mục
+ * (vpp_estimate_items.category_id = NULL). VPP không có "nhóm chuẩn" nên bỏ hẳn
+ * khái niệm đó so với dự trù chất chuẩn.
+ *
+ * TRÌNH KÝ 2 BƯỚC dùng chung khai báo config/estimate.php:
+ *   Nháp -> [Trình ký] -> Chờ Phó/Trưởng Phòng ký -> [Ký bước 1] -> Chờ Ban Giám Đốc ký
+ *        -> [Ký bước 2] -> Đã phê duyệt -> Chờ tiếp nhận
+ *        (reception_status = waiting) - nhân viên cung ứng bấm Tiếp nhận ở Trang chủ / tab Đơn dự trù đã được phê duyệt.
+ *   Bị từ chối ở bước nào cũng quay về "Bị từ chối", sửa lại rồi trình ký lại từ đầu.
+ */
+class VppEstimateController extends Controller
+{
+    use EstimateApprovedExport;
+    use EstimateItemCancel;
+    use EstimateSignFlow;
+    use VerifiesSignature;
+
+    private const TABLE = 'vpp_estimates';
+
+    private const ITEM_TABLE = 'vpp_estimate_items';
+
+    private const AMOUNT_TABLE = 'vpp_estimate_item_amounts';
+
+    private const HISTORY_TABLE = 'vpp_estimate_histories';
+
+    /** File đính kèm của phiếu - xoá mềm bằng cột active. */
+    private const ATTACHMENT_TABLE = 'vpp_estimate_attachments';
+
+    private const ATTACHMENT_FOLDER = 'vpp_estimates';
+
+    private const ATTACHMENT_MIMES = 'pdf,doc,docx,xls,xlsx,csv,ppt,pptx,txt,jpg,jpeg,png,gif,bmp,webp,zip,rar,7z,msg,eml';
+
+    /** Quy trình ký duyệt động - xem App\Http\Controllers\Concerns\EstimateSignFlow. */
+    private const SIGN_TABLE = 'vpp_estimate_signs';
+
+    private const ESTIMATE_FK = 'vpp_estimate_id';
+
+    private const EST_ROUTE = 'pages.estimate.vppEstimate.';
+
+    private const SIGN_PERMISSION = 'estimate_vpp_sign';
+
+    /** Hoàn thành / Huỷ / Hoàn tác mục dự trù đã duyệt (phía phòng đề nghị) */
+    private const TRACK_PERMISSION = 'estimate_vpp_tracking';
+
+    /** Gửi tin ở cột "Trao đổi" tab Theo dõi dự trù (quyền con của estimate_vpp_tab_tracking) */
+    private const CHAT_PERMISSION = 'estimate_vpp_chat';
+
+
+    private const CHAT_TYPE = 'vpp';
+
+    private const LABEL = 'phiếu dự trù VPP';
+
+    private const ITEM_LABEL = 'VPP dự trù';
+
+    private const EDITABLE_STATUSES = ['draft', 'rejected'];
+
+    /** Xuất Excel tab "Đơn dự trù đã được phê duyệt" - xem App\Http\Controllers\Concerns\EstimateApprovedExport. */
+    protected function exportConfig(): array
+    {
+        return [
+            'amount_fk' => 'vpp_estimate_item_id',
+            'title' => 'DỰ TRÙ VPP',
+            'file_prefix' => 'DuTruVatTu',
+            'code_label' => 'Mã VPP',
+            'name_label' => 'VPP',
+            // VPP không có Part Number (bỏ 12/11/2026) - không có cột thêm
+            'extras' => [],
+        ];
+    }
+
+    /** Huỷ mục cần xác nhận 2 bên - xem App\Http\Controllers\Concerns\EstimateItemCancel. */
+    protected function cancelConfig(): array
+    {
+        return [
+            'item_fk' => 'vpp_estimate_id',
+            'chat_type' => self::CHAT_TYPE,
+            'category_table' => 'vpp_categories',
+            'name_table' => 'material_names',
+            'name_fk' => 'material_names_id',
+            'manual_name' => 'material_name',
+            // Mọi mục dự trù VPP (kể cả ngoài danh mục) do Hành Chánh mua - không xét theo danh mục
+            'purchasing_col' => null,
+            'default_purchasing' => \App\Support\VppClassification::PURCHASING_ADMIN,
+            'purchasing_permission' => 'estimate_vpp_purchasing',
+        ];
+    }
+
+    /* ==========================================================
+     |  DANH SÁCH PHIẾU
+     ========================================================== */
+
+    public function index(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        // Quyền con xem từng tab (cha: estimate_vpp_view) - tab không có quyền thì không nạp dữ liệu
+        $tabAllowed = \App\Support\PageTabs::map('estimate_vpp');
+
+        $datas = ! $tabAllowed['list'] ? collect() : DB::table(self::TABLE)
+            ->leftJoin('deparments', self::TABLE.'.department_id', '=', 'deparments.id')
+            ->select(self::TABLE.'.*', 'deparments.shortName as department_short_name')
+            ->where(self::TABLE.'.department_id', $departmentId)
+            ->orderBy(self::TABLE.'.year', 'desc')
+            ->orderBy(self::TABLE.'.month', 'desc')
+            ->orderBy(self::TABLE.'.id', 'desc')
+            ->get();
+
+        // Tình trạng xử lý của phiếu đã duyệt (cột "Tình Trạng")
+        $this->attachApprovedStatus($datas);
+
+        // Bước ký của các phiếu đang hiện: list_id => danh sách bước theo step_no
+        $signRows = $this->signRows($datas->pluck('id'));
+
+        $datas->each(function ($row) use ($signRows) {
+            $signs = $signRows->get($row->id, collect());
+            $row->pending_sign = $this->pendingSign($row, $signs);
+            $row->can_sign = $row->pending_sign ? $this->canSignRow($row->pending_sign) : false;
+        });
+
+        // Mục do phòng đang chọn phụ trách mua (null = không phải bộ phận mua hàng)
+        $purchasingScope = $tabAllowed['tracking'] ? $this->purchasingItems($departmentId) : null;
+
+        // Theo dõi dự trù: phiếu của phòng + mục bộ phận mua hàng phụ trách (đã hẹn ngày, chưa giao)
+        $trackedItems = $tabAllowed['tracking']
+            ? self::trackedItems($departmentId, $purchasingScope ? $purchasingScope->pluck('id')->all() : [])
+            : collect();
+
+        // VPP tồn dưới ngưỡng tối thiểu + VPP người dùng bấm "Ghi nhớ" bên Sử Dụng VPP.
+        // Phòng thường đề nghị VPP trong danh mục từ kho VPP (Sử Dụng VPP) - xem VppWatchlist::forEstimate()
+        $watchlistItems = $tabAllowed['watchlist'] ? VppWatchlist::forEstimate($departmentId) : collect();
+
+
+
+        // Tab "Đơn dự trù đã được phê duyệt" - phiếu đã duyệt của mọi phòng ban, chỉ bộ phận mua hàng
+        $approvedLists = $tabAllowed['approved'] ? $this->approvedLists($departmentId) : null;
+
+        // Tab của bộ phận mua hàng còn cần đang chọn phòng mua hàng (null = không hiện)
+        $tabAllowed['approved'] = $approvedLists !== null;
+
+        $tabs = array_keys(array_filter($tabAllowed));
+        $activeTab = in_array($request->query('tab'), $tabs, true)
+            ? $request->query('tab')
+            : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : ($tabs[0] ?? null));
+
+        session()->put(['title' => 'DỰ TRÙ - DỰ TRÙ VPP']);
+
+        return view('pages.estimate.VppEstimate.list', [
+            'datas' => $datas,
+            'itemCounts' => $this->itemCounts($datas->pluck('id')->all()),
+            'appStatuses' => config('estimate.app_statuses'),
+            'signStatuses' => config('estimate.sign_statuses'),
+            'receptionStatuses' => config('estimate.reception_statuses'),
+            'signRows' => $signRows,
+            'signPermission' => self::SIGN_PERMISSION,
+            'nextCode' => $this->nextCode($departmentId),
+            'trackedItems' => $trackedItems,
+            'watchlistItems' => $watchlistItems,
+            'units' => $this->unitOptions(),
+            'activeTab' => $activeTab,
+            'tabAllowed' => $tabAllowed,
+            'approvedLists' => $approvedLists,
+            'approvedSignRows' => $approvedLists ? $this->signRows($approvedLists->pluck('id')) : collect(),
+            'approvedItemCounts' => $approvedLists ? $this->itemCounts($approvedLists->pluck('id')->all()) : [],
+        ]);
+    }
+
+    public function detail(Request $request)
+    {
+        $list = DB::table(self::TABLE)
+            ->leftJoin('deparments', self::TABLE.'.department_id', '=', 'deparments.id')
+            ->select(self::TABLE.'.*', 'deparments.name as department_name', 'deparments.shortName as department_short_name')
+            ->where(self::TABLE.'.id', $request->id)
+            ->first();
+
+        // Phiếu phòng khác: bộ phận mua hàng chỉ được mở xem (chỉ đọc) khi phiếu đã duyệt
+        $readOnly = $list && (int) $list->department_id !== $this->departmentId();
+
+        if (! $list || ($readOnly && ! $this->canViewAsPurchaser($list))) {
+            return redirect()->route('pages.estimate.vppEstimate.list')
+                ->with('error', 'Không tìm thấy '.self::LABEL.' của phòng ban đang chọn!');
+        }
+
+        session()->put(['title' => 'DỰ TRÙ - CHI TIẾT PHIẾU '.$list->code]);
+
+        $signs = $this->signRows([$list->id])->get($list->id, collect());
+        $pendingSign = $this->pendingSign($list, $signs);
+
+        return view('pages.estimate.VppEstimate.detail', [
+            // Ngưỡng tồn tối đa + tồn hiện tại của phòng, để khối số lượng cảnh báo dự trù quá nhiều
+            'maxStock' => \App\Support\MaxStockWarning::forVpp((int) $list->department_id),
+            'list' => $list,
+            'items' => self::itemsOf($list->id),
+            'histories' => self::historiesOf($list->id),
+            'categories' => $this->categoryOptions(),
+            // Danh mục VPP của phòng - khung "Chọn từ danh mục phòng" ở modal thêm VPP
+            'deptCategories' => DepartmentVpp::importCategoryOptions((int) $list->department_id),
+            'units' => $this->unitOptions(),
+            'appStatuses' => config('estimate.app_statuses'),
+            'signStatuses' => config('estimate.sign_statuses'),
+            'receptionStatuses' => config('estimate.reception_statuses'),
+            'signs' => $signs,
+            'pendingSign' => $pendingSign,
+            // Mốc tính cảnh báo thời gian đặt hàng: ngày BGĐ duyệt (bước ký cuối), chưa duyệt thì ngày tạo phiếu
+            'approvedAt' => $list->app_status === 'approved' ? $signs->max('signed_at') : null,
+            'canSignCurrent' => ! $readOnly && $pendingSign && $this->canSignRow($pendingSign),
+            'signPermission' => self::SIGN_PERMISSION,
+            'canEditItems' => ! $readOnly && $this->editable($list),
+            'readOnly' => $readOnly,
+            // Mở từ tab "Đơn dự trù đã được phê duyệt": hiện cột Ngày Hẹn Đáp Ứng cho bộ phận mua hàng sửa
+            'purchaserView' => $request->query('from') === 'approved' && $this->canViewAsPurchaser($list),
+            'backRoute' => route('pages.estimate.vppEstimate.list', $request->query('from') === 'approved' ? ['tab' => 'approved'] : []),
+            'estRoute' => 'pages.estimate.vppEstimate.',
+        ]);
+    }
+
+    public function history(Request $request)
+    {
+        return response()->json(['rows' => self::historiesOf((int) $request->id)]);
+    }
+
+    /**
+     * Bỏ ghi nhớ một VPP khỏi tab "Danh sách VPP cần dự trù". VPP vẫn hiện lại ở
+     * đây nếu tồn hiện tại đang dưới ngưỡng tối thiểu - xem App\Support\VppWatchlist.
+     */
+    public function watchlistDismiss(Request $request)
+    {
+        $ok = VppWatchlist::dismiss((int) $request->id, $this->departmentId(), $this->actor());
+
+        if (! $ok) {
+            return redirect()->back()
+                ->with('error', 'Không tìm thấy VPP ghi nhớ cần bỏ, hoặc đã được bỏ trước đó!')
+                ->with('activeTab', 'watchlist');
+        }
+
+        return redirect()->back()
+            ->with('success', 'Đã bỏ ghi nhớ VPP cần dự trù!')
+            ->with('activeTab', 'watchlist');
+    }
+
+    /**
+     * LẬP PHIẾU DỰ TRÙ TỪ TAB "DANH SÁCH VPP CẦN DỰ TRÙ"
+     *
+     * Người dùng tick chọn các VPP ngay trên tab rồi khai số lượng / tháng cần dùng cho
+     * từng dòng. Phiếu tạo ra giống hệt phiếu lập tay: một vpp_estimates trạng thái
+     * Nháp, mỗi VPP một vpp_estimate_items kèm ĐÚNG MỘT dòng số lượng. Lưu xong mở
+     * thẳng trang chi tiết để người lập bổ sung thêm tháng / mặt hàng rồi trình ký.
+     *
+     * Dòng của tab theo VppWatchlist::forEstimate(); phòng thường đề nghị VPP trong danh mục từ
+     * kho VPP ở Sử Dụng VPP (VppExportController::vppWatchlistStore()).
+     */
+    public function watchlistEstimateStore(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make(
+            $request->all(),
+            $this->rules() + $this->watchlistItemRules(),
+            $this->messages() + $this->watchlistItemMessages()
+        );
+
+        $validator->after(function ($validator) use ($request) {
+            $categoryIds = [];
+
+            foreach ((array) $request->input('items', []) as $index => $item) {
+                if (empty($item['category_id']) && trim((string) ($item['material_name'] ?? '')) === '') {
+                    $validator->errors()->add('items.'.$index.'.material_name', 'VPP dòng '.($index + 1).' thiếu cả mã danh mục lẫn tên, không lập phiếu được.');
+                }
+
+                $categoryIds['items.'.$index.'.category_id'] = $item['category_id'] ?? null;
+            }
+
+            foreach ($this->duplicateCategoryErrors(null, $categoryIds) as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+
+            foreach (VppWatchlist::inProgressErrors($this->departmentId(), (array) $request->input('items', [])) as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'watchlistEstimateErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput()
+                ->with('activeTab', 'watchlist');
+        }
+
+        $items = (array) $request->input('items', []);
+
+        $result = DB::transaction(function () use ($request, $departmentId, $items) {
+            $code = $this->nextCode($departmentId);
+
+            $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
+                'code' => $code,
+                'department_id' => $departmentId,
+                'app_status' => 'draft',
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Ngày mong muốn giao = ngày lập + 7 ngày - xem VppLeadTime::defaultExpectedDate()
+            foreach ($items as $item) {
+                $categoryId = ! empty($item['category_id']) ? (int) $item['category_id'] : null;
+
+                $itemId = DB::table(self::ITEM_TABLE)->insertGetId([
+                    'vpp_estimate_id' => $id,
+                    'category_id' => $categoryId,
+                    'material_name' => $categoryId ? null : $this->nullIfBlank($item['material_name'] ?? null),
+                    'technical_information' => $this->nullIfBlank($item['technical_information'] ?? null),
+                    'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
+                    'expected_delivery_date' => VppLeadTime::defaultExpectedDate(),
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                DB::table(self::AMOUNT_TABLE)->insert([
+                    'vpp_estimate_item_id' => $itemId,
+                    'amount' => (float) $item['amount'],
+                    'unit_id' => (int) $item['unit_id'],
+                    'for_month_year' => $item['for_month_year'].'-01',
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            VppWatchlist::closeFor(
+                $departmentId,
+                array_column($items, 'category_id'),
+                array_map(fn ($item) => empty($item['category_id']) ? ($item['material_name'] ?? null) : null, $items),
+                $this->actor()
+            );
+
+            return ['id' => $id, 'code' => $code];
+        });
+
+        AuditTrialController::log(
+            'Thêm mới',
+            self::TABLE,
+            $result['id'],
+            'NA',
+            'Lập '.self::LABEL.' '.$result['code'].' từ danh sách VPP cần dự trù ('.count($items).' mục)'
+        );
+
+        return redirect()->route(self::EST_ROUTE.'detail', ['id' => $result['id']])
+            ->with('success', 'Đã lập '.self::LABEL.' mã '.$result['code'].' với '.count($items).' VPP đã chọn!');
+    }
+
+    /* ==========================================================
+     |  ĐẦU PHIẾU
+     ========================================================== */
+
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), $this->rules(), $this->messages());
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator, 'createErrors')->withInput();
+        }
+
+        $departmentId = $this->departmentId();
+
+        $result = DB::transaction(function () use ($request, $departmentId) {
+            $code = $this->nextCode($departmentId);
+
+            $id = DB::table(self::TABLE)->insertGetId($this->payload($request) + [
+                'code' => $code,
+                'department_id' => $departmentId,
+                'app_status' => 'draft',
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return ['id' => $id, 'code' => $code];
+        });
+
+        return redirect()->route('pages.estimate.vppEstimate.detail', ['id' => $result['id']])
+            ->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'! Hãy khai các VPP cần dự trù.');
+    }
+
+    public function update(Request $request)
+    {
+        $current = $this->findOwn($request->id);
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần cập nhật!');
+        }
+
+        if (! $this->editable($current)) {
+            return redirect()->back()->with('error', 'Phiếu '.$current->code.' đã trình ký nên không sửa được nữa!');
+        }
+
+        $validator = Validator::make($request->all(), $this->rules(), $this->messages());
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
+        }
+
+        DB::table(self::TABLE)->where('id', $current->id)->update($this->payload($request) + [
+            'updated_by' => $this->actor(),
+            'updated_at' => now(),
+        ]);
+
+        if ($current->app_status !== 'draft') {
+            AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->code, $current->code);
+            self::writeHistory($current->id, 'Sửa phiếu', null, $current->app_status, $current->app_status, 'Cập nhật thông tin phiếu dự trù.');
+        }
+
+        return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
+    }
+
+    public function destroy(Request $request)
+    {
+        $current = $this->findOwn($request->id);
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần huỷ!');
+        }
+
+        if (! in_array($current->app_status, ['draft', 'rejected'])) {
+            return redirect()->back()->with('error', 'Chỉ có thể huỷ phiếu chưa trình ký!');
+        }
+
+        DB::table(self::TABLE)->where('id', $current->id)->update([
+            'app_status' => 'cancelled',
+            'cancel_reason' => $request->cancel_reason,
+            'updated_by' => $this->actor(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log('Huỷ phiếu', self::TABLE, $current->id, 'Phiếu: '.$current->code, 'Lý do: '.$request->cancel_reason);
+
+        return redirect()->back()->with('success', 'Đã huỷ '.self::LABEL.' thành công!');
+    }
+
+    /* ==========================================================
+     |  FILE ĐÍNH KÈM - mỗi file gắn với MỘT mục dự trù.
+     |  Chỉ đính kèm / xoá khi phiếu còn Nháp / Bị từ chối. Xoá là xoá mềm.
+     ========================================================== */
+
+    public function uploadAttachment(Request $request)
+    {
+        $list = $this->findOwn($request->vpp_estimate_id);
+
+        if (! $list) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần đính kèm file!');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'attachments' => ['required', 'array', 'max:20'],
+            'attachments.*' => ['file', 'max:20480', 'mimes:'.self::ATTACHMENT_MIMES],
+            'note' => ['nullable', 'max:255'],
+            'vpp_estimate_item_id' => ['required', 'integer'],
+        ], [
+            'attachments.required' => 'Vui lòng chọn file cần đính kèm.',
+            'vpp_estimate_item_id.required' => 'File đính kèm phải gắn với một mục dự trù.',
+            'attachments.max' => 'Mỗi lần tải tối đa 20 file.',
+            'attachments.*.file' => 'File tải lên không hợp lệ.',
+            'attachments.*.max' => 'Mỗi file tối đa 20MB.',
+            'attachments.*.mimes' => 'Định dạng file không được hỗ trợ.',
+            'note.max' => 'Ghi chú tối đa 255 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->with('error', $validator->errors()->first());
+        }
+
+        if (! $this->editable($list)) {
+            return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không đính kèm file được nữa!');
+        }
+
+        // Mỗi file phải gắn với một mục dự trù thuộc đúng phiếu này
+        $itemId = DB::table(self::ITEM_TABLE)
+            ->where('id', $request->vpp_estimate_item_id)
+            ->where('vpp_estimate_id', $list->id)
+            ->where('active', 1)
+            ->value('id');
+
+        if (! $itemId) {
+            return redirect()->back()->with('error', 'Không tìm thấy VPP cần đính kèm file!');
+        }
+
+        $names = DB::transaction(fn () => $this->storeFiles(
+            $list->id, $itemId, $request->file('attachments', []), $this->nullIfBlank($request->note)
+        ));
+
+        if (! $names) {
+            return redirect()->back()->with('error', 'Không có file hợp lệ nào được tải lên!');
+        }
+
+        AuditTrialController::log('Thêm mới', self::ATTACHMENT_TABLE, $list->id, $list->code, 'Đính kèm file: '.implode(', ', $names));
+
+        if ($list->app_status !== 'draft') {
+            self::writeHistory($list->id, 'Đính kèm file', null, $list->app_status, $list->app_status, 'Đính kèm '.count($names).' file: '.implode(', ', $names));
+        }
+
+        return redirect()->back()->with('success', 'Đã đính kèm '.count($names).' file vào phiếu '.$list->code.'!');
+    }
+
+    /**
+     * Xem / tải file. Người trong phòng lập phiếu, hoặc người được chỉ định ký phiếu
+     * (xem từ tab "Ký duyệt (mọi phòng ban)") đều mở được.
+     */
+    public function downloadAttachment($id)
+    {
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->join(self::TABLE, self::ATTACHMENT_TABLE.'.vpp_estimate_id', '=', self::TABLE.'.id')
+            ->select(self::ATTACHMENT_TABLE.'.*', self::TABLE.'.department_id')
+            ->where(self::ATTACHMENT_TABLE.'.id', $id)
+            ->where(self::ATTACHMENT_TABLE.'.active', 1)
+            ->first();
+
+        if (! $attachment) {
+            abort(404, 'Không tìm thấy file đính kèm.');
+        }
+
+        $isSigner = DB::table(self::SIGN_TABLE)
+            ->where(self::ESTIMATE_FK, $attachment->vpp_estimate_id)
+            ->where('user_id', session('user')['userId'] ?? 0)
+            ->where('active', 1)
+            ->exists();
+
+        // Bộ phận mua hàng xem được file của phiếu đã duyệt ở tab "Đơn dự trù đã được phê duyệt"
+        $isPurchaser = $this->canViewAsPurchaser(DB::table(self::TABLE)->where('id', $attachment->vpp_estimate_id)->first());
+
+        if ((int) $attachment->department_id !== $this->departmentId() && ! $isSigner && ! $isPurchaser) {
+            abort(403, 'Bạn không có quyền xem file này.');
+        }
+
+        if (! Storage::exists($attachment->file_path)) {
+            abort(404, 'File không tồn tại trên hệ thống lưu trữ.');
+        }
+
+        return Storage::response($attachment->file_path, $attachment->file_name, [
+            'Content-Disposition' => "inline; filename*=UTF-8''".rawurlencode($attachment->file_name),
+        ]);
+    }
+
+    public function deleteAttachment(Request $request)
+    {
+        $attachment = DB::table(self::ATTACHMENT_TABLE)
+            ->where('id', $request->id)
+            ->where('active', 1)
+            ->first();
+
+        $list = $attachment ? $this->findOwn($attachment->vpp_estimate_id) : null;
+
+        if (! $attachment || ! $list) {
+            return redirect()->back()->with('error', 'Không tìm thấy file đính kèm cần xoá!');
+        }
+
+        if (! $this->editable($list)) {
+            return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không xoá file đính kèm được nữa!');
+        }
+
+        DB::table(self::ATTACHMENT_TABLE)->where('id', $attachment->id)->update([
+            'active' => 0,
+            'deleted_by' => $this->actor(),
+            'deleted_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log('Xoá', self::ATTACHMENT_TABLE, $list->id, $list->code, 'Xoá file đính kèm: '.$attachment->file_name);
+
+        if ($list->app_status !== 'draft') {
+            self::writeHistory($list->id, 'Xoá file đính kèm', null, $list->app_status, $list->app_status, 'Xoá file: '.$attachment->file_name);
+        }
+
+        return redirect()->back()->with('success', 'Đã xoá file '.$attachment->file_name.'!');
+    }
+
+    /* ==========================================================
+     |  MẶT HÀNG DỰ TRÙ + SỐ LƯỢNG THEO THÁNG
+     ========================================================== */
+
+    /**
+     * Thêm NHIỀU VPP một lần từ modal dạng bảng: mỗi dòng items[i] là một VPP, các
+     * tháng cần dùng là cột chung periods[k], số lượng của dòng ở items[i][amounts][k] và
+     * dùng chung đơn vị items[i][unit_id]. Dòng bỏ trống hoàn toàn thì bỏ qua.
+     */
+    public function storeItem(Request $request)
+    {
+        $list = $this->findOwn($request->vpp_estimate_id);
+
+        if (! $list) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần khai mặt hàng!');
+        }
+
+        if (! $this->editable($list)) {
+            return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không thêm mặt hàng được nữa!');
+        }
+
+        $itemFiles = $this->pruneEmptyItemRows($request);
+
+        // File của từng dòng đi theo chỉ số MỚI sau khi bỏ dòng trống (không dùng $request->all()
+        // vì phần file vẫn giữ chỉ số cũ)
+        $data = $request->input();
+        foreach ($itemFiles as $index => $files) {
+            $data['items'][$index]['files'] = $files;
+        }
+
+        $validator = Validator::make($data, $this->batchItemRules(), $this->batchItemMessages());
+
+        // Mỗi dòng phải có ít nhất một tháng có số lượng; cột nào có số thì phải chọn tháng
+        $validator->after(function ($validator) use ($request, $list) {
+            $categoryIds = [];
+
+            foreach ((array) $request->input('items', []) as $index => $line) {
+                if (($line['source'] ?? '') === 'category') {
+                    $categoryIds['items.'.$index.'.category_id'] = $line['category_id'] ?? null;
+                }
+            }
+
+            foreach ($this->duplicateCategoryErrors((int) $list->id, $categoryIds) as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+
+            $periods = (array) $request->input('periods', []);
+
+            foreach ((array) $request->input('items', []) as $index => $line) {
+                $hasAmount = false;
+
+                foreach ((array) ($line['amounts'] ?? []) as $k => $amount) {
+                    if ($amount === '') {
+                        continue;
+                    }
+
+                    $hasAmount = true;
+
+                    if (trim((string) ($periods[$k] ?? '')) === '') {
+                        $validator->errors()->add('periods.'.$k, 'Vui lòng chọn tháng cho cột số lượng đang có dữ liệu.');
+                    }
+                }
+
+                if (! $hasAmount) {
+                    $validator->errors()->add('items.'.$index.'.amounts', 'Vui lòng nhập số lượng ít nhất một tháng.');
+                }
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator, 'itemCreateErrors')->withInput();
+        }
+
+        $periods = (array) $request->input('periods', []);
+        $lines = (array) $request->input('items', []);
+
+        $itemIds = DB::transaction(function () use ($lines, $periods, $list, $itemFiles) {
+            $ids = [];
+
+            foreach ($lines as $index => $line) {
+                $itemId = DB::table(self::ITEM_TABLE)->insertGetId($this->itemPayloadFrom($line) + [
+                    'vpp_estimate_id' => $list->id,
+                    'status_id' => 1,
+                    'created_by' => $this->actor(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Một dòng dùng chung một đơn vị cho mọi cột tháng
+                $amountRows = [];
+
+                foreach ((array) ($line['amounts'] ?? []) as $k => $amount) {
+                    $amountRows[] = [
+                        'amount' => $amount,
+                        'unit_id' => $line['unit_id'] ?? null,
+                        'for_month_year' => $periods[$k] ?? '',
+                    ];
+                }
+
+                $this->saveAmountRows($itemId, $amountRows);
+                $this->storeFiles($list->id, $itemId, $itemFiles[$index] ?? [], null);
+                $ids[] = $itemId;
+            }
+
+            return $ids;
+        });
+
+        if ($list->app_status !== 'draft') {
+            foreach ($itemIds as $itemId) {
+                AuditTrialController::log('Thêm mới', self::ITEM_TABLE, $itemId, 'NA', 'Thêm '.self::ITEM_LABEL.' vào phiếu '.$list->code);
+            }
+
+            self::writeHistory($list->id, 'Thêm mặt hàng', null, $list->app_status, $list->app_status, 'Thêm '.count($itemIds).' mặt hàng vào phiếu.');
+        }
+
+        return redirect()->back()->with('success', 'Đã thêm '.count($itemIds).' '.self::ITEM_LABEL.' vào phiếu '.$list->code.'!');
+    }
+
+    public function updateItem(Request $request)
+    {
+        [$item, $list] = $this->findItem($request->id);
+
+        if (! $item) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần cập nhật!');
+        }
+
+        if (! $this->editable($list)) {
+            return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không sửa mặt hàng được nữa!');
+        }
+
+        $this->pruneEmptyAmounts($request);
+
+        $validator = Validator::make($request->all(), $this->itemRules(), $this->itemMessages());
+
+        $validator->after(function ($validator) use ($request, $list, $item) {
+            if ($request->input('source') !== 'category') {
+                return;
+            }
+
+            $errors = $this->duplicateCategoryErrors((int) $list->id, ['category_id' => $request->input('category_id')], (int) $item->id);
+
+            foreach ($errors as $key => $message) {
+                $validator->errors()->add($key, $message);
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator, 'itemUpdateErrors')->withInput();
+        }
+
+        DB::transaction(function () use ($request, $item) {
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update($this->itemPayload($request) + [
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table(self::AMOUNT_TABLE)->where('vpp_estimate_item_id', $item->id)->update(['active' => 0]);
+            $this->saveAmounts($item->id, $request);
+        });
+
+        if ($list->app_status !== 'draft') {
+            AuditTrialController::log('Cập nhật', self::ITEM_TABLE, $item->id, 'Phiếu '.$list->code, 'Sửa '.self::ITEM_LABEL);
+            self::writeHistory($list->id, 'Sửa mặt hàng', null, $list->app_status, $list->app_status, 'Chỉnh sửa mặt hàng trong phiếu.');
+        }
+
+        return redirect()->back()->with('success', 'Cập nhật '.self::ITEM_LABEL.' thành công!');
+    }
+
+    public function deleteItem(Request $request)
+    {
+        [$item, $list] = $this->findItem($request->id);
+
+        if (! $item) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần xoá!');
+        }
+
+        if (! $this->editable($list)) {
+            return redirect()->back()->with('error', 'Phiếu '.$list->code.' đã trình ký nên không xoá mặt hàng được nữa!');
+        }
+
+        DB::transaction(function () use ($item) {
+            DB::table(self::AMOUNT_TABLE)->where('vpp_estimate_item_id', $item->id)->update(['active' => 0]);
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'active' => 0,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        if ($list->app_status !== 'draft') {
+            AuditTrialController::log('Xoá', self::ITEM_TABLE, $item->id, 'Phiếu '.$list->code, 'Xoá '.self::ITEM_LABEL);
+            self::writeHistory($list->id, 'Xoá mặt hàng', null, $list->app_status, $list->app_status, 'Xoá mặt hàng khỏi phiếu.');
+        }
+
+        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu dự trù!');
+    }
+
+    /**
+     * Phòng đề nghị cập nhật trạng thái mục đã duyệt: hoàn thành / hoàn tác, và phần của
+     * PHÒNG ĐỀ NGHỊ trong luồng huỷ 2 bên (cancel / cancel_reject / cancel_withdraw) -
+     * xem EstimateItemCancel. Bộ phận mua hàng thao tác phần của mình qua purchaseCancel().
+     */
+    public function updateItemStatus(Request $request)
+    {
+        if (! user_can(self::TRACK_PERMISSION)) {
+            return redirect()->back()->with('error', 'Bạn không có quyền cập nhật trạng thái mục dự trù!');
+        }
+
+        $request->validate([
+            'id' => 'required|integer',
+            'action' => 'required|in:complete,cancel,cancel_reject,cancel_withdraw,undo',
+        ]);
+
+        [$item, $list] = $this->findItem($request->id);
+
+        if (! $item) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::ITEM_LABEL.' cần cập nhật!');
+        }
+
+        if ($list->app_status !== 'approved') {
+            return redirect()->back()->with('error', 'Phiếu chưa được duyệt nên không thể cập nhật trạng thái mục!');
+        }
+
+        if (str_starts_with($request->action, 'cancel')) {
+            return $this->applyCancel($item, 'requester', $request->action, $request->cancel_reason);
+        }
+
+        if ($request->action === 'complete') {
+            if ($item->cancel_requester_at || $item->cancel_purchasing_at) {
+                return redirect()->back()->with('error', 'Mục đang chờ xác nhận huỷ, xử lý đề nghị huỷ trước khi xác nhận hoàn thành!');
+            }
+
+            $updateData = ['fulfilled_date' => now(), 'status_id' => 1];
+            $logMessage = 'Đã xác nhận hoàn thành (giao hàng).';
+        } else {
+            // Mục đã huỷ (đủ xác nhận của hai bên) là trạng thái cuối, không hoàn tác được
+            if ((int) $item->status_id === 0) {
+                return redirect()->back()->with('error', 'Mục '.self::ITEM_LABEL.' đã được xác nhận huỷ, không thể hoàn tác!');
+            }
+
+            $updateData = ['fulfilled_date' => null, 'status_id' => 1] + $this->clearCancel();
+            $logMessage = 'Đã khôi phục lại trạng thái mặt hàng.';
+        }
+
+        DB::transaction(function () use ($item, $updateData, $logMessage) {
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update($updateData);
+            $this->itemSystemChat($item->id, $logMessage);
+        });
+
+        return redirect()->back()->with('success', 'Đã cập nhật trạng thái '.self::ITEM_LABEL.'!');
+    }
+
+    public function updatePromisedDate(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer',
+            'amount_id' => 'required|integer',
+            'promised_date' => 'nullable|date',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        [$item, $list] = $this->findPurchasingItem($request->id);
+
+        if (! $item) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy '.self::ITEM_LABEL.' cần cập nhật, hoặc bạn không phải bộ phận mua hàng của phiếu này!']);
+        }
+
+        if ($list->app_status !== 'approved') {
+            return response()->json(['success' => false, 'message' => 'Phiếu chưa được duyệt nên không thể hẹn ngày!']);
+        }
+
+        // Mỗi tháng dự trù của mục có một ngày hẹn riêng
+        $amount = DB::table(self::AMOUNT_TABLE)
+            ->where('id', $request->amount_id)
+            ->where('vpp_estimate_item_id', $item->id)
+            ->where('active', 1)
+            ->first();
+
+        if (! $amount) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy tháng dự trù cần hẹn ngày!']);
+        }
+
+        $month = \Carbon\Carbon::parse($amount->for_month_year)->format('m/Y');
+        $oldDate = $amount->promised_date ? \Carbon\Carbon::parse($amount->promised_date)->format('d/m/Y') : 'Chưa có';
+        $newDate = $request->promised_date ? \Carbon\Carbon::parse($request->promised_date)->format('d/m/Y') : 'Chưa có';
+
+        // Lần hẹn đầu tiên của tháng (chưa có ngày hẹn) không bắt nhập lý do
+        if ($amount->promised_date && $oldDate !== $newDate && trim((string) $request->reason) === '') {
+            return response()->json(['success' => false, 'message' => 'Vui lòng nhập lý do thay đổi ngày hẹn đáp ứng!']);
+        }
+
+        $actor = $this->actor();
+        $reason = trim((string) $request->reason);
+        $historyAdded = false;
+
+        DB::transaction(function () use ($item, $amount, $request, $month, $oldDate, $newDate, $actor, $reason, &$historyAdded) {
+            DB::table(self::AMOUNT_TABLE)->where('id', $amount->id)->update([
+                'promised_date' => $request->promised_date,
+            ]);
+
+            // Ngày hẹn của mục = ngày hẹn sớm nhất trong các tháng (tab Theo dõi dự trù lọc / sắp xếp theo cột này)
+            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
+                'promised_date' => DB::table(self::AMOUNT_TABLE)
+                    ->where('vpp_estimate_item_id', $item->id)
+                    ->where('active', 1)
+                    ->min('promised_date'),
+            ]);
+
+            if ($oldDate !== $newDate) {
+                DB::table('estimate_item_chats')->insert([
+                    'item_id' => $item->id,
+                    'item_type' => self::CHAT_TYPE,
+                    'user_name' => $actor,
+                    'content' => $amount->promised_date
+                        ? "Tháng {$month}: cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]. Lý do: {$reason}"
+                        : "Tháng {$month}: hẹn ngày đáp ứng lần đầu [{$newDate}]",
+                    'type' => 'history_promised_date',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $historyAdded = true;
+            }
+        });
+
+        return response()->json(['success' => true, 'message' => 'Đã cập nhật ngày hẹn đáp ứng!', 'historyAdded' => $historyAdded]);
+    }
+
+    public function getPromisedDateHistory($itemId)
+    {
+        $histories = DB::table('estimate_item_chats')
+            ->where('item_id', $itemId)
+            ->where('item_type', self::CHAT_TYPE)
+            ->where('type', 'history_promised_date')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($chat) => [
+                'content' => $chat->content,
+                'user_name' => $chat->user_name,
+                'created_at_formatted' => \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y'),
+            ]);
+
+        return response()->json(['success' => true, 'histories' => $histories]);
+    }
+
+    public function storeItemChat(Request $request)
+    {
+        $request->validate([
+            'item_id' => 'required|integer',
+            'content' => 'required|string|max:1000',
+        ]);
+
+        if (! user_can(self::CHAT_PERMISSION)) {
+            return response()->json(['success' => false, 'message' => 'Bạn không có quyền trao đổi ở mục dự trù!']);
+        }
+
+        // Phòng đề nghị (phiếu của phòng đang chọn) hoặc bộ phận mua hàng phụ trách mục
+        [$item, $list] = $this->findItem($request->item_id);
+        if (! $item) {
+            [$item, $list] = $this->findPurchasingItem($request->item_id);
+        }
+
+        if (! $item) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy '.self::ITEM_LABEL]);
+        }
+
+        $chatId = DB::table('estimate_item_chats')->insertGetId([
+            'item_id' => $item->id,
+            'item_type' => self::CHAT_TYPE,
+            'user_name' => $this->actor(),
+            'content' => $request->content,
+            'type' => 'chat',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $chat = DB::table('estimate_item_chats')->where('id', $chatId)->first();
+        $chat->created_at_formatted = \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y');
+
+        return response()->json(['success' => true, 'chat' => $chat]);
+    }
+
+    /* ==========================================================
+     |  TRÌNH KÝ
+     ========================================================== */
+
+    /**
+     * TRÌNH KÝ: người lập khai quy trình ký duyệt (số bước + người ký từng bước) ngay trên
+     * modal Trình ký, tối thiểu 2 bước và bước cuối là Ban Giám Đốc. Quy trình được ghi lại
+     * mỗi lần trình ký (kể cả trình ký lại sau khi bị từ chối).
+     */
+    public function submit(Request $request)
+    {
+        $current = $this->findOwn($request->id);
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần trình ký!');
+        }
+
+        if (! $this->editable($current)) {
+            return redirect()->back()->with('error', 'Phiếu '.$current->code.' đang ở bước "'.$this->statusLabel($current->app_status).'", không trình ký lại được!');
+        }
+
+        if ($current->status_id != 1) {
+            return redirect()->back()->with('error', 'Phiếu '.$current->code.' đang bị khoá, hãy mở khoá trước khi trình ký!');
+        }
+
+        if (! DB::table(self::ITEM_TABLE)->where('vpp_estimate_id', $current->id)->where('active', 1)->exists()) {
+            return redirect()->back()->with('error', 'Phiếu '.$current->code.' chưa có VPP nào, chưa trình ký được!');
+        }
+
+        // Bước 1 Quản Lý Bộ Phận (tự gán theo phòng lập phiếu), bước 2 Ban Giám Đốc người lập chọn
+        $validator = $this->signFlowValidator($request, (int) $current->department_id);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator, 'submitErrors')
+                ->with('error', $validator->errors()->first())
+                ->withInput();
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Trình ký')) {
+            return $stop;
+        }
+
+        $now = now();
+        $stepCount = $this->signFlowStepCount();
+
+        DB::transaction(function () use ($current, $request, $stepCount, $now) {
+            DB::table(self::TABLE)->where('id', $current->id)->update([
+                'app_status' => 'pending_sign',
+                'current_step' => 1,
+                'sign_step_count' => $stepCount,
+                'submitted_by' => $this->actor(),
+                'submitted_at' => $now,
+                'rejected_by' => null,
+                'rejected_at' => null,
+                'reject_step' => null,
+                'reject_reason' => null,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ]);
+
+            // Ghi lại quy trình ký: bỏ hiệu lực bước cũ (nếu trình ký lại) rồi ghi bước mới
+            $this->deactivateSigns($current->id);
+            $this->insertSigns($current->id, $request);
+        });
+
+        self::writeHistory($current->id, 'Trình ký', '1', $current->app_status, 'pending_sign', $this->nullIfBlank($request->note));
+
+        AuditTrialController::log('Trình ký', self::TABLE, $current->id, 'app_status: '.$current->app_status, 'app_status: pending_sign, '.$stepCount.' bước ký');
+
+        return redirect()->back()->with('success', 'Đã trình ký phiếu '.$current->code.' qua '.$stepCount.' bước duyệt!');
+    }
+
+    /**
+     * KÝ MỘT BƯỚC của phiếu dự trù. Chỉ đúng người được chỉ định ở bước đang chờ mới ký được,
+     * và phải nhập lại mật khẩu (21 CFR Part 11). Ký xong bước cuối thì phiếu được duyệt và
+     * tự đánh dấu đã tiếp nhận.
+     */
+    public function signStep(Request $request)
+    {
+        $tab = $this->approvalActiveTab($request);
+        $current = $this->resolveEstimateForApproval($request);
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần ký duyệt!')->with('activeTab', $tab);
+        }
+
+        $sign = $this->currentSign($current);
+
+        if (! $sign) {
+            return redirect()->back()->with('error', 'Phiếu '.$current->code.' không ở bước chờ ký nên không ký được!')->with('activeTab', $tab);
+        }
+
+        if (! $this->canSignRow($sign)) {
+            return redirect()->back()
+                ->with('error', 'Bước '.$sign->step_no.' của phiếu '.$current->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không ký thay được!')
+                ->with('activeTab', $tab);
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Ký duyệt '.self::LABEL)) {
+            return $stop->with('activeTab', $tab);
+        }
+
+        $stepCount = (int) $current->sign_step_count;
+        $stepNo = (int) $sign->step_no;
+        $isLast = $stepNo >= $stepCount;
+        $now = now();
+
+        DB::transaction(function () use ($current, $sign, $stepNo, $isLast, $now) {
+            DB::table(self::SIGN_TABLE)->where('id', $sign->id)->update([
+                'status' => 'signed',
+                'signed_by' => $this->actor(),
+                'signed_at' => $now,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ]);
+
+            $payload = [
+                'app_status' => $isLast ? 'approved' : 'pending_sign',
+                'current_step' => $isLast ? null : $stepNo + 1,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ];
+
+            if ($isLast) {
+                // Duyệt xong: chờ nhân viên cung ứng bấm Tiếp nhận (receive) - hiện ở Trang chủ
+                $payload['reception_status'] = 'waiting';
+                $payload['received_by'] = null;
+                $payload['received_at'] = null;
+            }
+
+            DB::table(self::TABLE)->where('id', $current->id)->update($payload);
+        });
+
+        self::writeHistory($current->id, 'Ký duyệt', (string) $stepNo, $current->app_status, $isLast ? 'approved' : 'pending_sign', $this->nullIfBlank($request->note));
+
+        AuditTrialController::log('Ký duyệt', self::TABLE, $current->id, 'Bước '.$stepNo.'/'.$stepCount, 'app_status: '.($isLast ? 'approved' : 'pending_sign'));
+
+        return redirect()->back()->with(
+            'success',
+            $isLast
+                ? 'Đã ký bước '.$stepNo.'/'.$stepCount.' - phiếu '.$current->code.' được phê duyệt và ghi nhận tiếp nhận.'
+                : 'Đã ký bước '.$stepNo.'/'.$stepCount.' cho phiếu '.$current->code.'! Đã chuyển tới người ký bước '.($stepNo + 1).'.'
+        )->with('activeTab', $tab);
+    }
+
+    public function reject(Request $request)
+    {
+        $tab = $this->approvalActiveTab($request);
+        $current = $this->resolveEstimateForApproval($request);
+
+        if (! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy '.self::LABEL.' cần từ chối!')->with('activeTab', $tab);
+        }
+
+        $sign = $this->currentSign($current);
+
+        if (! $sign) {
+            return redirect()->back()->with('error', 'Phiếu '.$current->code.' không ở bước chờ ký nên không từ chối được!')->with('activeTab', $tab);
+        }
+
+        if (! $this->canSignRow($sign)) {
+            return redirect()->back()
+                ->with('error', 'Bước '.$sign->step_no.' của phiếu '.$current->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không từ chối thay được!')
+                ->with('activeTab', $tab);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'reject_reason' => ['required', 'max:500'],
+        ], [
+            'reject_reason.required' => 'Vui lòng nhập lý do từ chối.',
+            'reject_reason.max' => 'Lý do từ chối tối đa 500 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator, 'rejectErrors')->withInput()->with('activeTab', $tab);
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Từ chối duyệt')) {
+            return $stop->with('activeTab', $tab);
+        }
+
+        $now = now();
+
+        DB::transaction(function () use ($current, $sign, $request, $now) {
+            DB::table(self::SIGN_TABLE)->where('id', $sign->id)->update([
+                'status' => 'rejected',
+                'reject_reason' => $request->reject_reason,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ]);
+
+            DB::table(self::TABLE)->where('id', $current->id)->update([
+                'app_status' => 'rejected',
+                'current_step' => null,
+                'rejected_by' => $this->actor(),
+                'rejected_at' => $now,
+                'reject_step' => (string) $sign->step_no,
+                'reject_reason' => $request->reject_reason,
+                'updated_by' => $this->actor(),
+                'updated_at' => $now,
+            ]);
+        });
+
+        self::writeHistory($current->id, 'Từ chối', (string) $sign->step_no, $current->app_status, 'rejected', $request->reject_reason);
+
+        AuditTrialController::log('Từ chối duyệt', self::TABLE, $current->id, 'Bước '.$sign->step_no, 'app_status: rejected');
+
+        return redirect()->back()->with('success', 'Đã từ chối phiếu '.$current->code.'. Phòng ban cần sửa lại rồi trình ký lại.')->with('activeTab', $tab);
+    }
+
+    /* ==========================================================
+     |  HÀM DÙNG CHUNG
+     ========================================================== */
+
+    /**
+     * VPP đã được Hành Chánh (bộ phận mua hàng) hẹn ngày đáp ứng nhưng CHƯA giao xong, gom theo phòng ban
+     * đang chọn để đổ vào tab "Theo dõi dự trù". Kèm số lượng theo tháng và trao đổi.
+     *
+     * Gom một truy vấn cho VPP, một cho số lượng, một cho trao đổi rồi ghép trong PHP
+     * để không phải hỏi DB theo từng dòng.
+     */
+    public static function trackedItems(int $departmentId, array $extraItemIds = [])
+    {
+        $items = DB::table(self::ITEM_TABLE)
+            ->join(self::TABLE, self::ITEM_TABLE.'.vpp_estimate_id', '=', self::TABLE.'.id')
+            ->leftJoin('vpp_categories', self::ITEM_TABLE.'.category_id', '=', 'vpp_categories.id')
+            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentVpp::joinUnitOn($query, self::TABLE.'.department_id', self::ITEM_TABLE.'.category_id'))
+            ->leftJoin('deparments', self::TABLE.'.department_id', '=', 'deparments.id')
+            ->select(
+                self::ITEM_TABLE.'.*',
+                self::TABLE.'.id as list_id',
+                self::TABLE.'.code as list_code',
+                self::TABLE.'.department_id as list_department_id',
+                'deparments.shortName as department_short_name',
+                'deparments.name as department_name',
+                'material_names.name as category_material_name',
+                'units.short_name as category_unit_short_name',
+                'manufacturers.name as category_manufacturer_name'
+            )
+            // Phiếu của phòng đang chọn + mục bộ phận mua hàng (phòng đang chọn) phụ trách mua
+            ->where(function ($q) use ($departmentId, $extraItemIds) {
+                $q->where(self::TABLE.'.department_id', $departmentId);
+                if ($extraItemIds) {
+                    $q->orWhereIn(self::ITEM_TABLE.'.id', $extraItemIds);
+                }
+            })
+            ->whereNotNull(self::ITEM_TABLE.'.promised_date')
+            ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
+            ->where(self::ITEM_TABLE.'.status_id', 1)
+            ->where(self::ITEM_TABLE.'.active', 1)
+            ->orderBy(self::ITEM_TABLE.'.promised_date', 'asc')
+            ->get();
+
+        if ($items->isEmpty()) {
+            return $items;
+        }
+
+        $amounts = DB::table(self::AMOUNT_TABLE)
+            ->leftJoin('units', self::AMOUNT_TABLE.'.unit_id', '=', 'units.id')
+            ->select(
+                self::AMOUNT_TABLE.'.*',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name'
+            )
+            ->where(self::AMOUNT_TABLE.'.active', 1)
+            ->whereIn(self::AMOUNT_TABLE.'.vpp_estimate_item_id', $items->pluck('id')->all())
+            ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
+            ->get()
+            ->groupBy('vpp_estimate_item_id');
+
+        $allChats = DB::table('estimate_item_chats')
+            ->where('item_type', self::CHAT_TYPE)
+            ->whereIn('item_id', $items->pluck('id')->all())
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $chats = $allChats->where('type', '!=', 'history_promised_date')
+            ->map(function ($chat) {
+                $chat->created_at_formatted = \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y');
+
+                return $chat;
+            })
+            ->groupBy('item_id');
+
+        $historyCounts = $allChats->where('type', 'history_promised_date')
+            ->groupBy('item_id')
+            ->map->count();
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts) {
+            $item->amounts = ($amounts[$item->id] ?? collect())->values();
+            $item->chats = ($chats[$item->id] ?? collect())->values();
+            $item->history_count = $historyCounts[$item->id] ?? 0;
+            $item->display_name = $item->category_id ? $item->category_material_name : $item->material_name;
+            // Bảng theo dõi dùng chung hiện category_code + category_type sau tên mặt hàng.
+            // VPP không có mã/loại danh mục, cũng không có quy cách kỹ thuật ở danh mục.
+            $item->category_code = null;
+            $item->category_type = null;
+
+            return $item;
+        });
+    }
+
+    public static function itemsOf(int $listId)
+    {
+        $departmentId = (int) DB::table(self::TABLE)->where('id', $listId)->value('department_id');
+
+        $items = DB::table(self::ITEM_TABLE)
+            ->leftJoin('vpp_categories', self::ITEM_TABLE.'.category_id', '=', 'vpp_categories.id')
+            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, self::ITEM_TABLE.'.category_id'))
+            ->select(
+                self::ITEM_TABLE.'.*',
+                'vpp_categories.code as vpp_code',
+                'material_names.name as category_material_name',
+                'units.short_name as category_unit_short_name',
+                'manufacturers.name as category_manufacturer_name',
+                'manufacturers.short_name as category_manufacturer_short_name'
+            )
+            ->where(self::ITEM_TABLE.'.vpp_estimate_id', $listId)
+            ->where(self::ITEM_TABLE.'.active', 1)
+            ->orderBy(self::ITEM_TABLE.'.id', 'asc')
+            ->get();
+
+        $amounts = DB::table(self::AMOUNT_TABLE)
+            ->leftJoin('units', self::AMOUNT_TABLE.'.unit_id', '=', 'units.id')
+            ->select(
+                self::AMOUNT_TABLE.'.*',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name'
+            )
+            ->where(self::AMOUNT_TABLE.'.active', 1)
+            ->whereIn(self::AMOUNT_TABLE.'.vpp_estimate_item_id', $items->pluck('id')->all())
+            ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
+            ->get()
+            ->groupBy('vpp_estimate_item_id');
+
+        $allChats = DB::table('estimate_item_chats')
+            ->where('item_type', self::CHAT_TYPE)
+            ->whereIn('item_id', $items->pluck('id')->all())
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $chats = $allChats->where('type', '!=', 'history_promised_date')
+            ->map(function ($chat) {
+                $chat->created_at_formatted = \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y');
+
+                return $chat;
+            })
+            ->groupBy('item_id');
+
+        $historyCounts = $allChats->where('type', 'history_promised_date')
+            ->groupBy('item_id')
+            ->map->count();
+
+        // File đính kèm của từng VPP
+        $files = DB::table(self::ATTACHMENT_TABLE)
+            ->whereIn('vpp_estimate_item_id', $items->pluck('id')->all())
+            ->where('active', 1)
+            ->orderBy('id', 'asc')
+            ->get()
+            ->groupBy('vpp_estimate_item_id');
+
+        return $items->map(function ($item) use ($amounts, $chats, $historyCounts, $files) {
+            $item->files = ($files[$item->id] ?? collect())->values();
+            $item->amounts = ($amounts[$item->id] ?? collect())->values();
+            $item->chats = ($chats[$item->id] ?? collect())->values();
+            $item->history_count = $historyCounts[$item->id] ?? 0;
+            $item->display_name = $item->category_id ? $item->category_material_name : $item->material_name;
+
+            return $item;
+        });
+    }
+
+    public static function historiesOf(int $listId): array
+    {
+        $labels = config('estimate.app_statuses') + config('estimate.reception_statuses');
+        $steps = config('estimate.sign_steps');
+        $stepLabel = function ($step) use ($steps) {
+            if (! $step) {
+                return '';
+            }
+            // Luồng động: step là số thứ tự bước ký
+            if (is_numeric($step)) {
+                return 'Bước '.$step;
+            }
+            // Nhật ký ghi trước khi đổi luồng: 'manager' / 'director' / 'reception'
+            return $steps[$step]['label'] ?? ($step === 'reception' ? 'Hành Chánh' : $step);
+        };
+
+        return DB::table(self::HISTORY_TABLE)
+            ->where('vpp_estimate_id', $listId)
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(fn ($row) => [
+                'action' => $row->action,
+                'step' => $stepLabel($row->step),
+                'from_status' => $labels[$row->from_status] ?? ($row->from_status ?: ''),
+                'to_status' => $labels[$row->to_status] ?? ($row->to_status ?: ''),
+                'note' => $row->note ?: '',
+                'created_by' => $row->created_by ?: 'NA',
+                'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
+            ])
+            ->values()
+            ->all();
+    }
+
+    public static function writeHistory(int $listId, string $action, ?string $step, ?string $from, ?string $to, ?string $note): void
+    {
+        DB::table(self::HISTORY_TABLE)->insert([
+            'vpp_estimate_id' => $listId,
+            'action' => $action,
+            'step' => $step,
+            'from_status' => $from,
+            'to_status' => $to,
+            'note' => $note,
+            'created_by' => \App\Support\Signer::actor(),
+            'created_at' => now(),
+        ]);
+    }
+
+    private function itemCounts(array $listIds): array
+    {
+        if (! $listIds) {
+            return [];
+        }
+
+        return DB::table(self::ITEM_TABLE)
+            ->select('vpp_estimate_id', DB::raw('COUNT(*) as total'))
+            ->whereIn('vpp_estimate_id', $listIds)
+            ->where('active', 1)
+            ->groupBy('vpp_estimate_id')
+            ->pluck('total', 'vpp_estimate_id')
+            ->all();
+    }
+
+    private function pruneEmptyAmounts(Request $request): void
+    {
+        $rows = array_values(array_filter(
+            (array) $request->input('amounts', []),
+            fn ($line) => trim((string) ($line['amount'] ?? '')) !== ''
+        ));
+
+        $request->merge(['amounts' => $rows]);
+    }
+
+    /**
+     * Modal thêm nhiều VPP: bỏ các dòng trống hoàn toàn (chưa chọn/gõ VPP, không số
+     * lượng, không thông tin) rồi đánh số lại, để lỗi validate trỏ đúng dòng đang hiện.
+     */
+    /** @return array<int, \Illuminate\Http\UploadedFile[]> file đính kèm theo chỉ số dòng MỚI */
+    private function pruneEmptyItemRows(Request $request): array
+    {
+        $rows = [];
+        $files = [];
+
+        foreach ((array) $request->input('items', []) as $origIndex => $line) {
+            $lineFiles = array_values(array_filter((array) $request->file('items.'.$origIndex.'.files', [])));
+            $line = (array) $line;
+            $line['amounts'] = array_map(fn ($value) => trim((string) $value), (array) ($line['amounts'] ?? []));
+
+            $isBlank = ! array_filter($line['amounts'], fn ($value) => $value !== '')
+                && trim((string) ($line['category_id'] ?? '')) === ''
+                && trim((string) ($line['material_name'] ?? '')) === ''
+                && trim((string) ($line['technical_information'] ?? '')) === ''
+                && trim((string) ($line['purpose'] ?? '')) === ''
+                && trim((string) ($line['expected_delivery_date'] ?? '')) === ''
+                && ! $lineFiles;
+
+            if (! $isBlank) {
+                if ($lineFiles) {
+                    $files[count($rows)] = $lineFiles;
+                }
+                $rows[] = $line;
+            }
+        }
+
+        $request->merge(['items' => $rows]);
+
+        return $files;
+    }
+
+    /**
+     * Lưu file đính kèm (của cả phiếu khi $itemId = null, hoặc của một VPP).
+     *
+     * @return string[] tên các file đã lưu
+     */
+    private function storeFiles(int $listId, ?int $itemId, array $files, ?string $note): array
+    {
+        $names = [];
+
+        foreach ($files as $file) {
+            if (! $file || ! $file->isValid()) {
+                continue;
+            }
+
+            $path = $file->store('public/'.self::ATTACHMENT_FOLDER);
+            AttachmentBackup::copy($path, self::ATTACHMENT_FOLDER);
+
+            DB::table(self::ATTACHMENT_TABLE)->insert([
+                'vpp_estimate_id' => $listId,
+                'vpp_estimate_item_id' => $itemId,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
+                'file_size' => $file->getSize(),
+                'file_type' => $file->getClientMimeType() ?: $file->getClientOriginalExtension(),
+                'note' => $note,
+                'active' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $names[] = $file->getClientOriginalName();
+        }
+
+        return $names;
+    }
+
+    private function saveAmounts(int $itemId, Request $request): void
+    {
+        $this->saveAmountRows($itemId, (array) $request->input('amounts', []));
+    }
+
+    /** Ghi các dòng số lượng [amount, unit_id, for_month_year 'Y-m']; dòng thiếu số hoặc tháng thì bỏ qua. */
+    private function saveAmountRows(int $itemId, array $lines): void
+    {
+        $rows = [];
+
+        foreach ($lines as $line) {
+            $amount = trim((string) ($line['amount'] ?? ''));
+            $period = trim((string) ($line['for_month_year'] ?? ''));
+
+            if ($amount === '' || $period === '') {
+                continue;
+            }
+
+            $rows[] = [
+                'vpp_estimate_item_id' => $itemId,
+                'amount' => (float) $amount,
+                'unit_id' => ! empty($line['unit_id']) ? (int) $line['unit_id'] : null,
+                'for_month_year' => $period.'-01',
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        if ($rows) {
+            DB::table(self::AMOUNT_TABLE)->insert($rows);
+        }
+    }
+
+    /**
+     * Mã phiếu kế tiếp: <DeptShortName><yymmdd>.<NN>, số thứ tự đếm riêng cho từng bộ
+     * (phòng ban, tháng, năm). Phiếu chỉ khoá chứ không xoá nên mã không bị dùng lại.
+     */
+    private function nextCode(int $departmentId): string
+    {
+        $shortName = DB::table('deparments')->where('id', $departmentId)->value('shortName') ?? 'UNK';
+        $prefix = $shortName.'VPP'.date('ymd').'.';
+
+        $next = DB::table(self::TABLE)
+            ->where('department_id', $departmentId)
+            ->whereYear('created_at', date('Y'))
+            ->whereMonth('created_at', date('m'))
+            ->pluck('code')
+            ->map(function ($code) {
+                $parts = explode('.', $code);
+
+                return isset($parts[1]) ? (int) $parts[1] : 0;
+            })
+            ->max();
+
+        return $prefix.str_pad((string) (($next ?? 0) + 1), 2, '0', STR_PAD_LEFT);
+    }
+
+    /** Danh mục VPP đã duyệt và đang hoạt động mới được chọn để dự trù. */
+    private function categoryOptions()
+    {
+        $departmentId = $this->departmentId();
+
+        return DB::table('vpp_categories')
+            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_categories.id'))
+            ->select(
+                'vpp_categories.id',
+                'material_names.name as material_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                'units.short_name as unit_short_name',
+                'units.id as unit_id'
+            )
+            ->where('vpp_categories.status_id', 1)
+            ->where('vpp_categories.app_status', 'approved')
+            ->orderBy('material_names.name', 'asc')
+            ->get();
+    }
+
+    private function unitOptions()
+    {
+        return DB::table('units')
+            ->select('id', 'name', 'short_name')
+            ->where('status_id', 1)
+            ->where('app_status', 'approved')
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    private function findOwn($id)
+    {
+        return DB::table(self::TABLE)
+            ->where('id', $id)
+            ->where('department_id', $this->departmentId())
+            ->first();
+    }
+
+    private function findItem($id): array
+    {
+        $item = DB::table(self::ITEM_TABLE)->where('id', $id)->where('active', 1)->first();
+
+        if (! $item) {
+            return [null, null];
+        }
+
+        $list = $this->findOwn($item->vpp_estimate_id);
+
+        return $list ? [$item, $list] : [null, null];
+    }
+
+    /**
+     * Mỗi mã VPP (category_id) chỉ được MỘT dòng còn hiệu lực trong một phiếu dự trù - cần
+     * nhiều tháng thì khai thêm cột số lượng ở dòng đã có. Kiểm cả dòng đã lưu trong phiếu và
+     * các dòng trùng nhau trong cùng lần gửi.
+     *
+     * @param  array<string, int|null>  $categoryIds  [khoá lỗi => category_id]
+     * @return array<string, string> [khoá lỗi => thông báo]
+     */
+    private function duplicateCategoryErrors(?int $listId, array $categoryIds, ?int $exceptItemId = null): array
+    {
+        $categoryIds = array_filter(array_map(fn ($id) => $id ? (int) $id : null, $categoryIds));
+
+        if (! $categoryIds) {
+            return [];
+        }
+
+        $seen = $listId
+            ? DB::table(self::ITEM_TABLE)
+                ->where('vpp_estimate_id', $listId)
+                ->where('active', 1)
+                ->whereNotNull('category_id')
+                ->when($exceptItemId, fn ($query) => $query->where('id', '!=', $exceptItemId))
+                ->pluck('category_id')
+                ->mapWithKeys(fn ($id) => [(int) $id => 'saved'])
+                ->all()
+            : [];
+
+        $labels = DB::table('vpp_categories')
+            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->whereIn('vpp_categories.id', array_values($categoryIds))
+            ->select('vpp_categories.id', 'vpp_categories.code', 'material_names.name')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->id => trim($row->code.' — '.$row->name, ' —')])
+            ->all();
+
+        $errors = [];
+
+        foreach ($categoryIds as $key => $categoryId) {
+            $label = $labels[$categoryId] ?? 'VPP';
+
+            if (isset($seen[$categoryId])) {
+                $errors[$key] = $seen[$categoryId] === 'saved'
+                    ? $label.' đã có trong phiếu, mỗi mã VPP chỉ được một dòng - hãy sửa số lượng ở dòng đã có.'
+                    : $label.' bị khai trùng nhiều dòng, mỗi mã VPP chỉ được một dòng.';
+
+                continue;
+            }
+
+            $seen[$categoryId] = 'new';
+        }
+
+        return $errors;
+    }
+
+    private function editable($list): bool
+    {
+        return in_array($list->app_status, self::EDITABLE_STATUSES, true) && $list->status_id == 1;
+    }
+
+    private function statusLabel(?string $appStatus): string
+    {
+        return config('estimate.app_statuses')[$appStatus] ?? ($appStatus ?: '—');
+    }
+
+    private function departmentId(): int
+    {
+        return (int) (session('user')['selected_department_id'] ?? 0);
+    }
+
+    private function actor(): string
+    {
+        return \App\Support\Signer::actor();
+    }
+
+    /* ==========================================================
+     |  KIỂM TRA DỮ LIỆU NHẬP
+     ========================================================== */
+
+    /** Quy tắc cho các dòng VPP chọn từ tab "Danh sách VPP cần dự trù". */
+    private function watchlistItemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.category_id' => ['nullable', 'exists:vpp_categories,id'],
+            'items.*.material_name' => ['nullable', 'max:255'],
+            'items.*.technical_information' => ['nullable', 'max:1000'],
+            'items.*.purpose' => ['nullable', 'max:1000'],
+            'items.*.amount' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.unit_id' => ['required', 'exists:units,id'],
+            'items.*.for_month_year' => ['required', 'date_format:Y-m'],
+        ];
+    }
+
+    private function watchlistItemMessages(): array
+    {
+        return [
+            'items.required' => 'Vui lòng chọn ít nhất một VPP để lập phiếu dự trù.',
+            'items.min' => 'Vui lòng chọn ít nhất một VPP để lập phiếu dự trù.',
+            'items.*.category_id.exists' => 'VPP được chọn không tồn tại trong danh mục.',
+            'items.*.material_name.max' => 'Tên VPP tối đa 255 ký tự.',
+            'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'items.*.amount.required' => 'Vui lòng nhập số lượng dự trù cho mọi VPP đã chọn.',
+            'items.*.amount.numeric' => 'Số lượng dự trù phải là số.',
+            'items.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính cho mọi VPP đã chọn.',
+            'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'items.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng cho mọi VPP đã chọn.',
+            'items.*.for_month_year.date_format' => 'Tháng cần dùng không hợp lệ.',
+        ];
+    }
+
+    private function rules(): array
+    {
+        return [
+            'month' => ['required', 'integer', 'between:1,12'],
+            'year' => ['required', 'integer', 'between:2020,2100'],
+            'note' => ['nullable', 'max:500'],
+        ];
+    }
+
+    private function payload(Request $request): array
+    {
+        return [
+            'month' => (int) $request->month,
+            'year' => (int) $request->year,
+            'note' => $this->nullIfBlank($request->note),
+        ];
+    }
+
+    private function messages(): array
+    {
+        return [
+            'month.required' => 'Vui lòng chọn tháng dự trù.',
+            'month.between' => 'Tháng dự trù phải từ 1 đến 12.',
+            'year.required' => 'Vui lòng nhập năm dự trù.',
+            'year.between' => 'Năm dự trù không hợp lệ.',
+            'note.max' => 'Ghi chú tối đa 500 ký tự.',
+        ];
+    }
+
+    private function itemRules(): array
+    {
+        return [
+            'source' => ['required', 'in:category,manual'],
+            'category_id' => ['required_if:source,category', 'nullable', 'exists:vpp_categories,id'],
+            'material_name' => ['required_if:source,manual', 'nullable', 'max:255'],
+            'technical_information' => ['nullable', 'max:1000'],
+            'purpose' => ['nullable', 'max:1000'],
+            'amounts' => ['required', 'array', 'min:1'],
+            'amounts.*.amount' => ['required', 'numeric', 'min:0.0001'],
+            'amounts.*.unit_id' => ['required', 'exists:units,id'],
+            'amounts.*.for_month_year' => ['required', 'date_format:Y-m'],
+        ];
+    }
+
+    private function itemPayload(Request $request): array
+    {
+        return $this->itemPayloadFrom($request->all());
+    }
+
+    /** Payload một mặt hàng từ mảng dữ liệu (form sửa 1 dòng hoặc 1 dòng items[i] của modal thêm nhiều). */
+    private function itemPayloadFrom(array $line): array
+    {
+        $fromCategory = ($line['source'] ?? '') === 'category';
+
+        return [
+            'category_id' => $fromCategory ? (int) $line['category_id'] : null,
+            'material_name' => $fromCategory ? null : $this->nullIfBlank($line['material_name'] ?? null),
+            'technical_information' => $this->nullIfBlank($line['technical_information'] ?? null),
+            'purpose' => $this->nullIfBlank($line['purpose'] ?? null),
+            'expected_delivery_date' => $this->nullIfBlank($line['expected_delivery_date'] ?? null),
+        ];
+    }
+
+    /** Modal thêm nhiều VPP: items[i] là một VPP, periods[k] là cột tháng chung. */
+    private function batchItemRules(): array
+    {
+        return [
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.source' => ['required', 'in:category,manual'],
+            'items.*.category_id' => ['required_if:items.*.source,category', 'nullable', 'exists:vpp_categories,id'],
+            'items.*.material_name' => ['required_if:items.*.source,manual', 'nullable', 'max:255'],
+            'items.*.technical_information' => ['nullable', 'max:1000'],
+            'items.*.purpose' => ['nullable', 'max:1000'],
+            'items.*.expected_delivery_date' => ['nullable', 'date'],
+            'items.*.unit_id' => ['required', 'exists:units,id'],
+            'items.*.amounts' => ['array'],
+            'items.*.amounts.*' => ['nullable', 'numeric', 'min:0.0001'],
+            'items.*.files' => ['nullable', 'array', 'max:10'],
+            'items.*.files.*' => ['file', 'max:20480', 'mimes:'.self::ATTACHMENT_MIMES],
+            'periods' => ['required', 'array', 'min:1'],
+            'periods.*' => ['nullable', 'date_format:Y-m', 'distinct'],
+        ];
+    }
+
+    private function batchItemMessages(): array
+    {
+        return [
+            'items.required' => 'Vui lòng khai ít nhất một VPP.',
+            'items.min' => 'Vui lòng khai ít nhất một VPP.',
+            'items.max' => 'Mỗi lần thêm tối đa 200 VPP.',
+            'items.*.source.required' => 'Vui lòng chọn nguồn VPP.',
+            'items.*.source.in' => 'Nguồn VPP không hợp lệ.',
+            'items.*.category_id.required_if' => 'Vui lòng chọn VPP trong danh mục.',
+            'items.*.category_id.exists' => 'VPP được chọn không tồn tại trong danh mục.',
+            'items.*.material_name.required_if' => 'Vui lòng nhập tên VPP ngoài danh mục.',
+            'items.*.material_name.max' => 'Tên VPP tối đa 255 ký tự.',
+            'items.*.technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
+            'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'items.*.expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
+            'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
+            'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'items.*.amounts.*.numeric' => 'Số lượng dự trù phải là số.',
+            'items.*.amounts.*.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.files.max' => 'Mỗi VPP đính kèm tối đa 10 file.',
+            'items.*.files.*.file' => 'File đính kèm không hợp lệ.',
+            'items.*.files.*.max' => 'Mỗi file đính kèm tối đa 20MB.',
+            'items.*.files.*.mimes' => 'Định dạng file đính kèm không được hỗ trợ.',
+            'periods.required' => 'Vui lòng khai ít nhất một tháng cần dùng.',
+            'periods.*.date_format' => 'Tháng cần dùng không hợp lệ.',
+            'periods.*.distinct' => 'Các cột tháng cần dùng bị trùng nhau.',
+        ];
+    }
+
+    private function itemMessages(): array
+    {
+        return [
+            'source.required' => 'Vui lòng chọn nguồn VPP.',
+            'source.in' => 'Nguồn VPP không hợp lệ.',
+            'category_id.required_if' => 'Vui lòng chọn VPP trong danh mục.',
+            'category_id.exists' => 'VPP được chọn không tồn tại trong danh mục.',
+            'material_name.required_if' => 'Vui lòng nhập tên VPP ngoài danh mục.',
+            'material_name.max' => 'Tên VPP tối đa 255 ký tự.',
+            'technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
+            'purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
+            'amounts.required' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
+            'amounts.min' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
+            'amounts.*.amount.required' => 'Vui lòng nhập số lượng dự trù.',
+            'amounts.*.amount.numeric' => 'Số lượng dự trù phải là số.',
+            'amounts.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'amounts.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
+            'amounts.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
+            'amounts.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng.',
+            'amounts.*.for_month_year.date_format' => 'Tháng cần dùng không hợp lệ.',
+        ];
+    }
+
+    private function nullIfBlank($value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
+    }
+}

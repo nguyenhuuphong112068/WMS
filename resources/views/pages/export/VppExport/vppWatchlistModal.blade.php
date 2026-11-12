@@ -1,10 +1,10 @@
 {{--
-| LẬP ĐỀ NGHỊ VPP TỪ CÁC VẬT TƯ ĐÃ CHỌN Ở TAB "DANH SÁCH VẬT TƯ CẦN ĐỀ NGHỊ HÀNH CHÍNH"
+| LẬP ĐỀ NGHỊ VPP TỪ CÁC VPP ĐÃ CHỌN Ở TAB "DANH SÁCH VPP CẦN ĐỀ NGHỊ HÀNH CHÍNH"
 |
 | Dòng do JS của watchlistTable (chế độ vpp) nhân bản từ <template class="wl-row-template">.
-| Phòng nhận cố định là phòng Hành Chính của công ty ($vppTarget, xem App\Support\MaterialVpp)
+| Phòng nhận cố định là phòng Hành Chính của công ty ($vppTarget, xem App\Support\VppStore)
 | - server tự xác định lại, không nhận phòng gửi lên từ form. Phiếu ghi vào cùng bộ bảng
-| material_transfer_requests với đề nghị liên phòng ban nên Hành Chính cấp phát / phòng mình
+| vpp_transfer_requests với đề nghị liên phòng ban nên Hành Chính cấp phát / phòng mình
 | nhận hàng y như luồng liên phòng ban.
 --}}
 @php
@@ -20,7 +20,7 @@
                     <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
                 </div>
 
-                <form action="{{ route('pages.export.materialExport.vppWatchlistStore') }}" method="POST">
+                <form action="{{ route('pages.export.vppExport.vppWatchlistStore') }}" method="POST">
                     @csrf
                     <input type="hidden" name="action_type" class="vpp-wl-action-type" value="send">
 
@@ -69,7 +69,7 @@
                                 <thead>
                                     <tr>
                                         <th class="text-center" style="width: 45px">STT</th>
-                                        <th style="width: 260px">Vật Tư</th>
+                                        <th style="width: 260px">VPP</th>
                                         <th>Quy Cách</th>
                                         <th style="width: 140px">Số Lượng Đề Nghị <span class="text-danger">*</span></th>
                                         <th class="text-center" style="width: 90px">ĐVT</th>

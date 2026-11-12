@@ -26,7 +26,7 @@ class CategoryLookup
     ];
 
     /** Loại hàng của định khu (locations.item_type) */
-    public const ITEM_TYPES = ['material', 'chemical', 'standard'];
+    public const ITEM_TYPES = ['material', 'vpp', 'chemical', 'standard'];
 
     /* ==========================================================
      |  TÊN DỮ LIỆU GỐC

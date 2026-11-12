@@ -5,30 +5,30 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 
 /**
- * ĐỀ NGHỊ VẬT TƯ TỪ KHO VPP (văn phòng phẩm) - SỬ DỤNG VẬT TƯ, tab "Đề nghị VPP".
+ * ĐỀ NGHỊ VPP TỪ KHO VPP (văn phòng phẩm) - SỬ DỤNG VPP, tab "Đề nghị VPP".
  *
- * Đề nghị VPP KHÔNG phải một bộ bảng riêng: đó là các đề nghị chuyển vật tư liên phòng ban
- * (material_transfer_requests) GỬI TỚI PHÒNG HÀNH CHÍNH - phòng giữ kho VPP. Phân loại suy
- * thẳng từ phòng nhận nên đề nghị lập tay, lập từ danh sách vật tư cần đề nghị, hay tự sinh
+ * Đề nghị VPP KHÔNG phải một bộ bảng riêng: đó là các đề nghị chuyển VPP liên phòng ban
+ * (vpp_transfer_requests) GỬI TỚI PHÒNG HÀNH CHÍNH - phòng giữ kho VPP. Phân loại suy
+ * thẳng từ phòng nhận nên đề nghị lập tay, lập từ danh sách VPP cần đề nghị, hay tự sinh
  * từ danh sách đề nghị liên phòng ban theo chu kỳ đều rơi đúng tab mà không cần cột riêng.
  * Các bước sau (Hành Chính cấp phát -> phòng đề nghị nhận hàng) dùng nguyên luồng liên
- * phòng ban của MaterialExportController.
+ * phòng ban của VppExportController.
  *
  * Phòng Hành Chính nhận ra theo cùng quy tắc với bộ phận mua hàng "Hành Chánh"
  * (MaterialPurchasing, khoá admin).
  *
- * Đề nghị gửi tới Hành Chính CHỈ gồm vật tư có Bộ Phận Mua Hàng = Hành Chánh - vật tư Hành
- * Chánh mua cũng là vật tư Hành Chánh cấp phát (MaterialClassification::isAdminPurchased).
+ * Đề nghị gửi tới Hành Chính CHỈ gồm VPP có Bộ Phận Mua Hàng = Hành Chánh - VPP Hành
+ * Chánh mua cũng là VPP Hành Chánh cấp phát (VppClassification::isAdminPurchased).
  * Chặn ở mọi đường lập phiếu: Đề nghị VPP (lập tay / từ danh sách cần đề nghị / sửa nháp) và
  * danh sách liên phòng ban theo chu kỳ gửi Hành Chính - xem allowedCategoryIds().
  */
-class MaterialVpp
+class VppStore
 {
-    /** Tên tab ở màn Sử Dụng Vật Tư (?tab=vpp). */
+    /** Tên tab ở màn Sử Dụng VPP (?tab=vpp). */
     public const TAB = 'vpp';
 
-    /** Khoá bộ phận mua hàng của vật tư phải đề nghị từ kho VPP. */
-    public const PURCHASING_KEY = MaterialClassification::PURCHASING_ADMIN;
+    /** Khoá bộ phận mua hàng của VPP phải đề nghị từ kho VPP. */
+    public const PURCHASING_KEY = VppClassification::PURCHASING_ADMIN;
 
     private static ?array $departmentIds = null;
 
@@ -43,7 +43,7 @@ class MaterialVpp
         return $departmentId && in_array((int) $departmentId, self::departmentIds(), true);
     }
 
-    /** Tab của màn Sử Dụng Vật Tư chứa một đề nghị liên phòng ban, theo phòng nhận đề nghị. */
+    /** Tab của màn Sử Dụng VPP chứa một đề nghị liên phòng ban, theo phòng nhận đề nghị. */
     public static function tabFor(?int $toDepartmentId): string
     {
         return self::isVppDepartment($toDepartmentId) ? self::TAB : 'transfer';
@@ -80,7 +80,7 @@ class MaterialVpp
             return [];
         }
 
-        return DB::table('material_categories')
+        return DB::table('vpp_categories')
             ->whereIn('id', $categoryIds)
             ->where('purchasing_department', self::PURCHASING_KEY)
             ->pluck('id')
@@ -89,7 +89,7 @@ class MaterialVpp
     }
 
     /**
-     * Lỗi validate cho các dòng không phải vật tư Hành Chánh mua: [items.i.category_id => thông báo].
+     * Lỗi validate cho các dòng không phải VPP Hành Chánh mua: [items.i.category_id => thông báo].
      * Dòng đánh số theo thứ tự trên form vì chỉ số items[] do JS sinh có thể nhảy cóc.
      */
     public static function itemErrors(array $items): array
@@ -103,7 +103,7 @@ class MaterialVpp
             $categoryId = (int) ($item['category_id'] ?? 0);
 
             if ($categoryId && ! in_array($categoryId, $allowed, true)) {
-                $errors['items.'.$index.'.category_id'] = 'Dòng '.$row.': vật tư không do Hành Chánh mua, không đề nghị từ kho VPP được.';
+                $errors['items.'.$index.'.category_id'] = 'Dòng '.$row.': VPP không do Hành Chánh mua, không đề nghị từ kho VPP được.';
             }
         }
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\General;
 use App\Http\Controllers\Controller;
 use App\Support\DepartmentChemical;
 use App\Support\DepartmentMaterial;
+use App\Support\DepartmentVpp;
 use App\Support\DepartmentStandard;
 use App\Support\ZoneType;
 use Illuminate\Http\Request;
@@ -97,6 +98,24 @@ class PublicStockLookupController extends Controller
             'exportStatus' => true,
             'internal' => false,
         ],
+        'vpp' => [
+            'route' => 'publicVppLookup',
+            'tab' => 'VPP',
+            'title' => 'Tra cứu tồn kho VPP',
+            'item' => 'VPP',
+            'icon' => 'bi-paperclip',
+            'lot' => 'Mã xuất nhập',
+            'imports' => 'vpp_imports',
+            'exports' => 'vpp_exports',
+            'balancings' => 'vpp_balancings',
+            'categories' => 'vpp_categories',
+            'names' => 'material_names',
+            'nameKey' => 'material_names_id',
+            'support' => DepartmentVpp::class,
+            'exportTypes' => ['export', 'cancel', 'transfer_out'],
+            'exportStatus' => true,
+            'internal' => false,
+        ],
     ];
 
     public function chemical(Request $request)
@@ -112,6 +131,11 @@ class PublicStockLookupController extends Controller
     public function material(Request $request)
     {
         return $this->show($request, 'material');
+    }
+
+    public function vpp(Request $request)
+    {
+        return $this->show($request, 'vpp');
     }
 
     private function show(Request $request, string $kind)

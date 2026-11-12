@@ -123,10 +123,6 @@ class MaterialClassification
         'it' => 'IT (đã bỏ)',
     ];
 
-    /** Nhãn + icon của tiêu chí Bộ Phận Mua Hàng khi dựng form chung với 4 tiêu chí kia. */
-    public const PURCHASING_LABEL = 'Theo Bộ Phận Mua Hàng';
-    public const PURCHASING_ICON = 'fas fa-cart-shopping';
-
     /** Số ngày đặt hàng tối đa cho phép khai - chặn gõ nhầm 3650 thành 36500. */
     public const MAX_LEAD_TIME_DAYS = 3650;
 
@@ -257,9 +253,7 @@ class MaterialClassification
                     'icon' => $group['icon'],
                     'chips' => collect($group['options'])->map(fn ($name, $value) => [
                         'key' => $criterion.':'.$value,
-                        'short' => $criterion === 'purchasing_department'
-                            ? 'Mua: '.$name
-                            : (self::SHORT_LABELS[$criterion][$value] ?? $name),
+                        'short' => self::SHORT_LABELS[$criterion][$value] ?? $name,
                         'class' => self::CHIP_CLASSES[$criterion][$value] ?? '',
                     ])->values()->all(),
                 ];
@@ -290,10 +284,12 @@ class MaterialClassification
     }
 
     /**
-     * 6 nhóm tiêu chí theo đúng thứ tự trên form khai báo.
+     * Các nhóm tiêu chí theo đúng thứ tự trên form khai báo.
      *
-     * Bộ Phận Mua Hàng đứng thứ 4 cùng dạng radio với 5 tiêu chí kia nhưng lưu ở cột riêng
-     * purchasing_department, nên gom ở đây để view dựng một mạch thay vì tách hai khối.
+     * Bộ Phận Mua Hàng KHÔNG còn chọn trên form: từ khi VPP tách thành module riêng (11/2026) nó
+     * cố định theo module - danh mục Vật Tư luôn Cung Ứng mua (MaterialPurchasing::DEFAULT_KEY),
+     * danh mục VPP luôn Hành Chánh mua (PURCHASING_ADMIN). Cột purchasing_department vẫn giữ để
+     * luồng dự trù (bộ phận mua hàng tiếp nhận) đọc chung. $purchasing giữ để không đổi chữ ký hàm.
      */
     public static function formGroups(array $selected = [], ?string $purchasing = null): array
     {
@@ -308,28 +304,16 @@ class MaterialClassification
                 'options' => $criterion['options'],
                 'value' => (string) ($selected[$key] ?? ''),
             ];
-
-            if ($key === 'dangerous') {
-                $groups[] = [
-                    'label' => self::PURCHASING_LABEL,
-                    'icon' => self::PURCHASING_ICON,
-                    'name' => 'purchasing_department',
-                    'errorKey' => 'purchasing_department',
-                    'options' => self::PURCHASING_DEPARTMENTS,
-                    'value' => (string) $purchasing,
-                ];
-            }
         }
 
         return $groups;
     }
 
-    /** Quy tắc validate cho phần phân loại + bộ phận mua hàng + thời gian đặt hàng. */
+    /** Quy tắc validate cho phần phân loại + thời gian đặt hàng. */
     public static function rules(): array
     {
         $rules = [
             'classification' => ['required', 'array'],
-            'purchasing_department' => ['required', Rule::in(array_keys(self::PURCHASING_DEPARTMENTS))],
             'lead_time_days' => ['nullable', 'integer', 'min:0', 'max:'.self::MAX_LEAD_TIME_DAYS],
         ];
 
@@ -344,8 +328,6 @@ class MaterialClassification
     {
         $messages = [
             'classification.required' => 'Vui lòng chọn đủ các tiêu chí phân loại.',
-            'purchasing_department.required' => 'Vui lòng chọn bộ phận mua hàng.',
-            'purchasing_department.in' => 'Bộ phận mua hàng không hợp lệ.',
             'lead_time_days.integer' => 'Thời gian đặt hàng phải là số ngày nguyên.',
             'lead_time_days.min' => 'Thời gian đặt hàng không được âm.',
             'lead_time_days.max' => 'Thời gian đặt hàng tối đa '.self::MAX_LEAD_TIME_DAYS.' ngày.',

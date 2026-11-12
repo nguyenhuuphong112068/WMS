@@ -22,8 +22,7 @@
             </tr>
             <tr>
                 <td>DS đề nghị liên phòng ban theo chu kỳ</td>
-                <td style="font-weight: 400">Đề nghị <a href="#lien-phong-ban">liên phòng ban</a> gửi tới <b>Phòng Cấp Phát</b> đã chọn.
-                    Gửi tới Hành Chánh thì chỉ được chọn vật tư do Hành Chánh mua.</td>
+                <td style="font-weight: 400">Đề nghị <a href="#lien-phong-ban">liên phòng ban</a> gửi tới <b>Phòng Cấp Phát</b> đã chọn.</td>
             </tr>
             <tr>
                 <td>DS dự trù theo chu kỳ</td>

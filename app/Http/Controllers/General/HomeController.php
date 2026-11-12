@@ -8,8 +8,10 @@ use App\Support\MaterialCalibration;
 use App\Support\EstimateSigner;
 use App\Support\MaterialPurchasing;
 use App\Support\MaterialTransferSignFlow;
-use App\Support\MaterialVpp;
 use App\Support\ReviewHistory;
+use App\Support\VppCalibration;
+use App\Support\VppStore;
+use App\Support\VppTransferSignFlow;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -118,6 +120,20 @@ class HomeController extends Controller
             'category_code' => false,
             'route' => 'pages.inventory.materialInventory.list',
         ],
+        'vpp' => [
+            'label' => 'VPP',
+            'icon' => 'fas fa-paperclip',
+            'imports' => 'vpp_imports',
+            'exports' => 'vpp_exports',
+            'balancings' => 'vpp_balancings',
+            'categories' => 'vpp_categories',
+            'departments' => 'vpp_department_categories',
+            'names' => 'material_names',
+            'name_key' => 'material_names_id',
+            'internal_expiry' => false,
+            'category_code' => false,
+            'route' => 'pages.inventory.vppInventory.list',
+        ],
     ];
 
     public function showHomeForm()
@@ -201,7 +217,8 @@ class HomeController extends Controller
                     $join->on('dp.category_id', '=', 'i.category_id')
                         ->where('dp.department_id', '=', $departmentId);
                 })
-                ->leftJoin('units as u', 'dp.unit_id', '=', 'u.id')
+                // VPP: đơn vị tính nằm ở danh mục công ty (vpp_categories.unit_id), phòng không khai riêng
+                ->leftJoin('units as u', $kind === 'vpp' ? 'c.unit_id' : 'dp.unit_id', '=', 'u.id')
                 ->select(
                     'i.id',
                     'i.code',
@@ -414,6 +431,7 @@ class HomeController extends Controller
      */
     public const REVIEW_OBJECTS = [
         'vt' => ['label' => 'Vật tư', 'icon' => 'fas fa-boxes', 'color' => 'material'],
+        'vpp' => ['label' => 'VPP', 'icon' => 'fas fa-paperclip', 'color' => 'vpp'],
         'hc' => ['label' => 'Hoá chất', 'icon' => 'fas fa-flask', 'color' => 'chemical'],
         'cc' => ['label' => 'Chất chuẩn', 'icon' => 'fas fa-vial', 'color' => 'standard'],
         'dc' => ['label' => 'Dùng chung', 'icon' => 'fas fa-database', 'color' => 'master'],
@@ -448,6 +466,7 @@ class HomeController extends Controller
         'vpp_receipt' => ['group' => 'vpp', 'actor' => 'dept', 'label' => 'VPP đã cấp, chờ bạn nhận'],
         'material_calibration' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Chờ QA hiệu chuẩn'],
         'material_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Vật tư hỏng chờ quyết định'],
+        'vpp_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'VPP hỏng chờ quyết định'],
         'chemical_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Hoá chất hỏng chờ quyết định'],
         'standard_quarantine' => ['group' => 'quality', 'actor' => 'sign', 'label' => 'Chất chuẩn hỏng chờ quyết định'],
         'category' => ['group' => 'data', 'actor' => 'sign', 'label' => 'Danh mục chờ duyệt'],
@@ -456,7 +475,7 @@ class HomeController extends Controller
     ];
 
     /** Đối tượng theo phạm vi quyền materData_<phạm vi>_approve của dữ liệu gốc. */
-    private const MASTER_DATA_OBJECTS = ['chemical' => 'hc', 'standard' => 'cc', 'material' => 'vt', 'common' => 'dc'];
+    private const MASTER_DATA_OBJECTS = ['chemical' => 'hc', 'standard' => 'cc', 'material' => 'vt', 'vpp' => 'vpp', 'common' => 'dc'];
 
     /**
      * Ba loại dự trù dùng chung luồng ký động (trait EstimateSignFlow), chỉ khác bộ bảng.
@@ -505,6 +524,54 @@ class HomeController extends Controller
             'permission' => 'estimate_material_sign',
             'purchasing_permission' => 'estimate_material_purchasing',
             'route' => 'pages.estimate.materialEstimate.',
+        ],
+        'vpp' => [
+            'object' => 'vpp',
+            'label' => 'Dự trù VPP',
+            'table' => 'vpp_estimates',
+            'sign_table' => 'vpp_estimate_signs',
+            'sign_fk' => 'vpp_estimate_id',
+            'item_table' => 'vpp_estimate_items',
+            'item_fk' => 'vpp_estimate_id',
+            'category_table' => 'vpp_categories',
+            // Mọi mục dự trù VPP do Hành Chánh mua (xem VppEstimateController::cancelConfig)
+            'purchasing_col' => null,
+            'default_purchasing' => 'admin',
+            'permission' => 'estimate_vpp_sign',
+            'purchasing_permission' => 'estimate_vpp_purchasing',
+            'route' => 'pages.estimate.vppEstimate.',
+        ],
+    ];
+
+    /**
+     * Vật Tư và VPP (module tách từ Vật Tư 11/2026) dùng chung khuôn bảng và luồng - đề nghị cấp phát nội
+     * bộ, liên phòng ban, cách ly, hiệu chuẩn - chỉ khác tiền tố bảng, quyền, route và đối tượng hiển thị.
+     * VPP có thêm đề nghị gửi kho VPP của phòng Hành Chính (App\Support\VppStore) - nhóm "Văn phòng phẩm".
+     */
+    private const ITEM_MODULES = [
+        'material' => [
+            'object' => 'vt',
+            'prefix' => 'material_',
+            'perm' => 'export_material_',
+            'export_route' => 'pages.export.materialExport.list',
+            'quarantine_type' => 'material_quarantine',
+            'sign_flow' => MaterialTransferSignFlow::class,
+            'calibration' => MaterialCalibration::class,
+            'store' => null,
+            'internal_request' => true,
+        ],
+        'vpp' => [
+            'object' => 'vpp',
+            'prefix' => 'vpp_',
+            'perm' => 'export_vpp_',
+            'export_route' => 'pages.export.vppExport.list',
+            'quarantine_type' => 'vpp_quarantine',
+            'sign_flow' => VppTransferSignFlow::class,
+            'calibration' => VppCalibration::class,
+            'store' => VppStore::class,
+            // VPP dùng cơ chế "Sử dụng - ghi sổ" như Hoá Chất (12/11/2026): không có đề nghị
+            // cấp phát nội bộ / chờ cấp phát / hiệu chuẩn trước khi cấp phát
+            'internal_request' => false,
         ],
     ];
 
@@ -771,27 +838,41 @@ class HomeController extends Controller
      * thì xét user_id đích danh, phiếu cũ nữa thì xét theo vai trò. Nút Ký còn cần quyền
      * export_material_approve.
      */
+    /** Module còn đề nghị cấp phát nội bộ (VPP đã chuyển sang ghi sổ trực tiếp). */
+    private function internalRequestModules(): array
+    {
+        return array_values(array_filter(self::ITEM_MODULES, fn ($m) => $m['internal_request']));
+    }
+
     private function materialRequestSignReviews(): array
     {
-        if (! $this->isGeneralUser() && ! user_can('export_material_approve')) {
+        return array_merge([], ...array_map(fn ($m) => $this->requestSignReviewsOf($m), $this->internalRequestModules()));
+    }
+
+    /** Đề nghị cấp phát nội bộ chờ ký của một module (Vật Tư / VPP) - xem materialRequestSignReviews(). */
+    private function requestSignReviewsOf(array $m): array
+    {
+        $approvePermission = $m['perm'].'approve';
+
+        if (! $this->isGeneralUser() && ! user_can($approvePermission)) {
             return [];
         }
 
         $userId = $this->userId();
         $companyDeptIds = $this->signDepartmentIds();
 
-        $candidateCount = DB::table('material_request_sign_candidates as cc')
+        $candidateCount = DB::table($m['prefix'].'request_sign_candidates as cc')
             ->selectRaw('COUNT(*)')
             ->whereColumn('cc.sign_id', 's.id')
             ->where('cc.active', 1);
 
-        $records = DB::table('material_request_lists as r')
-            ->join('material_request_signs as s', function ($join) {
+        $records = DB::table($m['prefix'].'request_lists as r')
+            ->join($m['prefix'].'request_signs as s', function ($join) {
                 $join->on('s.request_list_id', '=', 'r.id')
                     ->on('s.step_no', '=', 'r.current_step')
                     ->where('s.active', 1);
             })
-            ->leftJoin('material_request_sign_candidates as mc', function ($join) use ($userId) {
+            ->leftJoin($m['prefix'].'request_sign_candidates as mc', function ($join) use ($userId) {
                 $join->on('mc.sign_id', '=', 's.id')
                     ->where('mc.active', 1)
                     ->where('mc.user_id', $userId);
@@ -818,7 +899,7 @@ class HomeController extends Controller
         $rows = [];
 
         foreach ($records as $record) {
-            if (! $this->canReviewIn((int) $record->department_id, 'export_material_approve')) {
+            if (! $this->canReviewIn((int) $record->department_id, $approvePermission)) {
                 continue;
             }
 
@@ -834,12 +915,12 @@ class HomeController extends Controller
 
             $rows[] = $this->reviewRow(
                 'material_request',
-                'vt',
+                $m['object'],
                 $record->code,
                 $record->name,
                 $this->joinMeta([$this->stepLabel($record), $record->department_short]),
                 $record->submitted_at ?: $record->created_at,
-                $this->signUrl((int) $record->department_id, 'pages.export.materialExport.list', ['tab' => $record->type ?: 'regular', 'open' => 'reqDetailModal_'.$record->id])
+                $this->signUrl((int) $record->department_id, $m['export_route'], ['tab' => $record->type ?: 'regular', 'open' => 'reqDetailModal_'.$record->id])
             );
         }
 
@@ -854,10 +935,18 @@ class HomeController extends Controller
      */
     private function transferSignReviews(): array
     {
-        $userId = $this->userId();
-        $signs = MaterialTransferSignFlow::SIGN_TABLE;
+        return array_merge(...array_map(fn ($m) => $this->transferSignReviewsOf($m), array_values(self::ITEM_MODULES)));
+    }
 
-        $records = DB::table('material_transfer_requests as r')
+    /** Đề nghị liên phòng ban (VPP: cả đề nghị gửi Hành Chính) chờ mình ký của một module. */
+    private function transferSignReviewsOf(array $m): array
+    {
+        $userId = $this->userId();
+        $flow = $m['sign_flow'];
+        $store = $m['store'];
+        $signs = $flow::SIGN_TABLE;
+
+        $records = DB::table($m['prefix'].'transfer_requests as r')
             ->join($signs.' as s', function ($join) {
                 $join->on('s.transfer_request_id', '=', 'r.id')
                     ->on('s.step_no', '=', 'r.current_step')
@@ -866,7 +955,7 @@ class HomeController extends Controller
             })
             ->leftJoin('deparments as d', 'd.id', '=', 'r.department_id')
             ->leftJoin('deparments as t', 't.id', '=', 'r.to_department_id')
-            ->where('r.status', MaterialTransferSignFlow::STATUS_PENDING_SIGN)
+            ->where('r.status', $flow::STATUS_PENDING_SIGN)
             ->select(
                 'r.id', 'r.code', 'r.title', 'r.department_id', 'r.to_department_id', 'r.updated_at', 'r.created_at',
                 's.step_no', 's.role_names', 's.department_id as sign_department_id',
@@ -879,21 +968,22 @@ class HomeController extends Controller
         foreach ($records as $record) {
             $sign = (object) ['role_names' => $record->role_names, 'department_id' => $record->sign_department_id];
 
-            if (! MaterialTransferSignFlow::canSign($userId, $sign)) {
+            if (! $flow::canSign($userId, $sign)) {
                 continue;
             }
 
             // Hướng nhìn từ phòng của bước ký: bước ở phòng đề nghị là "gửi đi", còn lại là "nhận về"
             $outgoing = (int) $record->sign_department_id === (int) $record->department_id;
+            $toStore = $store && $store::isVppDepartment((int) $record->to_department_id);
 
             $rows[] = $this->reviewRow(
-                MaterialVpp::isVppDepartment((int) $record->to_department_id) ? 'vpp_sign' : 'transfer_sign',
-                'vt',
+                $toStore ? 'vpp_sign' : 'transfer_sign',
+                $m['object'],
                 $record->code,
                 $record->title,
                 'Bước '.$record->step_no,
                 $record->updated_at ?: $record->created_at,
-                $this->signUrl((int) $record->sign_department_id, 'pages.export.materialExport.list', ['tab' => MaterialVpp::tabFor((int) $record->to_department_id), 'open' => 'matTransferDetailModal_'.$record->id]),
+                $this->signUrl((int) $record->sign_department_id, $m['export_route'], ['tab' => $toStore ? $store::TAB : 'transfer', 'open' => 'matTransferDetailModal_'.$record->id]),
                 $outgoing ? 'out' : 'in',
                 $outgoing ? $record->to_short : $record->from_short
             );
@@ -905,15 +995,21 @@ class HomeController extends Controller
     /** Phiếu cách ly vật tư hỏng của phòng chưa có quyết định Loại bỏ / Trả về kho. */
     private function quarantineReviews(): array
     {
+        return array_merge(...array_map(fn ($m) => $this->quarantineReviewsOf($m), array_values(self::ITEM_MODULES)));
+    }
+
+    /** Phiếu cách ly hàng hỏng chưa có quyết định của một module (Vật Tư / VPP). */
+    private function quarantineReviewsOf(array $m): array
+    {
         $departmentId = $this->departmentId();
 
-        if ($departmentId <= 0 || ! user_can('export_material_quarantine_decide')) {
+        if ($departmentId <= 0 || ! user_can($m['perm'].'quarantine_decide')) {
             return [];
         }
 
-        $records = DB::table('material_quarantines as q')
-            ->leftJoin('material_imports as i', 'q.import_id', '=', 'i.id')
-            ->leftJoin('material_categories as c', 'i.category_id', '=', 'c.id')
+        $records = DB::table($m['prefix'].'quarantines as q')
+            ->leftJoin($m['prefix'].'imports as i', 'q.import_id', '=', 'i.id')
+            ->leftJoin($m['prefix'].'categories as c', 'i.category_id', '=', 'c.id')
             ->leftJoin('material_names as n', 'c.material_names_id', '=', 'n.id')
             ->select('q.id', 'q.code', 'q.created_at', 'i.code as import_code', 'n.name as material_name')
             ->where('q.department_id', $departmentId)
@@ -925,13 +1021,13 @@ class HomeController extends Controller
 
         foreach ($records as $record) {
             $rows[] = $this->reviewRow(
-                'material_quarantine',
-                'vt',
+                $m['quarantine_type'],
+                $m['object'],
                 $record->code,
                 $record->material_name,
                 $record->import_code,
                 $record->created_at,
-                route('pages.export.materialExport.list', ['tab' => 'quarantine', 'qstatus' => 'quarantined'])
+                route($m['export_route'], ['tab' => 'quarantine', 'qstatus' => 'quarantined'])
             );
         }
 
@@ -1016,6 +1112,13 @@ class HomeController extends Controller
      */
     private function calibrationReviews(): array
     {
+        return array_merge([], ...array_map(fn ($m) => $this->calibrationReviewsOf($m), $this->internalRequestModules()));
+    }
+
+    /** Phiếu đề nghị hiệu chuẩn chờ QA xác nhận của một module (Vật Tư / VPP). */
+    private function calibrationReviewsOf(array $m): array
+    {
+        $calibration = $m['calibration'];
         $userId = $this->userId();
         $qaDepartmentIds = DB::table('deparments')->where('EngshortName', 'QA')->where('isActive', 1)->pluck('id');
         $rows = [];
@@ -1025,16 +1128,16 @@ class HomeController extends Controller
             $qaDepartmentId = (int) $qaDepartmentId;
 
             if (! user_can_access_department($userId, $qaDepartmentId)
-                || ! isset(user_permission_names($userId, $qaDepartmentId)[MaterialCalibration::CONFIRM_PERMISSION])) {
+                || ! isset(user_permission_names($userId, $qaDepartmentId)[$calibration::CONFIRM_PERMISSION])) {
                 continue;
             }
 
-            $records = DB::table(MaterialCalibration::TABLE.' as c')
-                ->leftJoin('material_categories as mc', 'c.category_id', '=', 'mc.id')
+            $records = DB::table($calibration::TABLE.' as c')
+                ->leftJoin($m['prefix'].'categories as mc', 'c.category_id', '=', 'mc.id')
                 ->leftJoin('material_names as n', 'mc.material_names_id', '=', 'n.id')
                 ->leftJoin('deparments as d', 'c.department_id', '=', 'd.id')
                 ->select('c.code', DB::raw('MIN(c.requested_at) as requested_at'), DB::raw('MAX(n.name) as material_name'), DB::raw('MAX(d.name) as department_name'))
-                ->whereIn('c.department_id', MaterialCalibration::sourceDepartmentIds($qaDepartmentId))
+                ->whereIn('c.department_id', $calibration::sourceDepartmentIds($qaDepartmentId))
                 ->where('c.status_id', 1)
                 ->where('c.app_status', 'pending')
                 ->groupBy('c.code')
@@ -1048,12 +1151,12 @@ class HomeController extends Controller
                 $seen[$record->code] = true;
                 $rows[] = $this->reviewRow(
                     'material_calibration',
-                    'vt',
+                    $m['object'],
                     $record->code,
                     $record->material_name,
                     $record->department_name,
                     $record->requested_at,
-                    $this->signUrl($qaDepartmentId, 'pages.export.materialExport.list', ['tab' => 'calibration'])
+                    $this->signUrl($qaDepartmentId, $m['export_route'], ['tab' => 'calibration'])
                 );
             }
         }
@@ -1071,6 +1174,7 @@ class HomeController extends Controller
             ['chemical_categories', 'chem_names', 'chem_names_id', 'category_chemical_approve', 'hc', 'pages.category.chemicalCategory.list'],
             ['standard_categories', 'standard_names', 'chem_names_id', 'category_standard_approve', 'cc', 'pages.category.standardCategory.list'],
             ['material_categories', 'material_names', 'material_names_id', 'category_material_approve', 'vt', 'pages.category.materialCategory.list'],
+            ['vpp_categories', 'material_names', 'material_names_id', 'category_vpp_approve', 'vpp', 'pages.category.vppCategory.list'],
         ];
 
         $rows = [];
@@ -1202,8 +1306,9 @@ class HomeController extends Controller
     /* ---------- Chờ phòng ban xử lý ---------- */
 
     /**
-     * Ba bộ bảng đề nghị chuyển liên phòng ban (hoá chất / chất chuẩn / vật tư): bảng,
-     * quyền cấp phát, quyền nhận / trả lại và tab màn hình Sử Dụng tương ứng.
+     * Các bộ bảng đề nghị chuyển liên phòng ban (hoá chất / chất chuẩn / vật tư / VPP): bảng,
+     * quyền cấp phát, quyền nhận / trả lại và tab màn hình Sử Dụng tương ứng. VPP: đề nghị gửi
+     * tới phòng Hành Chính (kho VPP, App\Support\VppStore) nằm ở tab riêng - store / store_url.
      */
     private function transferKinds(): array
     {
@@ -1231,8 +1336,16 @@ class HomeController extends Controller
                 'issue_permission' => 'export_material_transfer',
                 'receive_permissions' => ['export_material_transfer_receive', 'export_material_transfer_return'],
                 'url' => route('pages.export.materialExport.list', ['tab' => 'transfer']),
-                // Đề nghị gửi tới phòng Hành Chính nằm ở tab "Đề nghị VPP" (App\Support\MaterialVpp)
-                'vpp_url' => route('pages.export.materialExport.list', ['tab' => MaterialVpp::TAB]),
+            ],
+            [
+                'object' => 'vpp',
+                'requests' => 'vpp_transfer_requests',
+                'items' => 'vpp_transfer_items',
+                'issue_permission' => 'export_vpp_transfer',
+                'receive_permissions' => ['export_vpp_transfer_receive', 'export_vpp_transfer_return'],
+                'url' => route('pages.export.vppExport.list', ['tab' => 'transfer']),
+                'store' => VppStore::class,
+                'store_url' => route('pages.export.vppExport.list', ['tab' => VppStore::TAB]),
             ],
         ];
     }
@@ -1260,8 +1373,8 @@ class HomeController extends Controller
                 ->whereIn('t.status', ['pending', 'partial'])
                 ->get();
 
-            // Vật tư gửi tới phòng Hành Chính là đề nghị VPP
-            $isVpp = isset($kind['vpp_url']) && MaterialVpp::isVppDepartment($departmentId);
+            // VPP gửi tới phòng Hành Chính (kho VPP) là đề nghị VPP
+            $isVpp = isset($kind['store']) && $kind['store']::isVppDepartment($departmentId);
 
             foreach ($records as $record) {
                 $rows[] = $this->reviewRow(
@@ -1271,7 +1384,7 @@ class HomeController extends Controller
                     $record->title,
                     null,
                     $record->created_at,
-                    $isVpp ? $kind['vpp_url'] : $kind['url'],
+                    $isVpp ? $kind['store_url'] : $kind['url'],
                     'in',
                     $record->from_department
                 );
@@ -1312,7 +1425,7 @@ class HomeController extends Controller
                 ->get();
 
             foreach ($records as $record) {
-                $isVpp = isset($kind['vpp_url']) && MaterialVpp::isVppDepartment((int) $record->to_department_id);
+                $isVpp = isset($kind['store']) && $kind['store']::isVppDepartment((int) $record->to_department_id);
 
                 $rows[] = $this->reviewRow(
                     $isVpp ? 'vpp_receipt' : 'transfer_receipt',
@@ -1321,7 +1434,7 @@ class HomeController extends Controller
                     $record->title,
                     $record->item_count.' mục chờ nhận',
                     $record->first_issued_at,
-                    $isVpp ? $kind['vpp_url'] : $kind['url'],
+                    $isVpp ? $kind['store_url'] : $kind['url'],
                     'out',
                     $record->to_department
                 );
@@ -1342,8 +1455,13 @@ class HomeController extends Controller
 
         $rows = [];
 
-        if (user_can('export_material_issue')) {
-            $records = DB::table('material_request_lists')
+        // Vật Tư + VPP: cùng khuôn đề nghị cấp phát nội bộ (self::ITEM_MODULES)
+        foreach ($this->internalRequestModules() as $m) {
+            if (! user_can($m['perm'].'issue')) {
+                continue;
+            }
+
+            $records = DB::table($m['prefix'].'request_lists')
                 ->select('id', 'code', 'name', 'type', 'issue_status', 'submitted_at', 'created_at', 'updated_at')
                 ->where('department_id', $departmentId)
                 ->where('status_id', 1)
@@ -1356,12 +1474,12 @@ class HomeController extends Controller
 
                 $rows[] = $this->reviewRow(
                     'issue_pending',
-                    'vt',
+                    $m['object'],
                     $record->code,
                     $record->name,
                     $record->issue_status === 'partial' ? 'Đã cấp một phần' : null,
                     $record->updated_at ?: $record->created_at,
-                    route('pages.export.materialExport.list', [
+                    route($m['export_route'], [
                         'tab' => $type,
                         self::MATERIAL_REQUEST_TAB_PREFIX[$type].'unissued' => 1,
                     ])
@@ -1468,10 +1586,11 @@ class HomeController extends Controller
 
         // Bộ phận mua hàng tiếp nhận phiếu của MỌI công ty; loại hàng không khai bộ phận mua thì chỉ Cung Ứng
         $purchasingKeys = MaterialPurchasing::keysOfDepartment($departmentId);
-        $isDefaultPurchaser = in_array(MaterialPurchasing::DEFAULT_KEY, $purchasingKeys, true);
         $rows = [];
 
         foreach (self::ESTIMATE_KINDS as $kind) {
+            $isDefaultPurchaser = in_array($kind['default_purchasing'] ?? MaterialPurchasing::DEFAULT_KEY, $purchasingKeys, true);
+
             if (! $purchasingKeys || (! $kind['purchasing_col'] && ! $isDefaultPurchaser)
                 || ! user_can($kind['purchasing_permission'])) {
                 continue;
@@ -1566,7 +1685,7 @@ class HomeController extends Controller
             }
 
             // Bên bộ phận mua hàng: loại hàng không khai bộ phận mua thì chỉ Cung Ứng phụ trách
-            $isDefaultPurchaser = in_array(MaterialPurchasing::DEFAULT_KEY, $purchasingKeys, true);
+            $isDefaultPurchaser = in_array($kind['default_purchasing'] ?? MaterialPurchasing::DEFAULT_KEY, $purchasingKeys, true);
 
             if (! $purchasingKeys || (! $kind['purchasing_col'] && ! $isDefaultPurchaser)
                 || ! user_can($kind['purchasing_permission'])) {

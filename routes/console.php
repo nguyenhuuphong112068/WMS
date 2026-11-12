@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\MaterialPeriodicRequest;
+use App\Support\VppPeriodicRequest;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -25,3 +26,18 @@ Artisan::command('material:periodic-requests', function () {
 })->purpose('Tạo đề nghị vật tư từ danh sách theo chu kỳ đã tới hạn');
 
 Schedule::command('material:periodic-requests')->dailyAt('00:05')->withoutOverlapping();
+
+/*
+| Như trên cho module VPP (bộ bảng vpp_*): danh sách đề nghị VPP theo chu kỳ đã tới hạn.
+*/
+Artisan::command('vpp:periodic-requests', function () {
+    $created = VppPeriodicRequest::generateDue();
+
+    foreach ($created as $result) {
+        $this->line('Đã tạo đề nghị '.$result['code'].' từ danh sách #'.$result['list_id']);
+    }
+
+    $this->info('Hoàn tất: '.count($created).' đề nghị VPP được tạo.');
+})->purpose('Tạo đề nghị VPP từ danh sách theo chu kỳ đã tới hạn');
+
+Schedule::command('vpp:periodic-requests')->dailyAt('00:10')->withoutOverlapping();

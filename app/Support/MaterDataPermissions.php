@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Quyền con theo từng màn hình Dữ Liệu Gốc.
  *
- * Mỗi phạm vi (material / chemical / standard / common) có 3 quyền nhóm: view (Xem), manage (Thêm / Sửa / Khoá) và
+ * Mỗi phạm vi (material / vpp / chemical / standard / common) có 3 quyền nhóm: view (Xem), manage (Thêm / Sửa / Khoá) và
  * review (Duyệt / Từ chối). Quyền nhóm materData_<phạm vi>_<thao tác> phủ nhiều màn hình;
  * mỗi màn hình có quyền con materData_<phạm vi>_<thao tác>_<màn hình>, parent_id = quyền nhóm. Quyền con chỉ có
  * hiệu lực khi có cả quyền nhóm (user_permission_names), nên mọi chỗ kiểm tra dùng quyền con: menu trái, nút
@@ -78,7 +78,7 @@ class MaterDataPermissions
     /** [màn hình, thao tác] nếu là quyền con của một màn hình Dữ Liệu Gốc, ngược lại null */
     public static function parse(string $name): ?array
     {
-        if (! preg_match('/^materData_(material|chemical|standard|common)_([a-zA-Z]+)_([a-zA-Z]+)$/', $name, $m)
+        if (! preg_match('/^materData_(material|vpp|chemical|standard|common)_([a-zA-Z]+)_([a-zA-Z]+)$/', $name, $m)
             || (self::SCREENS[$m[3]][0] ?? null) !== $m[1]) {
             return null;
         }
@@ -89,7 +89,7 @@ class MaterDataPermissions
     /** Quyền nhóm materData_<phạm vi>_<thao tác> (cha của quyền con các màn hình) */
     public static function isGroupPermission(string $name): bool
     {
-        return (bool) preg_match('/^materData_(material|chemical|standard|common)_(view|manage|review)$/', $name);
+        return (bool) preg_match('/^materData_(material|vpp|chemical|standard|common)_(view|manage|review)$/', $name);
     }
 
     public static function can(string $screen, string $action): bool

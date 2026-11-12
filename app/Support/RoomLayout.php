@@ -94,7 +94,7 @@ class RoomLayout
     }
 
     /** Nhãn module của loại lưu trữ ở bảng locations.item_type. */
-    private const TYPE_LABELS = ['chemical' => 'Hoá chất', 'standard' => 'Chất chuẩn', 'material' => 'Vật tư'];
+    private const TYPE_LABELS = ['chemical' => 'Hoá chất', 'standard' => 'Chất chuẩn', 'material' => 'Vật tư', 'vpp' => 'VPP'];
 
     /**
      * Kệ/tủ chỉ có ô dành cho module KHÁC (không có ô dùng chung hay ô của loại $ownType): màn Tồn Kho không có

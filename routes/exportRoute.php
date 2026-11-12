@@ -13,7 +13,9 @@ use App\Http\Controllers\Pages\Export\ChemicalExportController;
 use App\Http\Controllers\Pages\Export\ChemicalQuarantineController;
 use App\Http\Controllers\Pages\Export\MaterialCalibrationController;
 use App\Http\Controllers\Pages\Export\MaterialExportController;
+use App\Http\Controllers\Pages\Export\VppExportController;
 use App\Http\Controllers\Pages\Export\MaterialQuarantineController;
+use App\Http\Controllers\Pages\Export\VppQuarantineController;
 use App\Http\Controllers\Pages\Export\StandardExportController;
 use App\Http\Controllers\Pages\Export\StandardQuarantineController;
 use App\Http\Middleware\CheckLogin;
@@ -133,9 +135,6 @@ Route::prefix('/export')
             Route::get('prepPrint', 'prepPrint')->name('prepPrint');
             // "Ghi nhớ vật tư cần dự trù" từ dòng đề nghị - hiện ở tab Dự Trù Vật Tư
             Route::post('watchlistRemember', 'watchlistRemember')->name('watchlistRemember');
-            // Tab "Đề nghị VPP": lập đề nghị tới kho VPP (Hành Chính) từ danh sách vật tư cần đề nghị
-            Route::post('vppWatchlistStore', 'vppWatchlistStore')->name('vppWatchlistStore');
-            Route::post('watchlistDismiss', 'watchlistDismiss')->name('watchlistDismiss');
 
             // Đề nghị cấp phát + trình ký
             Route::post('requestStore', 'requestStore')->name('requestStore');
@@ -151,6 +150,37 @@ Route::prefix('/export')
 
             // Đề nghị chuyển vật tư LIÊN PHÒNG BAN: A đề nghị -> B cấp phát (trừ tồn B) -> A nhận (tạo tồn A)
             // Danh mục + tồn kho của phòng được đề nghị, trả JSON cho picker chọn nhiều vật tư
+            Route::get('transferDepartmentStock', 'transferDepartmentStock')->name('transferDepartmentStock');
+            Route::post('transferRequestStore', 'transferRequestStore')->name('transferRequestStore');
+            Route::post('transferRequestUpdate', 'transferRequestUpdate')->name('transferRequestUpdate');
+            Route::post('transferRequestSend', 'transferRequestSend')->name('transferRequestSend');
+            Route::post('transferRequestDestroy', 'transferRequestDestroy')->name('transferRequestDestroy');
+            Route::post('transferIssueStore', 'transferIssueStore')->name('transferIssueStore');
+            Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
+            Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
+            Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
+            // Ký duyệt đề nghị liên phòng ban / VPP theo quy trình ở Dữ Liệu Gốc > Trình Ký Đề Nghị Liên Phòng Ban
+            Route::post('transferSign', 'transferSign')->name('transferSign');
+            Route::post('transferSignReject', 'transferSignReject')->name('transferSignReject');
+        });
+
+        /*
+        | SỬ DỤNG VPP - cơ chế "Sử dụng - ghi sổ" như Hoá Chất (từ 12/11/2026): bấm Sử dụng VPP, chọn
+        | lô rồi Lưu là trừ tồn ngay, không đề nghị nội bộ / trình ký / Phiếu Tạm. Giữ đề nghị VPP
+        | liên phòng ban + đề nghị VPP đến kho Hành Chính (VppStore).
+        */
+        Route::prefix('/vppExport')->name('vppExport.')->controller(VppExportController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::get('history', 'history')->name('history');
+            // Tab "VPP đến HC": lập đề nghị tới kho VPP (Hành Chính) từ danh sách VPP cần đề nghị
+            Route::post('vppWatchlistStore', 'vppWatchlistStore')->name('vppWatchlistStore');
+            Route::post('watchlistDismiss', 'watchlistDismiss')->name('watchlistDismiss');
+
+            // Đề nghị chuyển VPP LIÊN PHÒNG BAN: A đề nghị -> B cấp phát (trừ tồn B) -> A nhận (tạo tồn A)
+            // Danh mục + tồn kho của phòng được đề nghị, trả JSON cho picker chọn nhiều VPP
             Route::get('transferDepartmentStock', 'transferDepartmentStock')->name('transferDepartmentStock');
             Route::post('transferRequestStore', 'transferRequestStore')->name('transferRequestStore');
             Route::post('transferRequestUpdate', 'transferRequestUpdate')->name('transferRequestUpdate');
@@ -182,6 +212,14 @@ Route::prefix('/export')
         | Vật Tư, dữ liệu do MaterialExportController::index() nạp sẵn.
         */
         Route::prefix('/materialQuarantine')->name('materialQuarantine.')->controller(MaterialQuarantineController::class)->group(function () {
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('decide', 'decide')->name('decide');
+            Route::post('dispose', 'dispose')->name('dispose');
+        });
+
+        // VPP - nhân bản từ nhóm /materialQuarantine (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        Route::prefix('/vppQuarantine')->name('vppQuarantine.')->controller(VppQuarantineController::class)->group(function () {
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('decide', 'decide')->name('decide');

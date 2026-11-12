@@ -11,6 +11,7 @@
 
 use App\Http\Controllers\Pages\Import\ChemicalImportController;
 use App\Http\Controllers\Pages\Import\MaterialImportController;
+use App\Http\Controllers\Pages\Import\VppImportController;
 use App\Http\Controllers\Pages\Import\StandardImportController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -62,6 +63,28 @@ Route::prefix('/import')
             Route::get('purposeObjects', 'purposeObjects')->name('purposeObjects');
             Route::post('store', 'store')->name('store');
             // Trang in nhãn dán lô vật tư (mã QR), mở tab mới rồi bấm In
+            Route::get('label', 'label')->name('label');
+            // Trang in nhãn báo về khi bấm In: ghi audit log in nhãn của lô nào, mấy cái, lúc nào
+            Route::post('labelPrinted', 'labelPrinted')->name('labelPrinted');
+            Route::get('history', 'history')->name('history');
+            Route::post('update', 'update')->name('update');
+            // Xác nhận kiểm tra lô đang "Chờ kiểm tra": bổ sung thông tin còn thiếu,
+            // định khu lại vị trí thật, từ đó lô mới được cộng vào tồn kho
+            Route::post('confirmCheck', 'confirmCheck')->name('confirmCheck');
+            Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('delete-attachment', 'deleteAttachment')->name('deleteAttachment');
+            // Đổi trạng thái Đang sử dụng / Ngưng sử dụng của một file đính kèm
+            Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
+            Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
+        });
+
+        // VPP - nhân bản từ nhóm /materialImport (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        Route::prefix('/vppImport')->name('vppImport.')->controller(VppImportController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            // Modal chọn Đối Tượng (1 hoặc nhiều) để điền vào ô Mục đích sử dụng
+            Route::get('purposeObjects', 'purposeObjects')->name('purposeObjects');
+            Route::post('store', 'store')->name('store');
+            // Trang in nhãn dán lô VPP (mã QR), mở tab mới rồi bấm In
             Route::get('label', 'label')->name('label');
             // Trang in nhãn báo về khi bấm In: ghi audit log in nhãn của lô nào, mấy cái, lúc nào
             Route::post('labelPrinted', 'labelPrinted')->name('labelPrinted');

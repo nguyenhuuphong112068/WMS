@@ -49,7 +49,7 @@
 <h3>Các nhánh phụ</h3>
 <ul>
     <li><a href="#lien-phong-ban">Đề nghị liên phòng ban</a>: xin vật tư từ kho của phòng khác.</li>
-    <li><a href="#de-nghi-vpp">Đề nghị VPP</a>: xin văn phòng phẩm từ kho của phòng Hành Chánh.</li>
+    <li>Văn phòng phẩm (Hành Chánh mua, cấp phát) quản lý ở module riêng - xem <a href="{{ route('pages.userGuide.show', 'vpp') }}">Hướng dẫn VPP</a>.</li>
     <li><a href="#hieu-chuan">Hiệu chuẩn</a>: vật tư "Cần hiệu chuẩn trước khi dùng" phải được QA xác nhận đạt mới cấp phát được.</li>
     <li><a href="#cach-ly">Cách ly - Loại bỏ - Huỷ</a>: xử lý vật tư hỏng, hết hạn.</li>
     <li><a href="#danh-sach-chu-ky">Danh sách theo chu kỳ</a>: hệ thống tự tạo đề nghị hoặc phiếu dự trù định kỳ.</li>

@@ -25,7 +25,7 @@ class InitialDataCommand extends Command
         {file? : file Excel (template: nơi lưu file mẫu; check/import: file đã điền)}
         {--department= : (template) tên viết tắt phòng ban - tạo file riêng của phòng đó}
         {--stage= : (template) 1 | 2 | 3 - tạo file chỉ thu thập một giai đoạn}
-        {--module= : (template) material | chemical | standard - tạo file chỉ thu thập một module}
+        {--module= : (template) material | vpp | chemical | standard - tạo file chỉ thu thập một module}
         {--password= : mật khẩu khởi tạo chung cho tài khoản mới ở sheet Người dùng}
         {--actor=Khởi tạo dữ liệu (CLI) : tên người thực hiện ghi vào lịch sử}';
 

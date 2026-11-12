@@ -298,6 +298,7 @@
     .db-g-material { --g: var(--db-group-material); }
     .db-g-chemical { --g: var(--db-group-chemical); }
     .db-g-standard { --g: var(--db-group-standard); }
+    .db-g-vpp { --g: var(--db-group-vpp); }
     .db-g-master { --g: var(--db-group-master); }
     .db-g-user { --g: var(--db-group-user); }
     .db-g-utility { --g: var(--db-group-utility); }

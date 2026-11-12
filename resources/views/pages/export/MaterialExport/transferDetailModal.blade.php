@@ -19,21 +19,15 @@
         'returned' => ['label' => 'Đã từ chối nhận', 'class' => 'rejected'],
     ];
     $mtBadge = $mtBadge ?? fn($status) => $mtStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
-    // Cả đề nghị liên phòng ban lẫn đề nghị VPP (tab Đề nghị VPP) dùng chung modal chi tiết
     $mtAll = $transferSent->getCollection()
         ->merge($transferSentDone->getCollection())
         ->merge($transferReceived->getCollection())
         ->merge($transferDone->getCollection())
-        ->merge($vppSent->getCollection())
-        ->merge($vppSentDone->getCollection())
-        ->merge($vppReceived->getCollection())
-        ->merge($vppDone->getCollection())
         // Phiếu chờ mình ký có thể không nằm trong 4 danh sách trên (VD người ký thuộc phòng thứ ba)
         ->merge($transferToSign)
-        ->merge($vppToSign)
         ->unique('id');
     // Phiếu người đăng nhập đang ký được ở bước hiện tại -> chân modal có nút Đồng ý / Từ chối
-    $mtSignable = $transferToSign->merge($vppToSign)->keyBy('id');
+    $mtSignable = $transferToSign->keyBy('id');
 @endphp
 
 <style>
@@ -59,10 +53,6 @@
         $sourceStock = $transferSourceStock[(int) $req->to_department_id] ?? [];
         $mtSignRow = $mtSignable->get($req->id);
         $mtCanSign = (bool) $mtSignRow;
-        // Đề nghị VPP (gửi Hành Chính): phòng đề nghị không bao giờ thấy tồn kho VPP; phía Hành Chính
-        // cũng ẩn ở bước đề nghị / ký duyệt, tới bước cấp phát mới hiện
-        $mtIsVpp = \App\Support\MaterialVpp::isVppDepartment((int) $req->to_department_id)
-            && (! $iAmSource || in_array($req->status, ['draft', \App\Support\MaterialTransferSignFlow::STATUS_PENDING_SIGN], true));
     @endphp
     <div class="modal fade md-modal" id="matTransferDetailModal_{{ $req->id }}" data-req-id="{{ $req->id }}" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 96vw;" role="document">
@@ -117,10 +107,8 @@
                                     <th style="width: 40px">STT</th>
                                     <th style="min-width: 220px">Vật Tư</th>
                                     <th style="min-width: 90px" class="text-right">SL Đề Nghị</th>
-                                    @unless ($mtIsVpp)
                                         <th style="min-width: 100px" class="text-right" title="Tồn hiện hành của phòng cấp phát">Tồn Hiện Hành</th>
                                         <th style="min-width: 100px" class="text-right" title="Tồn trừ phần các đề nghị nội bộ của phòng cấp phát đang chờ ký / chờ cấp đã giữ chỗ">Tồn Khả Dụng</th>
-                                    @endunless
                                     @if ($iAmSource)
                                         <th style="min-width: 240px">Mã Xuất Nhập (Kho Mình) <span class="text-danger">*</span></th>
                                         <th style="min-width: 110px" class="text-right">SL Cấp Phát <span class="text-danger">*</span></th>
@@ -147,7 +135,6 @@
                                         <td class="align-middle text-right font-weight-bold text-primary">
                                             {{ $expNum($item->requested_amount) }} {{ $item->requested_unit }}
                                         </td>
-                                        @unless ($mtIsVpp)
                                         @php
                                             $stock = $sourceStock[(int) $item->category_id] ?? ['remaining' => 0, 'available' => 0, 'unit' => null];
                                             // Chỉ so với SL đề nghị khi cùng đơn vị, khác đơn vị thì không tô màu thiếu
@@ -162,7 +149,6 @@
                                             @if ($short)<i class="fas fa-exclamation-triangle mr-1"></i>@endif{{ $expNum($stock['available']) }}
                                             <span class="text-muted font-weight-normal">{{ $stock['unit'] }}</span>
                                         </td>
-                                        @endunless
 
                                         @if ($iAmSource && $item->status === 'pending')
                                             {{-- B đang cấp phát: chỉ chọn mã xuất nhập của mình + số lượng. Định khu
@@ -350,7 +336,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="{{ $mtIsVpp ? 8 : 10 }}" class="text-center text-muted py-3">Phiếu này không có vật tư nào.</td>
+                                        <td colspan="10" class="text-center text-muted py-3">Phiếu này không có vật tư nào.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

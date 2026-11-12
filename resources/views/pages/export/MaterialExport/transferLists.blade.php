@@ -1,7 +1,7 @@
 {{--
 | HAI CARD ĐỀ NGHỊ CHUYỂN VẬT TƯ LIÊN PHÒNG BAN - "phòng mình gửi đi" và "phòng khác gửi
-| đến", mỗi card 2 tab con Chờ xử lý / Đã hoàn thành. Dùng chung cho tab "Chuyển liên phòng ban" (transferPane) và tab "Đề nghị VPP"
-| (vppPane) - cùng bộ bảng material_transfer_requests, chỉ khác phòng nhận đề nghị.
+| đến", mỗi card 2 tab con Chờ xử lý / Đã hoàn thành. Dùng cho tab "Chuyển liên phòng ban" (transferPane)
+| - bộ bảng material_transfer_requests.
 |
 | Biến vào: $mtTab (tên tab cho bộ lọc / phân trang), $mtPrefix (tiền tố bộ lọc: t | v),
 | $mtTableId, $mtToSign,
@@ -409,7 +409,7 @@
 
             function mtOpenSign(btn) {
                 var reject = $(btn).data('mode') === 'reject';
-                // Modal chỉ render một lần, nằm trong tab Liên phòng ban: đang ở tab VPP thì tab đó ẩn,
+                // Modal chỉ render một lần, nằm trong tab Liên phòng ban: tab đang ẩn thì
                 // modal nằm trong khối display:none sẽ không hiện -> đưa ra <body> trước khi mở
                 var $modal = $('#mtSignModal').appendTo('body');
                 var $form = $modal.find('form');

@@ -5,8 +5,10 @@ namespace App\Support\InitialData;
 use App\Http\Controllers\Pages\MaterData\ConsumptionObjectController;
 use App\Http\Controllers\Pages\MaterData\ZoneController;
 use App\Support\MaterialClassification;
+use App\Support\VppClassification;
 use App\Support\ZoneType;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * KHỞI TẠO DỮ LIỆU BAN ĐẦU - CẤU TRÚC FILE EXCEL
@@ -44,7 +46,7 @@ use Illuminate\Support\Facades\DB;
 class InitialDataSchema
 {
     /** Phiên bản cấu trúc file. Đổi cột / sheet thì tăng số này để chặn file mẫu cũ. */
-    public const VERSION = 'WMS-INITIAL-DATA-V3';
+    public const VERSION = 'WMS-INITIAL-DATA-V4';
 
     /** Tên sheet ẩn chứa danh sách chọn cố định + phiên bản file. */
     public const LIST_SHEET = '_DS';
@@ -112,6 +114,7 @@ class InitialDataSchema
         'groups' => 2,
         'users' => 2,
         'stock_materials' => 4,
+        'stock_vpp' => 4,
         'stock_chemicals' => 4,
         'stock_standards' => 4,
     ];
@@ -120,7 +123,7 @@ class InitialDataSchema
     public const MODULE_KEY = '@module';
 
     /** Module tách file thu thập riêng. */
-    public const MODULES = ['material' => 'Vật tư', 'chemical' => 'Hoá chất', 'standard' => 'Chất chuẩn'];
+    public const MODULES = ['material' => 'Vật tư', 'vpp' => 'VPP', 'chemical' => 'Hoá chất', 'standard' => 'Chất chuẩn'];
 
     /**
      * Sheet (dữ liệu + tra cứu) thuộc riêng module nào; sheet không có ở đây là sheet dùng chung,
@@ -133,10 +136,13 @@ class InitialDataSchema
         'purposes' => ['standard'],
         'consumption' => ['material'],
         'dept_class' => ['material'],
-        'material_names' => ['material'],
+        'material_names' => ['material', 'vpp'],
         'material_cats' => ['material'],
         'dept_materials' => ['material'],
         'stock_materials' => ['material'],
+        'vpp_cats' => ['vpp'],
+        'dept_vpp' => ['vpp'],
+        'stock_vpp' => ['vpp'],
         'chem_names' => ['chemical'],
         'chem_comp' => ['chemical'],
         'chemical_cats' => ['chemical'],
@@ -188,6 +194,7 @@ class InitialDataSchema
 
         return [
             'yes_no' => ['Có' => 1, 'Không' => 0],
+            'vpp_group' => array_flip(VppClassification::CRITERIA[VppClassification::GROUP_KEY]['options']),
             'zone_type' => array_flip(ZoneType::TYPES),
             'item_type' => array_flip(ZoneController::LOCATION_TYPES),
             'unit_group' => $unitGroups,
@@ -212,6 +219,7 @@ class InitialDataSchema
     public const ROLE_COLUMNS = [
         'role_general' => null,
         'role_material' => 'material',
+        'role_vpp' => 'vpp',
         'role_chemical' => 'chemical',
         'role_standard' => 'standard',
     ];
@@ -219,10 +227,11 @@ class InitialDataSchema
     private static ?array $roleLists = null;
 
     /**
-     * Danh sách vai trò cho từng cột phân quyền: [cột => [tên vai trò => tên vai trò]]. Bảng roles
-     * không lưu module nên suy ra: tên chứa "vật tư" / "hoá chất" / "chuẩn" là vai trò của module
-     * đó, trừ khi quyền của vai trò trải đều nhiều module (VD Nhân Viên Cung Ứng Vật Tư có quyền cả
-     * hoá chất, chất chuẩn) thì xếp vào chung. Admin không cấp qua file.
+     * Danh sách vai trò cho từng cột phân quyền: [cột => [tên vai trò => tên vai trò]], theo Loại
+     * Phụ Trách của vai trò (roles.kinds, chọn ở màn Nhóm Quyền): phụ trách đủ 4 loại (hoặc chưa
+     * chọn) là vai trò chung; phụ trách 1-3 loại thì có mặt ở cột của từng loại đó (VD Tổ Trưởng Kho
+     * Hoá chất - Chất chuẩn ở cả cột Hoá chất lẫn Chất chuẩn). Admin (đủ 4 loại) nằm ở cột chung,
+     * cấp được qua file vì chỉ tài khoản Admin mới nạp được file khởi tạo.
      */
     public static function roleLists(): array
     {
@@ -230,47 +239,21 @@ class InitialDataSchema
             return self::$roleLists;
         }
 
-        $counts = [];
-        $rows = DB::table('role_permission')
-            ->join('permissions', 'permissions.id', '=', 'role_permission.permission_id')
-            ->get(['role_permission.role_id', 'permissions.name']);
-        foreach ($rows as $row) {
-            foreach (['material', 'chemical', 'standard'] as $module) {
-                if (str_contains(strtolower($row->name), $module)) {
-                    $counts[$row->role_id][$module] = ($counts[$row->role_id][$module] ?? 0) + 1;
-                    break;
-                }
+        $business = array_values(array_filter(self::ROLE_COLUMNS));
+        $lists = array_fill_keys(array_keys(self::ROLE_COLUMNS), []);
+        $hasKinds = Schema::hasColumn('roles', 'kinds');
+
+        foreach (DB::table('roles')->orderBy('name')->get() as $role) {
+            $kinds = $hasKinds ? array_values(array_intersect($business, explode(',', (string) $role->kinds))) : [];
+            if (! $kinds || count($kinds) === count($business)) {
+                $kinds = [null];
+            }
+            foreach ($kinds as $kind) {
+                $lists[array_search($kind, self::ROLE_COLUMNS, true)][$role->name] = $role->name;
             }
         }
 
-        $lists = array_fill_keys(array_keys(self::ROLE_COLUMNS), []);
-        foreach (DB::table('roles')->where('name', '!=', 'Admin')->orderBy('name')->pluck('name', 'id') as $id => $name) {
-            $module = self::roleModule($name, $counts[$id] ?? []);
-            $lists[array_search($module, self::ROLE_COLUMNS, true)][$name] = $name;
-        }
-
         return self::$roleLists = $lists;
-    }
-
-    /** Module của một vai trò theo tên + số quyền từng module; null = vai trò chung. */
-    private static function roleModule(string $name, array $counts): ?string
-    {
-        $name = mb_strtolower(\Normalizer::normalize($name));
-        $module = match (true) {
-            str_contains($name, 'vật tư') => 'material',
-            str_contains($name, 'hoá chất'), str_contains($name, 'hóa chất') => 'chemical',
-            str_contains($name, 'chuẩn') => 'standard',
-            default => null,
-        };
-
-        // Quyền module khác chiếm từ 20% trở lên so với module chính: vai trò dùng chung
-        arsort($counts);
-        $values = array_values($counts);
-        if ($module && count($values) > 1 && $values[1] >= 0.2 * $values[0]) {
-            return null;
-        }
-
-        return $module;
     }
 
     /**
@@ -295,6 +278,7 @@ class InitialDataSchema
             'R_TEN_HC' => ['chem_names', 'name'],
             'R_TEN_CC' => ['standard_names', 'name'],
             'R_DM_VT' => ['material_cats', 'display'],
+            'R_DM_VPP' => ['vpp_cats', 'display'],
             'R_DM_HC' => ['chemical_cats', 'display'],
             'R_DM_CC' => ['standard_cats', 'display'],
             'R_KHO' => ['warehouses', 'code'],
@@ -393,6 +377,7 @@ class InitialDataSchema
                     ['key' => 'mail', 'label' => 'Email', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 28, 'hint' => 'Không có thì ghi NA'],
                     ['key' => 'role_general', 'label' => 'Phân quyền chung', 'type' => 'multi', 'list' => 'role_general', 'width' => 26, 'hint' => 'Vai trò dùng cho nhiều module. Nhiều vai trò cách nhau dấu phẩy'],
                     ['key' => 'role_material', 'label' => 'Phân quyền Vật tư', 'type' => 'multi', 'list' => 'role_material', 'width' => 26, 'hint' => 'Chỉ vai trò module Vật tư'],
+                    ['key' => 'role_vpp', 'label' => 'Phân quyền VPP', 'type' => 'multi', 'list' => 'role_vpp', 'width' => 26, 'hint' => 'Chỉ vai trò module VPP'],
                     ['key' => 'role_chemical', 'label' => 'Phân quyền Hoá chất', 'type' => 'multi', 'list' => 'role_chemical', 'width' => 26, 'hint' => 'Chỉ vai trò module Hoá chất'],
                     ['key' => 'role_standard', 'label' => 'Phân quyền Chất chuẩn', 'type' => 'multi', 'list' => 'role_standard', 'width' => 26, 'hint' => 'Chỉ vai trò module Chất chuẩn'],
                     ['key' => 'group', 'label' => 'Tổ / nhóm', 'type' => 'ref', 'ref' => 'R_TO_NHOM', 'width' => 22, 'hint' => 'Tổ thuộc đúng phòng ban ở trên'],
@@ -599,6 +584,22 @@ class InitialDataSchema
                 ],
             ],
 
+            'vpp_cats' => [
+                'title' => '34.DM VPP',
+                'table' => 'vpp_categories',
+                'group' => 'Danh mục công ty',
+                'desc' => 'Danh mục VPP = Tên VPP (dùng chung sheet 15 Tên vật tư) + Nhà sản xuất + Đơn vị tính. Mã danh mục (P00001...) tự sinh nối tiếp mã đã có khi điền tên. Bộ phận mua hàng của VPP mặc định là Hành Chánh.',
+                'columns' => [
+                    $autoCode('P'),
+                    ['key' => 'material_name', 'label' => 'Tên VPP', 'type' => 'ref', 'ref' => 'R_TEN_VT', 'req' => true, 'width' => 40, 'hint' => 'Chọn ở sheet 15'],
+                    ['key' => 'manufacturer', 'label' => 'Nhà sản xuất', 'type' => 'ref', 'ref' => 'R_NSX', 'req' => true, 'width' => 16, 'hint' => 'Chọn ở sheet 09'],
+                    ['key' => 'unit', 'label' => 'Đơn vị tính', 'type' => 'ref', 'ref' => 'R_DVT', 'req' => true, 'width' => 12, 'hint' => 'Chọn ở sheet 06, cả công ty dùng chung'],
+                    ['key' => 'vpp_group', 'label' => 'Nhóm dự trù', 'type' => 'list', 'list' => 'vpp_group', 'req' => true, 'width' => 34, 'hint' => 'Nhóm 1-5 theo cách dự trù'],
+                    ['key' => 'purchasing_department', 'label' => 'Bộ phận mua hàng', 'type' => 'list', 'list' => 'purchasing', 'width' => 13, 'hint' => 'Trống = Hành Chánh'],
+                    ['key' => 'display', 'label' => 'Hiển thị chọn (tự động)', 'type' => 'calc', 'width' => 40, 'hidden' => true, 'formula' => '=IF(A{r}="","",A{r}&" | "&B{r}&" ("&C{r}&")")'],
+                ],
+            ],
+
             // ================================================================ ĐỊNH KHU
             'warehouses' => [
                 'title' => '22.Kho - Phòng',
@@ -662,7 +663,7 @@ class InitialDataSchema
                 'title' => '26.Vị trí',
                 'table' => 'locations',
                 'group' => 'Định khu kho',
-                'desc' => 'Cấp 5 định khu: vị trí (ô) đặt hàng - nơi gắn tồn kho. Loại lưu trữ để trống = dùng chung cả 3 loại hàng.',
+                'desc' => 'Cấp 5 định khu: vị trí (ô) đặt hàng - nơi gắn tồn kho. Loại lưu trữ để trống = dùng chung cả 4 loại hàng.',
                 'columns' => [
                     $dept,
                     ['key' => 'code', 'label' => 'Mã vị trí', 'type' => 'text', 'req' => true, 'max' => 50, 'width' => 18, 'hint' => 'VD: QC1-A01 (không trùng)'],
@@ -727,6 +728,20 @@ class InitialDataSchema
                     $note,
                 ],
             ],
+            'dept_vpp' => [
+                'title' => '35.VPP của phòng',
+                'table' => 'vpp_department_categories',
+                'group' => 'Khai báo hàng của phòng',
+                'desc' => 'Phòng nào dùng / quản lý VPP nào. Đơn vị tính theo danh mục VPP (sheet 34). Phải khai ở đây thì mới nhập tồn được.',
+                'columns' => [
+                    $dept,
+                    ['key' => 'category', 'label' => 'Danh mục VPP', 'type' => 'ref', 'ref' => 'R_DM_VPP', 'req' => true, 'width' => 50, 'hint' => 'Chọn ở sheet 34'],
+                    $minStock,
+                    $maxStock,
+                    $defaultLocation,
+                    $note,
+                ],
+            ],
             'conversions' => [
                 'title' => '30.Quy đổi đơn vị',
                 'table' => 'category_unit_conversions',
@@ -752,6 +767,25 @@ class InitialDataSchema
                     $dept,
                     ['key' => 'category', 'label' => 'Danh mục vật tư', 'type' => 'ref', 'ref' => 'R_DM_VT', 'req' => true, 'width' => 50, 'hint' => 'Đã khai ở sheet 27 cho phòng này'],
                     ['key' => 'amount', 'label' => 'Số lượng mỗi kiện', 'type' => 'num', 'gt' => 0, 'req' => true, 'width' => 12, 'hint' => 'Theo ĐVT của phòng (sheet 27)'],
+                    $packs,
+                    ['key' => 'batch_no', 'label' => 'Số lô', 'type' => 'text', 'max' => 100, 'width' => 14, 'hint' => ''],
+                    ['key' => 'invoice_number', 'label' => 'Số hoá đơn', 'type' => 'text', 'max' => 100, 'width' => 14, 'hint' => ''],
+                    ['key' => 'invoice_date', 'label' => 'Ngày hoá đơn', 'type' => 'date', 'width' => 13, 'hint' => 'dd/mm/yyyy'],
+                    ['key' => 'expired_date', 'label' => 'Hạn sử dụng', 'type' => 'date', 'width' => 13, 'hint' => 'dd/mm/yyyy'],
+                    $stockLocation,
+                    ['key' => 'purpose', 'label' => 'Mục đích', 'type' => 'text', 'max' => 500, 'width' => 24, 'hint' => ''],
+                    $note,
+                ],
+            ],
+            'stock_vpp' => [
+                'title' => '36.Tồn đầu - VPP',
+                'table' => 'vpp_imports',
+                'group' => 'Tồn đầu kỳ',
+                'desc' => 'Tồn VPP thực tế lúc bắt đầu dùng hệ thống. Ngày nhập = ngày nhập file. Lô được ghi nhận ĐẠT kiểm tra và cộng ngay vào tồn.',
+                'columns' => [
+                    $dept,
+                    ['key' => 'category', 'label' => 'Danh mục VPP', 'type' => 'ref', 'ref' => 'R_DM_VPP', 'req' => true, 'width' => 50, 'hint' => 'Đã khai ở sheet 35 cho phòng này'],
+                    ['key' => 'amount', 'label' => 'Số lượng mỗi kiện', 'type' => 'num', 'gt' => 0, 'req' => true, 'width' => 12, 'hint' => 'Theo ĐVT của danh mục (sheet 34)'],
                     $packs,
                     ['key' => 'batch_no', 'label' => 'Số lô', 'type' => 'text', 'max' => 100, 'width' => 14, 'hint' => ''],
                     ['key' => 'invoice_number', 'label' => 'Số hoá đơn', 'type' => 'text', 'max' => 100, 'width' => 14, 'hint' => ''],
@@ -884,6 +918,7 @@ class InitialDataSchema
      */
     private const EXTRA_DEPENDS = [
         'stock_materials' => ['dept_materials'],
+        'stock_vpp' => ['dept_vpp'],
         'stock_chemicals' => ['dept_chemicals'],
         'stock_standards' => ['dept_standards'],
     ];

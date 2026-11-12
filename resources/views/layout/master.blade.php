@@ -143,6 +143,7 @@
         .notif-item.obj-vt { --c: var(--db-group-material); --c-rgb: var(--db-group-material-rgb); }
         .notif-item.obj-hc { --c: var(--db-group-chemical); --c-rgb: var(--db-group-chemical-rgb); }
         .notif-item.obj-cc { --c: var(--db-group-standard); --c-rgb: var(--db-group-standard-rgb); }
+        .notif-item.obj-vpp { --c: var(--db-group-vpp); --c-rgb: var(--db-group-vpp-rgb); }
         .notif-item.obj-dc { --c: var(--db-group-master); --c-rgb: var(--db-group-master-rgb); }
 
         .notif-top {

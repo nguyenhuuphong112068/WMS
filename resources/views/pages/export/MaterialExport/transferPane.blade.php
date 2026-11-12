@@ -10,7 +10,7 @@
 |    bấm Nhận: lúc này mới thật sự tạo mã xuất nhập mới cho A (bắt buộc A đã khai vật tư
 |    này trước). A cũng có thể Từ chối nhận để hoàn tồn lại cho B.
 |
-| Hai bảng gửi đi / gửi đến dựng ở transferLists (dùng chung với tab Đề nghị VPP).
+| Hai bảng gửi đi / gửi đến dựng ở transferLists.
 --}}
 
 @tab('export_material', 'transfer')
@@ -36,8 +36,7 @@
         'mtEmptyReceived' => 'Không còn đề nghị nào cần cấp phát.',
         'mtEmptyDone' => 'Không có đề nghị đã hoàn thành trong khoảng đã lọc.',
         'mtCreate' => ['target' => '#matTransferRequestModal', 'label' => 'Tạo đề nghị chuyển liên phòng ban'],
-        // Phòng Hành Chính nhận đề nghị ở tab "Đề nghị VPP"
-        'mtShowReceived' => ! $vppIsAdminDepartment,
+        'mtShowReceived' => true,
     ])
 </div>
 @endtab

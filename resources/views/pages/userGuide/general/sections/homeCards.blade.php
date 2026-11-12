@@ -53,8 +53,9 @@
             <tr><td rowspan="3">Văn phòng phẩm</td><td style="font-weight: 400">Ký đề nghị VPP</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td style="font-weight: 400">Chờ phòng bạn cấp VPP</td><td style="font-weight: 400">Phòng xử lý</td></tr>
             <tr><td style="font-weight: 400">VPP đã cấp, chờ bạn nhận</td><td style="font-weight: 400">Phòng xử lý</td></tr>
-            <tr><td rowspan="4">KS chất lượng / hàng hỏng</td><td style="font-weight: 400">Chờ QA hiệu chuẩn</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
+            <tr><td rowspan="5">KS chất lượng / hàng hỏng</td><td style="font-weight: 400">Chờ QA hiệu chuẩn</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td style="font-weight: 400">Vật tư hỏng chờ quyết định</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
+            <tr><td style="font-weight: 400">VPP hỏng chờ quyết định</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td style="font-weight: 400">Hoá chất hỏng chờ quyết định</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td style="font-weight: 400">Chất chuẩn hỏng chờ quyết định</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td rowspan="3">Phê duyệt dữ liệu</td><td style="font-weight: 400">Danh mục chờ duyệt</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>

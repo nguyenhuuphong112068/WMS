@@ -89,7 +89,6 @@
                                 <th style="width: 120px">Part Number</th>
                                 <th>Thông Tin Kỹ Thuật</th>
                                 <th style="width: 200px">Phân Loại</th>
-                                <th style="width: 120px">Bộ Phận Mua Hàng</th>
                                 <th class="text-center" style="width: 95px">Thời Gian Đặt Hàng</th>
                             </tr>
                         </thead>
@@ -134,9 +133,6 @@
                                             <span class="md-empty">Chưa phân loại</span>
                                         @endif
                                     </td>
-                                    <td class="md-sub">
-                                        {{ MaterialClassification::purchasingLabel($category->purchasing_department) ?: '—' }}
-                                    </td>
                                     <td class="text-center">
                                         @if ($category->lead_time_days !== null)
                                             <span class="font-weight-bold">{{ $category->lead_time_days }}</span>
@@ -148,7 +144,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center md-empty py-3">
+                                    <td colspan="9" class="text-center md-empty py-3">
                                         Phòng đã khai hết vật tư trong danh mục chung.
                                     </td>
                                 </tr>

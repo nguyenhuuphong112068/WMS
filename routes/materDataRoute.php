@@ -22,6 +22,7 @@ use App\Http\Controllers\Pages\MaterData\InitialDataController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
 use App\Http\Controllers\Pages\MaterData\MaterialSignFlowController;
 use App\Http\Controllers\Pages\MaterData\TransferSignFlowController;
+use App\Http\Controllers\Pages\MaterData\VppTransferSignFlowController;
 use App\Http\Controllers\Pages\MaterData\PackagingSpecificationController;
 use App\Http\Controllers\Pages\MaterData\ProductNameController;
 use App\Http\Controllers\Pages\MaterData\PurposeController;
@@ -174,6 +175,15 @@ Route::prefix('/materData')
         // Trình ký đề nghị chuyển vật tư liên phòng ban (gồm Đề nghị VPP): mỗi dòng một bước ký
         // theo loại đề nghị + công ty của phòng đề nghị - xem App\Support\MaterialTransferSignFlow.
         Route::prefix('/transferSignFlow')->name('transferSignFlow.')->controller(TransferSignFlowController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+        });
+
+        // VPP - nhân bản từ nhóm /transferSignFlow (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        Route::prefix('/vppTransferSignFlow')->name('vppTransferSignFlow.')->controller(VppTransferSignFlowController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');

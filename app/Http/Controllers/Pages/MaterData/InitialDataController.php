@@ -70,7 +70,7 @@ class InitialDataController extends Controller
      * Bảng việc cần làm theo giai đoạn: mỗi việc = giai đoạn + phòng ban (+ module ở GĐ3 / GĐ4).
      *   GĐ1 : 1 việc của Admin cho toàn hệ thống
      *   GĐ2 : mỗi phòng ban 1 việc (người dùng & tổ của phòng)
-     *   GĐ3 / GĐ4 : mỗi phòng có kho × 3 module
+     *   GĐ3 / GĐ4 : mỗi phòng có kho × 4 module
      * Trạng thái lấy theo lần nộp mới nhất khớp việc (file đủ module / đủ giai đoạn khớp mọi việc
      * con): Đã xử lý = hoàn thành; Admin đánh dấu "Không áp dụng" thì việc không tính vào tiến độ.
      */
@@ -472,7 +472,7 @@ class InitialDataController extends Controller
     {
         return collect([
             $stage ? 'Giai đoạn '.$stage : 'Đủ 4 giai đoạn',
-            $module ? InitialDataSchema::MODULES[$module] : 'Cả 3 module',
+            $module ? InitialDataSchema::MODULES[$module] : 'Cả 4 module',
             $department,
         ])->implode(' · ');
     }
@@ -488,7 +488,7 @@ class InitialDataController extends Controller
                 .', khác giai đoạn đã chọn.';
         }
         if ($meta['module'] !== $module) {
-            return 'File là mẫu '.($meta['module'] ? 'module '.InitialDataSchema::MODULES[$meta['module']] : 'cả 3 module').', khác module đã chọn.';
+            return 'File là mẫu '.($meta['module'] ? 'module '.InitialDataSchema::MODULES[$meta['module']] : 'cả 4 module').', khác module đã chọn.';
         }
         if ($meta['department'] !== null && mb_strtolower($meta['department']) !== mb_strtolower($department)) {
             return 'File là mẫu riêng của phòng '.$meta['department'].', khác phòng ban đã chọn ('.$department.').';

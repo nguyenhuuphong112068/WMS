@@ -40,6 +40,6 @@
 </ol>
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Bộ phận mua hàng không tự đề nghị huỷ được; chỉ xác nhận khi phòng đề nghị đã bấm huỷ. Vật tư trong danh mục theo
-        <b>Bộ Phận Mua Hàng</b> đã khai; vật tư ngoài danh mục mặc định do Cung Ứng mua.</div>
+    <div>Bộ phận mua hàng không tự đề nghị huỷ được; chỉ xác nhận khi phòng đề nghị đã bấm huỷ. Bộ phận mua hàng của mọi
+        mục dự trù vật tư là <b>Cung Ứng</b> (dự trù VPP do Hành Chánh tiếp nhận ở module VPP).</div>
 </div>

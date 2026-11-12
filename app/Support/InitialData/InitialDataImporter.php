@@ -9,6 +9,8 @@ use App\Support\ChemicalCode;
 use App\Support\CheckStatus;
 use App\Support\MaterialClassification;
 use App\Support\MaterialCode;
+use App\Support\VppClassification;
+use App\Support\VppCode;
 use App\Support\StandardCode;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -68,7 +70,7 @@ class InitialDataImporter
     /** Tên viết tắt phòng ban của file riêng; null = file toàn hệ thống. */
     private ?string $scopeDepartment = null;
 
-    /** Module của file riêng (material / chemical / standard); null = file đủ 3 module. */
+    /** Module của file riêng (material / vpp / chemical / standard); null = file đủ 4 module. */
     private ?string $module = null;
 
     /** Giai đoạn của file riêng; null = file đủ 3 giai đoạn. Chỉ đọc / nạp sheet của giai đoạn này. */
@@ -393,7 +395,7 @@ class InitialDataImporter
 
                 case 'ref':
                     // Ô chọn danh mục hiển thị "mã | tên": chỉ lấy phần mã
-                    $row[$col['key']] = in_array($col['ref'], ['R_DM_VT', 'R_DM_HC', 'R_DM_CC'], true)
+                    $row[$col['key']] = in_array($col['ref'], ['R_DM_VT', 'R_DM_VPP', 'R_DM_HC', 'R_DM_CC'], true)
                         ? trim(explode(trim(InitialDataSchema::REF_SEPARATOR), $text)[0])
                         : $text;
                     break;
@@ -959,6 +961,36 @@ class InitialDataImporter
         });
     }
 
+    private function importVppCats(array $rows): void
+    {
+        $this->eachUnique($rows, ['code'], function ($row) {
+            $nameId = $this->requireRef($row, 'material_names', 'name', 'material_name', 'Tên VPP', 'sheet 15');
+            $makerId = $this->requireRef($row, 'manufacturers', 'short_name', 'manufacturer', 'Nhà sản xuất', 'sheet 09');
+            $unitId = $this->requireRef($row, 'units', 'short_name', 'unit', 'Đơn vị tính', 'sheet 06');
+            if (! $nameId || ! $makerId || ! $unitId) {
+                return;
+            }
+
+            $same = DB::table('vpp_categories')->where('material_names_id', $nameId)->where('manufacturers_id', $makerId)->first(['id', 'code']);
+            if ($same) {
+                return $this->existingCategory('vpp_categories', $row, $same);
+            }
+
+            $id = DB::table('vpp_categories')->insertGetId([
+                'code' => $this->categoryCode('vpp_categories', 'P', $row),
+                'material_names_id' => $nameId,
+                'manufacturers_id' => $makerId,
+                'unit_id' => $unitId,
+                'classification' => VppClassification::encode([VppClassification::GROUP_KEY => $row['vpp_group']]),
+                'purchasing_department' => $row['purchasing_department'] ?? VppClassification::PURCHASING_ADMIN,
+            ] + $this->approvedStamp());
+
+            $this->categoryHistory('vpp_category_histories', 'vpp_category_id', 'vpp_categories', $id);
+            $this->inserted();
+            $this->rememberFileCode('vpp_categories', $row, $id);
+        });
+    }
+
     private function importChemicalCats(array $rows): void
     {
         $this->eachUnique($rows, ['code'], function ($row) {
@@ -1082,6 +1114,9 @@ class InitialDataImporter
 
     // ================================================================== ĐỊNH KHU
 
+    /** Loại hàng VPP (chưa có hằng tương ứng ở CategoryUnitConversion vì VPP không quy đổi đơn vị theo phòng). */
+    private const TYPE_VPP = 'vpp';
+
     private const ZONE_TABLES = ['warehouse' => 'warehouses', 'shelf' => 'shelves', 'column' => 'columns', 'tier' => 'tiers', 'location' => 'locations'];
 
     private const ZONE_LABELS = ['warehouse' => 'Mã kho', 'shelf' => 'Mã kệ / tủ', 'column' => 'Mã cột', 'tier' => 'Mã tầng'];
@@ -1203,6 +1238,11 @@ class InitialDataImporter
         $this->importDepartmentItems($rows, CategoryUnitConversion::TYPE_MATERIAL);
     }
 
+    private function importDeptVpp(array $rows): void
+    {
+        $this->importDepartmentItems($rows, self::TYPE_VPP);
+    }
+
     private function importDeptChemicals(array $rows): void
     {
         $this->importDepartmentItems($rows, CategoryUnitConversion::TYPE_CHEMICAL);
@@ -1220,7 +1260,8 @@ class InitialDataImporter
         $this->eachUnique($rows, ['department', 'category'], function ($row) use ($type, $categoryTable, $deptTable) {
             $deptId = $this->department($row);
             $categoryId = $this->requireRef($row, $categoryTable, 'code', 'category', 'Danh mục', 'sheet '.$this->categorySheetNo($type));
-            $unitId = $this->requireRef($row, 'units', 'short_name', 'unit', 'Đơn vị tính của phòng', 'sheet 06');
+            // VPP: đơn vị tính khai ở danh mục công ty (vpp_categories.unit_id), phòng không khai riêng
+            $unitId = $type === self::TYPE_VPP ? true : $this->requireRef($row, 'units', 'short_name', 'unit', 'Đơn vị tính của phòng', 'sheet 06');
             if (! $deptId || ! $categoryId || ! $unitId) {
                 return;
             }
@@ -1244,12 +1285,15 @@ class InitialDataImporter
             $data = [
                 'department_id' => $deptId,
                 'category_id' => $categoryId,
-                'unit_id' => $unitId,
                 'min_stock' => $row['min_stock'],
                 'max_stock' => $row['max_stock'],
                 'default_location_id' => $locationId,
                 'note' => $row['note'],
             ];
+
+            if ($type !== self::TYPE_VPP) {
+                $data['unit_id'] = $unitId;
+            }
 
             if ($type === CategoryUnitConversion::TYPE_MATERIAL && $row['classification'] !== null) {
                 $data['classification_id'] = $this->scopedId('department_classification', $deptId, $row['classification']);
@@ -1381,6 +1425,11 @@ class InitialDataImporter
         $this->importStock($rows, CategoryUnitConversion::TYPE_MATERIAL);
     }
 
+    private function importStockVpp(array $rows): void
+    {
+        $this->importStock($rows, self::TYPE_VPP);
+    }
+
     private function importStockChemicals(array $rows): void
     {
         $this->importStock($rows, CategoryUnitConversion::TYPE_CHEMICAL);
@@ -1396,6 +1445,7 @@ class InitialDataImporter
         [$categoryTable, $deptTable, $sheetNo] = $this->typeTables($type);
         [$importTable, $historyTable, $historyKey] = match ($type) {
             CategoryUnitConversion::TYPE_MATERIAL => ['material_imports', 'material_import_histories', 'material_import_id'],
+            self::TYPE_VPP => ['vpp_imports', 'vpp_import_histories', 'vpp_import_id'],
             CategoryUnitConversion::TYPE_CHEMICAL => ['chemical_imports', 'chemical_import_histories', 'import_id'],
             default => ['standard_imports', 'standard_import_histories', 'standard_import_id'],
         };
@@ -1460,7 +1510,7 @@ class InitialDataImporter
                 }
 
                 $extra = match ($type) {
-                    CategoryUnitConversion::TYPE_MATERIAL => $this->materialStockFields($row),
+                    CategoryUnitConversion::TYPE_MATERIAL, self::TYPE_VPP => $this->materialStockFields($row),
                     CategoryUnitConversion::TYPE_CHEMICAL => $this->chemicalStockFields($row),
                     default => $this->standardStockFields($row, $categoryId),
                 };
@@ -1474,6 +1524,7 @@ class InitialDataImporter
                 for ($i = 0; $i < $packs; $i++) {
                     $code = match ($type) {
                         CategoryUnitConversion::TYPE_MATERIAL => ['code' => MaterialCode::next($deptId)],
+                        self::TYPE_VPP => ['code' => VppCode::next($deptId)],
                         CategoryUnitConversion::TYPE_CHEMICAL => ['code' => ChemicalCode::next($deptId)],
                         default => StandardCode::next($deptId, (string) $shortName, $extra['group_code'], $this->today),
                     };
@@ -1598,6 +1649,7 @@ class InitialDataImporter
     {
         return match ($type) {
             CategoryUnitConversion::TYPE_MATERIAL => ['material_categories', 'material_department_categories', 'sheet 27'],
+            self::TYPE_VPP => ['vpp_categories', 'vpp_department_categories', 'sheet 35'],
             CategoryUnitConversion::TYPE_CHEMICAL => ['chemical_categories', 'chemical_department_categories', 'sheet 28'],
             default => ['standard_categories', 'standard_department_categories', 'sheet 29'],
         };
@@ -1607,6 +1659,7 @@ class InitialDataImporter
     {
         return match ($type) {
             CategoryUnitConversion::TYPE_MATERIAL => '19',
+            self::TYPE_VPP => '34',
             CategoryUnitConversion::TYPE_CHEMICAL => '20',
             default => '21',
         };

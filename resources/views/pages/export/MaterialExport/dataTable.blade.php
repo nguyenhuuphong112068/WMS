@@ -10,9 +10,9 @@
     ];
 
     /*
-    | Thanh tab có 2 nhóm dropdown: "Đề Nghị" (3 loại đề nghị cấp phát nội bộ) và "Liên Phòng Ban"
-    | (đề nghị VPP gửi Hành Chính + đề nghị chuyển liên phòng ban). Mỗi mục vẫn là .exp-tab với pane
-    | riêng nên ?tab= và activeTab sau khi lưu không đổi.
+    | Thanh tab có nhóm dropdown "Đề Nghị Nội Bộ" (3 loại đề nghị cấp phát nội bộ). Mỗi mục vẫn là
+    | .exp-tab với pane riêng nên ?tab= và activeTab sau khi lưu không đổi. Đề nghị liên phòng ban là
+    | tab thường (đề nghị VPP gửi Hành Chính đã sang module VPP).
     */
     $reqGroups = [
         [
@@ -25,28 +25,6 @@
                 'label' => $meta['short'],
                 'count' => $reqTabs[$type]['list']->total(),
             ])->values(),
-        ],
-        [
-            'icon' => 'fas fa-people-arrows',
-            'label' => 'Đề nghị liên phòng ban',
-            'tabs' => collect([
-                [
-                    'key' => 'vpp',
-                    'pane' => 'mePaneVpp',
-                    'icon' => 'fas fa-paperclip',
-                    'label' => 'VPP đến HC',
-                    // Phiếu chờ xử lý, Controller đếm - số vật tư cần đề nghị hiện ở tab con trong pane
-                    'count' => $vppBadgeCount,
-                ],
-                [
-                    'key' => 'transfer',
-                    'pane' => 'mePaneTransfer',
-                    'icon' => 'fas fa-people-arrows',
-                    'label' => 'Phòng ban khác',
-                    // Do Controller đếm trên toàn bộ dữ liệu, không chỉ trang đang xem
-                    'count' => $transferBadgeCount,
-                ],
-            ]),
         ],
     ];
 
@@ -96,6 +74,14 @@
                             </div>
                         </div>
                     @endforeach
+                    @tab('export_material', 'transfer')
+                    <button type="button" class="exp-tab {{ $activeTab === 'transfer' ? 'is-active' : '' }}" data-pane="mePaneTransfer">
+                        <i class="fas fa-people-arrows mr-1"></i> Đề Nghị Liên Phòng Ban
+                        @if ($transferBadgeCount)
+                            <span class="exp-tab-count">{{ $transferBadgeCount }}</span>
+                        @endif
+                    </button>
+                    @endtab
                     @tab('export_material', 'prepare')
                     <button type="button" class="exp-tab {{ $activeTab === 'prepare' ? 'is-active' : '' }}" data-pane="mePanePrepare">
                         <i class="fas fa-dolly mr-1"></i> Chờ Cấp Phát
@@ -339,7 +325,6 @@
 
                 {{-- ============ ĐỀ NGHỊ CHUYỂN LIÊN PHÒNG BAN ============ --}}
                 @include('pages.export.MaterialExport.transferPane')
-                @include('pages.export.MaterialExport.vppPane')
 
 
             </div>

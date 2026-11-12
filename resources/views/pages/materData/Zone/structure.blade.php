@@ -3182,7 +3182,7 @@
     }
 
     // Chữ cái hiện trong ô theo loại lưu trữ (để trống = dùng chung).
-    var TYPE_LETTERS = { material: 'V', chemical: 'H', standard: 'C' };
+    var TYPE_LETTERS = { material: 'V', vpp: 'P', chemical: 'H', standard: 'C' };
 
     // Ô (p ngang, d sâu) có trên lưới mới / có trong sức chứa cũ không.
     function inNew(tier, p, d) { return p <= tier.max && d <= tier.depth; }

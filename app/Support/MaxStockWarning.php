@@ -37,6 +37,14 @@ class MaxStockWarning
             'balancings' => 'material_balancings',
             'exports' => 'material_exports',
         ],
+        'vpp' => [
+            'department_table' => 'vpp_department_categories',
+            // Đơn vị tính VPP nằm ở danh mục công ty, không ở dòng khai của phòng (12/11/2026)
+            'unit_table' => 'vpp_categories',
+            'imports' => 'vpp_imports',
+            'balancings' => 'vpp_balancings',
+            'exports' => 'vpp_exports',
+        ],
         'chemical' => [
             'department_table' => 'chemical_department_categories',
             'imports' => 'chemical_imports',
@@ -54,6 +62,11 @@ class MaxStockWarning
     public static function forMaterial(int $departmentId): array
     {
         return self::build('material', $departmentId);
+    }
+
+    public static function forVpp(int $departmentId): array
+    {
+        return self::build('vpp', $departmentId);
     }
 
     public static function forChemical(int $departmentId): array
@@ -76,7 +89,13 @@ class MaxStockWarning
         return self::onHand(self::SOURCES['material'], $departmentId);
     }
 
-    /** Như onHandMaterial() cho loại hàng bất kỳ: 'material' | 'chemical' | 'standard'. */
+    /** Như onHandMaterial() cho VPP (bộ bảng vpp_*) - xem App\Support\VppWatchlist::belowThreshold(). */
+    public static function onHandVpp(int $departmentId): array
+    {
+        return self::onHand(self::SOURCES['vpp'], $departmentId);
+    }
+
+    /** Như onHandMaterial() cho loại hàng bất kỳ: 'material' | 'vpp' | 'chemical' | 'standard'. */
     public static function onHandOf(string $type, int $departmentId): array
     {
         return self::onHand(self::SOURCES[$type], $departmentId);
@@ -91,12 +110,16 @@ class MaxStockWarning
     {
         $source = self::SOURCES[$type];
 
+        $unitOwner = isset($source['unit_table']) ? 'unit_cat' : 'dept';
+
         $rows = DB::table($source['department_table'].' as dept')
-            ->leftJoin('units', 'dept.unit_id', '=', 'units.id')
+            ->when(isset($source['unit_table']), fn ($query) => $query
+                ->leftJoin($source['unit_table'].' as unit_cat', 'unit_cat.id', '=', 'dept.category_id'))
+            ->leftJoin('units', $unitOwner.'.unit_id', '=', 'units.id')
             ->select(
                 'dept.category_id',
                 'dept.max_stock',
-                'dept.unit_id',
+                $unitOwner.'.unit_id',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name'
             )

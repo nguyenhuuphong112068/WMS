@@ -1,0 +1,171 @@
+@php
+    $bag = $errors->getBag('dmUpdateErrors');
+
+    // Xem chú thích ở create.blade.php: old() dùng chung cho cả 4 form của trang 2 tab.
+    $old = fn ($key, $default = null) => $bag->any() ? old($key, $default) : $default;
+@endphp
+
+<div class="modal fade md-modal" id="dmUpdateModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="{{ $mdIcon }}"></i> Sửa Khai Báo VPP Của Phòng</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+
+            <form action="{{ route($mdRoute . 'update') }}" method="POST">
+                @csrf
+                <input type="hidden" name="id" value="{{ $old('id') }}">
+
+                <div class="modal-body">
+
+                    {{-- VPP là khoá của dòng nên chỉ đọc: khai nhầm thì khoá dòng cũ, khai dòng mới --}}
+                    <div class="form-group">
+                        <label>VPP</label>
+                        <input type="text" class="form-control md-readonly dm-material-view" readonly>
+                        <small class="md-sub">Không đổi được VPP của một dòng đã khai. Nếu khai nhầm, hãy
+                            <b>khoá</b> dòng này rồi khai dòng mới để giữ lại vết.</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>Phân Loại Của Phòng</label>
+                            <select name="classification_id"
+                                class="form-control cat-select {{ $bag->has('classification_id') ? 'is-invalid' : '' }}">
+                                <option value="">-- Chưa phân loại --</option>
+                                @foreach ($classifications as $classification)
+                                    <option value="{{ $classification->id }}"
+                                        {{ $old('classification_id') == $classification->id ? 'selected' : '' }}>
+                                        {{ $classification->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @if ($bag->has('classification_id'))
+                                <span class="md-error">{{ $bag->first('classification_id') }}</span>
+                            @endif
+                            <small class="md-sub">Bộ nhóm riêng của phòng, khai ở
+                                <b>Dữ Liệu Gốc → Phân Loại</b>.</small>
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label>Đơn Vị Tính</label>
+                            <input type="text" class="form-control md-readonly dm-unit-view" readonly tabindex="-1">
+                            <small class="md-sub">Khai ở <b>Danh Mục VPP Công Ty</b>, cả công ty dùng chung.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>Ngưỡng Tồn Tối Thiểu</label>
+                            <input type="text" inputmode="decimal" name="min_stock" min="0"
+                                class="form-control js-decimal {{ $bag->has('min_stock') ? 'is-invalid' : '' }}"
+                                value="{{ $old('min_stock') }}" placeholder="Để trống nếu chưa đặt ngưỡng">
+                            @if ($bag->has('min_stock'))
+                                <span class="md-error">{{ $bag->first('min_stock') }}</span>
+                            @endif
+                            <small class="md-sub">Theo <b class="dm-unit-hint">đơn vị</b> của danh mục công ty.</small>
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label>Ngưỡng Tồn Tối Đa</label>
+                            <input type="text" inputmode="decimal" name="max_stock" min="0"
+                                class="form-control js-decimal {{ $bag->has('max_stock') ? 'is-invalid' : '' }}"
+                                value="{{ $old('max_stock') }}" placeholder="Để trống nếu không đặt trần tồn">
+                            @if ($bag->has('max_stock'))
+                                <span class="md-error">{{ $bag->first('max_stock') }}</span>
+                            @endif
+                            <small class="md-sub">Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.
+                                Theo <b class="dm-unit-hint">đơn vị</b> của danh mục công ty.</small>
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label>Định Khu</label>
+                            <select name="default_location_id" data-zone-filter
+                                data-lookup-url="{{ route('pages.category.lookup.locations', ['type' => 'vpp']) }}"
+                                class="form-control cat-select {{ $bag->has('default_location_id') ? 'is-invalid' : '' }}">
+                                <option value="">-- Chưa định khu --</option>
+                                @foreach ($locations as $location)
+                                    <option value="{{ $location->id }}" data-zone="{{ $location->zone_type ?? '' }}"
+                                        {{ $old('default_location_id') == $location->id ? 'selected' : '' }}>
+                                        {{ $location->warehouse_name ?: '—' }} /
+                                        {{ $location->shelf_name ?: '—' }} /
+                                        {{ $location->column_name ?: '—' }} /
+                                        {{ $location->tier_name ?: '—' }} /
+                                        {{ $location->code }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @if ($bag->has('default_location_id'))
+                                <span class="md-error">{{ $bag->first('default_location_id') }}</span>
+                            @endif
+                            <small class="md-sub">Đổi định khu chỉ đổi chỗ điền sẵn khi nhập, các lô đã xếp định khu
+                                giữ nguyên.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ghi Chú</label>
+                        <textarea name="note" rows="2"
+                            class="form-control {{ $bag->has('note') ? 'is-invalid' : '' }}">{{ $old('note') }}</textarea>
+                        @if ($bag->has('note'))
+                            <span class="md-error">{{ $bag->first('note') }}</span>
+                        @endif
+                    </div>
+                    <div class="form-group">
+                        <label>Lý Do Điều Chỉnh <span class="text-danger">*</span></label>
+                        <textarea name="change_reason" rows="2" maxlength="500" required
+                            class="form-control {{ $bag->has('change_reason') ? 'is-invalid' : '' }}"
+                            placeholder="Nêu rõ lý do sửa bản ghi này">{{ old('change_reason') }}</textarea>
+                        @if ($bag->has('change_reason'))
+                            <span class="md-error">{{ $bag->first('change_reason') }}</span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-1"></i> Cập nhật
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+        /* ---------- Ô chỉ đọc, đổ theo dòng đang sửa ---------- */
+        $(document).on('click', '.btn-md-edit[data-modal="#dmUpdateModal"]', function() {
+            var row = $(this).data('row') || {};
+            var $form = $('#dmUpdateModal').find('form');
+
+            var name = row.material_name || '';
+            if (row.manufacturer_name) {
+                name += ' (' + row.manufacturer_name + ')';
+            }
+            $form.find('.dm-material-view').val(name);
+
+            // Select2 chỉ vẽ lại khi có sự kiện change, .val() thôi là chưa đủ
+            $form.find('.cat-select').each(function() {
+                catSetSelectValue($(this), row);
+            });
+
+            // Đơn vị lấy từ danh mục công ty - chỉ hiện để biết ngưỡng tồn tính theo đơn vị nào
+            $form.find('.dm-unit-view').val(row.unit_short_name ? row.unit_short_name + ' - ' + (row.unit_name || '') : '—');
+            $form.find('.dm-unit-hint').text(row.unit_short_name || 'đơn vị');
+
+            // Lý do điều chỉnh phải nhập lại mỗi lần sửa
+            $form.find('[name="change_reason"]').val('');
+        });
+    });
+</script>
+
+@if ($bag->any())
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            $('#dmUpdateModal').modal('show');
+        });
+    </script>
+@endif

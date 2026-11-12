@@ -46,7 +46,6 @@
                         <th style="width: 120px">Part Number</th>
                         <th>Thông Tin Kỹ Thuật</th>
                         <th style="width: 190px">Phân Loại</th>
-                        <th style="width: 110px">Bộ Phận Mua Hàng</th>
                         <th class="text-center" style="width: 95px">Thời Gian Đặt Hàng</th>
                         <th style="width: 170px">Phòng Ban Đang Dùng</th>
                         <th style="width: 120px">Người Tạo</th>
@@ -97,9 +96,6 @@
                                 @else
                                     <span class="md-empty">Chưa phân loại</span>
                                 @endif
-                            </td>
-                            <td class="md-sub">
-                                {{ MaterialClassification::purchasingLabel($row->purchasing_department) ?: '—' }}
                             </td>
                             @include('pages.category.shared.leadTimeCell', ['row' => $row, 'permPrefix' => 'category_material_',
                                 'applies' => $row->purchasing_department !== MaterialClassification::PURCHASING_ADMIN])

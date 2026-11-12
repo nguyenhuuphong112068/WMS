@@ -15,9 +15,12 @@ use App\Http\Controllers\Pages\Category\ChemicalProductListController;
 use App\Http\Controllers\Pages\Category\StandardProductListController;
 use App\Http\Controllers\Pages\Category\DepartmentChemicalController;
 use App\Http\Controllers\Pages\Category\DepartmentMaterialController;
+use App\Http\Controllers\Pages\Category\DepartmentVppController;
 use App\Http\Controllers\Pages\Category\DepartmentStandardController;
 use App\Http\Controllers\Pages\Category\MaterialCategoryController;
+use App\Http\Controllers\Pages\Category\VppCategoryController;
 use App\Http\Controllers\Pages\Category\PeriodicRequestController;
+use App\Http\Controllers\Pages\Category\VppPeriodicRequestController;
 use App\Http\Controllers\Pages\Category\StandardCategoryController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +59,16 @@ Route::prefix('/category')
             Route::post('updateLeadTime', 'updateLeadTime')->name('updateLeadTime');
         });
 
+        // VPP - nhân bản từ nhóm /materialCategory (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        Route::prefix('/vppCategory')->name('vppCategory.')->controller(VppCategoryController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::post('approve', 'approve')->name('approve');
+        });
+
         // Cấu hình riêng của từng phòng ban cho vật tư dùng chung - không có bước duyệt,
         // phòng nào tự khai của phòng đó.
         //
@@ -69,6 +82,14 @@ Route::prefix('/category')
             Route::post('watchlistRemember', 'watchlistRemember')->name('watchlistRemember');
         });
 
+        // VPP - nhân bản từ nhóm /departmentMaterial (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        // VPP Của Phòng: dòng do hệ thống tạo theo danh mục chung (DepartmentVpp::syncRows) - chỉ sửa
+        Route::prefix('/departmentVpp')->name('departmentVpp.')->controller(DepartmentVppController::class)->group(function () {
+            Route::post('update', 'update')->name('update');
+            // "Đề nghị dự trù VPP" từ tab VPP Của Phòng - hiện ở tab Dự Trù VPP
+            Route::post('watchlistRemember', 'watchlistRemember')->name('watchlistRemember');
+        });
+
         // Danh sách vật tư đề nghị theo chu kỳ (nội bộ / liên phòng ban) - đến chu kỳ tự tạo
         // đề nghị Lưu tạm. Không có route hiển thị: nằm ở 2 tab của /category/materialCategory.
         Route::prefix('/periodicRequest')->name('periodicRequest.')->controller(PeriodicRequestController::class)->group(function () {
@@ -78,6 +99,21 @@ Route::prefix('/category')
             Route::get('objects', 'objects')->name('objects');
             // Lịch Pending bên CAL của đối tượng + ngày tạo sẽ theo - cho tuỳ chọn "Theo ngày đến hạn
             // lịch CAL" ở modal thêm / sửa danh sách nội bộ, xem MaterialPeriodicRequest::calSchedulePreview()
+            Route::get('calSchedule', 'calSchedule')->name('calSchedule');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::post('generateNow', 'generateNow')->name('generateNow');
+        });
+
+        // VPP - nhân bản từ nhóm /periodicRequest (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        Route::prefix('/vppPeriodicRequest')->name('vppPeriodicRequest.')->controller(VppPeriodicRequestController::class)->group(function () {
+            Route::get('history', 'history')->name('history');
+            // Tìm đối tượng (dữ liệu gốc) qua AJAX cho modal "Dữ Liệu Gốc - Đối Tượng" - không
+            // nhúng cả danh mục vào trang, xem VppPeriodicRequest::objectSearch()
+            Route::get('objects', 'objects')->name('objects');
+            // Lịch Pending bên CAL của đối tượng + ngày tạo sẽ theo - cho tuỳ chọn "Theo ngày đến hạn
+            // lịch CAL" ở modal thêm / sửa danh sách nội bộ, xem VppPeriodicRequest::calSchedulePreview()
             Route::get('calSchedule', 'calSchedule')->name('calSchedule');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');

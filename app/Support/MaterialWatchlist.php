@@ -22,13 +22,8 @@ use Illuminate\Support\Facades\DB;
  *
  * Một vật tư trong danh mục thuộc nhiều nguồn cùng lúc chỉ hiện MỘT dòng - xem forTab().
  *
- * Danh sách gộp được chia theo BỘ PHẬN MUA HÀNG của danh mục công ty:
- *   - forEstimate(): Cung Ứng mua (kể cả vật tư ngoài danh mục / chưa khai - mặc định Cung Ứng)
- *     -> tab "Danh sách vật tư cần dự trù" ở DỰ TRÙ VẬT TƯ, lập phiếu dự trù.
- *   - forVpp()     : Hành Chính mua -> tab "Danh sách vật tư cần đề nghị Hành Chính" ở SỬ DỤNG
- *     VẬT TƯ (Đề nghị VPP), gửi đề nghị tới kho VPP của phòng Hành Chính (App\Support\MaterialVpp).
- * Riêng phòng Hành Chính không tự đề nghị kho của mình được nên vật tư Hành Chính mua vẫn
- * nằm ở danh sách cần dự trù của phòng đó.
+ * forEstimate() -> tab "Danh sách vật tư cần dự trù" ở DỰ TRÙ VẬT TƯ, lập phiếu dự trù gửi Cung Ứng.
+ * VPP (Hành Chánh mua) đã tách sang module VPP - xem App\Support\VppWatchlist.
  */
 class MaterialWatchlist
 {
@@ -258,28 +253,7 @@ class MaterialWatchlist
     /** Danh sách vật tư cần dự trù (Dự Trù Vật Tư) - xem phần đầu lớp. */
     public static function forEstimate(int $departmentId)
     {
-        $rows = self::forTab($departmentId);
-
-        if (MaterialVpp::isVppDepartment($departmentId)) {
-            return $rows;
-        }
-
-        return $rows->filter(fn ($row) => MaterialPurchasing::keyOf($row->purchasing_department) !== MaterialVpp::PURCHASING_KEY)->values();
-    }
-
-    /**
-     * Danh sách vật tư cần đề nghị Hành Chính (Sử Dụng Vật Tư - Đề nghị VPP): vật tư trong danh
-     * mục do Hành Chính mua. Phòng Hành Chính / chưa có phòng Hành Chính để gửi thì rỗng.
-     */
-    public static function forVpp(int $departmentId)
-    {
-        if (! MaterialVpp::targetDepartmentId($departmentId)) {
-            return collect();
-        }
-
-        return self::forTab($departmentId)
-            ->filter(fn ($row) => $row->category_id && $row->purchasing_department === MaterialVpp::PURCHASING_KEY)
-            ->values();
+        return self::forTab($departmentId);
     }
 
     /**
@@ -393,24 +367,15 @@ class MaterialWatchlist
     }
 
     /**
-     * Thông báo sau khi ghi nhớ: nói rõ vật tư hiện ở danh sách nào (vật tư Hành Chính mua sang
-     * "Danh sách vật tư cần đề nghị Hành Chính", còn lại "Danh sách vật tư cần dự trù" - cùng
-     * quy tắc forEstimate / forVpp) và nếu đang nằm trong phiếu chưa xong thì kèm mã phiếu, vì
+     * Thông báo sau khi ghi nhớ: vật tư hiện ở "Danh sách vật tư cần dự trù", và nếu đang nằm
+     * trong phiếu chưa xong thì kèm mã phiếu, vì
      * khi đó dòng chỉ hiện ở trạng thái "Đã lập phiếu / Đã đề nghị" chứ không ở trạng thái mặc định.
      * in_progress = true để JS hiện hộp thoại chờ người dùng đọc thay vì toast tự tắt.
      */
     private static function rememberResult(int $departmentId, ?int $categoryId, ?string $materialName, bool $updated): array
     {
-        $purchasing = $categoryId
-            ? DB::table('material_categories')->where('id', $categoryId)->value('purchasing_department')
-            : null;
-
-        $toVpp = $categoryId
-            && MaterialPurchasing::keyOf($purchasing) === MaterialVpp::PURCHASING_KEY
-            && MaterialVpp::targetDepartmentId($departmentId);
-
-        $listName = $toVpp ? '"Danh sách vật tư cần đề nghị Hành Chính"' : '"Danh sách vật tư cần dự trù"';
-        $doneState = $toVpp ? '"Đã đề nghị"' : '"Đã lập phiếu"';
+        $listName = '"Danh sách vật tư cần dự trù"';
+        $doneState = '"Đã lập phiếu"';
 
         $progress = self::inProgress($departmentId);
         $refs = $categoryId
@@ -535,14 +500,12 @@ class MaterialWatchlist
             ->get(['t.category_id', 'r.id', 'r.code', 'r.status', 'r.to_department_id']);
 
         foreach ($transfers as $row) {
-            $isVpp = MaterialVpp::isVppDepartment((int) $row->to_department_id);
-
             $push($row->category_id, null, [
                 'type' => 'transfer',
-                'tab' => $isVpp ? MaterialVpp::TAB : 'transfer',
+                'tab' => 'transfer',
                 'id' => (int) $row->id,
                 'code' => $row->code,
-                'label' => $isVpp ? 'Đề nghị cấp phát VPP đến HC' : 'Đề nghị liên phòng ban',
+                'label' => 'Đề nghị liên phòng ban',
                 'status' => self::TRANSFER_STATUS_LABELS[$row->status] ?? $row->status,
             ]);
         }

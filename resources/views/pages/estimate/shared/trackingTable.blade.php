@@ -3,10 +3,13 @@
     // Bảng này được @include từ dataTable nên phải tự khai, không kế thừa từ trang chi tiết.
     $estNum = fn($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
 
-    // Quyền cập nhật theo dõi giao hàng suy ra từ $estRoute (vật tư / hoá chất / chất chuẩn).
-    $estTrackPerm = str_contains($estRoute, 'materialEstimate')
-        ? 'estimate_material_tracking'
-        : (str_contains($estRoute, 'standardEstimate') ? 'estimate_standard_tracking' : 'estimate_chemical_tracking');
+    // Quyền cập nhật theo dõi giao hàng suy ra từ $estRoute (vật tư / VPP / hoá chất / chất chuẩn).
+    $estTrackPerm = match (true) {
+        str_contains($estRoute, 'materialEstimate') => 'estimate_material_tracking',
+        str_contains($estRoute, 'vppEstimate') => 'estimate_vpp_tracking',
+        str_contains($estRoute, 'standardEstimate') => 'estimate_standard_tracking',
+        default => 'estimate_chemical_tracking',
+    };
     // Quyền gửi tin ở cột Trao đổi (quyền con của quyền xem tab Theo dõi dự trù)
     $estChatPerm = str_replace('_tracking', '_chat', $estTrackPerm);
 

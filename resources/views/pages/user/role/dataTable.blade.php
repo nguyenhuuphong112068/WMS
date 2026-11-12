@@ -136,10 +136,12 @@
 
 
     .perm-table thead th.is-material { box-shadow: inset 0 -3px 0 #16A34A; }
+    .perm-table thead th.is-vpp { box-shadow: inset 0 -3px 0 var(--db-group-vpp, #C2417E); }
     .perm-table thead th.is-chemical { box-shadow: inset 0 -3px 0 #F59E0B; }
     .perm-table thead th.is-standard { box-shadow: inset 0 -3px 0 var(--accent, #17B8D4); }
     .perm-table thead th.is-common { box-shadow: inset 0 -3px 0 var(--primary, #2E7BC4); }
     .perm-table thead th.perm-kind-head.is-material { color: #15803D; }
+    .perm-table thead th.perm-kind-head.is-vpp { color: var(--db-group-vpp, #C2417E); }
     .perm-table thead th.perm-kind-head.is-chemical { color: #B45309; }
     .perm-table thead th.perm-kind-head.is-standard { color: #0E8FA6; }
 
@@ -307,6 +309,13 @@
         box-shadow: inset 4px 0 0 #16A34A;
     }
 
+    .perm-group-row[data-kind="vpp"] td {
+        background: rgba(var(--db-group-vpp-rgb, 194, 65, 126), .08) !important;
+        color: var(--db-group-vpp, #C2417E);
+        border-top-color: var(--db-group-vpp, #C2417E);
+        box-shadow: inset 4px 0 0 var(--db-group-vpp, #C2417E);
+    }
+
     .perm-group-row[data-kind="chemical"] td {
         background: rgba(245, 158, 11, .10) !important;
         color: #B45309;
@@ -467,6 +476,7 @@
     }
 
     .role-kind-chip.is-material { background: rgba(22, 163, 74, .12); color: #15803D; }
+    .role-kind-chip.is-vpp { background: rgba(var(--db-group-vpp-rgb, 194, 65, 126), .12); color: var(--db-group-vpp, #C2417E); }
     .role-kind-chip.is-chemical { background: rgba(245, 158, 11, .15); color: #B45309; }
     .role-kind-chip.is-standard { background: rgba(23, 184, 212, .14); color: #0E8FA6; }
 

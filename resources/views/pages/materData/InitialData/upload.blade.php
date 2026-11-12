@@ -32,7 +32,7 @@
                         <div class="form-group col-md-3">
                             <label for="idtUpModule">Module</label>
                             <select name="module" id="idtUpModule" class="form-control" title="Module của file mẫu đã điền">
-                                <option value="">Cả 3 module</option>
+                                <option value="">Cả 4 module</option>
                                 @foreach ($modules as $key => $label)
                                     <option value="{{ $key }}" @selected(old('module') === $key)>{{ $label }}</option>
                                 @endforeach

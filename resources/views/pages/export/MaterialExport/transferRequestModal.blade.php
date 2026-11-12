@@ -5,10 +5,8 @@
 | Nút "Danh mục vật tư phòng nguồn" mở picker tồn kho của phòng nhận đề nghị
 | (transferStockPickerModal) để tick chọn nhiều vật tư một lần.
 |
-| Dựng HAI modal cùng một form, chỉ khác phòng nhận:
-|   #matTransferRequestModal : Chuyển liên phòng ban - tự chọn phòng (đã loại phòng Hành Chính).
-|   #matVppRequestModal      : Đề nghị VPP - phòng nhận cố định là phòng Hành Chính ($vppTarget).
-| Lưu lỗi validate thì chỉ modal của đúng loại vừa gửi được điền lại old() và tự mở lại.
+| #matTransferRequestModal: tự chọn phòng nhận (mọi phòng đang hoạt động). Lưu lỗi validate thì
+| modal được điền lại old() và tự mở lại. Đề nghị VPP gửi Hành Chính nằm ở module VPP.
 --}}
 @php
     $mtCreateModals = [[
@@ -23,28 +21,12 @@
         'template' => 'matTransferRowTemplate',
     ]];
 
-    if (! empty($vppTarget)) {
-        $mtCreateModals[] = [
-            'kind' => \App\Support\MaterialVpp::TAB,
-            'id' => 'matVppRequestModal',
-            'table' => 'tableMatVppRows',
-            'icon' => 'fas fa-paperclip',
-            'title' => 'Tạo Đề Nghị Cấp Phát VPP Đến HC',
-            'placeholder' => 'VD: Đề nghị văn phòng phẩm tháng ' . now()->format('m/Y'),
-            'departments' => collect([$vppTarget]),
-            // Chỉ vật tư Hành Chánh mua (App\Support\MaterialVpp)
-            'categories' => $vppCategories,
-            'template' => 'matVppRowTemplate',
-        ];
-    }
-
     $mtHasCreateErrors = $errors->transferCreateErrors->any();
-    $mtOldKind = $mtHasCreateErrors ? \App\Support\MaterialVpp::tabFor((int) old('to_department_id')) : null;
+    $mtOldKind = $mtHasCreateErrors ? 'transfer' : null;
 @endphp
 
 @foreach ($mtCreateModals as $mtCm)
 @php
-    $mtIsVpp = $mtCm['kind'] !== 'transfer';
     $mtOld = fn ($key) => $mtOldKind === $mtCm['kind'] ? old($key) : null;
 @endphp
 <div class="modal fade md-modal" id="{{ $mtCm['id'] }}" tabindex="-1" role="dialog" aria-hidden="true">
@@ -68,7 +50,7 @@
                                 Tiêu Đề Đề Nghị <span class="text-danger">*</span>
                             </label>
                             <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
-                                list="{{ $mtIsVpp ? 'matTitleOptionsVpp' : 'matTitleOptionsTransfer' }}" autocomplete="off"
+                                list="matTitleOptionsTransfer" autocomplete="off"
                                 placeholder="{{ $mtCm['placeholder'] }}" value="{{ $mtOld('title') }}" required>
                         </div>
                         <div class="form-group mb-0">
@@ -83,20 +65,17 @@
                                 <i class="fas fa-building mr-1 text-primary"></i> Gửi Đến Phòng Ban <span class="text-danger">*</span>:
                             </label>
                             <div style="min-width: 280px;">
-                                {{-- Đề nghị VPP: chỉ một phòng Hành Chính, khoá luôn ô chọn (vẫn là select để picker tồn kho đọc được) --}}
-                                <select name="to_department_id" class="form-control font-weight-bold {{ $mtIsVpp ? 'mat-transfer-dept-fixed' : '' }}"
-                                    style="height: 38px !important;" {{ $mtIsVpp ? 'tabindex=-1' : '' }} required>
-                                    @unless ($mtIsVpp)
-                                        <option value="">-- Chọn phòng ban đang giữ vật tư --</option>
-                                    @endunless
-                                    @include('layout.departmentOptions', ['departments' => $mtCm['departments'], 'selected' => $mtIsVpp ? collect($mtCm['departments'])->pluck('id')->all() : $mtOld('to_department_id')])
+                                <select name="to_department_id" class="form-control font-weight-bold"
+                                    style="height: 38px !important;" required>
+                                    <option value="">-- Chọn phòng ban đang giữ vật tư --</option>
+                                    @include('layout.departmentOptions', ['departments' => $mtCm['departments'], 'selected' => $mtOld('to_department_id')])
                                 </select>
                             </div>
                         </div>
                         <div class="d-flex align-items-center" style="gap: 8px;">
                             <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-mat-stock-picker"
                                 data-target-rows="#{{ $mtCm['table'] }} tbody">
-                                <i class="fas fa-boxes-stacked mr-1"></i> {{ $mtIsVpp ? 'Danh mục kho VPP' : 'Danh mục vật tư phòng nguồn' }}
+                                <i class="fas fa-boxes-stacked mr-1"></i> Danh mục vật tư phòng nguồn
                             </button>
                             <button type="button" class="btn btn-sm btn-outline-primary btn-add-mat-transfer-row shadow-sm"
                                 data-rows="#{{ $mtCm['table'] }} tbody">
@@ -150,22 +129,18 @@
 </div>
 @endforeach
 
-{{-- Tiêu đề phòng mình đã từng đặt - gợi ý cho ô Tiêu Đề của modal tạo, điều chỉnh và VPP từ danh sách cần đề nghị --}}
+{{-- Tiêu đề phòng mình đã từng đặt - gợi ý cho ô Tiêu Đề của modal tạo và điều chỉnh --}}
 @include('pages.shared.titleDatalist', ['id' => 'matTitleOptionsTransfer', 'titles' => $transferTitles['transfer'] ?? []])
-@include('pages.shared.titleDatalist', ['id' => 'matTitleOptionsVpp', 'titles' => $transferTitles['vpp'] ?? []])
 
-{{-- Mẫu một dòng vật tư, dùng chung cho cả modal tạo và các modal điều chỉnh; đề nghị VPP có mẫu riêng chỉ gồm vật tư Hành Chánh mua --}}
+{{-- Mẫu một dòng vật tư, dùng chung cho cả modal tạo và các modal điều chỉnh --}}
 <template id="matTransferRowTemplate">
     @include('pages.export.MaterialExport.transferRowFields', ['idx' => '__i__', 'item' => null, 'onlyRow' => false])
-</template>
-<template id="matVppRowTemplate">
-    @include('pages.export.MaterialExport.transferRowFields', ['idx' => '__i__', 'item' => null, 'onlyRow' => false, 'rowCategories' => $vppCategories])
 </template>
 
 @if ($mtHasCreateErrors)
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            $(@json($mtOldKind === 'transfer' ? '#matTransferRequestModal' : '#matVppRequestModal')).modal('show');
+            $('#matTransferRequestModal').modal('show');
         });
     </script>
 @endif
@@ -280,7 +255,7 @@
             }
         });
 
-        // Modal đã có sẵn phòng (đề nghị VPP, phiếu điều chỉnh) thì tải trước, không ghi đè ĐVT đã lưu
+        // Modal đã có sẵn phòng (phiếu điều chỉnh) thì tải trước, không ghi đè ĐVT đã lưu
         $(document).on('shown.bs.modal', '.md-modal', function() {
             var $form = $(this).find('form').has('.mat-transfer-row').first();
 

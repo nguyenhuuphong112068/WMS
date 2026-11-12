@@ -29,6 +29,12 @@ class PageTabs
             'external' => 'DS đề nghị liên phòng ban theo chu kỳ',
             'estimate' => 'DS dự trù theo chu kỳ',
         ]],
+        'category_vpp' => ['parent' => 'category_vpp_view', 'tabs' => [
+            'company' => 'Danh mục VPP công ty',
+            'department' => 'VPP của phòng',
+            'external' => 'DS đề nghị liên phòng ban theo chu kỳ',
+            'estimate' => 'DS dự trù theo chu kỳ',
+        ]],
         'category_chemical' => ['parent' => 'category_chemical_view', 'tabs' => [
             'company' => 'Danh mục hoá chất công ty',
             'department' => 'Hoá chất của phòng',
@@ -43,6 +49,10 @@ class PageTabs
         // ----- Nhập -----
         'import_material' => ['parent' => 'import_material_view', 'tabs' => [
             'book' => 'Sổ nhập vật tư',
+            'check' => 'Chờ kiểm tra',
+        ]],
+        'import_vpp' => ['parent' => 'import_vpp_view', 'tabs' => [
+            'book' => 'Sổ nhập VPP',
             'check' => 'Chờ kiểm tra',
         ]],
         'import_chemical' => ['parent' => 'import_chemical_view', 'tabs' => [
@@ -60,13 +70,20 @@ class PageTabs
             'periodic' => 'Đề nghị nội bộ - Theo định kỳ',
             'risk_assessment' => 'Đề nghị nội bộ - Theo ĐG rủi ro',
             'regular' => 'Đề nghị nội bộ - Thường quy',
-            'vpp' => 'Đề nghị liên phòng ban - VPP đến HC',
-            'transfer' => 'Đề nghị liên phòng ban - Phòng ban khác',
+            'transfer' => 'Đề nghị liên phòng ban',
             'prepare' => 'Chờ cấp phát',
             'calibration' => 'Xác nhận hiệu chuẩn',
             'book' => 'Sổ cấp phát',
             'quarantine' => 'Cách ly - Loại bỏ - Huỷ',
             'late' => 'Ghi nhận cấp phát trễ',
+        ]],
+        // VPP dùng cơ chế "Sử dụng - ghi sổ" như Hoá Chất từ 12/11/2026 (bỏ đề nghị nội bộ / cấp phát)
+        'export_vpp' => ['parent' => 'export_vpp_view', 'tabs' => [
+            'use' => 'Sử Dụng VPP',
+            'book' => 'Sổ sử dụng VPP',
+            'vpp' => 'Đề nghị liên phòng ban - VPP đến HC',
+            'transfer' => 'Đề nghị liên phòng ban - Phòng ban khác',
+            'quarantine' => 'Cách ly - Loại bỏ - Huỷ',
         ]],
         'export_chemical' => ['parent' => 'export_chemical_view', 'tabs' => [
             // Tab đầu: nút lập phiếu Sử dụng + các dòng đã Lưu Tạm (khoá 'draft' giữ nguyên vì quyền đã cấp)
@@ -89,6 +106,14 @@ class PageTabs
         'inventory_material' => ['parent' => 'inventory_material_view', 'tabs' => [
             'code' => 'Theo mã xuất nhập',
             'material' => 'Tồn theo mã vật tư',
+            'zone' => 'Tồn kho theo vị trí',
+            'expiring' => 'Cận hạn dùng',
+            'next' => 'Khả dụng tháng tới',
+            'check' => 'Kiểm kê định kỳ',
+        ]],
+        'inventory_vpp' => ['parent' => 'inventory_vpp_view', 'tabs' => [
+            'code' => 'Theo mã xuất nhập',
+            'material' => 'Tồn theo mã VPP',
             'zone' => 'Tồn kho theo vị trí',
             'expiring' => 'Cận hạn dùng',
             'next' => 'Khả dụng tháng tới',
@@ -120,6 +145,12 @@ class PageTabs
             'list' => 'Danh sách phiếu',
             'tracking' => 'Theo dõi dự trù',
             'watchlist' => 'Danh sách vật tư cần dự trù',
+            'approved' => 'Đơn dự trù đã được phê duyệt',
+        ]],
+        'estimate_vpp' => ['parent' => 'estimate_vpp_view', 'tabs' => [
+            'list' => 'Danh sách phiếu',
+            'tracking' => 'Theo dõi dự trù',
+            'watchlist' => 'Danh sách VPP cần dự trù',
             'approved' => 'Đơn dự trù đã được phê duyệt',
         ]],
         'estimate_chemical' => ['parent' => 'estimate_chemical_view', 'tabs' => [

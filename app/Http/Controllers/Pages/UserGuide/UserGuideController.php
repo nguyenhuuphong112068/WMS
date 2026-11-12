@@ -44,8 +44,14 @@ class UserGuideController extends Controller
         'material' => [
             'title' => 'Vật Tư',
             'icon' => 'fas fa-cubes',
-            'summary' => 'Trọn vòng đời vật tư: danh mục, nhập và kiểm tra, đề nghị - ký duyệt - cấp phát, liên phòng ban và VPP, tồn kho - kiểm kê, dự trù và thống kê, kèm sơ đồ đường đi phiếu.',
-            'updated_at' => '2026-11-10',
+            'summary' => 'Trọn vòng đời vật tư: danh mục, nhập và kiểm tra, đề nghị - ký duyệt - cấp phát, liên phòng ban, tồn kho - kiểm kê, dự trù và thống kê, kèm sơ đồ đường đi phiếu.',
+            'updated_at' => '2026-11-11',
+        ],
+        'vpp' => [
+            'title' => 'VPP',
+            'icon' => 'fas fa-paperclip',
+            'summary' => 'Văn phòng phẩm do Hành Chánh mua và cấp phát: danh mục, nhập, đề nghị cấp phát VPP đến Hành Chánh, đề nghị nội bộ - ký duyệt, liên phòng ban, tồn kho - kiểm kê, dự trù và thống kê.',
+            'updated_at' => '2026-11-11',
         ],
         'chemical' => [
             'title' => 'Hoá Chất',
@@ -85,7 +91,7 @@ class UserGuideController extends Controller
 
         if ($guide === 'permission') {
             $data += $this->permissionMatrix();
-        } elseif (in_array($guide, ['materData', 'material', 'chemical', 'standard'], true)) {
+        } elseif (in_array($guide, ['materData', 'material', 'vpp', 'chemical', 'standard'], true)) {
             // Bảng "vai trò được làm gì" ở mục Quyền Truy Cập của từng tài liệu
             $data['ugRoleSummary'] = PermissionMatrix::roleSummary($guide);
         }

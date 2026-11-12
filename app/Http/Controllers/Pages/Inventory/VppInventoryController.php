@@ -1,0 +1,1511 @@
+<?php
+
+namespace App\Http\Controllers\Pages\Inventory;
+
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
+use App\Support\DepartmentVpp;
+use App\Support\InventoryChart;
+use App\Support\VppAvailabilityForecast;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+
+/**
+ * TỒN - TỒN KHO VPP
+ *
+ * Tồn được TÍNH RA từ các bảng nghiệp vụ, không lưu bảng tồn riêng:
+ *
+ *      Tồn của một mã xuất nhập = vpp_imports.amount
+ *                        + SUM(vpp_balancings.balancing_amount)   (status_id = 1)
+ *                        - SUM(vpp_exports.amount where type='export')
+ *                        - SUM(vpp_exports.amount where type='cancel')
+ *                        - SUM(vpp_exports.amount where type='transfer_out')
+ *
+ * type = 'transfer_out' là phần cấp phát liên phòng ban - hàng đã rời kho phòng mình,
+ * gộp chung vào cột "đã sử dụng" của báo cáo (xem usedByImport).
+ *
+ * LỌC THEO KỲ: chỉ hiện mã xuất nhập CÓ PHÁT SINH hoặc CÒN TỒN trong kỳ - còn tồn cuối
+ * kỳ, hoặc có sử dụng, hoặc có loại bỏ (xem movedInPeriod). Mã đã hết sạch từ kỳ trước,
+ * trong kỳ không động tới thì không hiện.
+ *
+ * KỲ BÁO CÁO: xét khoảng "từ ngày - đến ngày" (mặc định trọn tháng hiện tại), tách thành
+ * Tồn đầu kỳ / Nhập trong kỳ / Sử dụng - Loại bỏ trong kỳ / Tồn cuối kỳ. Song song với
+ * StandardInventoryController nhưng gọn: VPP không có nhóm chuẩn, không kiểm soát khối
+ * lượng, không hạn dùng nội bộ nên chỉ còn hai hành động: xem tồn và Cân Đối.
+ *
+ * Riêng tab KIỂM KÊ ĐỊNH KỲ (chu kỳ 1 tháng 1 lần) do VppStocktakeController lo,
+ * index() chỉ lấy dữ liệu qua VppStocktakeController::panel().
+ */
+class VppInventoryController extends Controller
+{
+    private const NEAR_EXPIRY_DAYS = 30;
+
+    private const EXPIRING_SOON_MONTHS = 6;
+
+    /** Mốc lọc nhanh tab "Cận hạn dùng": hạn dùng <= hôm nay + mốc (kể cả đã quá hạn). */
+    private const EXPIRING_FILTERS = [
+        '3m' => ['label' => '≤ 3 tháng', 'months' => 3],
+        '1m' => ['label' => '≤ 1 tháng', 'months' => 1],
+        '2w' => ['label' => '≤ 2 tuần', 'days' => 14],
+        '1w' => ['label' => '≤ 1 tuần', 'days' => 7],
+    ];
+
+    private const LOW_STOCK_RATIO = 0.2;
+
+    private const EPSILON = 0.00005;
+
+    private const BALANCING_MAX_RATIO = 0.05;
+
+    /** Loại lưu trữ của định khu mà màn hình này quan tâm - xem locations.item_type. */
+    private const LOCATION_TYPE = 'vpp';
+
+    /** Loại định khu KHÔNG nhận Định khu nhanh / Đổi vị trí (hàng cách ly đi theo luồng Cách ly). */
+    public const ASSIGN_EXCEPT_ZONES = ['quarantine', 'pending', 'rejected'];
+
+    /** Số mã xuất nhập tối đa mỗi lượt định khu. */
+    public const ASSIGN_MAX = 200;
+
+    /** Phiếu cách ly còn nằm trong kho (trạng thái VppQuarantineController) -> nhãn trên sơ đồ vị trí. */
+    private const QUARANTINE_STATES = [
+        'quarantined' => 'Chờ quyết định',
+        'removed' => 'Chờ huỷ',
+    ];
+
+    public const STATES = [
+        'in' => 'Còn hàng',
+        'low' => 'Sắp hết',
+        'near' => 'Sắp hết hạn',
+        'expired' => 'Hết hạn',
+        'out' => 'Hết hàng',
+        'over' => 'Âm kho',
+    ];
+
+    public function index(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $period = $this->period($request);
+
+        $datas = $this->stockByCode($departmentId, $period['from'], $period['to']);
+        $zones = $this->zoneOptions($departmentId);
+
+        session()->put(['title' => 'TỒN - TỒN KHO VPP']);
+
+        return view('pages.inventory.VppInventory.list', [
+            'datas' => $datas,
+            // File đính kèm của phiếu nhập, để xem ngay trên màn hình tồn kho
+            'attachments' => $this->attachmentsFor($datas->pluck('id')),
+            'summaries' => $this->stockByVpp($datas),
+            'balancings' => $this->balancingHistory($departmentId),
+            'zones' => $zones,
+            'zoneRows' => $this->zoneRows($datas, $this->quarantineZoneRows($departmentId, $period['to'])),
+            // Tab KIỂM KÊ ĐỊNH KỲ - chu kỳ 1 tháng 1 lần, xem VppStocktakeController
+            'stocktake' => VppStocktakeController::panel($departmentId),
+            // Tab KHẢ DỤNG THÁNG TỚI - xem App\Support\VppAvailabilityForecast
+            'forecast' => VppAvailabilityForecast::build($departmentId, $request->query('forecast_month')),
+            'states' => self::STATES,
+            'period' => $period,
+            'nearExpiryDays' => self::NEAR_EXPIRY_DAYS,
+            'expiringSoonMonths' => self::EXPIRING_SOON_MONTHS,
+            'expiringFilters' => $this->expiringFilters(),
+            'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
+            'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
+        ]);
+    }
+
+    /** Mốc lọc của tab "Cận hạn dùng" kèm ngày chặn (Y-m-d) tính từ hôm nay. */
+    private function expiringFilters(): array
+    {
+        $today = now()->startOfDay();
+
+        return collect(self::EXPIRING_FILTERS)
+            ->map(fn ($filter) => [
+                'label' => $filter['label'],
+                'until' => isset($filter['months'])
+                    ? $today->copy()->addMonthsNoOverflow($filter['months'])->format('Y-m-d')
+                    : $today->copy()->addDays($filter['days'])->format('Y-m-d'),
+            ])
+            ->all();
+    }
+
+    private function period(Request $request): array
+    {
+        $parse = function ($value) {
+            if (! is_string($value) || trim($value) === '') {
+                return null;
+            }
+            try {
+                return \Carbon\Carbon::parse($value)->startOfDay();
+            } catch (\Throwable $e) {
+                return null;
+            }
+        };
+
+        $today = now()->startOfDay();
+        $from = $parse($request->query('from_date')) ?: $today->copy()->startOfMonth();
+        $to = $parse($request->query('to_date')) ?: $today->copy()->endOfMonth();
+
+        if ($from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        return [
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+            'days' => (int) $from->diffInDays($to) + 1,
+            'is_current' => $to->gte($today),
+        ];
+    }
+
+    /**
+     * CÂN ĐỐI SỐ LƯỢNG NHẬP - ghi thêm một dòng vpp_balancings.
+     *
+     * balancing_amount là SỐ ĐIỀU CHỈNH (+/-), không phải số lượng nhập mới. Chặn luỹ kế:
+     * tổng mọi lần cân đối không vượt 5% lượng nhập ban đầu, và cân đối xong tồn không âm.
+     */
+    public function balancing(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        $import = DB::table('vpp_imports')
+            ->where('id', $request->import_id)
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->first();
+
+        if (! $import) {
+            return redirect()->back()->with('error', 'Không tìm thấy mã xuất nhập VPP cần cân đối!');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'import_id' => ['required', 'exists:vpp_imports,id'],
+            'balancing_amount' => ['required', 'numeric', 'not_in:0'],
+            'balancing_at' => ['required', 'date'],
+        ], [
+            'import_id.required' => 'Vui lòng chọn mã xuất nhập cần cân đối.',
+            'import_id.exists' => 'Mã xuất nhập cần cân đối không tồn tại.',
+            'balancing_amount.required' => 'Vui lòng nhập số lượng cân đối.',
+            'balancing_amount.numeric' => 'Số lượng cân đối phải là số.',
+            'balancing_amount.not_in' => 'Số lượng cân đối phải khác 0.',
+            'balancing_at.required' => 'Vui lòng chọn thời điểm cân đối.',
+            'balancing_at.date' => 'Thời điểm cân đối không hợp lệ.',
+        ]);
+
+        $gap = $this->gapOf($import);
+        $balanced = $this->balancedOf($import);
+        $limit = max(1, abs((float) $import->amount) * self::BALANCING_MAX_RATIO);
+
+        $validator->after(function ($validator) use ($request, $gap, $balanced, $limit) {
+            if (! is_numeric($request->balancing_amount)) {
+                return;
+            }
+
+            $amount = (float) $request->balancing_amount;
+
+            if (abs($amount) < self::EPSILON) {
+                $validator->errors()->add('balancing_amount', 'Số lượng cân đối phải khác 0.');
+
+                return;
+            }
+
+            if (abs($balanced + $amount) > $limit + self::EPSILON) {
+                $validator->errors()->add(
+                    'balancing_amount',
+                    'Chỉ được cân đối tối đa '.(int) round(self::BALANCING_MAX_RATIO * 100).'% số lượng nhập, tức ±'
+                    .$this->number($limit).'. Mã xuất nhập này đã cân đối '.$this->number($balanced)
+                    .', lần này chỉ được nhập trong khoảng từ '.$this->number(-$limit - $balanced)
+                    .' đến '.$this->number($limit - $balanced).'.'
+                );
+
+                return;
+            }
+
+            if ($gap + $amount < -self::EPSILON) {
+                $validator->errors()->add(
+                    'balancing_amount',
+                    'Tồn hiện tại là '.$this->number($gap).', cân đối xong tồn không được âm. Vui lòng nhập từ '
+                    .$this->number(-$gap).' trở lên.'
+                );
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator, 'balancingErrors')->withInput();
+        }
+
+        $amount = (float) $request->balancing_amount;
+
+        $id = DB::table('vpp_balancings')->insertGetId([
+            'code' => $import->code,
+            'import_id' => (int) $import->id,
+            'department_id' => $departmentId,
+            'balancing_amount' => $amount,
+            'balancing_by' => $this->actor(),
+            'balancing_at' => \Carbon\Carbon::parse($request->balancing_at)->format('Y-m-d H:i:s'),
+            'status_id' => 1,
+            'created_by' => $this->actor(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Cân đối',
+            'vpp_balancings',
+            $id,
+            'Tồn: '.$this->number($gap),
+            'Cân đối '.($amount > 0 ? '+' : '').$this->number($amount).' -> tồn: '.$this->number($gap + $amount)
+        );
+
+        return redirect()->back()->with(
+            'success',
+            'Đã cân đối mã xuất nhập '.$import->code.' ('.($amount > 0 ? '+' : '').$this->number($amount)
+            .'), tồn còn lại '.$this->number($gap + $amount).'.'
+        );
+    }
+
+    /**
+     * BIỂU ĐỒ NHẬP - XUẤT - TỒN CỦA MỘT VPP (trả JSON cho modal).
+     *
+     * Mở bằng nút biểu đồ trên bảng "Tồn Kho Theo Tên". Kỳ báo cáo đọc lại đúng $period
+     * của màn hình (from_date / to_date trên thanh Kỳ) nên số liệu trong biểu đồ luôn
+     * khớp với con số đang hiện trên bảng.
+     *
+     * Cách chia mốc và cộng dồn tồn nằm ở App\Support\InventoryChart, dùng chung với
+     * màn hình Tồn Kho Hoá Chất. Ở đây chỉ lấy đúng 3 nguồn phát sinh của VPP.
+     */
+    public function chart(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $period = $this->period($request);
+
+        $query = DB::table('vpp_categories')
+            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_categories.id'))
+            ->tap(fn ($query) => DepartmentVpp::join($query, $departmentId, 'vpp_categories.id'));
+
+        // Đơn vị tính và ngưỡng tồn tối thiểu lấy theo khai báo của phòng ban đang chọn
+        $category = $query
+            ->select(
+                'vpp_categories.id',
+                'vpp_categories.code',
+                'material_names.name as material_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                DepartmentVpp::minStockColumn(),
+                'units.short_name as unit_short_name',
+                'units.name as unit_name'
+            )
+            ->where('vpp_categories.id', (int) $request->query('category_id'))
+            ->first();
+
+        if (! $category) {
+            return response()->json(['message' => 'Không tìm thấy VPP cần xem biểu đồ.'], 404);
+        }
+
+        $series = InventoryChart::series(
+            $period,
+            $this->chartImports($departmentId, $category->id, $period['to']),
+            $this->chartExports($departmentId, $category->id, $period['to']),
+            $this->chartBalancings($departmentId, $category->id, $period['to'])
+        );
+
+        return response()->json($series + [
+            'category_code' => $category->code,
+            'material_name' => $category->material_name,
+            'manufacturer_short_name' => $category->manufacturer_short_name,
+            'unit' => $category->unit_short_name ?: $category->unit_name,
+            'period' => $period + [
+                'label' => \Carbon\Carbon::parse($period['from'])->format('d/m/Y')
+                    .' - '.\Carbon\Carbon::parse($period['to'])->format('d/m/Y'),
+            ],
+            // Ngưỡng tồn tối thiểu của phòng, vẽ thành đường kẻ đứt để thấy lúc nào chạm đáy
+            'min_stock' => $category->min_stock === null ? null : (float) $category->min_stock,
+        ]);
+    }
+
+    /**
+     * CHI TIẾT PHÁT SINH CỦA MỘT CON SỐ TRÊN BẢNG TỒN (trả JSON cho modal).
+     *
+     * Mỗi cột theo kỳ (Tồn Đầu Kỳ / Nhập / Sử Dụng / Loại Bỏ / Tồn Cuối Kỳ) và cột
+     * Tổng Tồn VPP chỉ là một con số tổng. Endpoint này liệt kê đúng những bản ghi
+     * nghiệp vụ cộng lại thành con số đó, cắt kỳ y hệt stockByCode().
+     *
+     *      scope = import  : một mã xuất nhập  (id = vpp_imports.id)
+     *      scope = category: gộp mọi lô cùng VPP (id = vpp_categories.id)
+     *
+     * Số liệu chia theo App\Support\InventoryMovements để 3 màn Tồn cùng một cách tính.
+     */
+    public function movements(Request $request)
+    {
+        $departmentId = $this->departmentId();
+        $period = $this->period($request);
+        $from = $period['from'];
+        $to = $period['to'];
+
+        $scope = $request->query('scope') === 'category' ? 'category' : 'import';
+        $id = (int) $request->query('id');
+
+        $base = DB::table('vpp_imports')
+            ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
+            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
+            ->where('vpp_imports.department_id', $departmentId)
+            ->where('vpp_imports.status_id', 1)
+            // Lô đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn kho
+            ->where('vpp_imports.is_checked', 1)
+            ->whereDate('vpp_imports.imported_date', '<=', $to);
+
+        $base = $scope === 'category'
+            ? $base->where('vpp_imports.category_id', $id)
+            : $base->where('vpp_imports.id', $id);
+
+        $imports = $base
+            ->orderBy('vpp_imports.code')
+            ->get([
+                'vpp_imports.id',
+                'vpp_imports.code',
+                'vpp_imports.category_id',
+                'vpp_imports.amount',
+                'vpp_imports.imported_date',
+                'vpp_imports.imported_by',
+                'vpp_imports.expired_date',
+                'vpp_categories.code as category_code',
+                'material_names.name as material_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+            ]);
+
+        if ($imports->isEmpty()) {
+            return response()->json(['message' => 'Không tìm thấy dữ liệu phát sinh cho mục đã chọn.'], 404);
+        }
+
+        $first = $imports->first();
+        $unit = $first->unit_short_name ?: $first->unit_name;
+        $ids = $imports->pluck('id')->all();
+        $codeById = $imports->pluck('code', 'id');
+
+        $balancings = DB::table('vpp_balancings')
+            ->whereIn('import_id', $ids)
+            ->where('status_id', 1)
+            ->orderBy('balancing_at')
+            ->get(['import_id', 'balancing_amount', 'balancing_at', 'balancing_by']);
+
+        // Phiếu sử dụng: kèm mã phiếu đề nghị (phiếu cũ) và mục đích
+        $exports = DB::table('vpp_exports')
+            ->leftJoin('vpp_request_items', 'vpp_exports.request_item_id', '=', 'vpp_request_items.id')
+            ->leftJoin('vpp_request_lists', 'vpp_request_items.request_list_id', '=', 'vpp_request_lists.id')
+            ->whereIn('vpp_exports.import_id', $ids)
+            ->where('vpp_exports.status_id', 1)
+            ->orderBy('vpp_exports.created_at')
+            ->get([
+                'vpp_exports.import_id',
+                'vpp_exports.amount',
+                'vpp_exports.type',
+                'vpp_exports.created_at',
+                'vpp_exports.reason',
+                'vpp_exports.product_name',
+                'vpp_exports.used_by',
+                'vpp_exports.test_report_no',
+                'vpp_request_lists.code as request_code',
+                // Từ 12/11/2026 mục đích ghi trên chính phiếu sử dụng; phiếu cũ đọc từ dòng đề nghị
+                DB::raw('COALESCE(vpp_exports.purpose, vpp_request_items.purpose) as request_purpose'),
+            ]);
+
+        $stamp = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('Y-m-d H:i:s') : '';
+        $dayLabel = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y') : '';
+        $timeLabel = fn ($value) => $value ? \Carbon\Carbon::parse($value)->format('d/m/Y H:i') : '';
+
+        $events = [];
+
+        foreach ($imports as $import) {
+            $day = substr((string) $import->imported_date, 0, 10);
+            $events[] = [
+                'lot_id' => $import->id, 'metric' => 'in',
+                'datetime' => false, 'at' => $day.' 00:00:00',
+                'signed' => (float) $import->amount,
+                'fields' => [
+                    'kind' => 'Nhập kho',
+                    'at_label' => $dayLabel($import->imported_date),
+                    'code' => $import->code,
+                    // Danh mục VPP không có quy cách kỹ thuật (bỏ 12/11/2026)
+                    'spec' => '',
+                    'by' => $import->imported_by ?: '',
+                    'detail' => '',
+                ],
+            ];
+        }
+
+        foreach ($balancings as $balancing) {
+            $amount = (float) $balancing->balancing_amount;
+            $events[] = [
+                'lot_id' => $balancing->import_id, 'metric' => 'balanced',
+                'datetime' => true, 'at' => $stamp($balancing->balancing_at),
+                'signed' => $amount,
+                'fields' => [
+                    'kind' => 'Cân đối',
+                    'at_label' => $timeLabel($balancing->balancing_at),
+                    'code' => $codeById[$balancing->import_id] ?? '',
+                    'by' => trim((string) $balancing->balancing_by),
+                    'detail' => 'Điều chỉnh '.($amount > 0 ? '+' : '').$this->number($amount),
+                ],
+            ];
+        }
+
+        foreach ($exports as $export) {
+            $isCancel = $export->type === 'cancel';
+            $isTransfer = $export->type === 'transfer_out';
+            $purpose = $export->request_purpose ?: $export->product_name;
+            $events[] = [
+                'lot_id' => $export->import_id,
+                'metric' => $isCancel ? 'cancelled' : 'used',
+                'datetime' => true, 'at' => $stamp($export->created_at),
+                'signed' => -abs((float) $export->amount),
+                'fields' => [
+                    'kind' => $isCancel ? 'Loại bỏ' : ($isTransfer ? 'Cấp phát liên phòng ban' : 'Sử dụng'),
+                    'at_label' => $timeLabel($export->created_at),
+                    'code' => $codeById[$export->import_id] ?? '',
+                    'by' => $export->used_by ?: '',
+                    'request' => $export->request_code ?: '',
+                    'purpose' => $purpose ?: '',
+                    'reason' => $export->reason ?: ($isCancel ? ($export->product_name ?: '') : ''),
+                    'coa' => $export->test_report_no ?: '',
+                    'detail' => trim(implode(' · ', array_filter([
+                        $export->request_code ? 'ĐN '.$export->request_code : null,
+                        $purpose ?: null,
+                        $export->reason ?: null,
+                        $export->test_report_no ? 'KN '.$export->test_report_no : null,
+                    ]))),
+                ],
+            ];
+        }
+
+        $lots = [];
+        foreach ($imports as $import) {
+            $lots[$import->id] = [
+                'batch_no' => null,
+                'fields' => [
+                    'code' => $import->code,
+                    'spec' => '',
+                    'imported_at' => $dayLabel($import->imported_date),
+                    'expired_at' => $dayLabel($import->expired_date),
+                ],
+            ];
+        }
+
+        $want = $scope === 'category'
+            ? ['opening', 'period_in', 'period_used', 'period_cancelled', 'closing', 'stock_category']
+            : ['opening', 'period_in', 'period_used', 'period_cancelled', 'closing'];
+
+        $metrics = \App\Support\InventoryMovements::metrics($events, $from, $to, [
+            'unit' => $unit,
+            'want' => $want,
+            'lots' => $lots,
+            'columns' => \App\Support\InventoryMovements::columns('material'),
+            'labels' => [
+                'period_used' => 'Sử Dụng',
+                'period_cancelled' => 'Cách Ly/Huỷ',
+                'stock_category' => 'Tổng Tồn VPP',
+            ],
+        ]);
+
+        return response()->json([
+            'meta' => [
+                'scope' => $scope,
+                'name' => $first->material_name ?: '—',
+                'code' => $scope === 'category' ? null : $first->code,
+                'category_code' => $first->category_code,
+                'unit' => $unit,
+                'lots' => count($ids),
+                'period' => $period + [
+                    'label' => \Carbon\Carbon::parse($from)->format('d/m/Y').' - '.\Carbon\Carbon::parse($to)->format('d/m/Y'),
+                ],
+            ],
+            'metrics' => $metrics,
+        ]);
+    }
+
+    /* ==========================================================
+     |  TÍNH TỒN
+     ========================================================== */
+
+    private function stockByCode(int $departmentId, string $from, string $to)
+    {
+        $used = $this->usedByImport($departmentId, $from, $to);
+        $balanced = $this->balancedByImport($departmentId, $from, $to);
+        $today = now()->startOfDay();
+
+        $query = DB::table('vpp_imports')
+            ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
+            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
+            ->tap(fn ($query) => DepartmentVpp::join($query, $departmentId, 'vpp_imports.category_id'))
+            ->leftJoin('locations', 'vpp_imports.location_id', '=', 'locations.id')
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id');
+
+        return $query
+            ->select(
+                'vpp_imports.id',
+                'vpp_imports.code',
+                'vpp_imports.category_id',
+                'vpp_imports.amount',
+                'vpp_imports.imported_date',
+                'vpp_imports.expired_date',
+                'vpp_categories.code as category_code',
+                DepartmentVpp::minStockColumn(),
+                'vpp_categories.classification',
+                'vpp_categories.purchasing_department',
+                'material_names.name as material_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                'manufacturers.name as manufacturer_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                'vpp_imports.location_id',
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
+                'locations.color as location_color',
+                'locations.warehouse_id',
+                'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
+            ->where('vpp_imports.department_id', $departmentId)
+            ->where('vpp_imports.status_id', 1)
+            // Lô đang "Chờ kiểm tra" (is_checked = 0) chưa được cộng vào tồn kho
+            ->where('vpp_imports.is_checked', 1)
+            ->whereDate('vpp_imports.imported_date', '<=', $to)
+            ->orderBy('vpp_imports.code', 'asc')
+            ->get()
+            ->map(function ($row) use ($used, $balanced, $from, $to, $today) {
+                $out = $used[$row->id] ?? null;
+                $bal = $balanced[$row->id] ?? null;
+                $importedDate = substr((string) $row->imported_date, 0, 10);
+
+                $row->imported = (float) $row->amount;
+                $row->balanced = (float) ($bal->balanced_to ?? 0);
+                $row->used = (float) ($out->used_to ?? 0);
+                $row->cancelled = (float) ($out->cancelled_to ?? 0);
+
+                $row->last_balancing_at = $bal->last_balancing_at ?? null;
+                $row->balancing_times = (int) ($bal->times ?? 0);
+                $row->last_exported_date = $out->last_exported_date ?? null;
+                $row->export_times = (int) ($out->times ?? 0);
+                $row->period_export_times = (int) ($out->times_in ?? 0);
+
+                $row->opening = ($importedDate < $from ? $row->imported : 0)
+                    + (float) ($bal->balanced_before ?? 0)
+                    - (float) ($out->used_before ?? 0)
+                    - (float) ($out->cancelled_before ?? 0);
+
+                $row->period_imported = $importedDate >= $from && $importedDate <= $to ? $row->imported : 0;
+                $row->period_balanced = (float) ($bal->balanced_in ?? 0);
+                $row->period_in = $row->period_imported + $row->period_balanced;
+                $row->period_used = (float) ($out->used_in ?? 0);
+                $row->period_cancelled = (float) ($out->cancelled_in ?? 0);
+                $row->is_new_in_period = $row->period_imported > 0;
+
+                $row->effective = $row->imported + $row->balanced;
+
+                $row->balanced_all = (float) ($bal->balanced_all ?? 0);
+                $row->balancing_limit = max(1, abs($row->imported) * self::BALANCING_MAX_RATIO);
+                $row->balancing_min_input = -$row->balancing_limit - $row->balanced_all;
+                $row->balancing_max_input = $row->balancing_limit - $row->balanced_all;
+
+                $row->closing = $row->opening + $row->period_in - $row->period_used - $row->period_cancelled;
+                $row->gap = $row->closing;
+                $row->remaining = max($row->gap, 0);
+                $row->used_percent = $row->effective > 0
+                    ? (int) min(round(($row->used + $row->cancelled) / $row->effective * 100), 100)
+                    : 0;
+
+                $row->days_to_expiry = $row->expired_date
+                    ? (int) $today->diffInDays(\Carbon\Carbon::parse($row->expired_date)->startOfDay(), false)
+                    : null;
+
+                $row->min_stock = $row->min_stock !== null ? (float) $row->min_stock : null;
+
+                $row->effective_expired_date = $row->expired_date;
+                $row->days_to_effective_expiry = $row->days_to_expiry;
+                $row->is_expiring_soon = $row->expired_date
+                    && $row->remaining > self::EPSILON
+                    && \Carbon\Carbon::parse($row->expired_date)->startOfDay()
+                        ->lt($today->copy()->addMonthsNoOverflow(self::EXPIRING_SOON_MONTHS));
+
+                $row->state = $this->stateOf($row);
+                $row->state_label = self::STATES[$row->state];
+
+                return $row;
+            })
+            ->filter(fn ($row) => $this->movedInPeriod($row))
+            ->values()
+            ->pipe(fn ($rows) => $this->withGroupTotals($rows));
+    }
+
+    /**
+     * LỌC THEO KỲ - một mã xuất nhập chỉ hiện trên màn hình tồn khi trong kỳ đang xem
+     * có ít nhất một trong ba dấu hiệu:
+     *
+     *      - còn tồn cuối kỳ  (closing khác 0)
+     *      - có sử dụng       (period_used > 0)
+     *      - có loại bỏ       (period_cancelled > 0)
+     *
+     * Mã đã dùng hết từ những kỳ trước, trong kỳ này không nhập - không xuất - không loại bỏ
+     * (mọi cột đều bằng 0) thì không hiện ra nữa. Mã nhập mới trong kỳ luôn thoả điều kiện
+     * "còn tồn cuối kỳ" hoặc "có sử dụng" nên vẫn hiện bình thường. Riêng mã ÂM KHO
+     * (closing < 0) vẫn giữ lại để sai lệch số liệu không bị giấu đi.
+     */
+    private function movedInPeriod($row): bool
+    {
+        return abs($row->closing) > self::EPSILON
+            || $row->period_used > self::EPSILON
+            || $row->period_cancelled > self::EPSILON;
+    }
+
+    /** Tổng tồn của các lô CÙNG VPP (danh mục), cộng trong PHP để luôn khớp từng dòng. */
+    private function withGroupTotals($rows)
+    {
+        $byCategory = $rows->groupBy('category_id')
+            ->map(fn ($group) => [
+                'remaining' => (float) $group->sum('remaining'),
+                'codes' => $group->count(),
+            ]);
+
+        return $rows->map(function ($row) use ($byCategory) {
+            $category = $byCategory[$row->category_id];
+            $row->category_remaining = $category['remaining'];
+            $row->category_codes = $category['codes'];
+
+            return $row;
+        });
+    }
+
+    /**
+     * Phần đã ra khỏi kho của từng mã xuất nhập, cắt theo kỳ báo cáo.
+     *
+     * Cấp phát LIÊN PHÒNG BAN (type = transfer_out) gộp chung vào phần "đã sử dụng": hàng
+     * đã rời kho phòng mình nên phải trừ khỏi tồn, chỉ khác là nó thành tồn của phòng nhận
+     * chứ không mất đi. Không gộp thì tồn cuối kỳ lệch đúng bằng phần đã chuyển đi.
+     */
+    private function usedByImport(int $departmentId, string $from, string $to)
+    {
+        $start = $from.' 00:00:00';
+        $end = $to.' 23:59:59';
+
+        return DB::table('vpp_exports')
+            ->select('import_id')
+            ->selectRaw("SUM(CASE WHEN type IN ('export','transfer_out') AND created_at < ? THEN amount ELSE 0 END) as used_before", [$start])
+            ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at < ? THEN amount ELSE 0 END) as cancelled_before", [$start])
+            ->selectRaw("SUM(CASE WHEN type IN ('export','transfer_out') AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as used_in", [$start, $end])
+            ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as cancelled_in", [$start, $end])
+            ->selectRaw("SUM(CASE WHEN type IN ('export','transfer_out') AND created_at <= ? THEN amount ELSE 0 END) as used_to", [$end])
+            ->selectRaw("SUM(CASE WHEN type = 'cancel' AND created_at <= ? THEN amount ELSE 0 END) as cancelled_to", [$end])
+            ->selectRaw('SUM(CASE WHEN created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as times_in', [$start, $end])
+            ->selectRaw('SUM(CASE WHEN created_at <= ? THEN 1 ELSE 0 END) as times', [$end])
+            ->selectRaw('MAX(CASE WHEN created_at <= ? THEN created_at END) as last_exported_date', [$end])
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->groupBy('import_id')
+            ->get()
+            ->keyBy('import_id');
+    }
+
+    private function balancedByImport(int $departmentId, string $from, string $to)
+    {
+        $start = $from.' 00:00:00';
+        $end = $to.' 23:59:59';
+
+        return DB::table('vpp_balancings')
+            ->select('import_id')
+            ->selectRaw('SUM(CASE WHEN balancing_at < ? THEN balancing_amount ELSE 0 END) as balanced_before', [$start])
+            ->selectRaw('SUM(CASE WHEN balancing_at BETWEEN ? AND ? THEN balancing_amount ELSE 0 END) as balanced_in', [$start, $end])
+            ->selectRaw('SUM(CASE WHEN balancing_at <= ? THEN balancing_amount ELSE 0 END) as balanced_to', [$end])
+            ->selectRaw('SUM(balancing_amount) as balanced_all')
+            ->selectRaw('SUM(CASE WHEN balancing_at <= ? THEN 1 ELSE 0 END) as times', [$end])
+            ->selectRaw('MAX(balancing_at) as last_balancing_at')
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->groupBy('import_id')
+            ->get()
+            ->keyBy('import_id');
+    }
+
+    private function balancingHistory(int $departmentId)
+    {
+        return DB::table('vpp_balancings')
+            ->select('import_id', 'balancing_amount', 'balancing_by', 'balancing_at')
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->orderBy('balancing_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->groupBy('import_id');
+    }
+
+    private function balancedOf($import): float
+    {
+        return (float) DB::table('vpp_balancings')
+            ->where('import_id', $import->id)
+            ->where('status_id', 1)
+            ->sum('balancing_amount');
+    }
+
+    private function gapOf($import): float
+    {
+        $out = (float) DB::table('vpp_exports')
+            ->where('import_id', $import->id)
+            ->where('status_id', 1)
+            ->sum('amount');
+
+        return (float) $import->amount + $this->balancedOf($import) - $out;
+    }
+
+    private function zoneOptions(int $departmentId): array
+    {
+        $of = fn (string $table, array $columns) => DB::table($table)
+            ->select($columns)
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->orderBy('name', 'asc')
+            ->get();
+
+        return [
+            'warehouses' => \App\Support\RoomLayout::attach($of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_polygon', 'layout_door_wall', 'layout_door_offset', 'layout_door'])),
+            'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']),
+            'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
+            'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']),
+            'locations' => $this->locationOptions($departmentId),
+            'foreign' => \App\Support\RoomLayout::foreign($departmentId, self::LOCATION_TYPE),
+        ];
+    }
+
+    /**
+     * Chỉ lấy các ô đã khai loại lưu trữ là VPP. Ô chưa khai loại là "Dùng chung"
+     * nên vẫn lấy - định khu cũ chưa phân loại không bị biến mất khỏi sơ đồ.
+     */
+    private function locationOptions(int $departmentId)
+    {
+        return DB::table('locations')
+            ->select(['id', 'code', 'warehouse_id', 'shelf_id', 'column_id', 'tier_id', 'position', 'depth', 'item_type', 'zone_type', 'color'])
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
+            ->orderBy('code', 'asc')
+            ->get();
+    }
+
+    private function stockByVpp($datas)
+    {
+        return $datas
+            ->groupBy('category_id')
+            ->map(function ($rows) {
+                $first = $rows->first();
+                $inStock = $rows->filter(fn ($row) => $row->remaining > self::EPSILON);
+
+                return (object) [
+                    // Khoá của dòng cộng dồn, nút Biểu Đồ gửi lên chart() theo id này
+                    'category_id' => (int) $first->category_id,
+                    'category_code' => $first->category_code,
+                    'material_name' => $first->material_name,
+                    'manufacturer_short_name' => $first->manufacturer_short_name,
+                    'manufacturer_name' => $first->manufacturer_name,
+                    'classification_name' => \App\Support\VppClassification::summary($first->classification),
+                    'classification_keys' => \App\Support\VppClassification::filterKeys($first->classification, $first->purchasing_department),
+                    'unit' => $first->unit_short_name ?: $first->unit_name,
+                    'imported' => (float) $rows->sum('imported'),
+                    'balanced' => (float) $rows->sum('balanced'),
+                    'used' => (float) $rows->sum('used'),
+                    'cancelled' => (float) $rows->sum('cancelled'),
+                    'remaining' => (float) $rows->sum('remaining'),
+                    'opening' => (float) $rows->sum('opening'),
+                    'period_in' => (float) $rows->sum('period_in'),
+                    'period_used' => (float) $rows->sum('period_used'),
+                    'period_cancelled' => (float) $rows->sum('period_cancelled'),
+                    'closing' => (float) $rows->sum('closing'),
+                    'code_count' => $rows->count(),
+                    'in_stock_count' => $inStock->count(),
+                    'nearest_expiry' => $inStock->whereNotNull('expired_date')->min('expired_date'),
+                    'alert_count' => $rows->whereIn('state', ['low', 'near', 'expired', 'over'])->count(),
+                ];
+            })
+            ->sortBy('material_name')
+            ->values();
+    }
+
+    private function stateOf($row): string
+    {
+        if ($row->gap < -self::EPSILON) {
+            return 'over';
+        }
+
+        if ($row->remaining <= self::EPSILON) {
+            return 'out';
+        }
+
+        if ($row->days_to_expiry !== null) {
+            if ($row->days_to_expiry < 0) {
+                return 'expired';
+            }
+            if ($row->days_to_expiry <= self::NEAR_EXPIRY_DAYS) {
+                return 'near';
+            }
+        }
+
+        if ($row->min_stock !== null) {
+            return $row->remaining <= $row->min_stock ? 'low' : 'in';
+        }
+
+        if ($row->effective > 0 && $row->remaining <= $row->effective * self::LOW_STOCK_RATIO) {
+            return 'low';
+        }
+
+        return 'in';
+    }
+
+    /* ==========================================================
+     |  SƠ ĐỒ TỒN THEO VỊ TRÍ
+     ========================================================== */
+
+    /**
+     * Dòng tồn CÒN TỒN cho sơ đồ Theo vị trí (pages.inventory.shared.zoneGrid - cùng bộ vẽ với Hoá Chất / Chất Chuẩn).
+     *
+     * Hàng cách ly / chờ huỷ đã trừ khỏi tồn của lô nhưng vẫn nằm vật lý ở khu Chờ Quyết Định / Loại Bỏ
+     * nên được đưa vào như một dòng tồn ở đúng vị trí đó (đỏ cam trên sơ đồ: cách ly = 'low', chờ huỷ = 'expired').
+     * Mã chưa có vị trí rơi vào khối "Chưa xếp vị trí" do zoneGrid dựng.
+     */
+    private function zoneRows($datas, $quarantineRows = null): array
+    {
+        return $datas->concat($quarantineRows ?? collect())
+            ->filter(fn ($row) => $row->remaining > self::EPSILON)
+            ->map(fn ($row) => [
+                // id phiếu nhập cho Định khu / Đổi vị trí; dòng phiếu cách ly không có id (không xếp được)
+                'id' => isset($row->id) ? (int) $row->id : null,
+                'code' => $row->code,
+                'category_id' => (int) $row->category_id,
+                'name' => $row->material_name ?: '—',
+                'sub' => trim(implode(' · ', array_filter([
+                    $row->manufacturer_short_name,
+                    \App\Support\VppClassification::summary($row->classification),
+                ]))),
+                'remaining' => (float) $row->remaining,
+                'unit' => $row->unit_short_name ?: $row->unit_name,
+                'expired' => $row->expired_date ? \Carbon\Carbon::parse($row->expired_date)->format('d/m/Y') : '—',
+                'state' => ['quarantine' => 'low', 'rejected' => 'expired'][$row->state] ?? $row->state,
+                'state_label' => $row->state_label,
+                'location_id' => $row->location_id ? (int) $row->location_id : null,
+                'location_code' => $row->location_code,
+                'location_zone_type' => $row->location_zone_type ?? null,
+                'warehouse_id' => $row->warehouse_id,
+                'shelf_id' => $row->shelf_id,
+                'column_id' => $row->column_id,
+                'tier_id' => $row->tier_id,
+                'warehouse_name' => $row->warehouse_name,
+                'shelf_name' => $row->shelf_name,
+                'column_name' => $row->column_name,
+                'tier_name' => $row->tier_name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Hàng của phiếu cách ly CÒN MỞ (App\Http\Controllers\Pages\Export\VppQuarantineController)
+     * dựng thành dòng tồn cho sơ đồ vị trí: "Cách ly - Chờ quyết định" đứng ở pending_location_id,
+     * "Đã loại bỏ - chờ huỷ" đứng ở rejected_location_id. Số lượng phiếu đã trừ khỏi tồn của lô
+     * (dòng xuất cancel) nên không cộng trùng. Đã huỷ / trả về kho thì không còn nằm ở đó.
+     * Phiếu chưa gán định khu rơi vào khối "chưa xếp vị trí".
+     */
+    private function quarantineZoneRows(int $departmentId, string $to)
+    {
+        $locationOf = DB::raw("CASE WHEN vpp_quarantines.app_status = 'quarantined'"
+            .' THEN vpp_quarantines.pending_location_id ELSE vpp_quarantines.rejected_location_id END');
+
+        return DB::table('vpp_quarantines')
+            ->join('vpp_imports', 'vpp_quarantines.import_id', '=', 'vpp_imports.id')
+            ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
+            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
+            ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
+            ->leftJoin('locations', 'locations.id', '=', $locationOf)
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            ->select(
+                'vpp_quarantines.code as quarantine_code',
+                'vpp_quarantines.app_status',
+                'vpp_quarantines.amount',
+                'vpp_imports.code',
+                'vpp_imports.category_id',
+                'vpp_imports.expired_date',
+                'vpp_categories.classification',
+                'material_names.name as material_name',
+                'manufacturers.short_name as manufacturer_short_name',
+                'units.short_name as unit_short_name',
+                'units.name as unit_name',
+                'locations.id as location_id',
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type',
+                'locations.color as location_color',
+                'locations.warehouse_id',
+                'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
+            ->where('vpp_quarantines.department_id', $departmentId)
+            ->where('vpp_quarantines.status_id', 1)
+            ->whereIn('vpp_quarantines.app_status', array_keys(self::QUARANTINE_STATES))
+            ->where('vpp_quarantines.created_at', '<=', $to.' 23:59:59')
+            ->get()
+            ->map(function ($row) {
+                $row->remaining = (float) $row->amount;
+                $row->state = $row->app_status === 'quarantined' ? 'quarantine' : 'rejected';
+                $row->state_label = self::QUARANTINE_STATES[$row->app_status];
+                // Mã phiếu cách ly đứng đầu dòng phụ để biết hàng này đi theo phiếu nào
+                $row->manufacturer_short_name = trim('Phiếu '.$row->quarantine_code.($row->manufacturer_short_name ? ' · '.$row->manufacturer_short_name : ''));
+
+                return $row;
+            });
+    }
+
+    /** Các lần NHẬP của một VPP, tính đến hết ngày cuối kỳ (kể cả trước kỳ, để tính tồn đầu kỳ). */
+    private function chartImports(int $departmentId, int $categoryId, string $to)
+    {
+        return DB::table('vpp_imports')
+            ->select('imported_date as at', 'amount')
+            ->where('department_id', $departmentId)
+            ->where('category_id', $categoryId)
+            ->where('status_id', 1)
+            ->where('is_checked', 1)
+            ->whereDate('imported_date', '<=', $to)
+            ->get();
+    }
+
+    /**
+     * Các lần SỬ DỤNG / LOẠI BỎ của một VPP, tính đến hết ngày cuối kỳ.
+     *
+     * vpp_exports KHÔNG có cột ngày xuất riêng, mốc thời gian là created_at - đúng
+     * cột mà usedByImport() đang dùng để cắt kỳ, nên hai nơi không lệch nhau.
+     *
+     * Phiếu xuất chỉ trỏ tới mã xuất nhập nên phải join ngược về vpp_imports mới
+     * biết nó thuộc VPP nào; phiếu nhập đã khoá thì phần đã xuất của nó cũng không
+     * tính, đúng như cách stockByCode() bỏ qua các phiếu nhập status_id = 0.
+     */
+    private function chartExports(int $departmentId, int $categoryId, string $to)
+    {
+        return DB::table('vpp_exports')
+            ->join('vpp_imports', 'vpp_exports.import_id', '=', 'vpp_imports.id')
+            ->select(
+                'vpp_exports.created_at as at',
+                'vpp_exports.amount',
+                'vpp_exports.type'
+            )
+            ->where('vpp_exports.department_id', $departmentId)
+            ->where('vpp_exports.status_id', 1)
+            ->where('vpp_imports.category_id', $categoryId)
+            ->where('vpp_imports.status_id', 1)
+            ->where('vpp_imports.is_checked', 1)
+            ->where('vpp_exports.created_at', '<=', $to.' 23:59:59')
+            ->get();
+    }
+
+    /** Các lần CÂN ĐỐI của một VPP, tính đến hết ngày cuối kỳ. */
+    private function chartBalancings(int $departmentId, int $categoryId, string $to)
+    {
+        return DB::table('vpp_balancings')
+            ->join('vpp_imports', 'vpp_balancings.import_id', '=', 'vpp_imports.id')
+            ->select(
+                'vpp_balancings.balancing_at as at',
+                'vpp_balancings.balancing_amount as amount'
+            )
+            ->where('vpp_balancings.department_id', $departmentId)
+            ->where('vpp_balancings.status_id', 1)
+            ->where('vpp_imports.category_id', $categoryId)
+            ->where('vpp_imports.status_id', 1)
+            ->where('vpp_imports.is_checked', 1)
+            ->where('vpp_balancings.balancing_at', '<=', $to.' 23:59:59')
+            ->get();
+    }
+
+    /* ==================================================================
+     | FILE ĐÍNH KÈM PHIẾU NHẬP - xem / đổi trạng thái ngay trên màn hình tồn kho.
+     | Bảng chung với màn hình Nhập VPP (vpp_import_attachments); ở đây chỉ cho
+     | xem và đổi trạng thái Đang sử dụng / Ngưng sử dụng, không upload / xoá.
+     ================================================================== */
+
+    /** [vpp_import_id => collection file] cho các mã xuất nhập đang hiển thị. */
+    private function attachmentsFor($importIds)
+    {
+        return DB::table('vpp_import_attachments')
+            ->whereIn('vpp_import_id', $importIds)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('vpp_import_id');
+    }
+
+    public function downloadAttachment($id)
+    {
+        $attachment = DB::table('vpp_import_attachments')
+            ->join('vpp_imports', 'vpp_import_attachments.vpp_import_id', '=', 'vpp_imports.id')
+            ->where('vpp_import_attachments.id', $id)
+            ->where('vpp_imports.department_id', $this->departmentId())
+            ->select('vpp_import_attachments.*')
+            ->first();
+
+        if (! $attachment) {
+            abort(404, 'Không tìm thấy file đính kèm.');
+        }
+
+        if (! Storage::exists($attachment->file_path)) {
+            abort(404, 'File không tồn tại trên hệ thống lưu trữ.');
+        }
+
+        return Storage::response($attachment->file_path, $attachment->file_name, [
+            'Content-Disposition' => 'inline; filename="'.$attachment->file_name.'"',
+        ]);
+    }
+
+    public function toggleAttachmentStatus(Request $request)
+    {
+        $attachment = DB::table('vpp_import_attachments')
+            ->join('vpp_imports', 'vpp_import_attachments.vpp_import_id', '=', 'vpp_imports.id')
+            ->where('vpp_import_attachments.id', $request->id)
+            ->where('vpp_imports.department_id', $this->departmentId())
+            ->select('vpp_import_attachments.*', 'vpp_imports.code as import_code')
+            ->first();
+
+        if (! $attachment) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy file đính kèm.'], 404);
+        }
+
+        $wasActive = ! isset($attachment->is_active) || $attachment->is_active;
+        $newActive = $wasActive ? 0 : 1;
+
+        DB::table('vpp_import_attachments')->where('id', $attachment->id)->update([
+            'is_active' => $newActive,
+            'status_changed_by' => $this->actor(),
+            'status_changed_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        AuditTrialController::log(
+            'Đổi trạng thái tài liệu',
+            'vpp_imports',
+            $attachment->vpp_import_id,
+            $attachment->import_code,
+            'File "'.$attachment->file_name.'": '
+                .($wasActive ? 'Đang sử dụng' : 'Ngưng sử dụng').' -> '
+                .($newActive ? 'Đang sử dụng' : 'Ngưng sử dụng')
+        );
+
+        return response()->json(['success' => true, 'is_active' => $newActive]);
+    }
+
+    /**
+     * ĐỊNH KHU NHANH - xếp mã xuất nhập CHƯA CÓ định khu vào một vị trí (tab Tồn kho theo vị trí, AJAX).
+     * Cùng quy tắc với ChemicalInventoryController::assignLocation (VPP không xét tương kỵ).
+     */
+    public function assignLocation(Request $request)
+    {
+        if (! user_can('inventory_vpp_location')) {
+            return response()->json(['message' => 'Bạn chưa được cấp quyền Định Khu VPP.'], 403);
+        }
+
+        $departmentId = $this->departmentId();
+
+        $validator = Validator::make($request->all(), [
+            'import_ids' => ['required', 'array', 'min:1', 'max:'.self::ASSIGN_MAX],
+            'import_ids.*' => ['integer'],
+            'location_id' => $this->assignTargetRule($departmentId),
+        ], $this->assignMessages());
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $request->input('import_ids', []))));
+        $locationId = (int) $request->location_id;
+        $imports = $this->assignImports($ids, $departmentId);
+
+        if ($imports->count() !== count($ids)) {
+            return response()->json([
+                'message' => 'Có mã xuất nhập đã bị khoá, chưa kiểm tra Đạt hoặc không thuộc phòng ban đang chọn - vui lòng tải lại trang.',
+            ], 422);
+        }
+
+        $placed = $imports->filter(fn ($import) => $import->location_id);
+
+        if ($placed->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đã có định khu: '
+                    .$placed->map(fn ($import) => $import->code.' ('.($import->location_code ?: '—').')')->implode(', ')
+                    .'. Muốn đổi chỗ vui lòng dùng Đổi vị trí (ghi lý do), hoặc tải lại trang.',
+            ], 422);
+        }
+
+        $location = $this->assignLocationRow($locationId);
+        $note = 'Vị trí lưu trữ: — -> '.$location->code.' (Định khu nhanh ở Tồn Kho VPP)';
+        $conflict = null;
+
+        try {
+            DB::transaction(function () use ($imports, $locationId, $note, &$conflict) {
+                foreach ($imports as $import) {
+                    // whereNull: hai người cùng định khu một mã thì chỉ lượt đầu được ghi
+                    $updated = DB::table('vpp_imports')
+                        ->where('id', $import->id)
+                        ->whereNull('location_id')
+                        ->update([
+                            'location_id' => $locationId,
+                            'updated_by' => $this->actor(),
+                            'updated_at' => now(),
+                        ]);
+
+                    if (! $updated) {
+                        $conflict = 'Mã xuất nhập '.$import->code.' vừa được người khác định khu - vui lòng tải lại trang.';
+
+                        throw new \RuntimeException($conflict);
+                    }
+
+                    \App\Http\Controllers\Pages\Import\VppImportController::recordHistory((int) $import->id, 'Định khu', $note);
+                }
+            });
+        } catch (\RuntimeException $e) {
+            if ($conflict === null) {
+                throw $e;
+            }
+
+            return response()->json(['message' => $conflict], 422);
+        }
+
+        foreach ($imports as $import) {
+            AuditTrialController::log('Định khu', 'vpp_imports', $import->id, $import->code, $import->code.' | '.$note);
+        }
+
+        return $this->assignResponse([[$imports, $location]], 'Đã định khu');
+    }
+
+    /**
+     * ĐỔI VỊ TRÍ - chuyển mã xuất nhập ĐANG CÓ định khu sang vị trí khác, bắt buộc lý do (hộp chi tiết / kéo thả).
+     * `location_id` = gộp mọi mã vào một vị trí; `location_ids[]` (song song import_ids) = mỗi mã một vị trí.
+     */
+    public function moveLocation(Request $request)
+    {
+        if (! user_can('inventory_vpp_location')) {
+            return response()->json(['message' => 'Bạn chưa được cấp quyền Định Khu VPP.'], 403);
+        }
+
+        $departmentId = $this->departmentId();
+        $batch = is_array($request->input('location_ids'));
+
+        $validator = Validator::make($request->all(), [
+            'import_ids' => ['required', 'array', 'min:1', 'max:'.self::ASSIGN_MAX],
+            'import_ids.*' => ['integer'],
+            'location_id' => $batch ? ['nullable'] : $this->assignTargetRule($departmentId),
+            'location_ids' => $batch ? ['array', 'size:'.count((array) $request->input('import_ids', []))] : ['nullable'],
+            'location_ids.*' => $batch ? $this->assignTargetRule($departmentId) : ['nullable'],
+            'reason' => ['required', 'string', 'max:255'],
+        ], $this->assignMessages() + [
+            'location_ids.size' => 'Danh sách vị trí mới không khớp số mã xuất nhập - vui lòng tải lại trang.',
+            'location_ids.*.required' => 'Vui lòng chọn vị trí lưu trữ.',
+            'location_ids.*.exists' => 'Có vị trí mới không còn hoạt động, không thuộc phòng ban đang chọn, hoặc là khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ.',
+            'reason.required' => 'Vui lòng nhập lý do đổi vị trí.',
+            'reason.max' => 'Lý do đổi vị trí tối đa 255 ký tự.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $rawIds = array_map('intval', $request->input('import_ids', []));
+        $targetOf = $batch
+            ? array_combine($rawIds, array_map('intval', $request->input('location_ids', [])))
+            : array_fill_keys($rawIds, (int) $request->location_id);
+        $ids = array_keys($targetOf);
+        $reason = trim((string) $request->reason);
+        $imports = $this->assignImports($ids, $departmentId);
+
+        if ($imports->count() !== count($ids)) {
+            return response()->json([
+                'message' => 'Có mã xuất nhập đã bị khoá, chưa kiểm tra Đạt hoặc không thuộc phòng ban đang chọn - vui lòng tải lại trang.',
+            ], 422);
+        }
+
+        $unplaced = $imports->filter(fn ($import) => ! $import->location_id);
+        if ($unplaced->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập chưa có định khu: '.$unplaced->pluck('code')->implode(', ').' - vui lòng dùng Định khu / Thêm VPP.',
+            ], 422);
+        }
+
+        $locked = $imports->filter(fn ($import) => in_array($import->location_zone_type, self::ASSIGN_EXCEPT_ZONES, true));
+        if ($locked->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đang ở khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ: '.$locked->pluck('code')->implode(', ')
+                    .' - xử lý theo luồng Cách ly ở Sử Dụng VPP.',
+            ], 422);
+        }
+
+        $same = $imports->filter(fn ($import) => (int) $import->location_id === $targetOf[(int) $import->id]);
+        if ($same->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Mã xuất nhập đã nằm ở vị trí này: '.$same->pluck('code')->implode(', ').'.',
+            ], 422);
+        }
+
+        $locations = collect(array_unique(array_values($targetOf)))
+            ->mapWithKeys(fn ($id) => [$id => $this->assignLocationRow($id)]);
+        $notes = [];
+        $conflict = null;
+
+        try {
+            DB::transaction(function () use ($imports, $targetOf, $locations, $reason, &$notes, &$conflict) {
+                foreach ($imports as $import) {
+                    $location = $locations[$targetOf[(int) $import->id]];
+                    $updated = DB::table('vpp_imports')
+                        ->where('id', $import->id)
+                        ->where('location_id', $import->location_id)
+                        ->update([
+                            'location_id' => $location->id,
+                            'updated_by' => $this->actor(),
+                            'updated_at' => now(),
+                        ]);
+
+                    if (! $updated) {
+                        $conflict = 'Mã xuất nhập '.$import->code.' vừa được người khác đổi vị trí - vui lòng tải lại trang.';
+
+                        throw new \RuntimeException($conflict);
+                    }
+
+                    $notes[$import->id] = 'Vị trí lưu trữ: '.($import->location_code ?: '—').' -> '.$location->code
+                        .' (Đổi vị trí ở Tồn Kho VPP) - Lý do: '.$reason;
+                    \App\Http\Controllers\Pages\Import\VppImportController::recordHistory((int) $import->id, 'Đổi vị trí', $notes[$import->id]);
+                }
+            });
+        } catch (\RuntimeException $e) {
+            if ($conflict === null) {
+                throw $e;
+            }
+
+            return response()->json(['message' => $conflict], 422);
+        }
+
+        foreach ($imports as $import) {
+            AuditTrialController::log('Đổi vị trí', 'vpp_imports', $import->id, $import->location_code, $import->code.' | '.$notes[$import->id]);
+        }
+
+        return $this->assignResponse(
+            $imports->groupBy(fn ($import) => $targetOf[(int) $import->id])
+                ->map(fn ($group, $locationId) => [$group, $locations[$locationId]])
+                ->values()->all(),
+            'Đã chuyển'
+        );
+    }
+
+    /** Vị trí đích: thuộc phòng, đang mở, lưu VPP / Dùng chung, không phải khu cách ly. */
+    private function assignTargetRule(int $departmentId): array
+    {
+        return [
+            'required',
+            Rule::exists('locations', 'id')
+                ->where('department_id', $departmentId)
+                ->where('status_id', 1)
+                ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
+                ->where(fn ($query) => $query->whereNull('zone_type')->orWhereNotIn('zone_type', self::ASSIGN_EXCEPT_ZONES)),
+        ];
+    }
+
+    private function assignMessages(): array
+    {
+        return [
+            'import_ids.required' => 'Vui lòng chọn mã xuất nhập cần định khu.',
+            'import_ids.min' => 'Vui lòng chọn mã xuất nhập cần định khu.',
+            'import_ids.max' => 'Mỗi lần định khu tối đa '.self::ASSIGN_MAX.' mã xuất nhập.',
+            'location_id.required' => 'Vui lòng chọn vị trí lưu trữ.',
+            'location_id.exists' => 'Vị trí được chọn không còn hoạt động, không thuộc phòng ban đang chọn, hoặc là khu Biệt Trữ / Cách Ly Chờ Quyết Định / Loại Bỏ.',
+        ];
+    }
+
+    /** Mã xuất nhập xếp / đổi chỗ được (đang mở, đã kiểm tra Đạt, thuộc phòng) kèm vị trí hiện tại. */
+    private function assignImports(array $ids, int $departmentId)
+    {
+        return DB::table('vpp_imports')
+            ->leftJoin('locations', 'vpp_imports.location_id', '=', 'locations.id')
+            ->select(
+                'vpp_imports.id',
+                'vpp_imports.code',
+                'vpp_imports.location_id',
+                'locations.code as location_code',
+                'locations.zone_type as location_zone_type'
+            )
+            ->whereIn('vpp_imports.id', $ids)
+            ->where('vpp_imports.department_id', $departmentId)
+            ->where('vpp_imports.status_id', 1)
+            ->where('vpp_imports.is_checked', 1)
+            ->orderBy('vpp_imports.code', 'asc')
+            ->get();
+    }
+
+    private function assignLocationRow(int $locationId)
+    {
+        return DB::table('locations')
+            ->leftJoin('warehouses', 'locations.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
+            ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
+            ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            ->select(
+                'locations.id',
+                'locations.code',
+                'locations.zone_type',
+                'locations.warehouse_id',
+                'locations.shelf_id',
+                'locations.column_id',
+                'locations.tier_id',
+                'warehouses.name as warehouse_name',
+                'shelves.name as shelf_name',
+                'columns.name as column_name',
+                'tiers.name as tier_name'
+            )
+            ->where('locations.id', $locationId)
+            ->first();
+    }
+
+    /** JSON chung Định khu / Đổi vị trí: `groups` [{import_ids, location}] để trình duyệt vá dòng rồi dựng lại sơ đồ. */
+    private function assignResponse(array $groups, string $verb)
+    {
+        $payloads = [];
+        $count = 0;
+
+        foreach ($groups as [$imports, $location]) {
+            $count += $imports->count();
+            $payloads[] = [
+                'import_ids' => $imports->pluck('id')->map(fn ($id) => (int) $id)->values(),
+                'location' => [
+                    'location_id' => (int) $location->id,
+                    'location_code' => $location->code,
+                    'location_zone_type' => $location->zone_type,
+                    'warehouse_id' => $location->warehouse_id ? (int) $location->warehouse_id : null,
+                    'shelf_id' => $location->shelf_id ? (int) $location->shelf_id : null,
+                    'column_id' => $location->column_id ? (int) $location->column_id : null,
+                    'tier_id' => $location->tier_id ? (int) $location->tier_id : null,
+                    'warehouse_name' => $location->warehouse_name,
+                    'shelf_name' => $location->shelf_name,
+                    'column_name' => $location->column_name,
+                    'tier_name' => $location->tier_name,
+                ],
+            ];
+        }
+
+        [$firstImports, $firstLocation] = $groups[0];
+        $message = count($groups) === 1
+            ? $verb.' '.($count === 1 ? 'mã xuất nhập '.$firstImports->first()->code : $count.' mã xuất nhập')
+                .' vào '.(\App\Support\CategoryLookup::locationLabel($firstLocation) ?: (string) $firstLocation->code).'.'
+            : $verb.' '.$count.' mã xuất nhập sang '.count($groups).' vị trí mới.';
+
+        return response()->json([
+            'success' => true,
+            'warning' => null,
+            'message' => $message,
+            'groups' => $payloads,
+            'import_ids' => $payloads[0]['import_ids'],
+            'location' => $payloads[0]['location'],
+        ]);
+    }
+
+    private function departmentId(): int
+    {
+        return (int) (session('user')['selected_department_id'] ?? 0);
+    }
+
+    private function actor(): string
+    {
+        return \App\Support\Signer::actor();
+    }
+
+    private function number(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 4, '.', ','), '0'), '.');
+    }
+
+    public function uploadAttachment(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer',
+            'attachments' => 'required|array',
+            'attachments.*' => 'file|max:20480',
+        ]);
+
+        $departmentId = $this->departmentId();
+        $import = \Illuminate\Support\Facades\DB::table('vpp_imports')
+            ->where('id', $request->id)
+            ->where('department_id', $departmentId)
+            ->first();
+
+        if (! $import) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy phiếu nhập.']);
+        }
+
+        $newFiles = [];
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                if ($file->isValid()) {
+                    $originalName = $file->getClientOriginalName();
+                    $fileSize = $file->getSize();
+                    $fileType = $file->getClientMimeType() ?: $file->getClientOriginalExtension();
+                    $path = $file->store('public/vpp_imports');
+                    \App\Support\AttachmentBackup::copy($path, 'vpp_imports');
+
+                    $attachmentId = \Illuminate\Support\Facades\DB::table('vpp_import_attachments')->insertGetId([
+                        'vpp_import_id' => $import->id,
+                        'file_name' => $originalName,
+                        'file_path' => $path,
+                        'file_size' => $fileSize,
+                        'file_type' => $fileType,
+                        'created_by' => $this->actor(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $newFiles[] = [
+                        'id' => $attachmentId,
+                        'file_name' => $originalName,
+                        'created_by' => $this->actor(),
+                        'created_at' => now()->format('d/m/Y H:i'),
+                        'is_active' => 1,
+                        'url' => route('pages.inventory.vppInventory.downloadAttachment', ['id' => $attachmentId]),
+                    ];
+                }
+            }
+        }
+
+        if (empty($newFiles)) {
+            return response()->json(['success' => false, 'message' => 'Không có file nào được tải lên.']);
+        }
+
+        if (method_exists($this, 'writeHistory')) {
+            $this->writeHistory((int) $import->id, 'Điều chỉnh', 'Đã đính kèm thêm ' . count($newFiles) . ' file.');
+        }
+
+        \App\Http\Controllers\Pages\AuditTrail\AuditTrialController::log(
+            'Điều chỉnh',
+            'vpp_imports',
+            $import->id,
+            $import->code,
+            'Đính kèm thêm ' . count($newFiles) . ' file'
+        );
+
+        return response()->json(['success' => true, 'files' => $newFiles]);
+    }
+}

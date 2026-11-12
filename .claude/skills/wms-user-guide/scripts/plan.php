@@ -17,7 +17,7 @@ $app = require __DIR__.'/../../../../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 /** Phòng ban đang chọn khi chụp - phòng có nhiều dữ liệu nhất của từng module. */
-const GUIDE_DEPARTMENT = ['materData' => 20, 'material' => 4, 'chemical' => 20, 'standard' => 20, 'general' => 20, 'permission' => 20];
+const GUIDE_DEPARTMENT = ['materData' => 20, 'material' => 4, 'vpp' => 11, 'chemical' => 20, 'standard' => 20, 'general' => 20, 'permission' => 20];
 
 $guide = $argv[1] ?? exit("Thiếu khoá tài liệu\n");
 $only = isset($argv[2]) ? explode(',', $argv[2]) : null;

@@ -56,7 +56,7 @@ class ZoneStructureController extends Controller
     private const ROTATION_LABELS = [0 => 'Hướng xuống', 90 => 'Hướng trái', 180 => 'Hướng lên', 270 => 'Hướng phải'];
 
     /** Các bảng lô hàng có location_id - vị trí đang có lô còn hiệu lực coi là "có hàng". */
-    private const LOT_TABLES = ['chemical_imports', 'standard_imports', 'material_imports'];
+    private const LOT_TABLES = ['chemical_imports', 'standard_imports', 'material_imports', 'vpp_imports'];
 
     public static function limits(): array
     {

@@ -27,7 +27,9 @@ use Illuminate\Support\Facades\DB;
  *     'category_table'  => bảng danh mục chung,
  *     'name_table'      => bảng tên, 'name_fk' => cột trỏ tên trên bảng danh mục,
  *     'manual_name'     => cột tên tự gõ trên bảng mục (mục ngoài danh mục),
- *     'purchasing_col'  => cột bộ phận mua hàng trên bảng danh mục, null = luôn Cung Ứng,
+ *     'purchasing_col'  => cột bộ phận mua hàng trên bảng danh mục, null = luôn default_purchasing,
+ *     'default_purchasing' => (tuỳ chọn) bộ phận mua hàng khi danh mục không khai / không xét theo danh
+ *                          mục - mặc định Cung Ứng (MaterialPurchasing::DEFAULT_KEY), VPP là Hành Chánh,
  *     'purchasing_permission' => quyền tiếp nhận xử lý (estimate_<loại>_purchasing): ngoài việc
  *                        đang chọn đúng phòng mua hàng, user còn phải có quyền này mới thấy tab
  *                        "Đơn dự trù đã được phê duyệt" và xác nhận huỷ phía mua hàng,
@@ -79,7 +81,7 @@ trait EstimateItemCancel
         }
 
         if (! $this->isAdminUser()
-            && ! MaterialPurchasing::isPurchaser($this->departmentId(), $item->purchasing_department, $item->list_company_id)) {
+            && ! MaterialPurchasing::isPurchaser($this->departmentId(), $item->purchasing_department ?: $this->defaultPurchasingKey(), $item->list_company_id)) {
             return redirect()->back()->with('error', 'Phòng ban đang chọn không phải bộ phận mua hàng của mặt hàng này!');
         }
 
@@ -246,7 +248,13 @@ trait EstimateItemCancel
 
         $keys = MaterialPurchasing::keysOfDepartment($departmentId);
 
-        return $keys && ($cfg['purchasing_col'] || in_array(MaterialPurchasing::DEFAULT_KEY, $keys, true));
+        return $keys && ($cfg['purchasing_col'] || in_array($this->defaultPurchasingKey(), $keys, true));
+    }
+
+    /** Bộ phận mua hàng của mục không có cột / không khai trên danh mục: Cung Ứng, riêng VPP là Hành Chánh. */
+    private function defaultPurchasingKey(): string
+    {
+        return $this->cancelConfig()['default_purchasing'] ?? MaterialPurchasing::DEFAULT_KEY;
     }
 
     private function isAdminUser(): bool
@@ -422,7 +430,7 @@ trait EstimateItemCancel
             ->when($cfg['purchasing_col'] && ! $this->isAdminUser(), function ($q) use ($keys, $cat, $cfg) {
                 $q->where(function ($q) use ($keys, $cat, $cfg) {
                     $q->whereIn($cat.'.'.$cfg['purchasing_col'], $keys);
-                    if (in_array(MaterialPurchasing::DEFAULT_KEY, $keys, true)) {
+                    if (in_array($this->defaultPurchasingKey(), $keys, true)) {
                         $q->orWhereNull($cat.'.'.$cfg['purchasing_col']);
                     }
                 });

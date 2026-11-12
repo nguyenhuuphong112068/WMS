@@ -1,29 +1,17 @@
 {{--
-| BẢNG "VẬT TƯ CẦN ..." - dùng chung cho hai màn hình, chọn bằng $wlMode:
+| BẢNG "VẬT TƯ CẦN DỰ TRÙ" - DỰ TRÙ VẬT TƯ, tab "Danh sách vật tư cần dự trù"
+| (MaterialWatchlist::forEstimate), chọn nhiều dòng rồi Lập phiếu dự trù.
 |
-|   estimate (mặc định): DỰ TRÙ VẬT TƯ, tab "Danh sách vật tư cần dự trù" - vật tư Cung Ứng mua
-|                        (MaterialWatchlist::forEstimate), chọn nhiều dòng rồi Lập phiếu dự trù.
-|   vpp                : SỬ DỤNG VẬT TƯ, tab Đề nghị VPP > "Danh sách vật tư cần đề nghị Hành Chính"
-|                        - vật tư Hành Chính mua (MaterialWatchlist::forVpp), chọn nhiều dòng rồi
-|                        Lập đề nghị VPP gửi phòng Hành Chính (modal #vppWatchlistModal).
-|
-| Biến vào: $items, $wlMode. Hai màn hình không bao giờ cùng trang nên id bảng / nút giữ nguyên.
+| Biến vào: $items.
 --}}
 @php
-    use App\Support\MaterialClassification;
-    use App\Support\MaterialVpp;
     use App\Support\MaterialWatchlist;
 
-    $wlMode = ($wlMode ?? 'estimate') === 'vpp' ? 'vpp' : 'estimate';
-    $wlIsVpp = $wlMode === 'vpp';
     $wlSources = MaterialWatchlist::sourceLabels();
-
-    // Phòng Hành Chính tự dự trù cả vật tư Hành Chính mua nên mới cần cột Bộ Phận Mua Hàng
-    $wlShowBuyer = ! $wlIsVpp && MaterialVpp::isVppDepartment((int) (session('user')['selected_department_id'] ?? 0));
-    $wlActionCol = $wlShowBuyer ? 11 : 10;
+    $wlActionCol = 10;
 
     $wlEstRoute = 'pages.estimate.materialEstimate.';
-    $wlDismissRoute = $wlIsVpp ? 'pages.export.materialExport.watchlistDismiss' : $wlEstRoute . 'watchlistDismiss';
+    $wlDismissRoute = $wlEstRoute . 'watchlistDismiss';
     $wlNum = fn ($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
     $wlSourceLabel = fn ($type) => match ($type) {
         'risk_assessment' => 'Đề Nghị Theo ĐG Rủi Ro',
@@ -51,26 +39,18 @@
             <i class="far fa-check-square mr-1"></i> Chọn tất cả
         </button>
 
-        @if ($wlIsVpp)
-            @perm('export_material_request')
-                <button type="button" class="btn btn-primary btn-sm btn-wl-vpp" disabled>
-                    <i class="fas fa-paper-plane mr-1"></i> Lập đề nghị cấp phát VPP đến HC <span class="wl-count"></span>
-                </button>
-            @endperm
-        @else
-            @perm('estimate_material_create')
-                <button type="button" class="btn btn-primary btn-sm btn-wl-estimate" disabled>
-                    <i class="fas fa-clipboard-check mr-1"></i> Lập phiếu dự trù <span class="wl-count"></span>
-                </button>
-            @endperm
-        @endif
+        @perm('estimate_material_create')
+            <button type="button" class="btn btn-primary btn-sm btn-wl-estimate" disabled>
+                <i class="fas fa-clipboard-check mr-1"></i> Lập phiếu dự trù <span class="wl-count"></span>
+            </button>
+        @endperm
     </div>
 
     <div class="md-filter">
         <label for="wlProgressFilter"><i class="fas fa-filter mr-1"></i> Trạng thái</label>
         <select id="wlProgressFilter" class="form-control form-control-sm">
-            <option value="open">{{ $wlIsVpp ? 'Chưa đề nghị' : 'Chưa lập phiếu' }}</option>
-            <option value="done">{{ $wlIsVpp ? 'Đã đề nghị' : 'Đã lập phiếu' }}</option>
+            <option value="open">Chưa lập phiếu</option>
+            <option value="done">Đã lập phiếu</option>
             <option value="all">Tất cả</option>
         </select>
 
@@ -96,20 +76,13 @@
                 <th class="text-right" style="width: 100px">Tồn Hiện Tại</th>
                 <th class="text-right" style="width: 115px">Ngưỡng Tối Thiểu</th>
                 <th class="text-right" style="width: 105px">SL Đề Nghị</th>
-                @if ($wlShowBuyer)
-                    <th style="width: 125px">Bộ Phận Mua Hàng</th>
-                @endif
                 <th style="width: 190px">Nguồn</th>
-                <th style="width: 200px">{{ $wlIsVpp ? 'Lý Do Đề Nghị' : 'Lý Do Dự Trù' }}</th>
+                <th style="width: 200px">Lý Do Dự Trù</th>
                 <th class="text-center" style="width: 80px">Thao Tác</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($items as $item)
-                @php
-                    $wlPurchasing = $item->purchasing_department ?: null;
-                    $wlPurchasingLabel = MaterialClassification::purchasingLabel($wlPurchasing);
-                @endphp
                 <tr data-sources="{{ implode(' ', $item->sources) }}"
                     data-month="{{ $item->forecast->month ?? '' }}"
                     data-category-id="{{ $item->category_id }}"
@@ -125,7 +98,7 @@
                     <td class="text-center">
                         @if ($item->in_progress)
                             {{-- Đã có phiếu chưa xong - không chọn lại được --}}
-                            <i class="fas fa-lock wl-lock" title="{{ $wlIsVpp ? 'Đã đề nghị, chờ xử lý xong mới đề nghị lại được' : 'Đã lập phiếu, chờ xử lý xong mới dự trù lại được' }}"></i>
+                            <i class="fas fa-lock wl-lock" title="Đã lập phiếu, chờ xử lý xong mới dự trù lại được"></i>
                         @else
                             <input type="checkbox" class="js-wl-check" value="{{ $loop->index }}">
                         @endif
@@ -145,15 +118,6 @@
                     <td class="text-right">{{ $item->on_hand !== null ? $wlNum($item->on_hand) : '—' }}</td>
                     <td class="text-right">{{ $item->min_stock !== null ? $wlNum($item->min_stock) : '—' }}</td>
                     <td class="text-right font-weight-bold">{{ $item->quantity !== null ? $wlNum($item->quantity) : '—' }}</td>
-                    @if ($wlShowBuyer)
-                        <td>
-                            @if ($wlPurchasingLabel)
-                                <span class="wl-buyer {{ $wlPurchasing }}">{{ $wlPurchasingLabel }}</span>
-                            @else
-                                <span class="md-empty">—</span>
-                            @endif
-                        </td>
-                    @endif
                     <td>
                         @if ($item->below_threshold)
                             <span class="md-badge rejected">Dưới ngưỡng tồn tối thiểu</span>
@@ -265,25 +229,6 @@
         cursor: help;
     }
 
-    /* Nhãn bộ phận mua hàng trên bảng */
-    .wl-buyer {
-        display: inline-block;
-        border-radius: 999px;
-        padding: 2px 11px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        white-space: nowrap;
-        background: var(--primary-soft);
-        color: var(--primary-dark);
-        border: 1px solid var(--primary-lighter);
-    }
-
-    .wl-buyer.admin {
-        background: #FEF3C7;
-        color: #B45309;
-        border-color: #FCD34D;
-    }
-
     /* Cột ô chọn: cố định hẹp, không để DataTables / trình duyệt chia thêm chỗ trống */
     #mdWatchlistTable thead th.wl-check-col,
     #mdWatchlistTable tbody td:first-child:not(.dataTables_empty) {
@@ -328,7 +273,7 @@
             "columnDefs": [{ "orderable": false, "targets": [0, {{ $wlActionCol }}] }],
             "language": {
                 "url": "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}",
-                "emptyTable": @json($wlIsVpp ? 'Không có vật tư nào cần đề nghị Hành Chính' : 'Không có vật tư nào cần dự trù')
+                "emptyTable": "Không có vật tư nào cần dự trù"
             }
         });
 
@@ -408,7 +353,7 @@
             var count = wlPicked().length;
 
             $('.wl-count').text(count ? count : '');
-            $('.btn-wl-estimate, .btn-wl-vpp').prop('disabled', count === 0);
+            $('.btn-wl-estimate').prop('disabled', count === 0);
 
             // "Chọn tất cả" chỉ tính trên các dòng còn chọn được - dòng đã lập phiếu không có ô chọn
             var total = $(wlTable.rows({ search: 'applied' }).nodes())
@@ -470,21 +415,6 @@
                     .find('[data-field="amount"]').val(row.quantity).end()
                     .find('[data-field="for_month_year"]').val(function(i, val) { return row.month || val; }).end()
                     .find('[data-field="purpose"]').val(row.note).end();
-            });
-        });
-
-        $(document).on('click', '.btn-wl-vpp', function() {
-            wlFill('#vppWatchlistModal', function(row, index) {
-                var tpl = $('#vppWatchlistModal').find('.wl-row-template').html();
-
-                return $(tpl.replace(/__INDEX__/g, index))
-                    .find('[data-field="category_id"]').val(row.category_id).end()
-                    .find('[data-field="requested_unit"]').val(row.unit).end()
-                    .find('[data-field="display_name"]').text(row.name || '—').end()
-                    .find('[data-field="display_spec"]').text(row.spec || '—').end()
-                    .find('[data-field="display_unit"]').text(row.unit || '—').end()
-                    .find('[data-field="requested_amount"]').val(row.quantity).end()
-                    .find('[data-field="note"]').val(row.note).end();
             });
         });
 

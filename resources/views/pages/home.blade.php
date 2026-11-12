@@ -722,6 +722,7 @@
         .obj-vt { --c: var(--db-group-material); --c-rgb: var(--db-group-material-rgb); }
         .obj-hc { --c: var(--db-group-chemical); --c-rgb: var(--db-group-chemical-rgb); }
         .obj-cc { --c: var(--db-group-standard); --c-rgb: var(--db-group-standard-rgb); }
+        .obj-vpp { --c: var(--db-group-vpp); --c-rgb: var(--db-group-vpp-rgb); }
         .obj-dc { --c: var(--db-group-master); --c-rgb: var(--db-group-master-rgb); }
 
         /* ================= BANNER 3D ================= */

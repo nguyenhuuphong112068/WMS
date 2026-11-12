@@ -6,7 +6,7 @@
 | Bootstrap 5 như trang đăng nhập). Người dùng chọn 1 phòng ban + gõ (hoặc quét bằng camera) tên / mã /
 | mã lô -> xem các VỊ TRÍ đang chứa hàng đó kèm số lượng tồn, theo 3 kiểu như tab "Theo định khu" của
 | Tồn Kho: Thẻ (dựng ở đây), 3D từng kệ và Mặt bằng cả kho/phòng (pages.inventory.shared.zone3d).
-| Dữ liệu do PublicStockLookupController dựng sẵn ($kind = chemical | standard | material).
+| Dữ liệu do PublicStockLookupController dựng sẵn ($kind = chemical | standard | material | vpp).
 --}}
 @php
     $zoneTypes = \App\Http\Controllers\General\PublicStockLookupController::zoneTypes();

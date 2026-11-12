@@ -22,8 +22,8 @@
     <i class="fas fa-info-circle"></i>
     <div>
         <ul class="mb-0 pl-3">
-            <li>Danh sách này chỉ gồm vật tư <b>Cung Ứng</b> mua (và vật tư ngoài danh mục). Vật tư Hành Chánh mua nằm ở
-                <a href="#de-nghi-vpp">Danh sách vật tư cần đề nghị Hành Chính</a> bên Sử Dụng.</li>
+            <li>Danh sách gồm mọi vật tư (trong và ngoài danh mục) - đều do <b>Cung Ứng</b> mua. Văn phòng phẩm xin ở module
+                <a href="{{ route('pages.userGuide.show', 'vpp') }}">VPP</a>.</li>
             <li>Bấm <b>Bỏ ghi nhớ</b> để gỡ một vật tư. Nếu tồn vẫn dưới ngưỡng thì vật tư sẽ tự hiện lại.</li>
         </ul>
     </div>

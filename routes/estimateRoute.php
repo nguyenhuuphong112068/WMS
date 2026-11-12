@@ -16,6 +16,7 @@
 
 use App\Http\Controllers\Pages\Estimate\ChemicalEstimateController;
 use App\Http\Controllers\Pages\Estimate\MaterialEstimateController;
+use App\Http\Controllers\Pages\Estimate\VppEstimateController;
 use App\Http\Controllers\Pages\Estimate\StandardEstimateController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -135,6 +136,52 @@ Route::prefix('/estimate')
             Route::post('destroy', 'destroy')->name('destroy');
 
             // Vật tư dự trù + số lượng theo tháng
+            Route::post('storeItem', 'storeItem')->name('storeItem');
+            Route::post('updateItem', 'updateItem')->name('updateItem');
+            Route::post('deleteItem', 'deleteItem')->name('deleteItem');
+
+            // File đính kèm của phiếu (xoá mềm)
+            Route::post('uploadAttachment', 'uploadAttachment')->name('uploadAttachment');
+            Route::get('downloadAttachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('deleteAttachment', 'deleteAttachment')->name('deleteAttachment');
+
+            // Huỷ mục dự trù cần xác nhận của cả phòng đề nghị và bộ phận mua hàng
+            Route::post('purchaseCancel', 'purchaseCancel')->name('purchaseCancel');
+            // Bộ phận mua hàng tiếp nhận phiếu vừa được Ban Giám Đốc duyệt (lưu người + ngày tiếp nhận)
+            Route::post('receive', 'receive')->name('receive');
+
+            // Trình ký cố định 2 bước: Quản Lý Bộ Phận của phòng -> Ban Giám Đốc người lập chọn.
+            // signStep ký bước đang chờ của phiếu thuộc phòng đang chọn.
+            Route::post('submit', 'submit')->name('submit');
+            Route::post('signStep', 'signStep')->name('signStep');
+            Route::post('reject', 'reject')->name('reject');
+
+            // Cập nhật ngày mong muốn giao khi đã duyệt
+            Route::post('updateItemStatus', 'updateItemStatus')->name('updateItemStatus');
+            Route::post('updatePromisedDate', 'updatePromisedDate')->name('updatePromisedDate');
+            Route::get('getPromisedDateHistory/{itemId}', 'getPromisedDateHistory')->name('getPromisedDateHistory');
+            Route::post('storeItemChat', 'storeItemChat')->name('storeItemChat');
+        });
+
+        // VPP - nhân bản từ nhóm /materialEstimate (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        Route::prefix('/vppEstimate')->name('vppEstimate.')->controller(VppEstimateController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('detail', 'detail')->name('detail');
+            Route::get('history', 'history')->name('history');
+            // Tab "Đơn dự trù đã được phê duyệt": xuất Excel 1 phiếu hoặc nhiều phiếu (ids[]) vào cùng 1 file
+            Route::get('exportApproved', 'exportApproved')->name('exportApproved');
+
+            // Tab "Danh sách VPP cần dự trù" (VPP Cung Ứng mua): chọn nhiều VPP rồi lập
+            // phiếu dự trù. VPP Hành Chính mua đề nghị kho VPP ở Sử Dụng VPP (tab Đề nghị VPP).
+            Route::post('watchlistDismiss', 'watchlistDismiss')->name('watchlistDismiss');
+            Route::post('watchlistEstimateStore', 'watchlistEstimateStore')->name('watchlistEstimateStore');
+
+            // Đầu phiếu
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('destroy', 'destroy')->name('destroy');
+
+            // VPP dự trù + số lượng theo tháng
             Route::post('storeItem', 'storeItem')->name('storeItem');
             Route::post('updateItem', 'updateItem')->name('updateItem');
             Route::post('deleteItem', 'deleteItem')->name('deleteItem');

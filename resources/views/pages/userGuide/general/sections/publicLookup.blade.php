@@ -1,6 +1,6 @@
-<p>Trang chỉ xem, mở được mà không cần đăng nhập, để ai cũng tra nhanh một <b>hoá chất, chất chuẩn hoặc vật tư</b> đang để ở đâu
+<p>Trang chỉ xem, mở được mà không cần đăng nhập, để ai cũng tra nhanh một <b>hoá chất, chất chuẩn, vật tư hoặc VPP</b> đang để ở đâu
     và còn bao nhiêu. Bấm nút <b><i class="fas fa-search"></i> Tra cứu tồn kho</b> ở góc trên bên phải trang đăng nhập, rồi chọn
-    loại hàng ở 3 nút <b>Hoá chất | Chất chuẩn | Vật tư</b> đầu trang.</p>
+    loại hàng ở 4 nút <b>Hoá chất | Chất chuẩn | Vật tư | VPP</b> đầu trang.</p>
 
 <h3>Các ô nhập</h3>
 @include('pages.userGuide.shared.fields', ['fields' => [

@@ -10,9 +10,9 @@
         <tr><td>1. Tổ chức</td><td>Admin</td><td>01 Công ty, 02 Phòng ban, 04 Vai trò</td></tr>
         <tr><td>2. Người dùng &amp; Tổ - Nhóm</td><td>Phòng ban</td><td>03 Tổ - Nhóm (bổ sung tổ còn thiếu), 05 Người dùng
             (đăng nhập bằng <b>mã số nhân viên</b>)</td></tr>
-        <tr><td>3. Dữ liệu gốc &amp; danh mục</td><td>Phòng ban</td><td>06 - 18 (dữ liệu gốc, tên hàng), 19 - 21 (danh mục công ty),
-            22 - 26 (định khu), 27 - 29 (hàng của phòng), 30 (quy đổi đơn vị)</td></tr>
-        <tr><td>4. Tồn đầu kỳ</td><td>Phòng ban</td><td>31 - 33</td></tr>
+        <tr><td>3. Dữ liệu gốc &amp; danh mục</td><td>Phòng ban</td><td>06 - 18 (dữ liệu gốc, tên hàng; VPP dùng chung Tên vật tư ở sheet 15), 19 - 21 và 34 (danh mục công ty, 34 là DM VPP),
+            22 - 26 (định khu), 27 - 29 và 35 (hàng của phòng, 35 là VPP), 30 (quy đổi đơn vị)</td></tr>
+        <tr><td>4. Tồn đầu kỳ</td><td>Phòng ban</td><td>31 - 33 và 36 (Tồn đầu - VPP)</td></tr>
     </tbody>
 </table>
 <p>Giai đoạn 1 và 2 luôn là một file toàn hệ thống dùng chung cho mọi phòng ban (không chia theo phòng ban, module);
@@ -20,7 +20,7 @@
 
 <h3>Các bước (Admin)</h3>
 <ol class="ug-steps">
-    <li>Ở khối <b>File Excel mẫu</b>, chọn <b>Giai đoạn</b>, <b>Module</b> (Vật tư / Hoá chất / Chất chuẩn) và <b>Phạm vi file</b> (từng phòng ban) rồi bấm
+    <li>Ở khối <b>File Excel mẫu</b>, chọn <b>Giai đoạn</b>, <b>Module</b> (Vật tư / VPP / Hoá chất / Chất chuẩn) và <b>Phạm vi file</b> (từng phòng ban) rồi bấm
         <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-download mr-1"></i> Tải file mẫu</span>. Có thể kết hợp
         tuỳ ý 3 lựa chọn này.
         <ul class="mb-0 pl-3">
@@ -52,8 +52,8 @@
     <tbody>
         <tr><td>1. Tổ chức</td><td>1 việc của Admin cho toàn hệ thống (chỉ Admin thấy).</td></tr>
         <tr><td>2. Người dùng &amp; Tổ - Nhóm</td><td>Mỗi phòng ban 1 việc.</td></tr>
-        <tr><td>3. Dữ liệu gốc &amp; danh mục, 4. Tồn đầu kỳ</td><td>Mỗi phòng ban có kho 3 việc: Vật tư, Hoá chất, Chất chuẩn.
-            File đủ 3 module tính cho cả 3 việc.</td></tr>
+        <tr><td>3. Dữ liệu gốc &amp; danh mục, 4. Tồn đầu kỳ</td><td>Mỗi phòng ban có kho 4 việc: Vật tư, VPP, Hoá chất, Chất chuẩn.
+            File đủ 4 module tính cho cả 4 việc.</td></tr>
     </tbody>
 </table>
 <table class="table table-bordered ug-table">
@@ -93,7 +93,7 @@
 <ol class="ug-steps">
     <li>Cần file mẫu thì tự tải ở khối <b>File Excel mẫu</b>: chọn <b>Giai đoạn</b> (2 - 4), <b>Module</b> và phòng ban của mình
         (giai đoạn 2 là file chung, không chọn module / phòng ban) rồi bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-download mr-1"></i> Tải file mẫu</span>.
-        Chỉ Admin tải được file giai đoạn 1, cả 4 giai đoạn, cả 3 module hoặc toàn hệ thống.</li>
+        Chỉ Admin tải được file giai đoạn 1, cả 4 giai đoạn, cả 4 module hoặc toàn hệ thống.</li>
     <li>Ở khối <b>Theo dõi tiến độ</b>, mở tab giai đoạn, bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-upload mr-1"></i>Đính kèm</span>
         ở đúng việc của phòng mình - hộp thoại tự điền giai đoạn, module, phòng ban.</li>
     <li>Chọn file <span class="ug-key">.xlsx</span> (tối đa 50MB), ghi chú nếu cần, bấm
@@ -122,12 +122,12 @@
         hàng của phòng, định khu, tên hàng. Còn thiếu thì <b>bổ sung trực tiếp vào file</b>, dữ liệu bổ sung được nạp lên hệ
         thống cùng file. Riêng Công ty, Phòng ban, Vai trò do Admin khai, không bổ sung trong file của phòng ban.</li>
     <li>Sheet <b>05 Người dùng</b> chia phân quyền theo module: <b>Phân quyền chung</b> (vai trò dùng cho nhiều module như
-        Quản Lý Bộ Phận, Người Xem), <b>Phân quyền Vật tư</b>, <b>Phân quyền Hoá chất</b>, <b>Phân quyền Chất chuẩn</b>. Mỗi ô chỉ chọn
+        Quản Lý Bộ Phận, Người Xem), <b>Phân quyền Vật tư</b>, <b>Phân quyền VPP</b>, <b>Phân quyền Hoá chất</b>, <b>Phân quyền Chất chuẩn</b>. Mỗi ô chỉ chọn
         được vai trò đúng module, ghi nhiều vai trò thì cách nhau dấu phẩy; mỗi người cần ít nhất một vai trò. Module của vai trò
-        suy theo tên vai trò (chứa "Vật tư", "Hoá chất", "Chuẩn"); vai trò có quyền ở nhiều module xếp vào cột chung.
+        suy theo tên vai trò (chứa "Vật tư", "VPP", "Hoá chất", "Chuẩn"); vai trò có quyền ở nhiều module xếp vào cột chung.
         Vai trò Admin không cấp qua file.</li>
     <li>Ở sheet danh mục công ty, <b>không nhập Mã DM</b>: điền Tên thì mã tự sinh nối tiếp mã đang có
-        (<span class="ug-key">M00001</span>, <span class="ug-key">C00001</span>, <span class="ug-key">S00001</span>).
+        (<span class="ug-key">M00001</span>, <span class="ug-key">P00001</span> (VPP), <span class="ug-key">C00001</span>, <span class="ug-key">S00001</span>).
         Các phòng điền song song có thể trùng mã trong file; khi nạp hệ thống cấp mã thật theo thứ tự nạp, các sheet sau
         trong file vẫn trỏ đúng danh mục đã khai.</li>
 </ul>

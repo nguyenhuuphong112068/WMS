@@ -49,11 +49,6 @@
                 <td style="font-weight: 400">Phòng nhận chưa khai vật tư này ở Vật Tư Của Phòng. Khai xong rồi nhận lại.</td>
             </tr>
             <tr>
-                <td>Không thêm được vật tư vào đề nghị VPP</td>
-                <td style="font-weight: 400">Vật tư không có Bộ Phận Mua Hàng = Hành Chánh. Lập <a href="#du-tru">phiếu dự trù</a>
-                    gửi Cung Ứng thay vì đề nghị VPP.</td>
-            </tr>
-            <tr>
                 <td>"Còn N dòng chưa đếm, phải đếm đủ mới chốt được phiếu kiểm kê"</td>
                 <td style="font-weight: 400">Nhập Thực Tế Đếm cho mọi dòng, kể cả dòng bằng 0.</td>
             </tr>

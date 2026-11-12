@@ -5,13 +5,13 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 
 /**
- * QUY TRÌNH KÝ ĐỀ NGHỊ CHUYỂN VẬT TƯ LIÊN PHÒNG BAN (gồm Đề nghị VPP).
+ * QUY TRÌNH KÝ ĐỀ NGHỊ CHUYỂN VẬT TƯ LIÊN PHÒNG BAN.
  *
  * Khai ở Dữ Liệu Gốc > "Trình Ký Đề Nghị Liên Phòng Ban" (bảng material_transfer_sign_steps)
  * theo LOẠI đề nghị và CÔNG TY của phòng đề nghị. Mỗi bước = một vai trò + phạm vi phòng ban:
- *   - requester  : vai trò đó của PHÒNG ĐỀ NGHỊ        (VD: trưởng bộ phận đề nghị VPP)
+ *   - requester  : vai trò đó của PHÒNG ĐỀ NGHỊ        (VD: trưởng bộ phận đề nghị)
  *   - receiver   : vai trò đó của PHÒNG ĐƯỢC ĐỀ NGHỊ   (VD: trưởng bộ phận giữ hàng duyệt cho chuyển)
- *   - department : vai trò đó của một phòng cố định   (VD: trưởng Hành Chính - NM1 duyệt VPP của NM1)
+ *   - department : vai trò đó của một phòng cố định   (VD: trưởng Kho - NM1 duyệt đề nghị của NM1)
  * Người ký = mọi user có vai trò đó với phạm vi bao gồm phòng của bước (App\Support\EstimateSigner),
  * ai ký trước cũng được, nhập lại mật khẩu (21 CFR Part 11).
  *
@@ -25,13 +25,11 @@ class MaterialTransferSignFlow
 
     public const SIGN_TABLE = 'material_transfer_signs';
 
-    public const KIND_VPP = 'vpp';
-
     public const KIND_TRANSFER = 'transfer';
 
+    /** Vật Tư chỉ còn đề nghị liên phòng ban - đề nghị VPP gửi Hành Chính ký theo App\Support\VppTransferSignFlow. */
     public const KINDS = [
-        self::KIND_VPP => 'Đề nghị cấp phát VPP đến HC',
-        self::KIND_TRANSFER => 'Đề nghị liên phòng ban khác',
+        self::KIND_TRANSFER => 'Đề nghị liên phòng ban',
     ];
 
     public const SCOPE_REQUESTER = 'requester';
@@ -49,10 +47,10 @@ class MaterialTransferSignFlow
     /** Trạng thái phiếu đang chờ ký. */
     public const STATUS_PENDING_SIGN = 'pending_sign';
 
-    /** Loại đề nghị theo phòng nhận: gửi Hành Chính (kho VPP) là VPP, còn lại là liên phòng ban. */
+    /** Loại đề nghị theo phòng nhận - ở Vật Tư mọi phòng nhận đều là liên phòng ban. */
     public static function kindFor(?int $toDepartmentId): string
     {
-        return MaterialVpp::isVppDepartment($toDepartmentId) ? self::KIND_VPP : self::KIND_TRANSFER;
+        return self::KIND_TRANSFER;
     }
 
     /** Các bước đang hiệu lực của một loại + công ty, theo step_no. */

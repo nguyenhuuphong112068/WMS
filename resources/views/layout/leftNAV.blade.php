@@ -311,6 +311,7 @@
     .k-material { --c: var(--db-group-material); --c-rgb: var(--db-group-material-rgb); }
     .k-chemical { --c: var(--db-group-chemical); --c-rgb: var(--db-group-chemical-rgb); }
     .k-standard { --c: var(--db-group-standard); --c-rgb: var(--db-group-standard-rgb); }
+    .k-vpp { --c: var(--db-group-vpp); --c-rgb: var(--db-group-vpp-rgb); }
 
     .wms-tile {
         display: flex;
@@ -550,7 +551,7 @@
     // [đoạn route giữa pages.materData. và .list, tên, icon, quyền ('Admin' = chỉ role Admin)]
     $materDataGroups = [
         'Tổ chức' => [
-            ['company', 'Công Ty', 'fas fa-city', md_perm('company', 'view')],
+            // Công Ty: ẩn từ 12/11/2026 - dự án chỉ dùng cho một công ty (bảng companies + route vẫn giữ)
             ['department', 'Phòng Ban', 'fas fa-building', md_perm('department', 'view')],
             ['group', 'Tổ', 'fas fa-users', md_perm('group', 'view')],
         ],
@@ -576,6 +577,9 @@
             ['materialSignFlow', 'Trình Ký Đề Nghị CP Vật Tư', 'fas fa-file-signature', md_perm('materialSignFlow', 'view')],
             ['transferSignFlow', 'Trình Ký Đề Nghị Liên Phòng Ban', 'fas fa-route', 'materData_transferSign_view'],
         ],
+        'VPP' => [
+            ['vppTransferSignFlow', 'Trình Ký Đề Nghị Liên Phòng Ban VPP', 'fas fa-route', 'materData_vppTransferSign_view'],
+        ],
         'Kho & đối tượng' => [
             ['zone', 'Định Khu', 'fas fa-sitemap', md_perm('zone', 'view')],
             ['consumptionObject', 'Đối Tượng', 'fas fa-cogs', md_perm('consumptionObject', 'view')],
@@ -600,8 +604,8 @@
         }
     }
 
-    $kindIcons = ['material' => 'fas fa-cubes', 'chemical' => 'fas fa-flask', 'standard' => 'fas fa-vials'];
-    $kindLabels = ['material' => 'Vật Tư', 'chemical' => 'Hoá Chất', 'standard' => 'Chất Chuẩn'];
+    $kindIcons = ['material' => 'fas fa-cubes', 'vpp' => 'fas fa-paperclip', 'chemical' => 'fas fa-flask', 'standard' => 'fas fa-vials'];
+    $kindLabels = ['material' => 'Vật Tư', 'vpp' => 'VPP', 'chemical' => 'Hoá Chất', 'standard' => 'Chất Chuẩn'];
     // Mục con theo loại hàng: [loại, quyền, url, đang mở]
     $kindItems = function (array $rows) use ($kindIcons, $kindLabels) {
         $out = [];
@@ -628,6 +632,7 @@
             'desc' => 'Danh mục công ty & của phòng',
             'items' => $kindItems([
                 ['material', 'category_material_view', route('pages.category.materialCategory.list'), request()->is('category/materialCategory')],
+                ['vpp', 'category_vpp_view', route('pages.category.vppCategory.list'), request()->is('category/vppCategory')],
                 ['chemical', 'category_chemical_view', route('pages.category.chemicalCategory.list'), request()->is('category/chemicalCategory')],
                 ['standard', 'category_standard_view', route('pages.category.standardCategory.list'), request()->is('category/standardCategory')],
             ]),
@@ -637,6 +642,7 @@
             'desc' => 'Sổ nhập kho, kiểm tra nhập',
             'items' => $kindItems([
                 ['material', 'import_material_view', route('pages.import.materialImport.list'), request()->is('import/materialImport')],
+                ['vpp', 'import_vpp_view', route('pages.import.vppImport.list'), request()->is('import/vppImport')],
                 ['chemical', 'import_chemical_view', route('pages.import.chemicalImport.list'), request()->is('import/chemicalImport')],
                 ['standard', 'import_standard_view', route('pages.import.standardImport.list'), request()->is('import/standardImport')],
             ]),
@@ -646,6 +652,7 @@
             'desc' => 'Đề nghị, cấp phát, cách ly',
             'items' => $kindItems([
                 ['material', 'export_material_view', route('pages.export.materialExport.list'), request()->is('export/materialExport')],
+                ['vpp', 'export_vpp_view', route('pages.export.vppExport.list'), request()->is('export/vppExport')],
                 ['chemical', 'export_chemical_view', route('pages.export.chemicalExport.list'), request()->is('export/chemicalExport')],
                 ['standard', 'export_standard_view', route('pages.export.standardExport.list'), request()->is('export/standardExport')],
             ]),
@@ -655,6 +662,7 @@
             'desc' => 'Tồn theo lô, vị trí',
             'items' => $kindItems([
                 ['material', 'inventory_material_view', route('pages.inventory.materialInventory.list'), request()->is('inventory/materialInventory')],
+                ['vpp', 'inventory_vpp_view', route('pages.inventory.vppInventory.list'), request()->is('inventory/vppInventory')],
                 ['chemical', 'inventory_chemical_view', route('pages.inventory.chemicalInventory.list'), request()->is('inventory/chemicalInventory')],
                 ['standard', 'inventory_standard_view', route('pages.inventory.standardInventory.list'), request()->is('inventory/standardInventory') || request()->is('inventory/standardStability*')],
             ]),
@@ -664,6 +672,7 @@
             'desc' => 'Phiếu dự trù, ký duyệt',
             'items' => $kindItems([
                 ['material', 'estimate_material_view', route('pages.estimate.materialEstimate.list'), request()->is('estimate/materialEstimate*')],
+                ['vpp', 'estimate_vpp_view', route('pages.estimate.vppEstimate.list'), request()->is('estimate/vppEstimate*')],
                 ['chemical', 'estimate_chemical_view', route('pages.estimate.chemicalEstimate.list'), request()->is('estimate/chemicalEstimate*')],
                 ['standard', 'estimate_standard_view', route('pages.estimate.standardEstimate.list'), request()->is('estimate/standardEstimate*')],
             ]),
@@ -707,6 +716,7 @@
             ['label' => 'Phân Quyền', 'url' => route('pages.userGuide.show', 'permission'), 'icon' => 'fas fa-user-shield', 'active' => request()->is('userGuide/permission')],
             ['label' => 'Dữ Liệu Gốc', 'url' => route('pages.userGuide.show', 'materData'), 'icon' => 'fas fa-database', 'active' => request()->is('userGuide/materData')],
             ['label' => 'Vật Tư', 'url' => route('pages.userGuide.show', 'material'), 'icon' => 'fas fa-cubes', 'active' => request()->is('userGuide/material')],
+            ['label' => 'VPP', 'url' => route('pages.userGuide.show', 'vpp'), 'icon' => 'fas fa-paperclip', 'active' => request()->is('userGuide/vpp')],
             ['label' => 'Hoá Chất', 'url' => route('pages.userGuide.show', 'chemical'), 'icon' => 'fas fa-flask', 'active' => request()->is('userGuide/chemical')],
             ['label' => 'Chất Chuẩn', 'url' => route('pages.userGuide.show', 'standard'), 'icon' => 'fas fa-vials', 'active' => request()->is('userGuide/standard')],
         ],

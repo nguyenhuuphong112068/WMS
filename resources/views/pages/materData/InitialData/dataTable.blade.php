@@ -100,7 +100,7 @@
                             <select name="module" id="idtModule" class="form-control"
                                 title="File riêng một module: chỉ gồm sheet dùng chung + sheet của module đó">
                                 @if ($isAdmin)
-                                    <option value="">Cả 3 module</option>
+                                    <option value="">Cả 4 module</option>
                                 @endif
                                 @foreach ($modules as $key => $label)
                                     <option value="{{ $key }}">{{ $label }}</option>

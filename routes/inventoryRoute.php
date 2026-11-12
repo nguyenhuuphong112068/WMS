@@ -27,7 +27,9 @@
 
 use App\Http\Controllers\Pages\Inventory\ChemicalInventoryController;
 use App\Http\Controllers\Pages\Inventory\MaterialInventoryController;
+use App\Http\Controllers\Pages\Inventory\VppInventoryController;
 use App\Http\Controllers\Pages\Inventory\MaterialStocktakeController;
+use App\Http\Controllers\Pages\Inventory\VppStocktakeController;
 use App\Http\Controllers\Pages\Inventory\StandardInventoryController;
 use App\Http\Controllers\Pages\Inventory\StandardStabilityController;
 use App\Http\Controllers\Pages\Inventory\ThresholdReconciliationController;
@@ -111,6 +113,23 @@ Route::prefix('/inventory')
             Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
         });
 
+        // VPP - nhân bản từ nhóm /materialInventory (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        Route::prefix('/vppInventory')->name('vppInventory.')->controller(VppInventoryController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            // Dữ liệu JSON cho modal Biểu Đồ Nhập - Xuất - Tồn của một VPP
+            Route::get('chart', 'chart')->name('chart');
+            // Dữ liệu JSON cho modal "Chi Tiết Con Số" (bấm badge trên bảng tồn)
+            Route::get('movements', 'movements')->name('movements');
+            Route::post('balancing', 'balancing')->name('balancing');
+            // Định khu nhanh mã "Chưa xếp vị trí" + Đổi vị trí ở tab Tồn kho theo vị trí (AJAX, trả JSON)
+            Route::post('assignLocation', 'assignLocation')->name('assignLocation');
+            Route::post('moveLocation', 'moveLocation')->name('moveLocation');
+            // Cửa sổ xem file đính kèm của phiếu nhập ngay trên màn hình Tồn Kho
+            Route::get('download-attachment/{id}', 'downloadAttachment')->name('downloadAttachment');
+            Route::post('toggle-attachment-status', 'toggleAttachmentStatus')->name('toggleAttachmentStatus');
+            Route::post('upload-attachment', 'uploadAttachment')->name('uploadAttachment');
+        });
+
         // Tab "Đối chiếu ngưỡng PL IV" của Tồn Kho Hoá Chất - chỉ đọc, số liệu cộng trong phạm
         // vi các phòng ban thuộc công ty của phòng ban đang chọn. index chỉ chuyển sang tab,
         // pane trả HTML nội dung tab (nạp AJAX khi mở tab lần đầu).
@@ -123,6 +142,16 @@ Route::prefix('/inventory')
 
         // Tab KIỂM KÊ ĐỊNH KỲ của màn hình Tồn Kho Vật Tư - chu kỳ 1 tháng 1 lần
         Route::prefix('/materialStocktake')->name('materialStocktake.')->controller(MaterialStocktakeController::class)->group(function () {
+            Route::post('open', 'open')->name('open');
+            Route::post('count', 'count')->name('count');
+            Route::post('complete', 'complete')->name('complete');
+            Route::post('deActive', 'deActive')->name('deActive');
+            // Dữ liệu JSON cho modal xem lại một kỳ kiểm kê đã chốt
+            Route::get('detail', 'detail')->name('detail');
+        });
+
+        // VPP - nhân bản từ nhóm /materialStocktake (module VPP tách khỏi Vật Tư, bộ bảng vpp_*)
+        Route::prefix('/vppStocktake')->name('vppStocktake.')->controller(VppStocktakeController::class)->group(function () {
             Route::post('open', 'open')->name('open');
             Route::post('count', 'count')->name('count');
             Route::post('complete', 'complete')->name('complete');

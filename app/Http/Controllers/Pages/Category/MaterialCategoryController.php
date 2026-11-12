@@ -208,12 +208,13 @@ class MaterialCategoryController extends Controller
             $ids = [];
 
             foreach ($items as $item) {
-                $ids[] = DB::table(self::TABLE)->insertGetId($this->payload($item) + [
+                $payload = $this->payload($item);
+                $ids[] = DB::table(self::TABLE)->insertGetId($payload + [
                     'code' => $this->formatCode($number++),
                     'app_status' => 'pending',
                     // Modal Thêm không có ô Thời gian đặt hàng: báo người có quyền vào khai (thẻ trang chủ),
                     // trừ vật tư Hành Chánh - không cần thời gian đặt hàng
-                    'lead_time_pending' => $this->leadTimeApplies($item['purchasing_department'] ?? null) ? 1 : 0,
+                    'lead_time_pending' => $this->leadTimeApplies($payload['purchasing_department']) ? 1 : 0,
                     'status_id' => 1,
                     'created_by' => $this->actor(),
                     'created_at' => now(),
@@ -633,7 +634,6 @@ class MaterialCategoryController extends Controller
     {
         $techSpec = trim((string) ($input['technical_specification'] ?? ''));
         $partNumber = trim((string) ($input['part_number'] ?? ''));
-        $purchasing = (string) ($input['purchasing_department'] ?? '');
 
         return [
             'material_names_id' => (int) ($input['material_names_id'] ?? 0),
@@ -641,15 +641,14 @@ class MaterialCategoryController extends Controller
             'part_number' => $partNumber === '' ? null : $partNumber,
             'technical_specification' => $techSpec === '' ? null : $techSpec,
             'classification' => MaterialClassification::encode($input['classification'] ?? null),
-            'purchasing_department' => isset(MaterialClassification::PURCHASING_DEPARTMENTS[$purchasing])
-                ? $purchasing
-                : null,
+            // Bộ phận mua hàng cố định theo module, không chọn trên form: Vật Tư luôn do Cung Ứng mua
+            'purchasing_department' => \App\Support\MaterialPurchasing::DEFAULT_KEY,
             // Không nhận từ form: người có quyền khai sau qua updateLeadTime(), update() giữ giá trị cũ
             'lead_time_days' => null,
         ];
     }
 
-    /** Vật tư Hành Chánh mua (kho VPP) không cần thời gian đặt hàng - xem UpdatesCategoryLeadTime. */
+    /** Mặt hàng Hành Chánh mua (kho VPP) không cần thời gian đặt hàng - Vật Tư luôn Cung Ứng mua nên luôn cần. */
     private function leadTimeApplies(?string $purchasing): bool
     {
         return $purchasing !== MaterialClassification::PURCHASING_ADMIN;

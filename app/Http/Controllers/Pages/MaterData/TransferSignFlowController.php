@@ -13,9 +13,9 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * DỮ LIỆU GỐC - TRÌNH KÝ ĐỀ NGHỊ LIÊN PHÒNG BAN (gồm Đề nghị VPP).
+ * DỮ LIỆU GỐC - TRÌNH KÝ ĐỀ NGHỊ LIÊN PHÒNG BAN.
  *
- * Mỗi dòng là MỘT bước ký của một loại đề nghị (VPP / liên phòng ban khác) cho một công ty
+ * Mỗi dòng là MỘT bước ký của một loại đề nghị (liên phòng ban) cho một công ty
  * (công ty của phòng đề nghị): thứ tự, vai trò và phạm vi phòng ban - xem
  * App\Support\MaterialTransferSignFlow. Không có bước nào thì đề nghị gửi thẳng, không ký.
  */

@@ -1,15 +1,15 @@
 {{--
-| SỬ DỤNG VẬT TƯ - TAB "ĐỀ NGHỊ VPP" (đề nghị vật tư từ kho VPP của phòng Hành Chính)
+| SỬ DỤNG VPP - TAB "ĐỀ NGHỊ VPP" (đề nghị VPP từ kho VPP của phòng Hành Chính)
 |
-| Đề nghị VPP là đề nghị chuyển vật tư liên phòng ban GỬI TỚI phòng Hành Chính (xem
-| App\Support\MaterialVpp) nên hai bảng gửi đi / gửi đến và các bước Hành Chính cấp phát ->
+| Đề nghị VPP là đề nghị chuyển VPP liên phòng ban GỬI TỚI phòng Hành Chính (xem
+| App\Support\VppStore) nên hai bảng gửi đi / gửi đến và các bước Hành Chính cấp phát ->
 | phòng đề nghị nhận hàng dùng nguyên của tab Chuyển liên phòng ban (transferLists,
 | transferDetailModal).
 |
 | Hai tab con:
 |   - Đề nghị VPP: phiếu phòng mình đã gửi (phòng thường) / phiếu các phòng gửi tới (Hành Chính).
-|   - Danh sách vật tư cần đề nghị Hành Chính: vật tư Hành Chính mua đang dưới ngưỡng / người
-|     dùng đề nghị / thiếu tồn khả dụng (MaterialWatchlist::forVpp) - tick chọn rồi Lập đề nghị VPP.
+|   - Danh sách VPP cần đề nghị Hành Chính: VPP Hành Chính mua đang dưới ngưỡng / người
+|     dùng đề nghị / thiếu tồn khả dụng (VppWatchlist::forVpp) - tick chọn rồi Lập đề nghị VPP.
 |     Phòng Hành Chính không tự đề nghị kho của mình nên không có tab này.
 --}}
 @php
@@ -18,7 +18,7 @@
     $vppActiveSub = $vppShowWatchlist ? $vppSubTab : 'requests';
 @endphp
 
-@tab('export_material', 'vpp')
+@tab('export_vpp', 'vpp')
 <div class="exp-pane {{ $activeTab === 'vpp' ? 'is-active' : '' }}" id="mePaneVpp">
 
     @if ($vppShowWatchlist)
@@ -32,13 +32,13 @@
             </li>
             <li class="nav-item">
                 <a class="nav-link {{ $vppActiveSub === 'watchlist' ? 'active' : '' }}" data-toggle="tab" href="#vppSubWatchlist" role="tab">
-                    <i class="fas fa-clipboard-list mr-1"></i> Danh sách vật tư cần đề nghị Hành Chính
+                    <i class="fas fa-clipboard-list mr-1"></i> Danh sách VPP cần đề nghị Hành Chính
                     <span class="badge badge-warning">{{ $vppOpenCount }}</span>
                 </a>
             </li>
         </ul>
 
-        @perm('export_material_request')
+        @perm('export_vpp_request')
             <button type="button" class="btn btn-primary btn-sm vpp-create-btn" data-toggle="modal" data-target="#matVppRequestModal">
                 <i class="fas fa-plus mr-1"></i> Tạo đề nghị cấp phát VPP đến HC
             </button>
@@ -48,7 +48,7 @@
 
     <div class="tab-content">
         <div class="tab-pane fade {{ $vppActiveSub === 'requests' ? 'show active' : '' }}" id="vppSubRequests" role="tabpanel">
-            @include('pages.export.MaterialExport.transferLists', [
+            @include('pages.export.VppExport.transferLists', [
                 'mtTab' => 'vpp',
                 'mtPrefix' => 'v',
                 'mtTableId' => 'matVpp',
@@ -75,7 +75,7 @@
 
         @if ($vppShowWatchlist)
             <div class="tab-pane fade {{ $vppActiveSub === 'watchlist' ? 'show active' : '' }}" id="vppSubWatchlist" role="tabpanel">
-                @include('pages.estimate.MaterialEstimate.watchlistTable', [
+                @include('pages.estimate.VppEstimate.watchlistTable', [
                     'items' => $vppWatchlistItems,
                     'wlMode' => 'vpp',
                 ])

@@ -33,6 +33,8 @@ class CategoryUnitConversion
 
     public const TYPE_MATERIAL = 'material';
 
+    // VPP không có: đơn vị tính VPP dùng chung toàn công ty (vpp_categories.unit_id, từ 12/11/2026).
+
     /**
      * Các đơn vị mà CÁC PHÒNG KHÁC đã khai cho từng mã: [category_id => [đơn vị]].
      *

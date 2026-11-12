@@ -245,8 +245,8 @@
             $selected.each(function () {
                 var catId = String($(this).data('category-id'));
 
-                // Ô chọn vật tư của phiếu không có vật tư này (đề nghị VPP chỉ nhận vật tư Hành
-                // Chánh mua) thì bỏ qua, báo lại sau
+                // Ô chọn vật tư của phiếu không có vật tư này (danh mục chưa duyệt / đã khoá)
+                // thì bỏ qua, báo lại sau
                 if (!$tbody.find('.select-mat-transfer-category').first().find('option').filter(function () { return this.value === catId; }).length) {
                     skipped.push($.trim($(this).find('td').eq(2).text()) || catId);
                     return;
@@ -275,7 +275,7 @@
                 Swal.fire({
                     icon: 'info',
                     title: 'Bỏ qua ' + skipped.length + ' vật tư',
-                    text: 'Không có trong danh sách vật tư của phiếu này (đề nghị cấp phát VPP đến HC chỉ gồm vật tư do Hành Chánh mua): ' + skipped.join(', ')
+                    text: 'Không có trong danh sách vật tư của phiếu này: ' + skipped.join(', ')
                 });
             }
         });

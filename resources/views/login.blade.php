@@ -517,7 +517,7 @@
                 <div class="brand-tag">Consumables Management System</div>
             </div>
         </div>
-        <a href="{{ route('publicChemicalLookup') }}" class="btn-lookup" title="Tra cứu tồn kho hoá chất, chất chuẩn, vật tư (không cần đăng nhập)">
+        <a href="{{ route('publicChemicalLookup') }}" class="btn-lookup" title="Tra cứu tồn kho hoá chất, chất chuẩn, vật tư, VPP (không cần đăng nhập)">
             <i class="bi bi-search"></i><span>Tra cứu tồn kho</span>
         </a>
     </header>

@@ -198,11 +198,13 @@
                   --db-group-material: #2E7BC4;
                   --db-group-chemical: #E8663D;
                   --db-group-standard: #7C5CD6;
+                  --db-group-vpp: #C2417E;
                   --db-group-master: #0E9FB8;
                   /* Bản rgb của 4 màu đối tượng (vật tư / hoá chất / chuẩn / dùng chung) cho nền nhạt rgba() */
                   --db-group-material-rgb: 46, 123, 196;
                   --db-group-chemical-rgb: 232, 102, 61;
                   --db-group-standard-rgb: 124, 92, 214;
+                  --db-group-vpp-rgb: 194, 65, 126;
                   --db-group-master-rgb: 14, 159, 184;
                   --db-group-user: #16A34A;
                   --db-group-utility: #D99A0B;

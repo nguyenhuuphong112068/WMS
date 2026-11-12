@@ -20,7 +20,7 @@ return [
         ['id' => 'tra-cuu-cong-khai', 'file' => 'publicLookup', 'title' => 'Tra Cứu Tồn Kho Không Cần Đăng Nhập', 'icon' => 'fas fa-search',
             'path' => 'Trang đăng nhập › Tra cứu tồn kho',
             'route' => 'publicChemicalLookup',
-            'helpRoutes' => ['publicStandardLookup', 'publicMaterialLookup'],
+            'helpRoutes' => ['publicStandardLookup', 'publicMaterialLookup', 'publicVppLookup'],
             'keywords' => 'tra cuu cong khai ton kho vi tri hoa chat chat chuan vat tu khong dang nhap mat bang 3d quet ma camera',
             // Trang công khai (không có .content-wrapper): chụp cả trang khi chưa đăng nhập, tra một hoá chất ở chế độ Mặt bằng
             'shots' => [['name' => 'public-lookup', 'url' => '/tra-cuu-hoa-chat?department_id=9&q=Dodecyl', 'user' => '-',

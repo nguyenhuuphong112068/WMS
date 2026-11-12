@@ -1,0 +1,119 @@
+{{--
+| Modal ĐIỀU CHỈNH ĐỀ NGHỊ CHUYỂN VPP LIÊN PHÒNG BAN đang lưu tạm.
+| Chỉ dựng cho các phiếu phòng mình gửi đi và còn ở trạng thái draft - cả đề nghị liên phòng
+| ban lẫn đề nghị VPP. Phiếu VPP giữ cố định phòng nhận là phòng Hành Chính đã chọn.
+|
+| Dòng VPP, nút thêm dòng và picker "Danh mục tồn của phòng" dùng chung với modal tạo
+| (transferRequestModal + transferRowFields), nên hai form không lệch nhau.
+--}}
+@foreach ($transferSent->getCollection()->merge($vppSent->getCollection())->where('status', 'draft') as $req)
+    @php
+        $rows = ($transferItems[$req->id] ?? collect())->values();
+        $mtEditVpp = in_array((int) $req->to_department_id, $vppDepartmentIds, true);
+        $mtEditDepartments = $mtEditVpp
+            ? \Illuminate\Support\Facades\DB::table('deparments')->select('id', 'name', 'shortName')->where('id', $req->to_department_id)->get()
+            : $transferDepartments;
+    @endphp
+    <div class="modal fade md-modal" id="matTransferEditModal_{{ $req->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 85%; width: 85%;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit mr-2 text-warning"></i> Điều Chỉnh Đề Nghị: {{ $req->code }}</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <form action="{{ route('pages.export.vppExport.transferRequestUpdate') }}" method="POST" autocomplete="off">
+                    @csrf
+                    <input type="hidden" name="transfer_request_id" value="{{ $req->id }}">
+                    <input type="hidden" name="action_type" class="edit-mat-transfer-action-type" value="draft">
+
+                    <div class="modal-body p-3">
+                        <div class="d-flex flex-wrap mb-3" style="gap: 12px;">
+                            <div class="form-group mb-0 flex-grow-1" style="min-width: 280px;">
+                                <label class="font-weight-bold" style="font-size: 0.9rem;">
+                                    Tiêu Đề Đề Nghị <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" name="title" class="form-control font-weight-bold" maxlength="255"
+                                    list="{{ $mtEditVpp ? 'matTitleOptionsVpp' : 'matTitleOptionsTransfer' }}" autocomplete="off"
+                                    value="{{ $req->title }}" required>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="font-weight-bold" style="font-size: 0.9rem;">Ngày Mong Muốn</label>
+                                <input type="date" name="needed_date" class="form-control" value="{{ $req->needed_date ? \Carbon\Carbon::parse($req->needed_date)->format('Y-m-d') : '' }}">
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 8px;">
+                            <div class="d-flex align-items-center">
+                                <label class="font-weight-bold mb-0 mr-2 text-nowrap" style="font-size: 0.95rem;">
+                                    <i class="fas fa-building mr-1 text-primary"></i> Gửi Đến Phòng Ban <span class="text-danger">*</span>:
+                                </label>
+                                <div style="min-width: 280px;">
+                                    <select name="to_department_id" class="form-control font-weight-bold {{ $mtEditVpp ? 'mat-transfer-dept-fixed' : '' }}"
+                                        style="height: 38px !important;" {{ $mtEditVpp ? 'tabindex=-1' : '' }} required>
+                                        @unless ($mtEditVpp)
+                                            <option value="">-- Chọn phòng ban đang giữ VPP --</option>
+                                        @endunless
+                                        @include('layout.departmentOptions', ['departments' => $mtEditDepartments, 'selected' => $req->to_department_id])
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center" style="gap: 8px;">
+                                <button type="button" class="btn btn-sm btn-outline-info shadow-sm btn-open-mat-stock-picker"
+                                    data-target-rows="#matTransferEditRows_{{ $req->id }}">
+                                    <i class="fas fa-boxes-stacked mr-1"></i> Danh mục VPP phòng nguồn
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-add-edit-mat-transfer-row shadow-sm"
+                                    data-rows="#matTransferEditRows_{{ $req->id }}">
+                                    <i class="fas fa-plus mr-1"></i> Thêm VPP
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive border rounded">
+                            <table class="table table-bordered mb-0 mat-transfer-table" style="font-size: 0.9rem;">
+                                @include('pages.export.VppExport.transferRowsHead')
+                                <tbody id="matTransferEditRows_{{ $req->id }}" data-next-idx="{{ max($rows->count(), 1) }}"
+                                    data-template="{{ $mtEditVpp ? 'matVppRowTemplate' : 'matTransferRowTemplate' }}">
+                                    @for ($idx = 0; $idx < max($rows->count(), 1); $idx++)
+                                        @include('pages.export.VppExport.transferRowFields', [
+                                            'idx' => $idx,
+                                            'item' => $rows->get($idx),
+                                            'onlyRow' => $rows->count() <= 1,
+                                            'rowCategories' => $mtEditVpp ? $vppCategories : $transferCategories,
+                                        ])
+                                    @endfor
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="form-group mt-3 mb-0">
+                            <label class="font-weight-bold" style="font-size: 0.9rem;">Ghi chú chung</label>
+                            <textarea name="note" class="form-control" rows="2">{{ $req->note }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
+                        <button type="submit" class="btn btn-outline-primary btn-submit-edit-mat-transfer" data-action="draft"><i class="fas fa-save mr-1"></i> Lưu thay đổi</button>
+                        <button type="submit" class="btn btn-primary btn-submit-edit-mat-transfer" data-action="send"><i class="fas fa-paper-plane mr-1"></i> Gửi đề nghị</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endforeach
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        $(document).on('click', '.btn-submit-edit-mat-transfer', function() {
+            $(this).closest('form').find('.edit-mat-transfer-action-type').val($(this).data('action') || 'draft');
+        });
+
+        $(document).on('click', '.btn-add-edit-mat-transfer-row', function() {
+            window.matAddTransferRow($(this).data('rows'));
+        });
+    });
+</script>

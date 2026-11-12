@@ -27,6 +27,7 @@ Route::post('/', [LoginController::class, 'login'])->name('login');
 Route::get('/tra-cuu-hoa-chat', [PublicStockLookupController::class, 'chemical'])->name('publicChemicalLookup');
 Route::get('/tra-cuu-chat-chuan', [PublicStockLookupController::class, 'standard'])->name('publicStandardLookup');
 Route::get('/tra-cuu-vat-tu', [PublicStockLookupController::class, 'material'])->name('publicMaterialLookup');
+Route::get('/tra-cuu-vpp', [PublicStockLookupController::class, 'vpp'])->name('publicVppLookup');
 
 Route::post('/changePassword', [LoginController::class, 'changePassword'])->name('changePassword');
 

@@ -10,7 +10,7 @@
 
 @php
     $lateTypeLabel = ['periodic' => 'Định kỳ', 'risk_assessment' => 'ĐG rủi ro', 'regular' => 'Thường quy',
-        'transfer' => 'Liên phòng ban', \App\Support\MaterialVpp::TAB => 'Đề nghị VPP'];
+        'transfer' => 'Liên phòng ban'];
 
     $lateCauseMeta = [
         'approve' => ['label' => 'Duyệt trễ', 'icon' => 'fas fa-file-signature', 'class' => 'late-cause-approve'],
