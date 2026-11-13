@@ -20,9 +20,12 @@
         <tbody>
             @forelse ($calRows as $row)
                 @php
-                    $meta = $calStatusMeta[$row->status] ?? ['label' => $row->status, 'class' => '', 'icon' => 'fas fa-circle'];
+                    $calAfter = $row->timing === \App\Support\MaterialCalibration::TIMING_AFTER;
+                    $meta = ($calAfter ? ($calAfterStatusMeta[$row->status] ?? null) : null)
+                        ?? $calStatusMeta[$row->status] ?? ['label' => $row->status, 'class' => '', 'icon' => 'fas fa-circle'];
                     $calData = [
                         'code' => $row->code,
+                        'after' => $calAfter,
                         'material' => trim(($row->category_code ? $row->category_code . ' - ' : '') . ($row->material_name ?? '')),
                         'department' => $row->department_name,
                         'amount_text' => $expNum($row->amount) . ' ' . $row->unit,
@@ -51,6 +54,9 @@
                     <td data-order="{{ $row->requested_at }}">
                         <span class="exp-code font-weight-bold">{{ $row->code }}</span>
                         <div class="mt-1"><span class="cal-status {{ $meta['class'] }}"><i class="{{ $meta['icon'] }}"></i> {{ $meta['label'] }}</span></div>
+                        @if ($calAfter)
+                            <div class="mt-1"><span class="cal-timing-after"><i class="fas fa-dolly"></i> HC sau cấp phát</span></div>
+                        @endif
                         <div class="md-sub text-muted mt-1">{{ $row->requested_by }} · {{ $expDateTime($row->requested_at) }}</div>
                         @if ($row->request_note)
                             <div class="md-sub small">{{ $row->request_note }}</div>
@@ -123,6 +129,9 @@
                                 <div>{{ $row->result_note }}</div>
                             @endif
                             <div class="text-muted">{{ $row->result_by }} · {{ $expDateTime($row->result_at) }}</div>
+                            @if ($calAfter && $row->failed_amount > 0.00005)
+                                <div class="small text-danger"><i class="fas fa-undo-alt mr-1"></i>Đã cấp - cần thu hồi phần không đạt</div>
+                            @endif
                             @if ($row->quarantine_codes)
                                 <div class="small text-danger"><i class="fas fa-biohazard mr-1"></i>Cách ly: {{ implode(', ', $row->quarantine_codes) }}</div>
                             @endif
@@ -140,13 +149,16 @@
                                     <i class="fas fa-ruler-combined"></i>
                                 </button>
                             @endif
-                            @if ($row->status === 'pending' && $row->own)
+                            @if ($row->status === 'pending' && $row->own && ! $calAfter)
                                 @perm('export_material_issue')
                                     <button type="button" class="btn btn-sm btn-outline-danger btn-cal-cancel" title="Huỷ đề nghị hiệu chuẩn, nhả hàng về kho"
                                         data-code="{{ $row->code }}">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 @endperm
+                            @endif
+                            @if ($row->status === 'pending' && $calAfter && ! ($row->incoming && $calibrationCanConfirm))
+                                <span class="md-sub text-muted">—</span>
                             @endif
                             @unless ($row->status === 'pending')
                                 <span class="md-sub text-muted">—</span>

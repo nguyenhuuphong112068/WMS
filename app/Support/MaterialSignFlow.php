@@ -55,13 +55,22 @@ class MaterialSignFlow
 
     /**
      * Các tiêu chí khai được điều kiện của một phòng: [khoá => ['label', 'options' => [giá trị => nhãn]]].
-     * Gồm 5 tiêu chí của danh mục chung + phân loại của phòng (nếu phòng đã khai).
+     * Gồm 4 tiêu chí của danh mục chung + Theo Giá Trị của danh mục phòng + phân loại riêng của phòng (nếu đã khai).
      */
     public static function criteriaOptions(int $departmentId): array
     {
         $options = [];
 
         foreach (MaterialClassification::CRITERIA as $key => $criterion) {
+            $options[$key] = [
+                'label' => $criterion['label'],
+                'options' => array_map('strval', $criterion['options']),
+                'short' => MaterialClassification::SHORT_LABELS[$key] ?? [],
+            ];
+        }
+
+        // Tiêu chí khai ở danh mục vật tư của phòng (Theo Giá Trị) - giá trị đọc từ dòng của phòng
+        foreach (MaterialClassification::DEPARTMENT_CRITERIA as $key => $criterion) {
             $options[$key] = [
                 'label' => $criterion['label'],
                 'options' => array_map('strval', $criterion['options']),
@@ -321,13 +330,14 @@ class MaterialSignFlow
                 'material_categories.id',
                 'material_categories.classification',
                 'material_department_categories.classification_id',
+                'material_department_categories.price_level',
             ]);
 
         $items = [];
 
         foreach ($rows as $row) {
             $items[(int) $row->id] = [
-                'criteria' => MaterialClassification::decode($row->classification),
+                'criteria' => MaterialClassification::decode($row->classification) + MaterialClassification::departmentValues($row),
                 'classification_id' => $row->classification_id ? (int) $row->classification_id : null,
             ];
         }

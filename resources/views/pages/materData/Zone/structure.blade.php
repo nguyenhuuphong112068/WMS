@@ -1713,15 +1713,14 @@
         return String(position).padStart(2, '0');
     }
 
-    // Chữ của ô ngang thứ n kiểu cột Excel: 1 -> A, 26 -> Z, 27 -> AA (khớp máy chủ).
+    // Nhãn ô ngang thứ n: đánh số nguyên từ 1 (1, 2, 3...).
     function letters(n) {
-        var out = '';
-        while (n > 0) {
-            n--;
-            out = String.fromCharCode(65 + n % 26) + out;
-            n = Math.floor(n / 26);
-        }
-        return out;
+        return String(n);
+    }
+
+    // Đoạn cuối mã vị trí: <số ô ngang 2 chữ số>-<số dãy sâu>, ví dụ 05.2 (khớp máy chủ).
+    function cellSeg(position, depth) {
+        return seg(position) + '.' + depth;
     }
 
     function cellKey(position, depth) {
@@ -2619,7 +2618,7 @@
     var SPEC_DIMS = [
         { key: 'columns', label: 'Số cột', sub: 'của một kệ/tủ', min: 1, limit: 'maxColumns' },
         { key: 'tiers', label: 'Số tầng', sub: 'của mỗi cột', min: 1, limit: 'maxTiers' },
-        { key: 'max', label: 'Vị trí ngang', sub: 'mỗi tầng · A, B, C...', min: 1, limit: 'maxLocations' },
+        { key: 'max', label: 'Vị trí ngang', sub: 'mỗi tầng · 1, 2, 3...', min: 1, limit: 'maxLocations' },
         { key: 'depth', label: 'Vị trí sâu', sub: 'mỗi tầng · dãy 1 sát cửa', min: 1, limit: 'maxDepth' }
     ];
     var SPEC_DEFAULT = { columns: 1, tiers: 4, max: 5, depth: 1 };
@@ -2810,7 +2809,7 @@
     function specCaption(key, value) {
         if (value === null) return 'Đang khác nhau giữa các ' + (key === 'tiers' ? 'cột' : 'tầng');
         if (key === 'columns') return 'Cột <b>01</b> → <b>' + seg(value) + '</b>';
-        if (key === 'max') return 'Ô <b>A</b> → <b>' + letters(value) + '</b> dọc mép trước';
+        if (key === 'max') return 'Ô <b>1</b> → <b>' + letters(value) + '</b> dọc mép trước';
         if (key === 'depth') return 'Dãy <b>1</b> (sát cửa) → <b>' + value + '</b>';
         return '';
     }
@@ -3107,7 +3106,7 @@
                                 for (var p = 1; p <= tier.max; p++) {
                                     var key = cellKey(p, d);
                                     var cls = cell3dClass(tier, key);
-                                    var code = cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + letters(p) + d;
+                                    var code = cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + cellSeg(p, d);
                                     cells.push({
                                         p: p, d: d, cls: cls, style: cell3dStyle(tier, key, cls),
                                         title: code, label: code.split('/').pop()
@@ -3219,7 +3218,7 @@
                 } else {
                     cls = 'is-free'; status = 'trống';
                 }
-                var code = cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + letters(p) + d;
+                var code = cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + cellSeg(p, d);
                 var attr = cls === 'is-new' || cls === 'is-cut' ? null : tier.attrs[key];
                 var extra = '';
                 var letter = '';

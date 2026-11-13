@@ -409,9 +409,91 @@
     </div>
 </div>
 
+{{-- Modal lịch sử các đề nghị / phiếu dự trù đã tạo từ 1 danh sách - nạp AJAX khi bấm ".btn-pr-generated" --}}
+<div class="modal fade md-modal pr-modal" id="periodicGeneratedModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog pr-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-history"></i> Lịch Sử Đề Nghị Đã Tạo
+                    <small class="pr-generated-subtitle md-sub ml-2"></small>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0 pr-items-table">
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width: 46px">STT</th>
+                                <th style="width: 150px">Thời Gian Tạo</th>
+                                <th style="width: 170px">Mã Phiếu</th>
+                                <th style="width: 110px">Cách Tạo</th>
+                                <th>Diễn Giải</th>
+                                <th style="width: 180px">Trạng Thái Hiện Tại</th>
+                                <th style="width: 160px">Người Tạo</th>
+                            </tr>
+                        </thead>
+                        <tbody class="pr-generated-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         var prRowIndex = 0;
+        /* ---------- Modal "Lịch Sử Đề Nghị Đã Tạo" (AJAX) ---------- */
+        $(document).on('click', '.btn-pr-generated', function() {
+            var $modal = $('#periodicGeneratedModal');
+            var $body = $modal.find('.pr-generated-body')
+                .html('<tr><td colspan="7" class="text-center md-sub py-4"><i class="fas fa-spinner fa-spin mr-1"></i> Đang tải...</td></tr>');
+
+            $modal.find('.pr-generated-subtitle').text($(this).data('title') || '');
+            if (!$modal.parent().is('body')) {
+                $modal.appendTo('body');
+            }
+            $modal.modal('show');
+
+            $.getJSON($(this).data('url')).done(function(res) {
+                var rows = (res && res.rows) || [];
+                $body.empty();
+
+                if (!rows.length) {
+                    $body.html('<tr><td colspan="7" class="text-center md-empty py-4">Chưa có đề nghị nào được tạo.</td></tr>');
+                    return;
+                }
+
+                rows.forEach(function(row, index) {
+                    var $code = row.code
+                        ? (row.url
+                            ? $('<a>').attr('href', row.url).attr('target', '_blank').addClass('md-tag').text(row.code)
+                            : $('<span>').addClass('md-tag').text(row.code))
+                        : $('<span>').addClass('md-empty').text('—');
+                    var $status = row.exists
+                        ? $('<span>').addClass('font-weight-bold').text(row.status || '—')
+                        : $('<span>').addClass('text-danger').text('Không còn trên hệ thống');
+
+                    $body.append($('<tr>').append(
+                        $('<td>').addClass('text-center').text(index + 1),
+                        $('<td>').text(row.created_at || ''),
+                        $('<td>').append($code),
+                        $('<td>').append($('<span>').addClass('badge ' + (row.mode === 'Tạo ngay' ? 'badge-info' : 'badge-secondary')).text(row.mode)),
+                        $('<td>').addClass('md-sub').text(row.note || ''),
+                        $('<td>').append($status),
+                        $('<td>').addClass('md-sub').text(row.created_by || '')
+                    ));
+                });
+            }).fail(function() {
+                $body.html('<tr><td colspan="7" class="text-center text-danger py-4">Không tải được lịch sử, vui lòng thử lại.</td></tr>');
+            });
+        });
+
 
         var PR_WEEKDAYS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
         var PR_MAX_DAY = @json(\App\Support\MaterialPeriodicRequest::CYCLE_MAX_DAY);
@@ -799,6 +881,13 @@
         function prLoadCal($form, keepMode) {
             var $mode = $form.find('.pr-day-mode');
             if (!$mode.length) return;
+
+            // CAL_CYCLE_ENABLED=false (server không kết nối CAL): không có tuỳ chọn CAL, không gọi đọc lịch
+            if (!$mode.find('option[value="cal_due"]').length) {
+                $mode.val('fixed');
+                prApplyCycle($form);
+                return;
+            }
 
             var objectId = $form.find('select.pr-object').val() || '';
             var frequency = $form.find('.pr-frequency').val() || '';

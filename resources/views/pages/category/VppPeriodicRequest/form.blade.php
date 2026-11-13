@@ -227,7 +227,9 @@
                                 <select name="cycle_day_mode"
                                     class="form-control pr-day-mode {{ $bag->has('cycle_day_mode') ? 'is-invalid' : '' }}">
                                     <option value="{{ $prSupport::DAY_MODE_FIXED }}">Ngày cố định trong chu kỳ</option>
-                                    <option value="{{ $prSupport::DAY_MODE_CAL_DUE }}" disabled>Theo ngày đến hạn lịch CAL</option>
+                                    @if ($prSupport::calCycleEnabled())
+                                        <option value="{{ $prSupport::DAY_MODE_CAL_DUE }}" disabled>Theo ngày đến hạn lịch CAL</option>
+                                    @endif
                                 </select>
                                 <small class="pr-cal-info"></small>
                             @endunless

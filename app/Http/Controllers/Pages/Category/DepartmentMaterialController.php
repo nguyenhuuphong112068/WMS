@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\StoresBatchItems;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\CategoryUnitConversion;
+use App\Support\MaterialClassification;
 use App\Support\MaterialWatchlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -155,11 +156,13 @@ class DepartmentMaterialController extends Controller
             self::TABLE,
             $current->id,
             'phân loại: '.($classifications[$current->classification_id] ?? 'chưa khai')
+                .' | '.MaterialClassification::describeDepartment($current)
                 .' | đơn vị: '.($units[$current->unit_id] ?? 'chưa khai')
                 .' | ngưỡng: '.($current->min_stock ?? 'chưa khai')
                 .' | ngưỡng tối đa: '.($current->max_stock ?? 'chưa khai')
                 .' | định khu: '.($locations[$current->default_location_id] ?? 'chưa khai'),
             'phân loại: '.($classifications[(int) $request->classification_id] ?? 'chưa khai')
+                .' | '.MaterialClassification::describeDepartment($request->all())
                 .' | đơn vị: '.($units[(int) $request->unit_id] ?? 'chưa khai')
                 .' | ngưỡng: '.($request->min_stock ?: 'chưa khai')
                 .' | ngưỡng tối đa: '.($request->max_stock ?: 'chưa khai')
@@ -282,6 +285,9 @@ class DepartmentMaterialController extends Controller
             'note' => ['nullable', 'max:500'],
         ];
 
+        // Tiêu chí phân loại cấp phòng (Theo Giá Trị) - bắt buộc, xem MaterialClassification::DEPARTMENT_CRITERIA
+        $rules += MaterialClassification::departmentRules();
+
         if ($isUpdate) {
             $rules['id'] = ['required', 'exists:'.self::TABLE.',id'];
 
@@ -365,6 +371,7 @@ class DepartmentMaterialController extends Controller
     {
         return [
             'classification_id' => ! empty($input['classification_id']) ? (int) $input['classification_id'] : null,
+            'price_level' => $input['price_level'] ?? null,
             'unit_id' => (int) ($input['unit_id'] ?? 0),
             'min_stock' => $this->nullIfBlank($input['min_stock'] ?? null),
             'max_stock' => $this->nullIfBlank($input['max_stock'] ?? null),
@@ -394,7 +401,7 @@ class DepartmentMaterialController extends Controller
             'max_stock.min' => 'Ngưỡng tồn tối đa không được âm.',
             'default_location_id.exists' => 'Định khu không thuộc phòng ban đang chọn.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
-        ];
+        ] + MaterialClassification::departmentMessages();
     }
 
     /**

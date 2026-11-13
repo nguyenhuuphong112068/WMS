@@ -189,6 +189,9 @@ class InitialDataSchema
         foreach (MaterialClassification::CRITERIA as $key => $criterion) {
             $classification['cls_'.$key] = array_flip($criterion['options']);
         }
+        foreach (MaterialClassification::DEPARTMENT_CRITERIA as $key => $criterion) {
+            $classification['cls_'.$key] = array_flip($criterion['options']);
+        }
 
         $consumptionTypes = [];
         foreach (ConsumptionObjectController::TYPES as $key => $type) {
@@ -552,11 +555,11 @@ class InitialDataSchema
                     ['key' => 'material_name', 'label' => 'Tên vật tư', 'type' => 'ref', 'ref' => 'R_TEN_VT', 'req' => true, 'width' => 40, 'hint' => 'Chọn ở sheet 15'],
                     ['key' => 'manufacturer', 'label' => 'Nhà sản xuất', 'type' => 'ref', 'ref' => 'R_NSX', 'req' => true, 'width' => 16, 'hint' => 'Chọn ở sheet 09'],
                     ['key' => 'technical_specification', 'label' => 'Thông tin kỹ thuật', 'type' => 'text', 'max' => 100, 'width' => 24, 'hint' => 'VD: Size M, hộp 100 cái'],
-                    ['key' => 'cls_price', 'label' => 'Theo giá trị', 'type' => 'list', 'list' => 'cls_price', 'req' => true, 'width' => 11, 'hint' => 'Thấp / Cao'],
                     ['key' => 'cls_importance', 'label' => 'Mức độ quan trọng', 'type' => 'list', 'list' => 'cls_importance', 'req' => true, 'width' => 12, 'hint' => 'Thấp / Cao'],
                     ['key' => 'cls_dangerous', 'label' => 'Hàng nguy hiểm', 'type' => 'list', 'list' => 'cls_dangerous', 'req' => true, 'width' => 11, 'hint' => 'Có / Không'],
                     ['key' => 'purchasing_department', 'label' => 'Bộ phận mua hàng', 'type' => 'list', 'list' => 'purchasing', 'req' => true, 'width' => 13, 'hint' => 'Cung Ứng / Hành Chánh'],
-                    ['key' => 'cls_qa_calibration', 'label' => 'Cần hiệu chuẩn trước khi dùng', 'type' => 'list', 'list' => 'cls_qa_calibration', 'req' => true, 'width' => 13, 'hint' => 'Có / Không'],
+                    ['key' => 'cls_qa_calibration', 'label' => 'Cần hiệu chuẩn trước khi dùng', 'type' => 'list', 'list' => 'cls_qa_calibration', 'req' => true, 'width' => 22, 'hint' => 'Trước cấp phát / Sau cấp phát / Không'],
+                    ['key' => 'cls_contact', 'label' => 'Tiếp xúc', 'type' => 'list', 'list' => 'cls_contact', 'req' => true, 'width' => 13, 'hint' => 'Có tiếp xúc / Không tiếp xúc'],
                     $leadTime,
                     ['key' => 'display', 'label' => 'Hiển thị chọn (tự động)', 'type' => 'calc', 'width' => 40, 'hidden' => true, 'formula' => '=IF(A{r}="","",A{r}&" | "&B{r}&" ("&C{r}&")")'],
                 ],
@@ -706,6 +709,7 @@ class InitialDataSchema
                     ['key' => 'category', 'label' => 'Danh mục vật tư', 'type' => 'ref', 'ref' => 'R_DM_VT', 'req' => true, 'width' => 50, 'hint' => 'Chọn ở sheet 19'],
                     ['key' => 'unit', 'label' => 'Đơn vị tính của phòng', 'type' => 'ref', 'ref' => 'R_DVT', 'req' => true, 'width' => 12, 'hint' => 'Chọn ở sheet 06'],
                     ['key' => 'classification', 'label' => 'Phân loại của phòng', 'type' => 'ref', 'ref' => 'R_PL_PHONG', 'width' => 22, 'hint' => 'Sheet 14, cùng phòng ban'],
+                    ['key' => 'price_level', 'label' => 'Theo giá trị', 'type' => 'list', 'list' => 'cls_price', 'req' => true, 'width' => 11, 'hint' => 'Thấp / Cao'],
                     $minStock,
                     $maxStock,
                     $defaultLocation,

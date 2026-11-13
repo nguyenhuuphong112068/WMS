@@ -290,6 +290,16 @@ class PeriodicRequestController extends Controller
         ]);
     }
 
+    /** Lịch sử các đề nghị / phiếu dự trù đã tạo từ danh sách - AJAX cho nút ở cột "Đề Nghị Đã Tạo". */
+    public function generated(Request $request)
+    {
+        $current = $this->findOwn($request->id);
+
+        return response()->json([
+            'rows' => $current ? MaterialPeriodicRequest::generatedRequests($current) : [],
+        ]);
+    }
+
     /**
      * Tìm đối tượng (dữ liệu gốc) cho modal "Dữ Liệu Gốc - Đối Tượng" - AJAX, tối đa 50 dòng mỗi
      * lần thay vì nhúng cả danh mục (2000+ dòng) vào trang. Gọi lại mỗi khi gõ tìm / đổi bộ lọc.
@@ -361,7 +371,8 @@ class PeriodicRequestController extends Controller
         }
 
         $rules = [
-            'title' => ['required', 'string', 'max:255'],
+            // Nội bộ: tiêu đề lấy từ Đối tượng, không nhập tay
+            'title' => $isInternal ? ['nullable'] : ['required', 'string', 'max:255'],
             // Nội bộ: thiếu / sai tần suất thì chỉ báo lỗi ở ô tần suất, không báo trùng ở chu kỳ
             'periodic' => $isInternal
                 ? ['nullable']
@@ -403,7 +414,7 @@ class PeriodicRequestController extends Controller
                 Rule::in(MaterialPeriodicRequest::departmentOptions($departmentId)->pluck('id')->all()),
             ];
         } else {
-            // Danh sách nội bộ có thể không gắn với Đối tượng nào; giữ nguyên đối tượng cũ (dù đã khoá) thì cho qua
+            // Danh sách nội bộ bắt buộc gắn 1 Đối tượng (làm tiêu đề); giữ nguyên đối tượng cũ (dù đã khoá) thì cho qua
             $keepObject = $current && (int) $request->consumption_object_id === (int) $current->consumption_object_id;
 
             // Tổ quản lý: tổ đang hoạt động của phòng; giữ nguyên tổ cũ (dù đã khoá) thì cho qua
@@ -416,8 +427,8 @@ class PeriodicRequestController extends Controller
             $rules['group_id'] = ['required', 'integer', Rule::in($allowedGroupIds)];
 
             $rules['consumption_object_id'] = $keepObject
-                ? ['nullable', 'integer']
-                : ['nullable', 'integer', Rule::exists('consumption_objects', 'id')->where('status_id', 1)];
+                ? ['required', 'integer', Rule::exists('consumption_objects', 'id')]
+                : ['required', 'integer', Rule::exists('consumption_objects', 'id')->where('status_id', 1)];
 
             // Tần suất phải là một tần suất của đối tượng; giữ nguyên đối tượng thì tần suất đang dùng vẫn hợp lệ
             // dù đồng bộ CAL sau này đã bỏ tần suất đó khỏi đối tượng
@@ -533,7 +544,7 @@ class PeriodicRequestController extends Controller
             : MaterialPeriodicRequest::DAY_MODE_FIXED;
 
         return [
-            'title' => trim((string) $request->title),
+            'title' => $isInternal ? self::objectTitle($request->consumption_object_id) : trim((string) $request->title),
             'periodic' => $periodic,
             'cycle_length' => MaterialPeriodicRequest::hasCycleLength($periodic) ? (int) $request->cycle_length : null,
             // Theo hạn lịch CAL không dùng ngày cố định - giữ 1 cho cột NOT NULL
@@ -552,6 +563,20 @@ class PeriodicRequestController extends Controller
             'frequency' => $isInternal ? (string) $request->frequency : null,
             'group_id' => $isInternal && $request->filled('group_id') ? (int) $request->group_id : null,
         ];
+    }
+
+    /** Tiêu đề danh sách nội bộ = "Mã - Tên" của Đối tượng */
+    private static function objectTitle($objectId): string
+    {
+        $object = DB::table('consumption_objects')->where('id', (int) $objectId)->first(['code', 'name']);
+
+        if (! $object) {
+            return '';
+        }
+
+        $label = trim((string) $object->code) !== '' ? trim($object->code).' - '.trim($object->name) : trim($object->name);
+
+        return \Illuminate\Support\Str::limit($label, 255, '');
     }
 
     private function insertItems(int $listId, Request $request): void

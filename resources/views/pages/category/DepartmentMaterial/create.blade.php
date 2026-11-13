@@ -29,6 +29,7 @@
             ->values(),
         'units' => $units,
         'classifications' => $classifications,
+        'deptCriteria' => \App\Support\MaterialClassification::departmentFormGroups(),
         'shelf' => false,
         'packWeight' => false,
         'compat' => false,

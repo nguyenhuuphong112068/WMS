@@ -201,6 +201,30 @@ class MaterialPeriodicRequest
         };
     }
 
+    /** Nhãn "Bảo trì ..." theo tần suất của đối tượng (cột Đối Tượng ở DS nội bộ theo chu kỳ). */
+    public const MAINTENANCE_LABELS = [
+        'Daily' => 'Ngày',
+        'Alternate Day' => '2 ngày',
+        'Weekly' => 'Tuần',
+        'Fortnightly' => '2 tuần',
+        'Monthly' => 'Tháng',
+        'Bi Monthly' => '2 tháng',
+        'Quaterly' => 'Quý',
+        'Half Yearly' => '6 tháng',
+        'Yearly' => 'Năm',
+        'Two Yearly' => '2 năm',
+        'Three Yearly' => '3 năm',
+        'Five Yearly' => '5 năm',
+        'Seven Yearly' => '7 năm',
+    ];
+
+    public static function maintenanceLabel(?string $frequency): ?string
+    {
+        $label = self::MAINTENANCE_LABELS[(string) $frequency] ?? null;
+
+        return $label ? 'Bảo trì '.$label : null;
+    }
+
     /** Nhãn chu kỳ hiển thị: danh sách nội bộ dùng đúng tên tần suất của đối tượng ("2 tuần/lần"...). */
     public static function scheduleLabel(?string $periodic, $cycleLength = null, ?string $frequency = null): string
     {
@@ -650,6 +674,12 @@ class MaterialPeriodicRequest
 
     public const CAL_LEAD_DAYS_MAX = 30;
 
+    /** Công tắc .env CAL_CYCLE_ENABLED: server không kết nối được CAL thì tắt hẳn chế độ theo hạn lịch CAL. */
+    public static function calCycleEnabled(): bool
+    {
+        return (bool) config('services.cal.cycle_enabled', true);
+    }
+
     public static function dayModeOf($value): string
     {
         return $value === self::DAY_MODE_CAL_DUE ? self::DAY_MODE_CAL_DUE : self::DAY_MODE_FIXED;
@@ -785,6 +815,10 @@ class MaterialPeriodicRequest
         $leadDays = $leadDays !== null ? max(0, min(self::CAL_LEAD_DAYS_MAX, $leadDays)) : self::CAL_LEAD_DAYS_DEFAULT;
         $fail = fn (string $message) => ['available' => false, 'message' => $message, 'schedules' => [], 'next' => null, 'lead_days' => $leadDays];
 
+        if (! self::calCycleEnabled()) {
+            return $fail('Server này không kết nối phần mềm CAL nên chưa dùng được hạn lịch CAL.');
+        }
+
         if (! $object) {
             return $fail('Chọn đối tượng thuộc phần mềm CAL để dùng hạn lịch CAL.');
         }
@@ -842,7 +876,7 @@ class MaterialPeriodicRequest
      */
     public static function refreshCalSchedule($list, $today = null): bool
     {
-        if (! $list || self::dayModeOf($list->cycle_day_mode ?? null) !== self::DAY_MODE_CAL_DUE) {
+        if (! $list || ! self::calCycleEnabled() || self::dayModeOf($list->cycle_day_mode ?? null) !== self::DAY_MODE_CAL_DUE) {
             return false;
         }
 
@@ -884,6 +918,10 @@ class MaterialPeriodicRequest
      */
     public static function refreshCalSchedules(?int $departmentId = null, bool $force = false): void
     {
+        if (! self::calCycleEnabled()) {
+            return;
+        }
+
         DB::table(self::LIST_TABLE)
             ->where('status_id', 1)
             ->where('cycle_day_mode', self::DAY_MODE_CAL_DUE)
@@ -1142,6 +1180,85 @@ class MaterialPeriodicRequest
             return $result;
         });
     }
+
+    /**
+     * Các đề nghị / phiếu dự trù đã tạo từ danh sách (nút "Lịch sử đề nghị đã tạo" ở cột Đề Nghị Đã Tạo),
+     * mới nhất trước. Nguồn = dòng lịch sử "Tạo đề nghị" (mã nằm trong change_note), kèm trạng thái hiện
+     * tại của phiếu tra theo mã; phiếu đã bị xoá thì báo "Không còn trên hệ thống".
+     */
+    public static function generatedRequests($list): array
+    {
+        $type = (string) $list->type;
+
+        $rows = DB::table(self::HISTORY_TABLE)
+            ->where('periodic_request_list_id', (int) $list->id)
+            ->where('action', 'Tạo đề nghị')
+            ->orderBy('id', 'desc')
+            ->get(['change_note', 'created_by', 'created_at'])
+            ->map(function ($row) {
+                preg_match('/(?:đề nghị|phiếu dự trù) (\S+) \((?:Lưu tạm|Nháp)\)/u', (string) $row->change_note, $match);
+
+                return [
+                    'code' => $match[1] ?? null,
+                    'mode' => str_starts_with((string) $row->change_note, 'Tạo ngay') ? 'Tạo ngay' : 'Tự động',
+                    'note' => (string) $row->change_note,
+                    'created_by' => $row->created_by ?: 'NA',
+                    'created_at' => $row->created_at ? Carbon::parse($row->created_at)->format('d/m/Y H:i') : '',
+                ];
+            });
+
+        $codes = $rows->pluck('code')->filter()->unique()->values()->all();
+        $table = match ($type) {
+            self::TYPE_EXTERNAL => 'material_transfer_requests',
+            self::TYPE_ESTIMATE => 'material_estimates',
+            default => 'material_request_lists',
+        };
+        $docs = $codes
+            ? DB::table($table)->whereIn('code', $codes)->get()->keyBy('code')
+            : collect();
+
+        $appStatuses = config('material.request_app_statuses', []);
+        $issueStatuses = config('material.request_issue_statuses', []);
+        $estimateStatuses = config('estimate.app_statuses', []);
+
+        return $rows->map(function (array $row) use ($docs, $type, $appStatuses, $issueStatuses, $estimateStatuses) {
+            $doc = $row['code'] ? $docs->get($row['code']) : null;
+            $status = null;
+            $url = null;
+
+            if ($doc) {
+                if ($type === self::TYPE_EXTERNAL) {
+                    $status = self::TRANSFER_STATUS_LABELS[$doc->status] ?? $doc->status;
+                    $url = route('pages.export.materialExport.list', ['tab' => 'transfer'], false);
+                } elseif ($type === self::TYPE_ESTIMATE) {
+                    $status = $estimateStatuses[$doc->app_status] ?? $doc->app_status;
+                    $url = route('pages.estimate.materialEstimate.detail', ['id' => $doc->id], false);
+                } else {
+                    $status = $appStatuses[$doc->app_status] ?? $doc->app_status;
+                    if ($doc->app_status === 'approved' && $doc->issue_status) {
+                        $status .= ' · '.($issueStatuses[$doc->issue_status] ?? $doc->issue_status);
+                    }
+                    $url = route('pages.export.materialExport.list', ['tab' => 'periodic'], false);
+                }
+            }
+
+            return $row + ['exists' => (bool) $doc, 'status' => $status, 'url' => $url];
+        })->all();
+    }
+
+    /** Nhãn trạng thái đề nghị liên phòng ban (material_transfer_requests.status). */
+    private const TRANSFER_STATUS_LABELS = [
+        'draft' => 'Lưu tạm',
+        'pending_sign' => 'Chờ ký',
+        'pending' => 'Chờ cấp phát',
+        'partial' => 'Cấp một phần',
+        'completed' => 'Đã cấp đủ',
+        'rejected' => 'Từ chối',
+        'canceled' => 'Đã huỷ',
+        'issued' => 'Chờ nhận',
+        'received' => 'Đã nhận',
+        'returned' => 'Đã từ chối nhận',
+    ];
 
     /** "đề nghị LPB-... (Lưu tạm)" / "phiếu dự trù QC261009.01 (Nháp)" - cho lịch sử, Audit Trail, thông báo. */
     public static function resultLabel(array $result): string

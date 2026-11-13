@@ -51,6 +51,20 @@
                 </select>
             </td>
         @endif
+        @foreach ($cfg['deptCriteria'] ?? [] as $criterion)
+            <td>
+                <select name="items[{{ $index }}][{{ $criterion['name'] }}]" data-fill="{{ $criterion['name'] }}"
+                    class="form-control {{ $err($criterion['name']) }}" required>
+                    <option value="">-- Chọn --</option>
+                    @foreach ($criterion['options'] as $value => $label)
+                        <option value="{{ $value }}"
+                            {{ (string) ($row[$criterion['name']] ?? '') === (string) $value ? 'selected' : '' }}>
+                            {{ $label }}
+                        </option>
+                    @endforeach
+                </select>
+            </td>
+        @endforeach
         <td>
             <select name="items[{{ $index }}][unit_id]" data-fill="unit_id"
                 class="form-control cbt-select {{ $cfg['prefix'] }}-unit {{ $err('unit_id') }}" required>

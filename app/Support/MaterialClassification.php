@@ -11,14 +11,14 @@ use Illuminate\Validation\Rule;
  * dạng {"price":"high","importance":"low",...} để MỘT vật tư mang nhiều cách phân loại
  * cùng lúc, mỗi tiêu chí chọn đúng một giá trị:
  *
- *   - price          : theo giá trị
  *   - importance     : theo mức độ quan trọng
  *   - dangerous      : có thuộc danh mục hàng hoá nguy hiểm hay không
- *   - qa_calibration : có cần QA hiệu chuẩn trước khi sử dụng hay không
+ *   - qa_calibration : cần hiệu chuẩn trước khi cấp phát / sau khi cấp phát / không
+ *   - contact        : có tiếp xúc hay không
  *
- * Bộ tiêu chí do Phòng Tổng Hợp chốt: 5 tiêu chí, mỗi tiêu chí BẮT BUỘC chọn - không còn
- * mục "Chưa xác định". Bộ Phận Mua Hàng là tiêu chí thứ 4 trên form nhưng vẫn lưu ở cột
- * riêng purchasing_department, xem formGroups().
+ * Bộ tiêu chí do Phòng Tổng Hợp chốt (13/11/2026): 4 tiêu chí ở danh mục công ty, mỗi tiêu chí
+ * BẮT BUỘC chọn. "Theo Giá Trị" chuyển xuống danh mục vật tư của phòng (DEPARTMENT_CRITERIA,
+ * cột material_department_categories.price_level) - mọi phòng đều khai.
  *
  * Tiêu chí "Theo Cấp Phát Bởi Hành Chánh" (khoá supply) ĐÃ BỎ từ 16/10/2026: vật tư do
  * Hành Chánh cấp phát chính là vật tư có Bộ Phận Mua Hàng = Hành Chánh - xem isAdminPurchased().
@@ -40,14 +40,6 @@ class MaterialClassification
      * Khoá mảng chính là khoá lưu trong JSON, không đổi khi đã có dữ liệu.
      */
     public const CRITERIA = [
-        'price' => [
-            'label' => 'Theo Giá Trị',
-            'icon' => 'fas fa-tags',
-            'options' => [
-                'low' => 'Thấp',
-                'high' => 'Cao',
-            ],
-        ],
         'importance' => [
             'label' => 'Theo Mức Độ Quan Trọng',
             'icon' => 'fas fa-star',
@@ -64,12 +56,41 @@ class MaterialClassification
                 'no' => 'Không',
             ],
         ],
+        // Khoá 'yes' giữ nghĩa cũ "QA hiệu chuẩn TRƯỚC khi cấp phát" (MaterialCalibration đọc
+        // needsQaCalibration); 'after' thêm 13/11/2026 - hiệu chuẩn sau khi cấp phát.
         'qa_calibration' => [
             'label' => 'Theo Cần Hiệu Chuẩn Trước Khi Dùng',
             'icon' => 'fas fa-ruler-combined',
             'options' => [
-                'yes' => 'Có',
+                'yes' => 'Cần HC trước khi cấp phát (HC bởi NSX / Stella)',
+                'after' => 'Cần HC sau khi cấp phát',
                 'no' => 'Không',
+            ],
+        ],
+        'contact' => [
+            'label' => 'Theo Tiếp Xúc',
+            'icon' => 'fas fa-hand-paper',
+            'options' => [
+                'yes' => 'Có tiếp xúc',
+                'no' => 'Không tiếp xúc',
+            ],
+        ],
+    ];
+
+    /**
+     * Tiêu chí phân loại khai ở DANH MỤC VẬT TƯ CỦA PHÒNG (mọi phòng, bắt buộc), mỗi tiêu chí
+     * một cột riêng trên material_department_categories. "Theo Giá Trị" chuyển từ danh mục công
+     * ty xuống phòng ngày 13/11/2026. Khoá giữ 'price' để điều kiện trình ký đã khai
+     * ({"price":"high"}) vẫn chạy - MaterialSignFlow đọc giá trị từ dòng của phòng.
+     */
+    public const DEPARTMENT_CRITERIA = [
+        'price' => [
+            'label' => 'Theo Giá Trị',
+            'icon' => 'fas fa-tags',
+            'column' => 'price_level',
+            'options' => [
+                'low' => 'Thấp',
+                'high' => 'Cao',
             ],
         ],
     ];
@@ -82,7 +103,8 @@ class MaterialClassification
         'price' => ['low' => 'Giá thấp', 'high' => 'Giá cao'],
         'importance' => ['low' => 'Ít quan trọng', 'high' => 'Rất quan trọng'],
         'dangerous' => ['yes' => 'Hàng nguy hiểm', 'no' => 'Không nguy hiểm'],
-        'qa_calibration' => ['yes' => 'Cần hiệu chuẩn', 'no' => 'Không hiệu chuẩn'],
+        'qa_calibration' => ['yes' => 'HC trước cấp phát', 'after' => 'HC sau cấp phát', 'no' => 'Không hiệu chuẩn'],
+        'contact' => ['yes' => 'Có tiếp xúc', 'no' => 'Không tiếp xúc'],
     ];
 
     /**
@@ -91,7 +113,7 @@ class MaterialClassification
      */
     public const CHIP_CLASSES = [
         'dangerous' => ['yes' => 'critical'],
-        'qa_calibration' => ['yes' => 'banned'],
+        'qa_calibration' => ['yes' => 'banned', 'after' => 'banned'],
     ];
 
     /**
@@ -99,6 +121,11 @@ class MaterialClassification
      * sử thay đổi cũ không mất chữ (migration 2026_10_16_100000_drop_supply_material_classification).
      */
     public const RETIRED_CRITERIA = [
+        // Chuyển xuống danh mục vật tư của phòng 13/11/2026 (DEPARTMENT_CRITERIA)
+        'price' => [
+            'label' => 'Theo Giá Trị (đã chuyển về phòng)',
+            'options' => ['low' => 'Thấp', 'high' => 'Cao'],
+        ],
         'supply' => [
             'label' => 'Theo Cấp Phát Bởi Hành Chánh (đã bỏ)',
             'options' => ['yes' => 'Có', 'no' => 'Không', 'admin' => 'Hành Chánh', 'other' => 'Khác'],
@@ -261,10 +288,16 @@ class MaterialClassification
             ->all();
     }
 
-    /** Vật tư phải được QA hiệu chuẩn trước khi sử dụng - cấp phát xong phải báo QA. */
+    /** Vật tư phải được QA hiệu chuẩn ĐẠT trước khi cấp phát (luồng giữ chỗ - MaterialCalibration). */
     public static function needsQaCalibration(?string $json): bool
     {
         return (self::decode($json)['qa_calibration'] ?? null) === 'yes';
+    }
+
+    /** Vật tư "HC sau cấp phát": cấp phát bình thường, cấp xong tự gửi QA xác nhận hiệu chuẩn. */
+    public static function needsQaCalibrationAfter(?string $json): bool
+    {
+        return (self::decode($json)['qa_calibration'] ?? null) === 'after';
     }
 
     /**
@@ -307,6 +340,107 @@ class MaterialClassification
         }
 
         return $groups;
+    }
+
+    /** Giá trị tiêu chí cấp phòng của một dòng material_department_categories: [khoá => giá trị]. */
+    public static function departmentValues($row): array
+    {
+        $values = [];
+
+        foreach (self::DEPARTMENT_CRITERIA as $key => $criterion) {
+            $value = is_object($row) ? ($row->{$criterion['column']} ?? null) : ($row[$criterion['column']] ?? null);
+
+            if (is_string($value) && isset($criterion['options'][$value])) {
+                $values[$key] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    /** Chip tiêu chí cấp phòng - cùng dạng chips(). */
+    public static function departmentChips($row): array
+    {
+        $chips = [];
+
+        foreach (self::departmentValues($row) as $key => $value) {
+            $criterion = self::DEPARTMENT_CRITERIA[$key];
+            $chips[] = [
+                'short' => self::SHORT_LABELS[$key][$value] ?? $criterion['options'][$value],
+                'label' => $criterion['label'].': '.$criterion['options'][$value],
+                'class' => self::CHIP_CLASSES[$key][$value] ?? '',
+            ];
+        }
+
+        return $chips;
+    }
+
+    /** Mô tả tiêu chí cấp phòng cho lịch sử: "Theo Giá Trị: Cao" hoặc "chưa khai". */
+    public static function describeDepartment($row): string
+    {
+        $parts = [];
+
+        foreach (self::departmentValues($row) as $key => $value) {
+            $parts[] = self::DEPARTMENT_CRITERIA[$key]['label'].': '.self::DEPARTMENT_CRITERIA[$key]['options'][$value];
+        }
+
+        return $parts ? implode('; ', $parts) : 'chưa khai';
+    }
+
+    /** Khoá lọc "tiêu chí:giá trị" của tiêu chí cấp phòng, nối vào data-class của dòng bảng. */
+    public static function departmentFilterKeys($row): string
+    {
+        return collect(self::departmentValues($row))->map(fn ($value, $key) => $key.':'.$value)->implode(' ');
+    }
+
+    /** Ô chọn + badge lọc của tiêu chí cấp phòng (giống formGroups() / filterGroups()). */
+    public static function departmentFormGroups($row = null): array
+    {
+        $values = $row ? self::departmentValues($row) : [];
+        $groups = [];
+
+        foreach (self::DEPARTMENT_CRITERIA as $key => $criterion) {
+            $groups[] = [
+                'key' => $key,
+                'label' => $criterion['label'],
+                'icon' => $criterion['icon'],
+                'name' => $criterion['column'],
+                'errorKey' => $criterion['column'],
+                'options' => $criterion['options'],
+                'value' => (string) ($values[$key] ?? ''),
+                'chips' => collect($criterion['options'])->map(fn ($name, $value) => [
+                    'key' => $key.':'.$value,
+                    'short' => self::SHORT_LABELS[$key][$value] ?? $name,
+                    'class' => self::CHIP_CLASSES[$key][$value] ?? '',
+                ])->values()->all(),
+            ];
+        }
+
+        return $groups;
+    }
+
+    /** Validate tiêu chí cấp phòng (bắt buộc). $prefix cho form nhiều dòng, vd 'items.*.'. */
+    public static function departmentRules(string $prefix = ''): array
+    {
+        $rules = [];
+
+        foreach (self::DEPARTMENT_CRITERIA as $criterion) {
+            $rules[$prefix.$criterion['column']] = ['required', Rule::in(array_keys($criterion['options']))];
+        }
+
+        return $rules;
+    }
+
+    public static function departmentMessages(string $prefix = ''): array
+    {
+        $messages = [];
+
+        foreach (self::DEPARTMENT_CRITERIA as $criterion) {
+            $messages[$prefix.$criterion['column'].'.required'] = 'Vui lòng chọn tiêu chí "'.$criterion['label'].'".';
+            $messages[$prefix.$criterion['column'].'.in'] = 'Lựa chọn của tiêu chí "'.$criterion['label'].'" không hợp lệ.';
+        }
+
+        return $messages;
     }
 
     /** Quy tắc validate cho phần phân loại + thời gian đặt hàng. */

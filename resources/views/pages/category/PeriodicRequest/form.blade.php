@@ -110,10 +110,10 @@
                             </div>
                         @else
                             @php $objectTypes = \App\Http\Controllers\Pages\MaterData\ConsumptionObjectController::typeLabels(); @endphp
-                            <div class="form-group col-md-5">
-                                <label>Đối Tượng</label>
+                            <div class="form-group col-md-7">
+                                <label>Đối Tượng <span class="text-danger">*</span></label>
                                 <div class="input-group pr-object-group">
-                                    <select name="consumption_object_id"
+                                    <select name="consumption_object_id" required
                                         class="form-control cat-select pr-object {{ $bag->has('consumption_object_id') ? 'is-invalid' : '' }}">
                                         <option value="">-- Chọn đối tượng --</option>
                                         @foreach ($objects->groupBy('type') as $objectType => $typeObjects)
@@ -142,17 +142,6 @@
                                 <small class="pr-object-info"></small>
                             </div>
 
-                            <div class="form-group col-md-7">
-                                <label>Tiêu Đề <span class="text-danger">*</span></label>
-                                <input type="text" name="title" maxlength="255" required list="prTitleOptions_{{ $type }}" autocomplete="off"
-                                    class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
-                                    value="{{ $old('title') }}" placeholder="VD: Vật tư bảo trì hằng tháng">
-                            </div>
-                        @endif
-                    </div>
-
-                    @if ($isInternal)
-                        <div class="form-row">
                             <div class="form-group col-md-5">
                                 <label>Tổ Quản Lý <span class="text-danger">*</span></label>
                                 <select name="group_id" required
@@ -163,8 +152,8 @@
                                     @endforeach
                                 </select>
                             </div>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
 
                     <div class="form-row pr-cycle-row">
                         @unless ($isInternal)
@@ -223,7 +212,9 @@
                                 <select name="cycle_day_mode"
                                     class="form-control pr-day-mode {{ $bag->has('cycle_day_mode') ? 'is-invalid' : '' }}">
                                     <option value="{{ $prSupport::DAY_MODE_FIXED }}">Ngày cố định trong chu kỳ</option>
-                                    <option value="{{ $prSupport::DAY_MODE_CAL_DUE }}" disabled>Theo ngày đến hạn lịch CAL</option>
+                                    @if ($prSupport::calCycleEnabled())
+                                        <option value="{{ $prSupport::DAY_MODE_CAL_DUE }}" disabled>Theo ngày đến hạn lịch CAL</option>
+                                    @endif
                                 </select>
                                 <small class="pr-cal-info"></small>
                             @endunless

@@ -648,6 +648,12 @@ class VppPeriodicRequest
 
     public const CAL_LEAD_DAYS_MAX = 30;
 
+    /** Công tắc .env CAL_CYCLE_ENABLED: server không kết nối được CAL thì tắt hẳn chế độ theo hạn lịch CAL. */
+    public static function calCycleEnabled(): bool
+    {
+        return (bool) config('services.cal.cycle_enabled', true);
+    }
+
     public static function dayModeOf($value): string
     {
         return $value === self::DAY_MODE_CAL_DUE ? self::DAY_MODE_CAL_DUE : self::DAY_MODE_FIXED;
@@ -783,6 +789,10 @@ class VppPeriodicRequest
         $leadDays = $leadDays !== null ? max(0, min(self::CAL_LEAD_DAYS_MAX, $leadDays)) : self::CAL_LEAD_DAYS_DEFAULT;
         $fail = fn (string $message) => ['available' => false, 'message' => $message, 'schedules' => [], 'next' => null, 'lead_days' => $leadDays];
 
+        if (! self::calCycleEnabled()) {
+            return $fail('Server này không kết nối phần mềm CAL nên chưa dùng được hạn lịch CAL.');
+        }
+
         if (! $object) {
             return $fail('Chọn đối tượng thuộc phần mềm CAL để dùng hạn lịch CAL.');
         }
@@ -840,7 +850,7 @@ class VppPeriodicRequest
      */
     public static function refreshCalSchedule($list, $today = null): bool
     {
-        if (! $list || self::dayModeOf($list->cycle_day_mode ?? null) !== self::DAY_MODE_CAL_DUE) {
+        if (! $list || ! self::calCycleEnabled() || self::dayModeOf($list->cycle_day_mode ?? null) !== self::DAY_MODE_CAL_DUE) {
             return false;
         }
 
@@ -882,6 +892,10 @@ class VppPeriodicRequest
      */
     public static function refreshCalSchedules(?int $departmentId = null, bool $force = false): void
     {
+        if (! self::calCycleEnabled()) {
+            return;
+        }
+
         DB::table(self::LIST_TABLE)
             ->where('status_id', 1)
             ->where('cycle_day_mode', self::DAY_MODE_CAL_DUE)

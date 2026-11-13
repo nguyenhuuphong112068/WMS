@@ -28,6 +28,26 @@
                     </div>
 
                     <div class="form-row">
+                        @foreach (\App\Support\MaterialClassification::departmentFormGroups() as $criterion)
+                            <div class="form-group col-md-6">
+                                <label><i class="{{ $criterion['icon'] }} mr-1"></i>{{ $criterion['label'] }}
+                                    <span class="text-danger">*</span></label>
+                                <select name="{{ $criterion['name'] }}" required
+                                    class="form-control cat-select {{ $bag->has($criterion['errorKey']) ? 'is-invalid' : '' }}">
+                                    <option value="">-- Chọn --</option>
+                                    @foreach ($criterion['options'] as $value => $label)
+                                        <option value="{{ $value }}"
+                                            {{ (string) $old($criterion['name']) === (string) $value ? 'selected' : '' }}>
+                                            {{ $label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @if ($bag->has($criterion['errorKey']))
+                                    <span class="md-error">{{ $bag->first($criterion['errorKey']) }}</span>
+                                @endif
+                            </div>
+                        @endforeach
+
                         <div class="form-group col-md-6">
                             <label>Phân Loại Của Phòng</label>
                             <select name="classification_id"

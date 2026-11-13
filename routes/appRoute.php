@@ -12,6 +12,7 @@ use App\Http\Controllers\General\HomeController;
 use App\Http\Controllers\General\PublicStockLookupController;
 use App\Http\Controllers\General\PrintTestController;
 use App\Http\Controllers\General\SwitchProductionController;
+use App\Http\Controllers\General\TabletSetupController;
 use App\Http\Controllers\UploadDataController;
 use App\Http\Middleware\CheckLogin;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,10 @@ Route::get('/tra-cuu-hoa-chat', [PublicStockLookupController::class, 'chemical']
 Route::get('/tra-cuu-chat-chuan', [PublicStockLookupController::class, 'standard'])->name('publicStandardLookup');
 Route::get('/tra-cuu-vat-tu', [PublicStockLookupController::class, 'material'])->name('publicMaterialLookup');
 Route::get('/tra-cuu-vpp', [PublicStockLookupController::class, 'vpp'])->name('publicVppLookup');
+
+// Trợ lý cài đặt tablet quét mã bằng camera khi server chạy HTTP - chỉ Admin (mục Quản Trị trên leftNAV)
+Route::get('/cai-dat-tablet', [TabletSetupController::class, 'index'])->name('tabletSetup')
+    ->middleware([CheckLogin::class, 'role:Admin']);
 
 Route::post('/changePassword', [LoginController::class, 'changePassword'])->name('changePassword');
 

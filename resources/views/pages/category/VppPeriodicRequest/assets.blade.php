@@ -806,6 +806,13 @@
             var $mode = $form.find('.pr-day-mode');
             if (!$mode.length) return;
 
+            // CAL_CYCLE_ENABLED=false (server không kết nối CAL): không có tuỳ chọn CAL, không gọi đọc lịch
+            if (!$mode.find('option[value="cal_due"]').length) {
+                $mode.val('fixed');
+                prApplyCycle($form);
+                return;
+            }
+
             var objectId = $form.find('select.pr-object').val() || '';
             var frequency = $form.find('.pr-frequency').val() || '';
             var wanted = keepMode !== undefined && keepMode !== null && keepMode !== '' ? String(keepMode) : $mode.val();

@@ -20,6 +20,11 @@
         'failed' => ['label' => 'Không đạt', 'class' => 'cal-st-failed', 'icon' => 'fas fa-times-circle'],
         'canceled' => ['label' => 'Đã huỷ', 'class' => 'cal-st-canceled', 'icon' => 'fas fa-ban'],
     ];
+    // Phiếu "HC sau cấp phát" (timing = after): hàng đã cấp, đạt = 'issued' ngay khi QA xác nhận
+    $calAfterStatusMeta = [
+        'pending' => ['label' => 'Đã cấp - chờ QA xác nhận', 'class' => 'cal-st-pending', 'icon' => 'fas fa-hourglass-half'],
+        'issued' => ['label' => 'Đạt', 'class' => 'cal-st-passed', 'icon' => 'fas fa-check-circle'],
+    ];
     $calTypeLabel = ['periodic' => 'Định kỳ', 'risk_assessment' => 'ĐG rủi ro', 'regular' => 'Thường quy'];
 @endphp
 
@@ -40,6 +45,18 @@
     .cal-st-issued { background: var(--primary-soft); color: var(--primary-dark); }
     .cal-st-failed { background: #FEF2F2; color: #DC2626; }
     .cal-st-canceled { background: #F1F5F9; color: #475569; }
+
+    .cal-timing-after {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: rgba(var(--primary-rgb), 0.1);
+        color: var(--primary-dark);
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
 
     .cal-lot {
         font-size: 0.8rem;

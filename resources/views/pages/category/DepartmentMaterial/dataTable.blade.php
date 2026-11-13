@@ -30,6 +30,13 @@
                                 <option value="dept:{{ $id }}">{{ $name }}</option>
                             @endforeach
                         </optgroup>
+                        @foreach (\App\Support\MaterialClassification::departmentFormGroups() as $group)
+                            <optgroup label="{{ $group['label'] }} (phòng)">
+                                @foreach ($group['options'] as $value => $name)
+                                    <option value="{{ $group['key'] }}:{{ $value }}">{{ $name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
                         @foreach (\App\Support\MaterialClassification::formGroups() as $group)
                             @php $filterKey = str_replace('classification.', '', $group['errorKey']); @endphp
                             <optgroup label="{{ $group['label'] }}">
@@ -101,7 +108,7 @@
                 </thead>
                 <tbody>
                     @foreach ($datas as $row)
-                        <tr data-class="dept:{{ $row->classification_id ?: 'none' }} {{ \App\Support\MaterialClassification::filterKeys($row->category_classification, $row->category_purchasing_department) }}"
+                        <tr data-class="dept:{{ $row->classification_id ?: 'none' }} {{ \App\Support\MaterialClassification::filterKeys($row->category_classification, $row->category_purchasing_department) }} {{ \App\Support\MaterialClassification::departmentFilterKeys($row) }}"
                             data-maker="{{ $row->manufacturer_name }}"
                             data-zone="{{ $row->location_code ? 'yes' : 'no' }}"
                             data-stock="{{ $row->min_stock !== null && $row->max_stock !== null ? 'yes' : 'no' }}"
@@ -121,9 +128,14 @@
                             </td>
                             <td class="md-sub">{{ $row->category_technical_specification ?: '—' }}</td>
                             <td>
+                                @php $dmPriceChips = \App\Support\MaterialClassification::departmentChips($row); @endphp
                                 @if ($row->classification_name)
                                     <span class="md-tag">{{ $row->classification_name }}</span>
-                                @else
+                                @endif
+                                @foreach ($dmPriceChips as $chip)
+                                    <span class="md-tag" title="{{ $chip['label'] }}">{{ $chip['short'] }}</span>
+                                @endforeach
+                                @if (! $row->classification_name && ! $dmPriceChips)
                                     <span class="md-empty">—</span>
                                 @endif
                             </td>
@@ -190,6 +202,7 @@
                                                     'id' => $row->id,
                                                     'category_id' => $row->category_id,
                                                     'classification_id' => $row->classification_id,
+                                                    'price_level' => $row->price_level,
                                                     'unit_id' => $row->unit_id,
                                                     'min_stock' => $row->min_stock,
                                                     'max_stock' => $row->max_stock,

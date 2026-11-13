@@ -13,7 +13,6 @@
     // Danh sách dự trù tạo "phiếu dự trù", hai loại kia tạo "đề nghị"
     $prDoc = $isEstimate ? 'phiếu dự trù' : 'đề nghị';
     $prSupport = \App\Support\MaterialPeriodicRequest::class;
-    $prObjectTypes = \App\Http\Controllers\Pages\MaterData\ConsumptionObjectController::typeLabels();
     $prNum = fn ($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
 @endphp
 
@@ -48,16 +47,16 @@
                 <thead>
                     <tr>
                         <th class="text-center" style="width: 46px">STT</th>
-                        <th style="width: 190px">Tiêu Đề</th>
                         @if ($isInternal)
+                            <th style="width: 240px">Đối Tượng</th>
                             <th style="width: 130px">Tổ Quản Lý</th>
+                        @else
+                            <th style="width: 190px">Tiêu Đề</th>
                         @endif
                         @if ($isEstimate)
                             <th style="width: 150px">Dự Trù Cho</th>
                         @elseif ($isExternal)
                             <th style="width: 150px">Phòng Cấp Phát</th>
-                        @else
-                            <th style="width: 210px">Đối Tượng</th>
                         @endif
                         <th style="width: 160px">Chu Kỳ</th>
                         <th class="text-center" style="width: 110px">{{ $isEstimate ? 'Tạo Phiếu Kế Tiếp' : 'Tạo Đề Nghị Kế Tiếp' }}</th>
@@ -70,9 +69,22 @@
                     @foreach ($lists as $row)
                         <tr data-group="{{ $row->group_name ?: '__none' }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
-                            <td class="font-weight-bold">{{ $row->title }}</td>
                             @if ($isInternal)
+                                @php $prMaintenance = $prSupport::maintenanceLabel($row->frequency); @endphp
+                                <td data-order="{{ $row->object_code ?: $row->title }}">
+                                    @if ($row->object_code)
+                                        <span class="md-tag">{{ $row->object_code }}</span>
+                                        <div class="font-weight-bold">{{ $row->object_name }}</div>
+                                    @else
+                                        <div class="font-weight-bold">{{ $row->title }}</div>
+                                    @endif
+                                    @if ($prMaintenance)
+                                        <span class="badge badge-info mt-1">{{ $prMaintenance }}</span>
+                                    @endif
+                                </td>
                                 <td>{{ $row->group_name ?: '—' }}</td>
+                            @else
+                                <td class="font-weight-bold">{{ $row->title }}</td>
                             @endif
                             @if ($isEstimate)
                                 @php $prPeriod = $prSupport::estimatePeriod($row, $row->next_run_date ?: now()); @endphp
@@ -87,18 +99,6 @@
                                     {{ $row->to_department_name ?: '—' }}
                                     @if ($row->to_department_short)
                                         <br><span class="md-tag">{{ $row->to_department_short }}</span>
-                                    @endif
-                                </td>
-                            @else
-                                <td data-order="{{ $row->object_code }}">
-                                    @if ($row->object_code)
-                                        <span class="md-tag">{{ $row->object_code }}</span>
-                                        <div class="font-weight-bold">{{ $row->object_name }}</div>
-                                        <div class="md-sub">
-                                            {{ $prObjectTypes[$row->object_type] ?? $row->object_type }}{{ $row->object_location ? ' · ' . $row->object_location : '' }}
-                                        </div>
-                                    @else
-                                        <span class="md-empty">—</span>
                                     @endif
                                 </td>
                             @endif
@@ -127,7 +127,17 @@
                                 @endif
                             </td>
                             <td data-order="{{ (int) $row->generated_count }}">
-                                <div class="pr-count"><b>{{ (int) $row->generated_count }}</b> lần</div>
+                                <div class="pr-count">
+                                    <b>{{ (int) $row->generated_count }}</b> lần
+                                    @if ((int) $row->generated_count > 0)
+                                        <button type="button" class="btn btn-xs btn-outline-info ml-1 btn-pr-generated"
+                                            title="Xem lịch sử {{ $prDoc }} đã tạo"
+                                            data-url="{{ route($prRoute . 'generated', ['id' => $row->id]) }}"
+                                            data-title="{{ $row->title }}">
+                                            <i class="fas fa-history"></i>
+                                        </button>
+                                    @endif
+                                </div>
                                 @if ($row->last_generated_at)
                                     <div class="md-sub">Gần nhất {{ \Carbon\Carbon::parse($row->last_generated_at)->format('d/m/Y H:i') }}</div>
                                     <span class="md-tag">{{ $row->last_request_code }}</span>

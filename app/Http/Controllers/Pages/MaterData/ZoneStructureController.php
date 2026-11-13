@@ -1484,23 +1484,10 @@ class ZoneStructureController extends Controller
         return max(1, (int) ($cell->depth ?? 1));
     }
 
-    /** Mã vị trí: <mã tầng>/<chữ ô ngang><số dãy sâu>, ví dụ 01/01/01/03/E2. */
+    /** Mã vị trí: <mã tầng>/<số ô ngang 2 chữ số>-<số dãy sâu>, ví dụ 01/01/01/03/05.2. */
     private function locationCode(string $tierCode, int $position, int $depth): string
     {
-        return $tierCode . '/' . self::letters($position) . $depth;
-    }
-
-    /** Chữ của ô ngang thứ $n kiểu cột Excel: 1 -> A, 26 -> Z, 27 -> AA. */
-    public static function letters(int $n): string
-    {
-        $out = '';
-        while ($n > 0) {
-            $n--;
-            $out = chr(65 + $n % 26) . $out;
-            $n = intdiv($n, 26);
-        }
-
-        return $out;
+        return $tierCode . '/' . str_pad((string) $position, 2, '0', STR_PAD_LEFT) . '.' . $depth;
     }
 
     /** Khoá một tầng cùng các vị trí đang mở của nó, trả về số vị trí vừa khoá. */

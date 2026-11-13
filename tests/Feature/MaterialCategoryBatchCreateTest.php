@@ -54,7 +54,7 @@ class MaterialCategoryBatchCreateTest extends TestCase
             'manufacturers_id' => $manufacturerId,
             'part_number' => 'ZTEST-PN',
             'technical_specification' => '',
-            'classification' => ['price' => 'low', 'importance' => 'high', 'dangerous' => 'no', 'qa_calibration' => 'no'],
+            'classification' => ['importance' => 'high', 'dangerous' => 'no', 'qa_calibration' => 'after', 'contact' => 'yes'],
             'purchasing_department' => 'supply',
         ];
     }
@@ -109,7 +109,7 @@ class MaterialCategoryBatchCreateTest extends TestCase
                 ->post(self::PAGE.'/store', ['items' => [
                     $this->companyRow($names[0], $manufacturerId),
                     // Dòng để trống hoàn toàn (chỉ có phân loại do Điền nhanh) bị bỏ qua
-                    ['material_names_id' => '', 'manufacturers_id' => '', 'classification' => ['price' => 'low']],
+                    ['material_names_id' => '', 'manufacturers_id' => '', 'classification' => ['importance' => 'low']],
                     $this->companyRow($names[1], $manufacturerId),
                 ]])
                 ->assertRedirect(self::PAGE)
@@ -173,16 +173,17 @@ class MaterialCategoryBatchCreateTest extends TestCase
 
             $this->withSession($this->sess())->from(self::PAGE)
                 ->post('/category/departmentMaterial/store', ['items' => [
-                    ['category_id' => $categories[0], 'unit_id' => $unitId, 'min_stock' => '2', 'max_stock' => '10',
+                    ['category_id' => $categories[0], 'unit_id' => $unitId, 'price_level' => 'high', 'min_stock' => '2', 'max_stock' => '10',
                         'conversions' => $this->conversionsFor($categories[0], $unitId)],
-                    ['category_id' => $categories[1], 'unit_id' => $unitId, 'note' => 'ZTEST',
+                    ['category_id' => $categories[1], 'unit_id' => $unitId, 'price_level' => 'low', 'note' => 'ZTEST',
                         'conversions' => $this->conversionsFor($categories[1], $unitId)],
                 ]])
                 ->assertRedirect(self::PAGE)
                 ->assertSessionHas('success', 'Đã khai 2 vật tư của phòng thành công!');
 
-            $this->assertSame(2, DB::table('material_department_categories')
-                ->where('department_id', self::DEPARTMENT_ID)->whereIn('category_id', $categories)->count());
+            $this->assertSame(['high', 'low'], DB::table('material_department_categories')
+                ->where('department_id', self::DEPARTMENT_ID)->whereIn('category_id', $categories)
+                ->orderByRaw('category_id = ? desc', [$categories[0]])->pluck('price_level')->all());
         } finally {
             DB::rollBack();
         }
@@ -212,6 +213,7 @@ class MaterialCategoryBatchCreateTest extends TestCase
                 'updated_at' => now(),
             ]);
 
+            // Thiếu "Theo Giá Trị" (bắt buộc ở cấp phòng) cũng báo theo dòng
             $row = ['category_id' => $categories[0], 'unit_id' => $units[0], 'min_stock' => '10', 'max_stock' => '2'];
 
             $this->withSession($this->sess())->from(self::PAGE)
@@ -219,6 +221,7 @@ class MaterialCategoryBatchCreateTest extends TestCase
                 ->assertRedirect(self::PAGE)
                 ->assertSessionHasErrors([
                     'items.0.max_stock',
+                    'items.0.price_level',
                     'items.0.conversions.'.$units[1],
                     'items.1.category_id',
                 ], null, 'dmCreateErrors');
@@ -228,7 +231,7 @@ class MaterialCategoryBatchCreateTest extends TestCase
                 ->assertSee('Dòng 1: Ngưỡng tồn tối đa phải lớn hơn hoặc bằng ngưỡng tồn tối thiểu.', false);
 
             // Khai đủ hệ số + ngưỡng hợp lệ thì lưu được, hệ số ghi theo đúng dòng
-            $row = ['category_id' => $categories[0], 'unit_id' => $units[0],
+            $row = ['category_id' => $categories[0], 'unit_id' => $units[0], 'price_level' => 'low',
                 'conversions' => $this->conversionsFor($categories[0], $units[0])];
 
             $this->withSession($this->sess())->from(self::PAGE)

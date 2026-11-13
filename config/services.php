@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    /*
+    | Phần mềm CAL (DB cal1 / cal2). CAL_CYCLE_ENABLED=false: tắt "Theo ngày đến hạn lịch CAL" ở danh
+    | sách đề nghị theo chu kỳ (Vật Tư + VPP) - dùng cho server không kết nối được CAL (vd. 10.72.1.25).
+    */
+    'cal' => [
+        'cycle_enabled' => (bool) env('CAL_CYCLE_ENABLED', true),
+    ],
+
 ];

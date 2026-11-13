@@ -1430,6 +1430,36 @@ class MaterialExportController extends Controller
             }
         }
 
+        /*
+        | Vật tư "HC sau cấp phát": đã cấp như thường, giờ tự sinh phiếu hiệu chuẩn (HCN) gửi QA xác
+        | nhận - phiếu này không giữ chỗ tồn. QA thấy việc chờ ở Trang chủ (HomeController::
+        | calibrationReviews) + tab Xác Nhận Hiệu Chuẩn, không gửi chuông (quy ước ReviewHistory).
+        */
+        $afterCode = null;
+
+        if ($calibrated === null && MaterialCalibration::needsAfter($item->category_id ? (int) $item->category_id : null)) {
+            $afterCode = MaterialCalibration::createAfterIssue(
+                $departmentId,
+                $req,
+                $item,
+                array_map(fn ($line, $exportId) => [
+                    'import_id' => (int) $line['import']->id,
+                    'export_id' => $exportId,
+                    'amount' => (float) $line['amount'],
+                ], $lines, $result['export_ids']),
+                $issuedUnit,
+                $this->actor()
+            );
+
+            AuditTrialController::log(
+                'Đề nghị hiệu chuẩn vật tư (sau cấp phát)',
+                MaterialCalibration::TABLE,
+                $item->id,
+                'NA',
+                'Phiếu '.$afterCode.' cho đề nghị '.$req->code.': '.$this->number($addedAmount).' '.($issuedUnit ?: '').' từ mã xuất nhập '.$codes
+            );
+        }
+
         $message = count($lines) > 1
             ? 'Đã cấp phát '.$this->number($addedAmount).' '.($issuedUnit ?: '').' từ '.count($lines).' mã xuất nhập: '.$codes.'!'
             : 'Đã cấp phát '.$this->number($addedAmount).' '.($issuedUnit ?: '').' từ mã xuất nhập '.$first->code.'!';
@@ -1437,6 +1467,10 @@ class MaterialExportController extends Controller
         if ($newStatus === 'partial') {
             $message .= ' Mục này mới cấp '.$this->number($issuedAmount).'/'.$this->number($requestedAmount)
                 .' '.($issuedUnit ?: '').', còn thiếu '.$this->number($shortAfter).' - cấp thêm khi có hàng về.';
+        }
+
+        if ($afterCode) {
+            $message .= ' Đã gửi QA xác nhận hiệu chuẩn sau cấp phát (phiếu '.$afterCode.').';
         }
 
         if ($request->ajax()) {
@@ -1475,7 +1509,7 @@ class MaterialExportController extends Controller
      * còn hứa được, hạn dùng từ trước và tự refreshIssueStatus() sau khi ghi.
      *
      * @param  array  $lines  [['import' => lô (cần id, code), 'amount' => float], ...]
-     * @return array{status: string, issued: float, short: float, added: float, codes: string, issued_at: \Illuminate\Support\Carbon}
+     * @return array{status: string, issued: float, short: float, added: float, codes: string, issued_at: \Illuminate\Support\Carbon, export_ids: int[]}
      */
     private function recordIssue($item, $req, array $lines, ?string $issuedUnit, int $departmentId): array
     {
@@ -1494,7 +1528,9 @@ class MaterialExportController extends Controller
         $shortAfter = round(max($requestedAmount - $issuedAmount, 0), 4);
         $newStatus = $shortAfter > self::EPSILON ? 'partial' : 'issued';
 
-        DB::transaction(function () use ($item, $req, $lines, $first, $issuedAmount, $issuedUnit, $issuedAt, $departmentId, $newStatus) {
+        $exportIds = [];
+
+        DB::transaction(function () use ($item, $req, $lines, $first, $issuedAmount, $issuedUnit, $issuedAt, $departmentId, $newStatus, &$exportIds) {
             DB::table(self::REQ_ITEM)->where('id', $item->id)->update([
                 // Dòng đề nghị chỉ giữ phần tổng hợp; chi tiết từng lô nằm ở material_exports.
                 // Lô đầu tiên giữ nguyên qua các lần cấp thêm để còn tra đúng lần cấp đầu.
@@ -1525,6 +1561,8 @@ class MaterialExportController extends Controller
                     'updated_at' => $issuedAt,
                 ]);
 
+                $exportIds[] = (int) $exportId;
+
                 $this->logHistory($exportId, 'Cấp phát', 'Kho cấp phát cho đề nghị '.$req->code.', trừ tồn ngay '.$this->number($line['amount']).' '.($issuedUnit ?: ''));
             }
         });
@@ -1545,6 +1583,8 @@ class MaterialExportController extends Controller
             'added' => $addedAmount,
             'codes' => $codes,
             'issued_at' => $issuedAt,
+            // id phiếu sử dụng theo đúng thứ tự $lines
+            'export_ids' => $exportIds,
         ];
     }
 

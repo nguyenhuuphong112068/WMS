@@ -25,6 +25,7 @@
         'dangerous' => 'fas fa-exclamation-triangle',
         'purchasing' => 'fas fa-shopping-cart',
         'qa_calibration' => 'fas fa-ruler-combined',
+        'contact' => 'fas fa-hand-paper',
         'dept_class' => 'fas fa-layer-group',
     ];
 

@@ -706,6 +706,10 @@
             'id' => 'database', 'label' => 'Cơ Sở Dữ Liệu', 'short' => 'CSDL', 'icon' => 'fas fa-server',
             'url' => route('pages.database.list'), 'active' => request()->is('database'),
         ];
+        $navModules[] = [
+            'id' => 'tabletSetup', 'label' => 'Cài Đặt Tablet', 'short' => 'Tablet', 'icon' => 'fas fa-tablet-alt',
+            'url' => route('tabletSetup'), 'active' => request()->is('cai-dat-tablet'),
+        ];
     }
     // Hướng Dẫn Sử Dụng: mọi tài khoản đều xem được, đặt cuối cột
     $navModules[] = [

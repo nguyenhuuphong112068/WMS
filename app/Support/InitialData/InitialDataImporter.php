@@ -1413,6 +1413,10 @@ class InitialDataImporter
                 $data['unit_id'] = $unitId;
             }
 
+            if ($type === CategoryUnitConversion::TYPE_MATERIAL) {
+                $data['price_level'] = $row['price_level'] ?? null;
+            }
+
             if ($type === CategoryUnitConversion::TYPE_MATERIAL && $row['classification'] !== null) {
                 $data['classification_id'] = $this->scopedId('department_classification', $deptId, $row['classification']);
                 if (! $data['classification_id']) {

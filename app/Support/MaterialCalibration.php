@@ -35,6 +35,16 @@ class MaterialCalibration
 
     public const CONFIRM_PERMISSION = 'export_material_calibration_confirm';
 
+    /** Hiệu chuẩn TRƯỚC cấp phát (giữ chỗ tồn, đạt mới cấp) - qa_calibration = yes. */
+    public const TIMING_BEFORE = 'before';
+
+    /**
+     * Hiệu chuẩn SAU cấp phát - qa_calibration = after: cấp phát bình thường, mỗi lần cấp tự sinh
+     * một phiếu (issued_amount = amount, không giữ chỗ) gửi QA xác nhận. Không đạt KHÔNG tự cách ly
+     * (hàng đã rời kho) - chỉ ghi kết quả và báo phòng thu hồi.
+     */
+    public const TIMING_AFTER = 'after';
+
     /** Trạng thái còn giữ chỗ tồn: chờ QA, hoặc đạt mà chưa cấp hết. */
     public const HOLDING_STATUSES = ['pending', 'passed'];
 
@@ -85,6 +95,75 @@ class MaterialCalibration
         return $categoryId && self::categoryIdsNeeding([$categoryId]);
     }
 
+    /** Danh mục phân loại "HC sau cấp phát" (MaterialClassification::needsQaCalibrationAfter). */
+    public static function needsAfter(?int $categoryId): bool
+    {
+        return $categoryId && MaterialClassification::needsQaCalibrationAfter(
+            DB::table('material_categories')->where('id', $categoryId)->value('classification')
+        );
+    }
+
+    /**
+     * Sinh phiếu hiệu chuẩn SAU cấp phát cho một lần cấp: một mã phiếu, mỗi lô một dòng (đã cấp đủ
+     * nên issued_amount = amount, không giữ chỗ tồn), đơn vị chờ QA chọn Đạt / Không đạt (chưa có
+     * Seri No - QA xác nhận theo số thứ tự đơn vị).
+     *
+     * @param  array  $lots  [['import_id' => int, 'export_id' => ?int, 'amount' => float], ...]
+     */
+    public static function createAfterIssue(int $departmentId, $req, $item, array $lots, ?string $unit, string $actor): string
+    {
+        $now = now();
+
+        return DB::transaction(function () use ($departmentId, $req, $item, $lots, $unit, $actor, $now) {
+            $code = self::nextCode($departmentId);
+
+            foreach ($lots as $lot) {
+                $amount = round((float) $lot['amount'], 4);
+                $calibrationId = DB::table(self::TABLE)->insertGetId([
+                    'code' => $code,
+                    'timing' => self::TIMING_AFTER,
+                    'department_id' => $departmentId,
+                    'request_list_id' => $req->id,
+                    'request_item_id' => $item->id,
+                    'category_id' => $item->category_id,
+                    'import_id' => (int) $lot['import_id'],
+                    'export_id' => $lot['export_id'] ?? null,
+                    'amount' => $amount,
+                    'issued_amount' => $amount,
+                    'unit' => $unit,
+                    'app_status' => 'pending',
+                    'request_note' => 'Tự gửi khi cấp phát (HC sau cấp phát)',
+                    'requested_by' => $actor,
+                    'requested_at' => $now,
+                    'status_id' => 1,
+                    'created_by' => $actor,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                $count = self::unitCount($amount);
+
+                for ($i = 0; $i < max($count, 1); $i++) {
+                    DB::table(self::UNIT_TABLE)->insert([
+                        'calibration_id' => $calibrationId,
+                        'code' => $code,
+                        'import_id' => (int) $lot['import_id'],
+                        'unit_no' => $count ? $i + 1 : 0,
+                        'amount' => $count ? 1 : $amount,
+                        'serial_no' => null,
+                        'result' => null,
+                        'status_id' => 1,
+                        'created_by' => $actor,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            }
+
+            return $code;
+        });
+    }
+
     /* ---------- Giữ chỗ tồn ---------- */
 
     /** @return \Illuminate\Support\Collection import_id => số đang giữ */
@@ -94,6 +173,7 @@ class MaterialCalibration
             ->select('import_id', DB::raw('SUM('.self::HELD_AMOUNT.') as total'))
             ->where('department_id', $departmentId)
             ->where('status_id', 1)
+            ->where('timing', self::TIMING_BEFORE)
             ->whereIn('app_status', self::HOLDING_STATUSES)
             ->groupBy('import_id')
             ->pluck('total', 'import_id');
@@ -104,6 +184,7 @@ class MaterialCalibration
         return (float) DB::table(self::TABLE)
             ->where('import_id', $importId)
             ->where('status_id', 1)
+            ->where('timing', self::TIMING_BEFORE)
             ->whereIn('app_status', self::HOLDING_STATUSES)
             ->selectRaw('COALESCE(SUM('.self::HELD_AMOUNT.'), 0) as total')
             ->value('total');
@@ -120,6 +201,7 @@ class MaterialCalibration
             ->select('import_id', DB::raw('SUM('.self::HELD_AMOUNT.') as total'))
             ->where('request_item_id', $itemId)
             ->where('status_id', 1)
+            ->where('timing', self::TIMING_BEFORE)
             ->where('app_status', 'passed')
             ->groupBy('import_id')
             ->pluck('total', 'import_id')
@@ -143,6 +225,7 @@ class MaterialCalibration
                 ->where('request_item_id', $itemId)
                 ->where('import_id', $importId)
                 ->where('status_id', 1)
+                ->where('timing', self::TIMING_BEFORE)
                 ->where('app_status', 'passed')
                 ->orderBy('id')
                 ->get();
@@ -175,6 +258,7 @@ class MaterialCalibration
         return DB::table(self::TABLE)
             ->where('request_item_id', $itemId)
             ->where('status_id', 1)
+            ->where('timing', self::TIMING_BEFORE)
             ->where('app_status', 'passed')
             ->update([
                 'app_status' => 'issued',
@@ -189,6 +273,7 @@ class MaterialCalibration
         return DB::table(self::TABLE)
             ->where('request_item_id', $itemId)
             ->where('status_id', 1)
+            ->where('timing', self::TIMING_BEFORE)
             ->whereIn('app_status', self::HOLDING_STATUSES)
             ->update([
                 'app_status' => 'canceled',
@@ -221,6 +306,7 @@ class MaterialCalibration
         $rows = DB::table(self::TABLE)
             ->whereIn('request_item_id', $itemIds)
             ->where('status_id', 1)
+            ->where('timing', self::TIMING_BEFORE)
             ->whereIn('app_status', ['pending', 'passed', 'failed'])
             ->orderBy('id')
             ->get();

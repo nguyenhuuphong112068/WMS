@@ -94,6 +94,8 @@ Route::prefix('/category')
         // đề nghị Lưu tạm. Không có route hiển thị: nằm ở 2 tab của /category/materialCategory.
         Route::prefix('/periodicRequest')->name('periodicRequest.')->controller(PeriodicRequestController::class)->group(function () {
             Route::get('history', 'history')->name('history');
+            // Các đề nghị / phiếu dự trù đã tạo từ danh sách (lấy từ lịch sử "Tạo đề nghị")
+            Route::get('generated', 'generated')->name('generated');
             // Tìm đối tượng (dữ liệu gốc) qua AJAX cho modal "Dữ Liệu Gốc - Đối Tượng" - không
             // nhúng cả danh mục vào trang, xem MaterialPeriodicRequest::objectSearch()
             Route::get('objects', 'objects')->name('objects');

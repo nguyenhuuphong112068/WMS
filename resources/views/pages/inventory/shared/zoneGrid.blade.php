@@ -415,15 +415,9 @@
                 return byText('name')(a, b);
             }
 
-            /** 1 -> A, 26 -> Z, 27 -> AA (giống mã ô ở Cấu trúc kho) */
+            /** Nhãn ô ngang đánh số từ 1 (giống Cấu trúc kho) */
             function letters(n) {
-                var out = '';
-                while (n > 0) {
-                    var r = (n - 1) % 26;
-                    out = String.fromCharCode(65 + r) + out;
-                    n = Math.floor((n - 1) / 26);
-                }
-                return out;
+                return String(n);
             }
 
             /** Gom mã của một ô: đang có gì, cảnh báo gì, tô màu theo tình trạng như zoneNode() của Vật Tư */

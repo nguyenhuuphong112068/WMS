@@ -802,8 +802,8 @@ class InitialDataTemplate
 
                     return [
                         $r->code, $names[$r->material_names_id] ?? null, $makerNames[$r->manufacturers_id] ?? null, $r->technical_specification,
-                        $criterion('price'), $criterion('importance'), $criterion('dangerous'),
-                        $label('purchasing', $r->purchasing_department), $criterion('qa_calibration'), $r->lead_time_days, null,
+                        $criterion('importance'), $criterion('dangerous'),
+                        $label('purchasing', $r->purchasing_department), $criterion('qa_calibration'), $criterion('contact'), $r->lead_time_days, null,
                     ];
                 });
             })(),

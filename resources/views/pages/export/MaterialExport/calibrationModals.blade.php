@@ -68,7 +68,7 @@
                     <div class="form-group">
                         <label>Lý do không đạt <span class="text-danger cal-note-required" style="display:none">*</span></label>
                         <textarea name="result_note" rows="2" maxlength="500" class="form-control"
-                            placeholder="Không đạt thì ghi rõ lý do - hàng sẽ tự chuyển sang Cách ly của phòng đề nghị">{{ old('result_note') }}</textarea>
+                            placeholder="Không đạt thì ghi rõ lý do">{{ old('result_note') }}</textarea>
                     </div>
 
                     {{-- Thành phần thứ 2 của chữ ký điện tử - 21 CFR Part 11 §11.200 --}}
@@ -168,7 +168,7 @@
             });
 
             $m.find('.cal-sum').html('Đạt <b class="text-success">' + num(passed) + ' ' + esc(unit) + '</b>' +
-                (failed > EPS ? ' · không đạt <b class="text-danger">' + num(failed) + ' ' + esc(unit) + '</b> - chuyển sang Cách ly' : ''));
+                (failed > EPS ? ' · không đạt <b class="text-danger">' + num(failed) + ' ' + esc(unit) + '</b>' + ($m.data('after') ? ' - báo phòng thu hồi' : ' - chuyển sang Cách ly') : ''));
             $m.find('.cal-note-required').toggle(failed > EPS);
             $m.find('[name="result_note"]').prop('required', failed > EPS);
         }
@@ -205,6 +205,8 @@
             var no = 0;
 
             $m.data('unit', row.unit || '');
+            // Phiếu sau cấp phát: hàng đã cấp, không đạt thì báo thu hồi (không cách ly), không so số còn phải cấp
+            $m.data('after', !!row.after);
             $m.find('[name="code"]').val(row.code);
             $m.find('.cal-code').text(row.code || '');
             $m.find('.cal-material').text(row.material || '—');
@@ -216,7 +218,8 @@
             // Người đề nghị được gửi khác số còn phải cấp (thường là gửi dư dự phòng): ghi rõ để QA khỏi hiểu nhầm
             var diff = Math.round(((row.total || 0) - (row.left || 0)) * 10000) / 10000;
             $m.find('.cal-amount-note').text(
-                diff > 0.00005 ? '(người đề nghị gửi dư ' + num(diff) + ' ' + (row.unit || '') + ' dự phòng so với số còn phải cấp ' + num(row.left) + ' ' + (row.unit || '') + ')'
+                row.after ? '(đã cấp phát - hiệu chuẩn sau cấp phát)'
+                : diff > 0.00005 ? '(người đề nghị gửi dư ' + num(diff) + ' ' + (row.unit || '') + ' dự phòng so với số còn phải cấp ' + num(row.left) + ' ' + (row.unit || '') + ')'
                 : diff < -0.00005 ? '(ít hơn số còn phải cấp ' + num(row.left) + ' ' + (row.unit || '') + ')'
                 : ''
             );

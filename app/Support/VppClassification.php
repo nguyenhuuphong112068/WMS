@@ -63,7 +63,12 @@ class VppClassification
      * Tiêu chí ĐÃ BỎ: bộ 4 tiêu chí kiểu Vật Tư VPP dùng trước 12/11/2026. Chỉ describe() đọc
      * để lịch sử thay đổi cũ không mất chữ (migration 2026_11_12_090000).
      */
-    public const RETIRED_CRITERIA = MaterialClassification::CRITERIA;
+    public const RETIRED_CRITERIA = [
+        'price' => ['label' => 'Theo Giá Trị', 'options' => ['low' => 'Thấp', 'high' => 'Cao']],
+        'importance' => ['label' => 'Theo Mức Độ Quan Trọng', 'options' => ['low' => 'Thấp', 'high' => 'Cao']],
+        'dangerous' => ['label' => 'Theo Hàng Hoá Nguy Hiểm', 'options' => ['yes' => 'Có', 'no' => 'Không']],
+        'qa_calibration' => ['label' => 'Theo Cần Hiệu Chuẩn Trước Khi Dùng', 'options' => ['yes' => 'Có', 'no' => 'Không']],
+    ];
 
     /** VPP luôn do Hành Chánh mua và cấp phát (kho VPP). */
     public const PURCHASING_ADMIN = MaterialClassification::PURCHASING_ADMIN;

@@ -31,6 +31,10 @@ use Illuminate\Support\Facades\Validator;
  *
  * cancel(): phòng đề nghị huỷ phiếu còn chờ QA - nhả giữ chỗ.
  *
+ * Phiếu timing = after (vật tư "HC sau cấp phát"): MaterialExportController::issueStore() tự sinh
+ * khi cấp phát, không giữ chỗ. QA xác nhận như trên nhưng Không đạt KHÔNG cách ly (hàng đã cấp,
+ * đã trừ tồn) - chỉ ghi kết quả + báo phòng thu hồi; phòng không huỷ được phiếu loại này.
+ *
  * Không có index riêng: tab "Hiệu chuẩn" của Sử Dụng Vật Tư, dữ liệu qua paneData().
  */
 class MaterialCalibrationController extends Controller
@@ -125,6 +129,7 @@ class MaterialCalibrationController extends Controller
 
             return (object) [
                 'code' => $first->code,
+                'timing' => $first->timing ?? MaterialCalibration::TIMING_BEFORE,
                 'department_id' => (int) $first->department_id,
                 'department_name' => $first->department_name,
                 'own' => (int) $first->department_id === $departmentId,
@@ -475,11 +480,19 @@ class MaterialCalibrationController extends Controller
         $now = now();
         $code = (string) $request->code;
 
-        DB::transaction(function () use ($rows, $results, $input, $actor, $now, $note, $code) {
+        $isAfter = $rows->first()->timing === MaterialCalibration::TIMING_AFTER;
+
+        DB::transaction(function () use ($rows, $results, $input, $actor, $now, $note, $code, $isAfter) {
             foreach ($rows as $row) {
                 $passed = $results[$row->id]['passed'];
                 $failed = $results[$row->id]['failed'];
                 $result = ['result_note' => $note, 'result_by' => $actor, 'result_at' => $now, 'updated_by' => $actor, 'updated_at' => $now];
+
+                if ($isAfter) {
+                    $this->confirmAfterRow($row, $results[$row->id]['units'], $input, $passed, $failed, $result);
+
+                    continue;
+                }
 
                 // Phần không đạt: sang Cách ly chờ quyết định loại bỏ / trả về kho
                 $quarantineId = $failed > self::EPSILON
@@ -557,6 +570,18 @@ class MaterialCalibrationController extends Controller
         $reqCode = DB::table(self::REQ_LIST)->where('id', $rows->first()->request_list_id)->value('code');
         $summary = 'đạt '.$this->number($totalPassed).' '.$unit.($totalFailed > self::EPSILON ? ', không đạt '.$this->number($totalFailed).' '.$unit : '');
 
+        if ($isAfter) {
+            $this->notifyDepartment(
+                $sourceDepartmentId,
+                'QA xác nhận hiệu chuẩn sau cấp phát phiếu '.$code.' (đề nghị '.$reqCode.'): '.$summary.'.'
+                    .($totalFailed > self::EPSILON ? ' Vật tư không đạt đã cấp cho người dùng - vui lòng thu hồi ('.$note.').' : ''),
+                'calibration'
+            );
+
+            return $this->tabBack('success', 'Đã ký xác nhận hiệu chuẩn sau cấp phát phiếu '.$code.': '.$summary
+                .($totalFailed > self::EPSILON ? ' - đã báo phòng đề nghị thu hồi phần không đạt.' : '.'));
+        }
+
         $this->notifyDepartment(
             $sourceDepartmentId,
             'QA xác nhận hiệu chuẩn phiếu '.$code.' cho đề nghị '.$reqCode.': '.$summary.'.'
@@ -584,6 +609,7 @@ class MaterialCalibrationController extends Controller
         $affected = DB::table(self::TABLE)
             ->where('code', (string) $request->code)
             ->where('department_id', $departmentId)
+            ->where('timing', MaterialCalibration::TIMING_BEFORE)
             ->where('status_id', 1)
             ->where('app_status', 'pending')
             ->update([
@@ -605,6 +631,52 @@ class MaterialCalibrationController extends Controller
     /* ==========================================================
      |  HỖ TRỢ
      ========================================================== */
+
+    /**
+     * Ghi kết quả một dòng phiếu SAU cấp phát: hàng đã cấp (issued_amount = amount) nên phần đạt
+     * thành 'issued', phần không đạt thành 'failed' - không cách ly, không đụng tồn. Đạt một phần
+     * thì tách phần không đạt thành dòng riêng cùng mã phiếu như luồng trước cấp phát.
+     */
+    private function confirmAfterRow($row, $units, array $input, float $passed, float $failed, array $result): void
+    {
+        $failedId = $row->id;
+
+        if ($passed <= self::EPSILON) {
+            DB::table(self::TABLE)->where('id', $row->id)->update($result + ['app_status' => 'failed']);
+        } else {
+            DB::table(self::TABLE)->where('id', $row->id)->update($result + [
+                'app_status' => 'issued',
+                'amount' => $passed,
+                'issued_amount' => $passed,
+            ]);
+
+            if ($failed > self::EPSILON) {
+                $failedRow = (array) $row;
+                unset($failedRow['id'], $failedRow['import_code']);
+
+                $failedId = DB::table(self::TABLE)->insertGetId(array_merge($failedRow, $result, [
+                    'amount' => $failed,
+                    'issued_amount' => $failed,
+                    'app_status' => 'failed',
+                    'created_by' => $result['result_by'],
+                    'created_at' => $result['result_at'],
+                ]));
+            }
+        }
+
+        foreach ($units as $unitRow) {
+            $isPassed = $input[$unitRow->id] === 'passed';
+
+            DB::table(MaterialCalibration::UNIT_TABLE)->where('id', $unitRow->id)->update([
+                'result' => $input[$unitRow->id],
+                'calibration_id' => $isPassed ? $row->id : $failedId,
+                'result_by' => $result['result_by'],
+                'result_at' => $result['result_at'],
+                'updated_by' => $result['updated_by'],
+                'updated_at' => $result['updated_at'],
+            ]);
+        }
+    }
 
     /** Báo kết quả cho người cấp phát của phòng đề nghị. */
     private function notifyDepartment(int $departmentId, string $message, string $tab): void

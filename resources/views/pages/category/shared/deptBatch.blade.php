@@ -14,6 +14,7 @@
 |   items          : [{id, text, search, name, meta, unit, shelf}] - mã phòng chưa khai
 |   units          : đơn vị tính (unit_group nếu có, để hiện ô Khối lượng quy đổi)
 |   classifications: phân loại riêng của phòng (null = không có cột)
+|   deptCriteria   : tiêu chí phân loại cấp phòng bắt buộc (MaterialClassification::departmentFormGroups(), vật tư)
 |   shelf          : có cột Hạn Dùng Nội Bộ        packWeight: có ô Khối lượng quy đổi (hoá chất)
 |   compat         : khung cảnh báo tương kỵ ở định khu (hoá chất - DepartmentChemical/compatibility)
 |   locationType   : material|chemical|standard (lọc định khu)
@@ -42,7 +43,8 @@
         ]])
         ->all();
 
-    $cfg['columns'] = 7 + ($cfg['classifications'] !== null ? 1 : 0) + ($cfg['shelf'] ? 1 : 0);
+    $cfg['deptCriteria'] = $cfg['deptCriteria'] ?? [];
+    $cfg['columns'] = 7 + ($cfg['classifications'] !== null ? 1 : 0) + count($cfg['deptCriteria']) + ($cfg['shelf'] ? 1 : 0);
 @endphp
 
 @include('pages.category.shared.batchTable')
@@ -81,7 +83,7 @@
 
                     <div class="cbt-scroll">
                         <table class="table cbt-table" data-no-datatable
-                            style="min-width: {{ 1180 + ($cfg['classifications'] !== null ? 180 : 0) + ($cfg['shelf'] ? 110 : 0) }}px"
+                            style="min-width: {{ 1180 + ($cfg['classifications'] !== null ? 180 : 0) + count($cfg['deptCriteria']) * 120 + ($cfg['shelf'] ? 110 : 0) }}px"
                             data-soft-sync="cuc-{{ $cfg['prefix'] }}" data-units-in-use="{{ json_encode($cfg['unitsInUse']) }}"
                             data-conversions="{{ json_encode($cfg['conversions']) }}">
                             <colgroup>
@@ -90,6 +92,9 @@
                                 @if ($cfg['classifications'] !== null)
                                     <col style="width: 180px">
                                 @endif
+                                @foreach ($cfg['deptCriteria'] as $criterion)
+                                    <col style="width: 120px">
+                                @endforeach
                                 <col style="width: 180px">
                                 @if ($cfg['shelf'])
                                     <col style="width: 110px">
@@ -107,6 +112,9 @@
                                     @if ($cfg['classifications'] !== null)
                                         <th>Phân Loại Của Phòng</th>
                                     @endif
+                                    @foreach ($cfg['deptCriteria'] as $criterion)
+                                        <th>{{ $criterion['label'] }} <span class="text-danger">*</span></th>
+                                    @endforeach
                                     <th>Đơn Vị Tính <span class="text-danger">*</span></th>
                                     @if ($cfg['shelf'])
                                         <th class="text-right" title="Để trống thì lấy hạn dùng mặc định của danh mục">Hạn Dùng Nội Bộ (tháng)</th>
@@ -141,6 +149,16 @@
                                             </select>
                                         </th>
                                     @endif
+                                    @foreach ($cfg['deptCriteria'] as $criterion)
+                                        <th>
+                                            <select class="form-control" data-fill="{{ $criterion['name'] }}">
+                                                <option value="">-- Chọn --</option>
+                                                @foreach ($criterion['options'] as $value => $label)
+                                                    <option value="{{ $value }}">{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        </th>
+                                    @endforeach
                                     <th>
                                         <select class="form-control cbt-select" data-fill="unit_id" data-placeholder="-- Đơn vị --">
                                             <option value="">-- Đơn vị --</option>
