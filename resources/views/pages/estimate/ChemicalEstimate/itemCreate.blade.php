@@ -21,5 +21,8 @@
         'status' => $thresholdStatus ?? [],
         // Hoá chất nhóm 9 / 10 khai khác đơn vị danh mục phải có hệ số quy đổi
         'factorUnits' => $factorUnits ?? [],
+        // Code nhà sản xuất đã khai báo Cổng TT quốc gia [category_id => {declared, codes}] -
+        // có khoá này thì hiện cột Code NSX + badge nhắc khai báo
+        'portal' => $portalSummary ?? [],
     ],
 ])

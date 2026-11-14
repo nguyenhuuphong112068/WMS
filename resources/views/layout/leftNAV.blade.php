@@ -575,10 +575,7 @@
             ['materialName', 'Tên Vật Tư', 'fas fa-cubes', md_perm('materialName', 'view')],
             ['departmentClassification', 'Phân Loại', 'fas fa-tags', md_perm('departmentClassification', 'view')],
             ['materialSignFlow', 'Trình Ký Đề Nghị CP Vật Tư', 'fas fa-file-signature', md_perm('materialSignFlow', 'view')],
-            ['transferSignFlow', 'Trình Ký Đề Nghị Liên Phòng Ban', 'fas fa-route', 'materData_transferSign_view'],
-        ],
-        'VPP' => [
-            ['vppTransferSignFlow', 'Trình Ký Đề Nghị Liên Phòng Ban VPP', 'fas fa-route', 'materData_vppTransferSign_view'],
+            // "Trình Ký Đề Nghị Liên Phòng Ban" (VT + VPP) đã ẩn 14/11/2026: ký liên phòng ban cố định 2 bước (App\Support\TransferSignFlow)
         ],
         'Kho & đối tượng' => [
             ['zone', 'Định Khu', 'fas fa-sitemap', md_perm('zone', 'view')],

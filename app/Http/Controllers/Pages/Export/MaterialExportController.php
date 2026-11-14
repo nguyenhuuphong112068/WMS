@@ -17,6 +17,7 @@ use App\Support\MaterialSignFlow;
 use App\Support\MaterialTransferRequest;
 use App\Support\MaterialTransferSignFlow;
 use App\Support\MaterialWatchlist;
+use App\Support\QrCode;
 use App\Support\TitleSuggestions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,9 +35,13 @@ use Illuminate\Validation\Rule;
  *      một dòng vật tư thoả điều kiện (hoặc không khai điều kiện) thì thành một bước ký,
  *      xếp theo cấp ký, rồi chép sang material_request_signs. Không vai trò nào được kích
  *      hoạt thì phiếu duyệt thẳng - xem App\Support\MaterialSignFlow::resolveForItems().
- *   2. Ký lần lượt theo step_no, mỗi bước đúng người được chỉ định ký (nhập lại mật khẩu -
- *      21 CFR Part 11). Ký hết bước cuối -> approved, issue_status = waiting. Mỗi lần
- *      chuyển bước đều gửi thông báo cho người phải ký tiếp; từ chối thì báo người lập.
+ *   2. Ký ĐỒNG THỜI (từ 14/11/2026): trình ký xong thì mọi bước cùng nhận đề nghị (trang chủ
+ *      hiện cho người ký của tất cả các bước). Người ký bước nào cũng ký / từ chối được ngay,
+ *      không phải chờ bước trước; bước SAU đã ký thì các bước TRƯỚC còn chờ coi như duyệt
+ *      theo (status auto_signed) - VD Quản Lý Bộ Phận ký thì Tổ Trưởng không cần ký nữa.
+ *      Mỗi bước vẫn đúng người được chỉ định ký (nhập lại mật khẩu - 21 CFR Part 11). Bước
+ *      cuối đã ký -> approved, issue_status = waiting; từ chối thì báo người lập.
+ *      Chỉ áp dụng cho đề nghị nội bộ - đề nghị liên phòng ban vẫn ký lần lượt.
  *   3. Kho CẤP PHÁT từng dòng: chỉ định mã xuất nhập, số lượng. Cấp phát là XUẤT KHO,
  *      tương đương vật tư đã đem sử dụng - TRỪ TỒN TRỰC TIẾP, sinh luôn một bản ghi
  *      material_exports (type = export) gắn với dòng đề nghị. Cấp đủ số đề nghị thì
@@ -105,6 +110,15 @@ class MaterialExportController extends Controller
 
     /** Được điều chỉnh / khoá phiếu sử dụng đã ghi ở tab Sổ sử dụng vật tư. */
     public const UPDATE_PERMISSION = 'export_material_update';
+
+    /** Quyền in nhãn cấp phát ở tab Sổ Cấp Phát */
+    public const LABEL_PERMISSION = 'export_material_label';
+
+    /** Trạng thái phiếu cách ly in được nhãn ở Sổ Cấp Phát: chờ quyết định, đã loại bỏ - chờ huỷ */
+    public const LABEL_QUARANTINE_STATUSES = ['quarantined', 'removed'];
+
+    /** Số nhãn cấp phát tối đa cho một lần in */
+    private const LABEL_MAX_COPIES = 100;
 
     /**
      * 3 loại đề nghị cấp phát, mỗi loại một tab riêng: material_request_lists.type =>
@@ -642,10 +656,12 @@ class MaterialExportController extends Controller
     }
 
     /**
-     * KÝ MỘT BƯỚC của đề nghị.
+     * KÝ MỘT BƯỚC của đề nghị - ký đồng thời.
      *
-     * Chỉ đúng người được chỉ định ở bước đang chờ mới ký được, và phải nhập lại mật khẩu
-     * (21 CFR Part 11 §11.200). Ký xong bước cuối thì phiếu được duyệt, kho cấp phát được.
+     * Mọi bước còn chờ đều ký được ngay, không phải chờ bước trước. Người ký có tên ở nhiều
+     * bước thì ký bước CAO NHẤT. Bước nào ký xong thì các bước trước còn chờ được duyệt theo
+     * (auto_signed). Phải nhập lại mật khẩu (21 CFR Part 11 §11.200). Bước cuối đã ký thì
+     * phiếu được duyệt, kho cấp phát được.
      */
     public function requestSign(Request $request)
     {
@@ -656,15 +672,15 @@ class MaterialExportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần ký duyệt!')->with('activeTab', $tab);
         }
 
-        $sign = $this->currentSign($req);
-
-        if (! $sign) {
-            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước chờ ký nên không ký được!')->with('activeTab', $tab);
+        if ($req->app_status !== 'pending_sign') {
+            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở trạng thái chờ ký nên không ký được!')->with('activeTab', $tab);
         }
 
-        if (! $this->canSignRow($sign)) {
+        $sign = $this->signableSign($req);
+
+        if (! $sign) {
             return redirect()->back()
-                ->with('error', 'Bước '.$sign->step_no.' của đề nghị '.$req->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không ký thay được!')
+                ->with('error', 'Bạn không có tên trong danh sách người ký các bước đang chờ của đề nghị '.$req->code.', không ký thay được!')
                 ->with('activeTab', $tab);
         }
 
@@ -674,52 +690,73 @@ class MaterialExportController extends Controller
 
         $stepCount = (int) $req->sign_step_count;
         $stepNo = (int) $sign->step_no;
-        $isLast = $stepNo >= $stepCount;
         $signedAt = now();
 
-        DB::transaction(function () use ($req, $sign, $stepNo, $isLast, $signedAt) {
-            DB::table(self::REQ_SIGN)->where('id', $sign->id)->update([
-                'status' => 'signed',
+        $pendingSteps = DB::table(self::REQ_SIGN)
+            ->where('request_list_id', $req->id)
+            ->where('active', 1)
+            ->where('status', 'pending')
+            ->where('id', '!=', $sign->id)
+            ->pluck('step_no', 'id');
+
+        // Bước trước còn chờ: duyệt theo bước vừa ký. Bước sau còn chờ: phiếu tiếp tục chờ ký.
+        $skippedIds = $pendingSteps->filter(fn ($no) => (int) $no < $stepNo)->keys();
+        $skippedSteps = $pendingSteps->only($skippedIds->all())->sort()->values();
+        $nextStep = $pendingSteps->filter(fn ($no) => (int) $no > $stepNo)->min();
+        $isLast = $nextStep === null;
+
+        DB::transaction(function () use ($req, $sign, $isLast, $nextStep, $skippedIds, $signedAt) {
+            $signer = [
                 'signed_by' => $this->actor(),
                 // Bước giao cho nhiều người: ghi rõ AI trong danh sách đã ký
                 'signed_user_id' => (int) (session('user')['userId'] ?? 0) ?: null,
                 'signed_at' => $signedAt,
                 'updated_by' => $this->actor(),
                 'updated_at' => $signedAt,
-            ]);
+            ];
+
+            DB::table(self::REQ_SIGN)->where('id', $sign->id)->update(['status' => 'signed'] + $signer);
+
+            if ($skippedIds->isNotEmpty()) {
+                // Ghi người ký bước sau làm người duyệt thay - status riêng để phân biệt với tự ký
+                DB::table(self::REQ_SIGN)->whereIn('id', $skippedIds)->where('status', 'pending')
+                    ->update(['status' => 'auto_signed'] + $signer);
+            }
 
             DB::table(self::REQ_LIST)->where('id', $req->id)->update([
                 'app_status' => $isLast ? 'approved' : 'pending_sign',
-                'current_step' => $isLast ? null : $stepNo + 1,
+                'current_step' => $isLast ? null : (int) $nextStep,
                 'issue_status' => $isLast ? 'waiting' : $req->issue_status,
                 'updated_by' => $this->actor(),
                 'updated_at' => $signedAt,
             ]);
         });
 
+        $skippedText = $skippedSteps->isNotEmpty() ? ' Bước '.$skippedSteps->implode(', ').' được duyệt theo.' : '';
+
         AuditTrialController::log(
             'Ký duyệt đề nghị cấp phát vật tư',
             self::REQ_LIST,
             $req->id,
             'Bước '.$stepNo.'/'.$stepCount.' - app_status: '.$req->app_status,
-            'app_status: '.($isLast ? 'approved' : 'pending_sign')
+            'app_status: '.($isLast ? 'approved' : 'pending_sign').$skippedText
         );
 
         $fresh = DB::table(self::REQ_LIST)->where('id', $req->id)->first();
 
         if ($isLast) {
-            $this->notifyCreator($fresh, 'Đề nghị cấp phát vật tư '.$req->code.' đã được ký duyệt đủ '.$stepCount.' bước, chờ kho cấp phát.', 'Đã duyệt');
+            $this->notifyCreator($fresh, 'Đề nghị cấp phát vật tư '.$req->code.' đã được ký duyệt, chờ kho cấp phát.', 'Đã duyệt');
         }
 
         return redirect()->back()->with(
             'success',
-            $isLast
+            ($isLast
                 ? 'Đã ký bước '.$stepNo.'/'.$stepCount.' - đề nghị '.$req->code.' được phê duyệt, kho có thể cấp phát.'
-                : 'Đã ký bước '.$stepNo.'/'.$stepCount.' cho đề nghị '.$req->code.'! Đã chuyển tới người ký bước '.($stepNo + 1).'.'
+                : 'Đã ký bước '.$stepNo.'/'.$stepCount.' cho đề nghị '.$req->code.'! Còn chờ bước '.$nextStep.'.').$skippedText
         )->with('activeTab', $tab);
     }
 
-    /** TỪ CHỐI tại bước đang chờ ký: phiếu quay về "Bị từ chối", Tổ sửa rồi trình ký lại. */
+    /** TỪ CHỐI ở một bước còn chờ ký (ký đồng thời - bước nào cũng từ chối được): phiếu quay về "Bị từ chối", Tổ sửa rồi trình ký lại. */
     public function requestReject(Request $request)
     {
         $req = $this->resolveRequestForApproval($request);
@@ -729,15 +766,15 @@ class MaterialExportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy đề nghị cần từ chối!')->with('activeTab', $tab);
         }
 
-        $sign = $this->currentSign($req);
-
-        if (! $sign) {
-            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở bước chờ ký nên không từ chối được!')->with('activeTab', $tab);
+        if ($req->app_status !== 'pending_sign') {
+            return redirect()->back()->with('error', 'Đề nghị '.$req->code.' không ở trạng thái chờ ký nên không từ chối được!')->with('activeTab', $tab);
         }
 
-        if (! $this->canSignRow($sign)) {
+        $sign = $this->signableSign($req);
+
+        if (! $sign) {
             return redirect()->back()
-                ->with('error', 'Bước '.$sign->step_no.' của đề nghị '.$req->code.' do '.($sign->user_name ?: 'người khác').' ký, bạn không từ chối thay được!')
+                ->with('error', 'Bạn không có tên trong danh sách người ký các bước đang chờ của đề nghị '.$req->code.', không từ chối thay được!')
                 ->with('activeTab', $tab);
         }
 
@@ -1086,30 +1123,41 @@ class MaterialExportController extends Controller
             ->groupBy('request_list_id');
     }
 
-    /** Dòng bước ký đang chờ của một phiếu, đọc thẳng từ DB. */
-    private function currentSign($req)
+    /**
+     * Bước người đăng nhập ký được của một phiếu đang chờ ký, đọc thẳng từ DB.
+     *
+     * Ký đồng thời: mọi bước còn 'pending' đều ký được; có tên ở nhiều bước thì lấy bước
+     * CAO NHẤT (ký bước đó là các bước trước được duyệt theo).
+     */
+    private function signableSign($req)
     {
-        if ($req->app_status !== 'pending_sign' || ! $req->current_step) {
+        if ($req->app_status !== 'pending_sign') {
             return null;
         }
 
-        $sign = DB::table(self::REQ_SIGN)
+        $signs = DB::table(self::REQ_SIGN)
             ->where('request_list_id', $req->id)
             ->where('active', 1)
-            ->where('step_no', (int) $req->current_step)
-            ->first();
+            ->where('status', 'pending')
+            ->orderBy('step_no', 'desc')
+            ->get();
 
-        return $sign ? $this->attachCandidates([$sign])->first() : null;
+        return $this->attachCandidates($signs)->first(fn ($sign) => $this->canSignRow($sign));
     }
 
-    /** Bước đang chờ ký, lấy từ bộ bước đã nạp sẵn ở index() để khỏi truy vấn lại từng phiếu. */
+    /**
+     * Bước hiện ở nút ký của index(), lấy từ bộ bước đã nạp sẵn để khỏi truy vấn lại từng phiếu:
+     * bước cao nhất còn chờ mà mình ký được, không có thì bước thấp nhất còn chờ.
+     */
     private function pendingSign($req, $signs)
     {
-        if ($req->app_status !== 'pending_sign' || ! $req->current_step) {
+        if ($req->app_status !== 'pending_sign') {
             return null;
         }
 
-        return collect($signs)->firstWhere('step_no', (int) $req->current_step);
+        $pending = collect($signs)->where('status', 'pending')->sortByDesc('step_no')->values();
+
+        return $pending->first(fn ($sign) => $this->canSignRow($sign)) ?? $pending->last();
     }
 
     /**
@@ -1197,6 +1245,41 @@ class MaterialExportController extends Controller
      |  dụng riêng (material_exports) để tồn của từng lô trừ đúng phần của nó; dòng đề
      |  nghị chỉ giữ phần tổng hợp: lô đầu tiên + tổng số lượng đã cấp.
      ========================================================== */
+
+    /**
+     * QUÉT XÁC NHẬN MÃ XUẤT NHẬP KHI CẤP PHÁT (config material.issue_scan_required)
+     *
+     * Màn hình (MaterialExport/issueScanVerify) chỉ mở nút Cấp Phát sau khi người cấp quét
+     * đúng nhãn của từng mã xuất nhập sắp cấp, rồi gửi kèm scan_codes[] = các mã đã quét.
+     * Ở đây kiểm lại: mọi mã xuất nhập được cấp phải có trong danh sách đã quét.
+     *
+     * @param  array<int, int>  $importIds
+     * @return string|null  Câu báo lỗi, null = hợp lệ
+     */
+    private function issueScanError(Request $request, array $importIds): ?string
+    {
+        if (! config('material.issue_scan_required', true) || ! $importIds) {
+            return null;
+        }
+
+        $scanned = array_map(
+            fn ($code) => mb_strtoupper(trim((string) $code)),
+            (array) $request->input('scan_codes', [])
+        );
+
+        $missing = DB::table('material_imports')
+            ->whereIn('id', $importIds)
+            ->pluck('code')
+            ->filter(fn ($code) => ! in_array(mb_strtoupper(trim((string) $code)), $scanned, true))
+            ->values();
+
+        if ($missing->isEmpty()) {
+            return null;
+        }
+
+        return 'Chưa quét xác nhận mã xuất nhập '.$missing->implode(', ')
+            .'. Bấm "Quét mã" và quét đúng nhãn lô đang lấy trước khi cấp phát.';
+    }
 
     public function issueStore(Request $request)
     {
@@ -1298,6 +1381,11 @@ class MaterialExportController extends Controller
         |     cấp, kho thiếu thì = phần kho còn cấp được); không có cả quyền đổi lô thì từng lô
         |     cũng phải đúng số đề xuất.
         */
+        // Người cấp phát phải quét đúng nhãn từng mã xuất nhập sắp cấp (issueScanVerify ở màn hình)
+        if ($scanError = $this->issueScanError($request, array_keys($wanted))) {
+            return $fail($scanError);
+        }
+
         /*
         | Vật tư "Cần Hiệu Chuẩn Trước Khi Dùng": chỉ cấp được phần QA đã xác nhận ĐẠT cho đúng
         | dòng đề nghị này, đúng mã xuất nhập đã hiệu chuẩn, không vượt số đạt. Phần đạt đang giữ
@@ -1754,6 +1842,138 @@ class MaterialExportController extends Controller
         AuditTrialController::log($action, self::TABLE, $current->id, 'status_id: '.$current->status_id, 'status_id: '.$newStatus);
 
         return redirect()->back()->with('success', ($newStatus == 1 ? 'Đã mở khoá ' : 'Đã khoá ').self::LABEL.' '.$current->code.'!');
+    }
+
+    /**
+     * TRANG IN NHÃN CẤP PHÁT (tab Sổ Cấp Phát) - dán lên vật tư đã cấp cho bộ phận dùng.
+     *
+     * Chỉ phiếu sử dụng loại "Sử dụng" (không phải loại bỏ / cách ly / chuyển liên phòng ban).
+     * QR = mã xuất nhập (= mã lô nhập) để quét được như nhãn nhập. Khung nhãn dùng chung
+     * config('material.label') với nhãn nhập vật tư.
+     */
+    public function label(Request $request)
+    {
+        if (! user_can(self::LABEL_PERMISSION)) {
+            abort(403, 'Cần quyền In Nhãn Cấp Phát Vật Tư.');
+        }
+
+        $row = $this->labelRow($request->id);
+
+        if (! $row) {
+            abort(404, 'Không tìm thấy dòng sổ cấp phát in được nhãn.');
+        }
+
+        return view('pages.export.MaterialExport.label', [
+            'export' => $row,
+            'label' => config('material.label'),
+            'qr' => QrCode::render($row->code, 'Q', 1),
+            'maxCopies' => self::LABEL_MAX_COPIES,
+        ]);
+    }
+
+    /**
+     * GHI AUDIT LOG MỖI LẦN IN NHÃN CẤP PHÁT - trang in gọi trước khi in (kể cả Ctrl+P).
+     */
+    public function labelPrinted(Request $request)
+    {
+        if (! user_can(self::LABEL_PERMISSION)) {
+            return response()->json(['ok' => false, 'message' => 'Cần quyền In Nhãn Cấp Phát Vật Tư.'], 403);
+        }
+
+        $copies = max(1, min(self::LABEL_MAX_COPIES, (int) $request->input('copies', 1)));
+        $row = $this->labelRow($request->id);
+
+        if (! $row) {
+            return response()->json(['ok' => false, 'message' => 'Không tìm thấy phiếu cấp phát vật tư cần in nhãn.'], 404);
+        }
+
+        $printedAt = now();
+
+        AuditTrialController::log(
+            'In nhãn cấp phát',
+            self::TABLE,
+            $row->id,
+            'NA',
+            ($row->label_kind === 'issue' ? 'In nhãn cấp phát vật tư: ' : 'In nhãn '.mb_strtolower(MaterialQuarantineController::STATUSES[$row->label_kind]).': ')
+                .($row->material_name ?: '(chưa có tên)')
+                .' | Mã xuất nhập: '.$row->code
+                .($row->request_code ? ' | Phiếu đề nghị: '.$row->request_code : '')
+                .($row->quarantine_code ? ' | Phiếu cách ly: '.$row->quarantine_code : '')
+                .' | Số lượng nhãn: '.$copies
+                .' | Thời điểm in: '.$printedAt->format('d/m/Y H:i:s')
+        );
+
+        return response()->json([
+            'ok' => true,
+            'copies' => $copies,
+            'printedAt' => $printedAt->format('d/m/Y H:i:s'),
+        ]);
+    }
+
+    /**
+     * Dòng sổ cấp phát in được nhãn, kèm thông tin in nhãn:
+     *   - label_kind = issue      : phiếu loại Sử dụng (nhãn cấp phát);
+     *   - label_kind = quarantined: dòng của phiếu cách ly đang CHỜ QUYẾT ĐỊNH;
+     *   - label_kind = removed    : dòng của phiếu cách ly đã LOẠI BỎ - CHỜ HUỶ.
+     * Phiếu cách ly đã huỷ / trả về kho, loại bỏ lập thẳng, chuyển liên phòng ban: không có nhãn.
+     */
+    private function labelRow($id)
+    {
+        $departmentId = $this->departmentId();
+
+        $row = DB::table(self::TABLE)
+            ->leftJoin('material_imports', self::TABLE.'.import_id', '=', 'material_imports.id')
+            ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
+            ->leftJoin('material_names', 'material_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin(self::REQ_ITEM, self::TABLE.'.request_item_id', '=', self::REQ_ITEM.'.id')
+            ->leftJoin(self::REQ_LIST, self::REQ_ITEM.'.request_list_id', '=', self::REQ_LIST.'.id')
+            ->leftJoin(MaterialPicking::QUARANTINE_TABLE.' as quarantines', self::TABLE.'.quarantine_id', '=', 'quarantines.id')
+            ->leftJoin('locations as pending_locations', 'quarantines.pending_location_id', '=', 'pending_locations.id')
+            ->leftJoin('locations as rejected_locations', 'quarantines.rejected_location_id', '=', 'rejected_locations.id')
+            ->tap(fn ($query) => DepartmentMaterial::joinUnit($query, $departmentId, 'material_imports.category_id'))
+            ->select(
+                self::TABLE.'.id',
+                self::TABLE.'.code',
+                self::TABLE.'.type',
+                self::TABLE.'.quarantine_id',
+                self::TABLE.'.amount',
+                self::TABLE.'.created_at',
+                self::TABLE.'.used_by',
+                self::TABLE.'.created_by as issued_by',
+                'material_imports.expired_date',
+                'material_names.name as material_name',
+                'units.short_name as unit_short_name',
+                self::REQ_ITEM.'.purpose',
+                self::REQ_LIST.'.code as request_code',
+                // Người / ngày đề nghị = lúc gửi trình ký; phiếu chưa gửi (hoặc dữ liệu cũ) lấy lúc lập
+                DB::raw('COALESCE('.self::REQ_LIST.'.submitted_by, '.self::REQ_LIST.'.created_by) as requested_by'),
+                DB::raw('COALESCE('.self::REQ_LIST.'.submitted_at, '.self::REQ_LIST.'.created_at) as requested_at'),
+                'quarantines.code as quarantine_code',
+                'quarantines.app_status as quarantine_status',
+                'quarantines.reason as quarantine_reason',
+                'quarantines.created_by as quarantined_by',
+                'quarantines.created_at as quarantined_at',
+                'quarantines.decision_note',
+                'quarantines.decided_by',
+                'quarantines.decided_at',
+                'pending_locations.code as pending_location_code',
+                'rejected_locations.code as rejected_location_code'
+            )
+            ->where(self::TABLE.'.id', (int) $id)
+            ->where(self::TABLE.'.department_id', $departmentId)
+            ->first();
+
+        if (! $row) {
+            return null;
+        }
+
+        if ($row->quarantine_id) {
+            $row->label_kind = in_array($row->quarantine_status, self::LABEL_QUARANTINE_STATUSES, true) ? $row->quarantine_status : null;
+        } else {
+            $row->label_kind = $row->type === 'export' ? 'issue' : null;
+        }
+
+        return $row->label_kind ? $row : null;
     }
 
     public function history(Request $request)
@@ -2222,8 +2442,8 @@ class MaterialExportController extends Controller
     /**
      * KÝ DUYỆT ĐỀ NGHỊ LIÊN PHÒNG BAN - bước đang chờ của phiếu 'pending_sign'.
      *
-     * Không lọc theo phòng đang chọn: người ký có thể thuộc phòng đề nghị, phòng được đề nghị hoặc
-     * một phòng cố định (VD Hành Chính - NM1); quyền ký xét theo vai trò + phạm vi phòng ban của
+     * Không lọc theo phòng đang chọn: 2 bước cố định (App\Support\TransferSignFlow) - quản lý bộ phận
+     * phòng đề nghị rồi quản lý bộ phận phòng cấp phát; quyền ký xét theo vai trò + phạm vi phòng ban của
      * bước (MaterialTransferSignFlow::canSign) và phải nhập lại mật khẩu (21 CFR Part 11).
      */
     public function transferSign(Request $request)
@@ -2470,6 +2690,10 @@ class MaterialExportController extends Controller
 
         if ($validator->fails()) {
             return $error($validator->errors()->first());
+        }
+
+        if ($scanError = $this->issueScanError($request, [(int) $request->import_id])) {
+            return $error($scanError);
         }
 
         $item = DB::table(self::TRANSFER_ITEM_TABLE)
@@ -3674,7 +3898,7 @@ class MaterialExportController extends Controller
                 ->from(self::REQ_SIGN)
                 ->whereColumn(self::REQ_SIGN.'.request_list_id', self::REQ_LIST.'.id')
                 ->where(self::REQ_SIGN.'.active', 1)
-                ->where(self::REQ_SIGN.'.status', '!=', 'signed');
+                ->whereNotIn(self::REQ_SIGN.'.status', ['signed', 'auto_signed']);
         });
     }
 

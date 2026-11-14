@@ -227,7 +227,8 @@ class InventoryMovements
                 }
                 $row = $event['fields'];
                 $amount = round($event['signed'], 4);
-                $row['amount'] = $magnitude ? abs($amount) : $amount;
+                // 'reverse' = sự kiện ngược chiều trong cùng nhóm (VD trả hoá chất về kho trong nhóm Sử dụng) -> trừ bớt tổng
+                $row['amount'] = $magnitude ? (! empty($event['reverse']) ? -abs($amount) : abs($amount)) : $amount;
                 $rows[] = $row;
             }
             $out[$key] = [

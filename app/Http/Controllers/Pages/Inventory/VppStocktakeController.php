@@ -29,15 +29,13 @@ use Illuminate\Support\Facades\Validator;
  *
  * CHỐT PHIẾU: dòng nào lệch thì ghi thêm một dòng vpp_balancings đúng bằng phần
  * lệch để kéo tồn sổ sách về số thực đếm. Vẫn giữ nguyên hai chốt chặn của màn hình
- * Cân Đối: tổng cân đối của một mã không vượt 5% lượng nhập, và cân đối xong tồn không
+ * Cân Đối: VPP cân đối tự do (không hạn mức), và cân đối xong tồn không
  * được âm. Dòng vi phạm KHÔNG tự ghi cân đối, chỉ đánh dấu để xử lý riêng.
  */
 class VppStocktakeController extends Controller
 {
     private const EPSILON = 0.00005;
 
-    /** Trùng với VppInventoryController::BALANCING_MAX_RATIO - hạn mức cân đối 5%. */
-    private const BALANCING_MAX_RATIO = 0.05;
 
     /** Độ dài một chu kỳ kiểm kê, tính bằng tháng - 3 tháng = một quý. */
     private const CYCLE_MONTHS = 3;
@@ -93,7 +91,6 @@ class VppStocktakeController extends Controller
             'periodCount' => count($periods),
             'cycleMonths' => self::CYCLE_MONTHS,
             'canOpen' => $current === null,
-            'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
             'states' => self::STATES,
         ];
     }
@@ -382,7 +379,7 @@ class VppStocktakeController extends Controller
      * CHỐT PHIẾU KIỂM KÊ.
      *
      * Bắt buộc đếm đủ mọi dòng mới được chốt. Dòng nào lệch thì ghi thêm một dòng
-     * vpp_balancings đúng bằng phần lệch; dòng vi phạm hạn mức 5% hoặc làm tồn âm
+     * vpp_balancings đúng bằng phần lệch; dòng làm tồn âm
      * thì bỏ qua và ghi rõ lý do vào balancing_note để xử lý riêng.
      */
     public function complete(Request $request)
@@ -512,7 +509,7 @@ class VppStocktakeController extends Controller
 
         $message = 'Đã chốt phiếu kiểm kê '.$stocktake->code.': khớp '.$matched.' dòng, cân đối '.$balanced.' dòng.';
 
-        // Lý do bỏ qua mỗi dòng mỗi khác (vượt hạn mức / cân đối xong tồn âm) nên ở đây
+        // Lý do bỏ qua mỗi dòng mỗi khác (cân đối xong tồn âm) nên ở đây
         // chỉ báo số lượng, lý do từng dòng nằm ở cột Chênh Lệch của bảng kiểm kê.
         if ($skipped > 0) {
             $message .= ' Còn '.$skipped.' dòng lệch chưa cân đối được, xem lý do ở cột Chênh Lệch rồi xử lý riêng.';
@@ -660,7 +657,7 @@ class VppStocktakeController extends Controller
             });
     }
 
-    /** [import_id => tổng số đã cân đối] của cả phòng ban, dùng để chặn hạn mức 5%. */
+    /** [import_id => tổng số đã cân đối] của cả phòng ban, giữ để tra cứu. */
     private function balancedByImport(int $departmentId)
     {
         return DB::table('vpp_balancings')
@@ -684,14 +681,7 @@ class VppStocktakeController extends Controller
             return 'Không tìm thấy mã xuất nhập, không ghi được cân đối.';
         }
 
-        $limit = max(1, abs((float) $import->amount) * self::BALANCING_MAX_RATIO);
-
-        if (abs($balancedAll + $diff) > $limit + self::EPSILON) {
-            return 'Lệch '.($diff > 0 ? '+' : '').$this->number($diff).' vượt hạn mức cân đối ±'
-                .$this->number($limit).' ('.(int) round(self::BALANCING_MAX_RATIO * 100).'% lượng nhập, đã cân đối '
-                .$this->number($balancedAll).'). Cần lập phiếu xử lý riêng.';
-        }
-
+        // VPP cân đối tự do - không áp hạn mức, chỉ chặn tồn âm.
         $gap = $stock ? (float) $stock->gap : 0;
 
         if ($gap + $diff < -self::EPSILON) {

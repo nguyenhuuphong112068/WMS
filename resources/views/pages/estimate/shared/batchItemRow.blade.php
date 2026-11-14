@@ -59,6 +59,21 @@
         @endif
     </td>
 
+    @if (is_array($emi['portal'] ?? null))
+        {{-- Code nhà sản xuất: chọn Code đã khai báo Cổng TT quốc gia hoặc gõ mới - JS wmsPortalCode.setup()
+             dựng select2 theo mã danh mục của dòng (pages/estimate/shared/portalCode) --}}
+        <td class="emi-portal wms-portal-box">
+            <select data-f="manufacturer_code" name="{{ $name('manufacturer_code') }}"
+                class="form-control form-control-sm wms-portal-code {{ $err('manufacturer_code') }}">
+                <option value=""></option>
+                @if (($row['manufacturer_code'] ?? '') !== '')
+                    <option value="{{ $row['manufacturer_code'] }}" selected>{{ $row['manufacturer_code'] }}</option>
+                @endif
+            </select>
+            <div class="wms-portal-warn"></div>
+        </td>
+    @endif
+
     @if ($emi['groups'])
         <td>
             <select data-f="group_key" name="{{ $name('group_key') }}"

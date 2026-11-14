@@ -56,6 +56,8 @@
                                         —
                                         @if ($s->status === 'signed')
                                             <span class="text-success">Đã ký {{ $expDateTime($s->signed_at) }}</span>
+                                        @elseif ($s->status === 'auto_signed')
+                                            <span class="text-success" title="Bước sau đã ký nên bước này được duyệt theo">Duyệt theo bước sau ({{ $s->signed_by }}) {{ $expDateTime($s->signed_at) }}</span>
                                         @elseif ($s->status === 'rejected')
                                             <span class="text-danger">Từ chối: {{ $s->reject_reason }}</span>
                                         @else
@@ -380,16 +382,23 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
-                {{-- Chỉ đúng người được chỉ định ở bước đang chờ mới thấy nút Đồng ý / Từ chối --}}
+                {{-- Ký đồng thời: người ký của bất kỳ bước nào còn chờ đều thấy nút Đồng ý / Từ chối --}}
                 @if ($req->can_sign && user_can('export_material_approve'))
-                    @php $isLastStep = (int) $req->pending_sign->step_no >= (int) $req->sign_step_count; @endphp
+                    @php
+                        $isLastStep = (int) $req->pending_sign->step_no >= (int) $req->sign_step_count;
+                        $lowerPending = $signs->where('status', 'pending')->where('step_no', '<', (int) $req->pending_sign->step_no)->pluck('step_no');
+                        $nextPending = $signs->where('status', 'pending')->where('step_no', '>', (int) $req->pending_sign->step_no)->min('step_no');
+                        $signConfirmText = 'Đề nghị ' . $req->code . ' '
+                            . ($isLastStep || ! $nextPending ? 'sẽ được duyệt và kho có thể cấp phát.' : 'còn chờ người ký bước ' . $nextPending . '.')
+                            . ($lowerPending->isNotEmpty() ? ' Bước ' . $lowerPending->implode(', ') . ' sẽ được duyệt theo.' : '');
+                    @endphp
                     <button type="button" class="btn btn-outline-danger btn-req-reject" data-id="{{ $req->id }}" data-code="{{ $req->code }}">
                         <i class="fas fa-times mr-1"></i> Từ chối
                     </button>
                     <form class="form-md-confirm d-inline" action="{{ route($expRoute . 'requestSign') }}" method="POST"
                         data-require-password="1"
                         data-title="Ký duyệt bước {{ $req->pending_sign->step_no }}/{{ $req->sign_step_count }}?"
-                        data-text="Đề nghị {{ $req->code }} {{ $isLastStep ? 'sẽ được duyệt và kho có thể cấp phát.' : 'sẽ chuyển tới người ký bước ' . ($req->pending_sign->step_no + 1) . '.' }}">
+                        data-text="{{ $signConfirmText }}">
                         @csrf <input type="hidden" name="request_list_id" value="{{ $req->id }}">
                         <button type="submit" class="btn btn-success">
                             <i class="fas fa-{{ $isLastStep ? 'stamp' : 'signature' }} mr-1"></i> Đồng ý

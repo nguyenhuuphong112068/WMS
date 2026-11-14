@@ -44,6 +44,11 @@ return [
         ['id' => 'nhap-vat-tu', 'file' => 'importBook', 'title' => 'Nhập Vật Tư & Sổ Nhập', 'icon' => 'fas fa-dolly',
             'path' => 'Nhập › Vật Tư › tab Sổ nhập vật tư',
             'route' => 'pages.import.materialImport.list', 'pane' => 'impPaneBook', 'perm' => 'import_material_view', 'chips' => [$byDept],
+            // Hộp thoại Nhập Vật Tư mở từ tab Chờ kiểm tra (tab Sổ nhập không có nút tạo)
+            'shots' => [
+                ['name' => 'nhap-vat-tu', 'clip' => '.content-wrapper', 'maxHeight' => 640, 'pad' => 0],
+                ['name' => 'nhap-vat-tu-form', 'tab' => ['impPaneCheck'], 'js' => "document.querySelector('#impPaneCheck .btn-md-create').click()", 'clip' => '.modal.show .modal-content', 'maxHeight' => 1400, 'pad' => 0],
+            ],
             'keywords' => 'phieu nhap ma xuat nhap in nhan qr han su dung hoa don'],
     ],
     'Đề Nghị - Sử Dụng › Vật Tư' => [

@@ -44,15 +44,12 @@
                         <div class="form-group col-md-3">
                             <label>Hạn Mức Cân Đối</label>
                             <input type="text" class="form-control inv-readonly mi-limit-view" readonly
-                                value="{{ $invOldRow ? '±' . $invNum($invOldRow->balancing_limit) . ' ' . $invOldUnit : '' }}">
-                            <small class="md-sub mi-limit-hint">
-                                {{ $invOldRow ? 'Lần này nhập từ ' . $invNum($invOldRow->balancing_min_input) . ' đến ' . $invNum($invOldRow->balancing_max_input) . '.' : '' }}
-                            </small>
+                                value="Tự do">
+                            <small class="md-sub">VPP không áp hạn mức.</small>
                         </div>
                         <div class="form-group col-md-3">
                             <label>Số Lượng Cân Đối <span class="text-danger">*</span></label>
                             <input type="text" inputmode="decimal" name="balancing_amount"
-                                min="{{ $invOldRow->balancing_min_input ?? '' }}" max="{{ $invOldRow->balancing_max_input ?? '' }}"
                                 class="form-control js-decimal {{ $bag->has('balancing_amount') ? 'is-invalid' : '' }}"
                                 value="{{ old('balancing_amount') }}" placeholder="Ví dụ: 0.5 hoặc -0.5" required>
                             @if ($bag->has('balancing_amount'))
@@ -80,7 +77,7 @@
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Nhập <b>số điều chỉnh</b>, không phải số lượng nhập mới: số dương là nhập thiếu, số âm là nhập dư.
-                        <b>Tổng</b> các lần cân đối của một mã xuất nhập không vượt <b>±{{ $balancingMaxPercent }}%</b> số lượng nhập.
+                        VPP <b>cân đối tự do</b>, không áp hạn mức; chỉ chặn cân đối làm tồn bị âm.
                         Mọi lần cân đối đều lưu Audit Trail.
                     </div>
                 </div>

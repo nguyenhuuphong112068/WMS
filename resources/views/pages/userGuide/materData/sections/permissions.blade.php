@@ -25,7 +25,7 @@
             </tr>
             <tr>
                 <td>Vật tư</td>
-                <td>Tên Vật Tư, Phân Loại, Trình Ký Đề Nghị CP Vật Tư. Trình Ký Đề Nghị Liên Phòng Ban có bộ quyền riêng.</td>
+                <td>Tên Vật Tư, Phân Loại, Trình Ký Đề Nghị CP Vật Tư.</td>
             </tr>
         </tbody>
     </table>

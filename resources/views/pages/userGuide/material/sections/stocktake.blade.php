@@ -13,7 +13,8 @@
 <h3>Khi chốt phiếu</h3>
 <ul>
     <li>Dòng lệch được tự ghi một lần <b>cân đối</b> đúng bằng phần lệch, kéo tồn sổ sách về số thực đếm.</li>
-    <li>Vẫn áp dụng 2 giới hạn của Cân đối: tổng cân đối của lô không quá <b>5%</b> lượng nhập, và tồn không âm. Dòng vi phạm
+    <li>Vẫn áp dụng giới hạn của <a href="#ton-kho">Cân đối</a>: vật tư quan trọng <b>Cao</b> không được cân đối, quan trọng
+        <b>Thấp</b> tổng cân đối của lô không quá <b>2%</b> lượng nhập đầu, và tồn không âm. Dòng vi phạm
         <b>không</b> tự cân đối mà được đánh dấu <b>Chờ Xử Lý</b> để làm rõ riêng.</li>
 </ul>
 

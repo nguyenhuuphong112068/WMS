@@ -31,6 +31,8 @@ return [
     'Trang Chủ' => [
         ['id' => 'trang-chu', 'file' => 'home', 'title' => 'Trang Chủ', 'icon' => 'fas fa-home',
             'path' => 'Trang chủ', 'route' => 'pages.home',
+            // Ảnh lời chào đầu trang (thanh trên cùng home-topnav cắt từ ảnh toàn trang)
+            'shots' => [['name' => 'home-hero', 'clip' => '.hero3d', 'maxHeight' => 400, 'pad' => 0]],
             'keywords' => 'trang chu dashboard banner thanh tren cung thong bao chuong nut hoi'],
         ['id' => 'ma-tran', 'file' => 'homeMatrix', 'title' => 'Ma Trận Tổng Quan', 'icon' => 'fas fa-th',
             'path' => 'Trang chủ › Ma trận tổng quan',
@@ -57,6 +59,14 @@ return [
         ['id' => 'quan-tri-tai-khoan', 'file' => 'accountAdmin', 'title' => 'Quản Trị Tài Khoản', 'icon' => 'fas fa-users-cog',
             'path' => 'Quản Trị › Phân Quyền › User',
             'keywords' => 'tao tai khoan reset mat khau tam vo hieu hoa mo khoa quan tri'],
+    ],
+    'Thiết bị' => [
+        ['id' => 'cai-dat-tablet', 'file' => 'tabletSetup', 'title' => 'Cài Đặt Tablet Quét Mã', 'icon' => 'fas fa-tablet-alt',
+            'path' => 'Cài Đặt Tablet',
+            'route' => 'tabletSetup', 'perm' => 'Admin',
+            // Trang đứng riêng (không có khung menu): cắt khối nội dung chính
+            'shots' => [['name' => 'cai-dat-tablet', 'clip' => '.ts-shell', 'maxHeight' => 1100, 'pad' => 0]],
+            'keywords' => 'tablet may tinh bang camera quet ma qr chrome flags http insecure origin knox mdm co trang thu nho phong to zoom'],
     ],
     'Hỗ trợ' => [
         ['id' => 'loi-thuong-gap', 'file' => 'faq', 'title' => 'Lỗi Thường Gặp', 'icon' => 'fas fa-question-circle'],

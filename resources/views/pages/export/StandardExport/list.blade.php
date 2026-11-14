@@ -84,5 +84,9 @@
 @include('pages.export.StandardExport.transferRequestEditModal')
 @include('pages.shared.titleDatalist', ['id' => 'stdTitleOptionsTransfer', 'titles' => $transferTitles])
 @include('pages.export.StandardExport.transferDetailModal')
+@include('pages.export.shared.transferSignModal', [
+    'tsSignUrl' => route('pages.export.standardExport.transferSign'),
+    'tsRejectUrl' => route('pages.export.standardExport.transferSignReject'),
+])
 
 @endsection

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pages\Export;
 
+use App\Http\Controllers\Concerns\TransferSigning;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
@@ -9,6 +10,7 @@ use App\Support\DepartmentStandard;
 use App\Support\ListRange;
 use App\Support\ProductList;
 use App\Support\StandardCode;
+use App\Support\StandardTransferSignFlow;
 use App\Support\TitleSuggestions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +38,8 @@ use Illuminate\Validation\Rule;
  */
 class StandardExportController extends Controller
 {
+    use TransferSigning;
+
     private const TABLE = 'standard_exports';
 
     private const HISTORY_TABLE = 'standard_export_histories';
@@ -79,10 +83,10 @@ class StandardExportController extends Controller
      * Trạng thái đề nghị chuyển liên phòng ban còn DỞ DANG - bộ lọc khoảng ngày luôn
      * giữ lại các đề nghị này dù đã ngoài khoảng lọc.
      */
-    private const TRANSFER_PENDING_STATUSES = ['draft', 'pending', 'partial'];
+    private const TRANSFER_PENDING_STATUSES = ['draft', 'pending_sign', 'pending', 'partial'];
 
     /** Trạng thái phiếu liên phòng ban CHƯA tới phòng nhận - ẩn khỏi danh sách "gửi đến". */
-    private const TRANSFER_UNSENT_STATUSES = ['draft', 'canceled'];
+    private const TRANSFER_UNSENT_STATUSES = ['draft', 'pending_sign', 'canceled'];
 
     /** Trạng thái phiếu liên phòng ban phòng nhận CÒN PHẢI cấp phát - tab con "Chờ xử lý" của card gửi đến. */
     private const TRANSFER_ISSUE_STATUSES = ['pending', 'partial'];
@@ -384,6 +388,8 @@ class StandardExportController extends Controller
             'transferSent' => $transfer['sent'],
             'transferReceived' => $transfer['received'],
             'transferItems' => $transfer['items'],
+            'transferSigns' => $transfer['signs'],
+            'transferSignable' => $transfer['signable'],
             'transferBadgeCount' => $transfer['badgeCount'],
             'transferSentDone' => $transfer['sentDone'],
             'transferSentDoneRange' => $transfer['sentDoneRange'],
@@ -1379,7 +1385,8 @@ class StandardExportController extends Controller
 
         $actionType = $request->input('action_type', 'send');
         $isDraft = $actionType === 'draft';
-        $status = $isDraft ? 'draft' : 'pending';
+        // Gửi cũng ghi Lưu tạm trước rồi đi qua quy trình ký 2 bước (StandardTransferSignFlow::start)
+        $status = 'draft';
         $toDepartmentId = (int) $request->to_department_id;
 
         $code = $this->nextTransferCode($departmentId, $toDepartmentId);
@@ -1412,6 +1419,7 @@ class StandardExportController extends Controller
         }
 
         $toDeptName = DB::table('deparments')->where('id', $toDepartmentId)->value('name') ?: 'phòng ban khác';
+        $sendResult = $isDraft ? null : $this->startTransferSign((int) $listId);
 
         AuditTrialController::log(
             $isDraft ? 'Lưu tạm đề nghị cấp phát chuẩn liên phòng ban' : 'Tạo đề nghị cấp phát chuẩn liên phòng ban',
@@ -1419,14 +1427,15 @@ class StandardExportController extends Controller
             $listId,
             'NA',
             ($isDraft ? 'Lưu tạm đề nghị ' : 'Tạo đề nghị cấp phát liên phòng ban ') . $code . ' gửi đến ' . $toDeptName . ' (' . count($request->items) . ' mục)'
+                . ($sendResult ? ' -> ' . $sendResult['status'] : '')
         );
 
-        $msg = $isDraft
-            ? 'Đã lưu tạm đề nghị cấp phát chuẩn liên phòng ban ' . $code . '! Bạn có thể gửi đề nghị khi sẵn sàng.'
-            : 'Đã gửi đề nghị cấp phát chuẩn liên phòng ban ' . $code . ' đến ' . $toDeptName . ' thành công!';
+        [$flashType, $msg] = $isDraft
+            ? ['success', 'Đã lưu tạm đề nghị cấp phát chuẩn liên phòng ban ' . $code . '! Bạn có thể gửi đề nghị khi sẵn sàng.']
+            : $this->transferSendFlash($sendResult, $code, $toDepartmentId, 'đề nghị cấp phát chuẩn liên phòng ban');
 
         return redirect()->route('pages.export.standardExport.list', ['tab' => 'transfer'])
-            ->with('success', $msg);
+            ->with($flashType, $msg);
     }
 
     /**
@@ -1479,7 +1488,8 @@ class StandardExportController extends Controller
 
         $actionType = $request->input('action_type', 'draft');
         $isDraft = $actionType === 'draft';
-        $status = $isDraft ? 'draft' : 'pending';
+        // Gửi cũng ghi Lưu tạm trước rồi đi qua quy trình ký 2 bước (StandardTransferSignFlow::start)
+        $status = 'draft';
         $toDepartmentId = (int) $request->to_department_id;
 
         DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $req->id)->update([
@@ -1513,6 +1523,7 @@ class StandardExportController extends Controller
         }
 
         $toDeptName = DB::table('deparments')->where('id', $toDepartmentId)->value('name') ?: 'phòng ban khác';
+        $sendResult = $isDraft ? null : $this->startTransferSign((int) $req->id);
 
         AuditTrialController::log(
             $isDraft ? 'Cập nhật đề nghị cấp phát chuẩn liên phòng ban' : 'Gửi đề nghị cấp phát chuẩn liên phòng ban sau cập nhật',
@@ -1520,14 +1531,15 @@ class StandardExportController extends Controller
             $req->id,
             'draft',
             ($isDraft ? 'Cập nhật đề nghị ' : 'Gửi đề nghị ') . $req->code . ' gửi đến ' . $toDeptName . ' (' . count($request->items) . ' mục)'
+                . ($sendResult ? ' -> ' . $sendResult['status'] : '')
         );
 
-        $msg = $isDraft
-            ? 'Đã cập nhật lưu tạm đề nghị ' . $req->code . ' thành công!'
-            : 'Đã cập nhật và gửi đề nghị ' . $req->code . ' thành công!';
+        [$flashType, $msg] = $isDraft
+            ? ['success', 'Đã cập nhật lưu tạm đề nghị ' . $req->code . ' thành công!']
+            : $this->transferSendFlash($sendResult, $req->code, $toDepartmentId, 'đề nghị cấp phát chuẩn liên phòng ban');
 
         return redirect()->route('pages.export.standardExport.list', ['tab' => 'transfer'])
-            ->with('success', $msg);
+            ->with($flashType, $msg);
     }
 
     /**
@@ -1545,27 +1557,32 @@ class StandardExportController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy phiếu đề nghị lưu tạm cần gửi!');
         }
 
-        DB::table(self::TRANSFER_REQUEST_TABLE)->where('id', $req->id)->update([
-            'status' => 'pending',
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
-
-        DB::table(self::TRANSFER_ITEM_TABLE)->where('transfer_request_id', $req->id)->where('status', 'draft')->update([
-            'status' => 'pending',
-            'updated_at' => now(),
-        ]);
+        // Gửi = trình ký 2 bước (quản lý bộ phận phòng đề nghị -> quản lý bộ phận phòng cấp phát)
+        $result = $this->startTransferSign((int) $req->id);
 
         AuditTrialController::log(
             'Gửi đề nghị cấp phát chuẩn liên phòng ban',
             self::TRANSFER_REQUEST_TABLE,
             $req->id,
             'draft',
-            'Gửi đề nghị cấp phát liên phòng ban: ' . $req->code
+            'Gửi đề nghị cấp phát liên phòng ban: ' . $req->code . ' -> ' . $result['status']
         );
 
+        [$flashType, $msg] = $this->transferSendFlash($result, $req->code, (int) $req->to_department_id, 'đề nghị cấp phát chuẩn liên phòng ban');
+
         return redirect()->route('pages.export.standardExport.list', ['tab' => 'transfer'])
-            ->with('success', 'Đã gửi đề nghị cấp phát liên phòng ban mã ' . $req->code . ' thành công!');
+            ->with($flashType, $msg);
+    }
+
+    /** Quy trình ký 2 bước của đề nghị liên phòng ban (trait TransferSigning). */
+    protected function transferSignFlowClass(): string
+    {
+        return StandardTransferSignFlow::class;
+    }
+
+    protected function transferSignTab(): string
+    {
+        return 'transfer';
     }
 
     /**
@@ -2930,22 +2947,29 @@ class StandardExportController extends Controller
             ->paginate(ListRange::perPage($request, 'tsdone_'), ['*'], ListRange::pageName('tsdone_'))
             ->withQueryString();
 
+        // Phiếu đang chờ quản lý bộ phận phòng mình (phòng cấp phát) ký bước 2
+        $awaitingMySign = $this->transferAwaitingSignAt($departmentId);
+        $openStatuses = array_merge(self::TRANSFER_ISSUE_STATUSES, [StandardTransferSignFlow::STATUS_PENDING_SIGN]);
+
         $receivedBase = fn () => $base()
             ->leftJoin('deparments', self::TRANSFER_REQUEST_TABLE.'.department_id', '=', 'deparments.id')
             ->addSelect('deparments.name as partner_name', 'deparments.shortName as partner_short')
             ->where(self::TRANSFER_REQUEST_TABLE.'.to_department_id', $departmentId)
-            // Phòng nhận chỉ thấy phiếu đã gửi tới: Lưu tạm / huỷ (chỉ huỷ được khi còn Lưu tạm) là việc riêng của phòng đề nghị
-            ->whereNotIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_UNSENT_STATUSES);
+            // Phòng nhận chỉ thấy phiếu đã gửi tới: Lưu tạm / huỷ (chỉ huỷ được khi còn Lưu tạm) là việc riêng của phòng
+            // đề nghị; phiếu chờ ký chỉ hiện khi đã tới bước ký của phòng mình
+            ->where(fn ($query) => $query
+                ->whereNotIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_UNSENT_STATUSES)
+                ->orWhere($awaitingMySign));
 
-        // Cần cấp phát: Chờ cấp phát / Cấp một phần
+        // Cần xử lý: chờ phòng mình ký / Chờ cấp phát / Cấp một phần
         $received = $receivedBase()
-            ->whereIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_ISSUE_STATUSES)
+            ->whereIn(self::TRANSFER_REQUEST_TABLE.'.status', $openStatuses)
             ->paginate(ListRange::perPage($request, 'trecv_'), ['*'], ListRange::pageName('trecv_'))
             ->withQueryString();
 
         // Đã cấp đủ / từ chối
         $done = $receivedBase()
-            ->whereNotIn(self::TRANSFER_REQUEST_TABLE.'.status', self::TRANSFER_ISSUE_STATUSES)
+            ->whereNotIn(self::TRANSFER_REQUEST_TABLE.'.status', $openStatuses)
             ->tap(ListRange::dateFilter(self::TRANSFER_REQUEST_TABLE.'.created_at', $doneRange))
             ->paginate(ListRange::perPage($request, 'tdone_'), ['*'], ListRange::pageName('tdone_'))
             ->withQueryString();
@@ -2996,13 +3020,20 @@ class StandardExportController extends Controller
             ->where(self::TRANSFER_ITEM_TABLE.'.status', 'issued')
             ->count();
 
+        // Bước ký của các phiếu đang hiện + phiếu người đăng nhập ký được (trait TransferSigning)
+        $signData = $this->transferSignViewData(
+            collect([$sent, $sentDone, $received, $done])->flatMap(fn ($list) => $list->getCollection())
+        );
+
         return [
             'sent' => $sent,
             'sentDone' => $sentDone,
             'received' => $received,
             'done' => $done,
             'items' => $items,
-            'badgeCount' => $pendingIssue + $awaitingReceipt,
+            'signs' => $signData['signs'],
+            'signable' => $signData['signable'],
+            'badgeCount' => $pendingIssue + $awaitingReceipt + count($signData['signable']),
             'sentDoneRange' => $sentDoneRange,
             'sentDonePerPage' => ListRange::perPage($request, 'tsdone_'),
             'doneRange' => $doneRange,

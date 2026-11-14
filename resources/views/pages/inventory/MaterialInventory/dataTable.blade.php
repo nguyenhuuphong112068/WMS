@@ -242,6 +242,7 @@
                                                         'unit' => $row->unit_short_name ?: $row->unit_name,
                                                         'imported' => $row->imported, 'gap' => $row->gap,
                                                         'balancing_limit' => $row->balancing_limit,
+                                                        'balancing_locked' => (bool) $row->balancing_locked,
                                                         'balancing_min_input' => $row->balancing_min_input,
                                                         'balancing_max_input' => $row->balancing_max_input,
                                                     ]) }}">
@@ -497,8 +498,12 @@
             $f.find('.mi-imported-view').val(r.imported);
             $f.find('.mi-gap-view').val(r.gap + ' ' + (r.unit || ''));
             $f.find('.mi-limit-view').val('±' + r.balancing_limit + ' ' + (r.unit || ''));
-            $f.find('.mi-limit-hint').text('Lần này nhập từ ' + r.balancing_min_input + ' đến ' + r.balancing_max_input + '.');
-            $f.find('[name="balancing_amount"]').attr('min', r.balancing_min_input).attr('max', r.balancing_max_input).val('');
+            $f.find('.mi-limit-hint').toggleClass('text-danger', !!r.balancing_locked).text(r.balancing_locked
+                ? 'Vật tư quan trọng Cao - không được cân đối.'
+                : 'Lần này nhập từ ' + r.balancing_min_input + ' đến ' + r.balancing_max_input + '.');
+            $f.find('[name="balancing_amount"]').attr('min', r.balancing_min_input).attr('max', r.balancing_max_input).val('')
+                .prop('disabled', !!r.balancing_locked).removeClass('is-invalid');
+            $f.find('.mi-balancing-submit').prop('disabled', !!r.balancing_locked);
             $('#balancingModal').modal('show');
         });
 

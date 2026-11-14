@@ -37,8 +37,8 @@ use Illuminate\Validation\Rule;
  * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về "Chờ duyệt".
  * Mọi thay đổi đều được chụp lại ở bảng chemical_category_histories.
  *
- * "Đã khai báo trên Cổng thông tin quốc gia" không sửa qua update(): chỉ xác nhận được
- * một lần duy nhất qua declarePortal().
+ * "Khai báo trên Cổng thông tin quốc gia" không sửa qua update(): mỗi lần khai báo (Mã hồ sơ +
+ * Code nhà sản xuất) ghi một dòng qua declarePortal(), khai báo được nhiều lần; sửa từng lần qua updatePortal() (bắt lý do, ghi Audit Trail).
  *
  * Modal Thêm mới là BẢNG NHIỀU DÒNG (items[i][...], trait StoresBatchItems): một lần lưu được
  * nhiều mã, mã C00001... cấp liên tiếp theo thứ tự dòng. Modal Cập nhật vẫn sửa từng dòng.
@@ -154,6 +154,8 @@ class ChemicalCategoryController extends Controller
             'historyCounts' => $this->historyCounts(),
             // TẠM THỜI: mã hoá chất bên Access CMS 3.0 để đối chiếu dữ liệu chuyển đổi, đối chiếu xong thì gỡ
             'accessCodes' => \App\Support\AccessLegacyCode::byChemicalCategory(),
+            // Các lần khai báo Cổng thông tin quốc gia (Mã hồ sơ + Code NSX), mới nhất trước
+            'portalDeclarations' => \App\Support\ChemicalPortalDeclaration::byCategory(),
             // Đối chiếu tồn trữ với ngưỡng Phụ lục IV NĐ 24/2026, theo mã danh mục. Phạm vi
             // cộng tồn gói trong công ty của phòng ban đang chọn.
             'thresholds' => $thresholdsA,
@@ -336,11 +338,12 @@ class ChemicalCategoryController extends Controller
     }
 
     /**
-     * Xác nhận "Đã khai báo trên Cổng thông tin quốc gia".
+     * Khai báo trên Cổng thông tin quốc gia - được khai báo NHIỀU LẦN.
      *
-     * Chỉ cho cập nhật MỘT lần, một chiều Chưa -> Đã: ghi lại người + thời điểm xác nhận,
-     * sau đó không sửa / gỡ được nữa. Không nằm trong update() nên không bắt duyệt lại
-     * danh mục; bù lại phải nhập mật khẩu ký xác nhận vì thao tác không đảo ngược được.
+     * Mỗi lần khai báo là một dòng ở chemical_portal_declarations (Mã hồ sơ khai báo + Code nhà
+     * sản xuất), sửa lại qua updatePortal(). Các cột national_portal_* trên danh mục giữ giá trị
+     * của lần khai báo mới nhất. Không nằm trong update() nên không bắt duyệt lại danh mục; bù
+     * lại phải nhập mật khẩu ký xác nhận khi khai báo.
      */
     public function declarePortal(Request $request)
     {
@@ -354,48 +357,197 @@ class ChemicalCategoryController extends Controller
             return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần cập nhật!');
         }
 
-        $alreadyDeclared = 'Mã ' . $current->code . ' đã được xác nhận khai báo trên Cổng thông tin quốc gia, không cập nhật lại được.';
-
-        if ($current->national_portal_declared) {
-            return redirect()->back()->with('error', $alreadyDeclared);
-        }
-
         $declarationNo = trim((string) $request->input('declaration_no'));
+        $manufacturerCode = trim((string) $request->input('manufacturer_code'));
 
         if ($declarationNo === '') {
             return redirect()->back()->with('error', 'Vui lòng nhập Mã hồ sơ khai báo trên Cổng thông tin quốc gia!');
         }
 
-        if (mb_strlen($declarationNo) > 100) {
-            return redirect()->back()->with('error', 'Mã hồ sơ khai báo không được vượt quá 100 ký tự!');
+        if ($manufacturerCode === '') {
+            return redirect()->back()->with('error', 'Vui lòng nhập Code nhà sản xuất!');
         }
 
-        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Xác nhận khai báo Cổng thông tin quốc gia')) {
+        if (mb_strlen($declarationNo) > 100 || mb_strlen($manufacturerCode) > 100) {
+            return redirect()->back()->with('error', 'Mã hồ sơ khai báo và Code nhà sản xuất không được vượt quá 100 ký tự!');
+        }
+
+        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Khai báo Cổng thông tin quốc gia')) {
             return $stop;
         }
 
-        // Điều kiện "chưa khai báo" nằm ngay trong câu UPDATE: hai người bấm cùng lúc thì chỉ một người ghi được
-        $affected = DB::table(self::TABLE)
-            ->where('id', $current->id)
-            ->where('national_portal_declared', 0)
-            ->update([
+        $declarationTable = \App\Support\ChemicalPortalDeclaration::TABLE;
+
+        $duplicate = DB::transaction(function () use ($current, $declarationTable, $declarationNo, $manufacturerCode) {
+            // Khoá dòng danh mục: hai người bấm cùng lúc không ghi trùng một lần khai báo
+            DB::table(self::TABLE)->where('id', $current->id)->lockForUpdate()->first();
+
+            $exists = DB::table($declarationTable)
+                ->where('chemical_category_id', $current->id)
+                ->where('status_id', 1)
+                ->where('declaration_no', $declarationNo)
+                ->where('manufacturer_code', $manufacturerCode)
+                ->exists();
+
+            if ($exists) {
+                return true;
+            }
+
+            DB::table($declarationTable)->insert([
+                'chemical_category_id' => $current->id,
+                'declaration_no' => $declarationNo,
+                'manufacturer_code' => $manufacturerCode,
+                'status_id' => 1,
+                'created_by' => $this->actor(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table(self::TABLE)->where('id', $current->id)->update([
                 'national_portal_declared' => 1,
                 'national_portal_declaration_no' => $declarationNo,
+                'national_portal_manufacturer_code' => $manufacturerCode,
                 'national_portal_declared_by' => $this->actor(),
                 'national_portal_declared_at' => now(),
                 'updated_by' => $this->actor(),
                 'updated_at' => now(),
             ]);
 
-        if (! $affected) {
-            return redirect()->back()->with('error', $alreadyDeclared);
+            return false;
+        });
+
+        if ($duplicate) {
+            return redirect()->back()->with('error', 'Mã ' . $current->code . ' đã có lần khai báo với Mã hồ sơ ' . $declarationNo . ' và Code nhà sản xuất ' . $manufacturerCode . '.');
         }
 
-        $this->writeHistory($current->id, 'Khai báo Cổng TTQG', 'Khai báo trên Cổng thông tin quốc gia: Chưa khai báo -> Đã khai báo (Mã hồ sơ: ' . $declarationNo . ')');
+        $detail = 'Mã hồ sơ: ' . $declarationNo . ', Code nhà sản xuất: ' . $manufacturerCode;
 
-        AuditTrialController::log('Khai báo Cổng thông tin quốc gia', self::TABLE, $current->id, 'national_portal_declared: 0', 'national_portal_declared: 1, national_portal_declaration_no: ' . $declarationNo);
+        $this->writeHistory($current->id, 'Khai báo Cổng TTQG', 'Khai báo trên Cổng thông tin quốc gia (' . $detail . ')');
 
-        return redirect()->back()->with('success', 'Đã xác nhận ' . self::LABEL . ' ' . $current->code . ' đã khai báo trên Cổng thông tin quốc gia!');
+        AuditTrialController::log(
+            'Khai báo Cổng thông tin quốc gia',
+            self::TABLE,
+            $current->id,
+            'national_portal_declaration_no: ' . ($current->national_portal_declaration_no ?: '—') . ', national_portal_manufacturer_code: ' . ($current->national_portal_manufacturer_code ?? '—'),
+            'national_portal_declaration_no: ' . $declarationNo . ', national_portal_manufacturer_code: ' . $manufacturerCode
+        );
+
+        return redirect()->back()->with('success', 'Đã ghi nhận khai báo Cổng thông tin quốc gia cho ' . self::LABEL . ' ' . $current->code . ' (' . $detail . ')!');
+    }
+
+    /**
+     * Sửa một lần khai báo Cổng thông tin quốc gia đã ghi (Mã hồ sơ + Code nhà sản xuất).
+     *
+     * Cùng quyền với khai báo (category_chemical_update), bắt buộc lý do điều chỉnh như Sửa
+     * danh mục; ghi lịch sử danh mục + Audit Trail giá trị cũ -> mới. Sửa lần mới nhất thì
+     * đồng bộ lại các cột national_portal_* trên danh mục.
+     */
+    public function updatePortal(Request $request)
+    {
+        if (! user_can('category_chemical_update')) {
+            return redirect()->back()->with('error', 'Bạn không có quyền cập nhật ' . self::LABEL . '!');
+        }
+
+        $declarationTable = \App\Support\ChemicalPortalDeclaration::TABLE;
+
+        $declaration = DB::table($declarationTable)
+            ->where('id', $request->declaration_id)
+            ->where('status_id', 1)
+            ->first();
+        $current = $declaration ? DB::table(self::TABLE)->where('id', $declaration->chemical_category_id)->first() : null;
+
+        if (! $declaration || ! $current) {
+            return redirect()->back()->with('error', 'Không tìm thấy lần khai báo Cổng thông tin quốc gia cần sửa!');
+        }
+
+        $declarationNo = trim((string) $request->input('declaration_no'));
+        $manufacturerCode = trim((string) $request->input('manufacturer_code'));
+
+        if ($declarationNo === '') {
+            return redirect()->back()->with('error', 'Vui lòng nhập Mã hồ sơ khai báo trên Cổng thông tin quốc gia!');
+        }
+
+        if ($manufacturerCode === '') {
+            return redirect()->back()->with('error', 'Vui lòng nhập Code nhà sản xuất!');
+        }
+
+        if (mb_strlen($declarationNo) > 100 || mb_strlen($manufacturerCode) > 100) {
+            return redirect()->back()->with('error', 'Mã hồ sơ khai báo và Code nhà sản xuất không được vượt quá 100 ký tự!');
+        }
+
+        if ($stop = $this->guardChangeReason($request)) {
+            return $stop;
+        }
+
+        $old = 'Mã hồ sơ: ' . ($declaration->declaration_no ?: '—') . ', Code nhà sản xuất: ' . ($declaration->manufacturer_code ?: '—');
+        $new = 'Mã hồ sơ: ' . $declarationNo . ', Code nhà sản xuất: ' . $manufacturerCode;
+
+        if ($declarationNo === (string) $declaration->declaration_no && $manufacturerCode === (string) $declaration->manufacturer_code) {
+            return redirect()->back()->with('warning', 'Thông tin khai báo không có thay đổi.');
+        }
+
+        $duplicate = DB::transaction(function () use ($current, $declaration, $declarationTable, $declarationNo, $manufacturerCode) {
+            DB::table(self::TABLE)->where('id', $current->id)->lockForUpdate()->first();
+
+            $exists = DB::table($declarationTable)
+                ->where('chemical_category_id', $current->id)
+                ->where('status_id', 1)
+                ->where('id', '<>', $declaration->id)
+                ->where('declaration_no', $declarationNo)
+                ->where('manufacturer_code', $manufacturerCode)
+                ->exists();
+
+            if ($exists) {
+                return true;
+            }
+
+            DB::table($declarationTable)->where('id', $declaration->id)->update([
+                'declaration_no' => $declarationNo,
+                'manufacturer_code' => $manufacturerCode,
+                'updated_by' => $this->actor(),
+                'updated_at' => now(),
+            ]);
+
+            // Các cột trên danh mục luôn phản ánh lần khai báo mới nhất
+            $latest = DB::table($declarationTable)
+                ->where('chemical_category_id', $current->id)
+                ->where('status_id', 1)
+                ->orderBy('created_at', 'desc')
+                ->orderBy('id', 'desc')
+                ->first();
+
+            if ($latest && (int) $latest->id === (int) $declaration->id) {
+                DB::table(self::TABLE)->where('id', $current->id)->update([
+                    'national_portal_declaration_no' => $declarationNo,
+                    'national_portal_manufacturer_code' => $manufacturerCode,
+                ]);
+            }
+
+            return false;
+        });
+
+        if ($duplicate) {
+            return redirect()->back()->with('error', 'Mã ' . $current->code . ' đã có lần khai báo khác với Mã hồ sơ ' . $declarationNo . ' và Code nhà sản xuất ' . $manufacturerCode . '.');
+        }
+
+        $declaredAt = $declaration->created_at ? \Carbon\Carbon::parse($declaration->created_at)->format('d/m/Y H:i') : '—';
+
+        $this->writeHistory(
+            $current->id,
+            'Sửa khai báo Cổng TTQG',
+            'Sửa lần khai báo Cổng thông tin quốc gia ngày ' . $declaredAt . ': ' . $old . ' -> ' . $new,
+            $this->changeReason($request)
+        );
+
+        AuditTrialController::log(
+            'Sửa khai báo Cổng thông tin quốc gia',
+            $declarationTable,
+            $declaration->id,
+            'declaration_no: ' . ($declaration->declaration_no ?: '—') . ', manufacturer_code: ' . ($declaration->manufacturer_code ?: '—'),
+            'declaration_no: ' . $declarationNo . ', manufacturer_code: ' . $manufacturerCode . ' (Mã danh mục ' . $current->code . '; lý do: ' . $this->changeReason($request) . ')'
+        );
+
+        return redirect()->back()->with('success', 'Đã cập nhật khai báo Cổng thông tin quốc gia của ' . self::LABEL . ' ' . $current->code . ' (' . $new . ')!');
     }
 
     /** Trả về lịch sử thay đổi của một dòng danh mục cho modal xem lịch sử. */
@@ -445,6 +597,7 @@ class ChemicalCategoryController extends Controller
                         ? '—'
                         : ($row->national_portal_declared ? 'Đã khai báo' : 'Chưa khai báo'),
                     'Mã hồ sơ khai báo' => $row->national_portal_declaration_no ?: '—',
+                    'Code nhà sản xuất (khai báo)' => ($row->national_portal_manufacturer_code ?? null) ?: '—',
                 ];
 
                 // Đơn vị tính đã chuyển sang danh mục của phòng nên bản ghi mới không còn
@@ -651,6 +804,7 @@ class ChemicalCategoryController extends Controller
             'lead_time_days' => $row->lead_time_days,
             'national_portal_declared' => $row->national_portal_declared,
             'national_portal_declaration_no' => $row->national_portal_declaration_no,
+            'national_portal_manufacturer_code' => $row->national_portal_manufacturer_code,
             'app_status' => $row->app_status,
             'status_id' => $row->status_id,
             'change_note' => $note,

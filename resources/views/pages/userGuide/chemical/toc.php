@@ -135,7 +135,10 @@ return [
         ['id' => 'du-tru', 'file' => 'estimate', 'title' => 'Lập & Trình Ký Phiếu Dự Trù', 'icon' => 'fas fa-file-invoice',
             'path' => 'Dự Trù › Hoá Chất › tab Danh sách phiếu',
             'route' => 'pages.estimate.chemicalEstimate.list', 'pane' => 'list', 'params' => ['tab' => 'list'], 'perm' => 'estimate_chemical_view', 'chips' => [$sign],
-            'keywords' => 'quan ly bo phan ban giam doc nguong'],
+            'extraShots' => [
+                ['name' => 'du-tru-them-mat-hang', 'url' => '/estimate/chemicalEstimate/detail?id=6', 'dept' => 9, 'js' => "__ug.click('.btn-est-item-create')", 'clip' => '.modal.show .modal-content', 'maxHeight' => 900, 'pad' => 0],
+            ],
+            'keywords' => 'quan ly bo phan ban giam doc nguong code nha san xuat cong thong tin quoc gia'],
         ['id' => 'can-du-tru', 'file' => 'watchlist', 'title' => 'Danh Sách Hoá Chất Cần Dự Trù', 'icon' => 'fas fa-clipboard-list',
             'path' => 'Dự Trù › Hoá Chất › tab Danh sách hoá chất cần dự trù',
             'route' => 'pages.estimate.chemicalEstimate.list', 'pane' => 'watchlist', 'params' => ['tab' => 'watchlist'], 'perm' => 'estimate_chemical_view',

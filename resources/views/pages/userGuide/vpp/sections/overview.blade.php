@@ -1,7 +1,7 @@
 <p>
     Module <b>VPP</b> (văn phòng phẩm) quản lý các mặt hàng do <b>Hành Chánh</b> mua và cấp phát (giấy, bút, mực in...),
-    từ lúc khai danh mục cho tới khi VPP được cấp phát đem dùng. Module tách từ Vật Tư nên có đủ các chức năng như Vật Tư
-    nhưng dữ liệu, quyền và trình ký riêng. Các màn hình nằm ở 6 nhóm menu, mỗi nhóm có mục con <b>VPP</b>.
+    từ lúc khai danh mục cho tới khi VPP được cấp phát đem dùng. Module tách từ Vật Tư nhưng dữ liệu, quyền riêng và đơn giản hơn: VPP dùng trong phòng được <b>ghi sổ trực tiếp</b>,
+    không qua đề nghị nội bộ, trình ký và cấp phát. Các màn hình nằm ở 5 nhóm menu, mỗi nhóm có mục con <b>VPP</b>.
 </p>
 
 <h3>Vòng đời một VPP</h3>
@@ -18,13 +18,13 @@
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">3</span>
-        <b>Đề nghị & ký</b>
-        <a href="#de-nghi-noi-bo">Lập đề nghị</a> → trình ký → ký đủ các bước
+        <b>Lấy hàng</b>
+        Kho phòng thiếu thì <a href="#de-nghi-vpp">đề nghị VPP đến HC</a> hoặc <a href="#lien-phong-ban">phòng khác</a> → ký 2 bước → nhận hàng
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">4</span>
-        <b>Cấp phát</b>
-        <a href="#cho-cap-phat">Kho cấp phát</a>, trừ tồn ngay, ghi vào <a href="#so-cap-phat">Sổ cấp phát</a>
+        <b>Sử dụng</b>
+        <a href="#su-dung-vpp">Sử dụng VPP</a>: quét / chọn lô, Lưu là trừ tồn ngay và ghi vào <a href="#so-cap-phat">Sổ sử dụng VPP</a>
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">5</span>
@@ -50,7 +50,6 @@
 <ul>
     <li><a href="#de-nghi-vpp">Đề nghị VPP đến HC</a>: cách lấy VPP thường dùng nhất - xin từ kho VPP của phòng Hành Chánh.</li>
     <li><a href="#lien-phong-ban">Đề nghị liên phòng ban</a>: xin VPP từ kho của một phòng khác (không phải Hành Chánh).</li>
-    <li><a href="#hieu-chuan">Hiệu chuẩn</a>: VPP "Cần hiệu chuẩn trước khi dùng" phải được QA xác nhận đạt mới cấp phát được.</li>
     <li><a href="#cach-ly">Cách ly - Loại bỏ - Huỷ</a>: xử lý VPP hỏng, hết hạn.</li>
     <li><a href="#danh-sach-chu-ky">Danh sách theo chu kỳ</a>: hệ thống tự tạo đề nghị hoặc phiếu dự trù định kỳ.</li>
 </ul>
@@ -58,6 +57,6 @@
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
     <div>Hầu hết màn hình VPP làm việc trên <b>phòng ban đang chọn</b> ở thanh trên cùng. Dữ liệu nền (tên VPP, đơn
-        vị tính, nhà sản xuất, định khu, phân loại của phòng, trình ký) khai ở menu Dữ Liệu Gốc. Xem
+        vị tính, nhà sản xuất, định khu, phân loại của phòng) khai ở menu Dữ Liệu Gốc. Xem
         <a href="{{ route('pages.userGuide.show', 'materData') }}">Hướng dẫn Dữ Liệu Gốc</a>.</div>
 </div>

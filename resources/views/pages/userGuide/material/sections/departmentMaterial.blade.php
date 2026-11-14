@@ -17,7 +17,7 @@
                 <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-arrow-down"></i> Thêm vào bảng</span>.</li>
         </ul>
         Vật tư đã có dòng trong bảng không thêm lần hai (ô tick bị khoá, nhãn <i>Đã có trong bảng</i>).</li>
-    <li>Hàng <b>Điền nhanh cho mọi dòng</b> (dưới tiêu đề bảng): chọn Phân loại, Đơn vị hoặc Định khu ở đây là áp cho mọi dòng
+    <li>Hàng <b>Điền nhanh cho mọi dòng</b> (dưới tiêu đề bảng): chọn Theo Giá Trị, Phân loại, Đơn vị hoặc Định khu ở đây là áp cho mọi dòng
         đang có và điền sẵn cho dòng thêm sau. Đơn vị tính của dòng mới vẫn ưu tiên đơn vị các phòng khác đã khai cho vật tư đó.</li>
     <li>Sửa từng dòng nếu cần, bấm <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-trash-alt"></i></span> để bỏ dòng, rồi bấm <b>Lưu</b>.</li>
 </ol>
@@ -33,6 +33,7 @@
 
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Vật Tư', true, 'Chỉ vật tư đã duyệt trong danh mục công ty mà phòng <b>chưa khai</b>. Mỗi phòng khai một vật tư <b>một lần</b>.'],
+    ['Theo Giá Trị', true, '<b>Thấp</b> / <b>Cao</b>. Từ 13/11/2026 giá trị khai theo phòng (trước khai ở danh mục công ty), hiện thành chip ở cột Phân Loại; bộ lọc Phân loại có nhóm <b>Theo Giá Trị (phòng)</b>. Là tiêu chí điều kiện của Trình Ký Đề Nghị CP Vật Tư.'],
     ['Phân Loại Của Phòng', false, 'Bộ nhóm riêng của phòng, khai ở <b>Dữ Liệu Gốc › Phân Loại</b>.'],
     ['Đơn Vị Tính', true, 'Đơn vị phòng dùng để nhập, xuất và ghi tồn cho vật tư này.'],
     ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn xuống dưới mức này thì vật tư tự vào <a href="#can-du-tru">Danh sách cần dự trù</a>. Để trống nếu chưa đặt.'],

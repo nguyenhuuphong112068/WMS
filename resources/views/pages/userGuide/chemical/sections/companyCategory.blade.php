@@ -40,9 +40,12 @@
     <li><b>Phân Loại</b>: các nhóm NĐ 24/2026 suy được. Mã thuộc nhóm 9 (Bảng A) hoặc nhóm 10 (Bảng B) có thêm số liệu đối chiếu
         ngưỡng tồn trữ toàn công ty; bấm vào con số để xem các lô tạo nên nó.</li>
     <li><b>Phòng Ban Đang Dùng</b>: các phòng đã khai hoá chất này ở tab Hoá chất của phòng.</li>
-    <li><b>Khai Báo Cổng TT Quốc Gia</b>: bấm <b>Xác nhận</b>, nhập <b>Mã hồ sơ khai báo</b> (bắt buộc, tối đa 100 ký tự) và nhập lại mật khẩu.
-        Mã hồ sơ hiện dưới nhãn <b>Đã khai báo</b> và được ghi vào lịch sử. Chỉ xác nhận được <b>một lần</b>,
-        sau đó không sửa hay gỡ được (kể cả mã hồ sơ), và không làm danh mục phải duyệt lại.</li>
+    <li><b>Khai Báo Cổng TT Quốc Gia</b>: khai báo được <b>nhiều lần</b> (mỗi nhà sản xuất / catalogue một lần). Bấm
+        <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-check mr-1"></i>Khai báo</span> (lần đầu) hoặc
+        <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-plus mr-1"></i>Khai báo thêm</span>, nhập 2 ô bắt buộc
+        <b>Mã hồ sơ khai báo</b> và <b>Code nhà sản xuất</b> (mã hàng / catalogue number) rồi nhập lại mật khẩu. Cột liệt kê từng lần
+        khai báo: Code NSX, Hồ sơ, người · ngày; mỗi lần được ghi vào lịch sử. Lần khai báo đã ghi không sửa hay gỡ được, và không
+        làm danh mục phải duyệt lại. Code NSX khai ở đây hiện ở hộp <a href="#du-tru">Thêm mặt hàng dự trù</a>.</li>
 </ul>
 
 <h3>Điều chỉnh thời gian đặt hàng</h3>

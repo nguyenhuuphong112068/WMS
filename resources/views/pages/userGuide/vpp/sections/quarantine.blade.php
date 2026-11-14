@@ -21,6 +21,6 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>VPP <a href="#hieu-chuan">hiệu chuẩn Không đạt</a> tự vào bước Cách ly mà không cần thao tác. Định khu Cách Ly Chờ Quyết Định
+    <div>Định khu Cách Ly Chờ Quyết Định
         và Loại Bỏ/Chờ Huỷ là các vị trí đã gán phân loại tương ứng ở <b>Dữ Liệu Gốc › Định Khu</b>.</div>
 </div>

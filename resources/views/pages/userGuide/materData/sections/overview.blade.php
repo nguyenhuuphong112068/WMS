@@ -34,8 +34,8 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">Bước 5</span>
         <b>Quy trình ký</b>
-        <a href="#phan-loai">Phân Loại</a> → <a href="#trinh-ky-cap-phat">Trình Ký CP Vật Tư</a>,
-        <a href="#trinh-ky-lien-phong-ban">Liên Phòng Ban</a>
+        <a href="#phan-loai">Phân Loại</a> → <a href="#trinh-ky-cap-phat">Trình Ký CP Vật Tư</a>
+        (đề nghị liên phòng ban ký cố định 2 bước Quản Lý Bộ Phận, không cần khai)
     </div>
 </div>
 

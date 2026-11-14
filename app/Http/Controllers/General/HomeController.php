@@ -7,7 +7,9 @@ use App\Support\CompanyContext;
 use App\Support\MaterialCalibration;
 use App\Support\EstimateSigner;
 use App\Support\MaterialPurchasing;
+use App\Support\ChemicalTransferSignFlow;
 use App\Support\MaterialTransferSignFlow;
+use App\Support\StandardTransferSignFlow;
 use App\Support\ReviewHistory;
 use App\Support\VppCalibration;
 use App\Support\VppStore;
@@ -866,10 +868,12 @@ class HomeController extends Controller
             ->whereColumn('cc.sign_id', 's.id')
             ->where('cc.active', 1);
 
+        // Ký đồng thời (MaterialExportController::requestSign): mọi bước còn chờ cùng nhận đề nghị,
+        // không chỉ bước current_step - một phiếu ra nhiều dòng, lọc "của mình" rồi giữ bước cao nhất.
         $records = DB::table($m['prefix'].'request_lists as r')
             ->join($m['prefix'].'request_signs as s', function ($join) {
                 $join->on('s.request_list_id', '=', 'r.id')
-                    ->on('s.step_no', '=', 'r.current_step')
+                    ->where('s.status', 'pending')
                     ->where('s.active', 1);
             })
             ->leftJoin($m['prefix'].'request_sign_candidates as mc', function ($join) use ($userId) {
@@ -881,7 +885,7 @@ class HomeController extends Controller
             ->select(
                 'r.id', 'r.code', 'r.name', 'r.type', 'r.department_id', 'r.current_step', 'r.sign_step_count',
                 'r.submitted_at', 'r.created_at',
-                's.user_id as signer_id', 's.role_names', 'mc.id as my_candidate_id',
+                's.step_no as sign_step_no', 's.user_id as signer_id', 's.role_names', 'mc.id as my_candidate_id',
                 'd.shortName as department_short'
             )
             ->selectSub($candidateCount, 'candidate_count')
@@ -893,13 +897,14 @@ class HomeController extends Controller
                     ->orWhere(fn ($sub) => $sub->whereNull('s.user_id')->whereNotNull('s.role_names'));
             })
             ->when($companyDeptIds !== null, fn ($query) => $query->whereIn('r.department_id', $companyDeptIds))
-            ->get()
-            ->unique('id');
+            ->orderBy('s.step_no', 'desc')
+            ->get();
 
         $rows = [];
+        $seen = [];
 
         foreach ($records as $record) {
-            if (! $this->canReviewIn((int) $record->department_id, $approvePermission)) {
+            if (isset($seen[$record->id]) || ! $this->canReviewIn((int) $record->department_id, $approvePermission)) {
                 continue;
             }
 
@@ -913,12 +918,17 @@ class HomeController extends Controller
                 continue;
             }
 
+            $seen[$record->id] = true;
+
             $rows[] = $this->reviewRow(
                 'material_request',
                 $m['object'],
                 $record->code,
                 $record->name,
-                $this->joinMeta([$this->stepLabel($record), $record->department_short]),
+                $this->joinMeta([
+                    'Bước '.$record->sign_step_no.($record->sign_step_count ? '/'.$record->sign_step_count : ''),
+                    $record->department_short,
+                ]),
                 $record->submitted_at ?: $record->created_at,
                 $this->signUrl((int) $record->department_id, $m['export_route'], ['tab' => $record->type ?: 'regular', 'open' => 'reqDetailModal_'.$record->id])
             );
@@ -928,14 +938,40 @@ class HomeController extends Controller
     }
 
     /**
-     * Đề nghị chuyển vật tư liên phòng ban / VPP đang chờ mình ký (App\Support\MaterialTransferSignFlow):
-     * vai trò của bước với phạm vi bao gồm phòng của bước. Không giới hạn công ty - người ký có
-     * thể ở phòng đề nghị, phòng được đề nghị hoặc một phòng cố định (VD Hành Chính - NM1).
-     * Link chuyển phòng đang chọn sang PHÒNG CỦA BƯỚC KÝ, nơi tab hiện khối "Đề nghị chờ bạn ký".
+     * Hoá Chất / Chất Chuẩn chỉ có phần ký đề nghị liên phòng ban (không thuộc ITEM_MODULES) - cùng
+     * hình dạng khoá mà transferSignReviewsOf() đọc. Modal chi tiết phiếu: transferDetailModal_<id>.
+     */
+    private const TRANSFER_SIGN_ONLY_MODULES = [
+        'chemical' => [
+            'object' => 'hc',
+            'prefix' => 'chemical_',
+            'export_route' => 'pages.export.chemicalExport.list',
+            'sign_flow' => ChemicalTransferSignFlow::class,
+            'store' => null,
+            'transfer_tab' => 'request',
+            'transfer_modal' => 'transferDetailModal_',
+        ],
+        'standard' => [
+            'object' => 'cc',
+            'prefix' => 'standard_',
+            'export_route' => 'pages.export.standardExport.list',
+            'sign_flow' => StandardTransferSignFlow::class,
+            'store' => null,
+            'transfer_tab' => 'transfer',
+            'transfer_modal' => 'transferDetailModal_',
+        ],
+    ];
+
+    /**
+     * Đề nghị liên phòng ban (VT / VPP / HC / CC) đang chờ mình ký (App\Support\TransferSignFlow - 2 bước:
+     * quản lý bộ phận phòng đề nghị -> quản lý bộ phận phòng cấp phát): vai trò của bước với phạm vi
+     * bao gồm phòng của bước. Link chuyển phòng đang chọn sang PHÒNG CỦA BƯỚC KÝ.
      */
     private function transferSignReviews(): array
     {
-        return array_merge(...array_map(fn ($m) => $this->transferSignReviewsOf($m), array_values(self::ITEM_MODULES)));
+        $modules = array_merge(array_values(self::ITEM_MODULES), array_values(self::TRANSFER_SIGN_ONLY_MODULES));
+
+        return array_merge(...array_map(fn ($m) => $this->transferSignReviewsOf($m), $modules));
     }
 
     /** Đề nghị liên phòng ban (VPP: cả đề nghị gửi Hành Chính) chờ mình ký của một module. */
@@ -983,7 +1019,10 @@ class HomeController extends Controller
                 $record->title,
                 'Bước '.$record->step_no,
                 $record->updated_at ?: $record->created_at,
-                $this->signUrl((int) $record->sign_department_id, $m['export_route'], ['tab' => $toStore ? $store::TAB : 'transfer', 'open' => 'matTransferDetailModal_'.$record->id]),
+                $this->signUrl((int) $record->sign_department_id, $m['export_route'], [
+                    'tab' => $toStore ? $store::TAB : ($m['transfer_tab'] ?? 'transfer'),
+                    'open' => ($m['transfer_modal'] ?? 'matTransferDetailModal_').$record->id,
+                ]),
                 $outgoing ? 'out' : 'in',
                 $outgoing ? $record->to_short : $record->from_short
             );
@@ -1651,7 +1690,7 @@ class HomeController extends Controller
             return [];
         }
 
-        // Bộ phận mua hàng tiếp nhận phiếu của MỌI công ty (NM1 không có bộ phận mua hàng)
+        // Bộ phận mua hàng tiếp nhận mọi phiếu trong DB (mỗi nhà máy một DB, tự có bộ phận mua hàng)
         $purchasingKeys = MaterialPurchasing::keysOfDepartment($departmentId);
         $rows = [];
 

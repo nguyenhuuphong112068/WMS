@@ -8,45 +8,37 @@
         </thead>
         <tbody>
             <tr>
-                <td>Không tìm thấy VPP khi nhập kho hoặc lập đề nghị nội bộ</td>
-                <td style="font-weight: 400">VPP chưa khai ở <a href="#vat-tu-cua-phong">VPP Của Phòng</a>, hoặc danh mục
-                    công ty chưa được duyệt.</td>
+                <td>Không tìm thấy VPP khi nhập kho hoặc sử dụng</td>
+                <td style="font-weight: 400">Mã ở <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a> chưa được duyệt hoặc
+                    đã khoá (cột Sử Dụng ở <a href="#vat-tu-cua-phong">VPP Của Phòng</a> hiện Chờ duyệt / Đã khoá). Khi sử dụng: lô
+                    chưa kiểm tra Đạt, đã hết hạn hoặc đã hết tồn.</td>
             </tr>
             <tr>
                 <td>Đã nhập mà tồn không tăng</td>
                 <td style="font-weight: 400">Lô còn <b>Chờ kiểm tra</b>. Vào tab <a href="#cho-kiem-tra">Chờ kiểm tra</a> và xác nhận Đạt.</td>
             </tr>
             <tr>
-                <td>"Bạn không có quyền điều chỉnh mã xuất nhập / số lượng cấp phát"</td>
+                <td>"Bạn không có quyền điều chỉnh mã xuất nhập / số lượng cấp phát" (cấp phát liên phòng ban)</td>
                 <td style="font-weight: 400">Phải cấp đúng lô và số hệ thống đề xuất. Tải lại trang để lấy đề xuất mới nhất, hoặc
                     xin cấp quyền điều chỉnh.</td>
             </tr>
             <tr>
-                <td>"Mã xuất nhập ... đã hết hạn sử dụng, không được cấp phát"</td>
+                <td>"Mã xuất nhập ... đã hết hạn, không sử dụng được" / "... không được cấp phát"</td>
                 <td style="font-weight: 400">Chọn lô khác còn hạn; lô hết hạn đưa vào <a href="#cach-ly">Cách ly</a>.</td>
             </tr>
             <tr>
-                <td>"VPP này phải được QA hiệu chuẩn trước khi dùng"</td>
-                <td style="font-weight: 400">Bấm <b>Đề nghị HC</b> ở tab Chờ cấp phát và chờ QA xác nhận Đạt. Xem
-                    <a href="#hieu-chuan">Hiệu chuẩn</a>.</td>
+                <td>"Mã xuất nhập ... chỉ còn cho phép dùng tối đa X" / "... còn hứa được X. Được cấp vượt tối đa 5%"</td>
+                <td style="font-weight: 400">Lô không đủ hàng, hoặc một phần đang giữ cho cách ly hay phiếu khác. Dùng / cấp phần
+                    còn lại từ lô khác.</td>
             </tr>
             <tr>
-                <td>"... còn hứa được X. Được cấp vượt tối đa 5%"</td>
-                <td style="font-weight: 400">Lô không đủ hàng, hoặc một phần đang giữ cho cách ly hay đợt lấy hàng khác. Cấp một
-                    phần rồi cấp thêm khi có hàng.</td>
+                <td>"Bước ... do người khác ký, bạn không ký thay được" (đề nghị liên phòng ban / VPP đến HC)</td>
+                <td style="font-weight: 400">Đề nghị liên phòng ban ký 2 bước cố định: <b>Quản Lý Bộ Phận</b> phòng đề nghị rồi
+                    <b>Quản Lý Bộ Phận</b> phòng cấp phát. Chỉ tài khoản có vai trò đó ở đúng phòng mới ký được.</td>
             </tr>
             <tr>
-                <td>"Bước ... do người khác ký, bạn không ký thay được"</td>
-                <td style="font-weight: 400">Chỉ đúng người được chỉ định ở bước đang chờ mới ký được. Kiểm tra lại cấu hình
-                    <b>Dữ Liệu Gốc › Trình Ký</b> nếu sai người.</td>
-            </tr>
-            <tr>
-                <td>Không sửa được đề nghị</td>
-                <td style="font-weight: 400">Chỉ sửa được đề nghị đang <b>Nháp</b> hoặc <b>Bị từ chối</b>.</td>
-            </tr>
-            <tr>
-                <td>Không bấm Nhận được hàng liên phòng ban</td>
-                <td style="font-weight: 400">Phòng nhận chưa khai VPP này ở VPP Của Phòng. Khai xong rồi nhận lại.</td>
+                <td>Không sửa được đề nghị liên phòng ban</td>
+                <td style="font-weight: 400">Chỉ sửa được đề nghị đang <b>Lưu tạm</b> (kể cả phiếu bị từ chối ký quay về Lưu tạm).</td>
             </tr>
             <tr>
                 <td>Không thêm được VPP vào đề nghị VPP</td>

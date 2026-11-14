@@ -64,6 +64,11 @@
                 <td>"Chỉ được cân đối tối đa 5% số lượng nhập"</td>
                 <td style="font-weight: 400">Lệch quá lớn; làm rõ nguyên nhân, sửa phiếu nhập hoặc phiếu sử dụng nếu ghi sai.</td>
             </tr>
+            <tr>
+                <td>"Bước ký n (...) chưa có tài khoản ... nào của phòng ..." khi gửi đề nghị liên phòng ban</td>
+                <td style="font-weight: 400">Đề nghị liên phòng ban cần Quản Lý Bộ Phận của cả phòng đề nghị và phòng cấp phát để ký
+                    2 bước. Nhờ Admin phân vai trò Quản Lý Bộ Phận cho người của phòng đó rồi Gửi lại.</td>
+            </tr>
         </tbody>
     </table>
 </div>

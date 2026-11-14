@@ -22,6 +22,7 @@
 @php
     $expReqStatus = [
         'draft' => ['label' => 'Lưu tạm', 'class' => 'neutral'],
+        'pending_sign' => ['label' => 'Chờ ký', 'class' => 'warning'],
         'pending' => ['label' => 'Chờ cấp phát', 'class' => 'pending'],
         'partial' => ['label' => 'Cấp một phần', 'class' => 'warning'],
         'completed' => ['label' => 'Đã cấp đủ', 'class' => 'accepted'],
@@ -29,6 +30,9 @@
         'canceled' => ['label' => 'Đã huỷ', 'class' => 'rejected'],
     ];
     $expReqBadge = fn($status) => $expReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
+    // Ký 2 bước (App\Support\ChemicalTransferSignFlow): bước của từng phiếu + phiếu mình ký được (id => bước)
+    $ctSignsOf = fn($req) => ($transferSigns ?? collect())->get($req->id, collect());
+    $ctSignable = $transferSignable ?? [];
 
     $ctCards = [
         [
@@ -168,12 +172,21 @@
                             <span class="exp-req-badge {{ $expReqBadge($req->status)['class'] }}">
                                 {{ $expReqBadge($req->status)['label'] }}
                             </span>
+                            @include('pages.export.shared.transferSignChips', ['tsSigns' => $ctSignsOf($req), 'tsReq' => $req])
                         </td>
                         <td class="align-middle">{{ $req->updated_by ?: $req->created_by ?: '—' }}</td>
                         <td class="text-center align-middle">{{ $expDate($req->created_at) }}</td>
                         <td class="text-center align-middle">{{ $req->needed_date ? $expDate($req->needed_date) : '—' }}</td>
                         <td class="text-center align-middle" style="white-space: nowrap;">
-                            @if ($ctSide === 'sent' && $req->status === 'draft' && user_can('export_chemical_request'))
+                            @if (isset($ctSignable[$req->id]))
+                                {{-- Đồng ý / Từ chối nằm trong modal chi tiết phiếu --}}
+                                <button type="button" class="btn btn-sm btn-success px-2 py-1 shadow-sm"
+                                    data-toggle="modal"
+                                    data-target="#transferDetailModal_{{ $req->id }}"
+                                    title="Xem chi tiết và ký duyệt bước {{ $ctSignable[$req->id] }}">
+                                    <i class="fas fa-file-signature mr-1"></i> Ký duyệt
+                                </button>
+                            @elseif ($ctSide === 'sent' && $req->status === 'draft' && user_can('export_chemical_request'))
                                 <button type="button" class="btn btn-sm btn-warning px-2 py-1 shadow-sm mr-1"
                                     data-toggle="modal"
                                     data-target="#transferRequestEditModal_{{ $req->id }}"

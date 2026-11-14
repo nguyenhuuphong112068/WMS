@@ -136,8 +136,11 @@ Route::prefix('/category')
             Route::post('approve', 'approve')->name('approve');
             // Điều chỉnh Thời gian đặt hàng - quyền riêng, không đưa về Chờ duyệt (UpdatesCategoryLeadTime)
             Route::post('updateLeadTime', 'updateLeadTime')->name('updateLeadTime');
-            // Xác nhận "Đã khai báo trên Cổng thông tin quốc gia" - chỉ một lần, không gỡ lại được
+            // Khai báo trên Cổng thông tin quốc gia (Mã hồ sơ + Code nhà sản xuất) - khai báo được nhiều lần
             Route::post('declarePortal', 'declarePortal')->name('declarePortal');
+            // Sửa một lần khai báo đã ghi (cùng quyền khai báo, bắt lý do). URL kết thúc /update để
+            // layout/softSubmit gửi ngầm như nút Sửa khác
+            Route::post('declarePortal/update', 'updatePortal')->name('updatePortal');
         });
 
         // Cấu hình riêng của từng phòng ban cho hoá chất dùng chung - không có bước duyệt,

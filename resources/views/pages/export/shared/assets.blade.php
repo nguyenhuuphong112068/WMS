@@ -773,6 +773,24 @@
         color: #B91C1C;
         border: 1px solid #FCA5A5;
     }
+
+    /* Dòng trả hoá chất về kho (Acetonitril / Methanol) - số lượng âm, cộng lại tồn */
+    .exp-badge-return {
+        background: #DCFCE7;
+        color: #15803D;
+        border: 1px solid #86EFAC;
+    }
+
+    .exp-return-link {
+        color: #15803D;
+        font-weight: 600;
+        transition: color 0.2s;
+    }
+
+    .exp-return-link:hover {
+        color: #166534;
+        text-decoration: underline;
+    }
 </style>
 
 <script>

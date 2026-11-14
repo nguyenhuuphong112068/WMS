@@ -1,7 +1,8 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'vpp', 'no' => 2, 'label' => 'Đề nghị VPP đến HC'])
 
 <p>Xin <b>văn phòng phẩm</b> từ kho VPP của phòng <b>Hành Chánh</b>. Thực chất đây là một
-    <a href="#lien-phong-ban">đề nghị liên phòng ban</a> gửi tới Hành Chánh, nên các bước cấp phát và nhận hàng giống hệt.</p>
+    <a href="#lien-phong-ban">đề nghị liên phòng ban</a> gửi tới Hành Chánh, nên các bước ký, cấp phát và nhận hàng giống hệt (ký 2 bước: Quản Lý Bộ Phận phòng đề nghị → Quản Lý Bộ Phận
+    Hành Chánh, xem <a href="#lien-phong-ban">Đề nghị liên phòng ban</a>).</p>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/de-nghi-vpp.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › VPP › tab Đề nghị liên phòng ban - VPP đến HC'])
 
 <h3>Hai tab con</h3>
@@ -15,6 +16,6 @@
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>Mọi VPP trong danh mục đều do Hành Chánh mua nên đều đề nghị được từ kho VPP. VPP <b>ngoài danh mục</b> không
-        đề nghị kho được - lập <a href="#du-tru">phiếu dự trù</a>. Quy trình ký của đề nghị VPP khai ở
-        <b>Dữ Liệu Gốc › Trình Ký Đề Nghị Liên Phòng Ban VPP</b>, loại "Đề nghị cấp phát VPP đến HC".</div>
+        đề nghị kho được - lập <a href="#du-tru">phiếu dự trù</a>. Bộ phận mua và giữ kho VPP là
+        phòng Hành Chánh của nhà máy.</div>
 </div>

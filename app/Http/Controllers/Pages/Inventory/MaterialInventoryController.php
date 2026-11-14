@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
 use App\Support\InventoryChart;
+use App\Support\MaterialBalancingLimit;
 use App\Support\MaterialAvailabilityForecast;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,8 +57,6 @@ class MaterialInventoryController extends Controller
     private const LOW_STOCK_RATIO = 0.2;
 
     private const EPSILON = 0.00005;
-
-    private const BALANCING_MAX_RATIO = 0.05;
 
     /** Loại lưu trữ của định khu mà màn hình này quan tâm - xem locations.item_type. */
     private const LOCATION_TYPE = 'material';
@@ -111,7 +110,7 @@ class MaterialInventoryController extends Controller
             'expiringSoonMonths' => self::EXPIRING_SOON_MONTHS,
             'expiringFilters' => $this->expiringFilters(),
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
-            'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
+            'balancingMaxPercent' => MaterialBalancingLimit::percent(),
         ]);
     }
 
@@ -163,7 +162,8 @@ class MaterialInventoryController extends Controller
      * CÂN ĐỐI SỐ LƯỢNG NHẬP - ghi thêm một dòng material_balancings.
      *
      * balancing_amount là SỐ ĐIỀU CHỈNH (+/-), không phải số lượng nhập mới. Chặn luỹ kế:
-     * tổng mọi lần cân đối không vượt 5% lượng nhập ban đầu, và cân đối xong tồn không âm.
+     * tổng mọi lần cân đối không vượt hạn mức theo mức độ quan trọng (Cao = 0 - không cho cân đối,
+     * Thấp = 2% lượng nhập đầu, xem MaterialBalancingLimit), và cân đối xong tồn không âm.
      */
     public function balancing(Request $request)
     {
@@ -195,9 +195,11 @@ class MaterialInventoryController extends Controller
 
         $gap = $this->gapOf($import);
         $balanced = $this->balancedOf($import);
-        $limit = max(1, abs((float) $import->amount) * self::BALANCING_MAX_RATIO);
+        $classification = DB::table('material_categories')->where('id', $import->category_id)->value('classification');
+        $limit = MaterialBalancingLimit::limit((float) $import->amount, $classification);
+        $isHigh = MaterialBalancingLimit::isHighImportance($classification);
 
-        $validator->after(function ($validator) use ($request, $gap, $balanced, $limit) {
+        $validator->after(function ($validator) use ($request, $gap, $balanced, $limit, $isHigh) {
             if (! is_numeric($request->balancing_amount)) {
                 return;
             }
@@ -210,10 +212,19 @@ class MaterialInventoryController extends Controller
                 return;
             }
 
+            if ($isHigh) {
+                $validator->errors()->add(
+                    'balancing_amount',
+                    'Vật tư có mức độ quan trọng Cao, không được cân đối (hạn mức cân đối = 0).'
+                );
+
+                return;
+            }
+
             if (abs($balanced + $amount) > $limit + self::EPSILON) {
                 $validator->errors()->add(
                     'balancing_amount',
-                    'Chỉ được cân đối tối đa '.(int) round(self::BALANCING_MAX_RATIO * 100).'% số lượng nhập, tức ±'
+                    'Vật tư mức độ quan trọng Thấp chỉ được cân đối tối đa '.MaterialBalancingLimit::percent().'% số lượng nhập đầu, tức ±'
                     .$this->number($limit).'. Mã xuất nhập này đã cân đối '.$this->number($balanced)
                     .', lần này chỉ được nhập trong khoảng từ '.$this->number(-$limit - $balanced)
                     .' đến '.$this->number($limit - $balanced).'.'
@@ -618,7 +629,8 @@ class MaterialInventoryController extends Controller
                 $row->effective = $row->imported + $row->balanced;
 
                 $row->balanced_all = (float) ($bal->balanced_all ?? 0);
-                $row->balancing_limit = max(1, abs($row->imported) * self::BALANCING_MAX_RATIO);
+                $row->balancing_locked = MaterialBalancingLimit::isHighImportance($row->classification);
+                $row->balancing_limit = MaterialBalancingLimit::limit($row->imported, $row->classification);
                 $row->balancing_min_input = -$row->balancing_limit - $row->balanced_all;
                 $row->balancing_max_input = $row->balancing_limit - $row->balanced_all;
 

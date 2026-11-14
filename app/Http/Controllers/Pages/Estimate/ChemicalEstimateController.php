@@ -230,13 +230,20 @@ class ChemicalEstimateController extends Controller
             // Ngưỡng tồn tối đa + tồn hiện tại của phòng, để khối số lượng cảnh báo dự trù quá nhiều
             'maxStock' => \App\Support\MaxStockWarning::forChemical((int) $list->department_id),
             'list' => $list,
-            'items' => self::itemsOf($list->id),
+            'items' => $estItems = self::itemsOf($list->id),
             'histories' => self::historiesOf($list->id),
-            'categories' => $this->categoryOptions($list->department_id),
+            'categories' => $estCategories = $this->categoryOptions($list->department_id),
             // Danh mục hoá chất của phòng - khung "Chọn từ danh mục phòng" ở modal thêm mặt hàng
             'deptCategories' => $deptCategories = $this->deptCategoryOptions((int) $list->department_id),
             // Đơn vị danh mục của phòng cho hoá chất nhóm 9 / 10 - JS bắt khai hệ số quy đổi khi dự trù khác đơn vị
             'factorUnits' => $this->factorUnits($deptCategories),
+            // Code nhà sản xuất đã khai báo Cổng thông tin quốc gia theo mã danh mục - ô chọn Code NSX
+            // của modal thêm / sửa mặt hàng + cảnh báo code chưa khai báo ở bảng mặt hàng
+            'portalSummary' => \App\Support\ChemicalPortalDeclaration::summary(array_merge(
+                collect($estCategories)->pluck('id')->all(),
+                $deptCategories->pluck('id')->all(),
+                collect($estItems)->pluck('category_id')->filter()->all()
+            )),
             // Tồn hiện tại + đang dự trù chưa hoàn thành so với ngưỡng PL IV: mã đã vượt thì khoá ở
             // khung chọn danh mục; hoá chất nhóm 9 / 10 khai khác đơn vị phải có hệ số quy đổi
             'thresholdStatus' => $thresholdStatus = $this->thresholdStatus($list),
@@ -618,6 +625,27 @@ class ChemicalEstimateController extends Controller
         $warnings = [];
         foreach ($itemIds as $itemId) {
             array_push($warnings, ...array_column($this->thresholdWarnings($itemId), 'message'));
+        }
+
+        // Code nhà sản xuất chưa khai báo Cổng TT quốc gia: chỉ cảnh báo, không chặn
+        $portal = \App\Support\ChemicalPortalDeclaration::summary(array_column($lines, 'category_id'));
+        $portalWarnings = [];
+
+        foreach (array_values($lines) as $index => $line) {
+            $fromCategory = ($line['source'] ?? '') === 'category' && ! empty($line['category_id']);
+            $message = \App\Support\ChemicalPortalDeclaration::warning(
+                $fromCategory ? ($portal[(int) $line['category_id']] ?? null) : null,
+                $line['manufacturer_code'] ?? null,
+                $fromCategory
+            );
+
+            if ($message) {
+                $portalWarnings[] = 'Dòng '.($index + 1).': '.$message;
+            }
+        }
+
+        if ($portalWarnings) {
+            $warnings[] = 'Đề nghị khai báo ở Danh Mục Hoá Chất Công Ty - '.implode('; ', $portalWarnings);
         }
 
         if ($warnings) {
@@ -1776,6 +1804,7 @@ class ChemicalEstimateController extends Controller
             $isBlank = ! array_filter($line['amounts'], fn ($value) => $value !== '')
                 && trim((string) ($line['category_id'] ?? '')) === ''
                 && trim((string) ($line['chem_name'] ?? '')) === ''
+                && trim((string) ($line['manufacturer_code'] ?? '')) === ''
                 && trim((string) ($line['technical_information'] ?? '')) === ''
                 && trim((string) ($line['purpose'] ?? '')) === ''
                 && trim((string) ($line['expected_delivery_date'] ?? '')) === ''
@@ -2097,6 +2126,7 @@ class ChemicalEstimateController extends Controller
             'source' => ['required', 'in:category,manual'],
             'category_id' => ['required_if:source,category', 'nullable', 'exists:chemical_categories,id'],
             'chem_name' => ['required_if:source,manual', 'nullable', 'max:255'],
+            'manufacturer_code' => ['nullable', 'string', 'max:100'],
             'technical_information' => ['nullable', 'max:1000'],
             'purpose' => ['nullable', 'max:1000'],
             'expected_delivery_date' => ['nullable', 'date'],
@@ -2121,6 +2151,8 @@ class ChemicalEstimateController extends Controller
         return [
             'category_id' => $fromCategory ? (int) $line['category_id'] : null,
             'chem_name' => $fromCategory ? null : $this->nullIfBlank($line['chem_name'] ?? null),
+            // Code nhà sản xuất: chọn từ Code đã khai báo Cổng TT quốc gia hoặc gõ mới (chỉ cảnh báo)
+            'manufacturer_code' => $this->nullIfBlank($line['manufacturer_code'] ?? null),
             'technical_information' => $this->nullIfBlank($line['technical_information'] ?? null),
             'purpose' => $this->nullIfBlank($line['purpose'] ?? null),
             'expected_delivery_date' => $this->nullIfBlank($line['expected_delivery_date'] ?? null),
@@ -2167,6 +2199,7 @@ class ChemicalEstimateController extends Controller
             'items.*.source' => ['required', 'in:category,manual'],
             'items.*.category_id' => ['required_if:items.*.source,category', 'nullable', 'exists:chemical_categories,id'],
             'items.*.chem_name' => ['required_if:items.*.source,manual', 'nullable', 'max:255'],
+            'items.*.manufacturer_code' => ['nullable', 'string', 'max:100'],
             'items.*.technical_information' => ['nullable', 'max:1000'],
             'items.*.purpose' => ['nullable', 'max:1000'],
             'items.*.expected_delivery_date' => ['nullable', 'date'],
@@ -2191,6 +2224,7 @@ class ChemicalEstimateController extends Controller
             'items.*.category_id.exists' => 'Hoá chất được chọn không tồn tại trong danh mục.',
             'items.*.chem_name.required_if' => 'Vui lòng nhập tên hoá chất ngoài danh mục.',
             'items.*.chem_name.max' => 'Tên hoá chất tối đa 255 ký tự.',
+            'items.*.manufacturer_code.max' => 'Code nhà sản xuất tối đa 100 ký tự.',
             'items.*.technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
             'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
             'items.*.expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
@@ -2215,6 +2249,7 @@ class ChemicalEstimateController extends Controller
             'category_id.exists' => 'Hoá chất được chọn không tồn tại trong danh mục.',
             'chem_name.required_if' => 'Vui lòng nhập tên hoá chất ngoài danh mục.',
             'chem_name.max' => 'Tên hoá chất tối đa 255 ký tự.',
+            'manufacturer_code.max' => 'Code nhà sản xuất tối đa 100 ký tự.',
             'technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
             'purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
             'expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',

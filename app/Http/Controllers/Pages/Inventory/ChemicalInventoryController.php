@@ -1105,7 +1105,8 @@ class ChemicalInventoryController extends Controller
         $exports = DB::table('chemical_exports')
             ->whereIn('import_id', $ids)
             ->where('status_id', 1)
-            ->whereIn('type', ['export', 'cancel'])
+            // 'return' = trả Acetonitril / Methanol về kho (số lượng âm, cộng lại tồn)
+            ->whereIn('type', ['export', 'cancel', 'return'])
             ->orderBy('exported_date')
             ->get(['import_id', 'amount', 'type', 'exported_date', 'purpose', 'test_report_no', 'exported_by']);
 
@@ -1151,14 +1152,16 @@ class ChemicalInventoryController extends Controller
 
         foreach ($exports as $export) {
             $isCancel = $export->type === 'cancel';
+            $isReturn = $export->type === 'return';
             $day = substr((string) $export->exported_date, 0, 10);
             $events[] = [
                 'lot_id' => $export->import_id,
                 'metric' => $isCancel ? 'cancelled' : 'used',
+                'reverse' => $isReturn,
                 'datetime' => false, 'at' => $day.' 00:00:00',
-                'signed' => -abs((float) $export->amount),
+                'signed' => $isReturn ? abs((float) $export->amount) : -abs((float) $export->amount),
                 'fields' => [
-                    'kind' => $isCancel ? 'Huỷ bỏ' : 'Sử dụng',
+                    'kind' => $isCancel ? 'Huỷ bỏ' : ($isReturn ? 'Trả về kho' : 'Sử dụng'),
                     'at_label' => $dayLabel($export->exported_date),
                     'code' => $codeById[$export->import_id] ?? '',
                     'by' => $export->exported_by ?: '',
@@ -1487,13 +1490,13 @@ class ChemicalInventoryController extends Controller
     {
         return DB::table('chemical_exports')
             ->select('import_id')
-            ->selectRaw("SUM(CASE WHEN type = 'export' AND exported_date < ? THEN amount ELSE 0 END) as used_before", [$from])
+            ->selectRaw("SUM(CASE WHEN type IN ('export', 'return') AND exported_date < ? THEN amount ELSE 0 END) as used_before", [$from])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND exported_date < ? THEN amount ELSE 0 END) as cancelled_before", [$from])
-            ->selectRaw("SUM(CASE WHEN type = 'export' AND exported_date BETWEEN ? AND ? THEN amount ELSE 0 END) as used_in", [$from, $to])
+            ->selectRaw("SUM(CASE WHEN type IN ('export', 'return') AND exported_date BETWEEN ? AND ? THEN amount ELSE 0 END) as used_in", [$from, $to])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND exported_date BETWEEN ? AND ? THEN amount ELSE 0 END) as cancelled_in", [$from, $to])
-            ->selectRaw("SUM(CASE WHEN type = 'export' AND exported_date <= ? THEN amount ELSE 0 END) as used_to", [$to])
+            ->selectRaw("SUM(CASE WHEN type IN ('export', 'return') AND exported_date <= ? THEN amount ELSE 0 END) as used_to", [$to])
             ->selectRaw("SUM(CASE WHEN type = 'cancel' AND exported_date <= ? THEN amount ELSE 0 END) as cancelled_to", [$to])
-            ->selectRaw("SUM(CASE WHEN type = 'export' THEN amount ELSE 0 END) as used_all")
+            ->selectRaw("SUM(CASE WHEN type IN ('export', 'return') THEN amount ELSE 0 END) as used_all")
             ->selectRaw("SUM(CASE WHEN type = 'cancel' THEN amount ELSE 0 END) as cancelled_all")
             ->selectRaw('SUM(CASE WHEN exported_date BETWEEN ? AND ? THEN 1 ELSE 0 END) as times_in', [$from, $to])
             ->selectRaw('SUM(CASE WHEN exported_date <= ? THEN 1 ELSE 0 END) as times', [$to])

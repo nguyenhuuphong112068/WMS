@@ -6,6 +6,17 @@
 
 <p>Sổ được ghi <b>tự động</b> khi kho cấp phát. Không có chỗ lập phiếu sử dụng bằng tay, để tránh trừ tồn hai lần.</p>
 
+<h3>In nhãn cấp phát</h3>
+<p>Ở cột Thao Tác của dòng loại <b>Sử dụng</b>, nút <span class="btn btn-sm btn-outline-secondary ug-ui"><i class="fas fa-qrcode"></i></span>
+    mở trang in <b>nhãn cấp phát</b> để dán lên vật tư đã giao cho bộ phận dùng (chọn được số lượng nhãn cần in). Nhãn cùng khổ
+    với nhãn nhập vật tư, gồm lưới 2 × 3: Người / Ngày Đề Nghị, Người / Ngày Cấp Phát, Số Lượng, Hạn Dùng, kèm Mục Đích và
+    <b>mã QR</b> là mã xuất nhập (quét được như nhãn nhập). Mỗi lần in ghi Audit Trail <i>In nhãn cấp phát</i>.</p>
+<ul>
+    <li>Dòng của phiếu <b>cách ly</b> cũng có nút này: nhãn <b>CÁCH LY - CHỜ QUYẾT ĐỊNH</b> hoặc <b>LOẠI BỎ - CHỜ HUỶ</b> (dải đen
+        + mã phiếu CL, người / ngày cách ly hoặc quyết định, vị trí, lý do) để dán lên hàng đang chờ xử lý.</li>
+    <li>Cần quyền <b>In Nhãn Cấp Phát Vật Tư</b> (cấp sẵn cho Admin và các vai trò có quyền cấp phát); thiếu quyền thì nút mờ.</li>
+</ul>
+
 <h3>Điều chỉnh</h3>
 <ul>
     <li>Người có quyền <b>Điều Chỉnh Sổ Sử Dụng Vật Tư</b> bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span>

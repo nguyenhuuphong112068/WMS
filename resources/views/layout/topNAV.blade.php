@@ -25,6 +25,14 @@
 
     <!-- Right User Info + Notification + Logout -->
     <ul class="navbar-nav ms-auto align-items-center">
+        {{-- Cỡ trang trên tablet (layout/pageZoom): chỉ hiện khi con trỏ chính là cảm ứng --}}
+        <li class="nav-item d-none align-items-center mr-2 wms-zoom">
+            <div class="wms-zoom-group" role="group" aria-label="Cỡ trang">
+                <button type="button" data-wms-zoom="out" title="Thu nhỏ trang"><i class="fas fa-minus"></i></button>
+                <button type="button" data-wms-zoom="reset" data-wms-zoom-value title="Về 100%">100%</button>
+                <button type="button" data-wms-zoom="in" title="Phóng to trang"><i class="fas fa-plus"></i></button>
+            </div>
+        </li>
         {{-- Nút "?": mở mục hướng dẫn của màn hình hiện tại (App\Support\UserGuideLinks), chọn theo tab đang mở --}}
         @php
             $ugRouteName = request()->route()?->getName() ?? '';
@@ -66,6 +74,45 @@
 </nav>
 
 <style>
+    .wms-zoom:not(.d-none) {
+        display: flex;
+    }
+
+    .wms-zoom-group {
+        display: flex;
+        align-items: center;
+        height: 38px;
+        border: 1.5px solid var(--primary);
+        border-radius: 19px;
+        overflow: hidden;
+    }
+
+    .wms-zoom-group button {
+        height: 100%;
+        min-width: 38px;
+        padding: 0 8px;
+        border: 0;
+        background: transparent;
+        color: var(--primary);
+        font-size: 14px;
+        font-weight: 600;
+        transition: var(--transition-fast);
+    }
+
+    .wms-zoom-group button[data-wms-zoom="reset"] {
+        min-width: 52px;
+        border-left: 1px solid rgba(var(--primary-rgb), 0.25);
+        border-right: 1px solid rgba(var(--primary-rgb), 0.25);
+    }
+
+    .wms-zoom-group button:active:not(:disabled) {
+        background: var(--primary-soft);
+    }
+
+    .wms-zoom-group button:disabled {
+        color: var(--primary-lighter);
+    }
+
     .ug-help-btn {
         width: 38px;
         height: 38px;

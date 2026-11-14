@@ -156,6 +156,7 @@
                                 @php
                                     // Không có quyền điều chỉnh: vẫn hiện nút nhưng khoá lại (server cũng chặn ở update())
                                     $meCanUpdate = user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::UPDATE_PERMISSION);
+                                    $meCanLabel = user_can(\App\Http\Controllers\Pages\Export\MaterialExportController::LABEL_PERMISSION);
                                 @endphp
                                 @foreach ($exports as $row)
                                     <tr>
@@ -221,7 +222,12 @@
                                                 <span class="md-sub text-muted">—</span>
                                             @elseif ($row->quarantine_id)
                                                 {{-- Sinh từ phiếu cách ly ở tab "Cách ly - Loại Bỏ - Huỷ": chỉ điều chỉnh qua phiếu cách ly --}}
-                                                <span class="md-sub text-muted" title="Sinh từ phiếu cách ly, chỉ điều chỉnh ở tab Cách ly - Loại bỏ - Huỷ"><i class="fas fa-lock"></i></span>
+                                                <div class="md-actions">
+                                                    <span class="md-sub text-muted" title="Sinh từ phiếu cách ly, chỉ điều chỉnh ở tab Cách ly - Loại bỏ - Huỷ"><i class="fas fa-lock"></i></span>
+                                                    @if (in_array($row->quarantine_status, \App\Http\Controllers\Pages\Export\MaterialExportController::LABEL_QUARANTINE_STATUSES, true))
+                                                        @include('pages.export.MaterialExport.labelButton', ['lblTitle' => $row->quarantine_status === 'removed' ? 'In nhãn Loại bỏ - Chờ huỷ (mã QR)' : 'In nhãn Cách ly - Chờ quyết định (mã QR)'])
+                                                    @endif
+                                                </div>
                                             @else
                                             <div class="md-actions">
                                                 <span class="exp-btn-wrap">
@@ -260,6 +266,9 @@
                                                             data-title="{{ $row->code }}">{{ $c }}</button>
                                                     @endif
                                                 </span>
+                                                @if ($row->type === 'export')
+                                                    @include('pages.export.MaterialExport.labelButton', ['lblTitle' => 'In nhãn cấp phát (mã QR) - chọn được số lượng nhãn cần in'])
+                                                @endif
                                             </div>
                                             @endif
                                         </td>

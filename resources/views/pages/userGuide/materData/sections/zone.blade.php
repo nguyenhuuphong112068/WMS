@@ -21,8 +21,8 @@
             <li><b>Số cột</b> của một kệ/tủ (Cột 01, 02, 03... từ trái sang).</li>
             <li><b>Số tầng</b> của mỗi cột. Nút dưới ô số đổi chiều đánh số: <i>Tầng 01 dưới cùng</i> hoặc
                 <i>Tầng 01 trên cùng</i>; lựa chọn áp cho mọi kệ tạo cùng lượt.</li>
-            <li><b>Vị trí ngang</b> mỗi tầng: các ô <span class="ug-key">A</span>, <span class="ug-key">B</span>,
-                <span class="ug-key">C</span>... dọc mép trước tầng.</li>
+            <li><b>Vị trí ngang</b> mỗi tầng: các ô đánh <b>số</b> <span class="ug-key">1</span>, <span class="ug-key">2</span>,
+                <span class="ug-key">3</span>... dọc mép trước tầng.</li>
             <li><b>Vị trí sâu</b> mỗi tầng: các dãy <span class="ug-key">1</span>, <span class="ug-key">2</span>... từ cửa vào
                 trong (dãy 1 sát cửa). Tầng chỉ có một dãy thì để 1.</li>
         </ol>
@@ -35,7 +35,7 @@
     <li>Bên phải khung là <b>mô hình 3D</b> của kệ, vẽ lại ngay khi đổi số: vách giữa các cột, mặt từng tầng (nẹp đậm là
         Tầng 01), các ô vị trí trên mặt tầng (mép trước là dãy 1; tầng có ít vị trí hơn tầng rộng nhất thì các ô tự chia đều trên cả
         mặt tầng). Trên nóc mỗi cột có tên cột kèm <b>mã cột</b> (ví dụ <span class="ug-key">EN1/03/01</span>), trên mặt mỗi ô in
-        <b>mã vị trí</b> (đoạn cuối của mã, ví dụ <span class="ug-key">A1</span>, <span class="ug-key">B2</span>); rê chuột vào ô để xem
+        <b>mã vị trí</b> (đoạn cuối của mã, ví dụ <span class="ug-key">01.1</span>, <span class="ug-key">02.2</span>); rê chuột vào ô để xem
         mã đầy đủ. <b>Kéo chuột</b> trên mô hình để xoay, nhấp đúp để về góc
         nghiêng; các nút <b>Nghiêng</b>, <b>Chính diện</b>, <b>Từ trên</b> đổi góc nhìn, <i class="fas fa-search-minus"></i>
         / <i class="fas fa-search-plus"></i> thu nhỏ / phóng to. Rê chuột vào thẻ thông số nào thì phần tương ứng sáng lên
@@ -48,14 +48,14 @@
         chiều <b>Ngang</b> là các ô <span class="ug-key">A</span>, <span class="ug-key">B</span>, <span class="ug-key">C</span>...
         dọc mép trước tầng, chiều <b>Sâu</b> là các dãy <span class="ug-key">1</span>, <span class="ug-key">2</span>,
         <span class="ug-key">3</span>... từ cửa vào trong (dãy 1 sát cửa, vẽ dưới cùng). Mỗi ô là một vị trí.
-        Nhập số ô ngang ở ô số <b>dưới thước chữ</b>, số dãy sâu ở ô số <b>bên phải dãy trong cùng</b>, hoặc <b>kéo góc</b>
+        Nhập số ô ngang ở ô số <b>dưới thước số</b>, số dãy sâu ở ô số <b>bên phải dãy trong cùng</b>, hoặc <b>kéo góc</b>
         nhỏ ở góc dưới phải lưới: kéo ngang đổi số ô ngang, kéo lên/xuống đổi số dãy sâu. Tầng chỉ có một dãy thì để Sâu = 1. Bấm <b>Thêm cột</b> (ô nhỏ bên phải các cột) và <b>Thêm tầng</b>
         để mở rộng; ô <b>Mọi tầng</b> đặt cùng lúc Ngang × Sâu cho mọi tầng của cột (để trống ô nào thì giữ nguyên chiều
         đó), bấm <i class="fas fa-check"></i> để áp dụng. Góc phải tiêu đề cột có nút <i class="fas fa-clone"></i>
         <b>Nhân bản</b> (thêm cột mới cùng cấu trúc tầng) và <i class="fas fa-times"></i> <b>Gỡ cột</b>.</li>
     <li>Bấm vào <b>tên tầng</b> để mở hộp <b>Đổi tên / mã tầng</b>: <i>Tên tầng</i> là tên hiển thị, <i>Mã tầng</i> là đoạn
         mã của tầng nằm trong mã vị trí (mặc định là số thứ tự, ví dụ <span class="ug-key">06</span>; có thể đặt
-        <span class="ug-key">T6</span> để mã vị trí thành <span class="ug-key">…/01/T6/A1</span>). Mã tầng 1-20 ký tự, chỉ gồm
+        <span class="ug-key">T6</span> để mã vị trí thành <span class="ug-key">…/01/T6/01.1</span>). Mã tầng 1-20 ký tự, chỉ gồm
         chữ không dấu, số và dấu <span class="ug-key">. _ -</span>, không trùng tầng khác trong cùng cột. Khi lưu, mã mọi vị trí
         của tầng đổi theo; nhãn đã in theo mã cũ cần in lại.</li>
     <li>Bấm vào tên cột để đổi tên nếu cần. Xem phần chú thích màu phía trên lưới để biết ô nào <i>Sẽ tạo</i> (vị
@@ -67,8 +67,9 @@
 <div class="ug-callout">
     <i class="fas fa-lightbulb"></i>
     <div><b>Mã tự sinh theo cấp cha</b>: kệ <span class="ug-key">01/01</span> → cột <span class="ug-key">01/01/01</span> →
-        tầng <span class="ug-key">01/01/01/03</span> → vị trí <span class="ug-key">01/01/01/03/E2</span> (ô E, dãy 2 của tầng 03).
-        Chữ ô ngang tầng nào cũng bắt đầu lại từ A; quá 26 ô thì tiếp AA, AB... Đổi mã kệ thì mã của
+        tầng <span class="ug-key">01/01/01/03</span> → vị trí <span class="ug-key">01/01/01/03/05.2</span> (ô ngang số 5, dãy sâu 2 của tầng 03).
+        Ô ngang đánh <b>số</b> từ 1 (ghi 2 chữ số: 01, 02...), tầng nào cũng bắt đầu lại từ 1; mã cũ dạng chữ (E2) đã được đổi sang
+        dạng số. Đổi mã kệ thì mã của
         mọi cột, tầng, vị trí con đổi theo.</div>
 </div>
 

@@ -25,7 +25,7 @@
             <button type="button" class="ugfm-key k1" data-lane="du-tru"><span class="bnum">1</span> Dự trù mua hàng</button>
             <button type="button" class="ugfm-key k2" data-lane="vpp"><span class="bnum">2</span> Đề nghị VPP đến HC</button>
             <button type="button" class="ugfm-key k2" data-lane="lien-phong-ban"><span class="bnum">2</span> Liên phòng ban</button>
-            <button type="button" class="ugfm-key k3" data-lane="noi-bo"><span class="bnum">3</span> Đề nghị nội bộ</button>
+            <button type="button" class="ugfm-key k3" data-lane="noi-bo"><span class="bnum">3</span> Sử dụng - ghi sổ</button>
             <button type="button" class="ugfm-key k4" data-lane="cach-ly"><span class="bnum">4</span> Cách ly - Loại bỏ - Huỷ</button>
         </div>
         <button type="button" class="btn btn-sm btn-outline-primary ugfm-full-btn" title="Xem sơ đồ toàn màn hình (Esc để thoát)">
@@ -59,11 +59,9 @@
                     <td class="m-cell TK"><div class="m-flow">
                         <a class="m-src m-node" data-to="0" href="#kha-dung-thang-toi"><b>Dự báo thiếu tồn tháng tới</b><span>tự động</span></a>
                     </div></td>
-                    <td class="m-cell SD"><div class="m-flow">
-                        <a class="m-src m-node" data-to="0" href="#de-nghi-noi-bo"><b>Nút Đề nghị dự trù trên dòng đề nghị</b><span>người dùng</span></a>
-                    </div></td>
+                    <td class="m-cell SD pass"></td>
                     <td class="m-cell DT"><div class="m-flow">
-                        <div class="m-act"><span>gom · Cung Ứng mua</span></div>
+                        <div class="m-act"><span>gom · Hành Chánh mua</span></div>
                         <a class="m-doc m-node" data-n="0" href="#can-du-tru"><span class="k">tab DS VPP cần dự trù</span><span class="s">Chưa lập phiếu</span></a>
                         <div class="m-act"><span>lập phiếu</span></div>
                         <a class="m-doc m-node" data-n="1" href="#du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Nháp</span></a>
@@ -107,7 +105,7 @@
                         <div class="m-act"><span>gửi</span></div>
                         <a class="m-doc m-node" data-n="2" href="#de-nghi-vpp"><span class="k">tab VPP đến HC</span><span class="s">Chờ ký</span></a>
                         <div class="m-act"><span>ký duyệt</span></div>
-                        <a class="m-doc m-node" data-n="3" href="#cho-cap-phat"><span class="k">Hành Chánh · gửi đến</span><span class="s">Chờ cấp phát</span></a>
+                        <a class="m-doc m-node" data-n="3" href="#de-nghi-vpp"><span class="k">Hành Chánh · gửi đến</span><span class="s">Chờ cấp phát</span></a>
                         <div class="m-act"><span>HC xuất chuyển kho</span></div>
                         <a class="m-doc m-node" data-n="4" href="#de-nghi-vpp"><span class="k">tab VPP đến HC</span><span class="s">Chờ nhận</span></a>
                         <div class="m-act"><span>nhận · kiểm tra</span></div>
@@ -138,7 +136,7 @@
                         <div class="m-act"><span>gửi</span></div>
                         <a class="m-doc m-node" data-n="1" href="#lien-phong-ban"><span class="k">tab Phòng ban khác</span><span class="s">Chờ ký</span></a>
                         <div class="m-act"><span>ký duyệt</span></div>
-                        <a class="m-doc m-node" data-n="2" href="#cho-cap-phat"><span class="k">Phòng B · gửi đến</span><span class="s">Chờ cấp phát</span></a>
+                        <a class="m-doc m-node" data-n="2" href="#lien-phong-ban"><span class="k">Phòng B · gửi đến</span><span class="s">Chờ cấp phát</span></a>
                         <div class="m-act"><span>B xuất chuyển kho</span></div>
                         <a class="m-doc m-node" data-n="3" href="#lien-phong-ban"><span class="k">tab Phòng ban khác</span><span class="s">Chờ nhận</span></a>
                         <div class="m-act"><span>A nhận · kiểm tra</span></div>
@@ -155,31 +153,15 @@
                     </div></td>
                 </tr>
 
-                {{-- 3. Đề nghị sử dụng nội bộ --}}
+                {{-- 3. Sử dụng - ghi sổ --}}
                 <tr class="m-row m3" data-lane="noi-bo">
-                    <th class="m-lane"><span class="bnum">3</span><span class="m-lane-t"><b>Đề nghị sử dụng nội bộ</b><span>định kỳ · ĐG rủi ro · thường quy</span></span></th>
-                    <td class="m-cell DM"><div class="m-flow">
-                        <a class="m-src m-node" data-to="pk" href="#danh-sach-chu-ky"><b>DS đề nghị nội bộ theo chu kỳ</b><span>tự động</span></a>
-                    </div></td>
+                    <th class="m-lane"><span class="bnum">3</span><span class="m-lane-t"><b>Sử dụng - ghi sổ</b><span>dùng VPP trong kho của phòng</span></span></th>
+                    <td class="m-cell DM pass"></td>
                     <td class="m-cell TK pass"></td>
                     <td class="m-cell SD"><div class="m-flow">
-                        <div class="m-stack">
-                            <a class="m-src m-node" data-to="0" data-sid="pk" href="#de-nghi-noi-bo"><b>Tab Theo định kỳ</b><span>hệ thống tự tạo</span></a>
-                            <a class="m-src m-node" data-to="0" href="#de-nghi-noi-bo"><b>Tab Theo ĐG rủi ro</b><span>bấm Tạo đề nghị</span></a>
-                            <a class="m-src m-node" data-to="0" href="#de-nghi-noi-bo"><b>Tab Thường quy</b><span>bấm Tạo đề nghị</span></a>
-                        </div>
-                        <div class="m-act"><span>lập</span></div>
-                        <a class="m-doc m-node" data-n="0" href="#de-nghi-noi-bo"><span class="k">tab Đề nghị nội bộ</span><span class="s">Lưu tạm</span></a>
-                        <div class="m-act"><span>trình ký</span></div>
-                        <a class="m-doc m-node" data-n="1" href="#de-nghi-noi-bo"><span class="k">tab Đề nghị nội bộ</span><span class="s">Chờ ký duyệt</span></a>
-                        <div class="m-act"><span>ký duyệt</span></div>
-                        <a class="m-doc m-node" data-n="2" href="#de-nghi-noi-bo"><span class="k">tab Đề nghị nội bộ</span><span class="s">Đã duyệt</span></a>
-                        <div class="m-act"><span>chuyển kho</span></div>
-                        <a class="m-doc m-node" data-n="3" href="#cho-cap-phat"><span class="k">tab Chờ cấp phát</span><span class="s">Chờ cấp phát</span></a>
-                        <div class="m-act"><span>kho cấp phát</span></div>
-                        <a class="m-doc m-node done" data-n="4" href="#cho-cap-phat"><span class="k">tab Chờ cấp phát</span><span class="s">Đã cấp phát</span></a>
-                        <div class="m-act"><span>ghi sổ</span></div>
-                        <a class="m-doc m-node" data-n="5" href="#so-cap-phat"><span class="k">tab Sổ cấp phát</span><span class="s">Lượt cấp phát</span></a>
+                        <a class="m-src m-node" data-to="0" href="#su-dung-vpp"><b>Bấm Sử dụng VPP</b><span>quét mã · chọn từ tồn kho</span></a>
+                        <div class="m-act"><span>lưu</span></div>
+                        <a class="m-doc m-node done" data-n="0" href="#so-cap-phat"><span class="k">tab Sổ sử dụng VPP</span><span class="s">Đã ghi sổ</span></a>
                     </div></td>
                     <td class="m-cell DT pass"></td>
                     <td class="m-cell NH pass"></td>
@@ -190,14 +172,13 @@
 
                 {{-- 4. Cách ly - Loại bỏ - Huỷ --}}
                 <tr class="m-row m4" data-lane="cach-ly">
-                    <th class="m-lane"><span class="bnum">4</span><span class="m-lane-t"><b>Cách ly - Loại bỏ - Huỷ</b><span>hỏng · hết hạn · không đạt hiệu chuẩn</span></span></th>
+                    <th class="m-lane"><span class="bnum">4</span><span class="m-lane-t"><b>Cách ly - Loại bỏ - Huỷ</b><span>hỏng · hết hạn</span></span></th>
                     <td class="m-cell DM pass"></td>
                     <td class="m-cell TK pass"></td>
                     <td class="m-cell SD"><div class="m-flow">
                         <div class="m-stack">
                             <a class="m-src m-node" data-to="0" href="#cach-ly"><b>Nhóm VPP sắp hết hạn dùng</b><span>lô còn tồn sát / quá hạn</span></a>
                             <a class="m-src m-node" data-to="0" href="#cach-ly"><b>Nút Cách ly VPP hỏng</b><span>người dùng</span></a>
-                            <a class="m-src m-node" data-to="0" href="#hieu-chuan"><b>Tab Xác nhận hiệu chuẩn · QA ký Không đạt</b><span>tự cách ly phần không đạt</span></a>
                         </div>
                         <div class="m-act"><span>lập phiếu · định khu Chờ QĐ</span></div>
                         <a class="m-doc m-node" data-n="0" href="#cach-ly"><span class="k">tab Cách ly - Loại bỏ - Huỷ</span><span class="s">Cách ly - Chờ quyết định</span></a>
@@ -252,20 +233,18 @@
             <tr>
                 <td><span class="ugfm-no k2">2</span> Đề nghị liên phòng ban</td>
                 <td>Giống VPP nhưng phòng cấp là một phòng bất kỳ (<a href="#lien-phong-ban">Đề nghị liên phòng ban</a>).
-                    Dòng đề nghị hiện ở tab <a href="#cho-cap-phat">Chờ cấp phát</a> của phòng cấp.</td>
+                    Phiếu hiện ở mục <b>Gửi đến</b> của phòng cấp sau khi ký đủ 2 bước.</td>
                 <td>Phòng cấp giảm, phòng xin tăng.</td>
             </tr>
             <tr>
-                <td><span class="ugfm-no k3">3</span> Đề nghị sử dụng nội bộ</td>
-                <td>Lấy VPP trong kho của chính phòng để dùng. Đề nghị từ 3 tab
-                    (<a href="#de-nghi-noi-bo">định kỳ, ĐG rủi ro, thường quy</a>), ký duyệt xong chuyển kho
-                    <a href="#cho-cap-phat">cấp phát</a> và tự ghi <a href="#so-cap-phat">Sổ cấp phát</a>. VPP cần hiệu
-                    chuẩn phải qua <a href="#hieu-chuan">QA xác nhận Đạt</a> trước.</td>
-                <td>Giảm ngay khi kho cấp phát.</td>
+                <td><span class="ugfm-no k3">3</span> Sử dụng - ghi sổ</td>
+                <td>Dùng VPP trong kho của chính phòng: bấm <a href="#su-dung-vpp">Sử dụng VPP</a>, chọn lô, nhập số lượng
+                    rồi Lưu là ghi thẳng vào <a href="#so-cap-phat">Sổ sử dụng VPP</a>. Không đề nghị, không ký, không cấp phát.</td>
+                <td>Giảm ngay khi Lưu.</td>
             </tr>
             <tr>
                 <td><span class="ugfm-no k4">4</span> Cách ly - Loại bỏ - Huỷ</td>
-                <td>VPP hỏng, hết hạn hoặc QA ký <b>Không đạt</b> hiệu chuẩn được <a href="#cach-ly">cách ly</a> ở định
+                <td>VPP hỏng hoặc hết hạn được <a href="#cach-ly">cách ly</a> ở định
                     khu Chờ quyết định, sau đó quyết định <b>Loại bỏ</b> (rồi Huỷ) hoặc <b>Trả về kho</b>.</td>
                 <td>Giảm từ lúc cách ly; trả về kho thì hoàn lại.</td>
             </tr>
@@ -275,9 +254,8 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Bước <b>ký duyệt</b> của đề nghị nội bộ theo Dữ Liệu Gốc <i>Trình Ký Đề Nghị Cấp Phát VPP</i>; của đề nghị VPP và
-        liên phòng ban theo <i>Trình Ký Đề Nghị Liên Phòng Ban</i>. Không có quy định nào áp dụng thì phiếu được duyệt thẳng,
-        bỏ qua khối <b>Chờ ký</b>. Sơ đồ rộng: kéo ngang trong khung hoặc bấm <b>Toàn màn hình</b>.</div>
+    <div>Bước <b>ký duyệt</b> của đề nghị VPP đến HC và liên phòng ban luôn gồm 2 bước cố định: Quản Lý Bộ Phận phòng đề nghị
+        → Quản Lý Bộ Phận phòng cấp phát. Sơ đồ rộng: kéo ngang trong khung hoặc bấm <b>Toàn màn hình</b>.</div>
 </div>
 
 <style>

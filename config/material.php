@@ -28,12 +28,15 @@ return [
     ],
 
     /*
-     | Trạng thái một BƯỚC KÝ - cột material_request_signs.status. Bước đang chờ ký là
-     | bước 'pending' có step_no nhỏ nhất, trùng với material_request_lists.current_step.
+     | Trạng thái một BƯỚC KÝ - cột material_request_signs.status. Ký đồng thời: mọi bước
+     | 'pending' đều ký được; material_request_lists.current_step = bước 'pending' nhỏ nhất.
+     | Bước sau đã ký thì các bước trước còn chờ thành 'auto_signed' (duyệt theo bước sau,
+     | signed_by = người ký bước sau).
      */
     'request_sign_statuses' => [
         'pending' => 'Chờ ký',
         'signed' => 'Đã ký',
+        'auto_signed' => 'Duyệt theo bước sau',
         'rejected' => 'Từ chối',
     ],
 
@@ -112,6 +115,14 @@ return [
         'warning' => 60,
         'critical' => 30,
     ],
+
+    /*
+     | QUÉT XÁC NHẬN MÃ XUẤT NHẬP KHI CẤP PHÁT - nút Cấp Phát (tab Chờ Cấp Phát, phiếu chi
+     | tiết đề nghị, đề nghị liên phòng ban) chỉ mở khi người cấp đã quét đúng nhãn của TỪNG
+     | mã xuất nhập sắp cấp; server kiểm lại (MaterialExportController::issueScanError).
+     | Tắt tạm (VD máy quét hỏng): MATERIAL_ISSUE_SCAN_REQUIRED=false trong .env.
+     */
+    'issue_scan_required' => (bool) env('MATERIAL_ISSUE_SCAN_REQUIRED', true),
 
     /*
      | NHÃN LÔ VẬT TƯ - in từ màn hình Nhập Vật Tư. Mã vạch dạng QR (App\Support\QrCode).

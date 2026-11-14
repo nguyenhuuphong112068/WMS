@@ -30,14 +30,16 @@
     ['Nhà Sản Xuất', true, 'Chọn từ <b>Dữ Liệu Gốc › Nhà Sản Xuất</b>.'],
     ['Thông Tin Kỹ Thuật', false, 'Quy cách, kích thước, tiêu chuẩn. Tối đa 100 ký tự.'],
     ['Part Number', false, 'Mã P/N của hãng. Tối đa 100 ký tự.'],
-    ['Phân loại (4 cột)', true, 'Mỗi tiêu chí một cột, chọn đủ cả 4: <b>Giá Trị</b> (Thấp/Cao), <b>Mức Độ Quan Trọng</b> (Thấp/Cao), <b>Hàng Hoá Nguy Hiểm</b> (Có/Không), <b>Cần Hiệu Chuẩn Trước Khi Dùng</b> (Có/Không). Hộp thoại Cập nhật vẫn chọn bằng ô tick như cũ.'],
+    ['Phân loại (4 cột)', true, 'Mỗi tiêu chí một cột, chọn đủ cả 4: <b>Mức Độ Quan Trọng</b> (Thấp/Cao), <b>Hàng Hoá Nguy Hiểm</b> (Có/Không), <b>Cần Hiệu Chuẩn Trước Khi Dùng</b> (<i>Cần HC trước khi cấp phát (HC bởi NSX / Stella)</i> / <i>Cần HC sau khi cấp phát</i> / <i>Không</i>), <b>Tiếp Xúc</b> (Có tiếp xúc / Không tiếp xúc). <b>Theo Giá Trị</b> không còn khai ở đây mà khai ở <a href="#vat-tu-cua-phong">Vật tư của phòng</a>. Hộp thoại Cập nhật vẫn chọn bằng ô tick như cũ; mã cũ chưa có tiêu chí Tiếp Xúc phải chọn khi sửa.'],
 ]])
 
 <h3>Phân loại ảnh hưởng tới đâu?</h3>
 <ul>
     <li><b>Trình ký đề nghị cấp phát</b>: các tiêu chí là điều kiện để xác định vai trò nào phải ký
         (Dữ Liệu Gốc › Trình Ký Đề Nghị CP Vật Tư).</li>
-    <li><b>Cần hiệu chuẩn trước khi dùng = Có</b>: vật tư phải qua bước <a href="#hieu-chuan">Hiệu chuẩn</a> mới cấp phát được.</li>
+    <li><b>Cần HC trước khi cấp phát</b>: vật tư phải qua bước <a href="#hieu-chuan">Hiệu chuẩn</a> mới cấp phát được.
+        <b>Cần HC sau khi cấp phát</b>: cấp phát bình thường, hiệu chuẩn sau (không giữ chỗ, không cách ly).</li>
+    <li><b>Mức Độ Quan Trọng</b> quyết định hạn mức <a href="#ton-kho">cân đối</a>: Cao không được cân đối, Thấp tối đa 2% lượng nhập.</li>
     <li><b>Bộ phận mua hàng</b>: không chọn trên form - mọi vật tư do <b>Cung Ứng</b> mua. Văn phòng phẩm do Hành Chánh mua khai ở module
         <a href="{{ route('pages.userGuide.show', 'vpp') }}">VPP</a>.</li>
 </ul>

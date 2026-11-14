@@ -4,13 +4,14 @@
     của B sang tồn của A.</p>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/lien-phong-ban.png', 'caption' => 'Màn hình Đề Nghị - Sử Dụng › VPP › tab Đề nghị liên phòng ban - Phòng ban khác'])
 
-<h3>Ba bước</h3>
+<h3>Các bước</h3>
 <ol class="ug-steps">
     <li><b>A lập đề nghị</b>: bấm tạo đề nghị, chọn <b>Gửi Đến Phòng Ban</b>, thêm VPP (chọn được mọi VPP đã duyệt của
-        danh mục công ty, kể cả VPP A chưa khai), nhập số lượng, ngày mong muốn. Bấm
+        danh mục công ty), nhập số lượng, ngày mong muốn. Bấm
         <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-save mr-1"></i> Lưu tạm</span> hoặc
         <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-paper-plane mr-1"></i> Gửi đề nghị</span>.
-        Nếu công ty có khai bước ký liên phòng ban, phiếu đi qua các bước ký trước rồi mới tới B.</li>
+        Gửi là trình ký: phiếu chuyển <span class="ug-chip is-warn">Chờ ký</span> và phải qua đủ
+        <a href="#ky-lien-phong-ban">2 bước ký</a> rồi mới tới B.</li>
     <li><b>B cấp phát</b>: phiếu hiện ở mục <b>Gửi đến</b> của B và tab Chờ cấp phát. B chọn lô (gợi ý FEFO/FIFO) rồi
         <b>Cấp phát</b>, hoặc <b>Từ chối cấp phát</b> từng mục. Cấp phát trừ tồn của B ngay, mục chuyển sang <i>chờ nhận</i>.</li>
     <li><b>A nhận hàng</b>: bấm <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-inbox mr-1"></i> Nhận</span>. Bước nhận
@@ -19,16 +20,25 @@
         <span class="btn btn-sm btn-danger ug-ui"><i class="fas fa-undo mr-1"></i> Từ chối nhận</span>, tồn tự hoàn lại cho B.</li>
 </ol>
 
-<h3>Ký duyệt liên phòng ban</h3>
+<h3 id="ky-lien-phong-ban">Ký duyệt liên phòng ban (2 bước cố định)</h3>
+<ol class="ug-steps">
+    <li><b>Bước 1 - Quản Lý Bộ Phận phòng đề nghị</b> (phòng A).</li>
+    <li><b>Bước 2 - Quản Lý Bộ Phận phòng cấp phát</b> (phòng B; đề nghị VPP đến HC là Hành Chánh).</li>
+</ol>
 <ul>
-    <li>Các bước ký khai ở <b>Dữ Liệu Gốc › Trình Ký Đề Nghị Liên Phòng Ban</b>. Không khai bước nào thì phiếu gửi thẳng tới B.</li>
+    <li>Người ký là mọi tài khoản có vai trò Quản Lý Bộ Phận của đúng phòng, ai ký trước cũng được; ký lần lượt bước 1 rồi bước 2.
+        Trang chủ báo phiếu chờ ký; mở phiếu chi tiết rồi bấm
+        <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-signature mr-1"></i> Đồng ý</span> hoặc
+        <span class="btn btn-sm btn-danger ug-ui"><i class="fas fa-times mr-1"></i> Từ chối</span>.</li>
     <li>Người ký được <b>duyệt một phần</b>: bỏ tick các mục muốn từ chối và ghi lý do cho từng mục; các mục còn lại đi tiếp.
-        Muốn từ chối cả phiếu thì dùng nút <b>Từ chối</b>, phiếu quay về Lưu tạm cho A sửa.</li>
-    <li>Ký và từ chối đều phải nhập lại mật khẩu.</li>
+        Từ chối cả phiếu thì phiếu quay về <b>Lưu tạm</b> kèm lý do cho A sửa rồi gửi lại.</li>
+    <li>Ký và từ chối đều phải nhập lại mật khẩu. Không còn khai bước ký ở Dữ Liệu Gốc.</li>
+    <li>Phòng nào chưa có tài khoản Quản Lý Bộ Phận thì không Gửi được, hệ thống báo
+        <i>"Bước ký n (...) chưa có tài khoản ... nào của phòng ...".</i></li>
 </ul>
 
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
-    <div>A phải khai VPP ở <a href="#vat-tu-cua-phong">VPP Của Phòng</a> trước khi bấm Nhận, để có đơn vị tính quy đổi.
-        Phiếu cấp phát liên phòng ban không sửa hay khoá được ở Sổ cấp phát; muốn thu hồi thì A phải Từ chối nhận.</div>
+    <div>Mọi phòng đều có sẵn dòng VPP Của Phòng và cả công ty dùng chung một đơn vị tính, nên nhận hàng không cần khai hay quy đổi
+        đơn vị. Phiếu cấp phát liên phòng ban không sửa hay khoá được ở Sổ sử dụng VPP; muốn thu hồi thì A phải Từ chối nhận.</div>
 </div>

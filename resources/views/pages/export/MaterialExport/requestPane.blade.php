@@ -130,18 +130,22 @@
                             <div class="me-flow">
                                 @foreach ($signs as $s)
                                     @php
-                                        // Bước đã ký / bị từ chối / đang chờ ký; các bước phía sau còn mờ
+                                        // Ký đồng thời: mọi bước còn chờ của phiếu đang trình ký đều sáng
                                         $cls = 'step';
-                                        if ($s->status === 'signed') $cls .= ' done';
+                                        if (in_array($s->status, ['signed', 'auto_signed'])) $cls .= ' done';
                                         elseif ($s->status === 'rejected') $cls .= ' rejected';
-                                        elseif ($req->app_status === 'pending_sign' && (int) $req->current_step === (int) $s->step_no) $cls .= ' current';
+                                        elseif ($req->app_status === 'pending_sign' && $s->status === 'pending') $cls .= ' current';
                                         else $cls .= ' skip';
 
                                         // Phiếu cũ không chỉ định đích danh thì hiện chức danh được ký thay
                                         $who = $s->signer_full_name ?: ($s->user_name ?: ($s->role_names ?: '—'));
+                                        $signedNote = $s->signed_at
+                                            ? ($s->status === 'auto_signed' ? ' — duyệt theo bước sau (' . $s->signed_by . ') ' : ' — đã ký ') . \Carbon\Carbon::parse($s->signed_at)->format('d/m/Y H:i')
+                                            : '';
                                     @endphp
-                                    <span class="{{ $cls }}" title="Bước {{ $s->step_no }}: {{ $who }}{{ $s->signed_at ? ' — đã ký ' . \Carbon\Carbon::parse($s->signed_at)->format('d/m/Y H:i') : '' }}">
+                                    <span class="{{ $cls }}" title="Bước {{ $s->step_no }}: {{ $who }}{{ $signedNote }}">
                                         @if ($s->status === 'signed') <i class="fas fa-check"></i>
+                                        @elseif ($s->status === 'auto_signed') <i class="fas fa-check-double"></i>
                                         @elseif ($s->status === 'rejected') <i class="fas fa-times"></i>
                                         @else {{ $s->step_no }} @endif
                                         {{ $who }}

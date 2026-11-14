@@ -26,6 +26,9 @@
     @php
         $items = $transferItems[$req->id] ?? collect();
         $iAmSource = (int) $req->to_department_id === (int) $currentDepartmentId;
+        // Bước người đăng nhập ký được (null = không ký được) - StandardTransferSignFlow
+        $stSignStep = ($transferSignable ?? [])[$req->id] ?? null;
+        $stHeadBadge = $req->status === 'pending_sign' ? ['label' => 'Chờ ký', 'class' => 'warning'] : $stdReqBadge($req->status);
     @endphp
     <div class="modal fade md-modal" id="transferDetailModal_{{ $req->id }}" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 96vw;" role="document">
@@ -50,9 +53,10 @@
                                 </div>
                                 <div class="col-md-2">
                                     <span class="text-muted">Trạng thái:</span>
-                                    <span class="exp-req-badge {{ $stdReqBadge($req->status)['class'] }} ml-1">
-                                        {{ $stdReqBadge($req->status)['label'] }}
+                                    <span class="exp-req-badge {{ $stHeadBadge['class'] }} ml-1">
+                                        {{ $stHeadBadge['label'] }}
                                     </span>
+                                    @include('pages.export.shared.transferSignChips', ['tsSigns' => ($transferSigns ?? collect())->get($req->id, collect()), 'tsReq' => $req])
                                 </div>
                                 <div class="col-md-2">
                                     <span class="text-muted">Người lập:</span>
@@ -297,6 +301,17 @@
 
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
+                    {{-- Chỉ người ký được bước đang chờ mới thấy Đồng ý / Từ chối --}}
+                    @if ($stSignStep)
+                        <button type="button" class="btn btn-outline-danger btn-ts-sign"
+                            data-mode="reject" data-id="{{ $req->id }}" data-code="{{ $req->code }}" data-step="{{ $stSignStep }}">
+                            <i class="fas fa-times mr-1"></i> Từ chối
+                        </button>
+                        <button type="button" class="btn btn-success btn-ts-sign"
+                            data-mode="sign" data-id="{{ $req->id }}" data-code="{{ $req->code }}" data-step="{{ $stSignStep }}">
+                            <i class="fas fa-signature mr-1"></i> Đồng ý
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>

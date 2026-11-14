@@ -6,7 +6,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>CMS - Hệ Thống Quản Lý Vật Tư Tiêu Hao</title>
     <!-- Tell the browser to be responsive to screen width -->
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" id="wms-viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
+    @include('layout.pageZoom')
     <link rel="icon" type="image/png" href="{{ asset('img/iconstella.svg') }}">
 
     @include('layout.css')

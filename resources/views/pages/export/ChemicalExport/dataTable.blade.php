@@ -4,7 +4,14 @@
 @php
     // transfer_out không nằm trong $types (không chọn được ở form chung, chỉ tạo qua
     // tab Đề nghị chuyển hoá chất liên phòng ban) nên gán nhãn hiển thị riêng ở đây.
-    $expTypeLabel = fn($type) => $type === 'transfer_out' ? 'Chuyển liên phòng ban' : ($types[$type] ?? $type);
+    $expTypeLabel = fn($type) => match ($type) {
+        'transfer_out' => 'Chuyển liên phòng ban',
+        \App\Support\ChemicalReturn::TYPE => 'Trả về kho',
+        default => $types[$type] ?? $type,
+    };
+
+    // Lọc Sổ sử dụng theo đúng một mã xuất nhập, mọi ngày (phiếu sử dụng + các lần trả về kho)
+    $expBookCodeUrl = fn($code) => route($expRoute . 'list', ['tab' => 'book', 'book_q' => $code, 'book_from' => '', 'book_to' => '']);
 @endphp
 
 <div class="content-wrapper">
@@ -58,6 +65,12 @@
                         @if ($quarantineBadge)
                             <span class="exp-tab-count">{{ $quarantineBadge }}</span>
                         @endif
+                    </button>
+                    @endtab
+                    @tab('export_chemical', 'return')
+                    <button type="button" class="exp-tab {{ $activeTab === 'return' ? 'is-active' : '' }}"
+                        data-pane="expPaneReturn">
+                        <i class="fas fa-undo-alt mr-1"></i> Trả hoá chất Acetonitril hoặc Methanol về kho
                     </button>
                     @endtab
                     @tab('export_chemical', 'report')
@@ -130,7 +143,8 @@
                                         // Lý do khoá nút Sửa / Khoá (chuỗi rỗng = không khoá)
                                         $expLocked = $row->quarantine_id
                                             ? 'Sinh từ phiếu cách ly ' . $row->quarantine_code . ', chỉ điều chỉnh ở tab Cách ly - Loại bỏ - Huỷ'
-                                            : ($row->disposal_id ? 'Đã nằm trong đợt xin quyết định huỷ trước đây' : '');
+                                            : ($row->disposal_id ? 'Đã nằm trong đợt xin quyết định huỷ trước đây'
+                                                : ($row->type === \App\Support\ChemicalReturn::TYPE ? 'Dòng trả về kho, chỉ huỷ ở tab Trả hoá chất Acetonitril hoặc Methanol về kho' : ''));
                                         // Phiếu ngày cũ vẫn sửa được, chỉ khoá dòng sinh từ phiếu cách ly / đợt huỷ cũ
                                         $expEditLocked = $expLocked;
                                     @endphp
@@ -160,11 +174,30 @@
                                             <span
                                                 class="exp-amount">{{ rtrim(rtrim(number_format($row->amount, 4, '.', ','), '0'), '.') }}</span>
                                             <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>
+                                            {{-- Phiếu sử dụng đã có lượng trả về kho: lượng đã trả + thực dùng, bấm để lọc sổ theo mã --}}
+                                            @if ($expBookReturned = (float) ($bookReturned[$row->id] ?? 0))
+                                                <div class="md-sub mt-1 text-nowrap">
+                                                    <a href="{{ $expBookCodeUrl($row->code) }}" class="exp-return-link"
+                                                        title="Xem phiếu sử dụng và các lần trả về kho của mã {{ $row->code }}">
+                                                        <i class="fas fa-undo-alt"></i> Đã trả {{ $expNum($expBookReturned) }}
+                                                    </a>
+                                                    · Thực dùng <b>{{ $expNum((float) $row->amount - $expBookReturned) }}</b> {{ $row->unit_short_name ?: $row->unit_name }}
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="text-center">
                                             <span class="exp-badge exp-badge-{{ $row->type === 'transfer_out' ? 'transfer' : $row->type }}">
                                                 {{ $expTypeLabel($row->type) }}
                                             </span>
+                                            {{-- Dòng trả về kho: phiếu sử dụng gốc, bấm để lọc sổ theo mã --}}
+                                            @if ($row->type === \App\Support\ChemicalReturn::TYPE && $row->return_source_date)
+                                                <div class="md-sub mt-1">
+                                                    <a href="{{ $expBookCodeUrl($row->code) }}" class="exp-return-link"
+                                                        title="Xem phiếu sử dụng và các lần trả về kho của mã {{ $row->code }}">
+                                                        của phiếu SD {{ $expDate($row->return_source_date) }} · {{ $expNum($row->return_source_amount) }} {{ $row->unit_short_name ?: $row->unit_name }}
+                                                    </a>
+                                                </div>
+                                            @endif
                                             @if ($row->type === 'transfer_out')
                                                 <div class="md-sub mt-1">
                                                     <i
@@ -279,6 +312,13 @@
                 @tab('export_chemical', 'quarantine')
                 <div class="exp-pane {{ $activeTab === 'quarantine' ? 'is-active' : '' }}" id="expPaneQuarantine">
                     @include('pages.export.ChemicalExport.quarantinePane')
+                </div>
+                @endtab
+
+                {{-- ============ TRẢ HOÁ CHẤT ACETONITRIL / METHANOL VỀ KHO ============ --}}
+                @tab('export_chemical', 'return')
+                <div class="exp-pane {{ $activeTab === 'return' ? 'is-active' : '' }}" id="expPaneReturn">
+                    @include('pages.export.ChemicalExport.returnPane')
                 </div>
                 @endtab
 

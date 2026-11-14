@@ -233,9 +233,9 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Bước <b>ký duyệt</b> của đề nghị nội bộ theo Dữ Liệu Gốc <i>Trình Ký Đề Nghị Cấp Phát Vật Tư</i>; của đề nghị
-        liên phòng ban theo <i>Trình Ký Đề Nghị Liên Phòng Ban</i>. Không có quy định nào áp dụng thì phiếu được duyệt thẳng,
-        bỏ qua khối <b>Chờ ký</b>. Sơ đồ rộng: kéo ngang trong khung hoặc bấm <b>Toàn màn hình</b>.</div>
+    <div>Bước <b>ký duyệt</b> của đề nghị nội bộ theo Dữ Liệu Gốc <i>Trình Ký Đề Nghị Cấp Phát Vật Tư</i> (mọi bước ký đồng thời;
+        không có quy định nào áp dụng thì phiếu được duyệt thẳng, bỏ qua khối <b>Chờ ký</b>). Đề nghị liên phòng ban luôn ký 2 bước
+        cố định: Quản Lý Bộ Phận phòng đề nghị → Quản Lý Bộ Phận phòng cấp phát. Sơ đồ rộng: kéo ngang trong khung hoặc bấm <b>Toàn màn hình</b>.</div>
 </div>
 
 <style>

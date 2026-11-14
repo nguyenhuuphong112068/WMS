@@ -62,6 +62,8 @@
     @include('pages.export.MaterialExport.transferReceiveCheckModal')
     @include('pages.export.MaterialExport.transferStockPickerModal')
     @include('pages.export.MaterialExport.transferImportPickerModal')
+    {{-- Quét xác nhận mã xuất nhập trước khi Cấp Phát - sau các form cấp phát ở trên --}}
+    @include('pages.export.MaterialExport.issueScanVerify')
 
     {{--
     | Link "chờ bạn ký duyệt" ở Trang chủ mở thẳng phiếu: ?open=<id modal chi tiết>

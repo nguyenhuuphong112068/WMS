@@ -110,6 +110,34 @@
         #itemCreateModal .emi-col-pn {
             width: 150px;
         }
+
+        /* Code nhà sản xuất đã khai báo Cổng TT quốc gia (chỉ Dự Trù Hoá Chất) */
+        #itemCreateModal .emi-col-portal {
+            width: 170px;
+        }
+
+        #itemCreateModal .emi-portal {
+            min-width: 170px;
+        }
+
+        #itemCreateModal .emi-portal-code {
+            display: inline-block;
+            margin: 0 4px 4px 0;
+            padding: 2px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--primary-lighter);
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            font-size: 12px;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        #itemCreateModal .emi-portal-warn {
+            white-space: normal;
+            text-align: left;
+            line-height: 1.35;
+        }
     
         #itemCreateModal .emi-col-file { width: 110px; }
     

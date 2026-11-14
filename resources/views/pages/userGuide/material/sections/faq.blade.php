@@ -49,6 +49,21 @@
                 <td style="font-weight: 400">Phòng nhận chưa khai vật tư này ở Vật Tư Của Phòng. Khai xong rồi nhận lại.</td>
             </tr>
             <tr>
+                <td>"Chưa quét xác nhận mã xuất nhập ..."</td>
+                <td style="font-weight: 400">Chưa quét đủ nhãn của mọi lô đang cấp. Bấm <b>Quét mã</b> cạnh nút Cấp Phát và quét
+                    đúng nhãn QR từng lô (xem <a href="#cho-cap-phat">Chờ cấp phát</a>).</td>
+            </tr>
+            <tr>
+                <td>"Vật tư có mức độ quan trọng Cao, không được cân đối..."</td>
+                <td style="font-weight: 400">Vật tư quan trọng Cao không cân đối được. Làm rõ nguyên nhân lệch; vật tư quan trọng Thấp
+                    cân đối tối đa 2% lượng nhập đầu (xem <a href="#ton-kho">Cân đối</a>).</td>
+            </tr>
+            <tr>
+                <td>"Bước ký n (...) chưa có tài khoản ... nào của phòng ..."</td>
+                <td style="font-weight: 400">Đề nghị liên phòng ban cần Quản Lý Bộ Phận của cả phòng đề nghị và phòng cấp phát. Nhờ
+                    Admin phân vai trò Quản Lý Bộ Phận cho người của phòng đó rồi Gửi lại.</td>
+            </tr>
+            <tr>
                 <td>"Còn N dòng chưa đếm, phải đếm đủ mới chốt được phiếu kiểm kê"</td>
                 <td style="font-weight: 400">Nhập Thực Tế Đếm cho mọi dòng, kể cả dòng bằng 0.</td>
             </tr>

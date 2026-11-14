@@ -64,14 +64,6 @@ return [
         ['id' => 'trinh-ky-cap-phat', 'file' => 'materialSignFlow', 'shotDept' => 4, 'title' => 'Trình Ký Đề Nghị CP Vật Tư', 'icon' => 'fas fa-file-signature',
             'route' => 'pages.materData.materialSignFlow.list', 'perm' => md_perm('materialSignFlow', 'view'), 'chips' => [$byDept],
             'keywords' => 'cap ky nguoi ky vai tro dieu kien'],
-        ['id' => 'trinh-ky-lien-phong-ban', 'file' => 'transferSignFlow', 'title' => 'Trình Ký Đề Nghị Liên Phòng Ban', 'icon' => 'fas fa-route',
-            'route' => 'pages.materData.transferSignFlow.list', 'perm' => 'materData_transferSign_view',
-            'keywords' => 'buoc ky chuyen vat tu phong khac'],
-    ],
-    'VPP' => [
-        ['id' => 'trinh-ky-lien-phong-ban-vpp', 'file' => 'vppTransferSignFlow', 'title' => 'Trình Ký Đề Nghị Liên Phòng Ban VPP', 'icon' => 'fas fa-route',
-            'route' => 'pages.materData.vppTransferSignFlow.list', 'perm' => 'materData_vppTransferSign_view',
-            'keywords' => 'vpp van phong pham hanh chanh buoc ky'],
     ],
     'Kho & đối tượng' => [
         ['id' => 'dinh-khu', 'file' => 'zone', 'title' => 'Định Khu', 'icon' => 'fas fa-sitemap',

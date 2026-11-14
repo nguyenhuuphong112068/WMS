@@ -8,9 +8,10 @@
 <h3>Tạo phiếu nhập</h3>
 <ol class="ug-steps">
     <li>Ở tab <b>Nhập VPP</b>, bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Nhập VPP</span>.</li>
-    <li>Bấm vào ô <b>VPP</b> để mở danh sách VPP <b>phòng đang dùng</b>. Có thể lọc theo nhà sản xuất, phân loại,
-        tình trạng tồn. VPP chưa có trong danh sách thì khai ở <a href="#vat-tu-cua-phong">VPP Của Phòng</a> trước.</li>
-    <li>Nhập <b>Số lượng / lô</b> theo đơn vị của phòng. Nhập nhiều lô cùng thông tin thì tăng <b>Số lần nhập</b> (tối đa 50),
+    <li>Bấm vào ô <b>VPP</b> để mở danh sách VPP <b>phòng đang dùng</b>. Có thể lọc theo nhà sản xuất, nhóm dự trù /
+        phân loại của phòng, tình trạng tồn. Mọi mã đã duyệt ở <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a> đều có sẵn ở
+        phòng; mã chưa thấy là mã chưa duyệt hoặc đã khoá.</li>
+    <li>Nhập <b>Số lượng / lô</b> theo đơn vị của danh mục công ty. Nhập nhiều lô cùng thông tin thì tăng <b>Số lần nhập</b> (tối đa 50),
         mỗi lô một mã.</li>
     <li>Điền thông tin chứng từ nếu có, chọn <b>Định Khu Tạm</b> trong khu Biệt Trữ, đính kèm hồ sơ rồi bấm <b>Lưu</b>.</li>
 </ol>
@@ -18,10 +19,10 @@
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/nhap-vat-tu-form.png', 'caption' => 'Hộp thoại thêm mới - Nhập VPP & Sổ Nhập'])
 
 @include('pages.userGuide.shared.fields', ['fields' => [
-    ['VPP', true, 'Chỉ VPP đã khai ở VPP Của Phòng và đang hoạt động.'],
+    ['VPP', true, 'Chỉ VPP đã duyệt, chưa khoá ở danh mục công ty.'],
     ['Số lượng / lô', true, 'Lớn hơn 0.'],
     ['Số lần nhập', false, '1 - 50. Tạo nhiều lô giống hệt nhau trong một lần lưu.'],
-    ['Hạn sử dụng', false, 'Để trống nếu VPP không có hạn. Lô hết hạn sẽ không cấp phát được.'],
+    ['Hạn sử dụng', false, 'Để trống nếu VPP không có hạn. Lô hết hạn sẽ không sử dụng / cấp phát được.'],
     ['Số lô, Số hoá đơn, Ngày ký hoá đơn', false, 'Thông tin chứng từ; có thể bổ sung lúc kiểm tra.'],
     ['Định Khu Tạm (Biệt Trữ / Chờ Kiểm Tra)', false, 'Chỉ chọn được vị trí có phân loại <b>Biệt Trữ</b>. Vị trí thật chọn ở bước kiểm tra.'],
     ['Tài liệu đính kèm', false, 'Hoá đơn, phiếu giao hàng, CoA... tối đa 10MB mỗi file.'],

@@ -39,7 +39,7 @@
                             title="Đối chiếu tổng tồn trữ toàn công ty của hoạt chất với ngưỡng Phụ lục IV NĐ 24/2026/NĐ-CP">
                             Ngưỡng Tồn Trữ PL IV</th>
                         <th class="text-center" style="width: 140px"
-                            title="Đã khai báo trên Cổng thông tin quốc gia - chỉ xác nhận được một lần">
+                            title="Các lần khai báo trên Cổng thông tin quốc gia (Mã hồ sơ + Code nhà sản xuất) - khai báo được nhiều lần">
                             Khai Báo Cổng TT Quốc Gia</th>
                         <th style="width: 170px"
                             title="Các phòng ban đã khai dùng hoá chất này (bảng chemical_department_categories)">
@@ -197,35 +197,62 @@
                                     </div>
                                 @endif
                             </td>
-                            {{-- Khai báo Cổng thông tin quốc gia: xác nhận MỘT lần (Chưa -> Đã), sau đó khoá --}}
-                            <td class="text-center" data-order="{{ $row->national_portal_declared ? 1 : 0 }}">
-                                @if ($row->national_portal_declared)
-                                    <span class="badge badge-success"><i class="fas fa-check mr-1"></i>Đã khai báo</span>
-                                    @if ($row->national_portal_declaration_no)
-                                        <div class="mt-1" title="Mã hồ sơ khai báo"><strong>{{ $row->national_portal_declaration_no }}</strong></div>
-                                    @endif
-                                    <div class="md-sub mt-1">{{ $row->national_portal_declared_by ?: '—' }}</div>
-                                    @if ($row->national_portal_declared_at)
-                                        <small class="md-sub">{{ \Carbon\Carbon::parse($row->national_portal_declared_at)->format('d/m/Y') }}</small>
-                                    @endif
+                            {{-- Khai báo Cổng thông tin quốc gia: khai báo NHIỀU LẦN, mỗi lần = Mã hồ sơ + Code nhà sản xuất; sửa được (bắt lý do, ghi Audit Trail) --}}
+                            @php
+                                $rowDeclarations = $portalDeclarations[$row->id] ?? [];
+                                $portalFields = [
+                                    ['name' => 'declaration_no', 'label' => 'Mã hồ sơ khai báo', 'placeholder' => 'Mã hồ sơ trên Cổng thông tin quốc gia'],
+                                    ['name' => 'manufacturer_code', 'label' => 'Code nhà sản xuất', 'placeholder' => 'Mã hàng / catalogue number của nhà sản xuất'],
+                                ];
+                            @endphp
+                            <td class="text-center" data-order="{{ count($rowDeclarations) }}">
+                                @if ($rowDeclarations)
+                                    <span class="badge badge-success"><i class="fas fa-check mr-1"></i>Đã khai báo{{ count($rowDeclarations) > 1 ? ' (' . count($rowDeclarations) . ' lần)' : '' }}</span>
+                                    @foreach ($rowDeclarations as $declaration)
+                                        @php
+                                            $declAt = $declaration->created_at ? \Carbon\Carbon::parse($declaration->created_at) : null;
+                                            $declEditAt = $declaration->updated_by && $declaration->updated_at ? \Carbon\Carbon::parse($declaration->updated_at) : null;
+                                        @endphp
+                                        <div class="portal-decl"
+                                            title="Khai báo bởi {{ $declaration->created_by ?: '—' }}{{ $declAt ? ' lúc ' . $declAt->format('d/m/Y H:i') : '' }}{{ $declEditAt ? ' - sửa lần cuối bởi ' . $declaration->updated_by . ' lúc ' . $declEditAt->format('d/m/Y H:i') : '' }}">
+                                            @perm('category_chemical_update')
+                                                <form class="form-md-confirm portal-decl-edit" data-require-reason="1"
+                                                    data-extra-fields="{{ json_encode([
+                                                        $portalFields[0] + ['value' => (string) $declaration->declaration_no],
+                                                        $portalFields[1] + ['value' => (string) $declaration->manufacturer_code],
+                                                    ], JSON_UNESCAPED_UNICODE) }}"
+                                                    action="{{ route($mdRoute . 'updatePortal') }}" method="POST"
+                                                    data-title="Sửa khai báo Cổng thông tin quốc gia"
+                                                    data-text="Mã {{ $row->code }} - lần khai báo {{ $declAt ? $declAt->format('d/m/Y H:i') : '' }}. Thay đổi được ghi lịch sử và Audit Trail.">
+                                                    @csrf
+                                                    <input type="hidden" name="declaration_id" value="{{ $declaration->id }}">
+                                                    <button type="submit" class="btn btn-link p-0" title="Sửa lần khai báo này">
+                                                        <i class="fas fa-pen"></i>
+                                                    </button>
+                                                </form>
+                                            @endperm
+                                            <div><span class="portal-decl-lbl">Code NSX:</span> <strong>{{ $declaration->manufacturer_code ?: '—' }}</strong></div>
+                                            <div><span class="portal-decl-lbl">Hồ sơ:</span> {{ $declaration->declaration_no ?: '—' }}</div>
+                                            <div class="portal-decl-by">{{ $declaration->created_by ?: '—' }}{{ $declAt ? ' · ' . $declAt->format('d/m/Y') : '' }}@if ($declEditAt)<span class="portal-decl-edited"> · đã sửa</span>@endif</div>
+                                        </div>
+                                    @endforeach
                                 @else
                                     <span class="badge badge-warning">Chưa khai báo</span>
-                                    @perm('category_chemical_update')
-                                        <form class="form-md-confirm mt-1" data-require-password="1"
-                                            data-extra-name="declaration_no" data-extra-label="Mã hồ sơ khai báo"
-                                            data-extra-placeholder="Mã hồ sơ trên Cổng thông tin quốc gia"
-                                            action="{{ route($mdRoute . 'declarePortal') }}" method="POST"
-                                            data-title="Xác nhận đã khai báo trên Cổng thông tin quốc gia?"
-                                            data-text="Mã {{ $row->code }} - {{ $row->chem_name }}. Thông tin này chỉ cập nhật được MỘT lần, sau khi xác nhận sẽ không sửa hay gỡ lại được.">
-                                            @csrf
-                                            <input type="hidden" name="id" value="{{ $row->id }}">
-                                            <button type="submit" class="btn btn-sm btn-outline-primary"
-                                                title="Xác nhận đã khai báo trên Cổng thông tin quốc gia">
-                                                <i class="fas fa-check mr-1"></i>Xác nhận
-                                            </button>
-                                        </form>
-                                    @endperm
                                 @endif
+                                @perm('category_chemical_update')
+                                    <form class="form-md-confirm mt-1" data-require-password="1"
+                                        data-extra-fields="{{ json_encode($portalFields, JSON_UNESCAPED_UNICODE) }}"
+                                        action="{{ route($mdRoute . 'declarePortal') }}" method="POST"
+                                        data-title="Khai báo trên Cổng thông tin quốc gia"
+                                        data-text="Mã {{ $row->code }} - {{ $row->chem_name }}. Mỗi lần khai báo được lưu riêng; sửa lại sau phải nhập lý do điều chỉnh.">
+                                        @csrf
+                                        <input type="hidden" name="id" value="{{ $row->id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary"
+                                            title="{{ $rowDeclarations ? 'Khai báo thêm một lần trên Cổng thông tin quốc gia' : 'Khai báo trên Cổng thông tin quốc gia' }}">
+                                            <i class="fas fa-{{ $rowDeclarations ? 'plus' : 'check' }} mr-1"></i>{{ $rowDeclarations ? 'Khai báo thêm' : 'Khai báo' }}
+                                        </button>
+                                    </form>
+                                @endperm
                             </td>
                             {{-- Phòng ban đang dùng: danh mục chung toàn công ty, phòng nào khai mới hiện --}}
                             @php
@@ -322,6 +349,49 @@
     </div>
 
     <style>
+        /* Từng lần khai báo Cổng thông tin quốc gia trong cột Khai Báo Cổng TT Quốc Gia */
+        .portal-decl {
+            margin-top: 6px;
+            padding: 4px 8px;
+            border-left: 3px solid var(--primary-lighter);
+            background: var(--primary-soft);
+            border-radius: 6px;
+            text-align: left;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .portal-decl-lbl {
+            color: #64748b;
+        }
+
+        .portal-decl {
+            position: relative;
+            padding-right: 24px;
+        }
+
+        .portal-decl-edit {
+            position: absolute;
+            top: 3px;
+            right: 6px;
+        }
+
+        .portal-decl-edit .btn-link {
+            font-size: 11px;
+            color: var(--primary);
+            line-height: 1;
+        }
+
+        .portal-decl-by {
+            margin-top: 2px;
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .portal-decl-edited {
+            color: var(--warning, #F59E0B);
+        }
+
         .thr-detail-dialog {
             max-width: 80vw;
         }

@@ -31,6 +31,11 @@
         'canceled' => ['label' => 'Đã huỷ', 'class' => 'rejected'],
     ];
     $stdReqBadge = $stdReqBadge ?? fn($status) => $stdReqStatus[$status] ?? ['label' => $status, 'class' => 'pending'];
+    // Ký 2 bước (App\Support\StandardTransferSignFlow): $stdReqStatus có thể đã khai ở tab đề nghị nội bộ nên
+    // trạng thái Chờ ký xét riêng; bước của từng phiếu + phiếu mình ký được (id => bước)
+    $stTransferBadge = fn($status) => $status === 'pending_sign' ? ['label' => 'Chờ ký', 'class' => 'warning'] : $stdReqBadge($status);
+    $stSignsOf = fn($req) => ($transferSigns ?? collect())->get($req->id, collect());
+    $stSignable = $transferSignable ?? [];
 
     $stCards = [
         [
@@ -167,15 +172,24 @@
                             </span>
                         </td>
                         <td class="text-center align-middle">
-                            <span class="exp-req-badge {{ $stdReqBadge($req->status)['class'] }}">
-                                {{ $stdReqBadge($req->status)['label'] }}
+                            <span class="exp-req-badge {{ $stTransferBadge($req->status)['class'] }}">
+                                {{ $stTransferBadge($req->status)['label'] }}
                             </span>
+                            @include('pages.export.shared.transferSignChips', ['tsSigns' => $stSignsOf($req), 'tsReq' => $req])
                         </td>
                         <td class="align-middle">{{ $req->updated_by ?: $req->created_by ?: '—' }}</td>
                         <td class="text-center align-middle">{{ $expDate($req->created_at) }}</td>
                         <td class="text-center align-middle">{{ $req->needed_date ? $expDate($req->needed_date) : '—' }}</td>
                         <td class="text-center align-middle" style="white-space: nowrap;">
-                            @if ($stSide === 'sent' && $req->status === 'draft' && user_can('export_standard_request'))
+                            @if (isset($stSignable[$req->id]))
+                                {{-- Đồng ý / Từ chối nằm trong modal chi tiết phiếu --}}
+                                <button type="button" class="btn btn-sm btn-success px-2 py-1 shadow-sm"
+                                    data-toggle="modal"
+                                    data-target="#transferDetailModal_{{ $req->id }}"
+                                    title="Xem chi tiết và ký duyệt bước {{ $stSignable[$req->id] }}">
+                                    <i class="fas fa-file-signature mr-1"></i> Ký duyệt
+                                </button>
+                            @elseif ($stSide === 'sent' && $req->status === 'draft' && user_can('export_standard_request'))
                                 <button type="button" class="btn btn-sm btn-warning px-2 py-1 shadow-sm mr-1"
                                     data-toggle="modal"
                                     data-target="#transferRequestEditModal_{{ $req->id }}"

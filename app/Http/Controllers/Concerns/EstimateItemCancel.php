@@ -425,7 +425,7 @@ trait EstimateItemCancel
             ->where(self::ITEM_TABLE.'.active', 1)
             ->where(self::ITEM_TABLE.'.status_id', 1)
             ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
-            // Bộ phận mua hàng tiếp nhận phiếu của MỌI công ty (NM1 không có bộ phận mua hàng).
+            // Bộ phận mua hàng tiếp nhận mọi phiếu trong DB (mỗi nhà máy một DB, tự có bộ phận mua hàng).
             // Admin thấy mục của mọi bộ phận mua hàng
             ->when($cfg['purchasing_col'] && ! $this->isAdminUser(), function ($q) use ($keys, $cat, $cfg) {
                 $q->where(function ($q) use ($keys, $cat, $cfg) {

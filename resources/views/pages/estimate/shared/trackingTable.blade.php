@@ -89,6 +89,10 @@
                         @if ($item->category_manufacturer_name)
                             <div class="mb-1">NSX: <b>{{ $item->category_manufacturer_name }}</b></div>
                         @endif
+                        {{-- Chỉ Dự Trù Hoá Chất có Code nhà sản xuất --}}
+                        @if (!empty($item->manufacturer_code))
+                            <div class="mb-1">Code NSX: <b>{{ $item->manufacturer_code }}</b></div>
+                        @endif
                         <div>{{ $item->technical_information ?: '-' }}</div>
                     </td>
                     <td class="md-sub">

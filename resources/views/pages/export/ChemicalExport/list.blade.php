@@ -68,6 +68,7 @@
 @section('model')
     @include('pages.export.shared.historyModal')
     @include('pages.export.ChemicalExport.quarantineModals')
+    @include('pages.export.ChemicalExport.returnModal')
     @include('pages.export.ChemicalExport.create')
     @include('pages.export.ChemicalExport.update')
     @include('pages.export.ChemicalExport.picker')
@@ -77,5 +78,9 @@
     @include('pages.export.ChemicalExport.transferRequestEditModal')
     @include('pages.shared.titleDatalist', ['id' => 'chemTitleOptionsTransfer', 'titles' => $transferTitles])
     @include('pages.export.ChemicalExport.transferDetailModal')
+    @include('pages.export.shared.transferSignModal', [
+        'tsSignUrl' => route('pages.export.chemicalExport.transferSign'),
+        'tsRejectUrl' => route('pages.export.chemicalExport.transferSignReject'),
+    ])
     @include('pages.export.ChemicalExport.transferReceiveCheckModal')
 @endsection

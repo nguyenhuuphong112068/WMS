@@ -11,8 +11,20 @@
         nếu cần đi lấy hàng theo danh sách.</li>
     <li>Cột <b>Cấp Phát</b> đã điền sẵn lô và số lượng theo FEFO/FIFO. Bấm nút bên cạnh để xem danh mục tồn của vật tư
         và chọn lô khác (nếu có quyền).</li>
-    <li>Bấm <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-check mr-1"></i>Cấp Phát</span>.</li>
+    <li>Ra kệ lấy hàng, bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-qrcode mr-1"></i>Quét mã x/n</span>
+        cạnh nút Cấp Phát. Hộp <b>Quét Xác Nhận Mã Xuất Nhập</b> mở ra: quét nhãn QR của <b>từng</b> mã xuất nhập đang cấp (máy
+        quét cầm tay hoặc camera). Mỗi dòng lô hiện chip <span class="ug-chip">Chưa quét</span> hoặc
+        <span class="ug-chip is-success">Đã quét khớp</span>; số <i>x/n</i> trên nút là số mã đã quét khớp / số mã cần quét.</li>
+    <li>Quét đủ mọi mã thì nút <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-check mr-1"></i>Cấp Phát</span> mới mở,
+        bấm để cấp. Đổi lô hoặc số lượng thì phải quét lại mã mới.</li>
 </ol>
+
+<div class="ug-callout is-warn">
+    <i class="fas fa-qrcode"></i>
+    <div>Bước quét mã giúp chắc chắn lấy <b>đúng lô thật trên kệ</b>. Áp dụng ở tab Chờ cấp phát, phiếu chi tiết đề nghị nội bộ và
+        cấp phát đề nghị liên phòng ban (không áp cho bước gửi hiệu chuẩn). Chưa quét đủ mà vẫn gửi, hệ thống báo
+        <i>"Chưa quét xác nhận mã xuất nhập ... Bấm "Quét mã" và quét đúng nhãn lô đang lấy trước khi cấp phát."</i></div>
+</div>
 
 <h3>Quy tắc khi cấp</h3>
 <ul>

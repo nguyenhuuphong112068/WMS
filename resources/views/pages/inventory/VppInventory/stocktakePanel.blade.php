@@ -134,8 +134,8 @@
                 Kho VPP kiểm kê <b>{{ $stocktake['cycleMonths'] }} tháng 1 lần</b> theo quý, mỗi quý một phiếu.
                 Tồn sổ sách được chốt tại thời điểm mở phiếu, số đếm nhập theo đơn vị của phòng, tối đa 4 số lẻ.
                 Khi <b>chốt kiểm kê</b>, những dòng lệch được ghi một bản cân đối đúng bằng phần lệch để kéo tồn sổ sách về
-                số thực đếm — vẫn giữ hạn mức <b>±{{ $stocktake['balancingMaxPercent'] }}%</b> lượng nhập của một mã.
-                Dòng lệch vượt hạn mức không tự cân đối, phải xử lý riêng. Phiếu đã chốt không sửa lại được.
+                số thực đếm — VPP cân đối tự do, không áp hạn mức.
+                Dòng lệch làm tồn sổ sách âm không tự cân đối, phải xử lý riêng. Phiếu đã chốt không sửa lại được.
             </div>
         </details>
 

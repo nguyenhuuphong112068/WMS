@@ -880,6 +880,11 @@
 
             applySource($form);
 
+            // Dự Trù Hoá Chất: ô Code Nhà Sản Xuất (pages/estimate/shared/portalCode)
+            if ('manufacturer_code' in row && window.wmsPortalCode) {
+                window.wmsPortalCode.setup($form.find('select.wms-portal-code'), row.category_id || '', row.manufacturer_code || '');
+            }
+
             // Dựng lại các dòng số lượng theo đúng dữ liệu đang lưu
             var $box = $form.find('.est-amounts');
 

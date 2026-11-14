@@ -30,12 +30,15 @@
     <li>Người ký <b>không do người lập chọn</b>. Hệ thống tự xếp các bước theo
         <b>Dữ Liệu Gốc › Trình Ký Đề Nghị CP Vật Tư</b>, dựa vào phân loại của các vật tư trong phiếu. Không vai trò nào
         phải ký thì đề nghị được <b>duyệt thẳng</b> và chuyển sang kho.</li>
-    <li>Ký lần lượt từng bước. Người đến lượt ký thấy đề nghị trên Trang chủ (thẻ "Ký đề nghị cấp phát") và
-        trong thanh Thông báo, mở đề nghị và bấm
+    <li><b>Ký đồng thời</b>: trình ký xong thì người ký <b>mọi bước</b> cùng thấy đề nghị trên Trang chủ (thẻ "Ký đề nghị cấp phát")
+        và ký / từ chối ngay, không chờ bước trước. Người ký mở đề nghị và bấm
         <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-signature mr-1"></i> Đồng ý</span> hoặc
         <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-times mr-1"></i> Từ chối</span>, rồi nhập lại mật khẩu.
         Từ chối bắt buộc ghi lý do.</li>
-    <li>Ký xong bước cuối thì đề nghị <b>Đã duyệt</b>, chuyển sang <a href="#cho-cap-phat">Chờ cấp phát</a> và báo cho người cấp phát.</li>
+    <li>Người ở bước sau ký trước thì các bước trước chưa ký được <b>duyệt theo</b>: dòng bước đó hiện
+        <span class="ug-chip is-success">✓✓ Duyệt theo bước sau (người ký)</span>. Hộp xác nhận ký báo trước đề nghị <i>"còn chờ người ký
+        bước n"</i> hay <i>"sẽ được duyệt"</i>, kèm <i>"Bước x sẽ được duyệt theo"</i> nếu có.</li>
+    <li>Ký xong bước cuối (hoặc mọi bước đã ký / duyệt theo) thì đề nghị <b>Đã duyệt</b>, chuyển sang <a href="#cho-cap-phat">Chờ cấp phát</a> và báo cho người cấp phát.</li>
 </ul>
 
 <h3>Trạng thái đề nghị</h3>

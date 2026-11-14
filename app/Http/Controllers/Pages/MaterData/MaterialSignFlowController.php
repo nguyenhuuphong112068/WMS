@@ -37,6 +37,12 @@ class MaterialSignFlowController extends Controller
 
     private const LABEL = 'vai trò trình ký';
 
+    /** Quyền vai trò phải có để được khai làm vai trò nhận trình ký. */
+    private const APPROVE_PERMISSION = 'export_material_approve';
+
+    /** Vai trò chọn được làm vai trò nhận trình ký - xem approverRoles(). */
+    private $approverRolesCache = null;
+
     /** Danh sách người ký chọn được - nạp một lần cho cả request, xem signerOptions(). */
     private $signerOptionsCache = null;
 
@@ -50,7 +56,7 @@ class MaterialSignFlowController extends Controller
         return view('pages.materData.MaterialSignFlow.list', [
             'datas' => MaterialSignFlow::allRules($this->departmentId()),
             'criteriaOptions' => $this->criteriaOptions(),
-            'roles' => DB::table('roles')->orderBy('name', 'asc')->get(['id', 'name']),
+            'roles' => $this->approverRoles(),
             'signerOptions' => $this->signerOptions(),
             // Số lần thay đổi của từng dòng, hiện thành badge ở góc nút Sửa
             'historyCounts' => DataMasterHistory::counts(self::TABLE),
@@ -278,7 +284,8 @@ class MaterialSignFlowController extends Controller
             'role_id' => [
                 'required',
                 'integer',
-                Rule::exists('roles', 'id'),
+                // Chỉ vai trò có quyền Duyệt Cấp Phát Vật Tư (Admin luôn có) mới nhận trình ký
+                Rule::in($this->approverRoles()->pluck('id')->all()),
                 // Mỗi vai trò chỉ khai một lần trong phòng (kể cả dòng đã khoá - mở khoá lại mà dùng)
                 Rule::unique(self::TABLE, 'role_id')
                     ->where(fn ($query) => $query->where('department_id', $departmentId))
@@ -295,7 +302,7 @@ class MaterialSignFlowController extends Controller
     {
         return [
             'role_id.required' => 'Vui lòng chọn vai trò nhận trình ký.',
-            'role_id.exists' => 'Vai trò không hợp lệ.',
+            'role_id.in' => 'Vai trò không có quyền "Duyệt Cấp Phát Vật Tư" nên không nhận trình ký được.',
             'role_id.unique' => 'Vai trò này đã được khai trong phòng ban. Sửa dòng đã có thay vì thêm mới.',
             'level.required' => 'Vui lòng nhập cấp ký.',
             'level.integer' => 'Cấp ký phải là số nguyên.',
@@ -475,6 +482,27 @@ class MaterialSignFlowController extends Controller
             ->where('id', $id)
             ->where('department_id', $this->departmentId())
             ->first();
+    }
+
+    /**
+     * Vai trò chọn được làm "Vai Trò Nhận Trình Ký": vai trò được gán quyền Duyệt Cấp Phát Vật Tư
+     * (export_material_approve) ở Nhóm Quyền, cộng Admin (toàn quyền). Nạp một lần cho cả request.
+     */
+    private function approverRoles()
+    {
+        return $this->approverRolesCache ??= DB::table('roles')
+            ->where(function ($query) {
+                $query->where('roles.name', 'Admin')
+                    ->orWhereExists(function ($sub) {
+                        $sub->select(DB::raw(1))
+                            ->from('role_permission')
+                            ->join('permissions', 'permissions.id', '=', 'role_permission.permission_id')
+                            ->whereColumn('role_permission.role_id', 'roles.id')
+                            ->where('permissions.name', self::APPROVE_PERMISSION);
+                    });
+            })
+            ->orderBy('roles.name', 'asc')
+            ->get(['roles.id', 'roles.name']);
     }
 
     private function roleName($roleId): string

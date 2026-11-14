@@ -58,7 +58,7 @@ class PublicStockLookupController extends Controller
             'names' => 'chem_names',
             'nameKey' => 'chem_names_id',
             'support' => DepartmentChemical::class,
-            'exportTypes' => ['export', 'cancel'],
+            'exportTypes' => ['export', 'cancel', 'return'],
             'exportStatus' => true,
             'internal' => true,
         ],

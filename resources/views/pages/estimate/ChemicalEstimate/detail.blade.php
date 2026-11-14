@@ -140,6 +140,21 @@
                                         </td>
                                         <td class="md-sub">
                                             {{ $item->category_id ? ($item->category_manufacturer_short_name ?: ($item->category_manufacturer_name ?: '—')) : '—' }}
+                                            @if ($item->manufacturer_code)
+                                                <div class="mt-1">Code: <b class="text-body">{{ $item->manufacturer_code }}</b></div>
+                                            @endif
+                                            @php
+                                                $estPortalWarn = \App\Support\ChemicalPortalDeclaration::warning(
+                                                    $item->category_id ? ($portalSummary[$item->category_id] ?? null) : null,
+                                                    $item->manufacturer_code,
+                                                    (bool) $item->category_id
+                                                );
+                                            @endphp
+                                            @if ($estPortalWarn)
+                                                <span class="badge badge-warning mt-1 text-wrap text-left"
+                                                    title="Đề nghị khai báo ở Danh Mục Hoá Chất Công Ty (cột Khai Báo Cổng TT Quốc Gia)"><i
+                                                        class="fas fa-exclamation-triangle mr-1"></i>{{ $estPortalWarn }}</span>
+                                            @endif
                                         </td>
                                         <td>
                                             @php
@@ -216,6 +231,7 @@
                                                             'id' => $item->id,
                                                             'category_id' => $item->category_id,
                                                             'chem_name' => $item->chem_name,
+                                                            'manufacturer_code' => $item->manufacturer_code,
                                                             'technical_information' => $item->technical_information,
                                                             'purpose' => $item->purpose,
                                                             'expected_delivery_date' => $item->expected_delivery_date,
@@ -263,6 +279,8 @@
 
 @section('model')
     @if ($canEditItems)
+        {{-- Ô Code Nhà Sản Xuất (select2 tags + cảnh báo chưa khai báo Cổng TTQG) của 2 modal mặt hàng --}}
+        @include('pages.estimate.shared.portalCode')
         @include('pages.estimate.ChemicalEstimate.itemCreate')
         @include('pages.estimate.ChemicalEstimate.itemUpdate')
         @include('pages.estimate.shared.categoryPicker')

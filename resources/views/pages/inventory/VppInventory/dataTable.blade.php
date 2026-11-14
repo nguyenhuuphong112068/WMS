@@ -238,9 +238,6 @@
                                                         'id' => $row->id, 'code' => $row->code, 'material_name' => $row->material_name,
                                                         'unit' => $row->unit_short_name ?: $row->unit_name,
                                                         'imported' => $row->imported, 'gap' => $row->gap,
-                                                        'balancing_limit' => $row->balancing_limit,
-                                                        'balancing_min_input' => $row->balancing_min_input,
-                                                        'balancing_max_input' => $row->balancing_max_input,
                                                     ]) }}">
                                                     <i class="fas fa-balance-scale"></i>
                                                 </button>
@@ -487,9 +484,7 @@
             $f.find('.mi-mat-view').val(r.material_name);
             $f.find('.mi-imported-view').val(r.imported);
             $f.find('.mi-gap-view').val(r.gap + ' ' + (r.unit || ''));
-            $f.find('.mi-limit-view').val('±' + r.balancing_limit + ' ' + (r.unit || ''));
-            $f.find('.mi-limit-hint').text('Lần này nhập từ ' + r.balancing_min_input + ' đến ' + r.balancing_max_input + '.');
-            $f.find('[name="balancing_amount"]').attr('min', r.balancing_min_input).attr('max', r.balancing_max_input).val('');
+            $f.find('[name="balancing_amount"]').val('');
             $('#balancingModal').modal('show');
         });
 

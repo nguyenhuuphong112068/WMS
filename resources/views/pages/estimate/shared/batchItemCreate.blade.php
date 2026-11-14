@@ -27,6 +27,10 @@
 |                                     categoryStatus()]; mã có blocked = true bị khoá ở khung chọn,
 |             'factorUnits'        => [category_id => {unit_id, unit, group, base}] đơn vị danh mục của
 |                                     phòng cho hoá chất nhóm 9 / 10 (null = màn không có hệ số quy đổi),
+|             'portal'             => [category_id => ['declared' => bool, 'codes' => [Code NSX...]]] các
+|                                     lần khai báo Cổng TT quốc gia (App\Support\ChemicalPortalDeclaration::
+|                                     summary()); null = màn không có cột Code NSX. Mã chưa khai báo
+|                                     hiện badge nhắc khai báo ở khung chọn + dòng bảng,
 |           ]
 --}}
 @php
@@ -35,6 +39,7 @@
     $emiGroups = $emi['groups'] ?? null;
     $emiStatus = $emi['status'] ?? [];
     $emiFactorUnits = $emi['factorUnits'] ?? null;
+    $emiPortal = is_array($emi['portal'] ?? null) ? $emi['portal'] : null;
     $isChemical = $emi['kind'] === 'chemical';
 
     $estStart = \Carbon\Carbon::createFromDate($list->year, $list->month, 1);
@@ -45,9 +50,9 @@
     $emiPeriods = array_values((array) old('periods', $emiDefaultPeriods)) ?: $emiDefaultPeriods;
     $emiRows = array_values((array) old('items', []));
 
-    // Số cột cố định (ngoài các cột tháng): #, tên, [nhóm chuẩn], TTKT, mục đích, ngày giao, đơn vị, file, thao tác
-    $emiFixedCols = $emiGroups ? 9 : 8;
-    $emiBaseWidth = ($emiGroups ? 1360 : 1210) + (is_array($emiFactorUnits) ? 50 : 0);
+    // Số cột cố định (ngoài các cột tháng): #, tên, [code NSX], [nhóm chuẩn], TTKT, mục đích, ngày giao, đơn vị, file, thao tác
+    $emiFixedCols = ($emiGroups ? 9 : 8) + ($emiPortal !== null ? 1 : 0);
+    $emiBaseWidth = ($emiGroups ? 1360 : 1210) + (is_array($emiFactorUnits) ? 50 : 0) + ($emiPortal !== null ? 170 : 0);
 
     // Tên hiển thị của dòng danh mục: ưu tiên danh mục phòng, thiếu thì lấy danh mục chung
     $emiLabel = fn($c) => [
@@ -172,6 +177,9 @@
                                         @if ($isChemical)
                                             <th style="width:150px">Số CAS</th>
                                         @endif
+                                        @if ($emiPortal !== null)
+                                            <th style="width:160px" title="Code nhà sản xuất đã khai báo trên Cổng thông tin quốc gia">Code NSX</th>
+                                        @endif
                                         <th style="width:80px">Đơn Vị</th>
                                         <th class="text-right" style="width:100px">Tồn Hiện Tại</th>
                                         <th class="text-right" style="width:100px">Tồn Tối Thiểu</th>
@@ -249,6 +257,23 @@
                                             @if ($isChemical)
                                                 <td>{{ $deptCategory->cas_no ?: '—' }}</td>
                                             @endif
+                                            @if ($emiPortal !== null)
+                                                @php $pickPortal = $emiPortal[$deptCategory->id] ?? ['declared' => false, 'codes' => []]; @endphp
+                                                <td>
+                                                    @if (!$pickPortal['declared'])
+                                                        <span class="badge badge-warning emi-portal-warn"
+                                                            title="Hoá chất chưa khai báo trên Cổng thông tin quốc gia - đề nghị khai báo ở Danh Mục Hoá Chất Công Ty (cột Khai Báo Cổng TT Quốc Gia)"><i
+                                                                class="fas fa-exclamation-triangle mr-1"></i>Chưa khai báo Cổng TTQG</span>
+                                                    @elseif (!$pickPortal['codes'])
+                                                        <span class="badge badge-light border emi-portal-warn"
+                                                            title="Đã khai báo nhưng chưa có Code nhà sản xuất - đề nghị khai báo bổ sung ở Danh Mục Hoá Chất Công Ty">Chưa có Code NSX</span>
+                                                    @else
+                                                        @foreach ($pickPortal['codes'] as $pickCode)
+                                                            <span class="emi-portal-code">{{ $pickCode }}</span>
+                                                        @endforeach
+                                                    @endif
+                                                </td>
+                                            @endif
                                             <td>{{ $deptCategory->unit_short_name ?: $deptCategory->unit_name }}</td>
                                             <td
                                                 class="text-right {{ $pickLow ? 'text-danger font-weight-bold' : '' }}">
@@ -282,12 +307,12 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="13" class="text-center text-muted py-3">Phòng chưa khai
+                                            <td colspan="14" class="text-center text-muted py-3">Phòng chưa khai
                                                 {{ $emi['itemLabel'] }} nào trong danh mục.</td>
                                         </tr>
                                     @endforelse
                                     <tr class="emi-pick-none" style="display:none">
-                                        <td colspan="13" class="text-center text-muted py-3">Không tìm thấy
+                                        <td colspan="14" class="text-center text-muted py-3">Không tìm thấy
                                             {{ $emi['itemLabel'] }} phù hợp.</td>
                                     </tr>
                                 </tbody>
@@ -309,6 +334,9 @@
                                     <th class="emi-col-no text-center">#</th>
                                     <th class="emi-col-material">{{ $emi['itemHead'] }} <span
                                             class="text-danger">*</span></th>
+                                    @if ($emiPortal !== null)
+                                        <th class="emi-col-portal" title="Code nhà sản xuất đã khai báo trên Cổng thông tin quốc gia">Code Nhà Sản Xuất</th>
+                                    @endif
                                     @if ($emiGroups)
                                         <th class="emi-col-group" title="Bắt buộc với chất chuẩn ngoài danh mục">
                                             Nhóm Chuẩn Mong Muốn</th>
@@ -397,6 +425,14 @@
         var itemLabel = $modal.data('item-label') || 'mặt hàng';
         var factorUnits = $modal.data('factor-units') || {};
 
+        /* Cột Code NSX: select2 chọn Code đã khai báo Cổng TT quốc gia hoặc gõ mới (pages/estimate/shared/portalCode) */
+        function renderPortal($row, value) {
+            var $select = $row.find('select.wms-portal-code');
+            if (!$select.length || !window.wmsPortalCode) return;
+
+            window.wmsPortalCode.setup($select, $row.find('.emi-h-category').val() || '', value);
+        }
+
         function periodHeader(value) {
             return $(
                 '<th class="emi-col-period"><div class="emi-period">' +
@@ -475,6 +511,7 @@
             if (data.fields.source === 'category') $row.attr('data-lead-days', data.leadDays || '');
 
             $after ? $after.after($row) : $tbody.find('.emi-empty').before($row);
+            renderPortal($row, data.fields.manufacturer_code);
             applyFactor($row);
             checkMaxStock($row);
             checkLeadTime($row);
@@ -871,6 +908,7 @@
 
         // Dòng in sẵn từ server (khi validate lỗi)
         $tbody.find('.emi-row').each(function() {
+            renderPortal($(this));
             applyFactor($(this));
             checkMaxStock($(this));
             checkThreshold($(this));

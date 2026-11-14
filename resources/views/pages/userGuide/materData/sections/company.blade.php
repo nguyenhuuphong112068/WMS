@@ -3,6 +3,12 @@
     ban thuộc cùng một công ty.</p>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/cong-ty.png', 'caption' => 'Màn hình Công Ty'])
 
+<div class="ug-callout">
+    <i class="fas fa-info-circle"></i>
+    <div>Mục <b>Công Ty</b> hiện <b>ẩn khỏi menu Dữ Liệu Gốc</b> (mỗi nhà máy chạy một bản WMS riêng nên danh sách công ty ít khi
+        đổi). Dữ liệu công ty vẫn được dùng như mô tả bên dưới; cần sửa thì liên hệ Admin.</div>
+</div>
+
 <h3>Các ô nhập</h3>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/cong-ty-form.png', 'caption' => 'Hộp thoại thêm mới - Công Ty'])
 

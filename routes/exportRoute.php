@@ -48,12 +48,18 @@ Route::prefix('/export')
             Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
             Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
             Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
+            // Ký duyệt 2 bước: quản lý bộ phận phòng đề nghị -> quản lý bộ phận phòng cấp phát (App\Support\TransferSignFlow)
+            Route::post('transferSign', 'transferSign')->name('transferSign');
+            Route::post('transferSignReject', 'transferSignReject')->name('transferSignReject');
             // Picker "Chọn Nhiều Từ Tồn Kho": xuất/lưu tạm nhiều phiếu nhập cùng lúc
             Route::post('storeBatch', 'storeBatch')->name('storeBatch');
             // Tab "Phiếu Tạm": dùng ngay hoặc xoá các đợt đã lưu tạm
             Route::post('draftFinalize', 'draftFinalize')->name('draftFinalize');
             Route::post('draftDeleteItem', 'draftDeleteItem')->name('draftDeleteItem');
             Route::post('draftDeleteBatch', 'draftDeleteBatch')->name('draftDeleteBatch');
+            // Tab "Trả hoá chất Acetonitril hoặc Methanol về kho": trả lại tồn phần đã ghi sử dụng / huỷ phiếu trả
+            Route::post('returnStore', 'returnStore')->name('returnStore');
+            Route::post('returnCancel', 'returnCancel')->name('returnCancel');
         });
 
         /*
@@ -112,6 +118,9 @@ Route::prefix('/export')
             Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
             Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
             Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
+            // Ký duyệt 2 bước: quản lý bộ phận phòng đề nghị -> quản lý bộ phận phòng cấp phát (App\Support\TransferSignFlow)
+            Route::post('transferSign', 'transferSign')->name('transferSign');
+            Route::post('transferSignReject', 'transferSignReject')->name('transferSignReject');
         });
 
         /*
@@ -133,6 +142,9 @@ Route::prefix('/export')
             Route::get('requestObjects', 'requestObjects')->name('requestObjects');
             // Tab "Cấp phát vật tư" - phiếu soạn hàng A4 in theo đường đi trong kho
             Route::get('prepPrint', 'prepPrint')->name('prepPrint');
+            // Tab "Sổ Cấp Phát" - in nhãn cấp phát (QR mã xuất nhập), mỗi lần in ghi audit log
+            Route::get('label', 'label')->name('label');
+            Route::post('labelPrinted', 'labelPrinted')->name('labelPrinted');
             // "Ghi nhớ vật tư cần dự trù" từ dòng đề nghị - hiện ở tab Dự Trù Vật Tư
             Route::post('watchlistRemember', 'watchlistRemember')->name('watchlistRemember');
 
@@ -159,7 +171,7 @@ Route::prefix('/export')
             Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
             Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
             Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
-            // Ký duyệt đề nghị liên phòng ban / VPP theo quy trình ở Dữ Liệu Gốc > Trình Ký Đề Nghị Liên Phòng Ban
+            // Ký duyệt 2 bước: quản lý bộ phận phòng đề nghị -> quản lý bộ phận phòng cấp phát (App\Support\TransferSignFlow)
             Route::post('transferSign', 'transferSign')->name('transferSign');
             Route::post('transferSignReject', 'transferSignReject')->name('transferSignReject');
         });
@@ -190,7 +202,7 @@ Route::prefix('/export')
             Route::post('transferRequestReject', 'transferRequestReject')->name('transferRequestReject');
             Route::post('transferReceiveStore', 'transferReceiveStore')->name('transferReceiveStore');
             Route::post('transferReceiveReject', 'transferReceiveReject')->name('transferReceiveReject');
-            // Ký duyệt đề nghị liên phòng ban / VPP theo quy trình ở Dữ Liệu Gốc > Trình Ký Đề Nghị Liên Phòng Ban
+            // Ký duyệt 2 bước: quản lý bộ phận phòng đề nghị -> quản lý bộ phận phòng cấp phát (App\Support\TransferSignFlow)
             Route::post('transferSign', 'transferSign')->name('transferSign');
             Route::post('transferSignReject', 'transferSignReject')->name('transferSignReject');
         });

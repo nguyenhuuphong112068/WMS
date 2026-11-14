@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pages\Inventory;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentMaterial;
+use App\Support\MaterialBalancingLimit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -29,15 +30,13 @@ use Illuminate\Support\Facades\Validator;
  *
  * CHỐT PHIẾU: dòng nào lệch thì ghi thêm một dòng material_balancings đúng bằng phần
  * lệch để kéo tồn sổ sách về số thực đếm. Vẫn giữ nguyên hai chốt chặn của màn hình
- * Cân Đối: tổng cân đối của một mã không vượt 5% lượng nhập, và cân đối xong tồn không
+ * Cân Đối: hạn mức theo mức độ quan trọng (Cao = 0, Thấp = 2% lượng nhập đầu - MaterialBalancingLimit), và cân đối xong tồn không
  * được âm. Dòng vi phạm KHÔNG tự ghi cân đối, chỉ đánh dấu để xử lý riêng.
  */
 class MaterialStocktakeController extends Controller
 {
     private const EPSILON = 0.00005;
 
-    /** Trùng với MaterialInventoryController::BALANCING_MAX_RATIO - hạn mức cân đối 5%. */
-    private const BALANCING_MAX_RATIO = 0.05;
 
     /** Độ dài một chu kỳ kiểm kê, tính bằng tháng - 3 tháng = một quý. */
     private const CYCLE_MONTHS = 3;
@@ -93,7 +92,7 @@ class MaterialStocktakeController extends Controller
             'periodCount' => count($periods),
             'cycleMonths' => self::CYCLE_MONTHS,
             'canOpen' => $current === null,
-            'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
+            'balancingMaxPercent' => \App\Support\MaterialBalancingLimit::percent(),
             'states' => self::STATES,
         ];
     }
@@ -382,7 +381,7 @@ class MaterialStocktakeController extends Controller
      * CHỐT PHIẾU KIỂM KÊ.
      *
      * Bắt buộc đếm đủ mọi dòng mới được chốt. Dòng nào lệch thì ghi thêm một dòng
-     * material_balancings đúng bằng phần lệch; dòng vi phạm hạn mức 5% hoặc làm tồn âm
+     * material_balancings đúng bằng phần lệch; dòng vi phạm hạn mức (VT quan trọng Cao / vượt 2%) hoặc làm tồn âm
      * thì bỏ qua và ghi rõ lý do vào balancing_note để xử lý riêng.
      */
     public function complete(Request $request)
@@ -418,9 +417,10 @@ class MaterialStocktakeController extends Controller
             ->get();
 
         $imports = DB::table('material_imports')
-            ->select('id', 'code', 'amount')
-            ->where('department_id', $departmentId)
-            ->whereIn('id', $items->pluck('import_id')->all())
+            ->leftJoin('material_categories', 'material_imports.category_id', '=', 'material_categories.id')
+            ->select('material_imports.id', 'material_imports.code', 'material_imports.amount', 'material_categories.classification')
+            ->where('material_imports.department_id', $departmentId)
+            ->whereIn('material_imports.id', $items->pluck('import_id')->all())
             ->get()
             ->keyBy('id');
 
@@ -661,7 +661,7 @@ class MaterialStocktakeController extends Controller
             });
     }
 
-    /** [import_id => tổng số đã cân đối] của cả phòng ban, dùng để chặn hạn mức 5%. */
+    /** [import_id => tổng số đã cân đối] của cả phòng ban, dùng để chặn hạn mức cân đối. */
     private function balancedByImport(int $departmentId)
     {
         return DB::table('material_balancings')
@@ -685,11 +685,16 @@ class MaterialStocktakeController extends Controller
             return 'Không tìm thấy mã xuất nhập, không ghi được cân đối.';
         }
 
-        $limit = max(1, abs((float) $import->amount) * self::BALANCING_MAX_RATIO);
+        if (\App\Support\MaterialBalancingLimit::isHighImportance($import->classification ?? null)) {
+            return 'Lệch '.($diff > 0 ? '+' : '').$this->number($diff).' - vật tư mức độ quan trọng Cao không được cân đối'
+                .' (hạn mức 0). Cần lập phiếu xử lý riêng.';
+        }
+
+        $limit = \App\Support\MaterialBalancingLimit::limit((float) $import->amount, $import->classification ?? null);
 
         if (abs($balancedAll + $diff) > $limit + self::EPSILON) {
             return 'Lệch '.($diff > 0 ? '+' : '').$this->number($diff).' vượt hạn mức cân đối ±'
-                .$this->number($limit).' ('.(int) round(self::BALANCING_MAX_RATIO * 100).'% lượng nhập, đã cân đối '
+                .$this->number($limit).' ('.\App\Support\MaterialBalancingLimit::percent().'% lượng nhập đầu, đã cân đối '
                 .$this->number($balancedAll).'). Cần lập phiếu xử lý riêng.';
         }
 

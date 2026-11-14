@@ -1,10 +1,9 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'noi-bo', 'no' => 3, 'label' => 'Đề nghị sử dụng nội bộ'])
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'lien-phong-ban', 'no' => 2, 'label' => 'Đề nghị liên phòng ban'])
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
 
 <p>Lập sẵn một danh sách VPP dùng đều đặn. Đến ngày đã hẹn, hệ thống <b>tự tạo</b> một phiếu ở trạng thái
-    <b>Lưu tạm / Nháp</b> để bạn kiểm tra lại rồi gửi đi. Có 3 tab:</p>
-@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/danh-sach-chu-ky.png', 'caption' => 'Màn hình Danh Mục › VPP › 3 tab DS ... theo chu kỳ'])
+    <b>Lưu tạm / Nháp</b> để bạn kiểm tra lại rồi gửi đi. Có 2 tab:</p>
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/danh-sach-chu-ky.png', 'caption' => 'Màn hình Danh Mục › VPP › 2 tab DS ... theo chu kỳ'])
 
 <div class="table-responsive">
     <table class="table table-bordered ug-table">
@@ -15,11 +14,6 @@
             </tr>
         </thead>
         <tbody>
-            <tr>
-                <td>DS đề nghị nội bộ theo chu kỳ</td>
-                <td style="font-weight: 400">Đề nghị cấp phát nội bộ (tab <a href="#de-nghi-noi-bo">Đề nghị Theo Định Kỳ</a>). Có thể gắn
-                    với một <b>Đối Tượng</b> (thiết bị); khi đó chỉ chọn được tần suất của đối tượng đó. Bắt buộc chọn <b>Tổ Quản Lý</b>; đề nghị tự tạo mang tổ này. Bảng có cột Tổ Quản Lý và bộ lọc <i>Tổ quản lý</i> trên thanh công cụ.</td>
-            </tr>
             <tr>
                 <td>DS đề nghị liên phòng ban theo chu kỳ</td>
                 <td style="font-weight: 400">Đề nghị <a href="#lien-phong-ban">liên phòng ban</a> gửi tới <b>Phòng Cấp Phát</b> đã chọn.
@@ -39,12 +33,14 @@
 
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Tiêu Đề', true, 'Ví dụ: <i>VPP bảo trì hằng tháng</i>.'],
-    ['Chu Kỳ', true, 'Hằng tuần, Hằng tháng, 2 tháng/lần, Hằng quý, 6 tháng/lần, Theo số năm, Theo số ngày. Danh sách nội bộ không chọn chu kỳ mà chọn <b>Tần Suất Đề Nghị</b> (hằng ngày ... 7 năm/lần).'],
-    ['Ngày Tạo Đề Nghị Trong Chu Kỳ', true, '<b>Ngày Cụ Thể</b>: ví dụ ngày 5 hằng tháng; ngày vượt độ dài kỳ (31 ở tháng 30 ngày) thì lấy ngày cuối kỳ. Đối tượng đồng bộ từ CAL có thể chọn <b>theo hạn lịch CAL</b> và <b>Tạo Trước</b> 0 - 30 ngày.'],
-    ['Tổ Quản Lý', true, 'Chỉ ở <b>DS đề nghị nội bộ theo chu kỳ</b>: chọn một tổ đang hoạt động của phòng; đề nghị tự tạo mang tổ này. Danh sách cũ chưa có tổ phải chọn tổ khi sửa, bỏ trống báo <i>Vui lòng chọn tổ quản lý</i>.'],
+    ['Chu Kỳ', true, 'Hằng tuần, Hằng tháng, 2 tháng/lần, Hằng quý, 6 tháng/lần, Theo số năm, Theo số ngày.'],
+    ['Ngày Tạo Đề Nghị Trong Chu Kỳ', true, '<b>Ngày Cụ Thể</b>: ví dụ ngày 5 hằng tháng; ngày vượt độ dài kỳ (31 ở tháng 30 ngày) thì lấy ngày cuối kỳ.'],
     ['Ngày Bắt Đầu Chu Kỳ Đầu Tiên', true, 'Không được lùi về quá khứ. Hệ thống không bao giờ tạo phiếu trước ngày này.'],
-    ['VPP Đề Nghị / Dự Trù', true, 'Chọn VPP, số lượng, đơn vị, mục đích. Phiếu dự trù bắt buộc có đơn vị cho từng dòng.'],
+    ['VPP Đề Nghị / Dự Trù', true, 'Chọn VPP, số lượng, mục đích. Đơn vị theo <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a>.'],
 ]])
+
+<p>VPP không có danh sách đề nghị <b>nội bộ</b> theo chu kỳ: dùng VPP trong phòng thì ghi thẳng ở tab
+    <a href="#su-dung-vpp">Sử Dụng VPP</a>.</p>
 
 <div class="ug-callout">
     <i class="fas fa-lightbulb"></i>
@@ -53,7 +49,7 @@
             <li>Cần phiếu ngay mà chưa tới hạn? Bấm <span class="btn btn-sm btn-info ug-ui"><i class="fas fa-file-medical"></i></span>
                 (Tạo ngay) trên dòng. Lịch tự động vẫn giữ nguyên.</li>
             <li>Máy chủ tắt nhiều kỳ thì lần chạy lại chỉ tạo <b>một</b> phiếu rồi dời sang kỳ kế tiếp, không tạo dồn.</li>
-            <li>Mở màn Danh Mục hoặc Sử Dụng VPP thì hệ thống bù ngay các danh sách đã tới hạn của phòng.</li>
+            <li>Mở màn Danh Mục VPP thì hệ thống bù ngay các danh sách đã tới hạn của phòng.</li>
         </ul>
     </div>
 </div>

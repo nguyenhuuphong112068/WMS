@@ -15,8 +15,14 @@
         <tr><td>4. Tồn đầu kỳ</td><td>Phòng ban</td><td>31 - 33 và 36 (Tồn đầu - VPP)</td></tr>
     </tbody>
 </table>
-<p>Giai đoạn 1 và 2 luôn là một file toàn hệ thống dùng chung cho mọi phòng ban (không chia theo phòng ban, module);
-    giai đoạn 2 và 3 làm song song được.</p>
+<p>Giai đoạn 1 là một file toàn hệ thống. Giai đoạn 2 không chia module: tải file chung, hoặc chọn <b>Phạm vi file</b> là một
+    phòng ban để file điền sẵn tổ và người dùng phòng đó đã có trên hệ thống (dòng xám), phòng chỉ thêm người / tổ mới hoặc
+    sửa người đã có. Giai đoạn 2 và 3 làm song song được.</p>
+<div class="ug-callout is-warn">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>Hiện <b>tạm ẩn giai đoạn 3 (Dữ liệu gốc &amp; danh mục) và 4 (Tồn đầu kỳ)</b> với tài khoản không phải Admin: ô
+        Giai đoạn chỉ có giai đoạn 2, khối Theo dõi tiến độ chỉ có tab giai đoạn 2. Admin vẫn thấy đủ 4 giai đoạn.</div>
+</div>
 
 <h3>Các bước (Admin)</h3>
 <ol class="ug-steps">
@@ -25,7 +31,8 @@
         tuỳ ý 3 lựa chọn này.
         <ul class="mb-0 pl-3">
             <li>File một module chỉ gồm sheet dùng chung và sheet của module đó.</li>
-            <li>File một phòng ban chỉ điền sẵn tổ, phân loại, định khu của phòng đó; cột Phòng ban chỉ chọn được đúng phòng đó.</li>
+            <li>File một phòng ban chỉ điền sẵn dữ liệu của phòng đó (giai đoạn 2: tổ + người dùng; giai đoạn 3: tổ, phân loại,
+                định khu); cột Phòng ban chỉ chọn được đúng phòng đó.</li>
         </ul>
     </li>
     <li>Gửi file cho phòng ban. Người điền làm theo sheet <b>Hướng dẫn</b> trong file (mỗi loại file có mục đích, các bước
@@ -35,7 +42,10 @@
         để tải file mới nhất của từng việc về, tổng hợp file của tất cả phòng ban trong giai đoạn, làm sạch dữ liệu rồi nạp lên hệ
         thống. Nạp xong giai đoạn trước mới tải file giai đoạn sau.</li>
     <li>Bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-clipboard-check"></i></span> để cập nhật trạng thái file:
-        <b>Đã xử lý</b> khi đã nạp (việc chuyển sang Hoàn thành), hoặc <b>Trả lại</b> kèm lý do để phòng ban sửa rồi đính kèm lại.</li>
+        <b>Đã xử lý</b> khi đã nạp (việc chuyển sang Hoàn thành), hoặc <b>Trả lại</b> kèm lý do để phòng ban sửa rồi đính kèm lại.
+        Nút <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-trash-alt"></i></span> cạnh đó (và ở từng dòng
+        lịch sử nộp) <b>xoá hẳn</b> lần nộp đó - cả bản ghi lẫn file; xoá file đang hiệu lực thì lần nộp trước được dùng lại.
+        Chỉ tài khoản Admin có nút này, mỗi lần xoá ghi Audit Trail.</li>
     <li>Ở giai đoạn 2 - 4, đặt <b>Hạn nộp</b> ở đầu tab rồi bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-save mr-1"></i>Lưu</span>
         (để trống rồi Lưu = không giới hạn). Hết ngày hạn nộp thì phòng ban không đính kèm được nữa; muốn nhận thêm thì gia hạn.</li>
     <li>Phòng không cần làm một việc (VD không dùng chất chuẩn) thì bấm <span class="btn btn-sm btn-outline-secondary ug-ui"><i class="fas fa-ban mr-1"></i>Không áp dụng</span>
@@ -91,8 +101,8 @@
 
 <h3>Đính kèm file đã điền (phòng ban)</h3>
 <ol class="ug-steps">
-    <li>Cần file mẫu thì tự tải ở khối <b>File Excel mẫu</b>: chọn <b>Giai đoạn</b> (2 - 4), <b>Module</b> và phòng ban của mình
-        (giai đoạn 2 là file chung, không chọn module / phòng ban) rồi bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-download mr-1"></i> Tải file mẫu</span>.
+    <li>Cần file mẫu thì tự tải ở khối <b>File Excel mẫu</b>: chọn <b>Giai đoạn</b>, <b>Module</b> và phòng ban của mình
+        (giai đoạn 2 chỉ chọn phòng ban, không chọn module) rồi bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-download mr-1"></i> Tải file mẫu</span>.
         Chỉ Admin tải được file giai đoạn 1, cả 4 giai đoạn, cả 4 module hoặc toàn hệ thống.</li>
     <li>Ở khối <b>Theo dõi tiến độ</b>, mở tab giai đoạn, bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-upload mr-1"></i>Đính kèm</span>
         ở đúng việc của phòng mình - hộp thoại tự điền giai đoạn, module, phòng ban.</li>
@@ -102,7 +112,7 @@
     <li>Cần sửa (bị Trả lại hoặc tự phát hiện sai) thì bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-upload mr-1"></i>Nộp lại</span>:
         file mới thay thế file đang nộp, file cũ tự chuyển sang <span class="badge badge-light">Đã thay thế</span> trong lịch sử nộp.</li>
 </ol>
-<p>File đã nộp không xoá được; nộp sai thì bấm <b>Nộp lại</b> với file đúng.</p>
+<p>Phòng ban không xoá được file đã nộp; nộp sai thì bấm <b>Nộp lại</b> với file đúng (hoặc nhờ Admin xoá).</p>
 <p>Phòng không dùng một module (VD không có chất chuẩn) thì bấm <span class="btn btn-sm btn-outline-secondary ug-ui"><i class="fas fa-ban mr-1"></i>Không áp dụng</span>
     ở việc đó thay vì nộp file; bấm nhầm thì bấm <span class="btn btn-sm btn-outline-secondary ug-ui"><i class="fas fa-redo mr-1"></i>Áp dụng lại</span>.</p>
 
@@ -121,15 +131,21 @@
     <li><b>Sheet bổ sung</b> (tab màu xám): sheet giai đoạn trước mà file cần đến, VD file Tồn đầu kỳ kèm danh mục, khai báo
         hàng của phòng, định khu, tên hàng. Còn thiếu thì <b>bổ sung trực tiếp vào file</b>, dữ liệu bổ sung được nạp lên hệ
         thống cùng file. Riêng Công ty, Phòng ban, Vai trò do Admin khai, không bổ sung trong file của phòng ban.</li>
-    <li>Sheet <b>05 Người dùng</b> chia phân quyền theo module: <b>Phân quyền chung</b> (vai trò dùng cho nhiều module như
-        Quản Lý Bộ Phận, Người Xem), <b>Phân quyền Vật tư</b>, <b>Phân quyền VPP</b>, <b>Phân quyền Hoá chất</b>, <b>Phân quyền Chất chuẩn</b>. Mỗi ô chỉ chọn
-        được vai trò đúng module, ghi nhiều vai trò thì cách nhau dấu phẩy; mỗi người cần ít nhất một vai trò. Module của vai trò
-        suy theo tên vai trò (chứa "Vật tư", "VPP", "Hoá chất", "Chuẩn"); vai trò có quyền ở nhiều module xếp vào cột chung.
-        Vai trò Admin không cấp qua file.</li>
+    <li>Sheet <b>05 Người dùng</b> chia phân quyền theo module: <b>Phân quyền chung</b>, <b>Phân quyền Vật tư</b>, <b>Phân quyền VPP</b>,
+        <b>Phân quyền Hoá chất</b>, <b>Phân quyền Chất chuẩn</b>. Vai trò xếp vào cột theo <b>Loại Phụ Trách</b> khai ở
+        <b>Phân Quyền › Nhóm Quyền</b>: phụ trách đủ 4 loại thì ở cột chung (VD Quản Lý Bộ Phận, Người Xem, <b>Admin</b>); phụ trách
+        1 - 3 loại thì có mặt ở cột của từng loại đó (VD Tổ Trưởng Kho Hoá chất - Chất chuẩn ở cả cột Hoá chất và Chất chuẩn).
+        Ghi nhiều vai trò thì cách nhau dấu phẩy; mỗi người cần ít nhất một vai trò. Vai trò Admin chọn được ở cột chung vì chỉ
+        tài khoản Admin mới nạp được file.</li>
+    <li>Sheet 05 của file giai đoạn 2 theo phòng ban: <b>dòng xám</b> là tài khoản đã có, vẫn <b>sửa được</b> họ tên, phòng ban,
+        email, phân quyền, tổ (cột <b>Mã số NV</b> khoá). Nạp file sẽ cập nhật tài khoản theo đúng nội dung file.</li>
     <li>Ở sheet danh mục công ty, <b>không nhập Mã DM</b>: điền Tên thì mã tự sinh nối tiếp mã đang có
         (<span class="ug-key">M00001</span>, <span class="ug-key">P00001</span> (VPP), <span class="ug-key">C00001</span>, <span class="ug-key">S00001</span>).
         Các phòng điền song song có thể trùng mã trong file; khi nạp hệ thống cấp mã thật theo thứ tự nạp, các sheet sau
         trong file vẫn trỏ đúng danh mục đã khai.</li>
+    <li>Phân loại vật tư 2 cấp: sheet <b>19</b> (danh mục vật tư công ty) có 4 tiêu chí Mức độ quan trọng, Hàng nguy hiểm,
+        Cần hiệu chuẩn, Tiếp xúc (không còn cột Theo giá trị); sheet <b>27</b> (vật tư của phòng) có cột <b>Theo giá trị</b>
+        (Thấp / Cao) bắt buộc.</li>
 </ul>
 
 <div class="ug-callout is-danger">

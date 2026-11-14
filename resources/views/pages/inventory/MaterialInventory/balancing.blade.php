@@ -2,6 +2,7 @@
     $bag = $errors->getBag('balancingErrors');
     $invOldRow = $bag->any() ? $datas->firstWhere('id', (int) old('import_id')) : null;
     $invOldUnit = $invOldRow ? ($invOldRow->unit_short_name ?: $invOldRow->unit_name) : '';
+    $invOldLocked = $invOldRow && ! empty($invOldRow->balancing_locked);
 @endphp
 
 <div class="modal fade md-modal" id="balancingModal" tabindex="-1" role="dialog">
@@ -45,8 +46,12 @@
                             <label>Hạn Mức Cân Đối</label>
                             <input type="text" class="form-control inv-readonly mi-limit-view" readonly
                                 value="{{ $invOldRow ? '±' . $invNum($invOldRow->balancing_limit) . ' ' . $invOldUnit : '' }}">
-                            <small class="md-sub mi-limit-hint">
-                                {{ $invOldRow ? 'Lần này nhập từ ' . $invNum($invOldRow->balancing_min_input) . ' đến ' . $invNum($invOldRow->balancing_max_input) . '.' : '' }}
+                            <small class="md-sub mi-limit-hint {{ $invOldLocked ? 'text-danger' : '' }}">
+                                @if ($invOldLocked)
+                                    Vật tư quan trọng Cao - không được cân đối.
+                                @elseif ($invOldRow)
+                                    Lần này nhập từ {{ $invNum($invOldRow->balancing_min_input) }} đến {{ $invNum($invOldRow->balancing_max_input) }}.
+                                @endif
                             </small>
                         </div>
                         <div class="form-group col-md-3">
@@ -54,7 +59,7 @@
                             <input type="text" inputmode="decimal" name="balancing_amount"
                                 min="{{ $invOldRow->balancing_min_input ?? '' }}" max="{{ $invOldRow->balancing_max_input ?? '' }}"
                                 class="form-control js-decimal {{ $bag->has('balancing_amount') ? 'is-invalid' : '' }}"
-                                value="{{ old('balancing_amount') }}" placeholder="Ví dụ: 0.5 hoặc -0.5" required>
+                                value="{{ old('balancing_amount') }}" placeholder="Ví dụ: 0.5 hoặc -0.5" required {{ $invOldLocked ? 'disabled' : '' }}>
                             @if ($bag->has('balancing_amount'))
                                 <span class="md-error text-danger small">{{ $bag->first('balancing_amount') }}</span>
                             @endif
@@ -80,14 +85,15 @@
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Nhập <b>số điều chỉnh</b>, không phải số lượng nhập mới: số dương là nhập thiếu, số âm là nhập dư.
-                        <b>Tổng</b> các lần cân đối của một mã xuất nhập không vượt <b>±{{ $balancingMaxPercent }}%</b> số lượng nhập.
+                        Hạn mức theo <b>mức độ quan trọng</b>: vật tư quan trọng <b>Cao</b> không được cân đối (hạn mức 0);
+                        quan trọng <b>Thấp</b> thì <b>tổng</b> các lần cân đối của một mã xuất nhập không vượt <b>±{{ $balancingMaxPercent }}%</b> số lượng nhập đầu.
                         Mọi lần cân đối đều lưu Audit Trail.
                     </div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Lưu cân đối</button>
+                    <button type="submit" class="btn btn-primary mi-balancing-submit" {{ $invOldLocked ? 'disabled' : '' }}><i class="fas fa-save mr-1"></i> Lưu cân đối</button>
                 </div>
             </form>
         </div>

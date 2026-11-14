@@ -57,8 +57,6 @@ class VppInventoryController extends Controller
 
     private const EPSILON = 0.00005;
 
-    private const BALANCING_MAX_RATIO = 0.05;
-
     /** Loại lưu trữ của định khu mà màn hình này quan tâm - xem locations.item_type. */
     private const LOCATION_TYPE = 'vpp';
 
@@ -111,7 +109,6 @@ class VppInventoryController extends Controller
             'expiringSoonMonths' => self::EXPIRING_SOON_MONTHS,
             'expiringFilters' => $this->expiringFilters(),
             'lowStockPercent' => (int) round(self::LOW_STOCK_RATIO * 100),
-            'balancingMaxPercent' => (int) round(self::BALANCING_MAX_RATIO * 100),
         ]);
     }
 
@@ -162,8 +159,8 @@ class VppInventoryController extends Controller
     /**
      * CÂN ĐỐI SỐ LƯỢNG NHẬP - ghi thêm một dòng vpp_balancings.
      *
-     * balancing_amount là SỐ ĐIỀU CHỈNH (+/-), không phải số lượng nhập mới. Chặn luỹ kế:
-     * tổng mọi lần cân đối không vượt 5% lượng nhập ban đầu, và cân đối xong tồn không âm.
+     * balancing_amount là SỐ ĐIỀU CHỈNH (+/-), không phải số lượng nhập mới. VPP cân đối
+     * TỰ DO - không áp hạn mức như Vật Tư, chỉ chặn cân đối xong tồn bị âm.
      */
     public function balancing(Request $request)
     {
@@ -194,10 +191,7 @@ class VppInventoryController extends Controller
         ]);
 
         $gap = $this->gapOf($import);
-        $balanced = $this->balancedOf($import);
-        $limit = max(1, abs((float) $import->amount) * self::BALANCING_MAX_RATIO);
-
-        $validator->after(function ($validator) use ($request, $gap, $balanced, $limit) {
+        $validator->after(function ($validator) use ($request, $gap) {
             if (! is_numeric($request->balancing_amount)) {
                 return;
             }
@@ -210,18 +204,7 @@ class VppInventoryController extends Controller
                 return;
             }
 
-            if (abs($balanced + $amount) > $limit + self::EPSILON) {
-                $validator->errors()->add(
-                    'balancing_amount',
-                    'Chỉ được cân đối tối đa '.(int) round(self::BALANCING_MAX_RATIO * 100).'% số lượng nhập, tức ±'
-                    .$this->number($limit).'. Mã xuất nhập này đã cân đối '.$this->number($balanced)
-                    .', lần này chỉ được nhập trong khoảng từ '.$this->number(-$limit - $balanced)
-                    .' đến '.$this->number($limit - $balanced).'.'
-                );
-
-                return;
-            }
-
+            // VPP cân đối tự do - không áp hạn mức, chỉ chặn tồn âm.
             if ($gap + $amount < -self::EPSILON) {
                 $validator->errors()->add(
                     'balancing_amount',
@@ -616,9 +599,6 @@ class VppInventoryController extends Controller
                 $row->effective = $row->imported + $row->balanced;
 
                 $row->balanced_all = (float) ($bal->balanced_all ?? 0);
-                $row->balancing_limit = max(1, abs($row->imported) * self::BALANCING_MAX_RATIO);
-                $row->balancing_min_input = -$row->balancing_limit - $row->balanced_all;
-                $row->balancing_max_input = $row->balancing_limit - $row->balanced_all;
 
                 $row->closing = $row->opening + $row->period_in - $row->period_used - $row->period_cancelled;
                 $row->gap = $row->closing;

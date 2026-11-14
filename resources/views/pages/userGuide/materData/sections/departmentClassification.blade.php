@@ -14,7 +14,7 @@
     <i class="fas fa-info-circle"></i>
     <div>
         Màn hình luôn làm việc trên <b>phòng ban đang chọn</b> ở thanh trên cùng, không chọn phòng tay trong form.
-        Phân loại này khác với các tiêu chí ở Danh Mục Vật Tư Công Ty (giá trị, mức độ quan trọng, hàng nguy hiểm, cần
-        hiệu chuẩn), là các tiêu chí dùng chung toàn công ty.
+        Phân loại này khác với các tiêu chí ở Danh Mục Vật Tư Công Ty (mức độ quan trọng, hàng nguy hiểm, cần
+        hiệu chuẩn, tiếp xúc - dùng chung toàn công ty) và tiêu chí <b>Theo Giá Trị</b> khai ở Vật Tư Của Phòng.
     </div>
 </div>

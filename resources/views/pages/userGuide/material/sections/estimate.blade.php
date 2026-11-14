@@ -1,7 +1,7 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
 
 <p>Phòng lập <b>phiếu dự trù</b> để đề nghị bộ phận <b>Cung Ứng</b> mua vật tư cho một hoặc nhiều tháng. Phiếu phải được
-    ký đủ 2 bước mới chuyển tới Cung Ứng.</p>
+    ký đủ 2 bước mới chuyển tới Cung Ứng (mỗi nhà máy một bộ phận Cung Ứng riêng, NM1 là phòng <b>Cung Ứng - NM1</b>).</p>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/du-tru.png', 'caption' => 'Màn hình Dự Trù › Vật Tư › tab Danh sách phiếu'])
 
 <h3>Lập phiếu</h3>

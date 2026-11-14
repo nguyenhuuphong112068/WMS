@@ -73,6 +73,24 @@
                         @endif
                     </div>
 
+                    <div class="form-group wms-portal-box">
+                        <label title="Chọn Code đã khai báo Cổng thông tin quốc gia hoặc gõ code mới">Code Nhà Sản Xuất</label>
+                        <div class="w-50">
+                            <select name="manufacturer_code"
+                                class="form-control wms-portal-code {{ $bag->has('manufacturer_code') ? 'is-invalid' : '' }}"
+                                data-category="{{ old('source') === 'category' ? old('category_id') : '' }}">
+                                <option value=""></option>
+                                @if (old('manufacturer_code'))
+                                    <option value="{{ old('manufacturer_code') }}" selected>{{ old('manufacturer_code') }}</option>
+                                @endif
+                            </select>
+                        </div>
+                        <div class="wms-portal-warn w-50"></div>
+                        @if ($bag->has('manufacturer_code'))
+                            <span class="md-error">{{ $bag->first('manufacturer_code') }}</span>
+                        @endif
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label>Thông Tin Kỹ Thuật</label>

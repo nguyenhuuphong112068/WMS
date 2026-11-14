@@ -5,7 +5,13 @@
 <h3>Lập phiếu</h3>
 <ol class="ug-steps">
     <li>Ở tab <b>Danh sách phiếu</b>, bấm tạo phiếu, chọn tháng / năm dự trù và ghi chú.</li>
-    <li>Thêm mặt hàng: chọn từ Danh Mục Hoá Chất, hoặc gõ tên hoá chất <b>chưa có trong danh mục</b>.</li>
+    <li>Thêm mặt hàng: chọn từ Danh Mục Hoá Chất, hoặc gõ tên hoá chất <b>chưa có trong danh mục</b>. Bảng mặt hàng và khung
+        chọn danh mục phòng có cột <b>Code Nhà Sản Xuất</b>: các Code NSX đã khai báo trên Cổng TT quốc gia ở
+        <a href="#danh-muc-cong-ty">Danh mục công ty</a>. Mã chưa khai báo hiện badge
+        <span class="badge badge-warning"><i class="fas fa-exclamation-triangle mr-1"></i>Chưa khai báo Cổng TTQG</span>, đã khai báo nhưng
+        thiếu code hiện <span class="badge badge-light border">Chưa có Code NSX</span> - nhắc đề nghị khai báo bổ sung (không chặn lưu).
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/chemical/du-tru-them-mat-hang.png', 'caption' => 'Hộp thoại Thêm Mặt Hàng Dự Trù - cột Code NSX và badge nhắc khai báo Cổng TTQG'])
+    </li>
     <li>Nhập số lượng cho từng tháng cần dùng, ngày mong muốn giao, mục đích; đính kèm báo giá, catalogue nếu có.</li>
     <li>Bấm <b>Trình ký</b>, chọn đích danh người <b>Ban Giám Đốc</b> ký bước 2, nhập lại mật khẩu.</li>
 </ol>

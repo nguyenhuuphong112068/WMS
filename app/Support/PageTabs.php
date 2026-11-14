@@ -92,6 +92,8 @@ class PageTabs
             'banned' => 'Hoá chất cấm',
             'request' => 'Đề nghị chuyển liên phòng ban',
             'quarantine' => 'Cách ly - Loại bỏ - Huỷ',
+            // Trả lại tồn Acetonitril / Methanol đã ghi sử dụng (App\Support\ChemicalReturn)
+            'return' => 'Trả hoá chất Acetonitril hoặc Methanol về kho',
             'report' => 'Báo cáo theo khoảng thời gian',
         ]],
         'export_standard' => ['parent' => 'export_standard_view', 'tabs' => [

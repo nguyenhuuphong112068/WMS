@@ -978,8 +978,8 @@ class VppExportController extends Controller
     /**
      * KÝ DUYỆT ĐỀ NGHỊ LIÊN PHÒNG BAN / VPP - bước đang chờ của phiếu 'pending_sign'.
      *
-     * Không lọc theo phòng đang chọn: người ký có thể thuộc phòng đề nghị, phòng được đề nghị hoặc
-     * một phòng cố định (VD Hành Chính - NM1); quyền ký xét theo vai trò + phạm vi phòng ban của
+     * Không lọc theo phòng đang chọn: người ký thuộc phòng đề nghị hoặc phòng cấp phát (2 bước cố định -
+     * App\Support\TransferSignFlow); quyền ký xét theo vai trò + phạm vi phòng ban của
      * bước (VppTransferSignFlow::canSign) và phải nhập lại mật khẩu (21 CFR Part 11).
      */
     public function transferSign(Request $request)

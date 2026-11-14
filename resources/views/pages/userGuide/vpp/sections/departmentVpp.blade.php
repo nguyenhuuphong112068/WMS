@@ -1,48 +1,46 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
 
-<p>Mỗi phòng tự khai <b>những VPP phòng mình dùng</b> và <b>cách dùng riêng</b>: đơn vị tính, ngưỡng tồn, chỗ để.
-    Chỉ VPP đã khai ở tab này mới <b>nhập kho</b> và <b>đề nghị nội bộ</b> được ở phòng.</p>
+<p>Mỗi phòng khai <b>cách dùng riêng</b> của từng VPP: phân loại của phòng, ngưỡng tồn, chỗ để. Phòng <b>không phải tự thêm</b>
+    VPP: thêm một mã ở <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a> là mọi phòng ban có ngay một dòng tương ứng, nên số
+    mã của phòng luôn bằng số mã chung.</p>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/vat-tu-cua-phong.png', 'caption' => 'Màn hình Danh Mục › VPP › tab VPP của phòng'])
 
-<h3>Khai nhiều VPP một lần</h3>
-<p>Hộp thoại <b>Khai VPP Cho Phòng</b> là một bảng, <b>mỗi dòng là một VPP</b>; bấm <b>Lưu</b> một lần là khai được tất cả.</p>
-<ol class="ug-steps">
-    <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus"></i> Thêm mới VPP phòng</span>.</li>
-    <li>Đưa VPP vào bảng bằng một trong hai cách:
-        <ul>
-            <li>Gõ mã / tên / nhà sản xuất vào ô tìm trên thanh công cụ: mỗi lần chọn thêm một dòng, ô vẫn mở để chọn tiếp
-                (bấm ra ngoài để đóng).</li>
-            <li>Bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-cubes"></i> Chọn nhiều từ danh mục công ty</span>,
-                lọc theo nhà sản xuất / phân loại, tick nhiều VPP (ô tick ở đầu cột chọn mọi dòng đang hiện) rồi bấm
-                <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-arrow-down"></i> Thêm vào bảng</span>.</li>
-        </ul>
-        VPP đã có dòng trong bảng không thêm lần hai (ô tick bị khoá, nhãn <i>Đã có trong bảng</i>).</li>
-    <li>Hàng <b>Điền nhanh cho mọi dòng</b> (dưới tiêu đề bảng): chọn Phân loại, Đơn vị hoặc Định khu ở đây là áp cho mọi dòng
-        đang có và điền sẵn cho dòng thêm sau. Đơn vị tính của dòng mới vẫn ưu tiên đơn vị các phòng khác đã khai cho VPP đó.</li>
-    <li>Sửa từng dòng nếu cần, bấm <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-trash-alt"></i></span> để bỏ dòng, rồi bấm <b>Lưu</b>.</li>
-</ol>
-<div class="ug-callout is-warn">
-    <i class="fas fa-exclamation-triangle"></i>
-    <div>Dòng chọn đơn vị khác với đơn vị phòng khác đang dùng sẽ hiện thêm khối <b>Quy Đổi Đơn Vị</b> ngay dưới dòng đó, phải khai
-        hệ số. Chỉ cần <b>một dòng lỗi</b> là không dòng nào được lưu: lỗi ghi theo <b>"Dòng N: ..."</b> ở đầu hộp thoại.
-        Mỗi lần lưu tối đa 200 dòng.</div>
-</div>
+<h3>Các cột trên bảng</h3>
+<ul>
+    <li><b>Nhóm Dự Trù</b> và <b>Đơn Vị</b> lấy từ danh mục công ty (chỉ xem).</li>
+    <li><b>Phân Loại Của Phòng</b>: bộ nhóm riêng phòng tự khai.</li>
+    <li><b>Ngưỡng Tồn Tối Thiểu / Tối Đa</b>, <b>Định Khu</b>, <b>Ghi Chú</b>: phần phòng tự sửa.</li>
+    <li><b>Sử Dụng</b> theo trạng thái của mã ở danh mục công ty: <span class="ug-chip">Đang dùng</span>,
+        <span class="ug-chip is-warn">Chờ duyệt</span> (mã chưa được duyệt ở danh mục công ty) hoặc
+        <span class="ug-chip is-danger">Đã khoá</span> (mã đã khoá ở danh mục công ty). Bộ lọc <b>Sử dụng</b> lọc theo ba trạng thái này.</li>
+</ul>
 
-<h3>Các ô nhập (mỗi dòng)</h3>
-@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/vat-tu-cua-phong-form.png', 'caption' => 'Hộp thoại thêm mới - VPP Của Phòng'])
+<h3>Sửa phần riêng của phòng</h3>
+<ol class="ug-steps">
+    <li>Bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span> ở dòng cần sửa.</li>
+    <li>Sửa các ô trong bảng dưới đây, ghi <b>Lý Do Điều Chỉnh</b> rồi bấm Lưu. Bảng cập nhật ngay dòng vừa sửa, không tải lại trang.</li>
+</ol>
+
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/vat-tu-cua-phong-form.png', 'caption' => 'Hộp thoại sửa - VPP Của Phòng'])
 
 @include('pages.userGuide.shared.fields', ['fields' => [
-    ['VPP', true, 'Chỉ VPP đã duyệt trong danh mục công ty mà phòng <b>chưa khai</b>. Mỗi phòng khai một VPP <b>một lần</b>.'],
     ['Phân Loại Của Phòng', false, 'Bộ nhóm riêng của phòng, khai ở <b>Dữ Liệu Gốc › Phân Loại</b>.'],
-    ['Đơn Vị Tính', true, 'Đơn vị phòng dùng để nhập, xuất và ghi tồn cho VPP này.'],
+    ['Đơn Vị Tính', false, 'Chỉ hiện, không sửa: lấy theo <b>Danh mục VPP công ty</b>, cả công ty dùng chung một đơn vị nên không cần quy đổi đơn vị.'],
     ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn xuống dưới mức này thì VPP tự vào <a href="#can-du-tru">Danh sách cần dự trù</a>. Để trống nếu chưa đặt.'],
     ['Ngưỡng Tồn Tối Đa', false, 'Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.'],
     ['Định Khu', false, 'Vị trí <b>dự kiến</b> để VPP; chỉ dùng để điền sẵn khi nhập. Vị trí thật của từng lô chọn lúc kiểm tra.'],
     ['Ghi Chú', false, 'Ví dụ: chỉ dùng cho tổ Hoá Lý.'],
+    ['Lý Do Điều Chỉnh', true, 'Ghi vào lịch sử thay đổi.'],
 ]])
+
+<h3>Đề nghị dự trù một VPP</h3>
+<p>Nút <span class="btn btn-sm btn-outline-warning ug-ui"><i class="fas fa-bookmark"></i></span> ở dòng mở hộp <b>Đề nghị dự trù VPP này?</b>:
+    nhập số lượng cần đề nghị + lý do dự trù. Ở phòng thường VPP được đưa vào danh sách cần đề nghị Hành Chánh của tab
+    <a href="#de-nghi-vpp">Đề nghị VPP đến HC</a>; ở phòng Hành Chánh VPP vào <a href="#can-du-tru">Danh sách VPP cần dự trù</a>.
+    Dòng mã đã khoá không có nút này.</p>
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Tab làm việc trên <b>phòng ban đang chọn</b>. Không có bước duyệt; muốn ngừng dùng thì Khoá (bắt buộc ghi lý do).
-        Cột <b>Phòng Ban Đang Dùng</b> ở tab Danh mục công ty đọc từ chính các dòng khai ở đây.</div>
+    <div>Tab làm việc trên <b>phòng ban đang chọn</b>. Không có nút Thêm mới hay Khoá ở tab này: muốn thêm hoặc ngừng dùng một
+        VPP thì thêm / khoá mã ở <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a>, mọi phòng đổi theo.</div>
 </div>

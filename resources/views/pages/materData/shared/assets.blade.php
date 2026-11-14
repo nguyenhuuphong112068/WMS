@@ -388,7 +388,10 @@
          |
          | data-extra-name="...": thêm 1 ô chữ BẮT BUỘC phía trên ô mật khẩu / lý do
          | (nhãn data-extra-label, gợi ý data-extra-placeholder), gửi lên dưới đúng tên đó.
-         | Ô nằm trong vùng html của Swal nên không ảnh hưởng Swal.getInput().
+         | Cần nhiều ô: data-extra-fields='[{"name":..,"label":..,"placeholder":..,"value":..}, ...]'
+         | (value = giá trị điền sẵn, dùng cho hộp sửa)
+         | (dùng thay cho bộ data-extra-name). Ô nằm trong vùng html của Swal nên không ảnh
+         | hưởng Swal.getInput().
         */
         /*
          | Gửi form KHÔNG phụ thuộc vị trí của nó trong DOM.
@@ -477,34 +480,48 @@
             var form = this;
             var needPassword = String($(form).data('require-password') || '') === '1';
             var needReason = String($(form).data('require-reason') || '') === '1';
-            var extraName = $(form).data('extra-name') || '';
-            var extraLabel = $(form).data('extra-label') || '';
+            var extraFields = $(form).data('extra-fields') || [];
+            if (!Array.isArray(extraFields)) extraFields = [];
+            if (!extraFields.length && $(form).data('extra-name')) {
+                extraFields = [{
+                    name: $(form).data('extra-name'),
+                    label: $(form).data('extra-label') || '',
+                    placeholder: $(form).data('extra-placeholder') || ''
+                }];
+            }
+            var extraName = extraFields.length > 0;
             var escapeHtml = function(value) {
                 return $('<div>').text(value == null ? '' : String(value)).html();
             };
             var extraHtml = extraName ?
                 '<div>' + escapeHtml($(form).data('text')) + '</div>' +
-                '<div class="text-left mt-3">' +
-                '<label for="md-confirm-extra" class="mb-1" style="font-weight:600;font-size:14px;">' +
-                escapeHtml(extraLabel) + ' <span class="text-danger">*</span></label>' +
-                '<input type="text" id="md-confirm-extra" class="form-control" maxlength="100" autocomplete="off"' +
-                ' placeholder="' + escapeHtml($(form).data('extra-placeholder') || '') + '">' +
-                '</div>' : undefined;
+                extraFields.map(function(field, i) {
+                    return '<div class="text-left ' + (i === 0 ? 'mt-3' : 'mt-2') + '">' +
+                        '<label for="md-confirm-extra-' + i + '" class="mb-1" style="font-weight:600;font-size:14px;">' +
+                        escapeHtml(field.label) + ' <span class="text-danger">*</span></label>' +
+                        '<input type="text" id="md-confirm-extra-' + i + '" class="form-control md-confirm-extra"' +
+                        ' maxlength="100" autocomplete="off" placeholder="' + escapeHtml(field.placeholder || '') + '"' +
+                        ' value="' + escapeHtml(field.value || '') + '">' +
+                        '</div>';
+                }).join('') : undefined;
             // Chốt giá trị ngay trong preConfirm: sau khi hộp đóng, ô đã bị gỡ khỏi DOM
-            var extraValue = '';
+            var extraValues = {};
             var checkExtra = function() {
-                if (!extraName) return true;
-                extraValue = $.trim($('#md-confirm-extra').val() || '');
-                if (!extraValue) {
-                    Swal.showValidationMessage('Vui lòng nhập ' + extraLabel);
-                    $('#md-confirm-extra').trigger('focus');
-                    return false;
+                for (var i = 0; i < extraFields.length; i++) {
+                    var $input = $('#md-confirm-extra-' + i);
+                    var value = $.trim($input.val() || '');
+                    if (!value) {
+                        Swal.showValidationMessage('Vui lòng nhập ' + extraFields[i].label);
+                        $input.trigger('focus');
+                        return false;
+                    }
+                    extraValues[extraFields[i].name] = value;
                 }
                 return true;
             };
             var focusExtra = function() {
                 // Swal tự đặt focus vào ô mật khẩu sau didOpen -> trả focus về ô phụ ở nhịp sau
-                if (extraName) setTimeout(function() { $('#md-confirm-extra').trigger('focus'); }, 0);
+                if (extraName) setTimeout(function() { $('#md-confirm-extra-0').trigger('focus'); }, 0);
             };
 
             // Ô mật khẩu Swal không nằm trong <form> nên khi chọn tài khoản đã lưu,
@@ -591,9 +608,9 @@
 
                 var extras = {};
 
-                if (extraName) {
-                    extras[extraName] = extraValue;
-                }
+                Object.keys(extraValues).forEach(function(name) {
+                    extras[name] = extraValues[name];
+                });
 
                 if (needPassword) {
                     extras.sign_password = result.value || '';

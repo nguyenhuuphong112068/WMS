@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\DB;
  *
  * Danh mục vật tư khai material_categories.purchasing_department là một KHOÁ (supply / admin -
  * xem MaterialClassification::PURCHASING_DEPARTMENTS), không phải id phòng ban. Phòng ban nào
- * đảm nhận khoá nào khai ở Dữ Liệu Gốc > Phòng Ban (cột deparments.purchasing_key) - thực tế chỉ
- * Cung Ứng - NM2 và Hành Chính - NM2. Bộ phận mua hàng tiếp nhận dự trù / đề nghị VPP của MỌI
- * công ty (NM1 không có bộ phận mua hàng, gửi về NM2). Vật tư ngoài danh mục (không có khoá)
+ * đảm nhận khoá nào khai ở Dữ Liệu Gốc > Phòng Ban (cột deparments.purchasing_key). Từ 14/11/2026
+ * mỗi nhà máy chạy một bản WMS riêng (DB riêng) và TỰ CÓ bộ phận mua hàng: NM2 = Cung Ứng + Hành
+ * Chính Nhân Sự, NM1 = Cung Ứng - NM1 + Hành Chính - NM1 (migration 2026_11_14_091000). Trong một DB
+ * bộ phận mua hàng tiếp nhận mọi dự trù / đề nghị VPP. Vật tư ngoài danh mục (không có khoá)
  * mặc định do Cung Ứng mua.
  */
 class MaterialPurchasing
