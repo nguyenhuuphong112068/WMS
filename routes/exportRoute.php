@@ -216,6 +216,7 @@ Route::prefix('/export')
             Route::post('store', 'store')->name('store');
             Route::post('confirm', 'confirm')->name('confirm');
             Route::post('cancel', 'cancel')->name('cancel');
+            Route::post('confirmers', 'confirmers')->name('confirmers');
         });
 
         /*

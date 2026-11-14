@@ -1146,8 +1146,9 @@ class HomeController extends Controller
     }
 
     /**
-     * Phiếu đề nghị hiệu chuẩn vật tư chờ QA xác nhận (App\Support\MaterialCalibration): mọi phòng QA
-     * người dùng vào được và có quyền xác nhận ở đó; bấm phiếu tự chuyển sang phòng QA.
+     * Phiếu đề nghị hiệu chuẩn vật tư chờ xác nhận (App\Support\MaterialCalibration): phiếu đã chọn
+     * người xác nhận thì chỉ người được chọn thấy (bấm phiếu chuyển sang phòng xác nhận); phiếu chưa
+     * chọn người: mọi phòng QA người dùng vào được và có quyền xác nhận ở đó.
      */
     private function calibrationReviews(): array
     {
@@ -1163,6 +1164,49 @@ class HomeController extends Controller
         $rows = [];
         $seen = [];
 
+        // Phiếu người đề nghị đã chọn người xác nhận: chỉ hiện cho đúng người đó, bấm phiếu chuyển sang phòng xác nhận
+        $chosenTable = defined($calibration.'::CONFIRMER_TABLE') ? $calibration::CONFIRMER_TABLE : null;
+
+        if ($chosenTable) {
+            $assigned = $calibration::pendingCodesAssignedTo($userId);
+
+            $records = $assigned ? DB::table($calibration::TABLE.' as c')
+                ->leftJoin($m['prefix'].'categories as mc', 'c.category_id', '=', 'mc.id')
+                ->leftJoin('material_names as n', 'mc.material_names_id', '=', 'n.id')
+                ->leftJoin('deparments as d', 'c.department_id', '=', 'd.id')
+                ->select('c.code', DB::raw('MIN(c.requested_at) as requested_at'), DB::raw('MAX(n.name) as material_name'), DB::raw('MAX(d.name) as department_name'))
+                ->whereIn('c.code', array_keys($assigned))
+                ->where('c.status_id', 1)
+                ->where('c.app_status', 'pending')
+                ->groupBy('c.code')
+                ->get() : collect();
+
+            foreach ($records as $record) {
+                $confirmDepartmentId = (int) $assigned[$record->code];
+
+                if (! user_can_access_department($userId, $confirmDepartmentId)
+                    || ! isset(user_permission_names($userId, $confirmDepartmentId)[$calibration::CONFIRM_PERMISSION])) {
+                    continue;
+                }
+
+                $seen[$record->code] = true;
+                $rows[] = $this->reviewRow(
+                    'material_calibration',
+                    $m['object'],
+                    $record->code,
+                    $record->material_name,
+                    $record->department_name,
+                    $record->requested_at,
+                    $this->signUrl($confirmDepartmentId, $m['export_route'], ['tab' => 'calibration'])
+                );
+            }
+        }
+
+        // Phiếu chưa chọn người xác nhận (phiếu cũ / HC sau cấp phát chưa gửi): quy tắc cũ theo phòng QA
+        $chosenCodes = $chosenTable
+            ? DB::table($chosenTable)->where('status_id', 1)->distinct()->pluck('code')->all()
+            : [];
+
         foreach ($qaDepartmentIds as $qaDepartmentId) {
             $qaDepartmentId = (int) $qaDepartmentId;
 
@@ -1177,6 +1221,7 @@ class HomeController extends Controller
                 ->leftJoin('deparments as d', 'c.department_id', '=', 'd.id')
                 ->select('c.code', DB::raw('MIN(c.requested_at) as requested_at'), DB::raw('MAX(n.name) as material_name'), DB::raw('MAX(d.name) as department_name'))
                 ->whereIn('c.department_id', $calibration::sourceDepartmentIds($qaDepartmentId))
+                ->when($chosenCodes, fn ($query) => $query->whereNotIn('c.code', $chosenCodes))
                 ->where('c.status_id', 1)
                 ->where('c.app_status', 'pending')
                 ->groupBy('c.code')

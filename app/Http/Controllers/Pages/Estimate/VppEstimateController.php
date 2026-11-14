@@ -11,6 +11,7 @@ use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
 use App\Support\DepartmentVpp;
 use App\Support\VppLeadTime;
+use App\Support\VppStore;
 use App\Support\VppWatchlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,9 +21,10 @@ use Illuminate\Support\Facades\Validator;
 /**
  * DỰ TRÙ - DỰ TRÙ VPP
  *
- * Phòng ban lập phiếu dự trù VPP cho một tháng/năm (vpp_estimates), khai từng vật
- * tư cần dùng (vpp_estimate_items) và số lượng cần cho từng tháng
- * (vpp_estimate_item_amounts).
+ * CHỈ PHÒNG HÀNH CHÁNH (deparments.purchasing_key = admin, giữ kho VPP - VppStore) lập phiếu
+ * dự trù VPP cho một tháng/năm (vpp_estimates), khai từng VPP cần mua (vpp_estimate_items) và
+ * số lượng cần cho từng tháng (vpp_estimate_item_amounts). Phòng khác lấy VPP từ kho Hành Chánh
+ * qua Sử Dụng VPP, không dự trù VPP.
  *
  * Mặt hàng chọn từ Danh Mục VPP, hoặc tự gõ tên khi VPP chưa có trong danh mục
  * (vpp_estimate_items.category_id = NULL). VPP không có "nhóm chuẩn" nên bỏ hẳn
@@ -31,7 +33,8 @@ use Illuminate\Support\Facades\Validator;
  * TRÌNH KÝ 2 BƯỚC dùng chung khai báo config/estimate.php:
  *   Nháp -> [Trình ký] -> Chờ Phó/Trưởng Phòng ký -> [Ký bước 1] -> Chờ Ban Giám Đốc ký
  *        -> [Ký bước 2] -> Đã phê duyệt -> Chờ tiếp nhận
- *        (reception_status = waiting) - nhân viên cung ứng bấm Tiếp nhận ở Trang chủ / tab Đơn dự trù đã được phê duyệt.
+ *        (reception_status = waiting) - chính phòng Hành Chánh (quyền estimate_vpp_purchasing) bấm
+ *        Tiếp nhận ở Trang chủ / trang chi tiết phiếu, hẹn ngày đáp ứng, huỷ mặt hàng một lần xác nhận.
  *   Bị từ chối ở bước nào cũng quay về "Bị từ chối", sửa lại rồi trình ký lại từ đầu.
  */
 class VppEstimateController extends Controller
@@ -80,6 +83,9 @@ class VppEstimateController extends Controller
 
     private const EDITABLE_STATUSES = ['draft', 'rejected'];
 
+    /** Chỉ phòng Hành Chánh (deparments.purchasing_key = admin, giữ kho VPP) lập dự trù VPP. */
+    private const ONLY_ADMIN_MESSAGE = 'Chỉ phòng Hành Chánh (phòng giữ kho VPP) lập được phiếu dự trù VPP!';
+
     /** Xuất Excel tab "Đơn dự trù đã được phê duyệt" - xem App\Http\Controllers\Concerns\EstimateApprovedExport. */
     protected function exportConfig(): array
     {
@@ -108,6 +114,8 @@ class VppEstimateController extends Controller
             'purchasing_col' => null,
             'default_purchasing' => \App\Support\VppClassification::PURCHASING_ADMIN,
             'purchasing_permission' => 'estimate_vpp_purchasing',
+            // Hành Chánh vừa lập phiếu vừa tiếp nhận xử lý: huỷ mặt hàng chỉ cần một lần xác nhận
+            'single_side_cancel' => true,
         ];
     }
 
@@ -153,6 +161,10 @@ class VppEstimateController extends Controller
 
         // VPP tồn dưới ngưỡng tối thiểu + VPP người dùng bấm "Ghi nhớ" bên Sử Dụng VPP.
         // Phòng thường đề nghị VPP trong danh mục từ kho VPP (Sử Dụng VPP) - xem VppWatchlist::forEstimate()
+        // Dự trù VPP là việc của phòng Hành Chánh (giữ kho VPP) - phòng khác không lập phiếu, không có tab này
+        $canCreateHere = VppStore::isVppDepartment($departmentId);
+        $tabAllowed['watchlist'] = $tabAllowed['watchlist'] && $canCreateHere;
+
         $watchlistItems = $tabAllowed['watchlist'] ? VppWatchlist::forEstimate($departmentId) : collect();
 
 
@@ -179,6 +191,7 @@ class VppEstimateController extends Controller
             'signRows' => $signRows,
             'signPermission' => self::SIGN_PERMISSION,
             'nextCode' => $this->nextCode($departmentId),
+            'canCreateHere' => $canCreateHere,
             'trackedItems' => $trackedItems,
             'watchlistItems' => $watchlistItems,
             'units' => $this->unitOptions(),
@@ -232,8 +245,9 @@ class VppEstimateController extends Controller
             'signPermission' => self::SIGN_PERMISSION,
             'canEditItems' => ! $readOnly && $this->editable($list),
             'readOnly' => $readOnly,
-            // Mở từ tab "Đơn dự trù đã được phê duyệt": hiện cột Ngày Hẹn Đáp Ứng cho bộ phận mua hàng sửa
-            'purchaserView' => $request->query('from') === 'approved' && $this->canViewAsPurchaser($list),
+            // Hiện cột Ngày Hẹn Đáp Ứng + nút Tiếp nhận cho bộ phận mua hàng. Phiếu VPP do chính Hành
+            // Chánh (bộ phận mua hàng) lập nên mở từ tab nào cũng hiện, không chỉ từ tab đã duyệt
+            'purchaserView' => $this->canViewAsPurchaser($list),
             'backRoute' => route('pages.estimate.vppEstimate.list', $request->query('from') === 'approved' ? ['tab' => 'approved'] : []),
             'estRoute' => 'pages.estimate.vppEstimate.',
         ]);
@@ -277,6 +291,10 @@ class VppEstimateController extends Controller
     public function watchlistEstimateStore(Request $request)
     {
         $departmentId = $this->departmentId();
+
+        if (! VppStore::isVppDepartment($departmentId)) {
+            return redirect()->back()->with('error', self::ONLY_ADMIN_MESSAGE)->with('activeTab', 'watchlist');
+        }
 
         $validator = Validator::make(
             $request->all(),
@@ -384,6 +402,10 @@ class VppEstimateController extends Controller
 
     public function store(Request $request)
     {
+        if (! VppStore::isVppDepartment($this->departmentId())) {
+            return redirect()->back()->with('error', self::ONLY_ADMIN_MESSAGE);
+        }
+
         $validator = Validator::make($request->all(), $this->rules(), $this->messages());
 
         if ($validator->fails()) {

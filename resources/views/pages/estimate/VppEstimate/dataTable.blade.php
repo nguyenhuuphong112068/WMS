@@ -8,9 +8,17 @@
 
                 <div class="md-toolbar">
                     @if ($tabAllowed['list'] && user_can('estimate_vpp_create'))
-                        <button type="button" class="btn btn-primary btn-md-create">
-                            <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
-                        </button>
+                        @if ($canCreateHere)
+                            <button type="button" class="btn btn-primary btn-md-create">
+                                <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
+                            </button>
+                        @else
+                            {{-- Dự trù VPP chỉ phòng Hành Chánh (giữ kho VPP) lập --}}
+                            <button type="button" class="btn btn-primary" disabled>
+                                <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
+                            </button>
+                            <span class="text-muted small ml-2"><i class="fas fa-lock mr-1"></i>Chỉ phòng Hành Chánh (phòng giữ kho VPP) lập dự trù VPP</span>
+                        @endif
                     @endif
                 </div>
 

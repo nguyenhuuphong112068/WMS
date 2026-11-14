@@ -1,8 +1,33 @@
 {{--
-| Tab "Hiệu chuẩn": modal QA ký xác nhận kết quả + form ẩn huỷ phiếu chờ QA.
-| Route: pages.export.materialCalibration.confirm / cancel - MaterialCalibrationController.
+| Tab "Hiệu chuẩn": modal người xác nhận ký kết quả, modal Đề nghị HC (Seri No + chọn Phòng ->
+| Người xác nhận), modal Chọn / đổi người xác nhận + form ẩn huỷ phiếu chờ.
+| Route: pages.export.materialCalibration.confirm / store / confirmers / cancel - MaterialCalibrationController.
 --}}
-@php $calRoute = 'pages.export.materialCalibration.'; @endphp
+@php
+    $calRoute = 'pages.export.materialCalibration.';
+    // Phòng + người có quyền xác nhận (MaterialCalibration::confirmerOptions) - phòng QA đứng đầu, là mặc định
+    $calPickOptions = $calibrationConfirmerOptions ?? [];
+@endphp
+
+<style>
+    .cal-pick-users {
+        max-height: 170px;
+        overflow-y: auto;
+        padding: 8px 12px;
+        border: 1px solid var(--primary-lighter);
+        border-radius: var(--border-radius-md, 8px);
+        background: var(--bg-neutral);
+        transition: border-color 0.2s ease;
+    }
+
+    .cal-pick-users.is-invalid {
+        border-color: #DC2626;
+    }
+
+    .cal-pick-users .custom-control + .custom-control {
+        margin-top: 4px;
+    }
+</style>
 
 <div class="modal fade md-modal" id="calConfirmModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
@@ -118,15 +143,40 @@
                         </div>
                     </div>
 
+                    @include('pages.export.MaterialExport.calibrationConfirmerPicker', ['calPickOptions' => $calPickOptions])
+
                     <div class="form-group mb-0">
-                        <label>Ghi chú gửi QA</label>
+                        <label>Ghi chú gửi người xác nhận</label>
                         <textarea name="request_note" rows="2" maxlength="500" class="form-control"
-                            placeholder="Thông tin thêm cho QA (không bắt buộc)"></textarea>
+                            placeholder="Thông tin thêm cho người xác nhận (không bắt buộc)"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
-                    <button type="submit" class="btn btn-warning"><i class="fas fa-paper-plane mr-1"></i> Gửi QA hiệu chuẩn</button>
+                    <button type="submit" class="btn btn-warning" @disabled(!count($calPickOptions))><i class="fas fa-paper-plane mr-1"></i> Gửi hiệu chuẩn</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{-- Phòng đề nghị chọn / đổi người xác nhận của phiếu còn chờ - MaterialCalibrationController::confirmers() --}}
+<div class="modal fade md-modal" id="calAssignModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-check mr-2"></i>Người xác nhận hiệu chuẩn <span class="cal-assign-code"></span></h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <form action="{{ route($calRoute . 'confirmers') }}" method="POST">
+                @csrf
+                <input type="hidden" name="code">
+                <div class="modal-body">
+                    @include('pages.export.MaterialExport.calibrationConfirmerPicker', ['calPickOptions' => $calPickOptions])
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary" @disabled(!count($calPickOptions))><i class="fas fa-paper-plane mr-1"></i> Gửi xác nhận</button>
                 </div>
             </form>
         </div>
@@ -309,8 +359,84 @@
             $rq.find('.cal-req-serial').first().trigger('focus');
         });
 
+        /* ---------- Chọn Phòng -> Người xác nhận ---------- */
+
+        var CAL_PICK = @json($calPickOptions);
+
+        // Dựng danh sách người của phòng đang chọn; $scope = modal chứa ô chọn, checked = id người tick sẵn
+        function calPickRender($scope, checked) {
+            var deptId = String($scope.find('.cal-pick-dept').val() || '');
+            var dept = CAL_PICK.filter(function (d) { return String(d.id) === deptId; })[0] || { users: [] };
+            var prefix = $scope.attr('id') + '_u';
+
+            checked = (checked || []).map(String);
+
+            $scope.find('.cal-pick-users').removeClass('is-invalid').html(dept.users.map(function (user) {
+                var id = prefix + user.id;
+                // Phòng chỉ có một người: tick sẵn
+                var on = checked.indexOf(String(user.id)) !== -1 || dept.users.length === 1;
+
+                return '<div class="custom-control custom-checkbox">' +
+                    '<input type="checkbox" class="custom-control-input" id="' + id + '" name="confirmer_ids[]" value="' + user.id + '"' + (on ? ' checked' : '') + '>' +
+                    '<label class="custom-control-label" for="' + id + '">' + esc(user.name) + '</label></div>';
+            }).join('') || '<span class="text-muted small">Phòng này chưa có người xác nhận.</span>');
+        }
+
+        // Mở modal: về phòng đã chọn trước đó (đổi người) hoặc phòng đầu danh sách (QA)
+        function calPickReset($scope, deptId, checked) {
+            var $dept = $scope.find('.cal-pick-dept');
+
+            if (!$dept.length) return;
+            $dept.val(deptId && $dept.find('option[value="' + deptId + '"]').length ? String(deptId) : $dept.find('option').first().val());
+            calPickRender($scope, checked);
+        }
+
+        $(document).on('change', '.cal-pick-dept', function () {
+            calPickRender($(this).closest('.modal'), []);
+        });
+
+        $(document).on('change', '.cal-pick-users input', function () {
+            $(this).closest('.cal-pick-users').removeClass('is-invalid');
+        });
+
+        // Bắt buộc tick ít nhất một người (máy chủ kiểm lại)
+        function calPickValid($scope) {
+            var $box = $scope.find('.cal-pick-users');
+
+            if (!$box.length || $box.find('input:checked').length) return true;
+            $box.addClass('is-invalid');
+            Swal.fire({ icon: 'warning', title: 'Chưa chọn người xác nhận', text: 'Vui lòng chọn ít nhất một người xác nhận hiệu chuẩn.' });
+
+            return false;
+        }
+
+        $rq.on('show.bs.modal', function () {
+            calPickReset($rq, null, []);
+        });
+
+        var $as = $('#calAssignModal');
+
+        $(document).on('click', '.btn-cal-assign', function () {
+            var code = $(this).data('code');
+
+            $as.find('[name="code"]').val(code);
+            $as.find('.cal-assign-code').text(code);
+            calPickReset($as, $(this).data('department'), $(this).data('users') || []);
+            $as.modal('show');
+        });
+
+        $as.on('submit', 'form', function (e) {
+            if (!calPickValid($as)) e.preventDefault();
+        });
+
         // Seri No không được trùng trong phiếu (máy chủ kiểm lại)
         $rq.on('submit', 'form', function (e) {
+            if (!calPickValid($rq)) {
+                e.preventDefault();
+
+                return;
+            }
+
             var seen = {};
             var dup = null;
 

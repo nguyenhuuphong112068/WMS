@@ -7,5 +7,7 @@
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
     <div>Người kiểm tra hoá chất cấm phải có vai trò <b>Quản Lý Kho Hoá Chất</b> trong phòng. Tab
-        <b>Đối chiếu ngưỡng PL IV</b> của Tồn Kho Hoá Chất hiện với người có quyền xem tab đó (quyền con của Xem Tồn Kho Hoá Chất).</div>
+        <b>Đối chiếu ngưỡng PL IV</b> của Tồn Kho Hoá Chất hiện với người có quyền xem tab đó (quyền con của Xem Tồn Kho Hoá Chất).
+        Ký đề nghị <b>liên phòng ban</b> theo vai trò <b>Quản Lý Bộ Phận</b> (phòng đề nghị rồi phòng cấp phát), ký phiếu dự trù theo
+        Quản Lý Bộ Phận rồi <b>Ban Giám Đốc</b> - không dựa vào quyền.</div>
 </div>

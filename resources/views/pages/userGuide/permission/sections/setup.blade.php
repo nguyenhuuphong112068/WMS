@@ -6,8 +6,8 @@
     <li>Vào <b>Quản Trị › Phân Quyền › Nhóm Quyền</b>, bấm
         <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-users-cog"></i> Quản Lý Nhóm Quyền</span>
         (quyền <i>Tạo / Sửa Nhóm Quyền</i>).</li>
-    <li>Nhập <b>Tên Nhóm Quyền</b>, <b>Diễn Giải</b> và tick <b>Loại Phụ Trách</b> (Vật Tư / Hoá Chất / Chất Chuẩn, bắt buộc ít nhất
-        một; nhóm dùng chung cho cả kho thì tick cả 3), bấm <b>Lưu</b>. Báo lỗi <i>Vui lòng chọn ít nhất một loại phụ trách</i>
+    <li>Nhập <b>Tên Nhóm Quyền</b>, <b>Diễn Giải</b> và tick <b>Loại Phụ Trách</b> (Vật Tư / VPP / Hoá Chất / Chất Chuẩn, bắt buộc ít nhất
+        một; nhóm dùng chung cho cả kho thì tick cả 4), bấm <b>Lưu</b>. Báo lỗi <i>Vui lòng chọn ít nhất một loại phụ trách</i>
         khi chưa tick loại nào. Sửa tên bằng nút
         <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-pen"></i></span>.</li>
     <li>Xoá bằng nút <span class="btn btn-sm btn-outline-danger ug-ui"><i class="fas fa-trash"></i></span>. Không xoá được nhóm
@@ -18,17 +18,17 @@
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>Không đổi tên các nhóm <b>Quản Lý Bộ Phân</b>, <b>Ban Giám Đốc</b>, <b>Quản Lý Kho Hóa Chất</b>, <b>Admin</b>. Hệ thống
-        tìm người ký dự trù, người kiểm tra hoá chất cấm và tài khoản toàn quyền theo đúng các tên này.</div>
+        tìm người ký dự trù, người ký đề nghị liên phòng ban, người kiểm tra hoá chất cấm và tài khoản toàn quyền theo đúng các tên này.</div>
 </div>
 
 <h3>2. Tick quyền cho nhóm</h3>
 <ol class="ug-steps">
-    <li>Ở bảng Nhóm Quyền, mỗi cột là một nhóm quyền, mỗi dòng là một quyền, chia thành từng khối theo module trên menu trái (Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Dự Trù, Phân Quyền &amp; Lịch Sử); trong mỗi khối quyền xếp tiếp theo Vật Tư, Hoá Chất, Chất Chuẩn, Dùng Chung.</li>
-    <li>Các cột nhóm quyền được xếp tự động theo loại <b>Chung → Vật Tư → Hoá Chất → Chất Chuẩn</b> (hàng tiêu đề màu phía trên tên nhóm),
+    <li>Ở bảng Nhóm Quyền, mỗi cột là một nhóm quyền, mỗi dòng là một quyền, chia thành từng khối theo module trên menu trái (Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Dự Trù, Phân Quyền &amp; Lịch Sử); trong mỗi khối quyền xếp tiếp theo Vật Tư, VPP, Hoá Chất, Chất Chuẩn, Dùng Chung.</li>
+    <li>Các cột nhóm quyền được xếp tự động theo loại <b>Chung → Vật Tư → VPP → Hoá Chất → Chất Chuẩn</b> (hàng tiêu đề màu phía trên tên nhóm),
         trong cùng loại nhóm có nhiều quyền hơn đứng trước. Loại của nhóm lấy theo ô <b>Loại Phụ Trách</b> khi tạo / sửa nhóm quyền:
-        tick 1 loại thì xếp vào cột loại đó, tick 2-3 loại thì xếp vào Chung (Admin và Ban Giám Đốc luôn ở Chung). Hàng <b>Số quyền đã cấp</b> ngay dưới tiêu đề đếm số ô đã tick của từng nhóm trong khối, tự cập nhật khi tick. Rê chuột lên tên nhóm để xem diễn giải, lên tên quyền để xem mã quyền và diễn giải quyền đó được làm gì
+        tick 1 loại thì xếp vào cột loại đó, tick từ 2 loại trở lên thì xếp vào Chung (Admin và Ban Giám Đốc luôn ở Chung). Hàng <b>Số quyền đã cấp</b> ngay dưới tiêu đề đếm số ô đã tick của từng nhóm trong khối, tự cập nhật khi tick. Rê chuột lên tên nhóm để xem diễn giải, lên tên quyền để xem mã quyền và diễn giải quyền đó được làm gì
         (danh sách đầy đủ ở <b>Phân Quyền › Quyền</b>).</li>
-    <li>Thu hẹp bảng bằng thanh lọc phía trên: ô <b>Tìm quyền theo tên</b>; nút <b>Tất cả / Vật Tư / Hoá Chất / Chất Chuẩn / Dùng Chung</b>
+    <li>Thu hẹp bảng bằng thanh lọc phía trên: ô <b>Tìm quyền theo tên</b>; nút <b>Tất cả / Vật Tư / VPP / Hoá Chất / Chất Chuẩn / Dùng Chung</b>
         để chỉ xem quyền của một loại (các cột nhóm quyền khác loại cũng được ẩn, cột nhóm Chung luôn giữ); nút <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-users"></i> Tất cả nhóm quyền</span>
         để chọn một hoặc nhiều nhóm quyền cần xem (các cột khác bị ẩn). Khi đã chọn nhóm quyền, tick <b>Chỉ quyền đã cấp</b> để chỉ
         hiện các quyền mà ít nhất một nhóm đang chọn đã có. Bộ lọc được trình duyệt nhớ cho lần mở sau.</li>
@@ -40,6 +40,9 @@
     <li>Tick một quyền con thì quyền cha được tick theo; bỏ quyền cha thì các quyền con bị bỏ theo.</li>
     <li>Khối <b>Dữ Liệu Gốc</b>: mỗi phạm vi (Vật Tư / Hoá Chất / Chất Chuẩn / Dùng Chung) có 3 quyền <b>Xem</b>,
         <b>Thêm/Sửa/Khoá</b>, <b>Duyệt/Từ Chối</b>; dưới mỗi quyền là quyền con của từng màn hình (Tên Vật Tư, Đơn Vị Tính...).
+        Phạm vi VPP chỉ còn quyền Xem / Thêm-Sửa-Khoá chung, không có màn hình riêng. Các quyền <i>Trình Ký Liên Phòng Ban</i> và
+        <i>Trình Ký Liên Phòng Ban VPP</i> vẫn còn trong bảng nhưng hai màn hình này đã ẩn khỏi menu: đề nghị liên phòng ban ký cố
+        định 2 bước Quản Lý Bộ Phận, tick hay bỏ các quyền đó không ảnh hưởng gì.
         Muốn cho một nhóm làm việc ở một màn hình, tick quyền con của màn hình đó (quyền phạm vi được tick theo).</li>
     <li>Cấp một quyền cho nhiều nhóm cùng lúc: rê chuột vào dòng quyền, bấm nút
         <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-check-double"></i></span> ở cuối ô tên quyền để tick
@@ -65,7 +68,8 @@
     <i class="fas fa-info-circle"></i>
     <div>Nhóm chọn đầu tiên là <b>nhóm quyền chính</b> của người dùng. Khi hệ thống xét người dùng có thuộc một vai trò hay không
         (ví dụ tài khoản Admin), nhóm chính được tính ở mọi phòng ban trong phạm vi làm việc (phòng chỉ xem thì không). Ở bước ký dự trù, vai trò Quản Lý Bộ Phận và Ban Giám Đốc
-        phải có phạm vi gồm đúng phòng lập phiếu.</div>
+        phải có phạm vi gồm đúng phòng lập phiếu; ký đề nghị liên phòng ban thì Quản Lý Bộ Phận phải có phạm vi gồm phòng đề nghị
+        (bước 1) hoặc phòng cấp phát (bước 2).</div>
 </div>
 
 <h3>4. Cấp quyền riêng cho một người</h3>

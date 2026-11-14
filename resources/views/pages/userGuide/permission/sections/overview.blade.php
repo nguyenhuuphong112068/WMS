@@ -24,9 +24,10 @@
 
 <h3>Quyền được sắp xếp thế nào</h3>
 <p>Danh sách quyền chia theo <b>module trên menu trái</b>: Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Dự Trù và
-    Phân Quyền &amp; Lịch Sử. Trong mỗi module, quyền xếp tiếp theo <b>Vật Tư, Hoá Chất, Chất Chuẩn</b> và <b>Dùng Chung</b>.
-    Mỗi nhóm quyền có <b>loại phụ trách</b> (Vật Tư / Hoá Chất / Chất Chuẩn, hoặc cả ba là Chung) để xếp cột trên bảng
-    phân quyền: nhóm phụ trách một loại nằm ở loại đó, nhóm phụ trách 2-3 loại nằm ở <b>Chung</b>; Admin và Ban Giám Đốc luôn ở
+    Phân Quyền &amp; Lịch Sử. Trong mỗi module, quyền xếp tiếp theo <b>Vật Tư, VPP, Hoá Chất, Chất Chuẩn</b> và <b>Dùng Chung</b>
+    (Dữ Liệu Gốc chia theo phạm vi dữ liệu gốc, Phân Quyền &amp; Lịch Sử chia Phân Quyền / Lịch Sử &amp; Audit Trail).
+    Mỗi nhóm quyền có <b>loại phụ trách</b> (Vật Tư / VPP / Hoá Chất / Chất Chuẩn) để xếp cột trên bảng
+    phân quyền: nhóm phụ trách một loại nằm ở loại đó, nhóm phụ trách từ 2 loại trở lên nằm ở <b>Chung</b>; Admin và Ban Giám Đốc luôn ở
     Chung. Loại phụ trách chỉ dùng để sắp xếp và lọc bảng, không cấp hay chặn quyền nào. Xem các bảng ở phần
     <a href="#bang-materData">Bảng Phân Quyền Chung</a>. Các bảng này đọc thẳng cấu hình Nhóm Quyền: đổi quyền trên màn hình
     Nhóm Quyền thì trang hướng dẫn đang mở ở tab khác tự cập nhật bảng, không cần tải lại trang.</p>
@@ -64,8 +65,14 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Một số bước ký không chỉ dựa vào quyền mà còn dựa vào <b>tên vai trò</b>: người ký đề nghị cấp phát vật tư theo
-        <b>Dữ Liệu Gốc › Trình Ký Đề Nghị CP Vật Tư</b>, bước ký dự trù theo vai trò <b>Quản Lý Bộ Phận</b> và
-        <b>Ban Giám Đốc</b>, người kiểm tra hoá chất cấm theo vai trò <b>Quản Lý Kho Hoá Chất</b>. Vai trò
-        <b>Admin</b> luôn có toàn quyền ở mọi phòng ban.</div>
+    <div>Một số bước ký không chỉ dựa vào quyền mà còn dựa vào <b>tên vai trò</b>:
+        <ul class="mb-0 pl-3">
+            <li>Người ký đề nghị cấp phát vật tư nội bộ theo <b>Dữ Liệu Gốc › Trình Ký Đề Nghị CP Vật Tư</b> (vai trò nhận trình ký
+                phải có quyền <b>Duyệt Cấp Phát Vật Tư</b>; các bước ký đồng thời).</li>
+            <li>Đề nghị <b>liên phòng ban</b> (Vật Tư, VPP - kể cả đề nghị VPP đến Hành Chánh, Hoá Chất, Chất Chuẩn): 2 bước cố định,
+                vai trò <b>Quản Lý Bộ Phận</b> của phòng đề nghị rồi của phòng cấp phát.</li>
+            <li>Phiếu dự trù: vai trò <b>Quản Lý Bộ Phận</b> rồi <b>Ban Giám Đốc</b>.</li>
+            <li>Người kiểm tra hoá chất cấm: vai trò <b>Quản Lý Kho Hoá Chất</b>.</li>
+        </ul>
+        Vai trò <b>Admin</b> luôn có toàn quyền ở mọi phòng ban.</div>
 </div>

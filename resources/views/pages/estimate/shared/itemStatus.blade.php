@@ -7,7 +7,7 @@
 | mục, chỉ khi phòng đề nghị đã bấm huỷ - xem App\Http\Controllers\Concerns\EstimateItemCancel.
 |
 | Biến vào: $item, $list, $estRoute, $trackPermission (vd. 'estimate_material_tracking'),
-|           $purchaserView, $readOnly
+|           $purchaserView, $readOnly, $singleSideCancel (VPP: phòng lập = bộ phận mua hàng, huỷ 1 lần)
 --}}
 @php
     $isCancelPending = (int) $item->status_id === 1 && (($item->cancel_requester_at ?? null) || ($item->cancel_purchasing_at ?? null));
@@ -86,12 +86,22 @@
                 <input type="hidden" name="action" value="complete">
                 <button type="submit" class="btn btn-sm btn-success" title="Xác nhận đã được giao"><i class="fas fa-check"></i> Hoàn thành</button>
             </form>
-            <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm-cancel" data-title="Đề nghị huỷ mặt hàng này?" data-text="Mặt hàng chỉ bị huỷ khi bộ phận mua hàng cũng xác nhận." data-danger="1">
-                @csrf
-                <input type="hidden" name="id" value="{{ $item->id }}">
-                <input type="hidden" name="action" value="cancel">
-                <button type="submit" class="btn btn-sm btn-danger" title="Đề nghị huỷ - cần bộ phận mua hàng xác nhận"><i class="fas fa-times"></i> Huỷ</button>
-            </form>
+            @if ($singleSideCancel ?? false)
+                {{-- Phòng lập phiếu cũng là bộ phận mua hàng (dự trù VPP - Hành Chánh): huỷ ngay, không chờ bên kia --}}
+                <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm-cancel" data-title="Huỷ mặt hàng này?" data-text="Mặt hàng bị huỷ ngay, không hoàn tác được." data-danger="1">
+                    @csrf
+                    <input type="hidden" name="id" value="{{ $item->id }}">
+                    <input type="hidden" name="action" value="cancel">
+                    <button type="submit" class="btn btn-sm btn-danger" title="Huỷ mặt hàng"><i class="fas fa-times"></i> Huỷ</button>
+                </form>
+            @else
+                <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm-cancel" data-title="Đề nghị huỷ mặt hàng này?" data-text="Mặt hàng chỉ bị huỷ khi bộ phận mua hàng cũng xác nhận." data-danger="1">
+                    @csrf
+                    <input type="hidden" name="id" value="{{ $item->id }}">
+                    <input type="hidden" name="action" value="cancel">
+                    <button type="submit" class="btn btn-sm btn-danger" title="Đề nghị huỷ - cần bộ phận mua hàng xác nhận"><i class="fas fa-times"></i> Huỷ</button>
+                </form>
+            @endif
         @endif
     </div>
 @elseif ($list->app_status === 'approved' && $isCancelPending)

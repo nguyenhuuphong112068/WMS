@@ -5,8 +5,9 @@
 | huỷ, lọc theo ngày đề nghị - cal_sub=done giữ tab con khi lọc). Cả hai mới nhất lên trước.
 |
 | Phiếu đề nghị hiệu chuẩn vật tư "Cần Hiệu Chuẩn Trước Khi Dùng" (App\Support\MaterialCalibration):
-| phiếu của phòng đang chọn + phiếu các phòng gửi tới khi phòng đang chọn là phòng QA và người dùng có
-| quyền xác nhận. Mỗi hàng là một phiếu (các mã xuất nhập cùng mã phiếu).
+| phiếu của phòng đang chọn + phiếu người đề nghị đã chọn ĐÚNG người đang đăng nhập xác nhận tại phòng
+| đang chọn (phiếu chưa chọn người: phiếu các phòng gửi tới phòng QA). Mỗi hàng là một phiếu (các mã
+| xuất nhập cùng mã phiếu). Phòng đề nghị chọn / đổi người xác nhận bằng nút người ở cột Thao Tác.
 |
 | Dữ liệu vào: $calibrationPending, $calibrationDone, $calibrationSub, $calibrationRange, $calibrationCanConfirm - xem
 | MaterialCalibrationController::paneData().

@@ -38,7 +38,7 @@
                 <td>Nhóm quyền nằm sai cột loại (Chung / Vật Tư / Hoá Chất / Chất Chuẩn)</td>
                 <td style="font-weight: 400">Sửa ô <b>Loại Phụ Trách</b> của nhóm trong
                     <span class="btn btn-sm btn-success ug-ui"><i class="fas fa-users-cog"></i> Quản Lý Nhóm Quyền</span>:
-                    tick 1 loại thì nằm ở loại đó, tick 2-3 loại thì nằm ở Chung.</td>
+                    tick 1 loại thì nằm ở loại đó, tick từ 2 loại trở lên (Vật Tư / VPP / Hoá Chất / Chất Chuẩn) thì nằm ở Chung.</td>
             </tr>
             <tr>
                 <td>"Vui lòng chọn ít nhất một loại phụ trách (Vật Tư / Hoá Chất / Chất Chuẩn)."</td>

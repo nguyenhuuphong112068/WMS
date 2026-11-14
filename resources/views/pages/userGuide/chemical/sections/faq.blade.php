@@ -83,6 +83,12 @@
                 <td style="font-weight: 400">Đề nghị liên phòng ban cần Quản Lý Bộ Phận của cả phòng đề nghị và phòng cấp phát để ký
                     2 bước. Nhờ Admin phân vai trò Quản Lý Bộ Phận cho người của phòng đó rồi Gửi lại.</td>
             </tr>
+            <tr>
+                <td>"Lượng trả vượt lượng đã sử dụng..." / "Phiếu ... đã trả về kho ... Huỷ phiếu trả ... trước khi khoá" / "Không huỷ được: lô ... chỉ còn tồn ..."</td>
+                <td style="font-weight: 400">Quy tắc trả Acetonitril / Methanol về kho: tổng lượng trả không vượt lượng đã dùng của phiếu; phiếu
+                    đã có lượng trả phải huỷ phiếu trả trước khi khoá / đổi lô; huỷ phiếu trả cần lô còn đủ tồn để trừ lại. Xem
+                    <a href="#tra-ve-kho">Trả về kho</a>.</td>
+            </tr>
         </tbody>
     </table>
 </div>

@@ -118,7 +118,7 @@
                             data-title="Phiếu {{ $list->code }}">
                             <i class="fas fa-route mr-1"></i> Theo dõi trình ký
                         </button>
-                        {{-- Bộ phận mua hàng (mở từ tab "Đơn dự trù đã được phê duyệt"): tiếp nhận phiếu vừa duyệt --}}
+                        {{-- Phòng Hành Chánh (bộ phận mua hàng VPP, cũng là phòng lập phiếu): tiếp nhận phiếu vừa duyệt --}}
                         @if ($purchaserView ?? false)
                             @include('pages.estimate.shared.receptionAction')
                         @endif
@@ -237,7 +237,7 @@
                                                 <span class="md-empty">—</span>
                                             @endif
                                         </td>
-                                        {{-- Ngày hẹn đáp ứng: chỉ bộ phận mua hàng sửa, khi mở phiếu từ tab "Đơn dự trù đã được phê duyệt" --}}
+                                        {{-- Ngày hẹn đáp ứng: chỉ người có quyền tiếp nhận xử lý của phòng Hành Chánh sửa --}}
                                         @if ($purchaserView ?? false)
                                         <td>
                                             @include('pages.estimate.shared.promisedDates', ['editable' => $list->app_status === 'approved'])
@@ -280,7 +280,7 @@
                                                 </div>
                                             @endif
                                             {{-- Hoàn thành / Huỷ mục đã duyệt (phòng đề nghị), xác nhận huỷ (bộ phận mua hàng) --}}
-                                            @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_vpp_tracking'])
+                                            @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_vpp_tracking', 'singleSideCancel' => true])
                                             @include('pages.estimate.shared.itemChatButton', ['chatPermission' => 'estimate_vpp_chat'])
                                         </td>
                                     </tr>

@@ -144,7 +144,7 @@ class InitialDataTemplate
             self::buildDataSheet($ws, $key, $sheet);
             if (self::hidden($key)) {
                 $ws->setSheetState(Worksheet::SHEETSTATE_VERYHIDDEN);
-            } elseif (self::$roles[$key] === 'extra') {
+            } elseif (self::$roles[$key] === 'extra' && ! InitialDataSchema::readOnly($key)) {
                 // Sheet bổ sung (giai đoạn trước): tab xám để tách khỏi sheet chính của giai đoạn
                 $ws->getTabColor()->setRGB(self::MUTED);
             }
@@ -174,9 +174,9 @@ class InitialDataTemplate
 
         self::defineRefNames($book);
 
-        // Sheet ẩn đã khoá toàn bộ, không cần ô chọn
+        // Sheet ẩn / chỉ xem đã khoá toàn bộ, không cần ô chọn
         foreach (array_intersect_key(InitialDataSchema::sheets(), self::$roles) as $key => $sheet) {
-            if (! self::hidden($key)) {
+            if (! self::hidden($key) && ! InitialDataSchema::readOnly($key)) {
                 self::addValidations($book->getSheetByName($sheet['title']), $key, $sheet);
             }
         }
@@ -254,12 +254,16 @@ class InitialDataTemplate
         $row++;
         $row = self::guideHeading($ws, $row, 'B. CÁC BƯỚC ĐIỀN');
         $no = 1;
-        $extra = array_filter($visible, fn ($key) => self::$roles[$key] === 'extra', ARRAY_FILTER_USE_KEY);
-        foreach (array_diff_key($visible, $extra) as $key => $sheet) {
+        $readOnly = array_filter($visible, fn ($key) => InitialDataSchema::readOnly($key), ARRAY_FILTER_USE_KEY);
+        $extra = array_filter($visible, fn ($key) => self::$roles[$key] === 'extra' && ! isset($readOnly[$key]), ARRAY_FILTER_USE_KEY);
+        foreach (array_diff_key($visible, $extra, $readOnly) as $key => $sheet) {
             $row = self::guideLine($ws, $row, 'B'.$no++, $sheet['title'].': '.(self::GUIDE_STEPS[$key] ?? $sheet['desc']));
         }
+        foreach ($readOnly as $key => $sheet) {
+            $row = self::guideLine($ws, $row, 'B'.$no++, 'Sheet '.$sheet['title'].' (KHOÁ, KHÔNG ĐIỀN): '.(self::GUIDE_STEPS[$key] ?? $sheet['desc']));
+        }
         if ($extra) {
-            $row = self::guideLine($ws, $row, 'B'.$no++, 'Nếu thiếu dữ liệu giai đoạn trước (danh mục, vị trí, tên hàng...) thì bổ sung ngay ở các SHEET BỔ SUNG (tab màu xám, xem mục B+), không cần chờ cập nhật hệ thống.');
+            $row = self::guideLine($ws, $row, 'B'.$no++, 'Nếu thiếu dữ liệu giai đoạn trước (danh mục, tên hàng...) thì bổ sung ngay ở các SHEET BỔ SUNG (tab màu xám, xem mục B+), không cần chờ cập nhật hệ thống.');
         }
         $row = self::guideLine($ws, $row, 'B'.$no, 'Lưu file, gửi lại cho Admin. Admin tổng hợp file của các phòng ban, làm sạch dữ liệu rồi nạp lên hệ thống.');
 
@@ -348,11 +352,7 @@ class InitialDataTemplate
         'chemical_cats' => 'mỗi dòng = Tên hoá chất + Loại + Nhà sản xuất. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
         'vpp_cats' => 'mỗi dòng = Tên VPP (chọn ở sheet 15) + Nhà sản xuất + Đơn vị tính + Nhóm dự trù. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
         'standard_cats' => 'mỗi dòng = Tên chất chuẩn + Nguồn gốc / NSX + nhóm chuẩn. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
-        'warehouses' => 'định khu cấp 1: kho / phòng của phòng ban. Mã không trùng toàn hệ thống.',
-        'shelves' => 'định khu cấp 2: kệ / tủ, chọn mã kho.',
-        'columns' => 'định khu cấp 3: cột, chọn mã kệ (kho tự suy theo kệ).',
-        'tiers' => 'định khu cấp 4: tầng, chỉ cần chọn cấp cha gần nhất.',
-        'locations' => 'định khu cấp 5: vị trí đặt hàng (nơi gắn tồn kho), chọn cấp cha gần nhất; loại lưu trữ để trống = dùng chung.',
+        'locations' => 'danh sách vị trí đặt hàng đang có trên hệ thống (theo phòng ban, loại lưu trữ dùng chung hoặc đúng module của file), dùng để chọn Vị trí mặc định / Vị trí lưu. Định khu tạo trực tiếp trên phần mềm (Dữ Liệu Gốc → Định Khu); còn thiếu vị trí thì tạo trên phần mềm rồi TẢI LẠI file mẫu.',
         'dept_materials' => 'chọn danh mục vật tư phòng dùng, đơn vị tính của phòng, tồn tối thiểu / tối đa, vị trí mặc định.',
         'dept_vpp' => 'chọn danh mục VPP phòng dùng, tồn tối thiểu / tối đa, vị trí mặc định (đơn vị tính theo danh mục VPP).',
         'dept_chemicals' => 'chọn danh mục hoá chất phòng dùng, đơn vị tính của phòng, tồn tối thiểu / tối đa, vị trí mặc định.',
@@ -398,19 +398,19 @@ class InitialDataTemplate
                 ['Bước tiếp theo', 'Admin nạp file và nhập mật khẩu khởi tạo chung; người dùng đăng nhập bằng mã số nhân viên và phải đổi mật khẩu ở lần đầu.'],
             ],
             3 => [
-                ['Mục đích', 'Khai dữ liệu gốc (đơn vị, nhà sản xuất, tên hàng, định khu kho...), danh mục công ty và hàng hoá phòng ban sử dụng.'],
+                ['Mục đích', 'Khai dữ liệu gốc (đơn vị, nhà sản xuất, tên hàng...), danh mục công ty và hàng hoá phòng ban sử dụng. Định khu kho tạo trên phần mềm, file chỉ liệt kê để chọn vị trí.'],
                 ['Người điền', $ownDepartment ?? 'Các phòng ban.'],
                 ['Cần có trước', 'Giai đoạn 1 đã nạp.'],
-                ['Bước tiếp theo', 'Nạp xong thì tải file Giai đoạn 4 (Tồn đầu kỳ) - file đó chỉ chọn được danh mục và vị trí đã nạp ở giai đoạn này.'],
+                ['Bước tiếp theo', 'Nạp xong thì tải file Giai đoạn 4 (Tồn đầu kỳ) - file đó chỉ chọn được danh mục đã nạp ở giai đoạn này và vị trí đã tạo trên phần mềm.'],
             ],
             4 => [
                 ['Mục đích', 'Nhập tồn kho thực tế tại thời điểm bắt đầu dùng hệ thống.'],
                 ['Người điền', $ownDepartment ?? 'Các phòng ban có kho.'],
-                ['Cần có trước', 'Giai đoạn 3 đã nạp: danh mục phòng đã khai (sheet 27 - 29, 35) và vị trí kho (sheet 26).'],
+                ['Cần có trước', 'Giai đoạn 3 đã nạp: danh mục phòng đã khai (sheet 27 - 29, 35); định khu kho đã tạo trên phần mềm (sheet Định khu).'],
                 ['Bước tiếp theo', 'Đây là giai đoạn cuối. Mỗi phòng ban chỉ nạp tồn đầu kỳ MỘT lần.'],
             ],
             default => [
-                ['Mục đích', 'Khai toàn bộ dữ liệu ban đầu trong một file: tổ chức, người dùng, dữ liệu gốc, danh mục, định khu, tồn đầu kỳ.'],
+                ['Mục đích', 'Khai toàn bộ dữ liệu ban đầu trong một file: tổ chức, người dùng, dữ liệu gốc, danh mục, tồn đầu kỳ (định khu tạo trên phần mềm).'],
                 ['Người điền', $ownDepartment ?? 'Admin (tổng hợp từ các phòng ban).'],
                 ['Cần có trước', 'Không.'],
                 ['Bước tiếp theo', 'Nạp một lần. Khi nhiều phòng cùng điền, nên dùng file theo từng giai đoạn.'],
@@ -428,7 +428,7 @@ class InitialDataTemplate
             '"Số kiện" = số kiện / chai / ống giống hệt nhau; mỗi kiện được cấp 1 mã xuất nhập riêng để in nhãn. VD: 3 chai Methanol 4L còn nguyên → Lượng mỗi chai = 4, Số kiện = 3.',
             'Chai / ống đã mở dở ghi riêng 1 dòng với lượng còn lại thực tế.',
             'Ngày nhập kho = ngày nạp file (không điền tay). Lô tồn đầu được ghi nhận ĐẠT kiểm tra và cộng ngay vào tồn kho.',
-            'Vị trí lưu bắt buộc, phải là vị trí cùng phòng ban, loại lưu trữ trống hoặc đúng loại hàng.',
+            'Vị trí lưu bắt buộc, chọn ở sheet Định khu (vị trí cùng phòng ban, loại lưu trữ trống hoặc đúng loại hàng). Thiếu vị trí thì tạo trên phần mềm rồi tải lại file.',
             'Mỗi phòng ban chỉ nạp tồn đầu kỳ MỘT lần; nạp lại bị chặn để tránh cộng trùng tồn.',
         ];
         $catKeys = ['material_cats' => 'M00001', 'vpp_cats' => 'P00001', 'chemical_cats' => 'C00001', 'standard_cats' => 'S00001'];
@@ -452,7 +452,7 @@ class InitialDataTemplate
                     : null,
                 self::hasVisible(['material_cats', 'vpp_cats', 'chemical_cats', 'standard_cats']) ? $codeRule : null,
                 'Tên hàng / danh mục đã có (nền xám) thì chọn lại, không khai lại. Dòng mới trùng tổ hợp đã có sẽ được dùng lại bản cũ.',
-                self::hasVisible(['warehouses']) ? 'Định khu khai từ cấp lớn đến nhỏ: Kho → Kệ / Tủ → Cột → Tầng → Vị trí.' : null,
+                self::hasVisible(['locations']) ? 'Định khu KHÔNG khai trong file: tạo trên phần mềm (Dữ Liệu Gốc → Định Khu) trước, rồi tải file mẫu để sheet Định khu có đủ vị trí chọn.' : null,
             ])),
             4 => $stockRules,
             default => array_merge($userRules, [$codeRule], $stockRules),
@@ -582,7 +582,9 @@ class InitialDataTemplate
         $first = InitialDataSchema::FIRST_DATA_ROW;
         $prefill = self::prefill($key);
         $newRow = $first + count($prefill);
-        $maxRow = $newRow + InitialDataSchema::MAX_ROWS - 1;
+        $readOnly = InitialDataSchema::readOnly($key);
+        // Sheet chỉ xem không có vùng nhập mới: ô chọn tham chiếu chỉ trải đúng các dòng điền sẵn
+        $maxRow = $readOnly ? max($first, $newRow - 1) : $newRow + InitialDataSchema::MAX_ROWS - 1;
         $editable = InitialDataSchema::EDITABLE_PREFILL_SHEETS[$key] ?? null;
         // Sheet sửa được: bộ nạp đọc cả dòng điền sẵn, ô chọn / kiểm tra áp từ dòng đầu
         self::$prefillCounts[$key] = $editable === null ? count($prefill) : 0;
@@ -674,7 +676,12 @@ class InitialDataTemplate
             }
         }
 
-        self::protect($ws, $columns, $prefill ? $newRow - 1 : null, $last, self::hidden($key), $editable);
+        if ($readOnly && ! $prefill) {
+            $ws->setCellValue('A'.$first, 'Chưa có vị trí nào - tạo định khu trên phần mềm (Dữ Liệu Gốc → Định Khu) rồi tải lại file mẫu.');
+            $ws->getStyle('A'.$first)->getFont()->setItalic(true)->getColor()->setRGB(self::DANGER);
+        }
+
+        self::protect($ws, $columns, $prefill ? $newRow - 1 : null, $last, self::hidden($key) || $readOnly, $editable);
     }
 
     /**
@@ -756,7 +763,6 @@ class InitialDataTemplate
         $lists = InitialDataSchema::lists();
         $label = fn (string $list, $value) => array_flip($lists[$list])[$value] ?? null;
         $dept = fn () => DB::table('deparments')->pluck('shortName', 'id');
-        $code = fn (string $zoneTable) => DB::table($zoneTable)->pluck('code', 'id');
         $makers = fn () => DB::table('manufacturers')->pluck('short_name', 'id');
         $storages = fn () => DB::table('storage_conditions')->pluck('name', 'id');
 
@@ -847,27 +853,25 @@ class InitialDataTemplate
                     $r->lead_time_days, null,
                 ]);
             })(),
-            'warehouses', 'shelves', 'columns', 'tiers', 'locations' => (function () use ($key, $table, $dept, $code, $label) {
+            // Định khu chỉ xem: vị trí đang dùng của phòng (file phòng ban), loại lưu trữ dùng chung hoặc đúng module
+            'locations' => (function () use ($table, $dept, $label) {
                 $depts = $dept();
-                $parents = [];
-                foreach (['warehouse' => 'warehouses', 'shelf' => 'shelves', 'column' => 'columns', 'tier' => 'tiers'] as $level => $zoneTable) {
-                    $parents[$level] = $zoneTable === $table ? collect() : $code($zoneTable);
+                $levels = ['warehouse' => 'warehouses', 'shelf' => 'shelves', 'column' => 'columns', 'tier' => 'tiers'];
+                $names = [];
+                foreach ($levels as $level => $zoneTable) {
+                    $names[$level] = DB::table($zoneTable)->get(['id', 'code', 'name'])->mapWithKeys(fn ($z) => [
+                        $z->id => $z->name !== null && $z->name !== '' && $z->name !== $z->code ? $z->code.' - '.$z->name : $z->code,
+                    ]);
                 }
 
-                return self::ownDepartment(self::active($table))->orderBy('department_id')->orderBy('code')->get()
-                    ->map(function ($r) use ($key, $depts, $parents, $label) {
-                        $parentCodes = [];
-                        foreach (['warehouse', 'shelf', 'column', 'tier'] as $level) {
-                            if (property_exists($r, $level.'_id')) {
-                                $parentCodes[] = $parents[$level][$r->{$level.'_id'}] ?? null;
-                            }
-                        }
-                        $zone = [$label('zone_type', $r->zone_type), $r->color];
-
-                        return $key === 'locations'
-                            ? array_merge([$depts[$r->department_id] ?? null, $r->code], $parentCodes, [$label('item_type', $r->item_type)], $zone)
-                            : array_merge([$depts[$r->department_id] ?? null, $r->code, $r->name], $parentCodes, $zone);
-                    });
+                return self::ownDepartment(self::active($table))
+                    ->when(self::$module, fn ($q) => $q->where(fn ($w) => $w->whereNull('item_type')->orWhere('item_type', '')->orWhere('item_type', self::$module)))
+                    ->orderBy('department_id')->orderBy('code')->get()
+                    ->map(fn ($r) => array_merge(
+                        [$depts[$r->department_id] ?? null, $r->code],
+                        array_map(fn ($level) => $r->{$level.'_id'} ? ($names[$level][$r->{$level.'_id'}] ?? null) : null, array_keys($levels)),
+                        [$r->item_type ? $label('item_type', $r->item_type) : 'Dùng chung', $label('zone_type', $r->zone_type)],
+                    ));
             })(),
             default => collect(),
         };

@@ -137,30 +137,46 @@
                             @endif
                         @elseif ($row->status === 'canceled')
                             <span class="text-muted">{{ $row->result_note ?: 'Đã huỷ' }}</span>
+                        @elseif ($row->confirmers)
+                            <div class="cal-confirmers">
+                                <span class="text-muted">Chờ xác nhận:</span>
+                                @foreach ($row->confirmers['users'] as $user)
+                                    <div class="font-weight-bold text-dark"><i class="fas fa-user-check mr-1 text-primary"></i>{{ $user['name'] }}</div>
+                                @endforeach
+                                <span class="cal-dept">{{ $row->confirmers['department_name'] }}</span>
+                            </div>
                         @else
                             <span class="text-muted">Chờ QA xác nhận</span>
+                            <div class="small text-warning font-weight-bold">Chưa chọn người xác nhận</div>
                         @endif
                     </td>
                     <td class="text-center">
+                        @php
+                            $calCanAssign = $row->status === 'pending' && $row->own && user_can('export_material_issue');
+                        @endphp
                         <div class="md-actions">
-                            @if ($row->status === 'pending' && $row->incoming && $calibrationCanConfirm)
+                            @if ($row->can_confirm)
                                 <button type="button" class="btn btn-sm btn-primary btn-cal-confirm" title="Ký xác nhận kết quả hiệu chuẩn"
                                     data-row="{{ json_encode($calData) }}">
                                     <i class="fas fa-ruler-combined"></i>
                                 </button>
                             @endif
-                            @if ($row->status === 'pending' && $row->own && ! $calAfter)
-                                @perm('export_material_issue')
+                            @if ($calCanAssign)
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-cal-assign"
+                                    title="{{ $row->confirmers ? 'Đổi người xác nhận hiệu chuẩn' : 'Chọn người xác nhận hiệu chuẩn' }}"
+                                    data-code="{{ $row->code }}"
+                                    data-department="{{ $row->confirmers['department_id'] ?? '' }}"
+                                    data-users="{{ json_encode(array_column($row->confirmers['users'] ?? [], 'id')) }}">
+                                    <i class="fas fa-user-check"></i>
+                                </button>
+                                @unless ($calAfter)
                                     <button type="button" class="btn btn-sm btn-outline-danger btn-cal-cancel" title="Huỷ đề nghị hiệu chuẩn, nhả hàng về kho"
                                         data-code="{{ $row->code }}">
                                         <i class="fas fa-times"></i>
                                     </button>
-                                @endperm
+                                @endunless
                             @endif
-                            @if ($row->status === 'pending' && $calAfter && ! ($row->incoming && $calibrationCanConfirm))
-                                <span class="md-sub text-muted">—</span>
-                            @endif
-                            @unless ($row->status === 'pending')
+                            @unless ($row->can_confirm || $calCanAssign)
                                 <span class="md-sub text-muted">—</span>
                             @endunless
                         </div>

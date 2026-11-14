@@ -526,7 +526,7 @@ class InitialDataController extends Controller
     /** Câu báo lỗi khi thông tin trong file mẫu khác lựa chọn trên form; null = khớp. */
     private function metaMismatch(array $meta, ?int $stage, ?string $module, string $department): ?string
     {
-        if ($meta['version'] !== InitialDataSchema::VERSION) {
+        if (! InitialDataSchema::acceptsVersion($meta['version'], $meta['stage'])) {
             return 'File là mẫu phiên bản cũ ('.$meta['version'].'). Vui lòng tải file mẫu mới nhất và điền lại.';
         }
         if ($meta['stage'] !== $stage) {

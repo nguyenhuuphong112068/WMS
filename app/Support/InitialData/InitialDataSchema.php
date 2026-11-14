@@ -46,7 +46,20 @@ use Illuminate\Support\Facades\Schema;
 class InitialDataSchema
 {
     /** Phiên bản cấu trúc file. Đổi cột / sheet thì tăng số này để chặn file mẫu cũ. */
-    public const VERSION = 'WMS-INITIAL-DATA-V4';
+    public const VERSION = 'WMS-INITIAL-DATA-V5';
+
+    /**
+     * Phiên bản cũ vẫn nhận cho các giai đoạn không đổi cấu trúc: [phiên bản => [giai đoạn]].
+     * V5 (14/11/2026) chỉ đổi sheet định khu (giai đoạn 3 - 4) nên file V4 giai đoạn 1 - 2 vẫn dùng được.
+     */
+    public const COMPATIBLE_VERSIONS = ['WMS-INITIAL-DATA-V4' => [1, 2]];
+
+    /** File mẫu phiên bản $version, giai đoạn $stage còn dùng được (null = file đủ mọi giai đoạn). */
+    public static function acceptsVersion(?string $version, ?int $stage): bool
+    {
+        return $version === self::VERSION
+            || ($stage !== null && in_array($stage, self::COMPATIBLE_VERSIONS[$version] ?? [], true));
+    }
 
     /** Tên sheet ẩn chứa danh sách chọn cố định + phiên bản file. */
     public const LIST_SHEET = '_DS';
@@ -109,6 +122,18 @@ class InitialDataSchema
     public const EDITABLE_PREFILL_SHEETS = ['users' => ['user_name']];
 
     /**
+     * Sheet CHỈ XEM (14/11/2026): điền sẵn từ DB, khoá cả sheet, không có dòng nhập mới, bộ nạp không
+     * đọc. Định khu tạo trực tiếp trên màn hình Định Khu; sheet "Định khu" chỉ liệt kê vị trí đang có
+     * (theo phòng ban + module của file) làm nguồn ô chọn Vị trí mặc định / Vị trí lưu.
+     */
+    public const READONLY_SHEETS = ['locations'];
+
+    public static function readOnly(string $sheetKey): bool
+    {
+        return in_array($sheetKey, self::READONLY_SHEETS, true);
+    }
+
+    /**
      * TẠM ẨN với user khác Admin (12/11/2026): chưa mở giai đoạn này cho phòng ban - không hiện ở ô
      * chọn giai đoạn / bảng theo dõi, không tải mẫu / đính kèm / đánh dấu được. Mở lại: để mảng rỗng.
      */
@@ -123,7 +148,7 @@ class InitialDataSchema
     /**
      * Sheet thuộc giai đoạn 1 (tổ chức - Admin chuẩn bị) / 2 (người dùng + tổ - nhóm, các phòng bổ sung
      * tổ còn thiếu ngay trong file người dùng) / 4 (tồn đầu kỳ); sheet còn
-     * lại (dữ liệu gốc, tên hàng, danh mục, định khu, hàng của phòng) là giai đoạn 3.
+     * lại (dữ liệu gốc, tên hàng, danh mục, định khu chỉ xem, hàng của phòng) là giai đoạn 3.
      */
     public const STAGE_SHEETS = [
         'companies' => 1,
@@ -146,6 +171,7 @@ class InitialDataSchema
     /**
      * Sheet (dữ liệu + tra cứu) thuộc riêng module nào; sheet không có ở đây là sheet dùng chung,
      * có mặt trong file của mọi module (tổ chức, đơn vị, nhà sản xuất, sản phẩm, định khu, quy đổi).
+     * Sheet Định khu dùng chung nhưng chỉ liệt kê vị trí có Loại lưu trữ trống hoặc đúng module.
      */
     public const MODULE_SHEETS = [
         'packaging' => ['standard'],
@@ -302,10 +328,6 @@ class InitialDataSchema
             'R_DM_VPP' => ['vpp_cats', 'display'],
             'R_DM_HC' => ['chemical_cats', 'display'],
             'R_DM_CC' => ['standard_cats', 'display'],
-            'R_KHO' => ['warehouses', 'code'],
-            'R_KE' => ['shelves', 'code'],
-            'R_COT' => ['columns', 'code'],
-            'R_TANG' => ['tiers', 'code'],
             'R_VI_TRI' => ['locations', 'code'],
             'R_HOAT_CHAT' => ['ref_active_ingredients', 0],
             'R_BANG_B' => ['ref_hazard_categories', 0],
@@ -329,15 +351,13 @@ class InitialDataSchema
     private static function buildSheets(): array
     {
         $dept = ['key' => 'department', 'label' => 'Phòng ban', 'type' => 'ref', 'ref' => 'R_PHONG_BAN', 'req' => true, 'width' => 16, 'hint' => 'Chọn tên viết tắt phòng ban'];
-        $zoneType = ['key' => 'zone_type', 'label' => 'Phân loại khu', 'type' => 'list', 'list' => 'zone_type', 'width' => 18, 'hint' => 'Dự Phòng / Sử Dụng / Biệt Trữ...'];
-        $color = ['key' => 'color', 'label' => 'Màu hiển thị', 'type' => 'color', 'width' => 13, 'hint' => 'VD: #16A34A (để trống = màu theo phân loại)'];
         $leadTime = ['key' => 'lead_time_days', 'label' => 'Thời gian đặt hàng (ngày)', 'type' => 'int', 'min' => 0, 'maxValue' => MaterialClassification::MAX_LEAD_TIME_DAYS, 'width' => 14, 'hint' => 'VD: 30'];
         $shelfLife = ['key' => 'shelf_life_months', 'label' => 'Hạn dùng mặc định (tháng)', 'type' => 'int', 'min' => 1, 'maxValue' => 1200, 'width' => 14, 'hint' => 'VD: 24'];
         $minStock = ['key' => 'min_stock', 'label' => 'Tồn tối thiểu', 'type' => 'num', 'min' => 0, 'width' => 12, 'hint' => 'Theo đơn vị của phòng'];
         $maxStock = ['key' => 'max_stock', 'label' => 'Tồn tối đa', 'type' => 'num', 'min' => 0, 'width' => 12, 'hint' => 'Phải ≥ tồn tối thiểu'];
-        $defaultLocation = ['key' => 'default_location', 'label' => 'Vị trí mặc định', 'type' => 'ref', 'ref' => 'R_VI_TRI', 'width' => 16, 'hint' => 'Mã vị trí ở sheet 26, cùng phòng ban'];
+        $defaultLocation = ['key' => 'default_location', 'label' => 'Vị trí mặc định', 'type' => 'ref', 'ref' => 'R_VI_TRI', 'width' => 16, 'hint' => 'Mã vị trí ở sheet Định khu, cùng phòng ban'];
         $note = ['key' => 'note', 'label' => 'Ghi chú', 'type' => 'text', 'max' => 500, 'width' => 30, 'hint' => ''];
-        $stockLocation = ['key' => 'location', 'label' => 'Vị trí lưu', 'type' => 'ref', 'ref' => 'R_VI_TRI', 'req' => true, 'width' => 16, 'hint' => 'Mã vị trí ở sheet 26, cùng phòng ban'];
+        $stockLocation = ['key' => 'location', 'label' => 'Vị trí lưu', 'type' => 'ref', 'ref' => 'R_VI_TRI', 'req' => true, 'width' => 16, 'hint' => 'Mã vị trí ở sheet Định khu, cùng phòng ban'];
         $autoCode = fn (string $prefix) => ['key' => 'code', 'label' => 'Mã DM (tự sinh)', 'type' => 'auto', 'prefix' => $prefix, 'width' => 12, 'hint' => 'Tự sinh khi điền tên, không nhập'];
         $packs = ['key' => 'packs', 'label' => 'Số kiện / chai (tách mã)', 'type' => 'int', 'min' => 1, 'maxValue' => 1000, 'width' => 13, 'hint' => 'Để trống = 1. Mỗi kiện 1 mã xuất nhập'];
 
@@ -622,79 +642,20 @@ class InitialDataSchema
             ],
 
             // ================================================================ ĐỊNH KHU
-            'warehouses' => [
-                'title' => '22.Kho - Phòng',
-                'table' => 'warehouses',
-                'group' => 'Định khu kho',
-                'desc' => 'Cấp 1 định khu: kho / phòng. Mã không trùng trong toàn hệ thống.',
-                'columns' => [
-                    $dept,
-                    ['key' => 'code', 'label' => 'Mã kho', 'type' => 'text', 'req' => true, 'max' => 50, 'width' => 14, 'hint' => 'VD: QC1-K01'],
-                    ['key' => 'name', 'label' => 'Tên kho / phòng', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 30, 'hint' => 'VD: Kho hoá chất'],
-                    $zoneType,
-                    $color,
-                ],
-            ],
-            'shelves' => [
-                'title' => '23.Kệ - Tủ',
-                'table' => 'shelves',
-                'group' => 'Định khu kho',
-                'desc' => 'Cấp 2 định khu: kệ / tủ, thuộc 1 kho. Mã không trùng trong toàn hệ thống.',
-                'columns' => [
-                    $dept,
-                    ['key' => 'code', 'label' => 'Mã kệ / tủ', 'type' => 'text', 'req' => true, 'max' => 50, 'width' => 14, 'hint' => 'VD: QC1-K01-T01'],
-                    ['key' => 'name', 'label' => 'Tên kệ / tủ', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 26, 'hint' => 'VD: Tủ hoá chất 1'],
-                    ['key' => 'warehouse', 'label' => 'Mã kho', 'type' => 'ref', 'ref' => 'R_KHO', 'width' => 14, 'hint' => 'Chọn ở sheet 22'],
-                    $zoneType,
-                    $color,
-                ],
-            ],
-            'columns' => [
-                'title' => '24.Cột',
-                'table' => 'columns',
-                'group' => 'Định khu kho',
-                'desc' => 'Cấp 3 định khu: cột của kệ. Khai mã kệ thì kho tự lấy theo kệ.',
-                'columns' => [
-                    $dept,
-                    ['key' => 'code', 'label' => 'Mã cột', 'type' => 'text', 'req' => true, 'max' => 50, 'width' => 16, 'hint' => 'VD: QC1-T01-C1'],
-                    ['key' => 'name', 'label' => 'Tên cột', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 20, 'hint' => 'VD: Cột 1'],
-                    ['key' => 'warehouse', 'label' => 'Mã kho', 'type' => 'ref', 'ref' => 'R_KHO', 'width' => 14, 'hint' => 'Có thể bỏ trống nếu có mã kệ'],
-                    ['key' => 'shelf', 'label' => 'Mã kệ / tủ', 'type' => 'ref', 'ref' => 'R_KE', 'width' => 16, 'hint' => 'Chọn ở sheet 23'],
-                    $zoneType,
-                    $color,
-                ],
-            ],
-            'tiers' => [
-                'title' => '25.Tầng',
-                'table' => 'tiers',
-                'group' => 'Định khu kho',
-                'desc' => 'Cấp 4 định khu: tầng. Khai cấp cha gần nhất là đủ, các cấp trên tự suy ra.',
-                'columns' => [
-                    $dept,
-                    ['key' => 'code', 'label' => 'Mã tầng', 'type' => 'text', 'req' => true, 'max' => 50, 'width' => 16, 'hint' => 'VD: QC1-T01-C1-T1'],
-                    ['key' => 'name', 'label' => 'Tên tầng', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 20, 'hint' => 'VD: Tầng 1'],
-                    ['key' => 'warehouse', 'label' => 'Mã kho', 'type' => 'ref', 'ref' => 'R_KHO', 'width' => 14, 'hint' => ''],
-                    ['key' => 'shelf', 'label' => 'Mã kệ / tủ', 'type' => 'ref', 'ref' => 'R_KE', 'width' => 16, 'hint' => ''],
-                    ['key' => 'column', 'label' => 'Mã cột', 'type' => 'ref', 'ref' => 'R_COT', 'width' => 16, 'hint' => ''],
-                    $zoneType,
-                    $color,
-                ],
-            ],
             'locations' => [
-                'title' => '26.Vị trí',
+                'title' => 'Định khu',
                 'table' => 'locations',
                 'group' => 'Định khu kho',
-                'desc' => 'Cấp 5 định khu: vị trí (ô) đặt hàng - nơi gắn tồn kho. Loại lưu trữ để trống = dùng chung cả 4 loại hàng.',
+                'desc' => 'CHỈ XEM - vị trí (ô) đặt hàng đang có trên hệ thống, dùng để chọn Vị trí mặc định / Vị trí lưu. Định khu tạo trực tiếp trên phần mềm (Dữ Liệu Gốc → Định Khu); còn thiếu thì tạo trên phần mềm rồi tải lại file.',
                 'columns' => [
-                    $dept,
-                    ['key' => 'code', 'label' => 'Mã vị trí', 'type' => 'text', 'req' => true, 'max' => 50, 'width' => 18, 'hint' => 'VD: QC1-A01 (không trùng)'],
-                    ['key' => 'warehouse', 'label' => 'Mã kho', 'type' => 'ref', 'ref' => 'R_KHO', 'width' => 14, 'hint' => ''],
-                    ['key' => 'shelf', 'label' => 'Mã kệ / tủ', 'type' => 'ref', 'ref' => 'R_KE', 'width' => 16, 'hint' => ''],
-                    ['key' => 'column', 'label' => 'Mã cột', 'type' => 'ref', 'ref' => 'R_COT', 'width' => 16, 'hint' => ''],
-                    ['key' => 'tier', 'label' => 'Mã tầng', 'type' => 'ref', 'ref' => 'R_TANG', 'width' => 16, 'hint' => ''],
-                    ['key' => 'item_type', 'label' => 'Loại lưu trữ', 'type' => 'list', 'list' => 'item_type', 'width' => 14, 'hint' => 'Trống = dùng chung'],
-                    $zoneType,
-                    $color,
+                    ['key' => 'department', 'label' => 'Phòng ban', 'type' => 'text', 'width' => 12],
+                    ['key' => 'code', 'label' => 'Mã vị trí', 'type' => 'text', 'width' => 18],
+                    ['key' => 'warehouse', 'label' => 'Kho - Phòng', 'type' => 'text', 'width' => 26],
+                    ['key' => 'shelf', 'label' => 'Kệ - Tủ', 'type' => 'text', 'width' => 26],
+                    ['key' => 'column', 'label' => 'Cột', 'type' => 'text', 'width' => 18],
+                    ['key' => 'tier', 'label' => 'Tầng', 'type' => 'text', 'width' => 18],
+                    ['key' => 'item_type', 'label' => 'Loại lưu trữ', 'type' => 'text', 'width' => 14],
+                    ['key' => 'zone_type', 'label' => 'Phân loại khu', 'type' => 'text', 'width' => 18],
                 ],
             ],
 
@@ -992,7 +953,7 @@ class InitialDataSchema
     /** Sheet bộ nạp đọc của file: sheet giai đoạn đang thu thập + sheet bổ sung, theo thứ tự nhập. */
     public static function importSheets(?string $module, ?int $stage = null): array
     {
-        $roles = array_filter(self::fileSheets($module, $stage), fn ($role) => $role !== 'source');
+        $roles = array_filter(self::fileSheets($module, $stage), fn ($role, $key) => $role !== 'source' && ! self::readOnly($key), ARRAY_FILTER_USE_BOTH);
 
         return array_intersect_key(self::sheets(), $roles);
     }

@@ -33,6 +33,8 @@ use Illuminate\Support\Facades\DB;
  *     'purchasing_permission' => quyền tiếp nhận xử lý (estimate_<loại>_purchasing): ngoài việc
  *                        đang chọn đúng phòng mua hàng, user còn phải có quyền này mới thấy tab
  *                        "Đơn dự trù đã được phê duyệt" và xác nhận huỷ phía mua hàng,
+ *     'single_side_cancel' => (tuỳ chọn) true = phòng lập phiếu cũng là bộ phận mua hàng (VPP), huỷ
+ *                        một lần là đủ - không qua bước chờ bên kia xác nhận,
  *   ]
  */
 trait EstimateItemCancel
@@ -146,7 +148,27 @@ trait EstimateItemCancel
         $otherDone = (bool) $item->{$other.'_at'};
         $reason = $this->nullIfBlank($reason);
 
-        if ($action === 'cancel') {
+        if ($action === 'cancel' && $this->singleSideCancel()) {
+            // Phòng đề nghị cũng là bộ phận mua hàng (dự trù VPP - Hành Chánh): một lần xác nhận ghi cả hai bên
+            if (! $reason && ! $otherDone && ! $ownDone) {
+                return redirect()->back()->with('error', 'Vui lòng nhập lý do huỷ!');
+            }
+
+            $update = [
+                'status_id' => 0,
+                'cancel_requester_by' => $item->cancel_requester_by ?: $this->actor(),
+                'cancel_requester_at' => $item->cancel_requester_at ?: now(),
+                'cancel_purchasing_by' => $item->cancel_purchasing_by ?: $this->actor(),
+                'cancel_purchasing_at' => $item->cancel_purchasing_at ?: now(),
+            ];
+
+            if ($reason && ! $item->cancel_reason) {
+                $update['cancel_reason'] = $reason;
+            }
+
+            $message = 'Huỷ mặt hàng (phòng đề nghị cũng là bộ phận mua hàng).'.($reason ? ' Lý do: '.$reason : '');
+            $flash = 'Đã huỷ '.self::ITEM_LABEL.'!';
+        } elseif ($action === 'cancel') {
             if ($ownDone) {
                 return redirect()->back()->with('error', $sideLabel.' đã xác nhận huỷ rồi, đang chờ '.$otherLabel.'!');
             }
@@ -198,6 +220,15 @@ trait EstimateItemCancel
         AuditTrialController::log('Cập nhật', self::ITEM_TABLE, $item->id, 'NA', $message);
 
         return redirect()->back()->with('success', $flash);
+    }
+
+    /**
+     * Huỷ mục chỉ cần MỘT lần xác nhận: cancelConfig 'single_side_cancel' = true khi phòng lập phiếu
+     * cũng chính là bộ phận mua hàng (dự trù VPP - Hành Chánh lập và tự tiếp nhận).
+     */
+    protected function singleSideCancel(): bool
+    {
+        return (bool) ($this->cancelConfig()['single_side_cancel'] ?? false);
     }
 
     protected function cancelPending($item): bool

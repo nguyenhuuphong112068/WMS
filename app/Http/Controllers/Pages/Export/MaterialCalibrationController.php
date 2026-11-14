@@ -23,13 +23,16 @@ use Illuminate\Support\Facades\Validator;
  *
  *   1. store()   : kho chọn mã xuất nhập + số lượng của dòng đề nghị ở tab Chờ Cấp Phát, nhập Seri
  *                  No từng đơn vị rồi gửi QA hiệu chuẩn. Phần đó bị giữ chỗ tồn.
- *   2. confirm() : QA (phòng EngshortName = 'QA', quyền export_material_calibration_confirm) ký
+ *                  Người đề nghị chọn Phòng + Người xác nhận (MaterialCalibration::confirmerOptions).
+ *   2. confirm() : người được chọn (đang ở đúng phòng xác nhận, quyền export_material_calibration_confirm;
+ *                  phiếu chưa chọn người thì phòng QA cùng công ty) ký
  *                  xác nhận Đạt / Không đạt TỪNG ĐƠN VỊ của đúng số lượng + Seri No người đề nghị
  *                  đã nhập (QA không sửa số lượng / Seri No) - đạt một phần được. Không đạt -> hàng tự sang Cách ly (bước 1
  *                  quy trình loại bỏ vật tư hỏng) để phòng quyết định loại bỏ / trả về kho.
  *   3. Phần ĐẠT mới cấp được, đúng mã xuất nhập đã hiệu chuẩn, ở tab Chờ Cấp Phát như thường.
  *
  * cancel(): phòng đề nghị huỷ phiếu còn chờ QA - nhả giữ chỗ.
+ * confirmers(): phòng đề nghị chọn / đổi người xác nhận của phiếu còn chờ (cả phiếu sau cấp phát).
  *
  * Phiếu timing = after (vật tư "HC sau cấp phát"): MaterialExportController::issueStore() tự sinh
  * khi cấp phát, không giữ chỗ. QA xác nhận như trên nhưng Không đạt KHÔNG cách ly (hàng đã cấp,
@@ -71,9 +74,15 @@ class MaterialCalibrationController extends Controller
     public static function paneData(int $departmentId, Request $request): array
     {
         $range = ListRange::of($request, self::PREFIX);
+        $userId = (int) (session('user')['userId'] ?? 0);
         $canConfirm = user_can(MaterialCalibration::CONFIRM_PERMISSION);
+        // Phiếu chưa chọn người xác nhận: phòng QA thấy phiếu các phòng mình phụ trách (quy tắc cũ)
         $incomingIds = $canConfirm ? MaterialCalibration::sourceDepartmentIds($departmentId) : [];
         $departmentIds = array_values(array_unique(array_merge([$departmentId], $incomingIds)));
+        // Phiếu đang chờ đã chọn ĐÚNG người đang đăng nhập xác nhận tại phòng đang chọn
+        $assignedCodes = $canConfirm
+            ? array_keys(array_filter(MaterialCalibration::pendingCodesAssignedTo($userId), fn ($dept) => $dept === $departmentId))
+            : [];
 
         $lines = DB::table(self::TABLE)
             ->leftJoin('material_imports', self::TABLE.'.import_id', '=', 'material_imports.id')
@@ -101,13 +110,21 @@ class MaterialCalibrationController extends Controller
                 'deparments.name as department_name',
                 self::QUARANTINE_TABLE.'.code as quarantine_code'
             )
-            ->whereIn(self::TABLE.'.department_id', $departmentIds)
+            ->where(function ($query) use ($departmentIds, $assignedCodes) {
+                $query->whereIn(self::TABLE.'.department_id', $departmentIds);
+
+                if ($assignedCodes) {
+                    $query->orWhereIn(self::TABLE.'.code', $assignedCodes);
+                }
+            })
             ->where(self::TABLE.'.status_id', 1)
             // Chờ xác nhận: luôn hiện hết; đã xác nhận / huỷ: theo khoảng ngày đề nghị
             ->tap(ListRange::dateFilterKeepPending(self::TABLE.'.requested_at', $range, self::TABLE.'.app_status', ['pending']))
             ->orderByDesc(self::TABLE.'.requested_at')
             ->orderBy(self::TABLE.'.id')
             ->get();
+
+        $confirmers = MaterialCalibration::confirmersOf($lines->pluck('code'));
 
         // Seri No + kết quả từng đơn vị (QA nhập lúc xác nhận), theo dòng kết quả
         $units = DB::table(MaterialCalibration::UNIT_TABLE)
@@ -121,11 +138,16 @@ class MaterialCalibrationController extends Controller
             $line->units = $units->get($line->id, collect())->values();
         });
 
-        $rows = $lines->groupBy('code')->map(function ($group) use ($departmentId, $incomingIds) {
+        $rows = $lines->groupBy('code')->map(function ($group) use ($departmentId, $incomingIds, $assignedCodes, $confirmers, $canConfirm) {
             $first = $group->first();
             // Trạng thái phiếu: còn dòng chờ QA thì là chờ; còn phần đạt chưa cấp thì là đạt - chờ cấp
             $statuses = $group->pluck('app_status')->unique();
             $status = collect(['pending', 'passed', 'failed', 'issued', 'canceled'])->first(fn ($s) => $statuses->contains($s));
+            $chosen = $confirmers[$first->code] ?? null;
+            // Phiếu gửi tới người xem: đã chọn đúng người này, hoặc chưa chọn ai mà phòng QA đang chọn phụ trách
+            $incoming = $chosen
+                ? in_array($first->code, $assignedCodes, true)
+                : in_array((int) $first->department_id, $incomingIds, true);
 
             return (object) [
                 'code' => $first->code,
@@ -133,7 +155,9 @@ class MaterialCalibrationController extends Controller
                 'department_id' => (int) $first->department_id,
                 'department_name' => $first->department_name,
                 'own' => (int) $first->department_id === $departmentId,
-                'incoming' => in_array((int) $first->department_id, $incomingIds, true),
+                'incoming' => $incoming,
+                'can_confirm' => $status === 'pending' && $canConfirm && $incoming,
+                'confirmers' => $chosen,
                 'request_code' => $first->request_code,
                 'request_type' => $first->request_type,
                 'material_name' => $first->material_name,
@@ -161,11 +185,14 @@ class MaterialCalibrationController extends Controller
                 'result_at' => $first->result_at,
                 'quarantine_codes' => $group->pluck('quarantine_code')->filter()->unique()->values()->all(),
             ];
-        })->values();
+        })
+            // Phiếu phòng khác đã chọn người khác xác nhận: không hiện cho QA không được chọn
+            ->filter(fn ($row) => $row->own || $row->incoming)
+            ->values();
 
-        // Số trên tab: việc đang chờ của người xem - QA thấy phiếu các phòng gửi tới, kho thấy phiếu của phòng
+        // Số trên tab: việc đang chờ của người xem - người xác nhận thấy phiếu gửi tới mình, kho thấy phiếu của phòng
         $badge = $rows->where('status', 'pending')
-            ->filter(fn ($row) => $canConfirm && $row->incoming ? true : $row->own)
+            ->filter(fn ($row) => $row->can_confirm || $row->own)
             ->count();
 
         $sub = $request->query('cal_sub') === 'done' ? 'done' : 'pending';
@@ -177,7 +204,9 @@ class MaterialCalibrationController extends Controller
             'sub' => $sub,
             'range' => $range,
             'badge' => $badge,
-            'canConfirm' => $canConfirm && $incomingIds,
+            'canConfirm' => $rows->contains(fn ($row) => $row->can_confirm),
+            // Ô chọn Phòng + Người xác nhận ở modal Đề nghị HC / Đổi người xác nhận
+            'confirmerOptions' => MaterialCalibration::confirmerOptions($departmentId, $userId ?: null),
         ];
     }
 
@@ -202,7 +231,12 @@ class MaterialCalibrationController extends Controller
             'serials' => ['nullable', 'array'],
             'serials.*' => ['nullable', 'array'],
             'serials.*.*' => ['nullable', 'string', 'max:100'],
+            'confirm_department_id' => ['required', 'integer'],
+            'confirmer_ids' => ['required', 'array', 'min:1'],
+            'confirmer_ids.*' => ['integer'],
         ], [
+            'confirm_department_id.required' => 'Vui lòng chọn phòng của người xác nhận hiệu chuẩn.',
+            'confirmer_ids.required' => 'Vui lòng chọn ít nhất một người xác nhận hiệu chuẩn.',
             'serials.*.*.max' => 'Seri No tối đa 100 ký tự.',
             'lots.required' => 'Vui lòng chọn mã xuất nhập cần gửi hiệu chuẩn.',
             'lots.*.amount.numeric' => 'Số lượng phải là số.',
@@ -316,13 +350,22 @@ class MaterialCalibrationController extends Controller
             }
         }
 
+        // Người xác nhận do người đề nghị chọn: một phòng, một hay nhiều người có quyền xác nhận ở phòng đó
+        $chosen = MaterialCalibration::validateConfirmers($departmentId, $this->userId(), $request->confirm_department_id, $request->confirmer_ids);
+
+        if (is_string($chosen)) {
+            return $this->prepBack($request, 'error', $chosen);
+        }
+
         $actor = $this->actor();
         $now = now();
         $unit = $item->issued_unit ?: $item->requested_unit;
         $note = $this->nullIfBlank($request->request_note);
 
-        $code = DB::transaction(function () use ($wanted, $units, $departmentId, $req, $item, $unit, $note, $actor, $now) {
+        $code = DB::transaction(function () use ($wanted, $units, $departmentId, $req, $item, $unit, $note, $actor, $now, $chosen) {
             $code = MaterialCalibration::nextCode($departmentId);
+
+            MaterialCalibration::assignConfirmers($code, $chosen[0], $chosen[1], $actor);
 
             foreach ($wanted as $importId => $amount) {
                 $calibrationId = DB::table(self::TABLE)->insertGetId([
@@ -365,6 +408,7 @@ class MaterialCalibrationController extends Controller
 
         $codes = $lots->only(array_keys($wanted))->pluck('code')->implode(', ');
         $total = array_sum($wanted);
+        $confirmerText = $this->confirmerText($code);
 
         AuditTrialController::log(
             'Đề nghị hiệu chuẩn vật tư',
@@ -372,10 +416,11 @@ class MaterialCalibrationController extends Controller
             $item->id,
             'NA',
             'Phiếu '.$code.' cho đề nghị '.$req->code.': '.$this->number($total).' '.($unit ?: '').' từ mã xuất nhập '.$codes
+                .', người xác nhận: '.$confirmerText
         );
 
-        return $this->prepBack($request, 'success', 'Đã gửi QA hiệu chuẩn '.$this->number($total).' '.($unit ?: '')
-            .' (phiếu '.$code.'). Phần này được giữ chỗ, QA xác nhận đạt mới cấp phát được.');
+        return $this->prepBack($request, 'success', 'Đã gửi hiệu chuẩn '.$this->number($total).' '.($unit ?: '')
+            .' (phiếu '.$code.') tới '.$confirmerText.'. Phần này được giữ chỗ, xác nhận đạt mới cấp phát được.');
     }
 
     /* ==========================================================
@@ -428,9 +473,13 @@ class MaterialCalibrationController extends Controller
         }
 
         $sourceDepartmentId = (int) $rows->first()->department_id;
+        $chosen = MaterialCalibration::confirmersOf([$request->code])[$request->code] ?? null;
 
-        if (! in_array($sourceDepartmentId, MaterialCalibration::sourceDepartmentIds($departmentId), true)) {
-            return $this->tabBack('error', 'Phòng QA đang chọn không phụ trách hiệu chuẩn cho phòng đề nghị phiếu này.');
+        if (! MaterialCalibration::canConfirmCode((string) $request->code, $sourceDepartmentId, $this->userId(), $departmentId, $chosen)) {
+            return $this->tabBack('error', $chosen
+                ? 'Phiếu '.$request->code.' được gửi cho '.$this->confirmerText($request->code).' - bạn không phải người được chọn xác nhận'
+                    .($chosen['department_id'] !== $departmentId ? ' (hoặc chưa chuyển sang phòng '.$chosen['department_name'].')' : '').'.'
+                : 'Phòng QA đang chọn không phụ trách hiệu chuẩn cho phòng đề nghị phiếu này.');
         }
 
         // Đơn vị do người đề nghị khai - mọi đơn vị phải có kết quả
@@ -595,6 +644,50 @@ class MaterialCalibrationController extends Controller
     }
 
     /* ==========================================================
+     |  CHỌN / ĐỔI NGƯỜI XÁC NHẬN
+     ========================================================== */
+
+    /**
+     * Phòng đề nghị chọn lại người xác nhận của phiếu còn chờ (người đã chọn vắng, chọn nhầm), hoặc
+     * chọn lần đầu cho phiếu HC sau cấp phát / phiếu cũ chưa có người xác nhận.
+     */
+    public function confirmers(Request $request)
+    {
+        $departmentId = $this->departmentId();
+
+        if (! user_can('export_material_issue')) {
+            return $this->tabBack('error', 'Bạn không có quyền cấp phát vật tư nên không chọn người xác nhận hiệu chuẩn được!');
+        }
+
+        $code = (string) $request->code;
+
+        $pending = DB::table(self::TABLE)
+            ->where('code', $code)
+            ->where('department_id', $departmentId)
+            ->where('status_id', 1)
+            ->where('app_status', 'pending')
+            ->exists();
+
+        if (! $pending) {
+            return $this->tabBack('error', 'Phiếu '.$code.' không còn chờ xác nhận hiệu chuẩn của phòng này, vui lòng tải lại trang.');
+        }
+
+        $chosen = MaterialCalibration::validateConfirmers($departmentId, $this->userId(), $request->confirm_department_id, $request->confirmer_ids);
+
+        if (is_string($chosen)) {
+            return $this->tabBack('error', $chosen);
+        }
+
+        $before = $this->confirmerText($code);
+        MaterialCalibration::assignConfirmers($code, $chosen[0], $chosen[1], $this->actor());
+        $after = $this->confirmerText($code);
+
+        AuditTrialController::log('Chọn người xác nhận hiệu chuẩn vật tư', self::TABLE, 0, $before, 'Phiếu '.$code.': '.$after);
+
+        return $this->tabBack('success', 'Đã gửi phiếu '.$code.' tới '.$after.' xác nhận hiệu chuẩn.');
+    }
+
+    /* ==========================================================
      |  HUỶ PHIẾU CHỜ QA
      ========================================================== */
 
@@ -726,9 +819,21 @@ class MaterialCalibrationController extends Controller
         return $code;
     }
 
-    private function departmentName($id): string
+    /** "Nguyễn A (a), Trần B (b) - phòng QA" của phiếu; chưa chọn ai thì "phòng QA (chưa chọn người)". */
+    private function confirmerText(string $code): string
     {
-        return (string) (DB::table('deparments')->where('id', $id)->value('name') ?: '—');
+        $chosen = MaterialCalibration::confirmersOf([$code])[$code] ?? null;
+
+        if (! $chosen) {
+            return 'phòng QA (chưa chọn người xác nhận)';
+        }
+
+        return implode(', ', array_column($chosen['users'], 'name')).' - phòng '.$chosen['department_name'];
+    }
+
+    private function userId(): int
+    {
+        return (int) (session('user')['userId'] ?? 0);
     }
 
     private function departmentId(): int

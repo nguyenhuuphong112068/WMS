@@ -28,8 +28,8 @@
 
 <h3>Quy tắc khi cấp</h3>
 <ul>
-    <li>Không có quyền <b>Điều Chỉnh Mã Xuất Nhập Khi Cấp Phát</b>: chỉ cấp được từ đúng các lô hệ thống đề xuất.</li>
-    <li>Không có quyền <b>Điều Chỉnh Số Lượng Khi Cấp Phát</b>: phải cấp đúng số đề xuất.</li>
+    <li>Không có quyền <b>Điều Chỉnh Mã Xuất Nhập Khi Cấp Phát Vật Tư</b>: chỉ cấp được từ đúng các lô hệ thống đề xuất.</li>
+    <li>Không có quyền <b>Điều Chỉnh Số Lượng Khi Cấp Phát Vật Tư</b>: phải cấp đúng số đề xuất.</li>
     <li>Mỗi lô được cấp vượt tối đa <b>5%</b> so với phần còn hứa được (bù sai số cân, đong).</li>
     <li>Không cấp được lô <b>đã hết hạn</b>, lô của phòng khác, hoặc phần đang giữ cho việc khác (cách ly, hiệu chuẩn).</li>
     <li>Kho thiếu hàng thì cấp được bao nhiêu hay bấy nhiêu: dòng chuyển sang <b>Cấp phát một phần</b> và bấm

@@ -44,13 +44,16 @@
         <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-check mr-1"></i>Khai báo</span> (lần đầu) hoặc
         <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-plus mr-1"></i>Khai báo thêm</span>, nhập 2 ô bắt buộc
         <b>Mã hồ sơ khai báo</b> và <b>Code nhà sản xuất</b> (mã hàng / catalogue number) rồi nhập lại mật khẩu. Cột liệt kê từng lần
-        khai báo: Code NSX, Hồ sơ, người · ngày; mỗi lần được ghi vào lịch sử. Lần khai báo đã ghi không sửa hay gỡ được, và không
-        làm danh mục phải duyệt lại. Code NSX khai ở đây hiện ở hộp <a href="#du-tru">Thêm mặt hàng dự trù</a>.</li>
+        khai báo: Code NSX, Hồ sơ, người · ngày; mỗi lần được ghi vào lịch sử và không làm danh mục phải duyệt lại.
+        Khai sai thì bấm <i class="fas fa-pen"></i> ở góc phải khung của lần khai báo đó: hộp <b>Sửa khai báo Cổng thông tin quốc gia</b>
+        điền sẵn Mã hồ sơ + Code nhà sản xuất cũ, sửa rồi nhập <b>Lý do điều chỉnh</b> (bắt buộc, không cần mật khẩu). Thay đổi ghi vào
+        lịch sử danh mục (<i>Sửa khai báo Cổng TTQG</i>) và Audit Trail, khung hiện thêm <i>· đã sửa</i>. Không đổi gì mà vẫn lưu thì hệ
+        thống báo <i>"Thông tin khai báo không có thay đổi."</i> Khai báo và sửa đều cần quyền <b>Sửa Danh Mục Hoá Chất</b>. Code NSX khai ở đây hiện ở hộp <a href="#du-tru">Thêm mặt hàng dự trù</a>.</li>
 </ul>
 
 <h3>Điều chỉnh thời gian đặt hàng</h3>
 <p>Hộp thoại <b>Thêm mới</b> và <b>Cập nhật</b> không có ô Thời Gian Đặt Hàng - số ngày do người có quyền khai sau. Người có quyền <span class="ug-key">category_chemical_lead_time</span>
-    (<b>Điều Chỉnh Thời Gian Đặt Hàng</b>) thấy nút <span class="ug-key"><i class="fas fa-pen"></i></span> ngay trong cột
+    (<b>Điều Chỉnh Thời Gian Đặt Hàng Hoá Chất</b>) thấy nút <span class="ug-key"><i class="fas fa-pen"></i></span> ngay trong cột
     <b>Thời Gian Đặt Hàng</b> của bảng - không cần quyền Sửa danh mục.</p>
 <ol>
     <li>Bấm nút <span class="ug-key"><i class="fas fa-pen"></i></span> ở dòng cần đổi.</li>

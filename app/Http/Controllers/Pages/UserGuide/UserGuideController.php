@@ -33,7 +33,7 @@ class UserGuideController extends Controller
             'title' => 'Phân Quyền',
             'icon' => 'fas fa-user-shield',
             'summary' => 'Cách hệ thống phân quyền theo nhóm quyền và phòng ban, cách thiết lập cho người dùng, các vai trò hiện có và bảng phân quyền chung của toàn hệ thống.',
-            'updated_at' => '2026-11-04',
+            'updated_at' => '2026-11-14',
         ],
         'materData' => [
             'title' => 'Dữ Liệu Gốc',

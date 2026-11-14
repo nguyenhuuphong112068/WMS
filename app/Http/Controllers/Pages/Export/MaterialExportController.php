@@ -379,6 +379,7 @@ class MaterialExportController extends Controller
             'calibrationRange' => $calibration['range'],
             'calibrationBadge' => $calibration['badge'],
             'calibrationCanConfirm' => $calibration['canConfirm'],
+            'calibrationConfirmerOptions' => $calibration['confirmerOptions'],
             // ---- Tab "Cấp phát vật tư" ----
             'prepGroups' => $prep['groups'],
             'prepBadgeCount' => $prep['count'],

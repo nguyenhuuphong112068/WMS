@@ -194,7 +194,7 @@ class InitialDataImporter
 
         $lists = $book->getSheetByName(InitialDataSchema::LIST_SHEET);
         $version = $lists?->getCell('A2')->getValue();
-        if ($version !== InitialDataSchema::VERSION) {
+        if ($version !== InitialDataSchema::VERSION && ! isset(InitialDataSchema::COMPATIBLE_VERSIONS[$version])) {
             $this->error(null, null, 'File không đúng mẫu khởi tạo dữ liệu (phiên bản '.InitialDataSchema::VERSION.'). Vui lòng tải file mẫu mới nhất trên hệ thống và điền lại.');
 
             return null;
@@ -211,6 +211,13 @@ class InitialDataImporter
             } else {
                 $this->prefilled[$key] = (int) $value;
             }
+        }
+
+        // Phiên bản cũ chỉ nhận cho giai đoạn không đổi cấu trúc (COMPATIBLE_VERSIONS)
+        if (! InitialDataSchema::acceptsVersion($version, $this->stage)) {
+            $this->error(null, null, 'File là mẫu phiên bản cũ ('.$version.'). Vui lòng tải file mẫu mới nhất ('.InitialDataSchema::VERSION.') trên hệ thống và điền lại.');
+
+            return null;
         }
 
         // File của một module / giai đoạn: đọc sheet của giai đoạn + sheet bổ sung giai đoạn trước;
@@ -1235,109 +1242,10 @@ class InitialDataImporter
     /** Loại hàng VPP (chưa có hằng tương ứng ở CategoryUnitConversion vì VPP không quy đổi đơn vị theo phòng). */
     private const TYPE_VPP = 'vpp';
 
-    private const ZONE_TABLES = ['warehouse' => 'warehouses', 'shelf' => 'shelves', 'column' => 'columns', 'tier' => 'tiers', 'location' => 'locations'];
-
-    private const ZONE_LABELS = ['warehouse' => 'Mã kho', 'shelf' => 'Mã kệ / tủ', 'column' => 'Mã cột', 'tier' => 'Mã tầng'];
-
-    private function importWarehouses(array $rows): void
-    {
-        $this->importZone($rows, 'warehouse');
-    }
-
-    private function importShelves(array $rows): void
-    {
-        $this->importZone($rows, 'shelf');
-    }
-
-    private function importColumns(array $rows): void
-    {
-        $this->importZone($rows, 'column');
-    }
-
-    private function importTiers(array $rows): void
-    {
-        $this->importZone($rows, 'tier');
-    }
-
-    private function importLocations(array $rows): void
-    {
-        $this->importZone($rows, 'location');
-    }
-
     /**
-     * Một cấp định khu. Cấp cha khai ở cấp gần nhất là đủ: các cấp trên suy ra từ bản ghi cha;
-     * khai thêm cấp trên mà lệch với cấp suy ra thì báo lỗi. Mọi cấp cha phải cùng phòng ban.
+     * Định khu KHÔNG nạp qua file (tạo trực tiếp trên màn hình Định Khu): sheet "Định khu" của file chỉ
+     * liệt kê vị trí đang có để chọn Vị trí mặc định / Vị trí lưu, bộ nạp chỉ tra vị trí trong DB.
      */
-    private function importZone(array $rows, string $level): void
-    {
-        $table = self::ZONE_TABLES[$level];
-        $parentLevels = array_slice(array_keys(self::ZONE_LABELS), 0, array_search($level, array_keys(self::ZONE_TABLES)));
-
-        $this->eachUnique($rows, ['code'], function ($row) use ($table, $level, $parentLevels) {
-            $deptId = $this->department($row);
-            if (! $deptId) {
-                return;
-            }
-
-            $current = $this->zone($table, $row['code']);
-            if ($current) {
-                return (int) $current->department_id === $deptId
-                    ? $this->existing()
-                    : $this->error($row['_row'], 'Mã', 'Mã "'.$row['code'].'" đã được phòng ban khác dùng.');
-            }
-
-            // Lần từ cấp cha sâu nhất được khai lên trên
-            $parents = array_fill_keys(array_map(fn ($l) => $l.'_id', $parentLevels), null);
-            foreach (array_reverse($parentLevels) as $parentLevel) {
-                $code = $row[$parentLevel] ?? null;
-                if ($code === null) {
-                    continue;
-                }
-
-                $parent = $this->zone(self::ZONE_TABLES[$parentLevel], $code);
-                if (! $parent) {
-                    return $this->error($row['_row'], self::ZONE_LABELS[$parentLevel], 'Không có "'.$code.'" ở sheet định khu tương ứng.');
-                }
-                if ((int) $parent->department_id !== $deptId) {
-                    return $this->error($row['_row'], self::ZONE_LABELS[$parentLevel], '"'.$code.'" thuộc phòng ban khác.');
-                }
-
-                $derived = $parents[$parentLevel.'_id'];
-                if ($derived !== null && $derived !== (int) $parent->id) {
-                    return $this->error($row['_row'], self::ZONE_LABELS[$parentLevel], '"'.$code.'" không khớp với cấp con đã khai (cấp con thuộc '.self::ZONE_LABELS[$parentLevel].' khác).');
-                }
-                $parents[$parentLevel.'_id'] = (int) $parent->id;
-
-                foreach (['warehouse_id', 'shelf_id', 'column_id', 'tier_id'] as $column) {
-                    if (array_key_exists($column, $parents) && $parents[$column] === null && ! empty($parent->$column)) {
-                        $parents[$column] = (int) $parent->$column;
-                    }
-                }
-            }
-
-            $data = ['code' => $row['code'], 'department_id' => $deptId] + $parents + [
-                'zone_type' => $row['zone_type'] ?? null,
-                'color' => $row['color'] ?? null,
-            ];
-            if ($level !== 'location') {
-                $data['name'] = $row['name'];
-            } else {
-                $data['item_type'] = $row['item_type'];
-            }
-
-            $id = DB::table($table)->insertGetId($data + [
-                'status_id' => 1,
-                'created_by' => $this->actor,
-                'created_at' => $this->now,
-                'updated_at' => $this->now,
-            ]);
-            $this->masterHistory($table, $id, ['Phòng ban' => $row['department'], 'Mã' => $row['code']] + ($level !== 'location' ? ['Tên' => $row['name']] : []));
-            $this->inserted();
-
-            $this->cache['zone.'.$table][mb_strtolower($row['code'])] = (object) (['id' => $id] + $data);
-        });
-    }
-
     private function zone(string $table, string $code): ?object
     {
         $key = mb_strtolower($code);
@@ -1746,7 +1654,7 @@ class InitialDataImporter
         $location = $this->zone('locations', $code);
 
         if (! $location || (int) $location->department_id !== $deptId) {
-            $this->error($row['_row'], $label, 'Không có vị trí "'.$code.'" của phòng '.$row['department'].' (sheet 26).');
+            $this->error($row['_row'], $label, 'Không có vị trí "'.$code.'" của phòng '.$row['department'].' (sheet Định khu - vị trí tạo trên màn hình Định Khu).');
 
             return null;
         }

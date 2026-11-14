@@ -16,8 +16,10 @@ use Illuminate\Support\Facades\DB;
  *      xác nhận cả phiếu: Đạt (passed) hoặc Không đạt (failed -> hàng tự sang Cách ly).
  *   3. Chỉ phần ĐẠT mới được cấp, đúng mã xuất nhập đã hiệu chuẩn, cho đúng dòng đề nghị đó.
  *
- * QA phụ trách phòng nào: QA cùng công ty; công ty chưa có phòng QA thì mọi phòng QA đều
- * nhận (giống thông báo cũ khi cấp phát, để không lọt việc).
+ * Ai xác nhận: người đề nghị CHỌN Phòng + Người xác nhận (một hay nhiều người của phòng đó, có
+ * quyền xác nhận) khi gửi phiếu - bảng CONFIRMER_TABLE; chỉ những người đó, đang làm việc ở đúng
+ * phòng đó, mới ký được (canConfirmCode). Phiếu chưa chọn người (phiếu cũ, phiếu HC sau cấp phát
+ * chưa gửi) theo quy tắc cũ: QA cùng công ty; công ty chưa có phòng QA thì mọi phòng QA đều nhận.
  *
  * Query Builder thuần - song song với App\Support\MaterialPicking.
  */
@@ -34,6 +36,9 @@ class MaterialCalibration
     public const UNIT_LIMIT = 500;
 
     public const CONFIRM_PERMISSION = 'export_material_calibration_confirm';
+
+    /** Người xác nhận do người đề nghị chọn (theo mã phiếu) - xem confirmerOptions(). */
+    public const CONFIRMER_TABLE = 'material_calibration_confirmers';
 
     /** Hiệu chuẩn TRƯỚC cấp phát (giữ chỗ tồn, đạt mới cấp) - qa_calibration = yes. */
     public const TIMING_BEFORE = 'before';
@@ -386,6 +391,205 @@ class MaterialCalibration
             ->where('id', $departmentId)
             ->where('EngshortName', 'QA')
             ->exists();
+    }
+
+    /* ---------- Người xác nhận do người đề nghị chọn ---------- */
+
+    /**
+     * Ứng viên xác nhận cho phiếu của phòng $departmentId, nhóm theo phòng (chọn phòng trước, lọc
+     * người theo phòng): user đang hoạt động được gán vai trò có quyền CONFIRM_PERMISSION TẠI một
+     * phòng (user_role.department_id) - không tính vai trò Admin (Admin có mọi quyền ở mọi phòng),
+     * kiểm lại bằng user_permission_names() để tôn trọng quyền bị chặn riêng. Chỉ phòng cùng công
+     * ty với phòng đề nghị (công ty không có ai thì lấy mọi phòng). Bỏ chính người đề nghị.
+     *
+     * Phòng QA xếp trước (là phòng mặc định), rồi theo tên phòng.
+     *
+     * @return array<int, array{id:int, name:string, is_qa:bool, users:array<int, array{id:int, name:string}>}>
+     */
+    public static function confirmerOptions(int $departmentId, ?int $excludeUserId = null): array
+    {
+        $permissionId = DB::table('permissions')->where('name', self::CONFIRM_PERMISSION)->value('id');
+
+        if (! $permissionId) {
+            return [];
+        }
+
+        $rows = DB::table('user_role')
+            ->join('role_permission', 'role_permission.role_id', '=', 'user_role.role_id')
+            ->join('roles', 'roles.id', '=', 'user_role.role_id')
+            ->join('user_management', 'user_management.id', '=', 'user_role.user_id')
+            ->join('deparments', 'deparments.id', '=', 'user_role.department_id')
+            ->where('role_permission.permission_id', $permissionId)
+            ->where('roles.name', '<>', 'Admin')
+            ->whereNotNull('user_role.department_id')
+            ->where('user_management.isActive', 1)
+            ->where('deparments.isActive', 1)
+            ->when($excludeUserId, fn ($query) => $query->where('user_management.id', '<>', $excludeUserId))
+            ->select(
+                'user_role.user_id',
+                'user_role.department_id',
+                'user_management.fullName',
+                'user_management.userName',
+                'deparments.name as department_name',
+                'deparments.EngshortName',
+                'deparments.company_id'
+            )
+            ->distinct()
+            ->get()
+            ->filter(fn ($row) => isset(user_permission_names((int) $row->user_id, (int) $row->department_id)[self::CONFIRM_PERMISSION]));
+
+        $companyId = CompanyContext::resolveForDepartment($departmentId);
+        $sameCompany = $rows->filter(fn ($row) => (int) $row->company_id === (int) $companyId);
+        $rows = $sameCompany->isNotEmpty() ? $sameCompany : $rows;
+
+        return $rows->groupBy('department_id')
+            ->map(function ($group, $id) {
+                $first = $group->first();
+
+                return [
+                    'id' => (int) $id,
+                    'name' => (string) $first->department_name,
+                    'is_qa' => $first->EngshortName === 'QA',
+                    'users' => $group->unique('user_id')
+                        ->map(fn ($row) => ['id' => (int) $row->user_id, 'name' => self::userLabel($row->fullName, $row->userName)])
+                        ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->sortBy(fn ($dept) => ($dept['is_qa'] ? '0' : '1').mb_strtolower($dept['name']))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Kiểm phòng + danh sách người xác nhận người đề nghị gửi lên: phòng phải có trong ứng viên,
+     * mọi người phải thuộc phòng đó. Trả về [department_id, [user_id...]] hoặc câu báo lỗi.
+     *
+     * @return array{0:int, 1:array<int>}|string
+     */
+    public static function validateConfirmers(int $departmentId, ?int $requesterId, $confirmDepartmentId, $userIds): array|string
+    {
+        $confirmDepartmentId = (int) $confirmDepartmentId;
+        $userIds = array_values(array_unique(array_filter(array_map('intval', (array) $userIds))));
+
+        if (! $confirmDepartmentId) {
+            return 'Vui lòng chọn phòng của người xác nhận hiệu chuẩn.';
+        }
+
+        if (! $userIds) {
+            return 'Vui lòng chọn ít nhất một người xác nhận hiệu chuẩn.';
+        }
+
+        $dept = collect(self::confirmerOptions($departmentId, $requesterId))->firstWhere('id', $confirmDepartmentId);
+
+        if (! $dept) {
+            return 'Phòng được chọn không có người xác nhận hiệu chuẩn vật tư.';
+        }
+
+        $allowed = array_column($dept['users'], 'id');
+
+        foreach ($userIds as $userId) {
+            if (! in_array($userId, $allowed, true)) {
+                return $requesterId && $userId === $requesterId
+                    ? 'Không được tự chọn mình xác nhận hiệu chuẩn phiếu của mình.'
+                    : 'Người được chọn không có quyền xác nhận hiệu chuẩn vật tư ở phòng '.$dept['name'].'.';
+            }
+        }
+
+        return [$confirmDepartmentId, $userIds];
+    }
+
+    /** Ghi (thay toàn bộ) người xác nhận của phiếu $code - người cũ chuyển status_id = 0. */
+    public static function assignConfirmers(string $code, int $confirmDepartmentId, array $userIds, string $actor): void
+    {
+        $now = now();
+
+        DB::table(self::CONFIRMER_TABLE)
+            ->where('code', $code)
+            ->where('status_id', 1)
+            ->update(['status_id' => 0, 'updated_by' => $actor, 'updated_at' => $now]);
+
+        foreach ($userIds as $userId) {
+            DB::table(self::CONFIRMER_TABLE)->insert([
+                'code' => $code,
+                'department_id' => $confirmDepartmentId,
+                'user_id' => $userId,
+                'status_id' => 1,
+                'created_by' => $actor,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+    }
+
+    /**
+     * Người xác nhận đang được chọn của các phiếu.
+     *
+     * @return array<string, array{department_id:int, department_name:string, users:array<int, array{id:int, name:string}>}>
+     */
+    public static function confirmersOf($codes): array
+    {
+        $codes = collect($codes)->filter()->unique()->values();
+
+        if ($codes->isEmpty()) {
+            return [];
+        }
+
+        return DB::table(self::CONFIRMER_TABLE.' as c')
+            ->join('user_management as u', 'u.id', '=', 'c.user_id')
+            ->leftJoin('deparments as d', 'd.id', '=', 'c.department_id')
+            ->whereIn('c.code', $codes)
+            ->where('c.status_id', 1)
+            ->select('c.code', 'c.department_id', 'c.user_id', 'u.fullName', 'u.userName', 'd.name as department_name')
+            ->orderBy('u.fullName')
+            ->get()
+            ->groupBy('code')
+            ->map(fn ($group) => [
+                'department_id' => (int) $group->first()->department_id,
+                'department_name' => (string) $group->first()->department_name,
+                'users' => $group->map(fn ($row) => ['id' => (int) $row->user_id, 'name' => self::userLabel($row->fullName, $row->userName)])->values()->all(),
+            ])
+            ->all();
+    }
+
+    /** Mã phiếu đang chờ mà $userId được chọn xác nhận, theo phòng xác nhận: [code => department_id]. */
+    public static function pendingCodesAssignedTo(int $userId): array
+    {
+        return DB::table(self::CONFIRMER_TABLE.' as c')
+            ->join(self::TABLE.' as m', 'm.code', '=', 'c.code')
+            ->where('c.user_id', $userId)
+            ->where('c.status_id', 1)
+            ->where('m.status_id', 1)
+            ->where('m.app_status', 'pending')
+            ->distinct()
+            ->pluck('c.department_id', 'c.code')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * Người đang đăng nhập ($userId, đang làm việc ở $departmentId) có ký xác nhận được phiếu không:
+     * phiếu đã chọn người thì phải là một trong những người đó và đang ở đúng phòng xác nhận; phiếu
+     * chưa chọn người thì theo quy tắc cũ - phòng QA phụ trách phòng đề nghị.
+     */
+    public static function canConfirmCode(string $code, int $sourceDepartmentId, int $userId, int $departmentId, ?array $confirmers = null): bool
+    {
+        $confirmers ??= self::confirmersOf([$code])[$code] ?? null;
+
+        if ($confirmers) {
+            return $confirmers['department_id'] === $departmentId
+                && in_array($userId, array_column($confirmers['users'], 'id'), true);
+        }
+
+        return in_array($sourceDepartmentId, self::sourceDepartmentIds($departmentId), true);
+    }
+
+    private static function userLabel(?string $fullName, ?string $userName): string
+    {
+        $fullName = trim((string) $fullName);
+
+        return $fullName !== '' ? $fullName.($userName ? ' ('.$userName.')' : '') : (string) $userName;
     }
 
     /** Phòng QA nhận đề nghị hiệu chuẩn của $departmentId: QA cùng công ty, không có thì mọi QA. */

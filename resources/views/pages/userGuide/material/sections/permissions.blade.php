@@ -6,6 +6,8 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Người ký đề nghị cấp phát do <b>Dữ Liệu Gốc › Trình Ký Đề Nghị CP Vật Tư</b> quyết định, không chỉ dựa vào quyền.
+    <div>Người ký đề nghị cấp phát nội bộ do <b>Dữ Liệu Gốc › Trình Ký Đề Nghị CP Vật Tư</b> quyết định; vai trò nhận trình ký
+        phải có quyền <b>Duyệt Cấp Phát Vật Tư</b>. Ký đề nghị <b>liên phòng ban</b> theo vai trò <b>Quản Lý Bộ Phận</b> (phòng đề nghị rồi phòng cấp phát), ký phiếu dự trù theo
+        Quản Lý Bộ Phận rồi <b>Ban Giám Đốc</b> - không dựa vào quyền.
         Thống Kê Vật Tư hiện với người có quyền <b>Xem Cấp Phát Vật Tư</b>.</div>
 </div>

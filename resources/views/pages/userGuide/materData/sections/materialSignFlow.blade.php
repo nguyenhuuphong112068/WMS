@@ -6,7 +6,7 @@
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/trinh-ky-cap-phat-form.png', 'caption' => 'Hộp thoại thêm mới - Trình Ký Đề Nghị CP Vật Tư'])
 
 @include('pages.userGuide.shared.fields', ['fields' => [
-    ['Vai Trò Nhận Trình Ký', true, 'Mỗi vai trò chỉ khai <b>một lần</b> trong phòng (kể cả dòng đã khoá, muốn dùng lại thì mở khoá).'],
+    ['Vai Trò Nhận Trình Ký', true, 'Chỉ liệt kê <b>Admin</b> và các vai trò đã được gán quyền <b>Duyệt Cấp Phát Vật Tư</b> ở Phân Quyền › Nhóm Quyền (vai trò khác báo lỗi <i>"Vai trò không có quyền "Duyệt Cấp Phát Vật Tư" nên không nhận trình ký được."</i>). Mỗi vai trò chỉ khai <b>một lần</b> trong phòng (kể cả dòng đã khoá, muốn dùng lại thì mở khoá).'],
     ['Cấp Ký', true, 'Số thứ tự từ 1 đến 50, xếp thứ tự các bước trên phiếu (1 là bước đầu). Đề nghị nội bộ <b>ký đồng thời</b>: xem bên dưới.'],
     ['Người Ký', true, 'Bấm <b>Thêm người ký</b> để chọn một hoặc nhiều người thuộc vai trò. Chỉ cần <b>một người</b> trong số đó ký là xong bước.'],
     ['Điều Kiện Nhận Trình Ký', false, 'Bấm <b>Thêm nhóm điều kiện</b> (tối đa 10 nhóm). Để trống thì vai trò này nhận trình ký <b>mọi đề nghị</b>.'],

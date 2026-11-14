@@ -48,6 +48,11 @@
                 <td style="font-weight: 400">Hoá chất phải có ít nhất 2 hoạt chất, trong đó ít nhất một hoạt chất thuộc nhóm 9.
                     Xem mục <a href="#hoa-chat">Hoá Chất</a>.</td>
             </tr>
+            <tr>
+                <td>Không thấy vai trò cần chọn ở Trình Ký Đề Nghị CP Vật Tư, hoặc báo "Vai trò không có quyền "Duyệt Cấp Phát Vật Tư" nên không nhận trình ký được."</td>
+                <td style="font-weight: 400">Ô vai trò chỉ có Admin và các vai trò được tick quyền <b>Duyệt Cấp Phát Vật Tư</b>. Nhờ quản trị viên
+                    tick quyền này cho vai trò ở Phân Quyền › Nhóm Quyền rồi mở lại hộp thoại. Xem <a href="#trinh-ky-cap-phat">Trình Ký Đề Nghị CP Vật Tư</a>.</td>
+            </tr>
         </tbody>
     </table>
 </div>

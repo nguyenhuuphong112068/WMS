@@ -36,7 +36,7 @@
 
 <h3>Điều chỉnh thời gian đặt hàng</h3>
 <p>Hộp thoại <b>Thêm mới</b> và <b>Cập nhật</b> không có ô Thời Gian Đặt Hàng - số ngày do người có quyền khai sau. Người có quyền <span class="ug-key">category_standard_lead_time</span>
-    (<b>Điều Chỉnh Thời Gian Đặt Hàng</b>) thấy nút <span class="ug-key"><i class="fas fa-pen"></i></span> ngay trong cột
+    (<b>Điều Chỉnh Thời Gian Đặt Hàng Chất Chuẩn</b>) thấy nút <span class="ug-key"><i class="fas fa-pen"></i></span> ngay trong cột
     <b>Thời Gian Đặt Hàng</b> của bảng - không cần quyền Sửa danh mục.</p>
 <ol>
     <li>Bấm nút <span class="ug-key"><i class="fas fa-pen"></i></span> ở dòng cần đổi.

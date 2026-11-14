@@ -1,4 +1,4 @@
-<p>Mỗi màn hình Dữ Liệu Gốc thuộc một trong bốn phạm vi. Quyền được cấp ở màn hình <b>Phân Quyền › Nhóm Quyền</b>,
+<p>Mỗi màn hình Dữ Liệu Gốc thuộc một trong các phạm vi dưới đây (phạm vi <b>VPP</b> có quyền Xem / Thêm-Sửa-Khoá riêng nhưng hiện không có màn hình nào; tên VPP dùng chung màn Tên Vật Tư). Quyền được cấp ở màn hình <b>Phân Quyền › Nhóm Quyền</b>,
     theo phạm vi và chi tiết tới từng màn hình.</p>
 
 <div class="table-responsive">
@@ -12,7 +12,7 @@
         <tbody>
             <tr>
                 <td>Dùng chung</td>
-                <td>Công Ty, Phòng Ban, Tổ, Đơn Vị Tính, Quy Cách Đóng Gói, Điều Kiện Bảo Quản, Nhà Sản Xuất, Nhà Cung
+                <td>Công Ty (đang ẩn khỏi menu), Phòng Ban, Tổ, Đơn Vị Tính, Quy Cách Đóng Gói, Điều Kiện Bảo Quản, Nhà Sản Xuất, Nhà Cung
                     Cấp, Tên Sản Phẩm, Định Khu, Đối Tượng</td>
             </tr>
             <tr>
@@ -46,5 +46,6 @@
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
     <div>Không thấy menu hoặc nút cần dùng? Liên hệ quản trị viên để được cấp quyền phù hợp.
-        Ở màn hình <b>Khởi Tạo Dữ Liệu</b>, tải file mẫu chỉ dành cho Admin; phòng ban cần quyền <b>Đính Kèm File Khởi Tạo Dữ Liệu</b> để nộp file đã điền.</div>
+        Ở màn hình <b>Khởi Tạo Dữ Liệu</b>: phòng ban tự tải file mẫu giai đoạn của phòng mình và cần quyền <b>Đính Kèm File Khởi Tạo Dữ Liệu</b>
+        để nộp file đã điền; tải file giai đoạn 1 / cả hệ thống, cập nhật trạng thái và xoá file chỉ dành cho <b>Admin</b>.</div>
 </div>
