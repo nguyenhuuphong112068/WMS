@@ -385,7 +385,7 @@ class VppAvailabilityForecast
         }
 
         return DB::table('vpp_categories')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_categories.id'))
             ->tap(fn ($query) => DepartmentVpp::join($query, $departmentId, 'vpp_categories.id'))
@@ -394,7 +394,7 @@ class VppAvailabilityForecast
                 'vpp_categories.code as category_code',
                 'vpp_categories.purchasing_department',
                 'vpp_categories.classification',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 DepartmentVpp::minStockColumn(),
                 'units.id as unit_id',

@@ -27,20 +27,20 @@
 
                             <div class="form-group">
                                 <label>Tên VPP <span class="text-danger">*</span></label>
-                                <select name="material_names_id"
-                                    data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'material']) }}"
-                                    class="form-control cat-select {{ $bag->has('material_names_id') ? 'is-invalid' : '' }}"
+                                <select name="vpp_names_id"
+                                    data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'vpp']) }}"
+                                    class="form-control cat-select {{ $bag->has('vpp_names_id') ? 'is-invalid' : '' }}"
                                     required>
                                     <option value="">-- Chọn tên VPP --</option>
                                     @foreach ($materialNames as $option)
                                         <option value="{{ $option->id }}"
-                                            {{ old('material_names_id') == $option->id ? 'selected' : '' }}>
+                                            {{ old('vpp_names_id') == $option->id ? 'selected' : '' }}>
                                             {{ $option->name }}
                                         </option>
                                     @endforeach
                                 </select>
-                                @if ($bag->has('material_names_id'))
-                                    <span class="md-error">{{ $bag->first('material_names_id') }}</span>
+                                @if ($bag->has('vpp_names_id'))
+                                    <span class="md-error">{{ $bag->first('vpp_names_id') }}</span>
                                 @endif
                             </div>
 

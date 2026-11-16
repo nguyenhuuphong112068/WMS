@@ -68,13 +68,13 @@ class VppWatchlist
     {
         $rows = DB::table(DepartmentVpp::TABLE)
             ->join('vpp_categories', DepartmentVpp::TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', 'vpp_categories.unit_id', '=', 'units.id')
             ->select(
                 'vpp_categories.id as category_id',
                 'vpp_categories.purchasing_department',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 DepartmentVpp::TABLE.'.min_stock',
                 'vpp_categories.unit_id',
@@ -86,7 +86,7 @@ class VppWatchlist
             ->where('vpp_categories.app_status', 'approved')
             ->whereNotNull(DepartmentVpp::TABLE.'.min_stock')
             ->where(DepartmentVpp::TABLE.'.min_stock', '>', 0)
-            ->orderBy('material_names.name', 'asc')
+            ->orderBy('vpp_names.name', 'asc')
             ->get();
 
         if ($rows->isEmpty()) {
@@ -107,7 +107,7 @@ class VppWatchlist
     {
         return DB::table(self::TABLE)
             ->leftJoin('vpp_categories', self::TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
             ->leftJoin(DepartmentVpp::TABLE.' as dm_status', function ($join) use ($departmentId) {
@@ -117,7 +117,7 @@ class VppWatchlist
             ->select(
                 self::TABLE.'.*',
                 'vpp_categories.purchasing_department',
-                'material_names.name as category_material_name',
+                'vpp_names.name as category_material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.id as unit_id',
                 'units.short_name as unit_short_name'

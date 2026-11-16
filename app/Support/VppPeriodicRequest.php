@@ -501,7 +501,7 @@ class VppPeriodicRequest
         }
 
         return DB::table('vpp_categories')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_categories.id'))
             ->select(
@@ -511,14 +511,14 @@ class VppPeriodicRequest
                 'vpp_categories.classification',
                 'vpp_categories.purchasing_department',
                 DepartmentVpp::UNIT_ALIAS.'.classification_id',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name'
             )
             ->where('vpp_categories.status_id', 1)
             ->where('vpp_categories.app_status', 'approved')
-            ->orderBy('material_names.name', 'asc')
+            ->orderBy('vpp_names.name', 'asc')
             ->get();
     }
 
@@ -1387,11 +1387,11 @@ class VppPeriodicRequest
     {
         return DB::table(self::ITEM_TABLE)
             ->leftJoin('vpp_categories', self::ITEM_TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->select(
                 self::ITEM_TABLE.'.*',
                 'vpp_categories.code as category_code',
-                'material_names.name as material_name'
+                'vpp_names.name as material_name'
             )
             ->whereIn(self::ITEM_TABLE.'.periodic_request_list_id', $listIds)
             ->where(self::ITEM_TABLE.'.active', 1)

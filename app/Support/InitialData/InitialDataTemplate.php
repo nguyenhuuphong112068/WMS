@@ -344,13 +344,14 @@ class InitialDataTemplate
         'products' => 'thêm tên thành phẩm còn thiếu.',
         'consumption' => 'thêm thiết bị / đối tượng tiêu hao vật tư định kỳ còn thiếu (loại, mã, tên, tần suất).',
         'dept_class' => 'thêm nhóm phân loại vật tư riêng của phòng (dùng ở sheet 27).',
-        'material_names' => 'thêm tên vật tư / VPP chưa có (chỉ tên, KHÔNG kèm nhà sản xuất).',
+        'material_names' => 'thêm tên vật tư chưa có (chỉ tên, KHÔNG kèm nhà sản xuất).',
+        'vpp_names' => 'thêm tên VPP chưa có (chỉ tên, KHÔNG kèm nhà sản xuất).',
         'chem_names' => 'thêm tên hoá chất chưa có (chỉ tên, KHÔNG kèm nhà sản xuất).',
         'chem_comp' => 'khai thành phần cho tên hoá chất mới: mỗi dòng 1 hoạt chất (tra mã ở sheet TC.Hoạt chất, kèm hàm lượng %) hoặc 1 nhóm nguy hại Bảng B.',
         'standard_names' => 'thêm tên chất chuẩn chưa có (kèm tên hoạt chất, số CAS nếu có).',
         'material_cats' => 'mỗi dòng = Tên vật tư + Nhà sản xuất + các tiêu chí phân loại. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
         'chemical_cats' => 'mỗi dòng = Tên hoá chất + Loại + Nhà sản xuất. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
-        'vpp_cats' => 'mỗi dòng = Tên VPP (chọn ở sheet 15) + Nhà sản xuất + Đơn vị tính + Nhóm dự trù. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
+        'vpp_cats' => 'mỗi dòng = Tên VPP (chọn ở sheet 37) + Nhà sản xuất + Đơn vị tính + Nhóm dự trù. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
         'standard_cats' => 'mỗi dòng = Tên chất chuẩn + Nguồn gốc / NSX + nhóm chuẩn. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
         'locations' => 'danh sách vị trí đặt hàng đang có trên hệ thống (theo phòng ban, loại lưu trữ dùng chung hoặc đúng module của file), dùng để chọn Vị trí mặc định / Vị trí lưu. Định khu tạo trực tiếp trên phần mềm (Dữ Liệu Gốc → Định Khu); còn thiếu vị trí thì tạo trên phần mềm rồi TẢI LẠI file mẫu.',
         'dept_materials' => 'chọn danh mục vật tư phòng dùng, đơn vị tính của phòng, tồn tối thiểu / tối đa, vị trí mặc định.',
@@ -446,8 +447,8 @@ class InitialDataTemplate
             1 => ['Công ty / phòng ban / vai trò đã có trên hệ thống (nền xám) giữ nguyên, không sửa trong file. Tên viết tắt không trùng.'],
             2 => $userRules,
             3 => array_values(array_filter([
-                self::hasVisible(['material_names', 'chem_names', 'standard_names'])
-                    ? 'Thêm tên hàng mới ở '.self::titles(['material_names', 'chem_names', 'standard_names']).' trước, rồi mới tạo danh mục công ty ở '
+                self::hasVisible(['material_names', 'vpp_names', 'chem_names', 'standard_names'])
+                    ? 'Thêm tên hàng mới ở '.self::titles(['material_names', 'vpp_names', 'chem_names', 'standard_names']).' trước, rồi mới tạo danh mục công ty ở '
                         .self::titles(['material_cats', 'vpp_cats', 'chemical_cats', 'standard_cats']).' từ tên đó.'
                     : null,
                 self::hasVisible(['material_cats', 'vpp_cats', 'chemical_cats', 'standard_cats']) ? $codeRule : null,
@@ -786,7 +787,7 @@ class InitialDataTemplate
                 ->map(fn ($r) => [$r->name, $r->description]),
             'units' => self::active($table)->orderBy('unit_group')->orderBy('factor_to_base')->get()
                 ->map(fn ($r) => [$r->short_name, $r->name, $label('unit_group', $r->unit_group), self::number($r->factor_to_base)]),
-            'packaging', 'purposes', 'products', 'material_names', 'chem_names' => self::active($table)->orderBy('name')->get()
+            'packaging', 'purposes', 'products', 'material_names', 'vpp_names', 'chem_names' => self::active($table)->orderBy('name')->get()
                 ->map(fn ($r) => [$r->name]),
             'storage' => self::active($table)->orderBy('name')->get()
                 ->map(fn ($r) => [$r->name, $r->note]),
@@ -814,7 +815,7 @@ class InitialDataTemplate
                 });
             })(),
             'vpp_cats' => (function () use ($table, $makers, $label) {
-                $names = DB::table('material_names')->pluck('name', 'id');
+                $names = DB::table('vpp_names')->pluck('name', 'id');
                 $makerNames = $makers();
                 $unitNames = DB::table('units')->pluck('short_name', 'id');
 
@@ -822,7 +823,7 @@ class InitialDataTemplate
                     $group = VppClassification::decode($r->classification)[VppClassification::GROUP_KEY] ?? null;
 
                     return [
-                        $r->code, $names[$r->material_names_id] ?? null, $makerNames[$r->manufacturers_id] ?? null,
+                        $r->code, $names[$r->vpp_names_id] ?? null, $makerNames[$r->manufacturers_id] ?? null,
                         $unitNames[$r->unit_id] ?? null, $group !== null ? $label('vpp_group', $group) : null,
                         $label('purchasing', $r->purchasing_department), null,
                     ];

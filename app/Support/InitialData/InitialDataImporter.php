@@ -944,6 +944,11 @@ class InitialDataImporter
         $this->simpleNames($rows, 'material_names', 'Tên vật tư');
     }
 
+    private function importVppNames(array $rows): void
+    {
+        $this->simpleNames($rows, 'vpp_names', 'Tên VPP');
+    }
+
     private function importChemNames(array $rows): void
     {
         $this->simpleNames($rows, 'chem_names', 'Tên hoá chất');
@@ -1089,21 +1094,21 @@ class InitialDataImporter
     private function importVppCats(array $rows): void
     {
         $this->eachUnique($rows, ['code'], function ($row) {
-            $nameId = $this->requireRef($row, 'material_names', 'name', 'material_name', 'Tên VPP', 'sheet 15');
+            $nameId = $this->requireRef($row, 'vpp_names', 'name', 'vpp_name', 'Tên VPP', 'sheet 37');
             $makerId = $this->requireRef($row, 'manufacturers', 'short_name', 'manufacturer', 'Nhà sản xuất', 'sheet 09');
             $unitId = $this->requireRef($row, 'units', 'short_name', 'unit', 'Đơn vị tính', 'sheet 06');
             if (! $nameId || ! $makerId || ! $unitId) {
                 return;
             }
 
-            $same = DB::table('vpp_categories')->where('material_names_id', $nameId)->where('manufacturers_id', $makerId)->first(['id', 'code']);
+            $same = DB::table('vpp_categories')->where('vpp_names_id', $nameId)->where('manufacturers_id', $makerId)->first(['id', 'code']);
             if ($same) {
                 return $this->existingCategory('vpp_categories', $row, $same);
             }
 
             $id = DB::table('vpp_categories')->insertGetId([
                 'code' => $this->categoryCode('vpp_categories', 'P', $row),
-                'material_names_id' => $nameId,
+                'vpp_names_id' => $nameId,
                 'manufacturers_id' => $makerId,
                 'unit_id' => $unitId,
                 'classification' => VppClassification::encode([VppClassification::GROUP_KEY => $row['vpp_group']]),

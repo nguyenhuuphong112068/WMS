@@ -83,7 +83,7 @@ class VppPicking
 
         return DB::table('vpp_imports')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('locations', 'vpp_imports.location_id', '=', 'locations.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
             ->select(
@@ -94,7 +94,7 @@ class VppPicking
                 'vpp_imports.imported_date',
                 'vpp_imports.expired_date',
                 'vpp_imports.location_id',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'vpp_categories.code as category_code',
                 'units.short_name as unit_short_name',
                 'locations.code as location_code',

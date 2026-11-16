@@ -121,8 +121,8 @@
                                     'editData' => [
                                         'id' => $row->id,
                                         'code' => $row->code,
-                                        'material_names_id' => $row->material_names_id,
-                                        'material_names_id_text' => $row->material_name,
+                                        'vpp_names_id' => $row->vpp_names_id,
+                                        'vpp_names_id_text' => $row->material_name,
                                         'manufacturers_id' => $row->manufacturers_id,
                                         'unit_id' => $row->unit_id,
                                         'classification' => (object) $classification,

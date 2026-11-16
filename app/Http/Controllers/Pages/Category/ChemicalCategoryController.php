@@ -70,7 +70,7 @@ class ChemicalCategoryController extends Controller
         'ai_content_percent' => 'Hàm lượng hoạt chất (%)',
         'shelf_life_months' => 'Hạn dùng mặc định (tháng)',
         'storage_condition_id' => 'Điều kiện bảo quản',
-        'doc_no' => 'Số tài liệu',
+        // Số tài liệu (doc_no) đã bỏ khỏi form từ 10/11/2026 - không so sánh nữa, cột DB vẫn giữ
         'safety_warning' => 'Cảnh báo an toàn',
         'lead_time_days' => 'Thời gian đặt hàng (ngày)',
     ];

@@ -13,7 +13,7 @@
     $row = (array) ($row ?? []);
     $err = fn($field) => $index !== '' && $bag->has('items.' . $index . '.' . $field) ? 'is-invalid' : '';
     $rowHasError = $index !== '' && collect($bag->keys())->contains(fn($key) => str_starts_with($key, 'items.' . $index . '.'));
-    $nameId = (string) ($row['material_names_id'] ?? '');
+    $nameId = (string) ($row['vpp_names_id'] ?? '');
     $mfrId = (string) ($row['manufacturers_id'] ?? '');
 @endphp
 <tbody class="cbt-item {{ $rowHasError ? 'has-error' : '' }}">
@@ -21,9 +21,9 @@
         <td class="cbt-no text-center">{{ $index === '' ? '' : $index + 1 }}</td>
         <td><span class="md-tag cbt-code"></span></td>
         <td>
-            <select name="items[{{ $index }}][material_names_id]"
-                data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'material']) }}"
-                class="form-control cbt-select cbt-focus {{ $err('material_names_id') }}" required>
+            <select name="items[{{ $index }}][vpp_names_id]"
+                data-lookup-url="{{ route('pages.category.lookup.names', ['source' => 'vpp']) }}"
+                class="form-control cbt-select cbt-focus {{ $err('vpp_names_id') }}" required>
                 <option value="">-- Chọn tên VPP --</option>
                 @if ($nameId !== '' && isset($nameLabels[$nameId]))
                     <option value="{{ $nameId }}" selected>{{ $nameLabels[$nameId] }}</option>

@@ -46,13 +46,14 @@ use Illuminate\Support\Facades\Schema;
 class InitialDataSchema
 {
     /** Phiên bản cấu trúc file. Đổi cột / sheet thì tăng số này để chặn file mẫu cũ. */
-    public const VERSION = 'WMS-INITIAL-DATA-V5';
+    public const VERSION = 'WMS-INITIAL-DATA-V6';
 
     /**
      * Phiên bản cũ vẫn nhận cho các giai đoạn không đổi cấu trúc: [phiên bản => [giai đoạn]].
      * V5 (14/11/2026) chỉ đổi sheet định khu (giai đoạn 3 - 4) nên file V4 giai đoạn 1 - 2 vẫn dùng được.
+     * V6 (16/11/2026) thêm sheet 37.Tên VPP (tách khỏi 15.Tên vật tư) - chỉ đổi giai đoạn 3 - 4.
      */
-    public const COMPATIBLE_VERSIONS = ['WMS-INITIAL-DATA-V4' => [1, 2]];
+    public const COMPATIBLE_VERSIONS = ['WMS-INITIAL-DATA-V4' => [1, 2], 'WMS-INITIAL-DATA-V5' => [1, 2]];
 
     /** File mẫu phiên bản $version, giai đoạn $stage còn dùng được (null = file đủ mọi giai đoạn). */
     public static function acceptsVersion(?string $version, ?int $stage): bool
@@ -180,7 +181,8 @@ class InitialDataSchema
         'purposes' => ['standard'],
         'consumption' => ['material'],
         'dept_class' => ['material'],
-        'material_names' => ['material', 'vpp'],
+        'material_names' => ['material'],
+        'vpp_names' => ['vpp'],
         'material_cats' => ['material'],
         'dept_materials' => ['material'],
         'stock_materials' => ['material'],
@@ -322,6 +324,7 @@ class InitialDataSchema
             'R_MUC_DICH' => ['purposes', 'name'],
             'R_PL_PHONG' => ['dept_class', 'name'],
             'R_TEN_VT' => ['material_names', 'name'],
+            'R_TEN_VPP' => ['vpp_names', 'name'],
             'R_TEN_HC' => ['chem_names', 'name'],
             'R_TEN_CC' => ['standard_names', 'name'],
             'R_DM_VT' => ['material_cats', 'display'],
@@ -531,6 +534,15 @@ class InitialDataSchema
                     ['key' => 'name', 'label' => 'Tên vật tư', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 55, 'hint' => 'VD: Găng tay nitrile size M'],
                 ],
             ],
+            'vpp_names' => [
+                'title' => '37.Tên VPP',
+                'table' => 'vpp_names',
+                'group' => 'Tên vật tư / hoá chất / chất chuẩn',
+                'desc' => 'Tên văn phòng phẩm (không kèm nhà sản xuất), tách riêng khỏi Tên vật tư. Không trùng.',
+                'columns' => [
+                    ['key' => 'name', 'label' => 'Tên VPP', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 55, 'hint' => 'VD: Bút bi xanh 0.5mm'],
+                ],
+            ],
             'chem_names' => [
                 'title' => '16.Tên hoá chất',
                 'table' => 'chem_names',
@@ -629,10 +641,10 @@ class InitialDataSchema
                 'title' => '34.DM VPP',
                 'table' => 'vpp_categories',
                 'group' => 'Danh mục công ty',
-                'desc' => 'Danh mục VPP = Tên VPP (dùng chung sheet 15 Tên vật tư) + Nhà sản xuất + Đơn vị tính. Mã danh mục (P00001...) tự sinh nối tiếp mã đã có khi điền tên. Bộ phận mua hàng của VPP mặc định là Hành Chánh.',
+                'desc' => 'Danh mục VPP = Tên VPP (sheet 37) + Nhà sản xuất + Đơn vị tính. Mã danh mục (P00001...) tự sinh nối tiếp mã đã có khi điền tên. Bộ phận mua hàng của VPP mặc định là Hành Chánh.',
                 'columns' => [
                     $autoCode('P'),
-                    ['key' => 'material_name', 'label' => 'Tên VPP', 'type' => 'ref', 'ref' => 'R_TEN_VT', 'req' => true, 'width' => 40, 'hint' => 'Chọn ở sheet 15'],
+                    ['key' => 'vpp_name', 'label' => 'Tên VPP', 'type' => 'ref', 'ref' => 'R_TEN_VPP', 'req' => true, 'width' => 40, 'hint' => 'Chọn ở sheet 37'],
                     ['key' => 'manufacturer', 'label' => 'Nhà sản xuất', 'type' => 'ref', 'ref' => 'R_NSX', 'req' => true, 'width' => 16, 'hint' => 'Chọn ở sheet 09'],
                     ['key' => 'unit', 'label' => 'Đơn vị tính', 'type' => 'ref', 'ref' => 'R_DVT', 'req' => true, 'width' => 12, 'hint' => 'Chọn ở sheet 06, cả công ty dùng chung'],
                     ['key' => 'vpp_group', 'label' => 'Nhóm dự trù', 'type' => 'list', 'list' => 'vpp_group', 'req' => true, 'width' => 34, 'hint' => 'Nhóm 1-5 theo cách dự trù'],

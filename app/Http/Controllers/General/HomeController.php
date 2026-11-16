@@ -130,8 +130,8 @@ class HomeController extends Controller
             'balancings' => 'vpp_balancings',
             'categories' => 'vpp_categories',
             'departments' => 'vpp_department_categories',
-            'names' => 'material_names',
-            'name_key' => 'material_names_id',
+            'names' => 'vpp_names',
+            'name_key' => 'vpp_names_id',
             'internal_expiry' => false,
             'category_code' => false,
             'route' => 'pages.inventory.vppInventory.list',
@@ -1049,7 +1049,7 @@ class HomeController extends Controller
         $records = DB::table($m['prefix'].'quarantines as q')
             ->leftJoin($m['prefix'].'imports as i', 'q.import_id', '=', 'i.id')
             ->leftJoin($m['prefix'].'categories as c', 'i.category_id', '=', 'c.id')
-            ->leftJoin('material_names as n', 'c.material_names_id', '=', 'n.id')
+            ->leftJoin($m['prefix'].'names as n', 'c.'.$m['prefix'].'names_id', '=', 'n.id')
             ->select('q.id', 'q.code', 'q.created_at', 'i.code as import_code', 'n.name as material_name')
             ->where('q.department_id', $departmentId)
             ->where('q.status_id', 1)
@@ -1172,7 +1172,7 @@ class HomeController extends Controller
 
             $records = $assigned ? DB::table($calibration::TABLE.' as c')
                 ->leftJoin($m['prefix'].'categories as mc', 'c.category_id', '=', 'mc.id')
-                ->leftJoin('material_names as n', 'mc.material_names_id', '=', 'n.id')
+                ->leftJoin($m['prefix'].'names as n', 'mc.'.$m['prefix'].'names_id', '=', 'n.id')
                 ->leftJoin('deparments as d', 'c.department_id', '=', 'd.id')
                 ->select('c.code', DB::raw('MIN(c.requested_at) as requested_at'), DB::raw('MAX(n.name) as material_name'), DB::raw('MAX(d.name) as department_name'))
                 ->whereIn('c.code', array_keys($assigned))
@@ -1217,7 +1217,7 @@ class HomeController extends Controller
 
             $records = DB::table($calibration::TABLE.' as c')
                 ->leftJoin($m['prefix'].'categories as mc', 'c.category_id', '=', 'mc.id')
-                ->leftJoin('material_names as n', 'mc.material_names_id', '=', 'n.id')
+                ->leftJoin($m['prefix'].'names as n', 'mc.'.$m['prefix'].'names_id', '=', 'n.id')
                 ->leftJoin('deparments as d', 'c.department_id', '=', 'd.id')
                 ->select('c.code', DB::raw('MIN(c.requested_at) as requested_at'), DB::raw('MAX(n.name) as material_name'), DB::raw('MAX(d.name) as department_name'))
                 ->whereIn('c.department_id', $calibration::sourceDepartmentIds($qaDepartmentId))
@@ -1258,7 +1258,7 @@ class HomeController extends Controller
             ['chemical_categories', 'chem_names', 'chem_names_id', 'category_chemical_approve', 'hc', 'pages.category.chemicalCategory.list'],
             ['standard_categories', 'standard_names', 'chem_names_id', 'category_standard_approve', 'cc', 'pages.category.standardCategory.list'],
             ['material_categories', 'material_names', 'material_names_id', 'category_material_approve', 'vt', 'pages.category.materialCategory.list'],
-            ['vpp_categories', 'material_names', 'material_names_id', 'category_vpp_approve', 'vpp', 'pages.category.vppCategory.list'],
+            ['vpp_categories', 'vpp_names', 'vpp_names_id', 'category_vpp_approve', 'vpp', 'pages.category.vppCategory.list'],
         ];
 
         $rows = [];
@@ -1346,6 +1346,7 @@ class HomeController extends Controller
             ['active_ingredients', 'chemical', 'activeIngredient', 'Hoạt chất', 'code', 'name'],
             ['standard_names', 'standard', 'standardName', 'Tên chất chuẩn', null, 'name'],
             ['material_names', 'material', 'materialName', 'Tên vật tư', null, 'name'],
+            ['vpp_names', 'vpp', 'vppName', 'Tên VPP', null, 'name'],
             ['manufacturers', 'common', 'chemManufacturer', 'Nhà sản xuất', 'short_name', 'name'],
             ['suppliers', 'common', 'chemSupplier', 'Nhà cung cấp', null, 'name'],
             ['packaging_specifications', 'common', 'packagingSpecification', 'Quy cách đóng gói', null, 'name'],

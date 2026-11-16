@@ -103,7 +103,7 @@ class VppQuarantineController extends Controller
         $rows = DB::table(self::TABLE)
             ->leftJoin('vpp_imports', self::TABLE.'.import_id', '=', 'vpp_imports.id')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('locations', 'vpp_imports.location_id', '=', 'locations.id')
             ->leftJoin('locations as pending_locations', self::TABLE.'.pending_location_id', '=', 'pending_locations.id')
             ->leftJoin('locations as rejected_locations', self::TABLE.'.rejected_location_id', '=', 'rejected_locations.id')
@@ -114,7 +114,7 @@ class VppQuarantineController extends Controller
                 'vpp_imports.code as import_code',
                 'vpp_imports.expired_date',
                 'vpp_categories.code as category_code',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'locations.code as location_code',
                 'locations.zone_type as location_zone_type',
                 'pending_locations.code as pending_location_code',
@@ -136,7 +136,7 @@ class VppQuarantineController extends Controller
                 self::TABLE.'.code',
                 'vpp_imports.code',
                 'vpp_categories.code',
-                'material_names.name',
+                'vpp_names.name',
                 self::TABLE.'.reason',
             ], $keyword))
             // Việc còn phải làm lên trước: đang cách ly -> chờ huỷ -> đã xong

@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  */
 class CategoryLookupController extends Controller
 {
-    /** ?source=material|chemical|standard&q=&page= : tên dữ liệu gốc đã duyệt, đang hoạt động */
+    /** ?source=material|vpp|chemical|standard&q=&page= : tên dữ liệu gốc đã duyệt, đang hoạt động */
     public function names(Request $request)
     {
         $source = (string) $request->source;

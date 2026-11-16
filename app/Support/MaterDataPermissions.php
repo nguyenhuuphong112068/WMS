@@ -49,6 +49,7 @@ class MaterDataPermissions
         'materialName' => ['material', 'Tên Vật Tư', self::WITH_REVIEW],
         'departmentClassification' => ['material', 'Phân Loại', self::BASIC],
         'materialSignFlow' => ['material', 'Trình Ký Đề Nghị CP Vật Tư', self::BASIC],
+        'vppName' => ['vpp', 'Tên VPP', self::WITH_REVIEW],
         'activeIngredient' => ['chemical', 'Đơn Chất', self::WITH_REVIEW],
         'chemName' => ['chemical', 'Hoá Chất', self::WITH_REVIEW],
         'standardName' => ['standard', 'Tên Chuẩn', self::WITH_REVIEW],

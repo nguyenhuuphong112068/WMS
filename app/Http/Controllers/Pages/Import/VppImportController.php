@@ -80,7 +80,7 @@ class VppImportController extends Controller
                 self::TABLE.'.code',
                 self::TABLE.'.batch_no',
                 self::TABLE.'.invoice_number',
-                'material_names.name',
+                'vpp_names.name',
                 'locations.code',
                 self::TABLE.'.note',
             ], $bookKeyword))
@@ -168,7 +168,7 @@ class VppImportController extends Controller
     {
         return DB::table(self::TABLE)
             ->leftJoin('vpp_categories', self::TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
             ->tap(fn ($query) => DepartmentVpp::join($query, $departmentId, self::TABLE.'.category_id'))
@@ -180,7 +180,7 @@ class VppImportController extends Controller
             ->select(
                 self::TABLE.'.*',
                 'vpp_categories.code as category_code',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'vpp_categories.classification',
@@ -242,7 +242,7 @@ class VppImportController extends Controller
     {
         return DB::table(self::TABLE)
             ->leftJoin('vpp_categories', self::TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
@@ -250,7 +250,7 @@ class VppImportController extends Controller
             ->select(
                 self::TABLE.'.*',
                 'vpp_categories.code as category_code',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'manufacturers.name as manufacturer_name',
                 'units.short_name as unit_short_name',
@@ -281,12 +281,12 @@ class VppImportController extends Controller
 
         $row = DB::table(self::TABLE)
             ->leftJoin('vpp_categories', self::TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, self::TABLE.'.category_id'))
             ->leftJoin('locations', self::TABLE.'.location_id', '=', 'locations.id')
             ->select(
                 self::TABLE.'.*',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'units.short_name as unit_short_name',
                 'locations.code as location_code'
             )
@@ -325,8 +325,8 @@ class VppImportController extends Controller
 
         $row = DB::table(self::TABLE)
             ->leftJoin('vpp_categories', self::TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
-            ->select(self::TABLE.'.id', self::TABLE.'.code', 'material_names.name as material_name')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
+            ->select(self::TABLE.'.id', self::TABLE.'.code', 'vpp_names.name as material_name')
             ->where(self::TABLE.'.id', $request->id)
             // Chỉ ghi nhận in nhãn của lô thuộc phòng ban đang chọn
             ->where(self::TABLE.'.department_id', $departmentId)
@@ -755,12 +755,12 @@ class VppImportController extends Controller
 
         $rows = DB::table(self::HISTORY_TABLE)
             ->leftJoin('vpp_categories', self::HISTORY_TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, self::HISTORY_TABLE.'.category_id'))
             ->leftJoin('locations', self::HISTORY_TABLE.'.location_id', '=', 'locations.id')
             ->select(
                 self::HISTORY_TABLE.'.*',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
                 'locations.code as location_code',
@@ -982,8 +982,8 @@ class VppImportController extends Controller
     {
         return [
             'category_id' => DB::table('vpp_categories')
-                ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
-                ->pluck('material_names.name', 'vpp_categories.id')
+                ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
+                ->pluck('vpp_names.name', 'vpp_categories.id')
                 ->all(),
             'location_id' => DB::table('locations')->pluck('code', 'id')->all(),
         ];

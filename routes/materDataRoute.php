@@ -20,6 +20,7 @@ use App\Http\Controllers\Pages\MaterData\DepartmentController;
 use App\Http\Controllers\Pages\MaterData\GroupController;
 use App\Http\Controllers\Pages\MaterData\InitialDataController;
 use App\Http\Controllers\Pages\MaterData\MaterialNameController;
+use App\Http\Controllers\Pages\MaterData\VppNameController;
 use App\Http\Controllers\Pages\MaterData\MaterialSignFlowController;
 use App\Http\Controllers\Pages\MaterData\TransferSignFlowController;
 use App\Http\Controllers\Pages\MaterData\VppTransferSignFlowController;
@@ -143,6 +144,17 @@ Route::prefix('/materData')
         });
 
         Route::prefix('/materialName')->name('materialName.')->controller(MaterialNameController::class)->group(function () {
+            Route::get('', 'index')->name('list');
+            Route::get('history', 'history')->name('history');
+            Route::post('store', 'store')->name('store');
+            Route::post('update', 'update')->name('update');
+            Route::post('deActive', 'deActive')->name('deActive');
+            Route::post('approve', 'approve')->name('approve');
+            Route::post('reject', 'reject')->name('reject');
+        });
+
+        // Tên VPP: dữ liệu gốc riêng của module VPP (bảng vpp_names), tách khỏi Tên Vật Tư 16/11/2026
+        Route::prefix('/vppName')->name('vppName.')->controller(VppNameController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
             Route::post('store', 'store')->name('store');

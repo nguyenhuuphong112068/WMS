@@ -21,6 +21,7 @@ class CategoryLookup
     /** Nguồn tên dữ liệu gốc theo loại hàng => bảng */
     public const NAME_TABLES = [
         'material' => 'material_names',
+        'vpp' => 'vpp_names',
         'chemical' => 'chem_names',
         'standard' => 'standard_names',
     ];

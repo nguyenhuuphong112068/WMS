@@ -150,7 +150,7 @@ class DepartmentVpp
     {
         $query = DB::table(self::TABLE)
             ->join('vpp_categories', self::TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', 'vpp_categories.unit_id', '=', 'units.id')
             ->select(
@@ -161,7 +161,7 @@ class DepartmentVpp
                 // trình ký của dòng đề nghị, xem App\Support\VppSignFlow
                 self::TABLE.'.classification_id',
                 'vpp_categories.purchasing_department',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 self::TABLE.'.min_stock',
@@ -176,7 +176,7 @@ class DepartmentVpp
             ->where(self::TABLE.'.status_id', 1)
             ->where('vpp_categories.status_id', 1)
             ->where('vpp_categories.app_status', 'approved')
-            ->orderBy('material_names.name', 'asc');
+            ->orderBy('vpp_names.name', 'asc');
 
         $exclude = array_values(array_filter($exclude));
         if ($exclude) {
@@ -233,7 +233,7 @@ class DepartmentVpp
     {
         return DB::table(self::TABLE)
             ->leftJoin('vpp_categories', self::TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', 'vpp_categories.unit_id', '=', 'units.id')
             // Phân loại riêng của phòng (dữ liệu gốc department_classification)
@@ -252,7 +252,7 @@ class DepartmentVpp
                 'vpp_categories.status_id as category_status_id',
                 'vpp_categories.app_status as category_app_status',
                 'vpp_categories.purchasing_department as category_purchasing_department',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
@@ -266,7 +266,7 @@ class DepartmentVpp
                 'tiers.name as tier_name'
             )
             ->where(self::TABLE.'.department_id', $departmentId)
-            ->orderBy('material_names.name', 'asc')
+            ->orderBy('vpp_names.name', 'asc')
             ->get();
     }
 

@@ -623,7 +623,7 @@ class VppStocktakeController extends Controller
 
         return DB::table('vpp_imports')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
             ->leftJoin('locations', 'vpp_imports.location_id', '=', 'locations.id')
@@ -634,7 +634,7 @@ class VppStocktakeController extends Controller
                 'vpp_imports.location_id',
                 'vpp_imports.amount',
                 'vpp_imports.expired_date',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
@@ -697,14 +697,14 @@ class VppStocktakeController extends Controller
     {
         return DB::table('vpp_stocktake_items')
             ->leftJoin('vpp_categories', 'vpp_stocktake_items.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_stocktake_items.category_id'))
             ->leftJoin('locations', 'vpp_stocktake_items.location_id', '=', 'locations.id')
             ->leftJoin('vpp_imports', 'vpp_stocktake_items.import_id', '=', 'vpp_imports.id')
             ->select(
                 'vpp_stocktake_items.*',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',

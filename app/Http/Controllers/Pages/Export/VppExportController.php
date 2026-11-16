@@ -120,7 +120,7 @@ class VppExportController extends Controller
         $exports = DB::table(self::TABLE)
             ->leftJoin('vpp_imports', self::TABLE.'.import_id', '=', 'vpp_imports.id')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             // Phiếu cũ (trước 12/11/2026) cấp phát theo đề nghị nội bộ: mục đích + mã đề nghị nằm ở dòng đề nghị
             ->leftJoin(self::REQ_ITEM, self::TABLE.'.request_item_id', '=', self::REQ_ITEM.'.id')
             ->leftJoin(self::REQ_LIST, self::REQ_ITEM.'.request_list_id', '=', self::REQ_LIST.'.id')
@@ -134,7 +134,7 @@ class VppExportController extends Controller
             ->select(
                 self::TABLE.'.*',
                 'quarantines.app_status as quarantine_status',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'vpp_categories.code as category_code',
                 'units.short_name as unit_short_name',
                 'deparments.name as to_department_name',
@@ -154,7 +154,7 @@ class VppExportController extends Controller
                 self::TRANSFER_REQUEST_TABLE.'.code',
                 'vpp_imports.code',
                 'vpp_categories.code',
-                'material_names.name',
+                'vpp_names.name',
                 self::TABLE.'.used_by',
                 self::TABLE.'.purpose',
             ], $bookKeyword))
@@ -173,7 +173,7 @@ class VppExportController extends Controller
         $todayUses = DB::table(self::TABLE)
             ->leftJoin('vpp_imports', self::TABLE.'.import_id', '=', 'vpp_imports.id')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
             ->select(
                 self::TABLE.'.id',
@@ -183,7 +183,7 @@ class VppExportController extends Controller
                 self::TABLE.'.used_by',
                 self::TABLE.'.status_id',
                 self::TABLE.'.created_at',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'vpp_categories.code as category_code',
                 'units.short_name as unit_short_name'
             )
@@ -549,7 +549,7 @@ class VppExportController extends Controller
             ->join(self::TABLE, self::HISTORY_TABLE.'.vpp_export_id', '=', self::TABLE.'.id')
             ->leftJoin('vpp_imports', self::HISTORY_TABLE.'.import_id', '=', 'vpp_imports.id')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin(self::REQ_ITEM, self::TABLE.'.request_item_id', '=', self::REQ_ITEM.'.id')
             ->leftJoin(self::REQ_LIST, self::REQ_ITEM.'.request_list_id', '=', self::REQ_LIST.'.id')
             ->leftJoin(self::TRANSFER_ITEM_TABLE, self::TABLE.'.transfer_item_id', '=', self::TRANSFER_ITEM_TABLE.'.id')
@@ -559,7 +559,7 @@ class VppExportController extends Controller
             ->select(
                 self::HISTORY_TABLE.'.*',
                 self::TABLE.'.created_at as export_created_at',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'vpp_categories.code as category_code',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
@@ -1961,7 +1961,7 @@ class VppExportController extends Controller
 
         $items = DB::table(self::TRANSFER_ITEM_TABLE)
             ->leftJoin('vpp_categories', self::TRANSFER_ITEM_TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('locations', self::TRANSFER_ITEM_TABLE.'.dest_location_id', '=', 'locations.id')
             // Lô nguồn bên phòng gửi: modal Xác nhận kiểm tra hiện thông tin lô lấy từ nguồn
             ->leftJoin('vpp_imports as source_imports', self::TRANSFER_ITEM_TABLE.'.import_id', '=', 'source_imports.id')
@@ -1975,7 +1975,7 @@ class VppExportController extends Controller
                 'source_imports.invoice_date as source_invoice_date',
                 'source_imports.purpose as source_purpose',
                 'vpp_categories.code as category_code',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'locations.code as dest_location_code',
                 'locations.zone_type as dest_location_zone_type'
             )
@@ -2098,18 +2098,18 @@ class VppExportController extends Controller
     private function transferCategoryOptions(int $departmentId)
     {
         return DB::table('vpp_categories')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_categories.id'))
             ->select(
                 'vpp_categories.id',
                 'vpp_categories.code',
                 'vpp_categories.purchasing_department',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'units.short_name as unit_short_name'
             )
             ->where('vpp_categories.status_id', 1)
             ->where('vpp_categories.app_status', 'approved')
-            ->orderBy('material_names.name', 'asc')
+            ->orderBy('vpp_names.name', 'asc')
             ->get();
     }
 

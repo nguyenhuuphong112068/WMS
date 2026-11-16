@@ -54,7 +54,7 @@ class VppCategoryController extends Controller
 
     /** Các cột người dùng nhập, dùng chung cho validate - lưu - so sánh lịch sử. */
     private const FIELDS = [
-        'material_names_id' => 'Tên VPP',
+        'vpp_names_id' => 'Tên VPP',
         'manufacturers_id' => 'Nhà sản xuất',
         'unit_id' => 'Đơn vị tính',
         'classification' => 'Nhóm dự trù',
@@ -67,18 +67,18 @@ class VppCategoryController extends Controller
         DepartmentVpp::syncRows();
 
         $datas = DB::table(self::TABLE)
-            ->leftJoin('material_names', self::TABLE . '.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', self::TABLE . '.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', self::TABLE . '.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', self::TABLE . '.unit_id', '=', 'units.id')
             ->select(
                 self::TABLE . '.*',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.name as unit_name',
                 'units.short_name as unit_short_name'
             )
-            ->orderBy('material_names.name', 'asc')
+            ->orderBy('vpp_names.name', 'asc')
             ->get();
 
         session()->put(['title' => 'DANH MỤC - VPP']);
@@ -99,12 +99,12 @@ class VppCategoryController extends Controller
         return view('pages.category.VppCategory.list', [
             'datas' => $datas,
             // Ô Tên VPP tìm qua AJAX (CategoryLookup), chỉ dựng sẵn option của giá trị vừa gửi bị lỗi
-            // validate; dòng đang sửa gửi kèm nhãn qua material_names_id_text.
-            'materialNames' => \App\Support\CategoryLookup::namesByIds('material', [old('material_names_id')]),
+            // validate; dòng đang sửa gửi kèm nhãn qua vpp_names_id_text.
+            'materialNames' => \App\Support\CategoryLookup::namesByIds('vpp', [old('vpp_names_id')]),
             // Nhãn tên VPP của các dòng modal Thêm mới vừa báo lỗi (bảng nhiều dòng)
             'batchNames' => \App\Support\CategoryLookup::namesByIds(
-                'material',
-                collect((array) old('items', []))->filter(fn ($item) => is_array($item))->pluck('material_names_id')->all()
+                'vpp',
+                collect((array) old('items', []))->filter(fn ($item) => is_array($item))->pluck('vpp_names_id')->all()
             ),
             'manufacturers' => $this->options('manufacturers', $datas->pluck('manufacturers_id')->all()),
             // Đơn vị tính dùng chung toàn công ty của mã VPP
@@ -155,7 +155,7 @@ class VppCategoryController extends Controller
     {
         // Dòng để trống hoàn toàn (chưa chọn tên, nhà sản xuất) thì bỏ qua - đơn vị và nhóm
         // không tính vì hàng Điền nhanh tự điền sẵn cho mọi dòng
-        $items = $this->batchItems($request, fn ($item) => blank($item['material_names_id'] ?? null)
+        $items = $this->batchItems($request, fn ($item) => blank($item['vpp_names_id'] ?? null)
             && blank($item['manufacturers_id'] ?? null));
 
         $validator = Validator::make(
@@ -291,12 +291,12 @@ class VppCategoryController extends Controller
     public function history(Request $request)
     {
         $rows = DB::table(self::HISTORY_TABLE)
-            ->leftJoin('material_names', self::HISTORY_TABLE . '.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', self::HISTORY_TABLE . '.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', self::HISTORY_TABLE . '.manufacturers_id', '=', 'manufacturers.id')
             ->leftJoin('units', self::HISTORY_TABLE . '.unit_id', '=', 'units.id')
             ->select(
                 self::HISTORY_TABLE . '.*',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.name as manufacturer_name',
                 'units.name as unit_name'
             )
@@ -396,7 +396,7 @@ class VppCategoryController extends Controller
             'vpp_category_id' => $row->id,
             'action' => $action,
             'code' => $row->code,
-            'material_names_id' => $row->material_names_id,
+            'vpp_names_id' => $row->vpp_names_id,
             'manufacturers_id' => $row->manufacturers_id,
             'unit_id' => $row->unit_id,
             'classification' => $row->classification,
@@ -444,7 +444,7 @@ class VppCategoryController extends Controller
     private function labelMaps(): array
     {
         return [
-            'material_names_id' => DB::table('material_names')->pluck('name', 'id')->all(),
+            'vpp_names_id' => DB::table('vpp_names')->pluck('name', 'id')->all(),
             'manufacturers_id' => DB::table('manufacturers')->pluck('name', 'id')->all(),
             'unit_id' => DB::table('units')->pluck('name', 'id')->all(),
         ];
@@ -454,11 +454,11 @@ class VppCategoryController extends Controller
     private function describe(int $id): string
     {
         $row = DB::table(self::TABLE)
-            ->leftJoin('material_names', self::TABLE . '.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', self::TABLE . '.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', self::TABLE . '.manufacturers_id', '=', 'manufacturers.id')
             ->select(
                 self::TABLE . '.code',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.name as manufacturer_name'
             )
             ->where(self::TABLE . '.id', $id)
@@ -508,13 +508,13 @@ class VppCategoryController extends Controller
     {
         $validator->after(function ($validator) use ($request, $ignoreId) {
             $exists = DB::table(self::TABLE)
-                ->where('material_names_id', $request->material_names_id)
+                ->where('vpp_names_id', $request->vpp_names_id)
                 ->where('manufacturers_id', $request->manufacturers_id)
                 ->when($ignoreId, fn ($query) => $query->where('id', '<>', $ignoreId))
                 ->exists();
 
             if ($exists) {
-                $validator->errors()->add('material_names_id', 'Tổ hợp VPP - Nhà sản xuất này đã có trong danh mục.');
+                $validator->errors()->add('vpp_names_id', 'Tổ hợp VPP - Nhà sản xuất này đã có trong danh mục.');
             }
         });
     }
@@ -526,24 +526,24 @@ class VppCategoryController extends Controller
     private function checkBatchDuplicates($validator, array $items): void
     {
         $validator->after(function ($validator) use ($items) {
-            $key = fn ($item) => (int) ($item['material_names_id'] ?? 0) . '-' . (int) ($item['manufacturers_id'] ?? 0);
+            $key = fn ($item) => (int) ($item['vpp_names_id'] ?? 0) . '-' . (int) ($item['manufacturers_id'] ?? 0);
 
             $existing = DB::table(self::TABLE)
-                ->whereIn('material_names_id', collect($items)->pluck('material_names_id')->filter()->map(fn ($id) => (int) $id)->all())
-                ->get(['material_names_id', 'manufacturers_id'])
-                ->mapWithKeys(fn ($row) => [$row->material_names_id . '-' . $row->manufacturers_id => true]);
+                ->whereIn('vpp_names_id', collect($items)->pluck('vpp_names_id')->filter()->map(fn ($id) => (int) $id)->all())
+                ->get(['vpp_names_id', 'manufacturers_id'])
+                ->mapWithKeys(fn ($row) => [$row->vpp_names_id . '-' . $row->manufacturers_id => true]);
 
             $seen = [];
 
             foreach ($items as $index => $item) {
-                if (blank($item['material_names_id'] ?? null) || blank($item['manufacturers_id'] ?? null)) {
+                if (blank($item['vpp_names_id'] ?? null) || blank($item['manufacturers_id'] ?? null)) {
                     continue;
                 }
 
                 if (isset($existing[$key($item)])) {
-                    $validator->errors()->add('items.' . $index . '.material_names_id', 'Tổ hợp VPP - Nhà sản xuất này đã có trong danh mục.');
+                    $validator->errors()->add('items.' . $index . '.vpp_names_id', 'Tổ hợp VPP - Nhà sản xuất này đã có trong danh mục.');
                 } elseif (isset($seen[$key($item)])) {
-                    $validator->errors()->add('items.' . $index . '.material_names_id', 'Trùng VPP - Nhà sản xuất với dòng ' . ($seen[$key($item)] + 1) . '.');
+                    $validator->errors()->add('items.' . $index . '.vpp_names_id', 'Trùng VPP - Nhà sản xuất với dòng ' . ($seen[$key($item)] + 1) . '.');
                 }
 
                 $seen[$key($item)] ??= $index;
@@ -582,7 +582,7 @@ class VppCategoryController extends Controller
     private function rules(): array
     {
         return [
-            'material_names_id' => ['required', 'integer', 'exists:material_names,id'],
+            'vpp_names_id' => ['required', 'integer', 'exists:vpp_names,id'],
             'manufacturers_id' => ['required', 'integer', 'exists:manufacturers,id'],
             'unit_id' => ['required', 'integer', 'exists:units,id'],
         ] + VppClassification::rules();
@@ -592,7 +592,7 @@ class VppCategoryController extends Controller
     private function payload(array $input): array
     {
         return [
-            'material_names_id' => (int) ($input['material_names_id'] ?? 0),
+            'vpp_names_id' => (int) ($input['vpp_names_id'] ?? 0),
             'manufacturers_id' => (int) ($input['manufacturers_id'] ?? 0),
             'unit_id' => (int) ($input['unit_id'] ?? 0),
             'classification' => VppClassification::encode($input['classification'] ?? null),
@@ -604,8 +604,8 @@ class VppCategoryController extends Controller
     private function messages(): array
     {
         return [
-            'material_names_id.required' => 'Vui lòng chọn tên VPP.',
-            'material_names_id.exists' => 'Tên VPP không hợp lệ.',
+            'vpp_names_id.required' => 'Vui lòng chọn tên VPP.',
+            'vpp_names_id.exists' => 'Tên VPP không hợp lệ.',
             'manufacturers_id.required' => 'Vui lòng chọn nhà sản xuất.',
             'manufacturers_id.exists' => 'Nhà sản xuất không hợp lệ.',
             'unit_id.required' => 'Vui lòng chọn đơn vị tính.',

@@ -264,7 +264,7 @@ class VppInventoryController extends Controller
         $period = $this->period($request);
 
         $query = DB::table('vpp_categories')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_categories.id'))
             ->tap(fn ($query) => DepartmentVpp::join($query, $departmentId, 'vpp_categories.id'));
@@ -274,7 +274,7 @@ class VppInventoryController extends Controller
             ->select(
                 'vpp_categories.id',
                 'vpp_categories.code',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 DepartmentVpp::minStockColumn(),
                 'units.short_name as unit_short_name',
@@ -332,7 +332,7 @@ class VppInventoryController extends Controller
 
         $base = DB::table('vpp_imports')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
             ->where('vpp_imports.department_id', $departmentId)
             ->where('vpp_imports.status_id', 1)
@@ -355,7 +355,7 @@ class VppInventoryController extends Controller
                 'vpp_imports.imported_by',
                 'vpp_imports.expired_date',
                 'vpp_categories.code as category_code',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
             ]);
@@ -521,7 +521,7 @@ class VppInventoryController extends Controller
 
         $query = DB::table('vpp_imports')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
             ->tap(fn ($query) => DepartmentVpp::join($query, $departmentId, 'vpp_imports.category_id'))
@@ -543,7 +543,7 @@ class VppInventoryController extends Controller
                 DepartmentVpp::minStockColumn(),
                 'vpp_categories.classification',
                 'vpp_categories.purchasing_department',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'manufacturers.name as manufacturer_name',
                 'units.short_name as unit_short_name',
@@ -911,7 +911,7 @@ class VppInventoryController extends Controller
         return DB::table('vpp_quarantines')
             ->join('vpp_imports', 'vpp_quarantines.import_id', '=', 'vpp_imports.id')
             ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('material_names', 'vpp_categories.material_names_id', '=', 'material_names.id')
+            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
             ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
             ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
             ->leftJoin('locations', 'locations.id', '=', $locationOf)
@@ -927,7 +927,7 @@ class VppInventoryController extends Controller
                 'vpp_imports.category_id',
                 'vpp_imports.expired_date',
                 'vpp_categories.classification',
-                'material_names.name as material_name',
+                'vpp_names.name as material_name',
                 'manufacturers.short_name as manufacturer_short_name',
                 'units.short_name as unit_short_name',
                 'units.name as unit_name',
