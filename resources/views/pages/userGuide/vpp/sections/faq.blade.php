@@ -43,11 +43,11 @@
             <tr>
                 <td>Không thêm được VPP vào đề nghị VPP</td>
                 <td style="font-weight: 400">VPP chưa có trong danh mục (hoặc danh mục chưa duyệt / đã khoá). Khai và duyệt ở
-                    <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a>, hoặc báo Hành Chánh lập <a href="#du-tru">phiếu dự trù</a>.</td>
+                    <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a>, hoặc báo Hành Chánh lập <a href="#du-tru">phiếu mua hàng</a>.</td>
             </tr>
             <tr>
-                <td>Nút Lập phiếu dự trù bị khoá / "Chỉ phòng Hành Chánh (phòng giữ kho VPP) lập được phiếu dự trù VPP!"</td>
-                <td style="font-weight: 400">Dự trù VPP chỉ phòng Hành Chánh lập. Phòng khác cần VPP thì gửi
+                <td>Nút Lập phiếu mua hàng bị khoá / "Chỉ phòng Hành Chánh (phòng giữ kho VPP) lập được phiếu mua hàng VPP!"</td>
+                <td style="font-weight: 400">Mua hàng VPP chỉ phòng Hành Chánh lập. Phòng khác cần VPP thì gửi
                     <a href="#de-nghi-vpp">Đề nghị VPP đến Hành Chánh</a>.</td>
             </tr>
             <tr>

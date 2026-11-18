@@ -11,7 +11,7 @@
     $isEstimate = $type === 'estimate';
     $isInternal = ! $isExternal && ! $isEstimate;
     // Danh sách dự trù tạo "phiếu dự trù", hai loại kia tạo "đề nghị"
-    $prDoc = $isEstimate ? 'phiếu dự trù' : 'đề nghị';
+    $prDoc = $isEstimate ? 'phiếu mua hàng' : 'đề nghị';
     $prSupport = \App\Support\VppPeriodicRequest::class;
     $prObjectTypes = \App\Http\Controllers\Pages\MaterData\ConsumptionObjectController::typeLabels();
     $prNum = fn ($value) => rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
@@ -23,7 +23,7 @@
         <div class="md-toolbar">
             @perm('category_vpp_periodic_manage')
                 <button type="button" class="btn btn-primary btn-pr-create" data-modal="#periodic{{ $prKey }}CreateModal">
-                    <i class="fas fa-plus mr-1"></i> Thêm danh sách {{ $isEstimate ? 'dự trù' : ($isExternal ? 'liên phòng ban' : 'nội bộ') }}
+                    <i class="fas fa-plus mr-1"></i> Thêm danh sách {{ $isEstimate ? 'mua hàng' : ($isExternal ? 'liên phòng ban' : 'nội bộ') }}
                 </button>
             @endperm
 
@@ -53,7 +53,7 @@
                             <th style="width: 130px">Tổ Quản Lý</th>
                         @endif
                         @if ($isEstimate)
-                            <th style="width: 150px">Dự Trù Cho</th>
+                            <th style="width: 150px">Mua Hàng Cho</th>
                         @elseif ($isExternal)
                             <th style="width: 150px">Phòng Cấp Phát</th>
                         @else
@@ -142,7 +142,7 @@
                             </td>
                             <td>
                                 <div class="md-actions">
-                                    <button type="button" class="btn btn-sm btn-outline-info btn-pr-items" title="Xem VPP {{ $isEstimate ? 'dự trù' : 'đề nghị' }}"
+                                    <button type="button" class="btn btn-sm btn-outline-info btn-pr-items" title="Xem VPP {{ $isEstimate ? 'mua hàng' : 'đề nghị' }}"
                                         data-title="{{ $row->title }}"
                                         data-items="{{ json_encode($row->items->map(fn ($item) => [
                                             'category_code' => $item->category_code,
@@ -199,7 +199,7 @@
                                         @if ($row->status_id == 1)
                                             <form class="form-md-confirm d-inline" action="{{ route($prRoute . 'generateNow') }}" method="POST"
                                                 data-title="Tạo {{ $prDoc }} ngay?"
-                                                data-text="Hệ thống tạo {{ $isEstimate ? 'một phiếu dự trù VPP ở trạng thái Nháp' : 'một đề nghị ' . ($isExternal ? 'liên phòng ban' : 'nội bộ') . ' ở trạng thái Lưu tạm' }} từ danh sách &quot;{{ $row->title }}&quot;. Lịch tự động theo chu kỳ giữ nguyên.">
+                                                data-text="Hệ thống tạo {{ $isEstimate ? 'một phiếu mua hàng VPP ở trạng thái Nháp' : 'một đề nghị ' . ($isExternal ? 'liên phòng ban' : 'nội bộ') . ' ở trạng thái Lưu tạm' }} từ danh sách &quot;{{ $row->title }}&quot;. Lịch tự động theo chu kỳ giữ nguyên.">
                                                 @csrf
                                                 <input type="hidden" name="id" value="{{ $row->id }}">
                                                 <button type="submit" class="btn btn-sm btn-info" title="Tạo {{ $prDoc }} ngay">

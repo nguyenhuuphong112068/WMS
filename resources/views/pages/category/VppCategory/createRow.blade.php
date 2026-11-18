@@ -69,7 +69,7 @@
         @endforeach
         <td class="cbt-actions">
             <button type="button" class="btn btn-sm btn-outline-primary btn-cbt-copy"
-                title="Nhân bản dòng (giữ nhà sản xuất, đơn vị, nhóm dự trù)">
+                title="Nhân bản dòng (giữ nhà sản xuất, đơn vị, nhóm mua hàng)">
                 <i class="fas fa-clone"></i>
             </button>
             <button type="button" class="btn btn-sm btn-outline-danger btn-cbt-remove" title="Bỏ dòng">

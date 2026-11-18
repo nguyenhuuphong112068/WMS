@@ -35,7 +35,7 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">6</span>
         <b>Bổ sung / xử lý</b>
-        <a href="#du-tru">Dự trù</a> khi thiếu; <a href="#cach-ly">cách ly - huỷ</a> khi hỏng, hết hạn
+        <a href="#du-tru">Mua hàng</a> khi thiếu; <a href="#cach-ly">cách ly - huỷ</a> khi hỏng, hết hạn
     </div>
 </div>
 
@@ -43,6 +43,6 @@
     <i class="fas fa-info-circle"></i>
     <div>Dữ liệu nền khai ở menu Dữ Liệu Gốc: <b>Đơn Chất</b>, <b>Hoá Chất</b> (tên),
         Nhà Sản Xuất, Nhà Cung Cấp, Đơn Vị Tính, Điều Kiện Bảo Quản, Định Khu. Xem
-        <a href="{{ route('pages.userGuide.show', 'materData') }}">Hướng dẫn Dữ Liệu Gốc</a>. Đề nghị, ký duyệt và dự trù nói chung
+        <a href="{{ route('pages.userGuide.show', 'materData') }}">Hướng dẫn Dữ Liệu Gốc</a>. Đề nghị, ký duyệt và mua hàng nói chung
         giống module vật tư, xem thêm <a href="{{ route('pages.userGuide.show', 'material') }}">Hướng dẫn Vật Tư</a>.</div>
 </div>

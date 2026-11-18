@@ -93,7 +93,7 @@
                                     <th style="width: 130px">Nhóm Hoá Chất</th>
                                     <th>Thông Tin Kỹ Thuật</th>
                                     <th>Mục Đích Sử Dụng</th>
-                                    <th style="width: 200px">Số Lượng Dự Trù</th>
+                                    <th style="width: 200px">Số Lượng Mua Hàng</th>
                                     <th style="width: 150px">Ngày Mong Muốn</th>
                                     @if ($purchaserView ?? false)
                                         <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
@@ -126,7 +126,7 @@
                                                     <i class="fas fa-exclamation-triangle mr-1"></i>{{ $warning['message'] }}
                                                     <button type="button" class="btn-est-thr-detail"
                                                         data-params="{{ json_encode(['category_id' => $item->category_id, 'item_id' => $item->id]) }}"
-                                                        title="Xem các lượng đóng góp: tồn theo lô, dự trù chưa hoàn thành, mặt hàng này">
+                                                        title="Xem các lượng đóng góp: tồn theo lô, mua hàng chưa hoàn thành, mặt hàng này">
                                                         <i class="fas fa-search-plus"></i> Chi tiết
                                                     </button>
                                                 </div>

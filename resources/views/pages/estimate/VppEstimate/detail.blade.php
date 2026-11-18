@@ -151,11 +151,7 @@
                                     <th style="width: 90px">NSX</th>
                                     <th>Thông Tin Kỹ Thuật</th>
                                     <th>Mục Đích Sử Dụng</th>
-                                    <th style="width: 200px">Số Lượng Dự Trù</th>
-                                    <th style="width: 150px">Ngày Mong Muốn</th>
-                                    @if ($purchaserView ?? false)
-                                        <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>
-                                    @endif
+                                    <th style="width: 200px">Số Lượng Mua Hàng</th>
                                     <th style="width: 110px">Người Tạo</th>
                                     <th class="text-center" style="width: 150px">Thao Tác</th>
                                 </tr>
@@ -230,19 +226,6 @@
                                                 <span class="md-empty">—</span>
                                             @endforelse
                                         </td>
-                                        <td data-order="{{ $item->expected_delivery_date }}">
-                                            @if ($item->expected_delivery_date)
-                                                <div class="text-primary font-weight-bold">{{ \Carbon\Carbon::parse($item->expected_delivery_date)->format('d/m/Y') }}</div>
-                                            @else
-                                                <span class="md-empty">—</span>
-                                            @endif
-                                        </td>
-                                        {{-- Ngày hẹn đáp ứng: chỉ người có quyền tiếp nhận xử lý của phòng Hành Chánh sửa --}}
-                                        @if ($purchaserView ?? false)
-                                        <td>
-                                            @include('pages.estimate.shared.promisedDates', ['editable' => $list->app_status === 'approved'])
-                                        </td>
-                                        @endif
                                         <td class="md-sub">
                                             {{ $item->updated_by ?: $item->created_by ?: '—' }}
                                             <br><small>{{ $item->created_at ? \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') : '' }}</small>
@@ -257,7 +240,6 @@
                                                             'material_name' => $item->material_name,
                                                             'technical_information' => $item->technical_information,
                                                             'purpose' => $item->purpose,
-                                                            'expected_delivery_date' => $item->expected_delivery_date,
                                                             'amounts' => $item->amounts->map(fn($amount) => [
                                                                 'amount' => rtrim(rtrim(number_format((float) $amount->amount, 4, '.', ''), '0'), '.'),
                                                                 'unit_id' => $amount->unit_id,

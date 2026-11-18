@@ -1,16 +1,16 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
-<p>Phòng lập <b>phiếu dự trù</b> để đề nghị bộ phận <b>Cung Ứng</b> mua vật tư cho một hoặc nhiều tháng. Phiếu phải được
+<p>Phòng lập <b>phiếu mua hàng</b> để đề nghị bộ phận <b>Cung Ứng</b> mua vật tư cho một hoặc nhiều tháng. Phiếu phải được
     ký đủ 2 bước mới chuyển tới Cung Ứng (mỗi nhà máy một bộ phận Cung Ứng riêng, NM1 là phòng <b>Cung Ứng - NM1</b>).</p>
-@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/du-tru.png', 'caption' => 'Màn hình Dự Trù › Vật Tư › tab Danh sách phiếu'])
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/du-tru.png', 'caption' => 'Màn hình Mua Hàng › Vật Tư › tab Danh sách phiếu'])
 
 <h3>Lập phiếu</h3>
 <ol class="ug-steps">
-    <li>Ở tab <b>Danh sách phiếu</b>, bấm tạo phiếu. Chọn <b>Tháng Dự Trù</b>, <b>Năm</b> và ghi chú. Mã phiếu tự sinh dạng
+    <li>Ở tab <b>Danh sách phiếu</b>, bấm tạo phiếu. Chọn <b>Tháng Mua Hàng</b>, <b>Năm</b> và ghi chú. Mã phiếu tự sinh dạng
         <span class="ug-key">[Bộ phận]yymmdd.xx</span>.</li>
     <li>Mở chi tiết phiếu, thêm vật tư: chọn từ danh mục (hiện sẵn tồn hiện tại, ngưỡng, thời gian đặt hàng) hoặc gõ tên
         vật tư <b>chưa có trong danh mục</b> kèm thông tin kỹ thuật, Part Number.</li>
-    <li>Nhập <b>Số Lượng Dự Trù</b> cho từng tháng cần dùng (thêm hoặc bỏ cột tháng được), <b>Ngày Mong Muốn Giao</b>, mục đích
+    <li>Nhập <b>Số Lượng Mua Hàng</b> cho từng tháng cần dùng (thêm hoặc bỏ cột tháng được), <b>Ngày Mong Muốn Giao</b>, mục đích
         sử dụng. Đính kèm báo giá, ảnh, catalogue cho từng vật tư nếu có.</li>
     <li>Bấm <b>Trình ký</b>, chọn đích danh người <b>Ban Giám Đốc</b> ký bước 2, nhập lại mật khẩu.</li>
 </ol>

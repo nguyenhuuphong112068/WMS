@@ -56,6 +56,7 @@
                                 <th class="text-center" style="width: 45px">STT</th>
                                 <th style="width: 165px">Mã Xuất Nhập</th>
                                 <th>Vật Tư</th>
+                                <th style="width: 130px">Loại Nhập</th>
                                 <th style="width: 150px">Quy Cách / Phân Loại</th>
                                 <th class="text-right" style="width: 110px">Số Lượng</th>
                                 <th style="width: 110px">Số Lô</th>

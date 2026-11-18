@@ -12,7 +12,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-edit"></i> Cập Nhật Vật Tư Dự Trù</h5>
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Cập Nhật Vật Tư Mua Hàng</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -95,7 +95,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Số Lượng Dự Trù Theo Tháng <span class="text-danger">*</span></label>
+                        <label>Số Lượng Mua Hàng Theo Tháng <span class="text-danger">*</span></label>
                         @include('pages.estimate.shared.amountsBox', [
                             'units' => $units,
                             'oldRows' => (array) old('amounts', []),

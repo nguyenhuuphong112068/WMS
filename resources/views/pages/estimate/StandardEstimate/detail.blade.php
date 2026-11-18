@@ -107,7 +107,7 @@
                                     <th style="width: 120px">Nhóm Chuẩn</th>
                                     <th>Thông Tin Kỹ Thuật</th>
                                     <th>Mục Đích Sử Dụng</th>
-                                    <th style="width: 200px">Số Lượng Dự Trù</th>
+                                    <th style="width: 200px">Số Lượng Mua Hàng</th>
                                     <th style="width: 150px">Ngày Mong Muốn</th>
                                     @if ($purchaserView ?? false)
                                         <th style="width: 150px">Ngày Hẹn Đáp Ứng</th>

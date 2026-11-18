@@ -47,7 +47,7 @@
             <div class="modal-header">
                 <h5 class="modal-title">
                     <i class="fas fa-{{ $isEstimate ? 'calendar-check' : ($isExternal ? 'exchange-alt' : 'sync-alt') }}"></i>
-                    {{ $isUpdate ? 'Cập Nhật' : 'Thêm' }} Danh Sách {{ $isEstimate ? 'Dự Trù' : ($isExternal ? 'Đề Nghị Liên Phòng Ban' : 'Đề Nghị Nội Bộ') }} Theo Chu Kỳ
+                    {{ $isUpdate ? 'Cập Nhật' : 'Thêm' }} Danh Sách {{ $isEstimate ? 'Mua Hàng' : ($isExternal ? 'Đề Nghị Liên Phòng Ban' : 'Đề Nghị Nội Bộ') }} Theo Chu Kỳ
                 </h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
@@ -76,11 +76,11 @@
                                 <label>Tiêu Đề <span class="text-danger">*</span></label>
                                 <input type="text" name="title" maxlength="255" required list="prTitleOptions_{{ $type }}" autocomplete="off"
                                     class="form-control {{ $bag->has('title') ? 'is-invalid' : '' }}"
-                                    value="{{ $old('title') }}" placeholder="VD: Dự trù vật tư bảo trì hằng tháng">
+                                    value="{{ $old('title') }}" placeholder="VD: Mua hàng vật tư bảo trì hằng tháng">
                             </div>
 
                             <div class="form-group col-md-5">
-                                <label>Dự Trù Cho <span class="text-danger">*</span></label>
+                                <label>Mua Hàng Cho <span class="text-danger">*</span></label>
                                 <select name="estimate_month_offset" required
                                     class="form-control pr-estimate-offset {{ $bag->has('estimate_month_offset') ? 'is-invalid' : '' }}">
                                     @foreach ($prSupport::ESTIMATE_MONTH_OFFSETS as $offsetKey => $offsetLabel)
@@ -90,7 +90,7 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <small class="text-muted">Tính từ tháng hệ thống tạo phiếu dự trù.</small>
+                                <small class="text-muted">Tính từ tháng hệ thống tạo phiếu mua hàng.</small>
                             </div>
                         @elseif ($isExternal)
                             <div class="form-group col-md-7">
@@ -270,7 +270,7 @@
                     </div>
 
                     <div class="d-flex align-items-center justify-content-between flex-wrap mb-2" style="gap: 6px">
-                        <label class="mb-0">Vật Tư {{ $isEstimate ? 'Dự Trù' : 'Đề Nghị' }} <span class="text-danger">*</span></label>
+                        <label class="mb-0">Vật Tư {{ $isEstimate ? 'Mua Hàng' : 'Đề Nghị' }} <span class="text-danger">*</span></label>
                         <div class="d-flex flex-wrap" style="gap: 6px">
                             <button type="button" class="btn btn-sm btn-outline-info pr-open-picker"
                                 data-picker="#periodic{{ $prKey }}PickerModal">

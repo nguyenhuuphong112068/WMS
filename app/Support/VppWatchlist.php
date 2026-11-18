@@ -280,7 +280,7 @@ class VppWatchlist
         $note = trim((string) $note) ?: null;
 
         if (! $categoryId && ! $materialName) {
-            return ['success' => false, 'message' => 'Vui lòng chọn VPP trong danh mục hoặc nhập tên VPP trước khi đề nghị dự trù!'];
+            return ['success' => false, 'message' => 'Vui lòng chọn VPP trong danh mục hoặc nhập tên VPP trước khi đề nghị mua hàng!'];
         }
 
         if (! $quantity || $quantity <= 0) {
@@ -288,7 +288,7 @@ class VppWatchlist
         }
 
         if (! $note) {
-            return ['success' => false, 'message' => 'Vui lòng nhập lý do dự trù.'];
+            return ['success' => false, 'message' => 'Vui lòng nhập lý do mua hàng.'];
         }
 
         if ($categoryId) {
@@ -299,7 +299,7 @@ class VppWatchlist
                 ->exists();
 
             if ($isLocked) {
-                return ['success' => false, 'message' => 'VPP của phòng đã bị khoá, không thể đề nghị dự trù!'];
+                return ['success' => false, 'message' => 'VPP của phòng đã bị khoá, không thể đề nghị mua hàng!'];
             }
         }
 
@@ -352,7 +352,7 @@ class VppWatchlist
             && MaterialPurchasing::keyOf($purchasing) === VppStore::PURCHASING_KEY
             && VppStore::targetDepartmentId($departmentId);
 
-        $listName = $toVpp ? '"Danh sách VPP cần đề nghị Hành Chính"' : '"Danh sách VPP cần dự trù"';
+        $listName = $toVpp ? '"Danh sách VPP cần đề nghị Hành Chính"' : '"Danh sách VPP cần mua hàng"';
         $doneState = $toVpp ? '"Đã đề nghị"' : '"Đã lập phiếu"';
 
         $progress = self::inProgress($departmentId);
@@ -462,7 +462,7 @@ class VppWatchlist
                 'type' => 'estimate',
                 'id' => (int) $row->id,
                 'code' => $row->code,
-                'label' => 'Phiếu dự trù',
+                'label' => 'Phiếu mua hàng',
                 'status' => $appStatuses[$row->app_status] ?? $row->app_status,
             ]);
         }

@@ -137,8 +137,9 @@
     </li>
     <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-check mr-1"></i>Áp dụng</span>. Chọn <i>- Giữ nguyên -</i> ở ô nào thì ô đó không bị thay đổi.</li>
 </ol>
-<p>Vị trí đã chia sẻ có <b>tam giác màu ở góc trái trên</b> (chú thích <i>Chia sẻ cho bộ phận khác</i>); rê chuột vào ô để xem
-    tên bộ phận. Mỗi vị trí chỉ giao cho <b>một</b> bộ phận, và đã giao thì phòng chủ kho không cất hàng vào đó nữa:</p>
+<p>Vị trí đã chia sẻ có <b>tam giác màu ở góc trái trên</b> (chú thích <i>Chia sẻ cho bộ phận khác</i>), cả trên lưới, mô hình 3D
+    của kệ và 3D cả phòng ở Mặt bằng kho/phòng; rê chuột vào ô để xem tên bộ phận. Ở chế độ <b>Danh sách định khu</b>, tab <b>Vị Trí</b>
+    có cột <b>Chia Sẻ Cho</b> ghi bộ phận đang được giao ô. Mỗi vị trí chỉ giao cho <b>một</b> bộ phận, và đã giao thì phòng chủ kho không cất hàng vào đó nữa:</p>
 <ul>
     <li>Ô chọn định khu ở Nhập, Danh mục của phòng (Vị trí mặc định), Định khu ở Tồn Kho, Cách ly, Nhận chuyển:
         phòng chủ kho <b>không còn thấy</b> vị trí đã giao, bộ phận được chia sẻ <b>thấy và chọn được</b>.</li>

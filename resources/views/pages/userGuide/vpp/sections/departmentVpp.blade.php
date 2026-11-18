@@ -1,4 +1,4 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
 <p>Mỗi phòng khai <b>cách dùng riêng</b> của từng VPP: phân loại của phòng, ngưỡng tồn, chỗ để. Phòng <b>không phải tự thêm</b>
     VPP: thêm một mã ở <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a> là mọi phòng ban có ngay một dòng tương ứng, nên số
@@ -7,7 +7,7 @@
 
 <h3>Các cột trên bảng</h3>
 <ul>
-    <li><b>Nhóm Dự Trù</b> và <b>Đơn Vị</b> lấy từ danh mục công ty (chỉ xem).</li>
+    <li><b>Nhóm Mua Hàng</b> và <b>Đơn Vị</b> lấy từ danh mục công ty (chỉ xem).</li>
     <li><b>Phân Loại Của Phòng</b>: bộ nhóm riêng phòng tự khai.</li>
     <li><b>Ngưỡng Tồn Tối Thiểu / Tối Đa</b>, <b>Định Khu</b>, <b>Ghi Chú</b>: phần phòng tự sửa.</li>
     <li><b>Sử Dụng</b> theo trạng thái của mã ở danh mục công ty: <span class="ug-chip">Đang dùng</span>,
@@ -26,17 +26,17 @@
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Phân Loại Của Phòng', false, 'Bộ nhóm riêng của phòng, khai ở <b>Dữ Liệu Gốc › Phân Loại</b>.'],
     ['Đơn Vị Tính', false, 'Chỉ hiện, không sửa: lấy theo <b>Danh mục VPP công ty</b>, cả công ty dùng chung một đơn vị nên không cần quy đổi đơn vị.'],
-    ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn xuống dưới mức này thì VPP tự vào <a href="#can-du-tru">Danh sách cần dự trù</a>. Để trống nếu chưa đặt.'],
-    ['Ngưỡng Tồn Tối Đa', false, 'Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.'],
+    ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn xuống dưới mức này thì VPP tự vào <a href="#can-du-tru">Danh sách cần mua hàng</a>. Để trống nếu chưa đặt.'],
+    ['Ngưỡng Tồn Tối Đa', false, 'Tồn vượt mức này thì màn Nhập và Mua Hàng cảnh báo trữ quá nhiều.'],
     ['Định Khu', false, 'Vị trí <b>dự kiến</b> để VPP; chỉ dùng để điền sẵn khi nhập. Vị trí thật của từng lô chọn lúc kiểm tra.'],
     ['Ghi Chú', false, 'Ví dụ: chỉ dùng cho tổ Hoá Lý.'],
     ['Lý Do Điều Chỉnh', true, 'Ghi vào lịch sử thay đổi.'],
 ]])
 
-<h3>Đề nghị dự trù một VPP</h3>
-<p>Nút <span class="btn btn-sm btn-outline-warning ug-ui"><i class="fas fa-bookmark"></i></span> ở dòng mở hộp <b>Đề nghị dự trù VPP này?</b>:
-    nhập số lượng cần đề nghị + lý do dự trù. Ở phòng thường VPP được đưa vào danh sách cần đề nghị Hành Chánh của tab
-    <a href="#de-nghi-vpp">Đề nghị VPP đến HC</a>; ở phòng Hành Chánh VPP vào <a href="#can-du-tru">Danh sách VPP cần dự trù</a>.
+<h3>Đề nghị mua hàng một VPP</h3>
+<p>Nút <span class="btn btn-sm btn-outline-warning ug-ui"><i class="fas fa-bookmark"></i></span> ở dòng mở hộp <b>Đề nghị mua hàng VPP này?</b>:
+    nhập số lượng cần đề nghị + lý do mua hàng. Ở phòng thường VPP được đưa vào danh sách cần đề nghị Hành Chánh của tab
+    <a href="#de-nghi-vpp">Đề nghị VPP đến HC</a>; ở phòng Hành Chánh VPP vào <a href="#can-du-tru">Danh sách VPP cần mua hàng</a>.
     Dòng mã đã khoá không có nút này.</p>
 
 <div class="ug-callout">

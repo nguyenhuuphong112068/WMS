@@ -92,4 +92,55 @@ class VppTransferRequest
         return ['id' => $id, 'code' => $code]
             + ($send ? ['send' => VppTransferSignFlow::start((int) $id, $actor)] : []);
     }
+
+    /**
+     * Phiếu đề nghị đang Lưu tạm (Nháp) của phòng gửi tới một phòng - cho tuỳ chọn "Thêm vào
+     * đề nghị nháp" ở tab Danh sách VPP cần đề nghị Hành Chính. Kèm số mục còn hiệu lực.
+     */
+    public static function drafts(int $departmentId, ?int $toDepartmentId)
+    {
+        if (! $toDepartmentId) {
+            return collect();
+        }
+
+        return DB::table(self::TABLE.' as r')
+            ->leftJoin(self::ITEM_TABLE.' as i', function ($join) {
+                $join->on('i.transfer_request_id', '=', 'r.id')->where('i.active', 1);
+            })
+            ->select('r.id', 'r.code', 'r.title', 'r.created_at', 'r.updated_at', DB::raw('COUNT(i.id) as item_count'))
+            ->where('r.department_id', $departmentId)
+            ->where('r.to_department_id', $toDepartmentId)
+            ->where('r.status', 'draft')
+            ->groupBy('r.id', 'r.code', 'r.title', 'r.created_at', 'r.updated_at')
+            ->orderByDesc('r.updated_at')
+            ->orderByDesc('r.id')
+            ->get();
+    }
+
+    /**
+     * Thêm dòng VPP vào một phiếu đang Lưu tạm, phiếu vẫn ở trạng thái Nháp (người dùng tự
+     * gửi đi sau). $items cùng dạng với create(). Người gọi đã kiểm tra phiếu là Nháp của phòng.
+     */
+    public static function appendItems(int $requestId, array $items, string $actor): void
+    {
+        DB::transaction(function () use ($requestId, $items, $actor) {
+            foreach ($items as $item) {
+                DB::table(self::ITEM_TABLE)->insert([
+                    'transfer_request_id' => $requestId,
+                    'category_id' => (int) $item['category_id'],
+                    'requested_amount' => (float) ($item['requested_amount'] ?? 0),
+                    'requested_unit' => $item['requested_unit'] ?? null,
+                    'note' => $item['note'] ?? null,
+                    'status' => 'draft',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::table(self::TABLE)->where('id', $requestId)->update([
+                'updated_by' => $actor,
+                'updated_at' => now(),
+            ]);
+        });
+    }
 }

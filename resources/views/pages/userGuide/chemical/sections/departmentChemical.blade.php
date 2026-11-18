@@ -27,8 +27,8 @@
     ['Đơn Vị Tính', true, 'Đơn vị phòng dùng để nhập, xuất và ghi tồn. Mọi màn Nhập / Sử dụng / Tồn của phòng đọc đơn vị từ đây.'],
     ['Khối Lượng Quy Đổi', false, 'Ô <b>1 đv = ... kg</b> hiện ngay dưới Đơn Vị Tính khi đơn vị thuộc nhóm đếm (chai, can, thùng...): khối lượng hoá chất (kg) trong 1 đơn vị. Để trống thì hệ thống không quy ra kg được để đối chiếu ngưỡng PL IV.'],
     ['Hạn Dùng Nội Bộ (tháng)', false, 'Để trống thì lấy hạn dùng mặc định của danh mục (gợi ý <i>DM: n</i> trong ô).'],
-    ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn xuống dưới mức này thì màn Tồn Kho báo <b>Sắp hết</b> và hoá chất vào <a href="#can-du-tru">Danh sách cần dự trù</a>. Để trống thì cảnh báo khi tồn còn dưới 20% lượng nhập.'],
-    ['Ngưỡng Tồn Tối Đa', false, 'Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.'],
+    ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn xuống dưới mức này thì màn Tồn Kho báo <b>Sắp hết</b> và hoá chất vào <a href="#can-du-tru">Danh sách cần mua hàng</a>. Để trống thì cảnh báo khi tồn còn dưới 20% lượng nhập.'],
+    ['Ngưỡng Tồn Tối Đa', false, 'Tồn vượt mức này thì màn Nhập và Mua Hàng cảnh báo trữ quá nhiều.'],
     ['Định Khu', false, 'Chỗ dự kiến để hoá chất. Ô chỉ hiện <b>mã vị trí</b> (vd. <i>QC2-INS-068/02/01/01.1</i>), vẫn gõ được tên kho / kệ / cột / tầng để tìm. Chỗ nào cùng tầng với hoá chất tương kỵ có thêm dòng lý do màu đỏ (vẫn chọn được).'],
     ['Ghi Chú', false, 'Ví dụ: chỉ dùng cho kiểm nghiệm vi sinh.'],
 ]])

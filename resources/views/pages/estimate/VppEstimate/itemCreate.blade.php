@@ -62,7 +62,7 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-box-open"></i> Thêm VPP Dự Trù</h5>
+                <h5 class="modal-title"><i class="fas fa-box-open"></i> Thêm VPP Mua Hàng</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -186,7 +186,7 @@
                         <div class="emi-picker-foot">
                             <span class="emi-pick-count">Đã chọn 0 VPP</span>
                             <button type="button" class="btn btn-sm btn-primary btn-emi-pick-apply" disabled>
-                                <i class="fas fa-arrow-down mr-1"></i> Thêm vào bảng dự trù
+                                <i class="fas fa-arrow-down mr-1"></i> Thêm vào bảng mua hàng
                             </button>
                         </div>
                     </div>
@@ -199,7 +199,6 @@
                                     <th class="emi-col-material">VPP <span class="text-danger">*</span></th>
                                     <th class="emi-col-text">Thông Tin Kỹ Thuật</th>
                                     <th class="emi-col-text">Mục Đích Sử Dụng</th>
-                                    <th class="emi-col-date">Ngày Mong Muốn Giao</th>
                                     <th class="emi-col-unit">Đơn Vị <span class="text-danger">*</span></th>
                                     <th class="emi-col-file">File</th>
                                     @foreach ($emiPeriods as $k => $period)
@@ -229,7 +228,7 @@
                                     ])
                                 @endforeach
                                 <tr class="emi-empty" @if (count($emiRows)) style="display:none" @endif>
-                                    <td colspan="{{ 8 + count($emiPeriods) }}">
+                                    <td colspan="{{ 7 + count($emiPeriods) }}">
                                         <i class="fas fa-box-open"></i>
                                         Chưa có VPP nào. Bấm <b>Chọn từ danh mục phòng</b> hoặc
                                         <b>Thêm dòng ngoài danh mục</b>.
@@ -312,7 +311,7 @@
             });
 
             var rows = $tbody.find('.emi-row').length;
-            $tbody.find('.emi-empty').toggle(rows === 0).find('td').attr('colspan', 8 + periodCount());
+            $tbody.find('.emi-empty').toggle(rows === 0).find('td').attr('colspan', 7 + periodCount());
             $thead.find('.btn-emi-period-remove').prop('disabled', periodCount() <= 1);
             $table.css('min-width', (1360 + periodCount() * 150) + 'px');
             $form.find('.emi-count').text(rows + ' dòng VPP · ' + periodCount() + ' tháng');

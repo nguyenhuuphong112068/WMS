@@ -29,6 +29,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  *     'title'      => 'DỰ TRÙ VẬT TƯ', 'file_prefix' => 'DuTruVatTu',
  *     'code_label' => 'Mã Vật Tư', 'name_label' => 'Vật Tư',
  *     'extras'     => [tiêu đề cột => biểu thức select] cột riêng của từng loại hàng,
+ *     'no_dates'   => true: bỏ 2 cột Ngày Mong Muốn / Ngày Hẹn Đáp Ứng (mua hàng VPP, 18/11/2026),
  *   ]
  */
 trait EstimateApprovedExport
@@ -44,11 +45,11 @@ trait EstimateApprovedExport
             ->values();
 
         if ($ids->isEmpty()) {
-            return redirect()->back()->with('error', 'Vui lòng chọn ít nhất một đơn dự trù để xuất Excel!')->with('activeTab', 'approved');
+            return redirect()->back()->with('error', 'Vui lòng chọn ít nhất một đơn mua hàng để xuất Excel!')->with('activeTab', 'approved');
         }
 
         if (! $this->isPurchasingViewer($this->departmentId())) {
-            return redirect()->back()->with('error', 'Bạn không có quyền xuất Excel đơn dự trù đã được phê duyệt!');
+            return redirect()->back()->with('error', 'Bạn không có quyền xuất Excel đơn mua hàng đã được phê duyệt!');
         }
 
         $lists = DB::table(self::TABLE)
@@ -68,7 +69,7 @@ trait EstimateApprovedExport
             ->keyBy('id');
 
         if ($lists->isEmpty()) {
-            return redirect()->back()->with('error', 'Không tìm thấy đơn dự trù đã phê duyệt cần xuất!')->with('activeTab', 'approved');
+            return redirect()->back()->with('error', 'Không tìm thấy đơn mua hàng đã phê duyệt cần xuất!')->with('activeTab', 'approved');
         }
 
         $rows = $this->exportRows($lists);
@@ -88,7 +89,7 @@ trait EstimateApprovedExport
         $fileName = $cfg['file_prefix'].'_'.($multi ? $lists->count().'phieu' : $lists->first()->code).'_'.now()->format('Ymd_His').'.xlsx';
 
         AuditTrialController::log('Xuất Excel', self::TABLE, $multi ? 0 : $lists->first()->id, null,
-            'Xuất Excel đơn dự trù đã phê duyệt: '.$lists->pluck('code')->implode(', '));
+            'Xuất Excel đơn mua hàng đã phê duyệt: '.$lists->pluck('code')->implode(', '));
 
         return response()->streamDownload(function () use ($spreadsheet) {
             (new Xlsx($spreadsheet))->save('php://output');
@@ -200,12 +201,15 @@ trait EstimateApprovedExport
     private function fillDetailSheet(Worksheet $sheet, $lists, $rows, bool $multi): void
     {
         $exp = $this->exportConfig();
+        $noDates = ! empty($exp['no_dates']);
         $sheet->setTitle('Chi tiết');
 
         $headers = array_merge(
-            ['STT', 'Bộ Phận', 'Mã Phiếu', 'Kỳ Dự Trù', $exp['code_label'], $exp['name_label'], 'NSX'],
+            ['STT', 'Bộ Phận', 'Mã Phiếu', 'Kỳ Mua Hàng', $exp['code_label'], $exp['name_label'], 'NSX'],
             array_keys($exp['extras']),
-            ['Thông Tin Kỹ Thuật', 'Mục Đích Sử Dụng', 'Tháng Cần', 'Số Lượng', 'ĐVT', 'Ngày Mong Muốn', 'Ngày Hẹn Đáp Ứng', 'Tình Trạng']
+            ['Thông Tin Kỹ Thuật', 'Mục Đích Sử Dụng', 'Tháng Cần', 'Số Lượng', 'ĐVT'],
+            $noDates ? [] : ['Ngày Mong Muốn', 'Ngày Hẹn Đáp Ứng'],
+            ['Tình Trạng']
         );
 
         if ($multi) {
@@ -263,8 +267,12 @@ trait EstimateApprovedExport
                     $row['month'] ? \Carbon\Carbon::parse($row['month'])->format('m/Y') : '',
                     $row['amount'],
                     $row['unit'],
+                ],
+                $noDates ? [] : [
                     $row['expected'] ? \Carbon\Carbon::parse($row['expected'])->format('d/m/Y') : '',
                     $row['promised'] ? \Carbon\Carbon::parse($row['promised'])->format('d/m/Y') : '',
+                ],
+                [
                     $row['status'],
                 ]
             );
@@ -327,7 +335,9 @@ trait EstimateApprovedExport
         $widths = array_merge(
             [6, 14, 16, 10, 13, 40, 14],
             array_fill(0, count($exp['extras']), 16),
-            [30, 30, 10, 11, 9, 14, 14, 16]
+            [30, 30, 10, 11, 9],
+            $noDates ? [] : [14, 14],
+            [16]
         );
         if ($multi) {
             $widths[] = 14;

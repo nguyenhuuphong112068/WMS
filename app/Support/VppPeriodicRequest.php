@@ -842,10 +842,10 @@ class VppPeriodicRequest
 
         return array_filter([
             'Tiêu đề' => $list->title,
-            'Loại đề nghị' => $isEstimate ? 'Dự trù' : ($isExternal ? 'Liên phòng ban' : 'Nội bộ'),
+            'Loại đề nghị' => $isEstimate ? 'Mua hàng' : ($isExternal ? 'Liên phòng ban' : 'Nội bộ'),
             'Đối tượng' => $isExternal || $isEstimate ? null : (self::objectLabel($list->consumption_object_id) ?? '—'),
             'Tổ quản lý' => $isExternal || $isEstimate ? null : ($list->group_name ?: '—'),
-            'Dự trù cho' => $isEstimate ? self::ESTIMATE_MONTH_OFFSETS[self::estimateMonthOffset($list)] : null,
+            'Mua hàng cho' => $isEstimate ? self::ESTIMATE_MONTH_OFFSETS[self::estimateMonthOffset($list)] : null,
             'Phòng cấp phát' => $isExternal ? ($list->to_department_name ?: '—') : null,
             'Chu kỳ' => self::scheduleLabel($list->periodic, $list->cycle_length, $list->frequency),
             'Ngày tạo trong chu kỳ' => self::dayLabel($list),
@@ -1066,7 +1066,7 @@ class VppPeriodicRequest
     public static function resultLabel(array $result): string
     {
         return $result['type'] === self::TYPE_ESTIMATE
-            ? 'phiếu dự trù '.$result['code'].' (Nháp)'
+            ? 'phiếu mua hàng '.$result['code'].' (Nháp)'
             : 'đề nghị '.$result['code'].' (Lưu tạm)';
     }
 
@@ -1209,8 +1209,6 @@ class VppPeriodicRequest
      *
      * Dòng danh sách lưu đơn vị theo tên ngắn (requested_unit) còn phiếu dự trù cần unit_id: tra
      * theo tên ngắn, không khớp thì lấy đơn vị tính của Danh Mục VPP Công Ty.
-     *
-     * Ngày mong muốn giao = ngày tạo phiếu + 7 ngày - xem VppLeadTime::defaultExpectedDate().
      */
     private static function createEstimate($list, $items, string $actor): array
     {
@@ -1234,7 +1232,7 @@ class VppPeriodicRequest
             'department_id' => $list->department_id,
             'month' => $period->month,
             'year' => $period->year,
-            'note' => Str::limit('Tạo tự động từ danh sách dự trù theo chu kỳ "'.$list->title.'".', 500, ''),
+            'note' => Str::limit('Tạo tự động từ danh sách mua hàng theo chu kỳ "'.$list->title.'".', 500, ''),
             'app_status' => 'draft',
             'status_id' => 1,
             'created_by' => $actor,
@@ -1254,7 +1252,6 @@ class VppPeriodicRequest
                 'material_name' => null,
                 'technical_information' => null,
                 'purpose' => $item->purpose,
-                'expected_delivery_date' => VppLeadTime::defaultExpectedDate($now),
                 'status_id' => 1,
                 'created_by' => $actor,
                 'created_at' => $now,
@@ -1322,9 +1319,9 @@ class VppPeriodicRequest
         try {
             $notificationId = DB::table('notifications')->insertGetId([
                 'sender_id' => null,
-                'activity_type' => $isEstimate ? 'Dự trù theo chu kỳ' : 'Đề nghị theo chu kỳ',
+                'activity_type' => $isEstimate ? 'Mua hàng theo chu kỳ' : 'Đề nghị theo chu kỳ',
                 'message' => $isEstimate
-                    ? 'Đến chu kỳ: đã lập phiếu dự trù VPP '.$result['code'].' (Nháp) từ danh sách "'.$list->title
+                    ? 'Đến chu kỳ: đã lập phiếu mua hàng VPP '.$result['code'].' (Nháp) từ danh sách "'.$list->title
                         .'". Vui lòng kiểm tra, điều chỉnh rồi trình ký.'
                     : 'Đến chu kỳ: đã tạo đề nghị '.($isExternal ? 'liên phòng ban ' : 'cấp phát VPP ')
                         .$result['code'].' (Lưu tạm) từ danh sách "'.$list->title.'". Vui lòng kiểm tra, điều chỉnh rồi '

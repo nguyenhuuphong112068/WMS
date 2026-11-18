@@ -11,7 +11,7 @@
             </tr>
         </thead>
         <tbody>
-            <tr><td><i class="fas fa-file-invoice"></i> Dự trù</td><td style="font-weight: 400">Ký dự trù, dự trù mới chờ tiếp nhận, đề nghị huỷ mục dự trù.</td></tr>
+            <tr><td><i class="fas fa-file-invoice"></i> Mua hàng</td><td style="font-weight: 400">Ký mua hàng, mua hàng mới chờ tiếp nhận, đề nghị huỷ mục mua hàng.</td></tr>
             <tr><td><i class="fas fa-clipboard-list"></i> Đề nghị nội bộ</td><td style="font-weight: 400">Ký đề nghị cấp phát, phiếu chờ kho cấp, chuẩn đã cấp cho bạn.</td></tr>
             <tr><td><i class="fas fa-exchange-alt"></i> Liên phòng ban</td><td style="font-weight: 400">Ký đề nghị liên phòng ban (vật tư, hoá chất, chất chuẩn - 2 bước Quản Lý Bộ Phận), chờ phòng bạn cấp phát, hàng đã cấp chờ bạn nhận.</td></tr>
             <tr><td><i class="fas fa-paperclip"></i> Văn phòng phẩm</td><td style="font-weight: 400">Đề nghị cấp phát VPP đến Hành Chánh (module VPP): ký đề nghị VPP, chờ phòng bạn cấp VPP, VPP đã cấp chờ bạn nhận.</td></tr>

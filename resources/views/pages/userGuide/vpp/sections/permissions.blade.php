@@ -10,6 +10,6 @@
         <li><b>Sử Dụng VPP</b>: ghi phiếu ở tab <a href="#su-dung-vpp">Sử Dụng VPP</a> (trừ tồn ngay). Vai trò <b>Người Sử Dụng VPP</b> được cấp sẵn quyền này.</li>
         <li><b>Tạo Đề Nghị VPP Liên Phòng Ban / Đến HC</b>: lập và gửi đề nghị ở 2 tab liên phòng ban.</li>
         <li>Người <b>ký</b> đề nghị liên phòng ban / VPP đến HC xét theo <b>vai trò Quản Lý Bộ Phận</b> của phòng đề nghị và phòng cấp phát,
-            không theo quyền. Phiếu dự trù chỉ phòng Hành Chánh lập; người ký: Quản Lý Bộ Phận Hành Chánh rồi Ban Giám Đốc; kho VPP Hành Chánh tự tiếp nhận.</li>
+            không theo quyền. Phiếu mua hàng chỉ phòng Hành Chánh lập; người ký: Quản Lý Bộ Phận Hành Chánh rồi Ban Giám Đốc; kho VPP Hành Chánh tự tiếp nhận.</li>
     </ul></div>
 </div>

@@ -1018,6 +1018,29 @@
     .imp-pick-visible b {
         color: var(--primary);
     }
+
+    /* ---------- Ô Loại Nhập của sổ nhập (shared/importKind) ---------- */
+    .imp-kind {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .imp-kind.is-new {
+        background: #DCFCE7;
+        color: #15803D;
+        border: 1px solid #86EFAC;
+    }
+
+    .imp-kind.is-transfer {
+        background: var(--primary-soft);
+        color: var(--primary-dark);
+        border: 1px solid var(--primary-lighter);
+    }
 </style>
 
 <script>

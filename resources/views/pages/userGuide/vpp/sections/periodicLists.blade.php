@@ -1,5 +1,5 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'lien-phong-ban', 'no' => 2, 'label' => 'Đề nghị liên phòng ban'])
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
 <p>Lập sẵn một danh sách VPP dùng đều đặn. Đến ngày đã hẹn, hệ thống <b>tự tạo</b> một phiếu ở trạng thái
     <b>Lưu tạm / Nháp</b> để bạn kiểm tra lại rồi gửi đi. Có 2 tab:</p>
@@ -20,8 +20,8 @@
                     Thường gửi tới Hành Chánh (kho VPP).</td>
             </tr>
             <tr>
-                <td>DS dự trù theo chu kỳ</td>
-                <td style="font-weight: 400"><a href="#du-tru">Phiếu dự trù</a> ở trạng thái Nháp, dự trù cho tháng ở ô <b>Dự Trù Cho</b>
+                <td>DS mua hàng theo chu kỳ</td>
+                <td style="font-weight: 400"><a href="#du-tru">Phiếu mua hàng</a> ở trạng thái Nháp, mua hàng cho tháng ở ô <b>Mua Hàng Cho</b>
                     (tháng tạo phiếu, tháng sau, 2 hoặc 3 tháng sau).</td>
             </tr>
         </tbody>
@@ -36,7 +36,7 @@
     ['Chu Kỳ', true, 'Hằng tuần, Hằng tháng, 2 tháng/lần, Hằng quý, 6 tháng/lần, Theo số năm, Theo số ngày.'],
     ['Ngày Tạo Đề Nghị Trong Chu Kỳ', true, '<b>Ngày Cụ Thể</b>: ví dụ ngày 5 hằng tháng; ngày vượt độ dài kỳ (31 ở tháng 30 ngày) thì lấy ngày cuối kỳ.'],
     ['Ngày Bắt Đầu Chu Kỳ Đầu Tiên', true, 'Không được lùi về quá khứ. Hệ thống không bao giờ tạo phiếu trước ngày này.'],
-    ['VPP Đề Nghị / Dự Trù', true, 'Chọn VPP, số lượng, mục đích. Đơn vị theo <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a>.'],
+    ['VPP Đề Nghị / Mua Hàng', true, 'Chọn VPP, số lượng, mục đích. Đơn vị theo <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a>.'],
 ]])
 
 <p>VPP không có danh sách đề nghị <b>nội bộ</b> theo chu kỳ: dùng VPP trong phòng thì ghi thẳng ở tab

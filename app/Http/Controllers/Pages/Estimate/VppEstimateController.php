@@ -10,7 +10,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\AttachmentBackup;
 use App\Support\DepartmentVpp;
-use App\Support\VppLeadTime;
 use App\Support\VppStore;
 use App\Support\VppWatchlist;
 use Illuminate\Http\Request;
@@ -71,32 +70,34 @@ class VppEstimateController extends Controller
     /** Hoàn thành / Huỷ / Hoàn tác mục dự trù đã duyệt (phía phòng đề nghị) */
     private const TRACK_PERMISSION = 'estimate_vpp_tracking';
 
-    /** Gửi tin ở cột "Trao đổi" tab Theo dõi dự trù (quyền con của estimate_vpp_tab_tracking) */
+    /** Gửi tin ở nút "Trao đổi" từng VPP trong chi tiết phiếu (quyền con của estimate_vpp_view) */
     private const CHAT_PERMISSION = 'estimate_vpp_chat';
 
 
     private const CHAT_TYPE = 'vpp';
 
-    private const LABEL = 'phiếu dự trù VPP';
+    private const LABEL = 'phiếu mua hàng VPP';
 
-    private const ITEM_LABEL = 'VPP dự trù';
+    private const ITEM_LABEL = 'VPP mua hàng';
 
     private const EDITABLE_STATUSES = ['draft', 'rejected'];
 
     /** Chỉ phòng Hành Chánh (deparments.purchasing_key = admin, giữ kho VPP) lập dự trù VPP. */
-    private const ONLY_ADMIN_MESSAGE = 'Chỉ phòng Hành Chánh (phòng giữ kho VPP) lập được phiếu dự trù VPP!';
+    private const ONLY_ADMIN_MESSAGE = 'Chỉ phòng Hành Chánh (phòng giữ kho VPP) lập được phiếu mua hàng VPP!';
 
     /** Xuất Excel tab "Đơn dự trù đã được phê duyệt" - xem App\Http\Controllers\Concerns\EstimateApprovedExport. */
     protected function exportConfig(): array
     {
         return [
             'amount_fk' => 'vpp_estimate_item_id',
-            'title' => 'DỰ TRÙ VPP',
+            'title' => 'MUA HÀNG VPP',
             'file_prefix' => 'DuTruVatTu',
             'code_label' => 'Mã VPP',
             'name_label' => 'VPP',
             // VPP không có Part Number (bỏ 12/11/2026) - không có cột thêm
             'extras' => [],
+            // Mua hàng VPP không có Ngày mong muốn / Ngày hẹn đáp ứng (bỏ 18/11/2026)
+            'no_dates' => true,
         ];
     }
 
@@ -151,14 +152,6 @@ class VppEstimateController extends Controller
             $row->can_sign = $row->pending_sign ? $this->canSignRow($row->pending_sign) : false;
         });
 
-        // Mục do phòng đang chọn phụ trách mua (null = không phải bộ phận mua hàng)
-        $purchasingScope = $tabAllowed['tracking'] ? $this->purchasingItems($departmentId) : null;
-
-        // Theo dõi dự trù: phiếu của phòng + mục bộ phận mua hàng phụ trách (đã hẹn ngày, chưa giao)
-        $trackedItems = $tabAllowed['tracking']
-            ? self::trackedItems($departmentId, $purchasingScope ? $purchasingScope->pluck('id')->all() : [])
-            : collect();
-
         // VPP tồn dưới ngưỡng tối thiểu + VPP người dùng bấm "Ghi nhớ" bên Sử Dụng VPP.
         // Phòng thường đề nghị VPP trong danh mục từ kho VPP (Sử Dụng VPP) - xem VppWatchlist::forEstimate()
         // Dự trù VPP là việc của phòng Hành Chánh (giữ kho VPP) - phòng khác không lập phiếu, không có tab này
@@ -180,7 +173,7 @@ class VppEstimateController extends Controller
             ? $request->query('tab')
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : ($tabs[0] ?? null));
 
-        session()->put(['title' => 'DỰ TRÙ - DỰ TRÙ VPP']);
+        session()->put(['title' => 'MUA HÀNG - MUA HÀNG VPP']);
 
         return view('pages.estimate.VppEstimate.list', [
             'datas' => $datas,
@@ -192,7 +185,6 @@ class VppEstimateController extends Controller
             'signPermission' => self::SIGN_PERMISSION,
             'nextCode' => $this->nextCode($departmentId),
             'canCreateHere' => $canCreateHere,
-            'trackedItems' => $trackedItems,
             'watchlistItems' => $watchlistItems,
             'units' => $this->unitOptions(),
             'activeTab' => $activeTab,
@@ -219,7 +211,7 @@ class VppEstimateController extends Controller
                 ->with('error', 'Không tìm thấy '.self::LABEL.' của phòng ban đang chọn!');
         }
 
-        session()->put(['title' => 'DỰ TRÙ - CHI TIẾT PHIẾU '.$list->code]);
+        session()->put(['title' => 'MUA HÀNG - CHI TIẾT PHIẾU '.$list->code]);
 
         $signs = $this->signRows([$list->id])->get($list->id, collect());
         $pendingSign = $this->pendingSign($list, $signs);
@@ -273,7 +265,7 @@ class VppEstimateController extends Controller
         }
 
         return redirect()->back()
-            ->with('success', 'Đã bỏ ghi nhớ VPP cần dự trù!')
+            ->with('success', 'Đã bỏ ghi nhớ VPP cần mua hàng!')
             ->with('activeTab', 'watchlist');
     }
 
@@ -345,7 +337,6 @@ class VppEstimateController extends Controller
                 'updated_at' => now(),
             ]);
 
-            // Ngày mong muốn giao = ngày lập + 7 ngày - xem VppLeadTime::defaultExpectedDate()
             foreach ($items as $item) {
                 $categoryId = ! empty($item['category_id']) ? (int) $item['category_id'] : null;
 
@@ -355,7 +346,6 @@ class VppEstimateController extends Controller
                     'material_name' => $categoryId ? null : $this->nullIfBlank($item['material_name'] ?? null),
                     'technical_information' => $this->nullIfBlank($item['technical_information'] ?? null),
                     'purpose' => $this->nullIfBlank($item['purpose'] ?? null),
-                    'expected_delivery_date' => VppLeadTime::defaultExpectedDate(),
                     'status_id' => 1,
                     'created_by' => $this->actor(),
                     'created_at' => now(),
@@ -389,7 +379,7 @@ class VppEstimateController extends Controller
             self::TABLE,
             $result['id'],
             'NA',
-            'Lập '.self::LABEL.' '.$result['code'].' từ danh sách VPP cần dự trù ('.count($items).' mục)'
+            'Lập '.self::LABEL.' '.$result['code'].' từ danh sách VPP cần mua hàng ('.count($items).' mục)'
         );
 
         return redirect()->route(self::EST_ROUTE.'detail', ['id' => $result['id']])
@@ -431,7 +421,7 @@ class VppEstimateController extends Controller
         });
 
         return redirect()->route('pages.estimate.vppEstimate.detail', ['id' => $result['id']])
-            ->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'! Hãy khai các VPP cần dự trù.');
+            ->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'! Hãy khai các VPP cần mua hàng.');
     }
 
     public function update(Request $request)
@@ -459,7 +449,7 @@ class VppEstimateController extends Controller
 
         if ($current->app_status !== 'draft') {
             AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->code, $current->code);
-            self::writeHistory($current->id, 'Sửa phiếu', null, $current->app_status, $current->app_status, 'Cập nhật thông tin phiếu dự trù.');
+            self::writeHistory($current->id, 'Sửa phiếu', null, $current->app_status, $current->app_status, 'Cập nhật thông tin phiếu mua hàng.');
         }
 
         return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
@@ -509,7 +499,7 @@ class VppEstimateController extends Controller
             'vpp_estimate_item_id' => ['required', 'integer'],
         ], [
             'attachments.required' => 'Vui lòng chọn file cần đính kèm.',
-            'vpp_estimate_item_id.required' => 'File đính kèm phải gắn với một mục dự trù.',
+            'vpp_estimate_item_id.required' => 'File đính kèm phải gắn với một mục mua hàng.',
             'attachments.max' => 'Mỗi lần tải tối đa 20 file.',
             'attachments.*.file' => 'File tải lên không hợp lệ.',
             'attachments.*.max' => 'Mỗi file tối đa 20MB.',
@@ -819,7 +809,7 @@ class VppEstimateController extends Controller
             self::writeHistory($list->id, 'Xoá mặt hàng', null, $list->app_status, $list->app_status, 'Xoá mặt hàng khỏi phiếu.');
         }
 
-        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu dự trù!');
+        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu mua hàng!');
     }
 
     /**
@@ -830,7 +820,7 @@ class VppEstimateController extends Controller
     public function updateItemStatus(Request $request)
     {
         if (! user_can(self::TRACK_PERMISSION)) {
-            return redirect()->back()->with('error', 'Bạn không có quyền cập nhật trạng thái mục dự trù!');
+            return redirect()->back()->with('error', 'Bạn không có quyền cập nhật trạng thái mục mua hàng!');
         }
 
         $request->validate([
@@ -877,98 +867,6 @@ class VppEstimateController extends Controller
         return redirect()->back()->with('success', 'Đã cập nhật trạng thái '.self::ITEM_LABEL.'!');
     }
 
-    public function updatePromisedDate(Request $request)
-    {
-        $request->validate([
-            'id' => 'required|integer',
-            'amount_id' => 'required|integer',
-            'promised_date' => 'nullable|date',
-            'reason' => 'nullable|string|max:500',
-        ]);
-
-        [$item, $list] = $this->findPurchasingItem($request->id);
-
-        if (! $item) {
-            return response()->json(['success' => false, 'message' => 'Không tìm thấy '.self::ITEM_LABEL.' cần cập nhật, hoặc bạn không phải bộ phận mua hàng của phiếu này!']);
-        }
-
-        if ($list->app_status !== 'approved') {
-            return response()->json(['success' => false, 'message' => 'Phiếu chưa được duyệt nên không thể hẹn ngày!']);
-        }
-
-        // Mỗi tháng dự trù của mục có một ngày hẹn riêng
-        $amount = DB::table(self::AMOUNT_TABLE)
-            ->where('id', $request->amount_id)
-            ->where('vpp_estimate_item_id', $item->id)
-            ->where('active', 1)
-            ->first();
-
-        if (! $amount) {
-            return response()->json(['success' => false, 'message' => 'Không tìm thấy tháng dự trù cần hẹn ngày!']);
-        }
-
-        $month = \Carbon\Carbon::parse($amount->for_month_year)->format('m/Y');
-        $oldDate = $amount->promised_date ? \Carbon\Carbon::parse($amount->promised_date)->format('d/m/Y') : 'Chưa có';
-        $newDate = $request->promised_date ? \Carbon\Carbon::parse($request->promised_date)->format('d/m/Y') : 'Chưa có';
-
-        // Lần hẹn đầu tiên của tháng (chưa có ngày hẹn) không bắt nhập lý do
-        if ($amount->promised_date && $oldDate !== $newDate && trim((string) $request->reason) === '') {
-            return response()->json(['success' => false, 'message' => 'Vui lòng nhập lý do thay đổi ngày hẹn đáp ứng!']);
-        }
-
-        $actor = $this->actor();
-        $reason = trim((string) $request->reason);
-        $historyAdded = false;
-
-        DB::transaction(function () use ($item, $amount, $request, $month, $oldDate, $newDate, $actor, $reason, &$historyAdded) {
-            DB::table(self::AMOUNT_TABLE)->where('id', $amount->id)->update([
-                'promised_date' => $request->promised_date,
-            ]);
-
-            // Ngày hẹn của mục = ngày hẹn sớm nhất trong các tháng (tab Theo dõi dự trù lọc / sắp xếp theo cột này)
-            DB::table(self::ITEM_TABLE)->where('id', $item->id)->update([
-                'promised_date' => DB::table(self::AMOUNT_TABLE)
-                    ->where('vpp_estimate_item_id', $item->id)
-                    ->where('active', 1)
-                    ->min('promised_date'),
-            ]);
-
-            if ($oldDate !== $newDate) {
-                DB::table('estimate_item_chats')->insert([
-                    'item_id' => $item->id,
-                    'item_type' => self::CHAT_TYPE,
-                    'user_name' => $actor,
-                    'content' => $amount->promised_date
-                        ? "Tháng {$month}: cập nhật ngày hẹn đáp ứng từ [{$oldDate}] thành [{$newDate}]. Lý do: {$reason}"
-                        : "Tháng {$month}: hẹn ngày đáp ứng lần đầu [{$newDate}]",
-                    'type' => 'history_promised_date',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-                $historyAdded = true;
-            }
-        });
-
-        return response()->json(['success' => true, 'message' => 'Đã cập nhật ngày hẹn đáp ứng!', 'historyAdded' => $historyAdded]);
-    }
-
-    public function getPromisedDateHistory($itemId)
-    {
-        $histories = DB::table('estimate_item_chats')
-            ->where('item_id', $itemId)
-            ->where('item_type', self::CHAT_TYPE)
-            ->where('type', 'history_promised_date')
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn ($chat) => [
-                'content' => $chat->content,
-                'user_name' => $chat->user_name,
-                'created_at_formatted' => \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y'),
-            ]);
-
-        return response()->json(['success' => true, 'histories' => $histories]);
-    }
-
     public function storeItemChat(Request $request)
     {
         $request->validate([
@@ -977,7 +875,7 @@ class VppEstimateController extends Controller
         ]);
 
         if (! user_can(self::CHAT_PERMISSION)) {
-            return response()->json(['success' => false, 'message' => 'Bạn không có quyền trao đổi ở mục dự trù!']);
+            return response()->json(['success' => false, 'message' => 'Bạn không có quyền trao đổi ở mục mua hàng!']);
         }
 
         // Phòng đề nghị (phiếu của phòng đang chọn) hoặc bộ phận mua hàng phụ trách mục
@@ -1221,96 +1119,6 @@ class VppEstimateController extends Controller
      |  HÀM DÙNG CHUNG
      ========================================================== */
 
-    /**
-     * VPP đã được Hành Chánh (bộ phận mua hàng) hẹn ngày đáp ứng nhưng CHƯA giao xong, gom theo phòng ban
-     * đang chọn để đổ vào tab "Theo dõi dự trù". Kèm số lượng theo tháng và trao đổi.
-     *
-     * Gom một truy vấn cho VPP, một cho số lượng, một cho trao đổi rồi ghép trong PHP
-     * để không phải hỏi DB theo từng dòng.
-     */
-    public static function trackedItems(int $departmentId, array $extraItemIds = [])
-    {
-        $items = DB::table(self::ITEM_TABLE)
-            ->join(self::TABLE, self::ITEM_TABLE.'.vpp_estimate_id', '=', self::TABLE.'.id')
-            ->leftJoin('vpp_categories', self::ITEM_TABLE.'.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
-            ->leftJoin('manufacturers', 'vpp_categories.manufacturers_id', '=', 'manufacturers.id')
-            ->tap(fn ($query) => DepartmentVpp::joinUnitOn($query, self::TABLE.'.department_id', self::ITEM_TABLE.'.category_id'))
-            ->leftJoin('deparments', self::TABLE.'.department_id', '=', 'deparments.id')
-            ->select(
-                self::ITEM_TABLE.'.*',
-                self::TABLE.'.id as list_id',
-                self::TABLE.'.code as list_code',
-                self::TABLE.'.department_id as list_department_id',
-                'deparments.shortName as department_short_name',
-                'deparments.name as department_name',
-                'vpp_names.name as category_material_name',
-                'units.short_name as category_unit_short_name',
-                'manufacturers.name as category_manufacturer_name'
-            )
-            // Phiếu của phòng đang chọn + mục bộ phận mua hàng (phòng đang chọn) phụ trách mua
-            ->where(function ($q) use ($departmentId, $extraItemIds) {
-                $q->where(self::TABLE.'.department_id', $departmentId);
-                if ($extraItemIds) {
-                    $q->orWhereIn(self::ITEM_TABLE.'.id', $extraItemIds);
-                }
-            })
-            ->whereNotNull(self::ITEM_TABLE.'.promised_date')
-            ->whereNull(self::ITEM_TABLE.'.fulfilled_date')
-            ->where(self::ITEM_TABLE.'.status_id', 1)
-            ->where(self::ITEM_TABLE.'.active', 1)
-            ->orderBy(self::ITEM_TABLE.'.promised_date', 'asc')
-            ->get();
-
-        if ($items->isEmpty()) {
-            return $items;
-        }
-
-        $amounts = DB::table(self::AMOUNT_TABLE)
-            ->leftJoin('units', self::AMOUNT_TABLE.'.unit_id', '=', 'units.id')
-            ->select(
-                self::AMOUNT_TABLE.'.*',
-                'units.short_name as unit_short_name',
-                'units.name as unit_name'
-            )
-            ->where(self::AMOUNT_TABLE.'.active', 1)
-            ->whereIn(self::AMOUNT_TABLE.'.vpp_estimate_item_id', $items->pluck('id')->all())
-            ->orderBy(self::AMOUNT_TABLE.'.for_month_year', 'asc')
-            ->get()
-            ->groupBy('vpp_estimate_item_id');
-
-        $allChats = DB::table('estimate_item_chats')
-            ->where('item_type', self::CHAT_TYPE)
-            ->whereIn('item_id', $items->pluck('id')->all())
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        $chats = $allChats->where('type', '!=', 'history_promised_date')
-            ->map(function ($chat) {
-                $chat->created_at_formatted = \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y');
-
-                return $chat;
-            })
-            ->groupBy('item_id');
-
-        $historyCounts = $allChats->where('type', 'history_promised_date')
-            ->groupBy('item_id')
-            ->map->count();
-
-        return $items->map(function ($item) use ($amounts, $chats, $historyCounts) {
-            $item->amounts = ($amounts[$item->id] ?? collect())->values();
-            $item->chats = ($chats[$item->id] ?? collect())->values();
-            $item->history_count = $historyCounts[$item->id] ?? 0;
-            $item->display_name = $item->category_id ? $item->category_material_name : $item->material_name;
-            // Bảng theo dõi dùng chung hiện category_code + category_type sau tên mặt hàng.
-            // VPP không có mã/loại danh mục, cũng không có quy cách kỹ thuật ở danh mục.
-            $item->category_code = null;
-            $item->category_type = null;
-
-            return $item;
-        });
-    }
-
     public static function itemsOf(int $listId)
     {
         $departmentId = (int) DB::table(self::TABLE)->where('id', $listId)->value('department_id');
@@ -1475,7 +1283,6 @@ class VppEstimateController extends Controller
                 && trim((string) ($line['material_name'] ?? '')) === ''
                 && trim((string) ($line['technical_information'] ?? '')) === ''
                 && trim((string) ($line['purpose'] ?? '')) === ''
-                && trim((string) ($line['expected_delivery_date'] ?? '')) === ''
                 && ! $lineFiles;
 
             if (! $isBlank) {
@@ -1736,14 +1543,14 @@ class VppEstimateController extends Controller
     private function watchlistItemMessages(): array
     {
         return [
-            'items.required' => 'Vui lòng chọn ít nhất một VPP để lập phiếu dự trù.',
-            'items.min' => 'Vui lòng chọn ít nhất một VPP để lập phiếu dự trù.',
+            'items.required' => 'Vui lòng chọn ít nhất một VPP để lập phiếu mua hàng.',
+            'items.min' => 'Vui lòng chọn ít nhất một VPP để lập phiếu mua hàng.',
             'items.*.category_id.exists' => 'VPP được chọn không tồn tại trong danh mục.',
             'items.*.material_name.max' => 'Tên VPP tối đa 255 ký tự.',
             'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
-            'items.*.amount.required' => 'Vui lòng nhập số lượng dự trù cho mọi VPP đã chọn.',
-            'items.*.amount.numeric' => 'Số lượng dự trù phải là số.',
-            'items.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.amount.required' => 'Vui lòng nhập số lượng mua hàng cho mọi VPP đã chọn.',
+            'items.*.amount.numeric' => 'Số lượng mua hàng phải là số.',
+            'items.*.amount.min' => 'Số lượng mua hàng phải lớn hơn 0.',
             'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính cho mọi VPP đã chọn.',
             'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
             'items.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng cho mọi VPP đã chọn.',
@@ -1772,10 +1579,10 @@ class VppEstimateController extends Controller
     private function messages(): array
     {
         return [
-            'month.required' => 'Vui lòng chọn tháng dự trù.',
-            'month.between' => 'Tháng dự trù phải từ 1 đến 12.',
-            'year.required' => 'Vui lòng nhập năm dự trù.',
-            'year.between' => 'Năm dự trù không hợp lệ.',
+            'month.required' => 'Vui lòng chọn tháng mua hàng.',
+            'month.between' => 'Tháng mua hàng phải từ 1 đến 12.',
+            'year.required' => 'Vui lòng nhập năm mua hàng.',
+            'year.between' => 'Năm mua hàng không hợp lệ.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
         ];
     }
@@ -1810,7 +1617,6 @@ class VppEstimateController extends Controller
             'material_name' => $fromCategory ? null : $this->nullIfBlank($line['material_name'] ?? null),
             'technical_information' => $this->nullIfBlank($line['technical_information'] ?? null),
             'purpose' => $this->nullIfBlank($line['purpose'] ?? null),
-            'expected_delivery_date' => $this->nullIfBlank($line['expected_delivery_date'] ?? null),
         ];
     }
 
@@ -1824,7 +1630,6 @@ class VppEstimateController extends Controller
             'items.*.material_name' => ['required_if:items.*.source,manual', 'nullable', 'max:255'],
             'items.*.technical_information' => ['nullable', 'max:1000'],
             'items.*.purpose' => ['nullable', 'max:1000'],
-            'items.*.expected_delivery_date' => ['nullable', 'date'],
             'items.*.unit_id' => ['required', 'exists:units,id'],
             'items.*.amounts' => ['array'],
             'items.*.amounts.*' => ['nullable', 'numeric', 'min:0.0001'],
@@ -1849,11 +1654,10 @@ class VppEstimateController extends Controller
             'items.*.material_name.max' => 'Tên VPP tối đa 255 ký tự.',
             'items.*.technical_information.max' => 'Thông tin kỹ thuật tối đa 1000 ký tự.',
             'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
-            'items.*.expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
             'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
             'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
-            'items.*.amounts.*.numeric' => 'Số lượng dự trù phải là số.',
-            'items.*.amounts.*.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.amounts.*.numeric' => 'Số lượng mua hàng phải là số.',
+            'items.*.amounts.*.min' => 'Số lượng mua hàng phải lớn hơn 0.',
             'items.*.files.max' => 'Mỗi VPP đính kèm tối đa 10 file.',
             'items.*.files.*.file' => 'File đính kèm không hợp lệ.',
             'items.*.files.*.max' => 'Mỗi file đính kèm tối đa 20MB.',
@@ -1877,9 +1681,9 @@ class VppEstimateController extends Controller
             'purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
             'amounts.required' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
             'amounts.min' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
-            'amounts.*.amount.required' => 'Vui lòng nhập số lượng dự trù.',
-            'amounts.*.amount.numeric' => 'Số lượng dự trù phải là số.',
-            'amounts.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'amounts.*.amount.required' => 'Vui lòng nhập số lượng mua hàng.',
+            'amounts.*.amount.numeric' => 'Số lượng mua hàng phải là số.',
+            'amounts.*.amount.min' => 'Số lượng mua hàng phải lớn hơn 0.',
             'amounts.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
             'amounts.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
             'amounts.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng.',

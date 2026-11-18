@@ -10,8 +10,8 @@
     */
 
     $estRoute = 'pages.estimate.materialEstimate.';
-    $estLabel = 'phiếu dự trù vật tư';
-    $estTitle = 'Dự Trù Vật Tư';
+    $estLabel = 'phiếu mua hàng vật tư';
+    $estTitle = 'Mua Hàng Vật Tư';
     $estIcon = 'fas fa-clipboard-check';
 @endphp
 

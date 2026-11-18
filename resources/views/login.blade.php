@@ -670,6 +670,9 @@
                 <!-- Form đổi mật khẩu -->
                 <form id="changePassForm" action="{{ route('changePassword') }}" method="POST" style="display: none;">
                     @csrf
+                    @if (session('pwExpiredUser'))
+                        <input type="hidden" name="forcedUser" value="{{ session('pwExpiredUser') }}">
+                    @endif
                     <h3>Đổi Mật Khẩu</h3>
                     <p class="subtitle">Mật khẩu mới tối thiểu 6 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.</p>
 
@@ -677,7 +680,9 @@
                         <label class="form-label">Tên tài khoản</label>
                         <div class="input-shell">
                             <i class="bi bi-person field-icon"></i>
-                            <input type="text" name="username" class="form-control" placeholder="Xác nhận username">
+                            @php($forcedUser = session('pwExpiredUser'))
+                            <input type="text" id="changeUsername" name="username" class="form-control" placeholder="Xác nhận username"
+                                autocomplete="off" value="{{ $forcedUser ?? old('username') }}" @if ($forcedUser) readonly @endif>
                         </div>
                     </div>
 
@@ -685,7 +690,7 @@
                         <label class="form-label">Mật khẩu hiện tại</label>
                         <div class="input-shell">
                             <i class="bi bi-lock field-icon"></i>
-                            <input type="password" id="oldPassword" name="oldPassword" class="form-control" placeholder="••••••••">
+                            <input type="password" id="oldPassword" name="oldPassword" class="form-control" placeholder="••••••••" autocomplete="new-password">
                             <i class="bi bi-eye-slash toggle-password" onclick="togglePassword('oldPassword', this)"></i>
                         </div>
                     </div>
@@ -694,7 +699,7 @@
                         <label class="form-label">Mật khẩu mới</label>
                         <div class="input-shell">
                             <i class="bi bi-key field-icon"></i>
-                            <input type="password" id="newPassword" name="newPassword" class="form-control" placeholder="••••••••">
+                            <input type="password" id="newPassword" name="newPassword" class="form-control" placeholder="••••••••" autocomplete="new-password">
                             <i class="bi bi-eye-slash toggle-password" onclick="togglePassword('newPassword', this)"></i>
                         </div>
                     </div>
@@ -703,7 +708,7 @@
                         <label class="form-label">Xác nhận mật khẩu mới</label>
                         <div class="input-shell">
                             <i class="bi bi-key-fill field-icon"></i>
-                            <input type="password" id="confirmPassword" name="confirmPassword" class="form-control" placeholder="••••••••">
+                            <input type="password" id="confirmPassword" name="confirmPassword" class="form-control" placeholder="••••••••" autocomplete="new-password">
                             <i class="bi bi-eye-slash toggle-password" onclick="togglePassword('confirmPassword', this)"></i>
                         </div>
                     </div>
@@ -759,6 +764,23 @@
         // Giữ nguyên form đang thao tác sau khi server trả lỗi
         @if (session('activeForm') === 'changePass')
             toggleForms(true);
+        @endif
+
+        // Buộc đổi mật khẩu: trình duyệt có thể tự điền tài khoản/mật khẩu đã lưu (vd. Admin) sau khi trang tải -
+        // trả lại đúng tài khoản cần đổi và xoá mật khẩu hiện tại bị điền sẵn
+        @if (session('pwExpiredUser'))
+            (function () {
+                var forced = @json(session('pwExpiredUser'));
+                var restore = function () {
+                    var u = document.getElementById('changeUsername');
+                    if (u && u.value !== forced) {
+                        u.value = forced;
+                        var p = document.getElementById('oldPassword');
+                        if (p) p.value = '';
+                    }
+                };
+                [0, 300, 1000].forEach(function (ms) { setTimeout(restore, ms); });
+            })();
         @endif
 
         // Parallax 3D: ghi vị trí chuột (-1..1) vào biến CSS --mx/--my; bỏ qua trên màn hình cảm ứng / giảm chuyển động

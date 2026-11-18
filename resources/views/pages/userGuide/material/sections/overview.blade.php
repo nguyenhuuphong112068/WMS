@@ -35,7 +35,7 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">6</span>
         <b>Bổ sung hàng</b>
-        <a href="#can-du-tru">Vật tư cần dự trù</a> → <a href="#du-tru">Phiếu dự trù</a> → Cung Ứng mua → quay lại bước 2
+        <a href="#can-du-tru">Vật tư cần mua hàng</a> → <a href="#du-tru">Phiếu mua hàng</a> → Cung Ứng mua → quay lại bước 2
     </div>
 </div>
 
@@ -52,7 +52,7 @@
     <li>Văn phòng phẩm (Hành Chánh mua, cấp phát) quản lý ở module riêng - xem <a href="{{ route('pages.userGuide.show', 'vpp') }}">Hướng dẫn VPP</a>.</li>
     <li><a href="#hieu-chuan">Hiệu chuẩn</a>: vật tư "Cần hiệu chuẩn trước khi dùng" phải được QA xác nhận đạt mới cấp phát được.</li>
     <li><a href="#cach-ly">Cách ly - Loại bỏ - Huỷ</a>: xử lý vật tư hỏng, hết hạn.</li>
-    <li><a href="#danh-sach-chu-ky">Danh sách theo chu kỳ</a>: hệ thống tự tạo đề nghị hoặc phiếu dự trù định kỳ.</li>
+    <li><a href="#danh-sach-chu-ky">Danh sách theo chu kỳ</a>: hệ thống tự tạo đề nghị hoặc phiếu mua hàng định kỳ.</li>
 </ul>
 
 <div class="ug-callout">

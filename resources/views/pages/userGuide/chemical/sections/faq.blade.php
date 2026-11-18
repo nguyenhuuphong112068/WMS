@@ -20,7 +20,7 @@
             <tr>
                 <td>Chọn gói ở Cách 3 nhưng báo đỏ "Không còn lô dùng được: ..."</td>
                 <td style="font-weight: 400">Các hoá chất đó không còn lô nào còn tồn, còn hạn, đã kiểm tra Đạt và đã có hạn dùng nội bộ.
-                    Kiểm tra ở <a href="#ton-kho">Tồn kho</a>, xác định <a href="#han-dung">hạn nội bộ</a> hoặc lập <a href="#du-tru">dự trù</a>.</td>
+                    Kiểm tra ở <a href="#ton-kho">Tồn kho</a>, xác định <a href="#han-dung">hạn nội bộ</a> hoặc lập <a href="#du-tru">mua hàng</a>.</td>
             </tr>
             <tr>
                 <td>Lô hệ thống gợi ý theo gói không đủ số lượng</td>

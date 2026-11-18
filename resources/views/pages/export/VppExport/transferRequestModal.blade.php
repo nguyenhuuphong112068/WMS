@@ -258,10 +258,33 @@
             });
         }
 
+        // Nhớ VPP đang chọn của dòng trước khi đổi, để trả lại khi người dùng chọn trùng mã
+        $(document).on('focusin', '.select-mat-transfer-category', function() {
+            $(this).data('prev', this.value);
+        });
+
         // Chọn VPP thì hiện mã và điền sẵn đơn vị phòng cấp phát đã khai cho VPP đó
         $(document).on('change', '.select-mat-transfer-category', function() {
             var $option = $(this).find('option:selected');
             var $row = $(this).closest('tr');
+            var value = this.value;
+
+            // Một mã VPP chỉ một dòng trong phiếu: chọn trùng thì trả lại lựa chọn cũ và báo
+            if (value && $row.closest('tbody').find('.select-mat-transfer-category').not(this)
+                .filter(function () { return this.value === value; }).length) {
+                var label = $.trim($option.text());
+
+                $(this).val($(this).data('prev') || '');
+                $option = $(this).find('option:selected');
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'VPP đã có trong phiếu',
+                    text: label + ' đã có ở dòng khác. Mỗi mã VPP chỉ một dòng - vui lòng sửa số lượng ở dòng đó.'
+                });
+            }
+
+            $(this).data('prev', this.value);
 
             $row.find('.mat-transfer-code').text($option.data('code') || '');
             matApplyRowUnit($row, matSourceUnitsOf($row.closest('form')));

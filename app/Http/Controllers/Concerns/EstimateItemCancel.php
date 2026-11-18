@@ -124,7 +124,7 @@ trait EstimateItemCancel
         self::writeHistory($list->id, 'Tiếp nhận', null, 'waiting', 'received', $note);
         AuditTrialController::log('Tiếp nhận', self::TABLE, $list->id, $list->code, 'reception_status: waiting -> received');
 
-        return redirect()->back()->with('success', 'Đã tiếp nhận phiếu dự trù '.$list->code.'!');
+        return redirect()->back()->with('success', 'Đã tiếp nhận phiếu mua hàng '.$list->code.'!');
     }
 
     /**

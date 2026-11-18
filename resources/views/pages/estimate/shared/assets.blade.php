@@ -950,10 +950,10 @@
             $modal.find('form').attr('action', $(this).data('action'));
             $modal.find('[name="id"]').val($(this).data('id'));
             $modal.find('.est-reception-code').text($(this).data('code'));
-            $modal.find('.est-reception-title').text(mode === 'complete' ? 'Hoàn Tất Giải Quyết' : 'Tiếp Nhận Dự Trù');
+            $modal.find('.est-reception-title').text(mode === 'complete' ? 'Hoàn Tất Giải Quyết' : 'Tiếp Nhận Mua Hàng');
             $modal.find('.est-reception-desc').text(mode === 'complete' ?
-                'Xác nhận bộ phận Cung Ứng đã giải quyết xong phiếu dự trù này.' :
-                'Xác nhận bộ phận Cung Ứng tiếp nhận phiếu dự trù đã được phê duyệt.');
+                'Xác nhận bộ phận Cung Ứng đã giải quyết xong phiếu mua hàng này.' :
+                'Xác nhận bộ phận Cung Ứng tiếp nhận phiếu mua hàng đã được phê duyệt.');
             $modal.find('.est-reception-submit').text(mode === 'complete' ? 'Hoàn tất' : 'Tiếp nhận');
             $modal.modal('show');
         });

@@ -9,7 +9,7 @@
                 <div class="md-toolbar">
                     @if ($tabAllowed['list'] && user_can('estimate_material_create'))
                         <button type="button" class="btn btn-primary btn-md-create">
-                            <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
+                            <i class="fas fa-plus mr-1"></i> Lập phiếu mua hàng
                         </button>
                     @endif
                 </div>
@@ -22,20 +22,20 @@
                     @endif
                     @if ($tabAllowed['tracking'])
                         <li class="nav-item">
-                            <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
+                            <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi mua hàng <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
                         </li>
                     @endif
                     @if ($tabAllowed['watchlist'])
                         <li class="nav-item">
                             <a class="nav-link {{ $activeTab === 'watchlist' ? 'active' : '' }}" id="watchlist-tab" data-toggle="tab" href="#watchlist" role="tab">
-                                Danh sách vật tư cần dự trù <span class="badge badge-warning">{{ $watchlistItems->filter(fn ($item) => ! $item->in_progress)->count() }}</span>
+                                Danh sách vật tư cần mua hàng <span class="badge badge-warning">{{ $watchlistItems->filter(fn ($item) => ! $item->in_progress)->count() }}</span>
                             </a>
                         </li>
                     @endif
                     @if (($approvedLists ?? null) !== null)
                         <li class="nav-item">
                             <a class="nav-link {{ $activeTab === 'approved' ? 'active' : '' }}" id="approved-tab" data-toggle="tab" href="#approved" role="tab">
-                                Đơn dự trù đã được phê duyệt <span class="badge badge-success">{{ $approvedLists->count() }}</span>
+                                Đơn mua hàng đã được phê duyệt <span class="badge badge-success">{{ $approvedLists->count() }}</span>
                                 @if ($approvedWaiting = $approvedLists->where('reception_status', 'waiting')->count())<span class="badge badge-warning" title="Phiếu vừa duyệt chờ tiếp nhận">{{ $approvedWaiting }}</span>@endif
                                 @if ($approvedPendingCancel = $approvedLists->sum('pending_cancel_count'))<span class="badge badge-danger" title="Mục phòng đề nghị xin huỷ, chờ bộ phận mua hàng xác nhận">{{ $approvedPendingCancel }}</span>@endif
                             </a>
@@ -53,7 +53,7 @@
                                 <th class="text-center" style="width: 55px">STT</th>
                                 <th style="width: 150px">Bộ Phận</th>
                                 <th style="width: 140px">Mã Phiếu</th>
-                                <th class="text-center" style="width: 100px">Kỳ Dự Trù</th>
+                                <th class="text-center" style="width: 100px">Kỳ Mua Hàng</th>
                                 <th class="text-center" style="width: 95px">Vật Tư</th>
                                 <th style="width: 130px">Trạng Thái</th>
                                 <th class="text-center" style="width: 150px">Tình Trạng</th>
@@ -129,7 +129,7 @@
                                     <td>
                                         <div class="md-actions">
                                             <a href="{{ route($estRoute . 'detail', ['id' => $row->id]) }}"
-                                                class="btn btn-sm {{ $row->app_status === 'pending_sign' && $row->can_sign ? 'btn-success' : 'btn-primary' }}" title="{{ $row->app_status === 'pending_sign' && $row->can_sign ? 'Xem chi tiết và ký duyệt' : 'Xem chi tiết vật tư dự trù' }}">
+                                                class="btn btn-sm {{ $row->app_status === 'pending_sign' && $row->can_sign ? 'btn-success' : 'btn-primary' }}" title="{{ $row->app_status === 'pending_sign' && $row->can_sign ? 'Xem chi tiết và ký duyệt' : 'Xem chi tiết vật tư mua hàng' }}">
                                                 <i class="fas fa-list-ul"></i>
                                             </a>
 
@@ -161,7 +161,7 @@
                                             @if ($estEditable && user_can('estimate_material_delete'))
                                                 <form class="form-md-confirm-cancel d-inline" action="{{ route($estRoute . 'destroy') }}"
                                                     method="POST"
-                                                    data-title="Huỷ phiếu dự trù {{ $row->code }}?"
+                                                    data-title="Huỷ phiếu mua hàng {{ $row->code }}?"
                                                     data-text="Hành động này sẽ huỷ phiếu. Bạn cần nhập lý do huỷ."
                                                     data-danger="1">
                                                     @csrf

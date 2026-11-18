@@ -18,12 +18,12 @@
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>Không đổi tên các nhóm <b>Quản Lý Bộ Phân</b>, <b>Ban Giám Đốc</b>, <b>Quản Lý Kho Hóa Chất</b>, <b>Admin</b>. Hệ thống
-        tìm người ký dự trù, người ký đề nghị liên phòng ban, người kiểm tra hoá chất cấm và tài khoản toàn quyền theo đúng các tên này.</div>
+        tìm người ký mua hàng, người ký đề nghị liên phòng ban, người kiểm tra hoá chất cấm và tài khoản toàn quyền theo đúng các tên này.</div>
 </div>
 
 <h3>2. Tick quyền cho nhóm</h3>
 <ol class="ug-steps">
-    <li>Ở bảng Nhóm Quyền, mỗi cột là một nhóm quyền, mỗi dòng là một quyền, chia thành từng khối theo module trên menu trái (Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Dự Trù, Phân Quyền &amp; Lịch Sử); trong mỗi khối quyền xếp tiếp theo Vật Tư, VPP, Hoá Chất, Chất Chuẩn, Dùng Chung.</li>
+    <li>Ở bảng Nhóm Quyền, mỗi cột là một nhóm quyền, mỗi dòng là một quyền, chia thành từng khối theo module trên menu trái (Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Mua Hàng, Phân Quyền &amp; Lịch Sử); trong mỗi khối quyền xếp tiếp theo Vật Tư, VPP, Hoá Chất, Chất Chuẩn, Dùng Chung.</li>
     <li>Các cột nhóm quyền được xếp tự động theo loại <b>Chung → Vật Tư → VPP → Hoá Chất → Chất Chuẩn</b> (hàng tiêu đề màu phía trên tên nhóm),
         trong cùng loại nhóm có nhiều quyền hơn đứng trước. Loại của nhóm lấy theo ô <b>Loại Phụ Trách</b> khi tạo / sửa nhóm quyền:
         tick 1 loại thì xếp vào cột loại đó, tick từ 2 loại trở lên thì xếp vào Chung (Admin và Ban Giám Đốc luôn ở Chung). Hàng <b>Số quyền đã cấp</b> ngay dưới tiêu đề đếm số ô đã tick của từng nhóm trong khối, tự cập nhật khi tick. Rê chuột lên tên nhóm để xem diễn giải, lên tên quyền để xem mã quyền và diễn giải quyền đó được làm gì
@@ -67,7 +67,7 @@
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
     <div>Nhóm chọn đầu tiên là <b>nhóm quyền chính</b> của người dùng. Khi hệ thống xét người dùng có thuộc một vai trò hay không
-        (ví dụ tài khoản Admin), nhóm chính được tính ở mọi phòng ban trong phạm vi làm việc (phòng chỉ xem thì không). Ở bước ký dự trù, vai trò Quản Lý Bộ Phận và Ban Giám Đốc
+        (ví dụ tài khoản Admin), nhóm chính được tính ở mọi phòng ban trong phạm vi làm việc (phòng chỉ xem thì không). Ở bước ký mua hàng, vai trò Quản Lý Bộ Phận và Ban Giám Đốc
         phải có phạm vi gồm đúng phòng lập phiếu; ký đề nghị liên phòng ban thì Quản Lý Bộ Phận phải có phạm vi gồm phòng đề nghị
         (bước 1) hoặc phòng cấp phát (bước 2).</div>
 </div>

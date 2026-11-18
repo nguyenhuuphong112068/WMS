@@ -1,5 +1,5 @@
 <p>Thẻ chia theo nhóm nghiệp vụ (cùng thứ tự với hàng của <a href="#ma-tran">ma trận</a>). Mỗi thẻ là <b>một loại việc của một
-    đối tượng</b>, ví dụ "Ký dự trù" của Hoá chất, mang màu của đối tượng đó.</p>
+    đối tượng</b>, ví dụ "Ký mua hàng" của Hoá chất, mang màu của đối tượng đó.</p>
 
 <h3>Đọc một thẻ</h3>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/general/home-cards.png', 'caption' => 'Thẻ đề nghị nhóm Phê duyệt dữ liệu, màu theo đối tượng Vật tư / Hoá chất / Chất chuẩn'])
@@ -41,9 +41,9 @@
             </tr>
         </thead>
         <tbody>
-            <tr><td rowspan="3">Dự trù</td><td style="font-weight: 400">Ký dự trù</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
-            <tr><td style="font-weight: 400">Dự trù mới chờ tiếp nhận</td><td style="font-weight: 400">Phòng xử lý</td></tr>
-            <tr><td style="font-weight: 400">Đề nghị huỷ mục dự trù</td><td style="font-weight: 400">Phòng xử lý</td></tr>
+            <tr><td rowspan="3">Mua hàng</td><td style="font-weight: 400">Ký mua hàng</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
+            <tr><td style="font-weight: 400">Mua hàng mới chờ tiếp nhận</td><td style="font-weight: 400">Phòng xử lý</td></tr>
+            <tr><td style="font-weight: 400">Đề nghị huỷ mục mua hàng</td><td style="font-weight: 400">Phòng xử lý</td></tr>
             <tr><td rowspan="3">Đề nghị nội bộ</td><td style="font-weight: 400">Ký đề nghị cấp phát</td><td style="font-weight: 400">Bạn ký duyệt</td></tr>
             <tr><td style="font-weight: 400">Chờ kho cấp</td><td style="font-weight: 400">Phòng xử lý</td></tr>
             <tr><td style="font-weight: 400">Chuẩn đã cấp cho bạn</td><td style="font-weight: 400">Cấp cho bạn</td></tr>
@@ -65,5 +65,5 @@
     </table>
 </div>
 
-<p>Bạn chỉ thấy loại việc mà vai trò của bạn được giao (ví dụ người ký dự trù, QA, thủ kho). Thiếu một loại việc mong đợi thì xem
+<p>Bạn chỉ thấy loại việc mà vai trò của bạn được giao (ví dụ người ký mua hàng, QA, thủ kho). Thiếu một loại việc mong đợi thì xem
     <a href="#loi-thuong-gap">Lỗi Thường Gặp</a>.</p>

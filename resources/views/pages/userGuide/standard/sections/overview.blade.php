@@ -35,7 +35,7 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">6</span>
         <b>Bổ sung</b>
-        <a href="#can-du-tru">Chuẩn cần dự trù</a> → <a href="#du-tru">phiếu dự trù</a> → Cung Ứng mua
+        <a href="#can-du-tru">Chuẩn cần mua hàng</a> → <a href="#du-tru">phiếu mua hàng</a> → Cung Ứng mua
     </div>
 </div>
 

@@ -432,7 +432,7 @@
             function bar(card) {
                 var parts = [
                     ['current', card.bar.current, 'Tồn hiện tại: ' + card.current_kg + ' kg'],
-                    ['pending', card.bar.pending, 'Đang dự trù chưa hoàn thành: ' + card.pending_kg + ' kg']
+                    ['pending', card.bar.pending, 'Đang mua hàng chưa hoàn thành: ' + card.pending_kg + ' kg']
                 ];
                 if (card.has_add) parts.push(['add', card.bar.add, card.add_label + ': ' + card.add_kg + ' kg']);
 
@@ -448,7 +448,7 @@
 
                 return el('div', 'etd-bar')
                     .attr('role', 'img')
-                    .attr('aria-label', 'Tồn ' + card.current_kg + ' kg, đang dự trù ' + card.pending_kg + ' kg' +
+                    .attr('aria-label', 'Tồn ' + card.current_kg + ' kg, đang mua hàng ' + card.pending_kg + ' kg' +
                         (card.has_add ? ', ' + card.add_label.toLowerCase() + ' ' + card.add_kg + ' kg' : '') +
                         ' so với ngưỡng ' + card.threshold_kg + ' kg')
                     .append(el('div', 'etd-track').append($fill).append($limit));
@@ -470,7 +470,7 @@
                 var $figs = el('div', 'etd-figures')
                     .append(figure('current', 'Tồn hiện tại', card.current_kg + ' kg',
                         card.onhand_rows.length + ' lô còn tồn'))
-                    .append(figure('pending', 'Đang dự trù chưa hoàn thành', card.pending_kg + ' kg',
+                    .append(figure('pending', 'Đang mua hàng chưa hoàn thành', card.pending_kg + ' kg',
                         card.pending_rows.length + ' mặt hàng'));
                 if (card.has_add) {
                     $figs.append(figure('add', card.add_label, card.add_kg + ' kg',
@@ -478,13 +478,13 @@
                 }
                 var totalKg = card.has_add ? card.projected_kg : card.base_kg;
                 var totalPct = card.has_add ? card.projected_percent : card.base_percent;
-                $figs.append(figure(null, card.has_add ? 'Tổng dự kiến' : 'Tồn + đang dự trù', totalKg + ' kg',
+                $figs.append(figure(null, card.has_add ? 'Tổng dự kiến' : 'Tồn + đang mua hàng', totalKg + ' kg',
                     totalPct + '% ngưỡng ' + card.threshold_kg + ' kg', 'is-total'));
                 $card.append($figs);
 
                 $card.append(bar(card));
                 $card.append(el('div', 'etd-formula')
-                    .append(el('span', null, 'Tổng = tồn ' + card.current_kg + ' + đang dự trù ' + card.pending_kg +
+                    .append(el('span', null, 'Tổng = tồn ' + card.current_kg + ' + đang mua hàng ' + card.pending_kg +
                         (card.has_add ? ' + ' + card.add_label.toLowerCase() + ' ' + card.add_kg : '') + ' = '))
                     .append(el('b', null, totalKg + ' ' + card.kg_label))
                     .append(el('span', null, ' / ngưỡng ' + card.threshold_kg + ' kg.')));
@@ -552,9 +552,9 @@
                         ));
                     }
                 } else {
-                    $pending.append(el('div', 'etd-empty', 'Không có mặt hàng dự trù nào đang chờ hoàn thành.'));
+                    $pending.append(el('div', 'etd-empty', 'Không có mặt hàng cần mua nào đang chờ hoàn thành.'));
                 }
-                $card.append(section('fas fa-clipboard-list', 'Đang dự trù chưa hoàn thành — ' + card.pending_kg +
+                $card.append(section('fas fa-clipboard-list', 'Đang mua hàng chưa hoàn thành — ' + card.pending_kg +
                     ' kg', $pending));
 
                 /* ----- Lượng đang khai ----- */

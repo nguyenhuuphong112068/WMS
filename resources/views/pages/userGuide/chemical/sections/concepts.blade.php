@@ -35,7 +35,7 @@
 
 <h3>Ký điện tử bằng mật khẩu</h3>
 <p>Các thao tác <span class="ug-chip is-warn">Ký bằng mật khẩu</span> (duyệt danh mục, xác nhận khai báo cổng quốc gia,
-    quyết định loại bỏ, huỷ, ký dự trù) bắt buộc nhập lại mật khẩu đăng nhập (21 CFR Part 11).</p>
+    quyết định loại bỏ, huỷ, ký mua hàng) bắt buộc nhập lại mật khẩu đăng nhập (21 CFR Part 11).</p>
 
 <h3>Sửa, duyệt, khoá ở Danh Mục không tải lại trang</h3>
 <p class="mb-0">Ở Danh Mục Hoá Chất (tab Công Ty và Hoá Chất Của Phòng), <b>Sửa</b>, <b>Duyệt</b>, <b>Khai báo

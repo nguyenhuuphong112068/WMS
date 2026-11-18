@@ -39,6 +39,7 @@
             NSX: {{ $row->manufacturer_short_name ?: ($row->manufacturer_name ?: '—') }}
         </div>
     </td>
+    <td>@include('pages.import.shared.importKind', ['row' => $row])</td>
     <td class="md-sub">
         @php $rowClassification = \App\Support\VppClassification::summary($row->classification); @endphp
         @if ($rowClassification !== '')

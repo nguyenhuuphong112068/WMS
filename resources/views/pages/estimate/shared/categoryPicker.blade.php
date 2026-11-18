@@ -70,7 +70,7 @@
                                     <td>
                                         @if ($ecpBlocked)
                                             <span class="badge badge-danger" style="white-space: normal"
-                                                title="{{ $ecpStatus->message }}">Đã vượt ngưỡng, không được dự trù thêm</span>
+                                                title="{{ $ecpStatus->message }}">Đã vượt ngưỡng, không được mua hàng thêm</span>
                                         @elseif ($ecpLevel && isset($ecpLevelLabel[$ecpLevel]))
                                             <span class="badge {{ $ecpLevelBadge[$ecpLevel] }}"
                                                 title="{{ $ecpStatus->message ?? '' }}">{{ $ecpLevelLabel[$ecpLevel] }}</span>
@@ -80,7 +80,7 @@
                                         @if ($ecpStatus)
                                             <button type="button" class="btn-est-thr-detail text-primary"
                                                 data-params="{{ json_encode(['category_id' => $category->id]) }}"
-                                                title="Xem các lượng đóng góp: tồn theo lô, dự trù chưa hoàn thành">
+                                                title="Xem các lượng đóng góp: tồn theo lô, mua hàng chưa hoàn thành">
                                                 <i class="fas fa-search-plus"></i> Chi tiết
                                             </button>
                                         @endif
@@ -89,7 +89,7 @@
                                         <button type="button" class="btn btn-sm btn-primary ecp-choose"
                                             data-id="{{ $category->id }}"
                                             data-name="{{ $category->code }} - {{ $category->chem_name }}{{ $category->unit_short_name ? ' (' . $category->unit_short_name . ')' : '' }}"
-                                            title="{{ $ecpBlocked ? 'Đã vượt ngưỡng PL IV, không được dự trù thêm' : 'Chọn hoá chất này' }}"
+                                            title="{{ $ecpBlocked ? 'Đã vượt ngưỡng PL IV, không được mua hàng thêm' : 'Chọn hoá chất này' }}"
                                             {{ $ecpBlocked ? 'disabled' : '' }}>
                                             <i class="fas fa-check"></i>
                                         </button>

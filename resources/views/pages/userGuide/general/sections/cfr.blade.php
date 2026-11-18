@@ -29,7 +29,7 @@
                 <td>§11.10(g)</td>
                 <td>Kiểm tra thẩm quyền trước khi ký, thao tác</td>
                 <td style="font-weight: 400">Chỉ người có vai trò được giao ở đúng bước mới ký được (ví dụ Quản Lý Bộ Phận, Ban Giám
-                    Đốc với dự trù). Kiểm tra lại ở máy chủ khi lưu, không chỉ ẩn nút.</td>
+                    Đốc với mua hàng). Kiểm tra lại ở máy chủ khi lưu, không chỉ ẩn nút.</td>
             </tr>
             <tr>
                 <td>§11.50</td>

@@ -474,7 +474,7 @@
                             <div class="dash-card-foot">
                                 <span>Đang hiện {{ count($approvals) }} / {{ $approvalTotal }} mục</span>
                                 <a class="dash-link" href="{{ route('pages.estimate.chemicalEstimate.list') }}">
-                                    Mở màn hình Dự Trù <i class="fas fa-arrow-right ml-1"></i>
+                                    Mở màn hình Mua Hàng <i class="fas fa-arrow-right ml-1"></i>
                                 </a>
                             </div>
                         @endif

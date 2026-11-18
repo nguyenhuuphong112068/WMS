@@ -46,7 +46,7 @@ trait EstimateItemAttachments
             'item_id' => ['required', 'integer'],
         ], [
             'attachments.required' => 'Vui lòng chọn file cần đính kèm.',
-            'item_id.required' => 'File đính kèm phải gắn với một mục dự trù.',
+            'item_id.required' => 'File đính kèm phải gắn với một mục mua hàng.',
             'attachments.max' => 'Mỗi lần tải tối đa 20 file.',
             'attachments.*.file' => 'File tải lên không hợp lệ.',
             'attachments.*.max' => 'Mỗi file tối đa 20MB.',
@@ -70,7 +70,7 @@ trait EstimateItemAttachments
             ->value('id');
 
         if (! $itemId) {
-            return redirect()->back()->with('error', 'Không tìm thấy mục dự trù cần đính kèm file!');
+            return redirect()->back()->with('error', 'Không tìm thấy mục mua hàng cần đính kèm file!');
         }
 
         $names = DB::transaction(fn () => $this->storeItemFiles(

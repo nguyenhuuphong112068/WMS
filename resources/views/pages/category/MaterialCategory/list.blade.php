@@ -126,7 +126,7 @@
                     <a class="nav-link {{ $activeTab === 'estimate' ? 'active' : '' }}" id="tabPeriodicEstimateLink"
                         data-toggle="pill" href="#tabPeriodicEstimate" role="tab">
                         <i class="fas fa-calendar-check"></i>
-                        <span>DS dự trù theo chu kỳ</span>
+                        <span>DS mua hàng theo chu kỳ</span>
                         <span class="cat-tab-count">{{ $periodicEstimateLists->count() }}</span>
                     </a>
                 </li>

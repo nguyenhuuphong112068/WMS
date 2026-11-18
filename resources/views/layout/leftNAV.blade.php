@@ -668,8 +668,8 @@
             ]),
         ],
         [
-            'id' => 'estimate', 'label' => 'Dự Trù', 'short' => 'Dự trù', 'icon' => 'fas fa-file-signature',
-            'desc' => 'Phiếu dự trù, ký duyệt',
+            'id' => 'estimate', 'label' => 'Mua Hàng', 'short' => 'Mua hàng', 'icon' => 'fas fa-file-signature',
+            'desc' => 'Phiếu mua hàng, ký duyệt',
             'items' => $kindItems([
                 ['material', 'estimate_material_view', route('pages.estimate.materialEstimate.list'), request()->is('estimate/materialEstimate*')],
                 ['vpp', 'estimate_vpp_view', route('pages.estimate.vppEstimate.list'), request()->is('estimate/vppEstimate*')],

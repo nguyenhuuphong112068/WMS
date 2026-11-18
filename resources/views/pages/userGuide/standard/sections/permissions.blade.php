@@ -6,6 +6,6 @@
 
 <div class="ug-callout">
     <i class="fas fa-info-circle"></i>
-    <div>Ký đề nghị <b>liên phòng ban</b> theo vai trò <b>Quản Lý Bộ Phận</b> (phòng đề nghị rồi phòng cấp phát), ký phiếu dự trù theo
+    <div>Ký đề nghị <b>liên phòng ban</b> theo vai trò <b>Quản Lý Bộ Phận</b> (phòng đề nghị rồi phòng cấp phát), ký phiếu mua hàng theo
         Quản Lý Bộ Phận rồi <b>Ban Giám Đốc</b> - không dựa vào quyền.</div>
 </div>

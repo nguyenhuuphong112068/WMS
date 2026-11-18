@@ -1,6 +1,6 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'noi-bo', 'no' => 3, 'label' => 'Đề nghị sử dụng nội bộ'])
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'lien-phong-ban', 'no' => 2, 'label' => 'Đề nghị liên phòng ban'])
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
 <p>Lập sẵn một danh sách vật tư dùng đều đặn. Đến ngày đã hẹn, hệ thống <b>tự tạo</b> một phiếu ở trạng thái
     <b>Lưu tạm / Nháp</b> để bạn kiểm tra lại rồi gửi đi. Có 3 tab:</p>
@@ -27,8 +27,8 @@
                 <td style="font-weight: 400">Đề nghị <a href="#lien-phong-ban">liên phòng ban</a> gửi tới <b>Phòng Cấp Phát</b> đã chọn.</td>
             </tr>
             <tr>
-                <td>DS dự trù theo chu kỳ</td>
-                <td style="font-weight: 400"><a href="#du-tru">Phiếu dự trù</a> ở trạng thái Nháp, dự trù cho tháng ở ô <b>Dự Trù Cho</b>
+                <td>DS mua hàng theo chu kỳ</td>
+                <td style="font-weight: 400"><a href="#du-tru">Phiếu mua hàng</a> ở trạng thái Nháp, mua hàng cho tháng ở ô <b>Mua Hàng Cho</b>
                     (tháng tạo phiếu, tháng sau, 2 hoặc 3 tháng sau).</td>
             </tr>
         </tbody>
@@ -39,17 +39,17 @@
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/danh-sach-chu-ky-form.png', 'caption' => 'Hộp thoại thêm mới - Danh Sách Theo Chu Kỳ'])
 
 @include('pages.userGuide.shared.fields', ['fields' => [
-    ['Tiêu Đề', true, 'Chỉ ở DS liên phòng ban / dự trù theo chu kỳ. Ví dụ: <i>Vật tư bảo trì hằng tháng</i>.'],
+    ['Tiêu Đề', true, 'Chỉ ở DS liên phòng ban / mua hàng theo chu kỳ. Ví dụ: <i>Vật tư bảo trì hằng tháng</i>.'],
     ['Đối Tượng', true, 'Chỉ ở <b>DS đề nghị nội bộ theo chu kỳ</b>: chọn đối tượng (thiết bị) ở Dữ Liệu Gốc › Đối Tượng; tiêu đề danh sách lấy theo <i>Mã - Tên</i> đối tượng.'],
     ['Chu Kỳ', true, 'Hằng tuần, Hằng tháng, 2 tháng/lần, Hằng quý, 6 tháng/lần, Theo số năm, Theo số ngày. Danh sách nội bộ không chọn chu kỳ mà chọn <b>Tần Suất Đề Nghị</b> (hằng ngày ... 7 năm/lần).'],
     ['Ngày Tạo Đề Nghị Trong Chu Kỳ', true, '<b>Ngày Cụ Thể</b>: ví dụ ngày 5 hằng tháng; ngày vượt độ dài kỳ (31 ở tháng 30 ngày) thì lấy ngày cuối kỳ. Đối tượng đồng bộ từ CAL có thể chọn <b>theo hạn lịch CAL</b> và <b>Tạo Trước</b> 0 - 30 ngày.'],
     ['Tổ Quản Lý', true, 'Chỉ ở <b>DS đề nghị nội bộ theo chu kỳ</b>: chọn một tổ đang hoạt động của phòng; đề nghị tự tạo mang tổ này. Danh sách cũ chưa có tổ phải chọn tổ khi sửa, bỏ trống báo <i>Vui lòng chọn tổ quản lý</i>.'],
     ['Ngày Bắt Đầu Chu Kỳ Đầu Tiên', true, 'Không được lùi về quá khứ. Hệ thống không bao giờ tạo phiếu trước ngày này.'],
-    ['Vật Tư Đề Nghị / Dự Trù', true, 'Chọn vật tư, số lượng, đơn vị, mục đích. Phiếu dự trù bắt buộc có đơn vị cho từng dòng.'],
+    ['Vật Tư Đề Nghị / Mua Hàng', true, 'Chọn vật tư, số lượng, đơn vị, mục đích. Phiếu mua hàng bắt buộc có đơn vị cho từng dòng.'],
 ]])
 
 <h3>Lịch sử đề nghị đã tạo</h3>
-<p>Ở cột <b>Đề Nghị Đã Tạo</b> (tab dự trù: <b>Phiếu Đã Tạo</b>) của cả 3 tab, nút
+<p>Ở cột <b>Đề Nghị Đã Tạo</b> (tab mua hàng: <b>Phiếu Đã Tạo</b>) của cả 3 tab, nút
     <span class="btn btn-sm btn-outline-info ug-ui"><i class="fas fa-history"></i></span> mở hộp <b>Lịch Sử Đề Nghị Đã Tạo</b>:
     mỗi lần danh sách sinh phiếu là một dòng gồm thời gian tạo, mã phiếu, cách tạo (<i>Tự động</i> hoặc <i>Tạo ngay</i>),
     diễn giải, trạng thái hiện tại của phiếu và người tạo.</p>

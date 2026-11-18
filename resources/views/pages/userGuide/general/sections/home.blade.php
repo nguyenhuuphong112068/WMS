@@ -1,5 +1,5 @@
 <p>Trang chủ là màn hình đầu tiên sau khi đăng nhập. Trang gom mọi đề nghị đang chờ bạn hoặc phòng ban của bạn xử lý ở tất cả
-    các module, để bạn không phải mở lần lượt từng màn hình Dự Trù, Sử Dụng, Danh Mục... Số liệu tính theo
+    các module, để bạn không phải mở lần lượt từng màn hình Mua Hàng, Sử Dụng, Danh Mục... Số liệu tính theo
     <b>phòng ban đang chọn</b>; đổi phòng ban thì trang chủ đổi theo.</p>
 
 <h3>Bố cục</h3>

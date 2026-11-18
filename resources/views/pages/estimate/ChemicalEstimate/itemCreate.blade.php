@@ -6,7 +6,7 @@
 @include('pages.estimate.shared.batchItemCreate', [
     'emi' => [
         'kind' => 'chemical',
-        'title' => 'Thêm Mặt Hàng Dự Trù',
+        'title' => 'Thêm Mặt Hàng Cần Mua',
         'icon' => 'fas fa-flask',
         'saveLabel' => 'Lưu mặt hàng',
         'listField' => 'estimate_list_id',

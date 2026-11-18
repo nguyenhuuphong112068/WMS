@@ -8,6 +8,15 @@
         </thead>
         <tbody>
             <tr>
+                <td>"Hình ảnh chỉ nhận định dạng jpg, jpeg, png, gif, webp, bmp." / "Hình ảnh tối đa 10 MB." / "Tải hình ảnh lên không thành công"</td>
+                <td style="font-weight: 400">Ảnh vật tư ở <a href="#danh-muc-cong-ty">Danh mục vật tư công ty</a> phải là file ảnh, không quá 10 MB.
+                    Ảnh chụp từ điện thoại quá lớn thì giảm kích thước rồi chọn lại.</td>
+            </tr>
+            <tr>
+                <td>"Mỗi lần lưu gửi được tối đa N hình ảnh"</td>
+                <td style="font-weight: 400">Hộp thoại Thêm mới chọn ảnh cho quá nhiều dòng: lưu bớt dòng trước rồi thêm tiếp.</td>
+            </tr>
+            <tr>
                 <td>Không tìm thấy vật tư khi nhập kho hoặc lập đề nghị nội bộ</td>
                 <td style="font-weight: 400">Vật tư chưa khai ở <a href="#vat-tu-cua-phong">Vật Tư Của Phòng</a>, hoặc danh mục
                     công ty chưa được duyệt.</td>

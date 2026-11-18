@@ -10,14 +10,14 @@
                     @if ($tabAllowed['list'] && user_can('estimate_vpp_create'))
                         @if ($canCreateHere)
                             <button type="button" class="btn btn-primary btn-md-create">
-                                <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
+                                <i class="fas fa-plus mr-1"></i> Lập phiếu mua hàng
                             </button>
                         @else
                             {{-- Dự trù VPP chỉ phòng Hành Chánh (giữ kho VPP) lập --}}
                             <button type="button" class="btn btn-primary" disabled>
-                                <i class="fas fa-plus mr-1"></i> Lập phiếu dự trù
+                                <i class="fas fa-plus mr-1"></i> Lập phiếu mua hàng
                             </button>
-                            <span class="text-muted small ml-2"><i class="fas fa-lock mr-1"></i>Chỉ phòng Hành Chánh (phòng giữ kho VPP) lập dự trù VPP</span>
+                            <span class="text-muted small ml-2"><i class="fas fa-lock mr-1"></i>Chỉ phòng Hành Chánh (phòng giữ kho VPP) lập mua hàng VPP</span>
                         @endif
                     @endif
                 </div>
@@ -28,22 +28,17 @@
                             <a class="nav-link {{ $activeTab === 'list' ? 'active' : '' }}" id="list-tab" data-toggle="tab" href="#list" role="tab">Danh sách phiếu</a>
                         </li>
                     @endif
-                    @if ($tabAllowed['tracking'])
-                        <li class="nav-item">
-                            <a class="nav-link {{ $activeTab === 'tracking' ? 'active' : '' }}" id="tracking-tab" data-toggle="tab" href="#tracking" role="tab">Theo dõi dự trù <span class="badge badge-info">{{ $trackedItems->count() }}</span></a>
-                        </li>
-                    @endif
                     @if ($tabAllowed['watchlist'])
                         <li class="nav-item">
                             <a class="nav-link {{ $activeTab === 'watchlist' ? 'active' : '' }}" id="watchlist-tab" data-toggle="tab" href="#watchlist" role="tab">
-                                Danh sách VPP cần dự trù <span class="badge badge-warning">{{ $watchlistItems->filter(fn ($item) => ! $item->in_progress)->count() }}</span>
+                                Danh sách VPP cần mua hàng <span class="badge badge-warning">{{ $watchlistItems->filter(fn ($item) => ! $item->in_progress)->count() }}</span>
                             </a>
                         </li>
                     @endif
                     @if (($approvedLists ?? null) !== null)
                         <li class="nav-item">
                             <a class="nav-link {{ $activeTab === 'approved' ? 'active' : '' }}" id="approved-tab" data-toggle="tab" href="#approved" role="tab">
-                                Đơn dự trù đã được phê duyệt <span class="badge badge-success">{{ $approvedLists->count() }}</span>
+                                Đơn mua hàng đã được phê duyệt <span class="badge badge-success">{{ $approvedLists->count() }}</span>
                                 @if ($approvedWaiting = $approvedLists->where('reception_status', 'waiting')->count())<span class="badge badge-warning" title="Phiếu vừa duyệt chờ tiếp nhận">{{ $approvedWaiting }}</span>@endif
                                 @if ($approvedPendingCancel = $approvedLists->sum('pending_cancel_count'))<span class="badge badge-danger" title="Mục phòng đề nghị xin huỷ, chờ bộ phận mua hàng xác nhận">{{ $approvedPendingCancel }}</span>@endif
                             </a>
@@ -61,7 +56,7 @@
                                 <th class="text-center" style="width: 55px">STT</th>
                                 <th style="width: 150px">Bộ Phận</th>
                                 <th style="width: 140px">Mã Phiếu</th>
-                                <th class="text-center" style="width: 100px">Kỳ Dự Trù</th>
+                                <th class="text-center" style="width: 100px">Kỳ Mua Hàng</th>
                                 <th class="text-center" style="width: 95px">VPP</th>
                                 <th style="width: 130px">Trạng Thái</th>
                                 <th class="text-center" style="width: 150px">Tình Trạng</th>
@@ -137,7 +132,7 @@
                                     <td>
                                         <div class="md-actions">
                                             <a href="{{ route($estRoute . 'detail', ['id' => $row->id]) }}"
-                                                class="btn btn-sm {{ $row->app_status === 'pending_sign' && $row->can_sign ? 'btn-success' : 'btn-primary' }}" title="{{ $row->app_status === 'pending_sign' && $row->can_sign ? 'Xem chi tiết và ký duyệt' : 'Xem chi tiết VPP dự trù' }}">
+                                                class="btn btn-sm {{ $row->app_status === 'pending_sign' && $row->can_sign ? 'btn-success' : 'btn-primary' }}" title="{{ $row->app_status === 'pending_sign' && $row->can_sign ? 'Xem chi tiết và ký duyệt' : 'Xem chi tiết VPP mua hàng' }}">
                                                 <i class="fas fa-list-ul"></i>
                                             </a>
 
@@ -169,7 +164,7 @@
                                             @if ($estEditable && user_can('estimate_vpp_delete'))
                                                 <form class="form-md-confirm-cancel d-inline" action="{{ route($estRoute . 'destroy') }}"
                                                     method="POST"
-                                                    data-title="Huỷ phiếu dự trù {{ $row->code }}?"
+                                                    data-title="Huỷ phiếu mua hàng {{ $row->code }}?"
                                                     data-text="Hành động này sẽ huỷ phiếu. Bạn cần nhập lý do huỷ."
                                                     data-danger="1">
                                                     @csrf
@@ -187,11 +182,6 @@
                     </table>
                         </div>
                     </div>
-                    @endif
-                    @if ($tabAllowed['tracking'])
-                        <div class="tab-pane fade {{ $activeTab === 'tracking' ? 'show active' : '' }}" id="tracking" role="tabpanel">
-                            @include('pages.estimate.shared.trackingTable', ['items' => $trackedItems])
-                        </div>
                     @endif
                     @if ($tabAllowed['watchlist'])
                         <div class="tab-pane fade {{ $activeTab === 'watchlist' ? 'show active' : '' }}" id="watchlist" role="tabpanel">

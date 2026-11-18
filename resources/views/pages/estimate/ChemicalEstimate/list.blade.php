@@ -9,8 +9,8 @@
     */
 
     $estRoute = 'pages.estimate.chemicalEstimate.';
-    $estLabel = 'phiếu dự trù hoá chất';
-    $estTitle = 'Dự Trù Hoá Chất';
+    $estLabel = 'phiếu mua hàng hoá chất';
+    $estTitle = 'Mua Hàng Hoá Chất';
     $estIcon = 'fas fa-clipboard-check';
 @endphp
 

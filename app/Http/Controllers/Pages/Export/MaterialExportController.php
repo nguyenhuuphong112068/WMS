@@ -2152,8 +2152,8 @@ class MaterialExportController extends Controller
             'quantity.numeric' => 'Số lượng cần đề nghị phải là số.',
             'quantity.gt' => 'Số lượng cần đề nghị phải lớn hơn 0.',
             'quantity.max' => 'Số lượng cần đề nghị quá lớn.',
-            'note.required' => 'Vui lòng nhập lý do dự trù.',
-            'note.max' => 'Lý do dự trù tối đa 500 ký tự.',
+            'note.required' => 'Vui lòng nhập lý do mua hàng.',
+            'note.max' => 'Lý do mua hàng tối đa 500 ký tự.',
         ]);
 
         if ($validator->fails()) {

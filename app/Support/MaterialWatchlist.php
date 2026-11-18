@@ -311,7 +311,7 @@ class MaterialWatchlist
         $note = trim((string) $note) ?: null;
 
         if (! $categoryId && ! $materialName) {
-            return ['success' => false, 'message' => 'Vui lòng chọn vật tư trong danh mục hoặc nhập tên vật tư trước khi đề nghị dự trù!'];
+            return ['success' => false, 'message' => 'Vui lòng chọn vật tư trong danh mục hoặc nhập tên vật tư trước khi đề nghị mua hàng!'];
         }
 
         if (! $quantity || $quantity <= 0) {
@@ -319,7 +319,7 @@ class MaterialWatchlist
         }
 
         if (! $note) {
-            return ['success' => false, 'message' => 'Vui lòng nhập lý do dự trù.'];
+            return ['success' => false, 'message' => 'Vui lòng nhập lý do mua hàng.'];
         }
 
         if ($categoryId) {
@@ -330,7 +330,7 @@ class MaterialWatchlist
                 ->exists();
 
             if ($isLocked) {
-                return ['success' => false, 'message' => 'Vật tư của phòng đã bị khoá, không thể đề nghị dự trù!'];
+                return ['success' => false, 'message' => 'Vật tư của phòng đã bị khoá, không thể đề nghị mua hàng!'];
             }
         }
 
@@ -374,7 +374,7 @@ class MaterialWatchlist
      */
     private static function rememberResult(int $departmentId, ?int $categoryId, ?string $materialName, bool $updated): array
     {
-        $listName = '"Danh sách vật tư cần dự trù"';
+        $listName = '"Danh sách vật tư cần mua hàng"';
         $doneState = '"Đã lập phiếu"';
 
         $progress = self::inProgress($departmentId);
@@ -484,7 +484,7 @@ class MaterialWatchlist
                 'type' => 'estimate',
                 'id' => (int) $row->id,
                 'code' => $row->code,
-                'label' => 'Phiếu dự trù',
+                'label' => 'Phiếu mua hàng',
                 'status' => $appStatuses[$row->app_status] ?? $row->app_status,
             ]);
         }

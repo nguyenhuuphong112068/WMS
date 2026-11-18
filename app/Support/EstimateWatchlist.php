@@ -119,7 +119,7 @@ class EstimateWatchlist
 
             if ($refs) {
                 $ref = reset($refs);
-                $errors['items.'.$index.'.category_id'] = ucfirst($itemLabel).' dòng '.($index + 1).' đã có trong phiếu dự trù '
+                $errors['items.'.$index.'.category_id'] = ucfirst($itemLabel).' dòng '.($index + 1).' đã có trong phiếu mua hàng '
                     .$ref['code'].' ('.$ref['status'].'), không lập lại được.';
             }
         }

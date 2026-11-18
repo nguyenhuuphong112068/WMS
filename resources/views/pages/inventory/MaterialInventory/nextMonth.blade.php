@@ -94,8 +94,8 @@
                     Nhu Cầu {{ $mfMonth['label'] }}</th>
                 <th class="text-right" style="width:100px" title="Khả dụng - Nhu cầu; số âm là thiếu">Thiếu / Dư</th>
                 <th class="text-right" style="width:110px"
-                    title="Lượng nên dự trù để đủ nhu cầu tháng đang xét và giữ được ngưỡng tồn tối thiểu">
-                    Cần Dự Trù</th>
+                    title="Lượng nên mua hàng để đủ nhu cầu tháng đang xét và giữ được ngưỡng tồn tối thiểu">
+                    Cần Mua Hàng</th>
                 <th class="text-center" style="width:110px">Trạng Thái</th>
                 <th class="text-center" style="width:70px">Thao Tác</th>
             </tr>

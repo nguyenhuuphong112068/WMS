@@ -1,6 +1,6 @@
 <p>
     <b>Dữ Liệu Gốc</b> là nơi khai báo các thông tin nền mà mọi màn hình nghiệp vụ (Danh Mục, Nhập, Sử Dụng,
-    Tồn, Dự Trù...) chọn lại khi thao tác. Dữ liệu gốc khai đúng và đủ thì các phiếu nghiệp vụ mới chọn được,
+    Tồn, Mua Hàng...) chọn lại khi thao tác. Dữ liệu gốc khai đúng và đủ thì các phiếu nghiệp vụ mới chọn được,
     báo cáo mới khớp.
 </p>
 

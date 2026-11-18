@@ -105,14 +105,14 @@ class DepartmentVppController extends Controller
             'quantity' => ['required', 'numeric', 'gt:0', 'max:999999999'],
             'note' => ['required', 'max:500'],
         ], [
-            'category_id.required' => 'Không xác định được VPP cần đề nghị dự trù!',
+            'category_id.required' => 'Không xác định được VPP cần đề nghị mua hàng!',
             'category_id.exists' => 'VPP được chọn không tồn tại.',
             'quantity.required' => 'Vui lòng nhập số lượng cần đề nghị.',
             'quantity.numeric' => 'Số lượng cần đề nghị phải là số.',
             'quantity.gt' => 'Số lượng cần đề nghị phải lớn hơn 0.',
             'quantity.max' => 'Số lượng cần đề nghị quá lớn.',
-            'note.required' => 'Vui lòng nhập lý do dự trù.',
-            'note.max' => 'Lý do dự trù tối đa 500 ký tự.',
+            'note.required' => 'Vui lòng nhập lý do mua hàng.',
+            'note.max' => 'Lý do mua hàng tối đa 500 ký tự.',
         ]);
 
         if ($validator->fails()) {
@@ -127,7 +127,7 @@ class DepartmentVppController extends Controller
         if ($deptVpp && $deptVpp->status_id != 1) {
             return response()->json([
                 'success' => false,
-                'message' => 'VPP của phòng đã bị khoá, không thể đề nghị dự trù!',
+                'message' => 'VPP của phòng đã bị khoá, không thể đề nghị mua hàng!',
             ]);
         }
 

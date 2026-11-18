@@ -60,7 +60,7 @@
                 <th class="text-center" style="width: 55px">STT</th>
                 <th style="width: 150px">Bộ Phận</th>
                 <th style="width: 140px">Mã Phiếu</th>
-                <th class="text-center" style="width: 100px">Kỳ Dự Trù</th>
+                <th class="text-center" style="width: 100px">Kỳ Mua Hàng</th>
                 <th class="text-center" style="width: 95px">{{ $itemLabel }}</th>
                 <th class="text-center" style="width: 110px">Ngày Duyệt</th>
                 <th class="text-center" style="width: 150px">Tình Trạng</th>
@@ -181,7 +181,7 @@
                 info: 'Hiển thị _START_–_END_ / _TOTAL_ dòng',
                 infoEmpty: 'Không có dữ liệu',
                 zeroRecords: 'Không tìm thấy dữ liệu phù hợp',
-                emptyTable: 'Chưa có đơn dự trù nào được phê duyệt',
+                emptyTable: 'Chưa có đơn mua hàng nào được phê duyệt',
                 paginate: { previous: 'Trước', next: 'Sau' }
             }
         });

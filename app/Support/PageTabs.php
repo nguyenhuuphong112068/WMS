@@ -27,13 +27,13 @@ class PageTabs
             'department' => 'Vật tư của phòng',
             'internal' => 'DS đề nghị nội bộ theo chu kỳ',
             'external' => 'DS đề nghị liên phòng ban theo chu kỳ',
-            'estimate' => 'DS dự trù theo chu kỳ',
+            'estimate' => 'DS mua hàng theo chu kỳ',
         ]],
         'category_vpp' => ['parent' => 'category_vpp_view', 'tabs' => [
             'company' => 'Danh mục VPP công ty',
             'department' => 'VPP của phòng',
             'external' => 'DS đề nghị liên phòng ban theo chu kỳ',
-            'estimate' => 'DS dự trù theo chu kỳ',
+            'estimate' => 'DS mua hàng theo chu kỳ',
         ]],
         'category_chemical' => ['parent' => 'category_chemical_view', 'tabs' => [
             'company' => 'Danh mục hoá chất công ty',
@@ -78,8 +78,8 @@ class PageTabs
             'late' => 'Ghi nhận cấp phát trễ',
         ]],
         // VPP dùng cơ chế "Sử dụng - ghi sổ" như Hoá Chất từ 12/11/2026 (bỏ đề nghị nội bộ / cấp phát)
+        // 18/11/2026 bỏ tab 'use' (Sử Dụng VPP): nút Sử dụng VPP chuyển sang tab Sổ sử dụng VPP
         'export_vpp' => ['parent' => 'export_vpp_view', 'tabs' => [
-            'use' => 'Sử Dụng VPP',
             'book' => 'Sổ sử dụng VPP',
             'vpp' => 'Đề nghị liên phòng ban - VPP đến HC',
             'transfer' => 'Đề nghị liên phòng ban - Phòng ban khác',
@@ -144,27 +144,27 @@ class PageTabs
         // ----- Dự Trù -----
         'estimate_material' => ['parent' => 'estimate_material_view', 'tabs' => [
             'list' => 'Danh sách phiếu',
-            'tracking' => 'Theo dõi dự trù',
-            'watchlist' => 'Danh sách vật tư cần dự trù',
-            'approved' => 'Đơn dự trù đã được phê duyệt',
+            'tracking' => 'Theo dõi mua hàng',
+            'watchlist' => 'Danh sách vật tư cần mua hàng',
+            'approved' => 'Đơn mua hàng đã được phê duyệt',
         ]],
+        // Mua hàng VPP không có tab Theo dõi mua hàng (bỏ 18/11/2026 cùng ngày mong muốn / hẹn đáp ứng)
         'estimate_vpp' => ['parent' => 'estimate_vpp_view', 'tabs' => [
             'list' => 'Danh sách phiếu',
-            'tracking' => 'Theo dõi dự trù',
-            'watchlist' => 'Danh sách VPP cần dự trù',
-            'approved' => 'Đơn dự trù đã được phê duyệt',
+            'watchlist' => 'Danh sách VPP cần mua hàng',
+            'approved' => 'Đơn mua hàng đã được phê duyệt',
         ]],
         'estimate_chemical' => ['parent' => 'estimate_chemical_view', 'tabs' => [
             'list' => 'Danh sách phiếu',
-            'tracking' => 'Theo dõi dự trù',
-            'watchlist' => 'Danh sách hoá chất cần dự trù',
-            'approved' => 'Đơn dự trù đã được phê duyệt',
+            'tracking' => 'Theo dõi mua hàng',
+            'watchlist' => 'Danh sách hoá chất cần mua hàng',
+            'approved' => 'Đơn mua hàng đã được phê duyệt',
         ]],
         'estimate_standard' => ['parent' => 'estimate_standard_view', 'tabs' => [
             'list' => 'Danh sách phiếu',
-            'tracking' => 'Theo dõi dự trù',
-            'watchlist' => 'Danh sách chất chuẩn cần dự trù',
-            'approved' => 'Đơn dự trù đã được phê duyệt',
+            'tracking' => 'Theo dõi mua hàng',
+            'watchlist' => 'Danh sách chất chuẩn cần mua hàng',
+            'approved' => 'Đơn mua hàng đã được phê duyệt',
         ]],
     ];
 

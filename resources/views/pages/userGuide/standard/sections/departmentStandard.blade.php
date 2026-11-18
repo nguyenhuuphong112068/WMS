@@ -26,8 +26,8 @@
     ['Chất Chuẩn', true, 'Chọn ở ô tìm trên thanh công cụ (chỉ chất chuẩn đã duyệt mà phòng chưa khai). Mỗi phòng khai một chất chuẩn <b>một lần</b>.'],
     ['Đơn Vị Tính', true, 'Đơn vị phòng dùng để nhập, xuất và ghi tồn (mg, g, ml, ống...).'],
     ['Hạn Dùng Nội Bộ (tháng)', false, 'Hạn sau khi mở ống của riêng phòng. Để trống thì lấy hạn mặc định của danh mục (gợi ý <i>DM: n</i> trong ô).'],
-    ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn dưới mức này thì chuẩn vào <a href="#can-du-tru">Danh sách cần dự trù</a>. Để trống thì cảnh báo khi còn dưới 20% lượng nhập.'],
-    ['Ngưỡng Tồn Tối Đa', false, 'Vượt mức này thì màn Nhập và Dự Trù cảnh báo.'],
+    ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn dưới mức này thì chuẩn vào <a href="#can-du-tru">Danh sách cần mua hàng</a>. Để trống thì cảnh báo khi còn dưới 20% lượng nhập.'],
+    ['Ngưỡng Tồn Tối Đa', false, 'Vượt mức này thì màn Nhập và Mua Hàng cảnh báo.'],
     ['Định Khu', false, 'Chỗ dự kiến để chuẩn, dùng để điền sẵn khi nhập.'],
     ['Ghi Chú', false, ''],
 ]])

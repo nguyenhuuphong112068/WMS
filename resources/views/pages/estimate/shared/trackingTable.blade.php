@@ -21,7 +21,7 @@
 
 <div class="d-flex flex-wrap align-items-center mb-2" style="gap: 12px;">
     <div class="d-flex align-items-center">
-        <label for="mdTrackFilterList" class="mb-0 mr-2 text-nowrap">Phiếu dự trù</label>
+        <label for="mdTrackFilterList" class="mb-0 mr-2 text-nowrap">Phiếu mua hàng</label>
         <select id="mdTrackFilterList" class="form-control form-control-sm md-track-filter" style="min-width: 180px;">
             <option value="">Tất cả</option>
             @foreach ($trackLists as $listId => $listCode)
@@ -136,11 +136,11 @@
                             <input type="hidden" name="action" value="complete">
                             <button type="submit" class="btn btn-sm btn-success" title="Xác nhận đã được giao"><i class="fas fa-check"></i> Hoàn thành</button>
                         </form>
-                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-block form-md-confirm-cancel" data-title="Huỷ dự trù mặt hàng này?" data-text="Xác nhận khoa/phòng không cần dự trù mặt hàng này nữa?" data-danger="1">
+                        <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-block form-md-confirm-cancel" data-title="Huỷ mua hàng mặt hàng này?" data-text="Xác nhận khoa/phòng không cần mua hàng mặt hàng này nữa?" data-danger="1">
                             @csrf
                             <input type="hidden" name="id" value="{{ $item->id }}">
                             <input type="hidden" name="action" value="cancel">
-                            <button type="submit" class="btn btn-sm btn-danger" title="Không cần dự trù nữa"><i class="fas fa-times"></i> Huỷ</button>
+                            <button type="submit" class="btn btn-sm btn-danger" title="Không cần mua hàng nữa"><i class="fas fa-times"></i> Huỷ</button>
                         </form>
                         @endif
                     </td>

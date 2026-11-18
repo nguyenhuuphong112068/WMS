@@ -1,5 +1,5 @@
 @include('pages.export.shared.assets')
-@php $activeTab = \App\Support\PageTabs::active('export_vpp', $activeTab ?? 'use'); @endphp
+@php $activeTab = \App\Support\PageTabs::active('export_vpp', $activeTab ?? 'book'); @endphp
 
 @php
     /*
@@ -48,14 +48,6 @@
             <div class="card-body">
 
                 <div class="exp-tabs">
-                    @tab('export_vpp', 'use')
-                    <button type="button" class="exp-tab {{ $activeTab === 'use' ? 'is-active' : '' }}" data-pane="mePaneUse">
-                        <i class="fas fa-paperclip mr-1"></i> Sử Dụng VPP
-                        @if ($todayUses->count())
-                            <span class="exp-tab-count" title="Số dòng sử dụng hôm nay">{{ $todayUses->count() }}</span>
-                        @endif
-                    </button>
-                    @endtab
                     @tab('export_vpp', 'book')
                     <button type="button" class="exp-tab {{ $activeTab === 'book' ? 'is-active' : '' }}" data-pane="mePaneBook">
                         <i class="fas fa-book mr-1"></i> Sổ sử dụng VPP
@@ -98,59 +90,18 @@
                     @endtab
                 </div>
 
-                {{-- ============ SỬ DỤNG VPP: nút ghi phiếu + các dòng đã dùng hôm nay ============ --}}
-                @tab('export_vpp', 'use')
-                <div class="exp-pane {{ $activeTab === 'use' ? 'is-active' : '' }}" id="mePaneUse">
-                    <div class="md-toolbar">
-                        @perm(\App\Http\Controllers\Pages\Export\VppExportController::ISSUE_PERMISSION)
-                            <button type="button" class="btn btn-primary btn-vpp-use">
-                                <i class="fas fa-plus mr-1"></i> Sử dụng VPP
-                            </button>
-                        @endperm
-                    </div>
-
-                    <div class="table-responsive">
-                        <table id="meTodayTable" class="table table-bordered table-hover w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-center" style="width:45px">STT</th>
-                                    <th style="width:150px">Mã Xuất Nhập</th>
-                                    <th>VPP</th>
-                                    <th class="text-right" style="width:110px">Số Lượng</th>
-                                    <th class="text-center" style="width:90px">Giờ Dùng</th>
-                                    <th>Mục Đích</th>
-                                    <th style="width:150px">Người Sử Dụng</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($todayUses as $row)
-                                    <tr>
-                                        <td class="text-center">{{ $loop->iteration }}</td>
-                                        <td>
-                                            <span class="exp-code font-weight-bold">{{ $row->code }}</span>
-                                            @if ($row->category_code)
-                                                <div class="md-sub"><span class="md-tag">{{ $row->category_code }}</span></div>
-                                            @endif
-                                        </td>
-                                        <td class="font-weight-bold">
-                                            {{ $row->material_name ?: '—' }}
-                                            @if (! $row->status_id) <span class="badge badge-secondary ml-1">Đã khoá</span> @endif
-                                        </td>
-                                        <td class="text-right">{{ $expNum($row->amount) }} <span class="md-sub">{{ $row->unit_short_name }}</span></td>
-                                        <td class="text-center md-sub" data-order="{{ $row->created_at }}">{{ \Carbon\Carbon::parse($row->created_at)->format('H:i') }}</td>
-                                        <td class="md-sub">{{ $row->purpose ?: '—' }}</td>
-                                        <td class="md-sub">{{ $row->used_by ?: '—' }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                @endtab
-
                 {{-- ============ SỔ SỬ DỤNG ============ --}}
                 @tab('export_vpp', 'book')
                 <div class="exp-pane {{ $activeTab === 'book' ? 'is-active' : '' }}" id="mePaneBook">
+                    {{-- Ghi sử dụng VPP ngay trên tab Sổ: lưu là thành dòng mới của sổ, trừ tồn ngay --}}
+                    @perm(\App\Http\Controllers\Pages\Export\VppExportController::ISSUE_PERMISSION)
+                        <div class="md-toolbar">
+                            <button type="button" class="btn btn-primary btn-vpp-use">
+                                <i class="fas fa-plus mr-1"></i> Sử dụng VPP
+                            </button>
+                        </div>
+                    @endperm
+
                     @include('pages.shared.rangeFilter', [
                         'rfRoute' => $expRoute . 'list',
                         'rfTab' => 'book',
@@ -168,9 +119,9 @@
                             <thead>
                                 <tr>
                                     <th class="text-center" style="width:45px">STT</th>
-                                    <th style="width:150px">Mã Xuất Nhập</th>
+                                    <th class="me-col-code">Mã Xuất Nhập</th>
+                                    <th class="md-col-name">VPP</th>
                                     <th style="width:150px">Mã Phiếu Đề Nghị</th>
-                                    <th>VPP</th>
                                     <th class="text-right" style="width:100px">Số Lượng</th>
                                     <th class="text-center" style="width:90px">Loại</th>
                                     <th class="text-center" style="width:120px">Thời Gian</th>
@@ -187,11 +138,14 @@
                                 @foreach ($exports as $row)
                                     <tr>
                                         <td class="text-center">{{ $exports->firstItem() + $loop->index }}</td>
-                                        <td>
+                                        <td class="me-col-code">
                                             <span class="exp-code font-weight-bold">{{ $row->code }}</span>
                                             @if ($row->category_code)
                                                 <div class="md-sub"><span class="md-tag">{{ $row->category_code }}</span></div>
                                             @endif
+                                        </td>
+                                        <td>
+                                            <div class="font-weight-bold">{{ $row->material_name ?: '—' }}</div>
                                         </td>
                                         <td>
                                             @if ($row->request_code)
@@ -199,9 +153,6 @@
                                             @else
                                                 <span class="text-muted">—</span>
                                             @endif
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-bold">{{ $row->material_name ?: '—' }}</div>
                                         </td>
                                         <td class="text-right">
                                             {{ $expNum($row->amount) }} <span class="md-sub">{{ $row->unit_short_name }}</span>
@@ -324,3 +275,13 @@
         if ($.fn.DataTable.isDataTable('#mdTable')) $('#mdTable').DataTable().order([6, 'desc']).draw();
     });
 </script>
+
+<style>
+    /* Sổ sử dụng VPP: cột Mã Xuất Nhập không nhận phần rộng dư (dồn cho cột VPP),
+       vừa một dòng mã xuất nhập */
+    #mePaneBook table th.me-col-code,
+    #mePaneBook table td.me-col-code {
+        width: 240px;
+        max-width: 240px;
+    }
+</style>

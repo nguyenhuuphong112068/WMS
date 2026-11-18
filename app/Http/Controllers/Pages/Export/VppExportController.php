@@ -169,31 +169,6 @@ class VppExportController extends Controller
             ->filter(fn ($lot) => $lot->remaining > self::EPSILON)
             ->values();
 
-        // Phiếu sử dụng hôm nay của phòng - bảng ngay dưới nút Sử dụng VPP
-        $todayUses = DB::table(self::TABLE)
-            ->leftJoin('vpp_imports', self::TABLE.'.import_id', '=', 'vpp_imports.id')
-            ->leftJoin('vpp_categories', 'vpp_imports.category_id', '=', 'vpp_categories.id')
-            ->leftJoin('vpp_names', 'vpp_categories.vpp_names_id', '=', 'vpp_names.id')
-            ->tap(fn ($query) => DepartmentVpp::joinUnit($query, $departmentId, 'vpp_imports.category_id'))
-            ->select(
-                self::TABLE.'.id',
-                self::TABLE.'.code',
-                self::TABLE.'.amount',
-                self::TABLE.'.purpose',
-                self::TABLE.'.used_by',
-                self::TABLE.'.status_id',
-                self::TABLE.'.created_at',
-                'vpp_names.name as material_name',
-                'vpp_categories.code as category_code',
-                'units.short_name as unit_short_name'
-            )
-            ->where(self::TABLE.'.department_id', $departmentId)
-            ->where(self::TABLE.'.type', 'export')
-            ->whereNull(self::TABLE.'.quarantine_id')
-            ->whereDate(self::TABLE.'.created_at', now()->toDateString())
-            ->orderBy(self::TABLE.'.id', 'desc')
-            ->get();
-
         // Tab "Cách ly - Loại Bỏ - Huỷ": VPP sắp hết hạn -> cách ly -> loại bỏ -> huỷ
         $quarantine = VppQuarantineController::paneData($departmentId, $request);
 
@@ -214,13 +189,14 @@ class VppExportController extends Controller
         /*
         | Tab nào đang mở: ?tab= trên URL là chính; các action dùng redirect()->back() (không đổi
         | URL) nên tự flash activeTab qua session. Link cũ trỏ các tab đề nghị nội bộ / chờ cấp
-        | phát (đã bỏ 12/11/2026) rơi về tab Sử Dụng VPP.
+        | phát (bỏ 12/11/2026) hay tab Sử Dụng VPP (bỏ 18/11/2026 - nút Sử dụng VPP nằm ở tab Sổ)
+        | rơi về tab Sổ sử dụng VPP.
         */
-        $tabs = ['use', 'book', 'quarantine', 'transfer', VppStore::TAB];
+        $tabs = ['book', 'quarantine', 'transfer', VppStore::TAB];
         $flashTab = session('activeTab');
         $activeTab = in_array($request->query('tab'), $tabs, true)
             ? $request->query('tab')
-            : (in_array($flashTab, $tabs, true) ? $flashTab : 'use');
+            : (in_array($flashTab, $tabs, true) ? $flashTab : 'book');
 
         return view('pages.export.VppExport.list', [
             'exports' => $exports,
@@ -229,7 +205,6 @@ class VppExportController extends Controller
             'availableImports' => $availableImports,
             // Ô đơn vị ở dòng đề nghị liên phòng ban / VPP đến HC
             'units' => $this->unitOptions(),
-            'todayUses' => $todayUses,
             'overIssuePercent' => (int) round(self::OVER_ISSUE_RATIO * 100),
             // ---- Tab "Cách ly - Loại Bỏ - Huỷ" ----
             'quarantineRows' => $quarantine['rows'],
@@ -282,6 +257,8 @@ class VppExportController extends Controller
             'vppIsAdminDepartment' => VppStore::isVppDepartment($departmentId),
             'vppDepartmentIds' => VppStore::departmentIds(),
             'vppWatchlistItems' => VppWatchlist::forVpp($departmentId),
+            // Đề nghị nháp của phòng gửi HC - tuỳ chọn "Thêm vào đề nghị nháp" ở tab DS cần đề nghị
+            'vppDrafts' => VppTransferRequest::drafts($departmentId, VppStore::targetDepartmentId($departmentId)),
             'vppSubTab' => in_array($request->query('sub', session('vppSubTab')), ['requests', 'watchlist'], true)
                 ? $request->query('sub', session('vppSubTab'))
                 : 'requests',
@@ -311,7 +288,7 @@ class VppExportController extends Controller
     public function store(Request $request)
     {
         if (! user_can(self::ISSUE_PERMISSION)) {
-            return redirect()->back()->with('error', 'Bạn không có quyền sử dụng VPP!')->with('activeTab', 'use');
+            return redirect()->back()->with('error', 'Bạn không có quyền sử dụng VPP!')->with('activeTab', 'book');
         }
 
         $departmentId = $this->departmentId();
@@ -322,7 +299,7 @@ class VppExportController extends Controller
         }
 
         if (! $picked) {
-            return redirect()->back()->with('error', 'Vui lòng chọn ít nhất một VPP từ tồn kho của phòng.')->with('activeTab', 'use');
+            return redirect()->back()->with('error', 'Vui lòng chọn ít nhất một VPP từ tồn kho của phòng.')->with('activeTab', 'book');
         }
 
         try {
@@ -413,10 +390,10 @@ class VppExportController extends Controller
                 return count($rows);
             });
         } catch (\Illuminate\Validation\ValidationException $e) {
-            return redirect()->back()->withErrors($e->validator, 'createErrors')->withInput()->with('activeTab', 'use');
+            return redirect()->back()->withErrors($e->validator, 'createErrors')->withInput()->with('activeTab', 'book');
         }
 
-        return redirect()->back()->with('success', 'Đã ghi nhận '.$count.' dòng sử dụng VPP, tồn kho đã trừ!')->with('activeTab', 'use');
+        return redirect()->back()->with('success', 'Đã ghi nhận '.$count.' dòng sử dụng VPP, tồn kho đã trừ!')->with('activeTab', 'book');
     }
 
     /* ==========================================================
@@ -629,6 +606,9 @@ class VppExportController extends Controller
      * rồi gửi thẳng đề nghị cho phòng Hành Chính (kho VPP). Phòng nhận do server xác định
      * (VppStore::targetDepartmentId), không lấy từ form. Phiếu ghi vào vpp_transfer_requests
      * nên Hành Chính cấp phát / phòng mình nhận hàng theo đúng luồng liên phòng ban.
+     *
+     * Hai cách (ô mode): 'new' lập phiếu mới; 'append' thêm các VPP đã chọn vào một phiếu
+     * đang Lưu tạm (Nháp) của phòng gửi HC (draft_id) - phiếu vẫn Nháp, người dùng tự gửi sau.
      */
     public function vppWatchlistStore(Request $request)
     {
@@ -640,12 +620,31 @@ class VppExportController extends Controller
             return $back()->with('error', 'Không tìm thấy phòng Hành Chính để gửi đề nghị cấp phát VPP đến HC!');
         }
 
+        $isAppend = $request->input('mode') === 'append';
+        $draft = null;
+
+        if ($isAppend) {
+            $draft = DB::table(VppTransferRequest::TABLE)
+                ->where('id', (int) $request->input('draft_id'))
+                ->where('department_id', $departmentId)
+                ->where('to_department_id', $toDepartmentId)
+                ->first();
+
+            if (! $draft || $draft->status !== 'draft') {
+                return $back()
+                    ->withErrors(['draft_id' => 'Vui lòng chọn một đề nghị đang Lưu tạm (Nháp) của phòng.'], 'vppWatchlistErrors')
+                    ->with('error', 'Đề nghị nháp được chọn không còn ở trạng thái Lưu tạm, vui lòng chọn lại.')
+                    ->withInput();
+            }
+        }
+
         $validator = Validator::make($request->all(), [
-            'title' => ['required', 'string', 'max:255'],
+            'title' => [$isAppend ? 'nullable' : 'required', 'string', 'max:255'],
             'needed_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.category_id' => ['required', 'exists:vpp_categories,id'],
+            // Một mã VPP chỉ một dòng trong phiếu - cần thêm thì sửa số lượng ở dòng đã có
+            'items.*.category_id' => ['required', 'distinct', 'exists:vpp_categories,id'],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
@@ -657,6 +656,7 @@ class VppExportController extends Controller
             'items.min' => 'Vui lòng chọn ít nhất một VPP để đề nghị.',
             'items.*.category_id.required' => 'VPP ngoài danh mục không đề nghị kho VPP được.',
             'items.*.category_id.exists' => 'VPP được chọn không tồn tại trong danh mục.',
+            'items.*.category_id.distinct' => 'Mỗi mã VPP chỉ được một dòng trong phiếu đề nghị - vui lòng gộp số lượng vào một dòng.',
             'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',
             'items.*.requested_amount.numeric' => 'Số lượng đề nghị phải là số.',
             'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
@@ -665,6 +665,7 @@ class VppExportController extends Controller
         $validator->after(function ($validator) use ($request, $departmentId) {
             $items = (array) $request->input('items', []);
 
+            // VPP đã có trong phiếu nháp cũng tính là đang xử lý nên không thêm trùng vào nháp
             foreach (VppWatchlist::inProgressErrors($departmentId, $items) + VppStore::itemErrors($items) as $key => $message) {
                 $validator->errors()->add($key, $message);
             }
@@ -687,6 +688,24 @@ class VppExportController extends Controller
                 'requested_unit' => $this->nullIfBlank($item['requested_unit'] ?? null),
                 'note' => $this->nullIfBlank($item['note'] ?? null),
             ];
+        }
+
+        if ($draft) {
+            VppTransferRequest::appendItems((int) $draft->id, $items, $this->actor());
+            VppWatchlist::closeFor($departmentId, array_column($items, 'category_id'), [], $this->actor());
+
+            AuditTrialController::log(
+                'Thêm VPP vào đề nghị cấp phát VPP đến HC (nháp)',
+                VppTransferRequest::TABLE,
+                $draft->id,
+                $draft->code,
+                'Thêm '.count($items).' mục vào đề nghị nháp '.$draft->code.' từ danh sách VPP cần đề nghị Hành Chính'
+            );
+
+            return redirect()->route('pages.export.vppExport.list', ['tab' => VppStore::TAB])->with(
+                'success',
+                'Đã thêm '.count($items).' VPP vào đề nghị nháp '.$draft->code.'! Bạn có thể gửi đề nghị khi sẵn sàng.'
+            );
         }
 
         $result = VppTransferRequest::create(
@@ -2217,7 +2236,8 @@ class VppExportController extends Controller
             ],
             'needed_date' => ['nullable', 'date'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.category_id' => ['required', 'exists:vpp_categories,id'],
+            // Một mã VPP chỉ một dòng trong phiếu - cần thêm thì sửa số lượng ở dòng đã có
+            'items.*.category_id' => ['required', 'distinct', 'exists:vpp_categories,id'],
             'items.*.requested_amount' => ['required', 'numeric', 'min:0.0001'],
             'items.*.requested_unit' => ['nullable', 'string', 'max:50'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
@@ -2236,6 +2256,7 @@ class VppExportController extends Controller
             'items.min' => 'Vui lòng thêm ít nhất một VPP đề nghị.',
             'items.*.category_id.required' => 'Vui lòng chọn VPP.',
             'items.*.category_id.exists' => 'VPP được chọn không tồn tại.',
+            'items.*.category_id.distinct' => 'Mỗi mã VPP chỉ được một dòng trong phiếu đề nghị - vui lòng gộp số lượng vào một dòng.',
             'items.*.requested_amount.required' => 'Vui lòng nhập số lượng đề nghị.',
             'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
         ];

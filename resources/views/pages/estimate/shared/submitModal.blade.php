@@ -12,7 +12,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-paper-plane"></i> Trình Ký Phiếu Dự Trù
+                    <i class="fas fa-paper-plane"></i> Trình Ký Phiếu Mua Hàng
                     <span class="est-code est-submit-code"></span>
                 </h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>

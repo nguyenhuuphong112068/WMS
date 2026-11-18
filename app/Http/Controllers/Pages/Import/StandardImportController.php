@@ -91,6 +91,9 @@ class StandardImportController extends Controller
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
             ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
             ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            // Loại nhập: ống nhận chuyển từ phòng ban khác (source_import_id) -> phòng đã cấp phát
+            ->leftJoin('standard_imports as kind_import', self::TABLE . '.source_import_id', '=', 'kind_import.id')
+            ->leftJoin('deparments as from_dept', 'kind_import.department_id', '=', 'from_dept.id')
             ->select(
                 self::TABLE . '.*',
                 'standard_categories.code as category_code',
@@ -110,7 +113,9 @@ class StandardImportController extends Controller
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',
-                'tiers.name as tier_name'
+                'tiers.name as tier_name',
+                'from_dept.name as from_department_name',
+                'from_dept.shortName as from_department_short'
             )
             ->where(self::TABLE . '.department_id', $departmentId)
             ->tap(ListRange::dateFilter(self::TABLE . '.imported_date', $bookRange))

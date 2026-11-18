@@ -444,7 +444,7 @@ class HomeController extends Controller
      * direction: đề nghị đi giữa hai phòng - ô ma trận tách ← nhận / → gửi.
      */
     public const REVIEW_GROUPS = [
-        'estimate' => ['label' => 'Dự trù', 'icon' => 'fas fa-file-invoice', 'direction' => false],
+        'estimate' => ['label' => 'Mua hàng', 'icon' => 'fas fa-file-invoice', 'direction' => false],
         'internal' => ['label' => 'Đề nghị nội bộ', 'icon' => 'fas fa-clipboard-list', 'direction' => false],
         'transfer' => ['label' => 'Liên phòng ban', 'icon' => 'fas fa-exchange-alt', 'direction' => true],
         'vpp' => ['label' => 'Văn phòng phẩm', 'icon' => 'fas fa-paperclip', 'direction' => true],
@@ -454,9 +454,9 @@ class HomeController extends Controller
 
     /** Loại đề nghị: thuộc nhóm nghiệp vụ nào, ai phải làm. Card = một loại × một đối tượng. */
     public const REVIEW_TYPES = [
-        'estimate_sign' => ['group' => 'estimate', 'actor' => 'sign', 'label' => 'Ký dự trù'],
-        'estimate_reception' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Dự trù mới chờ tiếp nhận'],
-        'estimate_cancel' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Đề nghị huỷ mục dự trù'],
+        'estimate_sign' => ['group' => 'estimate', 'actor' => 'sign', 'label' => 'Ký mua hàng'],
+        'estimate_reception' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Mua hàng mới chờ tiếp nhận'],
+        'estimate_cancel' => ['group' => 'estimate', 'actor' => 'dept', 'label' => 'Đề nghị huỷ mục mua hàng'],
         'material_request' => ['group' => 'internal', 'actor' => 'sign', 'label' => 'Ký đề nghị cấp phát'],
         'issue_pending' => ['group' => 'internal', 'actor' => 'dept', 'label' => 'Chờ kho cấp'],
         'issued_to_me' => ['group' => 'internal', 'actor' => 'me', 'label' => 'Chuẩn đã cấp cho bạn'],
@@ -487,7 +487,7 @@ class HomeController extends Controller
     private const ESTIMATE_KINDS = [
         'chemical' => [
             'object' => 'hc',
-            'label' => 'Dự trù hoá chất',
+            'label' => 'Mua hàng hoá chất',
             'table' => 'chemical_estimates',
             'sign_table' => 'chemical_estimate_signs',
             'sign_fk' => 'chemical_estimate_id',
@@ -501,7 +501,7 @@ class HomeController extends Controller
         ],
         'standard' => [
             'object' => 'cc',
-            'label' => 'Dự trù chất chuẩn',
+            'label' => 'Mua hàng chất chuẩn',
             'table' => 'standard_estimates',
             'sign_table' => 'standard_estimate_signs',
             'sign_fk' => 'standard_estimate_id',
@@ -515,7 +515,7 @@ class HomeController extends Controller
         ],
         'material' => [
             'object' => 'vt',
-            'label' => 'Dự trù vật tư',
+            'label' => 'Mua hàng vật tư',
             'table' => 'material_estimates',
             'sign_table' => 'material_estimate_signs',
             'sign_fk' => 'material_estimate_id',
@@ -529,7 +529,7 @@ class HomeController extends Controller
         ],
         'vpp' => [
             'object' => 'vpp',
-            'label' => 'Dự trù VPP',
+            'label' => 'Mua hàng VPP',
             'table' => 'vpp_estimates',
             'sign_table' => 'vpp_estimate_signs',
             'sign_fk' => 'vpp_estimate_id',
@@ -1258,7 +1258,6 @@ class HomeController extends Controller
             ['chemical_categories', 'chem_names', 'chem_names_id', 'category_chemical_approve', 'hc', 'pages.category.chemicalCategory.list'],
             ['standard_categories', 'standard_names', 'chem_names_id', 'category_standard_approve', 'cc', 'pages.category.standardCategory.list'],
             ['material_categories', 'material_names', 'material_names_id', 'category_material_approve', 'vt', 'pages.category.materialCategory.list'],
-            ['vpp_categories', 'vpp_names', 'vpp_names_id', 'category_vpp_approve', 'vpp', 'pages.category.vppCategory.list'],
         ];
 
         $rows = [];

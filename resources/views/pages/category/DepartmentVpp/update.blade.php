@@ -74,7 +74,7 @@
                             @if ($bag->has('max_stock'))
                                 <span class="md-error">{{ $bag->first('max_stock') }}</span>
                             @endif
-                            <small class="md-sub">Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.
+                            <small class="md-sub">Tồn vượt mức này thì màn Nhập và Mua Hàng cảnh báo trữ quá nhiều.
                                 Theo <b class="dm-unit-hint">đơn vị</b> của danh mục công ty.</small>
                         </div>
 

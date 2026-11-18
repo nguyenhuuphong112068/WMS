@@ -16,6 +16,6 @@
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>Mọi VPP trong danh mục đều do Hành Chánh mua nên đều đề nghị được từ kho VPP. VPP <b>ngoài danh mục</b> không
-        đề nghị kho được - lập <a href="#du-tru">phiếu dự trù</a>. Bộ phận mua và giữ kho VPP là
+        đề nghị kho được - lập <a href="#du-tru">phiếu mua hàng</a>. Bộ phận mua và giữ kho VPP là
         phòng Hành Chánh của nhà máy.</div>
 </div>

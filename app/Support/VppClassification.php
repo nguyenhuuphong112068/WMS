@@ -33,14 +33,14 @@ class VppClassification
     /** Một tiêu chí duy nhất - khoá mảng là khoá lưu trong JSON, không đổi khi đã có dữ liệu. */
     public const CRITERIA = [
         self::GROUP_KEY => [
-            'label' => 'Nhóm Dự Trù',
+            'label' => 'Nhóm Mua Hàng',
             'icon' => 'fas fa-layer-group',
             'options' => [
-                '1' => 'Nhóm 1 - Dự trù hàng tháng, số lượng nhiều',
-                '2' => 'Nhóm 2 - Dự trù hàng tháng, số lượng ít',
-                '3' => 'Nhóm 3 - Dự trù hàng quý, số lượng nhiều',
-                '4' => 'Nhóm 4 - Dự trù hàng quý, số lượng ít',
-                '5' => 'Nhóm 5 - Dự trù khi có nhu cầu',
+                '1' => 'Nhóm 1 - Mua hàng hàng tháng, số lượng nhiều',
+                '2' => 'Nhóm 2 - Mua hàng hàng tháng, số lượng ít',
+                '3' => 'Nhóm 3 - Mua hàng hàng quý, số lượng nhiều',
+                '4' => 'Nhóm 4 - Mua hàng hàng quý, số lượng ít',
+                '5' => 'Nhóm 5 - Mua hàng khi có nhu cầu',
             ],
         ],
     ];
@@ -248,7 +248,7 @@ class VppClassification
 
     public static function messages(): array
     {
-        $messages = ['classification.array' => 'Nhóm dự trù không hợp lệ.'];
+        $messages = ['classification.array' => 'Nhóm mua hàng không hợp lệ.'];
 
         foreach (self::CRITERIA as $key => $criterion) {
             $messages['classification.'.$key.'.required'] = 'Vui lòng chọn "'.$criterion['label'].'".';

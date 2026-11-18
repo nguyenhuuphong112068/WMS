@@ -37,7 +37,7 @@ class PermissionMatrix
         'import'    => ['label' => 'Nhập', 'icon' => 'fa-dolly', 'groups' => ['Nhập']],
         'export'    => ['label' => 'Đề Nghị - Sử Dụng', 'icon' => 'fa-hand-holding-water', 'groups' => ['Sử Dụng']],
         'inventory' => ['label' => 'Tồn Kho', 'icon' => 'fa-boxes', 'groups' => ['Tồn Kho', 'Đánh Giá Hạn Dùng']],
-        'estimate'  => ['label' => 'Dự Trù', 'icon' => 'fa-file-signature', 'groups' => ['Dự Trù']],
+        'estimate'  => ['label' => 'Mua Hàng', 'icon' => 'fa-file-signature', 'groups' => ['Mua Hàng']],
         'admin'     => ['label' => 'Phân Quyền & Lịch Sử', 'icon' => 'fa-user-shield', 'groups' => ['Quản Trị']],
         'other'     => ['label' => 'Khác', 'icon' => 'fa-ellipsis-h', 'groups' => []],
     ];

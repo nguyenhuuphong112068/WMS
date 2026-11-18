@@ -69,7 +69,6 @@
                     <select id="dmStatusFilter" class="form-control form-control-sm">
                         <option value="">Tất cả</option>
                         <option value="1">Đang dùng</option>
-                        <option value="pending">Chờ duyệt</option>
                         <option value="0">Đã khoá</option>
                     </select>
                 </div>
@@ -84,7 +83,7 @@
                         <th style="width: 100px">Mã VPP</th>
                         <th style="width: 170px">Tên VPP</th>
                         <th style="width: 150px">Nhà Sản Xuất</th>
-                        <th style="width: 170px">Nhóm Dự Trù</th>
+                        <th style="width: 170px">Nhóm Mua Hàng</th>
                         <th style="width: 130px">Phân Loại Của Phòng</th>
                         <th class="text-center" style="width: 65px">Đơn Vị</th>
                         <th class="text-right" style="width: 120px">Ngưỡng Tồn Tối Thiểu</th>
@@ -99,7 +98,7 @@
                     @foreach ($datas as $row)
                         @php
                             // Dòng phòng không khoá riêng: tình trạng đi theo mã ở danh mục chung
-                            $dmState = $row->category_status_id == 0 ? '0' : ($row->category_app_status === 'approved' ? '1' : 'pending');
+                            $dmState = $row->category_status_id == 0 ? '0' : '1';
                         @endphp
                         <tr data-class="dept:{{ $row->classification_id ?: 'none' }} {{ \App\Support\VppClassification::filterKeys($row->category_classification, $row->category_purchasing_department) }}"
                             data-maker="{{ $row->manufacturer_name }}"
@@ -181,8 +180,6 @@
                             <td class="text-center">
                                 @if ($dmState === '1')
                                     <span class="badge badge-success">Đang dùng</span>
-                                @elseif ($dmState === 'pending')
-                                    <span class="badge badge-warning" title="Mã chưa được duyệt ở Danh Mục VPP Công Ty">Chờ duyệt</span>
                                 @else
                                     <span class="badge badge-danger" title="Mã đã khoá ở Danh Mục VPP Công Ty">Đã khoá</span>
                                 @endif
@@ -190,7 +187,7 @@
                             <td>
                                 <div class="md-actions">
                                     @if ($dmState !== '0')
-                                        <button type="button" class="btn btn-sm btn-outline-warning btn-dm-watchlist" title="Đề nghị dự trù VPP"
+                                        <button type="button" class="btn btn-sm btn-outline-warning btn-dm-watchlist" title="Đề nghị mua hàng VPP"
                                             data-category-id="{{ $row->category_id }}"
                                             data-unit="{{ $row->unit_short_name ?: $row->unit_name }}">
                                             <i class="fas fa-bookmark"></i>
@@ -324,7 +321,7 @@
             var unit = $btn.data('unit') || '';
 
             Swal.fire({
-                title: 'Đề nghị dự trù VPP này?',
+                title: 'Đề nghị mua hàng VPP này?',
                 html:
                     '<div class="text-left">' +
                         '<label class="font-weight-bold mb-1" for="dmWlQty">Số lượng cần đề nghị <span class="text-danger">*</span></label>' +
@@ -332,8 +329,8 @@
                             '<input id="dmWlQty" type="text" inputmode="decimal" class="form-control text-right js-decimal" placeholder="0">' +
                             (unit ? '<div class="input-group-append"><span class="input-group-text"></span></div>' : '') +
                         '</div>' +
-                        '<label class="font-weight-bold mb-1" for="dmWlNote">Lý do dự trù <span class="text-danger">*</span></label>' +
-                        '<textarea id="dmWlNote" class="form-control" rows="4" maxlength="500" placeholder="Nêu rõ lý do cần dự trù VPP này..."></textarea>' +
+                        '<label class="font-weight-bold mb-1" for="dmWlNote">Lý do mua hàng <span class="text-danger">*</span></label>' +
+                        '<textarea id="dmWlNote" class="form-control" rows="4" maxlength="500" placeholder="Nêu rõ lý do cần mua hàng VPP này..."></textarea>' +
                     '</div>',
                 showCancelButton: true,
                 confirmButtonColor: '#2E7BC4',
@@ -354,7 +351,7 @@
                         return false;
                     }
                     if (!note) {
-                        Swal.showValidationMessage('Vui lòng nhập lý do dự trù');
+                        Swal.showValidationMessage('Vui lòng nhập lý do mua hàng');
                         return false;
                     }
                     return { quantity: qty, note: note };

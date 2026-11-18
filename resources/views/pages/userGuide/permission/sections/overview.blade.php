@@ -9,7 +9,7 @@
     <li>Gộp tất cả quyền đã tick cho các vai trò đó ở <b>Nhóm Quyền</b>.</li>
     <li>Áp quyền <b>cấp riêng</b> cho bạn (nếu có): <b>Cho phép</b> thì thêm, <b>Từ chối</b> thì bỏ, ở mọi phòng ban.</li>
     <li>Bỏ các <b>quyền con</b> thiếu quyền cha. Ví dụ quyền xem một tab chỉ có tác dụng khi có quyền xem màn hình chứa tab
-        đó; quyền Trao Đổi Theo Dõi Dự Trù cần cả quyền xem tab Theo dõi dự trù.</li>
+        đó; quyền Trao Đổi Theo Dõi Mua Hàng cần cả quyền xem tab Theo dõi mua hàng.</li>
 </ol>
 
 <h3>Phạm vi làm việc và phòng ban chỉ xem</h3>
@@ -23,7 +23,7 @@
 </ul>
 
 <h3>Quyền được sắp xếp thế nào</h3>
-<p>Danh sách quyền chia theo <b>module trên menu trái</b>: Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Dự Trù và
+<p>Danh sách quyền chia theo <b>module trên menu trái</b>: Dữ Liệu Gốc, Danh Mục, Nhập, Đề Nghị - Sử Dụng, Tồn Kho, Mua Hàng và
     Phân Quyền &amp; Lịch Sử. Trong mỗi module, quyền xếp tiếp theo <b>Vật Tư, VPP, Hoá Chất, Chất Chuẩn</b> và <b>Dùng Chung</b>
     (Dữ Liệu Gốc chia theo phạm vi dữ liệu gốc, Phân Quyền &amp; Lịch Sử chia Phân Quyền / Lịch Sử &amp; Audit Trail).
     Mỗi nhóm quyền có <b>loại phụ trách</b> (Vật Tư / VPP / Hoá Chất / Chất Chuẩn) để xếp cột trên bảng
@@ -47,7 +47,7 @@
             </tr>
             <tr>
                 <td>Xem tab</td>
-                <td style="font-weight: 400">Hiện từng tab trong màn hình nhiều tab (Nhập, Sử Dụng, Tồn Kho, Dự Trù...).</td>
+                <td style="font-weight: 400">Hiện từng tab trong màn hình nhiều tab (Nhập, Sử Dụng, Tồn Kho, Mua Hàng...).</td>
             </tr>
             <tr>
                 <td>Thao tác</td>
@@ -71,7 +71,7 @@
                 phải có quyền <b>Duyệt Cấp Phát Vật Tư</b>; các bước ký đồng thời).</li>
             <li>Đề nghị <b>liên phòng ban</b> (Vật Tư, VPP - kể cả đề nghị VPP đến Hành Chánh, Hoá Chất, Chất Chuẩn): 2 bước cố định,
                 vai trò <b>Quản Lý Bộ Phận</b> của phòng đề nghị rồi của phòng cấp phát.</li>
-            <li>Phiếu dự trù: vai trò <b>Quản Lý Bộ Phận</b> rồi <b>Ban Giám Đốc</b>.</li>
+            <li>Phiếu mua hàng: vai trò <b>Quản Lý Bộ Phận</b> rồi <b>Ban Giám Đốc</b>.</li>
             <li>Người kiểm tra hoá chất cấm: vai trò <b>Quản Lý Kho Hoá Chất</b>.</li>
         </ul>
         Vai trò <b>Admin</b> luôn có toàn quyền ở mọi phòng ban.</div>

@@ -65,6 +65,7 @@
                                 <th class="text-center" style="width: 60px">STT</th>
                                 <th style="width: 130px">Mã Xuất Nhập</th>
                                 <th>Hoá Chất</th>
+                                <th style="width: 130px">Loại Nhập</th>
                                 <th class="text-right" style="width: 110px">Số Lượng</th>
                                 <th style="width: 110px">Số Lô</th>
                                 <th style="width: 180px"
@@ -119,6 +120,7 @@
                                             @endif
                                         </div>
                                     </td>
+                                    <td>@include('pages.import.shared.importKind', ['row' => $row])</td>
                                     <td class="text-right">
                                         <span class="imp-amount">{{ rtrim(rtrim(number_format($row->amount, 4, '.', ','), '0'), '.') }}</span>
                                         <span class="md-sub">{{ $row->unit_short_name ?: $row->unit_name }}</span>

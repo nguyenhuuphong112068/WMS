@@ -618,7 +618,7 @@ class InitialDataSchema
                     ['key' => 'vpp_name', 'label' => 'Tên VPP', 'type' => 'ref', 'ref' => 'R_TEN_VPP', 'req' => true, 'width' => 40, 'hint' => 'Chọn ở sheet 37'],
                     ['key' => 'manufacturer', 'label' => 'Nhà sản xuất', 'type' => 'ref', 'ref' => 'R_NSX', 'req' => true, 'width' => 16, 'hint' => 'Chọn ở sheet 09'],
                     ['key' => 'unit', 'label' => 'Đơn vị tính', 'type' => 'ref', 'ref' => 'R_DVT', 'req' => true, 'width' => 12, 'hint' => 'Chọn ở sheet 06, cả công ty dùng chung'],
-                    ['key' => 'vpp_group', 'label' => 'Nhóm dự trù', 'type' => 'list', 'list' => 'vpp_group', 'req' => true, 'width' => 34, 'hint' => 'Nhóm 1-5 theo cách dự trù'],
+                    ['key' => 'vpp_group', 'label' => 'Nhóm mua hàng', 'type' => 'list', 'list' => 'vpp_group', 'req' => true, 'width' => 34, 'hint' => 'Nhóm 1-5 theo cách mua hàng'],
                     ['key' => 'purchasing_department', 'label' => 'Bộ phận mua hàng', 'type' => 'list', 'list' => 'purchasing', 'width' => 13, 'hint' => 'Trống = Hành Chánh'],
                     ['key' => 'display', 'label' => 'Hiển thị chọn (tự động)', 'type' => 'calc', 'width' => 40, 'hidden' => true, 'formula' => '=IF(A{r}="","",A{r}&" | "&B{r}&" ("&C{r}&")")'],
                 ],

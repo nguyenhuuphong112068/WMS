@@ -30,8 +30,20 @@
     ['Nhà Sản Xuất', true, 'Chọn từ <b>Dữ Liệu Gốc › Nhà Sản Xuất</b>.'],
     ['Thông Tin Kỹ Thuật', false, 'Quy cách, kích thước, tiêu chuẩn. Tối đa 100 ký tự.'],
     ['Part Number', false, 'Mã P/N của hãng. Tối đa 100 ký tự.'],
+    ['Hình Ảnh', false, 'Bấm ô <span class="ug-key"><i class="fas fa-camera"></i></span> để chọn <b>một ảnh</b> cho mã vật tư (chụp bằng điện thoại / máy tính bảng hoặc chọn file). Nhận jpg, jpeg, png, gif, webp, bmp, tối đa <b>10 MB</b>. Chọn xong hiện ảnh thu nhỏ, bấm ảnh để xem lớn, bấm <span class="ug-key">&times;</span> để bỏ. Nhân bản dòng không chép ảnh. Mỗi lần Lưu gửi được tối đa ' . ((int) ini_get('max_file_uploads') ?: 20) . ' ảnh.'],
     ['Phân loại (4 cột)', true, 'Mỗi tiêu chí một cột, chọn đủ cả 4: <b>Mức Độ Quan Trọng</b> (Thấp/Cao), <b>Hàng Hoá Nguy Hiểm</b> (Có/Không), <b>Cần Hiệu Chuẩn Trước Khi Dùng</b> (<i>Cần HC trước khi cấp phát (HC bởi NSX / Stella)</i> / <i>Cần HC sau khi cấp phát</i> / <i>Không</i>), <b>Tiếp Xúc</b> (Có tiếp xúc / Không tiếp xúc). <b>Theo Giá Trị</b> không còn khai ở đây mà khai ở <a href="#vat-tu-cua-phong">Vật tư của phòng</a>. Hộp thoại Cập nhật vẫn chọn bằng ô tick như cũ; mã cũ chưa có tiêu chí Tiếp Xúc phải chọn khi sửa.'],
 ]])
+
+<h3>Hình ảnh vật tư</h3>
+<ul>
+    <li>Mã có ảnh hiện <b>ảnh thu nhỏ</b> ngay trước tên vật tư trên bảng; bấm vào để mở hộp <b>Hình Ảnh Vật Tư</b> xem ảnh lớn.</li>
+    <li>Thêm / thay / gỡ ảnh của mã đã có: bấm <span class="btn btn-sm btn-warning ug-ui"><i class="fas fa-edit"></i></span>, ở ô
+        <b>Hình Ảnh Vật Tư</b> bấm <span class="ug-key"><i class="fas fa-camera"></i> Chọn ảnh</span> để chọn ảnh mới, hoặc bấm
+        <span class="ug-key">&times;</span> trên ảnh hiện tại để <b>gỡ ảnh</b>, ghi lý do điều chỉnh rồi Lưu. Như mọi lần sửa, mã quay về
+        <b>Chờ duyệt</b>; lịch sử thay đổi ghi <i>Hình ảnh: Thêm ảnh / Thay ảnh mới / Gỡ ảnh</i>, ảnh cũ vẫn được lưu lại để đối chiếu.</li>
+    <li>Lưu bị báo lỗi thì trình duyệt không giữ được ảnh đã chọn: hệ thống nhắc <i>"Hình ảnh đã chọn không giữ lại được sau khi báo
+        lỗi, vui lòng chọn lại ảnh."</i>, hãy chọn lại ảnh trước khi Lưu lại.</li>
+</ul>
 
 <h3>Phân loại ảnh hưởng tới đâu?</h3>
 <ul>

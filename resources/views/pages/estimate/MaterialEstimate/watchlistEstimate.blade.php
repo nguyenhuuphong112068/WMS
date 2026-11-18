@@ -17,7 +17,7 @@
     <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="{{ $estIcon }}"></i> Lập Phiếu Dự Trù Từ Vật Tư Đã Chọn</h5>
+                <h5 class="modal-title"><i class="{{ $estIcon }}"></i> Lập Phiếu Mua Hàng Từ Vật Tư Đã Chọn</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -27,7 +27,7 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-3">
-                            <label>Tháng Dự Trù <span class="text-danger">*</span></label>
+                            <label>Tháng Mua Hàng <span class="text-danger">*</span></label>
                             <select name="month" class="form-control {{ $wlBag->has('month') ? 'is-invalid' : '' }}" required>
                                 @for ($m = 1; $m <= 12; $m++)
                                     <option value="{{ $m }}" {{ $wlMonthNow == $m ? 'selected' : '' }}>Tháng {{ $m }}</option>
@@ -57,7 +57,7 @@
                             <label>Ghi Chú</label>
                             <input type="text" name="note" maxlength="500"
                                 class="form-control {{ $wlBag->has('note') ? 'is-invalid' : '' }}"
-                                value="{{ old('note') }}" placeholder="Ví dụ: Dự trù bổ sung vật tư dưới ngưỡng">
+                                value="{{ old('note') }}" placeholder="Ví dụ: Mua hàng bổ sung vật tư dưới ngưỡng">
                             @if ($wlBag->has('note'))
                                 <span class="md-error">{{ $wlBag->first('note') }}</span>
                             @endif
@@ -121,7 +121,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save mr-1"></i> Lưu phiếu dự trù
+                        <i class="fas fa-save mr-1"></i> Lưu phiếu mua hàng
                     </button>
                 </div>
             </form>

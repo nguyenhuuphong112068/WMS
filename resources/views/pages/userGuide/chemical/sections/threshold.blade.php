@@ -46,5 +46,5 @@
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>Số kg chỉ đúng khi mọi lô quy được ra kg: cần <b>Tỉ Trọng</b> (đơn vị thể tích), <b>Khối Lượng Quy Đổi</b> (đơn vị đếm) và
-        <b>Hàm Lượng Hoạt Chất</b> khai đầy đủ ở Danh Mục. Cảnh báo cùng cách tính cũng hiện ngay khi nhập kho và lập dự trù.</div>
+        <b>Hàm Lượng Hoạt Chất</b> khai đầy đủ ở Danh Mục. Cảnh báo cùng cách tính cũng hiện ngay khi nhập kho và lập mua hàng.</div>
 </div>

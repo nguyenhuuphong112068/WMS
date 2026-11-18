@@ -1,4 +1,4 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
 <p>Mỗi phòng tự khai <b>những vật tư phòng mình dùng</b> và <b>cách dùng riêng</b>: đơn vị tính, ngưỡng tồn, chỗ để.
     Chỉ vật tư đã khai ở tab này mới <b>nhập kho</b> và <b>đề nghị nội bộ</b> được ở phòng.</p>
@@ -36,8 +36,8 @@
     ['Theo Giá Trị', true, '<b>Thấp</b> / <b>Cao</b>. Từ 13/11/2026 giá trị khai theo phòng (trước khai ở danh mục công ty), hiện thành chip ở cột Phân Loại; bộ lọc Phân loại có nhóm <b>Theo Giá Trị (phòng)</b>. Là tiêu chí điều kiện của Trình Ký Đề Nghị CP Vật Tư.'],
     ['Phân Loại Của Phòng', false, 'Bộ nhóm riêng của phòng, khai ở <b>Dữ Liệu Gốc › Phân Loại</b>.'],
     ['Đơn Vị Tính', true, 'Đơn vị phòng dùng để nhập, xuất và ghi tồn cho vật tư này.'],
-    ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn xuống dưới mức này thì vật tư tự vào <a href="#can-du-tru">Danh sách cần dự trù</a>. Để trống nếu chưa đặt.'],
-    ['Ngưỡng Tồn Tối Đa', false, 'Tồn vượt mức này thì màn Nhập và Dự Trù cảnh báo trữ quá nhiều.'],
+    ['Ngưỡng Tồn Tối Thiểu', false, 'Tồn xuống dưới mức này thì vật tư tự vào <a href="#can-du-tru">Danh sách cần mua hàng</a>. Để trống nếu chưa đặt.'],
+    ['Ngưỡng Tồn Tối Đa', false, 'Tồn vượt mức này thì màn Nhập và Mua Hàng cảnh báo trữ quá nhiều.'],
     ['Định Khu', false, 'Vị trí <b>dự kiến</b> để vật tư; chỉ dùng để điền sẵn khi nhập. Vị trí thật của từng lô chọn lúc kiểm tra.'],
     ['Ghi Chú', false, 'Ví dụ: chỉ dùng cho tổ Hoá Lý.'],
 ]])

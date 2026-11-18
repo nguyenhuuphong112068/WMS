@@ -1,4 +1,4 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
 <p>Ghi nhận từng lô VPP nhập vào kho của phòng đang chọn. Mỗi lô có một <b>mã xuất nhập</b> riêng. Lô mới nhập
     luôn ở trạng thái <span class="badge badge-warning">Chờ kiểm tra</span> và <b>chưa cộng vào tồn</b> cho tới khi
@@ -8,7 +8,7 @@
 <h3>Tạo phiếu nhập</h3>
 <ol class="ug-steps">
     <li>Ở tab <b>Nhập VPP</b>, bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Nhập VPP</span>.</li>
-    <li>Bấm vào ô <b>VPP</b> để mở danh sách VPP <b>phòng đang dùng</b>. Có thể lọc theo nhà sản xuất, nhóm dự trù /
+    <li>Bấm vào ô <b>VPP</b> để mở danh sách VPP <b>phòng đang dùng</b>. Có thể lọc theo nhà sản xuất, nhóm mua hàng /
         phân loại của phòng, tình trạng tồn. Mọi mã đã duyệt ở <a href="#danh-muc-cong-ty">Danh mục VPP công ty</a> đều có sẵn ở
         phòng; mã chưa thấy là mã chưa duyệt hoặc đã khoá.</li>
     <li>Nhập <b>Số lượng / lô</b> theo đơn vị của danh mục công ty. Nhập nhiều lô cùng thông tin thì tăng <b>Số lần nhập</b> (tối đa 50),

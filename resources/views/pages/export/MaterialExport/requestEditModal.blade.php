@@ -84,7 +84,7 @@
                                             @endif
                                         </td>
                                         <td class="text-center">
-                                            <button type="button" class="btn btn-xs btn-outline-warning me-remember-row mr-1" title="Đề nghị dự trù vật tư"><i class="fas fa-bookmark"></i></button>
+                                            <button type="button" class="btn btn-xs btn-outline-warning me-remember-row mr-1" title="Đề nghị mua hàng vật tư"><i class="fas fa-bookmark"></i></button>
                                             <button type="button" class="btn btn-xs btn-outline-danger me-del-row" title="Xoá dòng">&times;</button>
                                         </td>
                                     </tr>

@@ -10,8 +10,8 @@
     */
 
     $estRoute = 'pages.estimate.standardEstimate.';
-    $estLabel = 'phiếu dự trù chất chuẩn';
-    $estTitle = 'Dự Trù Chất Chuẩn';
+    $estLabel = 'phiếu mua hàng chất chuẩn';
+    $estTitle = 'Mua Hàng Chất Chuẩn';
     $estIcon = 'fas fa-clipboard-check';
 @endphp
 

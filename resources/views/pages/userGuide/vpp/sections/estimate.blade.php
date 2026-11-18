@@ -1,23 +1,23 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
-<p><b>Chỉ phòng Hành Chánh</b> (phòng giữ kho VPP, cũng là bộ phận mua VPP) lập <b>phiếu dự trù</b> để mua VPP cho một hoặc nhiều
-    tháng. Các phòng khác không dự trù VPP mà lấy VPP từ kho Hành Chánh qua <a href="#de-nghi-vpp">Đề nghị VPP đến Hành Chánh</a>.
+<p><b>Chỉ phòng Hành Chánh</b> (phòng giữ kho VPP, cũng là bộ phận mua VPP) lập <b>phiếu mua hàng</b> để mua VPP cho một hoặc nhiều
+    tháng. Các phòng khác không mua hàng VPP mà lấy VPP từ kho Hành Chánh qua <a href="#de-nghi-vpp">Đề nghị VPP đến Hành Chánh</a>.
     Phiếu phải được ký đủ 2 bước rồi kho VPP Hành Chánh tự tiếp nhận.</p>
 <div class="ug-callout">
     <i class="fas fa-lock"></i>
-    <div>Đang chọn phòng khác Hành Chánh thì nút <b>Lập phiếu dự trù</b> bị khoá, bên cạnh ghi <i>"Chỉ phòng Hành Chánh (phòng giữ kho
-        VPP) lập dự trù VPP"</i>, và không có tab <a href="#can-du-tru">Danh sách VPP cần dự trù</a>.</div>
+    <div>Đang chọn phòng khác Hành Chánh thì nút <b>Lập phiếu mua hàng</b> bị khoá, bên cạnh ghi <i>"Chỉ phòng Hành Chánh (phòng giữ kho
+        VPP) lập mua hàng VPP"</i>, và không có tab <a href="#can-du-tru">Danh sách VPP cần mua hàng</a>.</div>
 </div>
-@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/du-tru.png', 'caption' => 'Màn hình Dự Trù › VPP › tab Danh sách phiếu'])
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/du-tru.png', 'caption' => 'Màn hình Mua Hàng › VPP › tab Danh sách phiếu'])
 
 <h3>Lập phiếu</h3>
 <ol class="ug-steps">
-    <li>Ở tab <b>Danh sách phiếu</b>, bấm tạo phiếu. Chọn <b>Tháng Dự Trù</b>, <b>Năm</b> và ghi chú. Mã phiếu tự sinh dạng
+    <li>Ở tab <b>Danh sách phiếu</b>, bấm tạo phiếu. Chọn <b>Tháng Mua Hàng</b>, <b>Năm</b> và ghi chú. Mã phiếu tự sinh dạng
         <span class="ug-key">[Bộ phận]yymmdd.xx</span>.</li>
     <li>Mở chi tiết phiếu, thêm VPP: chọn từ danh mục của phòng (hiện sẵn đơn vị, tồn hiện tại, tồn tối thiểu / tối đa) hoặc gõ tên
         VPP <b>chưa có trong danh mục</b> kèm thông tin kỹ thuật. VPP không có Quy Cách / P/N và không có thời gian đặt hàng
         nên không có cảnh báo "Không kịp đặt hàng".</li>
-    <li>Nhập <b>Số Lượng Dự Trù</b> cho từng tháng cần dùng (thêm hoặc bỏ cột tháng được), <b>Ngày Mong Muốn Giao</b>, mục đích
+    <li>Nhập <b>Số Lượng Mua Hàng</b> cho từng tháng cần dùng (thêm hoặc bỏ cột tháng được), <b>Ngày Mong Muốn Giao</b>, mục đích
         sử dụng. Đính kèm báo giá, ảnh, catalogue cho từng VPP nếu có.</li>
     <li>Bấm <b>Trình ký</b>, chọn đích danh người <b>Ban Giám Đốc</b> ký bước 2, nhập lại mật khẩu.</li>
 </ol>

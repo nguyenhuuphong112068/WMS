@@ -436,7 +436,7 @@ class ChemicalEstimateThreshold
             'level' => ActiveIngredientThreshold::classify($ratio),
             'blocked' => $ratio >= 1.0,
             'message' => '"' . $name . '" (' . $basis . ' PL IV): tồn hiện tại ' . $num($currentKg) . ' kg'
-                . ' + đang dự trù chưa hoàn thành ' . $num($pendingKg) . ' kg = ' . $num($totalKg) . ' kg'
+                . ' + đang mua hàng chưa hoàn thành ' . $num($pendingKg) . ' kg = ' . $num($totalKg) . ' kg'
                 . ' / ngưỡng ' . $num($threshold) . ' kg (' . (int) round($ratio * 100) . '%).',
         ];
     }

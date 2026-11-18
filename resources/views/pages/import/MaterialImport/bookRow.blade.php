@@ -39,6 +39,7 @@
             NSX: {{ $row->manufacturer_short_name ?: ($row->manufacturer_name ?: '—') }}
         </div>
     </td>
+    <td>@include('pages.import.shared.importKind', ['row' => $row])</td>
     <td class="md-sub">
         <div>{{ $row->technical_specification ?: '—' }}</div>
         @php $rowClassification = \App\Support\MaterialClassification::summary($row->classification); @endphp

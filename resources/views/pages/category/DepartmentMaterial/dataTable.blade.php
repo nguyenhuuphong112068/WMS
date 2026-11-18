@@ -189,7 +189,7 @@
                             <td>
                                 <div class="md-actions">
                                     @if ($row->status_id == 1)
-                                        <button type="button" class="btn btn-sm btn-outline-warning btn-dm-watchlist" title="Đề nghị dự trù vật tư"
+                                        <button type="button" class="btn btn-sm btn-outline-warning btn-dm-watchlist" title="Đề nghị mua hàng vật tư"
                                             data-category-id="{{ $row->category_id }}"
                                             data-unit="{{ $row->unit_short_name ?: $row->unit_name }}">
                                             <i class="fas fa-bookmark"></i>
@@ -338,7 +338,7 @@
             var unit = $btn.data('unit') || '';
 
             Swal.fire({
-                title: 'Đề nghị dự trù vật tư này?',
+                title: 'Đề nghị mua hàng vật tư này?',
                 html:
                     '<div class="text-left">' +
                         '<label class="font-weight-bold mb-1" for="dmWlQty">Số lượng cần đề nghị <span class="text-danger">*</span></label>' +
@@ -346,8 +346,8 @@
                             '<input id="dmWlQty" type="text" inputmode="decimal" class="form-control text-right js-decimal" placeholder="0">' +
                             (unit ? '<div class="input-group-append"><span class="input-group-text"></span></div>' : '') +
                         '</div>' +
-                        '<label class="font-weight-bold mb-1" for="dmWlNote">Lý do dự trù <span class="text-danger">*</span></label>' +
-                        '<textarea id="dmWlNote" class="form-control" rows="4" maxlength="500" placeholder="Nêu rõ lý do cần dự trù vật tư này..."></textarea>' +
+                        '<label class="font-weight-bold mb-1" for="dmWlNote">Lý do mua hàng <span class="text-danger">*</span></label>' +
+                        '<textarea id="dmWlNote" class="form-control" rows="4" maxlength="500" placeholder="Nêu rõ lý do cần mua hàng vật tư này..."></textarea>' +
                     '</div>',
                 showCancelButton: true,
                 confirmButtonColor: '#2E7BC4',
@@ -368,7 +368,7 @@
                         return false;
                     }
                     if (!note) {
-                        Swal.showValidationMessage('Vui lòng nhập lý do dự trù');
+                        Swal.showValidationMessage('Vui lòng nhập lý do mua hàng');
                         return false;
                     }
                     return { quantity: qty, note: note };

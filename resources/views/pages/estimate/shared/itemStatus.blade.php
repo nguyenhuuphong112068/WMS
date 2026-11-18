@@ -28,7 +28,7 @@
             <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-check mr-1"></i>Đồng ý huỷ</button>
         </form>
         <form action="{{ route($estRoute . 'purchaseCancel') }}" method="POST" class="d-inline form-md-confirm"
-            data-title="Không đồng ý huỷ?" data-text="Mặt hàng sẽ tiếp tục được dự trù.">
+            data-title="Không đồng ý huỷ?" data-text="Mặt hàng sẽ tiếp tục được mua hàng.">
             @csrf
             <input type="hidden" name="id" value="{{ $item->id }}">
             <input type="hidden" name="action" value="cancel_reject">
@@ -38,7 +38,7 @@
 @elseif ($list->app_status === 'approved' && ! ($readOnly ?? false) && user_can($trackPermission))
     <div>
         @if ($item->status_id == 0)
-            <span class="badge badge-danger mb-1">Đã huỷ không dự trù</span>
+            <span class="badge badge-danger mb-1">Đã huỷ không mua hàng</span>
             @if ($item->cancel_reason)
                 <div class="text-danger small mb-1">Lý do: {{ $item->cancel_reason }}</div>
             @endif
@@ -59,7 +59,7 @@
             @include('pages.estimate.shared.cancelState')
 
             @if ($item->cancel_requester_at)
-                <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm" data-title="Rút lại đề nghị huỷ?" data-text="Mặt hàng sẽ tiếp tục được dự trù.">
+                <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm" data-title="Rút lại đề nghị huỷ?" data-text="Mặt hàng sẽ tiếp tục được mua hàng.">
                     @csrf
                     <input type="hidden" name="id" value="{{ $item->id }}">
                     <input type="hidden" name="action" value="cancel_withdraw">
@@ -72,7 +72,7 @@
                     <input type="hidden" name="action" value="cancel">
                     <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-check mr-1"></i>Đồng ý huỷ</button>
                 </form>
-                <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm" data-title="Không đồng ý huỷ?" data-text="Mặt hàng sẽ tiếp tục được dự trù.">
+                <form action="{{ route($estRoute . 'updateItemStatus') }}" method="POST" class="d-inline form-md-confirm" data-title="Không đồng ý huỷ?" data-text="Mặt hàng sẽ tiếp tục được mua hàng.">
                     @csrf
                     <input type="hidden" name="id" value="{{ $item->id }}">
                     <input type="hidden" name="action" value="cancel_reject">
@@ -110,7 +110,7 @@
     </div>
 @elseif ($item->status_id == 0)
     <div>
-        <span class="badge badge-danger">Đã huỷ không dự trù</span>
+        <span class="badge badge-danger">Đã huỷ không mua hàng</span>
         @if ($item->cancel_reason)
             <div class="text-danger small mt-1">Lý do: {{ $item->cancel_reason }}</div>
         @endif

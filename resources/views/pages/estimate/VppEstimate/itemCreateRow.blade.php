@@ -63,12 +63,6 @@
     </td>
 
     <td>
-        <input type="date" data-f="expected_delivery_date" name="{{ $name('expected_delivery_date') }}"
-            class="form-control form-control-sm {{ $err('expected_delivery_date') }}"
-            value="{{ $row['expected_delivery_date'] ?? '' }}">
-    </td>
-
-    <td>
         <select data-f="unit_id" name="{{ $name('unit_id') }}" class="form-control form-control-sm emi-unit {{ $err('unit_id') }}">
             <option value="">-- Chọn --</option>
             @foreach ($units as $unit)

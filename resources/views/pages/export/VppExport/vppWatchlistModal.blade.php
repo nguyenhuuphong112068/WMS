@@ -6,9 +6,16 @@
 | - server tự xác định lại, không nhận phòng gửi lên từ form. Phiếu ghi vào cùng bộ bảng
 | vpp_transfer_requests với đề nghị liên phòng ban nên Hành Chính cấp phát / phòng mình
 | nhận hàng y như luồng liên phòng ban.
+|
+| Hai cách lập (ô mode, nút trên thanh công cụ của bảng chọn sẵn):
+|   new    : Tạo đề nghị mới - Tiêu đề / Ngày cần dùng / Ghi chú, Lưu tạm hoặc Gửi đề nghị.
+|   append : Thêm vào đề nghị nháp - chọn một phiếu đang Lưu tạm của phòng gửi HC ($vppDrafts),
+|            các VPP được thêm vào phiếu đó, phiếu vẫn Nháp.
 --}}
 @php
     $vppBag = $errors->getBag('vppWatchlistErrors');
+    $vppDrafts = $vppDrafts ?? collect();
+    $vppWlMode = $vppBag->any() && old('mode') === 'append' && $vppDrafts->isNotEmpty() ? 'append' : 'new';
 @endphp
 
 @if ($vppTarget)
@@ -23,9 +30,48 @@
                 <form action="{{ route('pages.export.vppExport.vppWatchlistStore') }}" method="POST">
                     @csrf
                     <input type="hidden" name="action_type" class="vpp-wl-action-type" value="send">
+                    <input type="hidden" name="mode" class="vpp-wl-mode-input" value="{{ $vppWlMode }}">
 
                     <div class="modal-body">
-                        <div class="form-row">
+                        @if ($vppDrafts->isNotEmpty())
+                            <div class="vpp-wl-modes mb-3" role="group">
+                                <button type="button" class="btn btn-sm vpp-wl-mode-btn" data-mode="new">
+                                    <i class="fas fa-plus mr-1"></i> Tạo đề nghị mới
+                                </button>
+                                <button type="button" class="btn btn-sm vpp-wl-mode-btn" data-mode="append">
+                                    <i class="fas fa-folder-plus mr-1"></i> Thêm vào đề nghị nháp
+                                    <span class="badge badge-light ml-1">{{ $vppDrafts->count() }}</span>
+                                </button>
+                            </div>
+
+                            <div class="form-row vpp-wl-part" data-mode="append">
+                                <div class="form-group col-md-8">
+                                    <label>Đề Nghị Nháp <span class="text-danger">*</span></label>
+                                    <select name="draft_id" required
+                                        class="form-control {{ $vppBag->has('draft_id') ? 'is-invalid' : '' }}">
+                                        @foreach ($vppDrafts as $draft)
+                                            <option value="{{ $draft->id }}" @selected((string) old('draft_id') === (string) $draft->id)>
+                                                {{ $draft->code }}{{ $draft->title ? ' - ' . $draft->title : '' }}
+                                                · {{ $draft->item_count }} mục
+                                                · {{ \Carbon\Carbon::parse($draft->updated_at ?: $draft->created_at)->format('d/m/Y') }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @if ($vppBag->has('draft_id'))
+                                        <span class="md-error">{{ $vppBag->first('draft_id') }}</span>
+                                    @endif
+                                </div>
+
+                                <div class="form-group col-md-4">
+                                    <label>Gửi Đến</label>
+                                    <div class="form-control vpp-target" tabindex="-1">
+                                        <i class="fas fa-building mr-1"></i>{{ $vppTarget->name }}{{ $vppTarget->shortName ? ' (' . $vppTarget->shortName . ')' : '' }}
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="form-row vpp-wl-part" data-mode="new">
                             <div class="form-group col-md-4">
                                 <label>Tiêu Đề Đề Nghị <span class="text-danger">*</span></label>
                                 <input type="text" name="title" maxlength="255" required list="matTitleOptionsVpp" autocomplete="off"
@@ -105,12 +151,17 @@
 
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Huỷ</button>
-                        <button type="submit" class="btn btn-outline-primary btn-vpp-wl-submit" data-action="draft">
+                        <button type="submit" class="btn btn-outline-primary btn-vpp-wl-submit vpp-wl-part" data-mode="new" data-action="draft">
                             <i class="fas fa-save mr-1"></i> Lưu tạm
                         </button>
-                        <button type="submit" class="btn btn-primary btn-vpp-wl-submit" data-action="send">
+                        <button type="submit" class="btn btn-primary btn-vpp-wl-submit vpp-wl-part" data-mode="new" data-action="send">
                             <i class="fas fa-paper-plane mr-1"></i> Gửi đề nghị
                         </button>
+                        @if ($vppDrafts->isNotEmpty())
+                            <button type="submit" class="btn btn-primary btn-vpp-wl-submit vpp-wl-part" data-mode="append" data-action="draft">
+                                <i class="fas fa-folder-plus mr-1"></i> Thêm vào nháp
+                            </button>
+                        @endif
                     </div>
                 </form>
             </div>
@@ -140,6 +191,29 @@
             text-overflow: ellipsis;
         }
 
+        #vppWatchlistModal .vpp-wl-modes {
+            display: inline-flex;
+            padding: 3px;
+            gap: 3px;
+            border-radius: var(--border-radius-md);
+            background: var(--primary-soft);
+        }
+
+        #vppWatchlistModal .vpp-wl-mode-btn {
+            border: none;
+            border-radius: 6px;
+            color: var(--primary-dark);
+            font-weight: 600;
+            background: transparent;
+            transition: all 0.2s;
+        }
+
+        #vppWatchlistModal .vpp-wl-mode-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: var(--shadow-sm);
+        }
+
         #vppWatchlistModal .wl-items-table {
             min-width: 900px;
             margin-bottom: 0;
@@ -151,7 +225,33 @@
     </style>
 
     <script>
+        /*
+        | Đổi cách lập: hiện phần của cách đang chọn, tắt (disabled) ô của phần còn lại để
+        | ô bắt buộc bị ẩn (Tiêu đề / Đề nghị nháp) không chặn gửi form.
+        */
+        window.vppWlSetMode = function(mode) {
+            var $modal = $('#vppWatchlistModal');
+
+            mode = mode === 'append' && $modal.find('select[name="draft_id"]').length ? 'append' : 'new';
+            $modal.find('.vpp-wl-mode-input').val(mode);
+            $modal.find('.vpp-wl-mode-btn').each(function() {
+                $(this).toggleClass('active', $(this).data('mode') === mode);
+            });
+            $modal.find('.vpp-wl-part').each(function() {
+                var on = $(this).data('mode') === mode;
+
+                $(this).toggleClass('d-none', !on);
+                $(this).find('input, select, textarea').prop('disabled', !on);
+            });
+        };
+
         document.addEventListener('DOMContentLoaded', function() {
+            window.vppWlSetMode(@json($vppWlMode));
+
+            $(document).on('click', '#vppWatchlistModal .vpp-wl-mode-btn', function() {
+                window.vppWlSetMode($(this).data('mode'));
+            });
+
             $('#vppWatchlistModal').on('shown.bs.modal', function() {
                 $(this).find('.wl-items-body tr').each(function(index) {
                     $(this).find('.wl-stt').text(index + 1);

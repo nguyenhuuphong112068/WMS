@@ -10,7 +10,7 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="{{ $estIcon }}"></i> Lập Phiếu Dự Trù Chất Chuẩn</h5>
+                <h5 class="modal-title"><i class="{{ $estIcon }}"></i> Lập Phiếu Mua Hàng Chất Chuẩn</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -20,7 +20,7 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-4">
-                            <label>Tháng Dự Trù <span class="text-danger">*</span></label>
+                            <label>Tháng Mua Hàng <span class="text-danger">*</span></label>
                             <select name="month"
                                 class="form-control est-period-part {{ $bag->has('month') ? 'is-invalid' : '' }}"
                                 required>
@@ -57,7 +57,7 @@
                         <label>Ghi Chú</label>
                         <textarea name="note" rows="2" maxlength="500"
                             class="form-control {{ $bag->has('note') ? 'is-invalid' : '' }}"
-                            placeholder="Ví dụ: Dự trù chất chuẩn phục vụ kiểm nghiệm quý 4">{{ old('note') }}</textarea>
+                            placeholder="Ví dụ: Mua hàng chất chuẩn phục vụ kiểm nghiệm quý 4">{{ old('note') }}</textarea>
                         @if ($bag->has('note'))
                             <span class="md-error">{{ $bag->first('note') }}</span>
                         @endif
@@ -66,8 +66,8 @@
                     <div class="md-hint">
                         <i class="fas fa-info-circle mr-1"></i>
                         Phiếu được lập cho phòng ban <b>{{ session('user')['selected_department'] }}</b>, mỗi kỳ chỉ có
-                        một phiếu dự trù chất chuẩn. Lưu xong hệ thống mở thẳng trang chi tiết để khai các chất chuẩn
-                        cần dự trù.
+                        một phiếu mua hàng chất chuẩn. Lưu xong hệ thống mở thẳng trang chi tiết để khai các chất chuẩn
+                        cần mua hàng.
                     </div>
                 </div>
 

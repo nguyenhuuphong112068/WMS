@@ -65,7 +65,7 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-box-open"></i> Thêm Vật Tư Dự Trù</h5>
+                <h5 class="modal-title"><i class="fas fa-box-open"></i> Thêm Vật Tư Mua Hàng</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -198,7 +198,7 @@
                         <div class="emi-picker-foot">
                             <span class="emi-pick-count">Đã chọn 0 vật tư</span>
                             <button type="button" class="btn btn-sm btn-primary btn-emi-pick-apply" disabled>
-                                <i class="fas fa-arrow-down mr-1"></i> Thêm vào bảng dự trù
+                                <i class="fas fa-arrow-down mr-1"></i> Thêm vào bảng mua hàng
                             </button>
                         </div>
                     </div>

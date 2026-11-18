@@ -38,14 +38,20 @@
 
         @if ($wlIsVpp)
             @perm('export_vpp_request')
-                <button type="button" class="btn btn-primary btn-sm btn-wl-vpp" disabled>
+                <button type="button" class="btn btn-primary btn-sm btn-wl-vpp" data-mode="new" disabled>
                     <i class="fas fa-paper-plane mr-1"></i> Lập đề nghị cấp phát VPP đến HC <span class="wl-count"></span>
                 </button>
+                {{-- Phòng đang có đề nghị nháp gửi HC thì thêm được các VPP đã chọn vào nháp đó --}}
+                @if (($vppDrafts ?? collect())->isNotEmpty())
+                    <button type="button" class="btn btn-outline-primary btn-sm btn-wl-vpp" data-mode="append" disabled>
+                        <i class="fas fa-folder-plus mr-1"></i> Thêm vào đề nghị nháp <span class="wl-count"></span>
+                    </button>
+                @endif
             @endperm
         @else
             @perm('estimate_vpp_create')
                 <button type="button" class="btn btn-primary btn-sm btn-wl-estimate" disabled>
-                    <i class="fas fa-clipboard-check mr-1"></i> Lập phiếu dự trù <span class="wl-count"></span>
+                    <i class="fas fa-clipboard-check mr-1"></i> Lập phiếu mua hàng <span class="wl-count"></span>
                 </button>
             @endperm
         @endif
@@ -82,7 +88,7 @@
                 <th class="text-right" style="width: 115px">Ngưỡng Tối Thiểu</th>
                 <th class="text-right" style="width: 105px">SL Đề Nghị</th>
                 <th style="width: 190px">Nguồn</th>
-                <th style="width: 200px">{{ $wlIsVpp ? 'Lý Do Đề Nghị' : 'Lý Do Dự Trù' }}</th>
+                <th style="width: 200px">{{ $wlIsVpp ? 'Lý Do Đề Nghị' : 'Lý Do Mua Hàng' }}</th>
                 <th class="text-center" style="width: 80px">Thao Tác</th>
             </tr>
         </thead>
@@ -102,7 +108,7 @@
                     <td class="text-center">
                         @if ($item->in_progress)
                             {{-- Đã có phiếu chưa xong - không chọn lại được --}}
-                            <i class="fas fa-lock wl-lock" title="{{ $wlIsVpp ? 'Đã đề nghị, chờ xử lý xong mới đề nghị lại được' : 'Đã lập phiếu, chờ xử lý xong mới dự trù lại được' }}"></i>
+                            <i class="fas fa-lock wl-lock" title="{{ $wlIsVpp ? 'Đã đề nghị, chờ xử lý xong mới đề nghị lại được' : 'Đã lập phiếu, chờ xử lý xong mới mua hàng lại được' }}"></i>
                         @else
                             <input type="checkbox" class="js-wl-check" value="{{ $loop->index }}">
                         @endif
@@ -129,7 +135,7 @@
                         @foreach ($item->in_progress as $ref)
                             <div class="md-sub mt-1">
                                 @if ($ref['type'] === 'estimate')
-                                    <a href="{{ route($wlEstRoute . 'detail', ['id' => $ref['id']]) }}" class="md-badge wl-progress" title="Mở phiếu dự trù">
+                                    <a href="{{ route($wlEstRoute . 'detail', ['id' => $ref['id']]) }}" class="md-badge wl-progress" title="Mở phiếu mua hàng">
                                         <i class="fas fa-file-signature mr-1"></i>Đã lập {{ $ref['code'] }} · {{ $ref['status'] }}
                                     </a>
                                 @else
@@ -142,7 +148,7 @@
                         @endforeach
                         @if ($item->watchlist_id)
                             <div class="md-sub mt-1">
-                                <span class="md-badge pending">Đề nghị dự trù</span>
+                                <span class="md-badge pending">Đề nghị mua hàng</span>
                                 @if ($wlSourceLabel($item->source_type))
                                     <span class="ml-1">({{ $wlSourceLabel($item->source_type) }})</span>
                                 @endif
@@ -281,7 +287,7 @@
             "columnDefs": [{ "orderable": false, "targets": [0, {{ $wlActionCol }}] }],
             "language": {
                 "url": "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}",
-                "emptyTable": @json($wlIsVpp ? 'Không có VPP nào cần đề nghị Hành Chính' : 'Không có VPP nào cần dự trù')
+                "emptyTable": @json($wlIsVpp ? 'Không có VPP nào cần đề nghị Hành Chính' : 'Không có VPP nào cần mua hàng')
             }
         });
 
@@ -424,6 +430,10 @@
         });
 
         $(document).on('click', '.btn-wl-vpp', function() {
+            if (window.vppWlSetMode) {
+                window.vppWlSetMode($(this).data('mode'));
+            }
+
             wlFill('#vppWatchlistModal', function(row, index) {
                 var tpl = $('#vppWatchlistModal').find('.wl-row-template').html();
 

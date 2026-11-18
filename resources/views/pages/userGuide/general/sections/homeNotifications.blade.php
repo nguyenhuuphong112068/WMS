@@ -8,7 +8,7 @@
 <h3>Đọc một dòng</h3>
 <ol class="ug-steps">
     <li>Viền trái và chip mang màu đối tượng giống thẻ Trang chủ: <b>Vật tư</b>, <b>Hoá chất</b>, <b>Chất chuẩn</b>, <b>Dùng chung</b>.</li>
-    <li>Nhóm nghiệp vụ (Dự trù, Đề nghị nội bộ, Liên phòng ban, Văn phòng phẩm, KS chất lượng / hàng hỏng, Phê duyệt dữ liệu) và nhãn
+    <li>Nhóm nghiệp vụ (Mua hàng, Đề nghị nội bộ, Liên phòng ban, Văn phòng phẩm, KS chất lượng / hàng hỏng, Phê duyệt dữ liệu) và nhãn
         ai phải làm: <span class="ug-chip"><i class="fas fa-signature"></i> Bạn ký duyệt</span>,
         <span class="ug-chip is-warn"><i class="fas fa-people-carry"></i> Phòng xử lý</span>,
         <span class="ug-chip is-success"><i class="fas fa-user-check"></i> Cấp cho bạn</span>.</li>

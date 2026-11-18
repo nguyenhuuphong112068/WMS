@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Pages\Category;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\RequiresChangeReason;
 use App\Http\Controllers\Concerns\StoresBatchItems;
-use App\Http\Controllers\Concerns\VerifiesSignature;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DepartmentVpp;
 use App\Support\VppClassification;
@@ -35,14 +34,13 @@ use Illuminate\Support\Facades\Validator;
  * Modal Thêm mới là BẢNG NHIỀU DÒNG (items[i][...]): một lần lưu được nhiều mã, mã M00001...
  * cấp liên tiếp theo thứ tự dòng. Modal Cập nhật vẫn sửa từng dòng.
  *
- * Dữ liệu mới tạo ở trạng thái "Chờ duyệt", sửa lại bản ghi đã duyệt sẽ đưa về "Chờ duyệt".
+ * Danh mục VPP KHÔNG qua bước duyệt (18/11/2026): thêm mới là "Đã duyệt" ngay, sửa không đưa về chờ duyệt.
  * Mọi thay đổi đều được chụp lại ở bảng vpp_category_histories.
  */
 class VppCategoryController extends Controller
 {
     use RequiresChangeReason;
     use StoresBatchItems;
-    use VerifiesSignature;
 
     private const TABLE = 'vpp_categories';
     private const HISTORY_TABLE = 'vpp_category_histories';
@@ -57,7 +55,7 @@ class VppCategoryController extends Controller
         'vpp_names_id' => 'Tên VPP',
         'manufacturers_id' => 'Nhà sản xuất',
         'unit_id' => 'Đơn vị tính',
-        'classification' => 'Nhóm dự trù',
+        'classification' => 'Nhóm mua hàng',
         'purchasing_department' => 'Bộ phận mua hàng',
     ];
 
@@ -179,7 +177,10 @@ class VppCategoryController extends Controller
             foreach ($items as $item) {
                 $ids[] = DB::table(self::TABLE)->insertGetId($this->payload($item) + [
                     'code' => $this->formatCode($number++),
-                    'app_status' => 'pending',
+                    // Danh mục VPP không qua bước duyệt: tạo ra là dùng được ngay
+                    'app_status' => 'approved',
+                    'approved_by' => $this->actor(),
+                    'approved_at' => now(),
                     'status_id' => 1,
                     'created_by' => $this->actor(),
                     'created_at' => now(),
@@ -202,8 +203,8 @@ class VppCategoryController extends Controller
         }
 
         $message = count($ids) === 1
-            ? 'Đã thêm ' . self::LABEL . ' mã ' . $codes->first() . '! Bản ghi đang chờ duyệt.'
-            : 'Đã thêm ' . count($ids) . ' ' . self::LABEL . ' (mã ' . $codes->first() . ' - ' . $codes->last() . ')! Các bản ghi đang chờ duyệt.';
+            ? 'Đã thêm ' . self::LABEL . ' mã ' . $codes->first() . '!'
+            : 'Đã thêm ' . count($ids) . ' ' . self::LABEL . ' (mã ' . $codes->first() . ' - ' . $codes->last() . ')!';
 
         return redirect()->back()->with('success', $message);
     }
@@ -236,10 +237,6 @@ class VppCategoryController extends Controller
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
-            // Sửa nội dung thì phải duyệt lại từ đầu
-            'app_status' => 'pending',
-            'approved_by' => null,
-            'approved_at' => null,
             'updated_by' => $this->actor(),
             'updated_at' => now(),
         ]);
@@ -248,7 +245,7 @@ class VppCategoryController extends Controller
 
         AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $note ?: 'Không đổi', $this->describe($current->id));
 
-        return redirect()->back()->with('success', 'Cập nhật ' . self::LABEL . ' thành công! Bản ghi chuyển về chờ duyệt.');
+        return redirect()->back()->with('success', 'Cập nhật ' . self::LABEL . ' thành công!');
     }
 
     public function deActive(Request $request)
@@ -282,11 +279,6 @@ class VppCategoryController extends Controller
         );
     }
 
-    public function approve(Request $request)
-    {
-        return $this->setApproval($request);
-    }
-
     /** Trả về lịch sử thay đổi của một dòng danh mục cho modal xem lịch sử. */
     public function history(Request $request)
     {
@@ -311,7 +303,7 @@ class VppCategoryController extends Controller
                     'Tên VPP' => $row->material_name ?: '—',
                     'Nhà sản xuất' => $row->manufacturer_name ?: '—',
                     'Đơn vị tính' => $row->unit_name ?: '—',
-                    'Nhóm dự trù' => VppClassification::describe($row->classification),
+                    'Nhóm mua hàng' => VppClassification::describe($row->classification),
                     'Bộ phận mua hàng' => VppClassification::purchasingLabel($row->purchasing_department) ?: '—',
                 ];
 
@@ -351,34 +343,6 @@ class VppCategoryController extends Controller
             ->where('action', '<>', 'Thêm mới')
             ->groupBy('vpp_category_id')
             ->pluck('times', 'vpp_category_id');
-    }
-
-    /** Ghi nhận kết quả duyệt: ai duyệt, duyệt lúc nào. */
-    private function setApproval(Request $request)
-    {
-        $current = DB::table(self::TABLE)->where('id', $request->id)->first();
-
-        if (! $current) {
-            return redirect()->back()->with('error', 'Không tìm thấy ' . self::LABEL . ' cần duyệt!');
-        }
-
-        if ($stop = $this->guardSignature($request, self::TABLE, $current->id, 'Phê duyệt')) {
-            return $stop;
-        }
-
-        DB::table(self::TABLE)->where('id', $current->id)->update([
-            'app_status' => 'approved',
-            'approved_by' => $this->actor(),
-            'approved_at' => now(),
-            'updated_by' => $this->actor(),
-            'updated_at' => now(),
-        ]);
-
-        $this->writeHistory($current->id, 'Phê duyệt', 'Trạng thái duyệt: ' . $current->app_status . ' -> approved');
-
-        AuditTrialController::log('Phê duyệt', self::TABLE, $current->id, 'app_status: ' . $current->app_status, 'app_status: approved');
-
-        return redirect()->back()->with('success', 'Đã duyệt ' . self::LABEL . '!');
     }
 
     /**

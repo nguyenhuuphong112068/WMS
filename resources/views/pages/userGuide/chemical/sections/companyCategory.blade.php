@@ -48,7 +48,7 @@
         Khai sai thì bấm <i class="fas fa-pen"></i> ở góc phải khung của lần khai báo đó: hộp <b>Sửa khai báo Cổng thông tin quốc gia</b>
         điền sẵn Mã hồ sơ + Code nhà sản xuất cũ, sửa rồi nhập <b>Lý do điều chỉnh</b> (bắt buộc, không cần mật khẩu). Thay đổi ghi vào
         lịch sử danh mục (<i>Sửa khai báo Cổng TTQG</i>) và Audit Trail, khung hiện thêm <i>· đã sửa</i>. Không đổi gì mà vẫn lưu thì hệ
-        thống báo <i>"Thông tin khai báo không có thay đổi."</i> Khai báo và sửa đều cần quyền <b>Sửa Danh Mục Hoá Chất</b>. Code NSX khai ở đây hiện ở hộp <a href="#du-tru">Thêm mặt hàng dự trù</a>.</li>
+        thống báo <i>"Thông tin khai báo không có thay đổi."</i> Khai báo và sửa đều cần quyền <b>Sửa Danh Mục Hoá Chất</b>. Code NSX khai ở đây hiện ở hộp <a href="#du-tru">Thêm mặt hàng cần mua</a>.</li>
 </ul>
 
 <h3>Điều chỉnh thời gian đặt hàng</h3>

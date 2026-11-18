@@ -21,8 +21,8 @@
 
 <div class="ug-callout">
     <i class="fas fa-lightbulb"></i>
-    <div>Thấy vật tư sắp thiếu ngay lúc lập đề nghị? Bấm <b>Đề nghị dự trù vật tư</b> trên dòng, nhập số lượng và lý do.
-        Vật tư sẽ hiện ở <a href="#can-du-tru">Danh sách vật tư cần dự trù</a>, dù đề nghị có lưu hay không.</div>
+    <div>Thấy vật tư sắp thiếu ngay lúc lập đề nghị? Bấm <b>Đề nghị mua hàng vật tư</b> trên dòng, nhập số lượng và lý do.
+        Vật tư sẽ hiện ở <a href="#can-du-tru">Danh sách vật tư cần mua hàng</a>, dù đề nghị có lưu hay không.</div>
 </div>
 
 <h3>Quy trình ký</h3>

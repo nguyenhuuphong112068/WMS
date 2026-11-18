@@ -202,10 +202,8 @@ Route::prefix('/estimate')
             Route::post('signStep', 'signStep')->name('signStep');
             Route::post('reject', 'reject')->name('reject');
 
-            // Cập nhật ngày mong muốn giao khi đã duyệt
+            // Hoàn thành / Huỷ mục đã duyệt (mua hàng VPP không có ngày mong muốn / ngày hẹn đáp ứng)
             Route::post('updateItemStatus', 'updateItemStatus')->name('updateItemStatus');
-            Route::post('updatePromisedDate', 'updatePromisedDate')->name('updatePromisedDate');
-            Route::get('getPromisedDateHistory/{itemId}', 'getPromisedDateHistory')->name('getPromisedDateHistory');
             Route::post('storeItemChat', 'storeItemChat')->name('storeItemChat');
         });
     });

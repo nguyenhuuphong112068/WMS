@@ -302,7 +302,7 @@ class InitialDataTemplate
             $examples[] = '"TOXIC, CORROSIVE"';
         }
         if (isset($visible['vpp_cats'])) {
-            $multi[] = 'Nhóm dự trù VPP (sheet 34): '.implode('; ', array_keys($lists['vpp_group']));
+            $multi[] = 'Nhóm mua hàng VPP (sheet 34): '.implode('; ', array_keys($lists['vpp_group']));
         }
         if (isset($visible['standard_cats']) || isset($visible['stock_standards'])) {
             $multi[] = 'Phân nhóm chuẩn (sheet 21, 33): '.implode('; ', array_keys($lists['standard_group']));
@@ -349,7 +349,7 @@ class InitialDataTemplate
         'standard_names' => 'thêm tên chất chuẩn chưa có (kèm tên hoạt chất, số CAS nếu có).',
         'material_cats' => 'mỗi dòng = Tên vật tư + Nhà sản xuất + các tiêu chí phân loại. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
         'chemical_cats' => 'mỗi dòng = Tên hoá chất + Loại + Nhà sản xuất. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
-        'vpp_cats' => 'mỗi dòng = Tên VPP (chọn ở sheet 37) + Nhà sản xuất + Đơn vị tính + Nhóm dự trù. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
+        'vpp_cats' => 'mỗi dòng = Tên VPP (chọn ở sheet 37) + Nhà sản xuất + Đơn vị tính + Nhóm mua hàng. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
         'standard_cats' => 'mỗi dòng = Tên chất chuẩn + Nguồn gốc / NSX + nhóm chuẩn. KHÔNG nhập Mã DM: điền tên là mã tự hiện.',
         'locations' => 'danh sách vị trí đặt hàng đang có trên hệ thống (theo phòng ban, loại lưu trữ dùng chung hoặc đúng module của file), dùng để chọn Vị trí mặc định / Vị trí lưu. Định khu tạo trực tiếp trên phần mềm (Dữ Liệu Gốc → Định Khu); còn thiếu vị trí thì tạo trên phần mềm rồi TẢI LẠI file mẫu.',
         'dept_materials' => 'chọn danh mục vật tư phòng dùng, đơn vị tính của phòng, tồn tối thiểu / tối đa, vị trí mặc định.',

@@ -10,8 +10,8 @@
     */
 
     $estRoute = 'pages.estimate.vppEstimate.';
-    $estLabel = 'phiếu dự trù VPP';
-    $estTitle = 'Dự Trù VPP';
+    $estLabel = 'phiếu mua hàng VPP';
+    $estTitle = 'Mua Hàng VPP';
     $estIcon = 'fas fa-clipboard-check';
 @endphp
 

@@ -963,10 +963,10 @@ class MaterialPeriodicRequest
 
         return array_filter([
             'Tiêu đề' => $list->title,
-            'Loại đề nghị' => $isEstimate ? 'Dự trù' : ($isExternal ? 'Liên phòng ban' : 'Nội bộ'),
+            'Loại đề nghị' => $isEstimate ? 'Mua hàng' : ($isExternal ? 'Liên phòng ban' : 'Nội bộ'),
             'Đối tượng' => $isExternal || $isEstimate ? null : (self::objectLabel($list->consumption_object_id) ?? '—'),
             'Tổ quản lý' => $isExternal || $isEstimate ? null : ($list->group_name ?: '—'),
-            'Dự trù cho' => $isEstimate ? self::ESTIMATE_MONTH_OFFSETS[self::estimateMonthOffset($list)] : null,
+            'Mua hàng cho' => $isEstimate ? self::ESTIMATE_MONTH_OFFSETS[self::estimateMonthOffset($list)] : null,
             'Phòng cấp phát' => $isExternal ? ($list->to_department_name ?: '—') : null,
             'Chu kỳ' => self::scheduleLabel($list->periodic, $list->cycle_length, $list->frequency),
             'Ngày tạo trong chu kỳ' => self::dayLabel($list),
@@ -1196,7 +1196,7 @@ class MaterialPeriodicRequest
             ->orderBy('id', 'desc')
             ->get(['change_note', 'created_by', 'created_at'])
             ->map(function ($row) {
-                preg_match('/(?:đề nghị|phiếu dự trù) (\S+) \((?:Lưu tạm|Nháp)\)/u', (string) $row->change_note, $match);
+                preg_match('/(?:đề nghị|phiếu mua hàng) (\S+) \((?:Lưu tạm|Nháp)\)/u', (string) $row->change_note, $match);
 
                 return [
                     'code' => $match[1] ?? null,
@@ -1264,7 +1264,7 @@ class MaterialPeriodicRequest
     public static function resultLabel(array $result): string
     {
         return $result['type'] === self::TYPE_ESTIMATE
-            ? 'phiếu dự trù '.$result['code'].' (Nháp)'
+            ? 'phiếu mua hàng '.$result['code'].' (Nháp)'
             : 'đề nghị '.$result['code'].' (Lưu tạm)';
     }
 
@@ -1428,7 +1428,7 @@ class MaterialPeriodicRequest
             'department_id' => $list->department_id,
             'month' => $period->month,
             'year' => $period->year,
-            'note' => Str::limit('Tạo tự động từ danh sách dự trù theo chu kỳ "'.$list->title.'".', 500, ''),
+            'note' => Str::limit('Tạo tự động từ danh sách mua hàng theo chu kỳ "'.$list->title.'".', 500, ''),
             'app_status' => 'draft',
             'status_id' => 1,
             'created_by' => $actor,
@@ -1519,9 +1519,9 @@ class MaterialPeriodicRequest
         try {
             $notificationId = DB::table('notifications')->insertGetId([
                 'sender_id' => null,
-                'activity_type' => $isEstimate ? 'Dự trù theo chu kỳ' : 'Đề nghị theo chu kỳ',
+                'activity_type' => $isEstimate ? 'Mua hàng theo chu kỳ' : 'Đề nghị theo chu kỳ',
                 'message' => $isEstimate
-                    ? 'Đến chu kỳ: đã lập phiếu dự trù vật tư '.$result['code'].' (Nháp) từ danh sách "'.$list->title
+                    ? 'Đến chu kỳ: đã lập phiếu mua hàng vật tư '.$result['code'].' (Nháp) từ danh sách "'.$list->title
                         .'". Vui lòng kiểm tra, điều chỉnh rồi trình ký.'
                     : 'Đến chu kỳ: đã tạo đề nghị '.($isExternal ? 'liên phòng ban ' : 'cấp phát vật tư ')
                         .$result['code'].' (Lưu tạm) từ danh sách "'.$list->title.'". Vui lòng kiểm tra, điều chỉnh rồi '

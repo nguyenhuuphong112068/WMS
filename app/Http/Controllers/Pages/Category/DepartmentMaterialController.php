@@ -222,14 +222,14 @@ class DepartmentMaterialController extends Controller
             'quantity' => ['required', 'numeric', 'gt:0', 'max:999999999'],
             'note' => ['required', 'max:500'],
         ], [
-            'category_id.required' => 'Không xác định được vật tư cần đề nghị dự trù!',
+            'category_id.required' => 'Không xác định được vật tư cần đề nghị mua hàng!',
             'category_id.exists' => 'Vật tư được chọn không tồn tại.',
             'quantity.required' => 'Vui lòng nhập số lượng cần đề nghị.',
             'quantity.numeric' => 'Số lượng cần đề nghị phải là số.',
             'quantity.gt' => 'Số lượng cần đề nghị phải lớn hơn 0.',
             'quantity.max' => 'Số lượng cần đề nghị quá lớn.',
-            'note.required' => 'Vui lòng nhập lý do dự trù.',
-            'note.max' => 'Lý do dự trù tối đa 500 ký tự.',
+            'note.required' => 'Vui lòng nhập lý do mua hàng.',
+            'note.max' => 'Lý do mua hàng tối đa 500 ký tự.',
         ]);
 
         if ($validator->fails()) {
@@ -244,7 +244,7 @@ class DepartmentMaterialController extends Controller
         if ($deptMaterial && $deptMaterial->status_id != 1) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vật tư của phòng đã bị khoá, không thể đề nghị dự trù!',
+                'message' => 'Vật tư của phòng đã bị khoá, không thể đề nghị mua hàng!',
             ]);
         }
 

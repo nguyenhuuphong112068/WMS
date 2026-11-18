@@ -4,7 +4,7 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-edit"></i> Cập Nhật Phiếu Dự Trù</h5>
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Cập Nhật Phiếu Mua Hàng</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -16,7 +16,7 @@
 
                     <div class="form-row">
                         <div class="form-group col-md-6">
-                            <label>Tháng Dự Trù <span class="text-danger">*</span></label>
+                            <label>Tháng Mua Hàng <span class="text-danger">*</span></label>
                             <select name="month" class="form-control {{ $bag->has('month') ? 'is-invalid' : '' }}" required>
                                 @for ($m = 1; $m <= 12; $m++)
                                     <option value="{{ $m }}" {{ (int) old('month') === $m ? 'selected' : '' }}>

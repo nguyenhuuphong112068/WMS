@@ -9,7 +9,7 @@
 
 @if ($list->reception_status === 'waiting')
     <form action="{{ route($estRoute . 'receive') }}" method="POST" class="d-inline form-md-confirm"
-        data-title="Tiếp nhận phiếu dự trù {{ $list->code }}?"
+        data-title="Tiếp nhận phiếu mua hàng {{ $list->code }}?"
         data-text="Ghi nhận bạn là người tiếp nhận, thời điểm tiếp nhận là bây giờ.">
         @csrf
         <input type="hidden" name="id" value="{{ $list->id }}">

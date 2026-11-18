@@ -287,7 +287,7 @@
                                                 <td>
                                                     @if ($pickBlocked)
                                                         <span class="badge badge-danger emi-blocked-badge"
-                                                            title="{{ $pickStatus->message }}">Đã vượt ngưỡng, không được dự trù thêm</span>
+                                                            title="{{ $pickStatus->message }}">Đã vượt ngưỡng, không được mua hàng thêm</span>
                                                     @elseif ($pickStatus)
                                                         <span class="badge {{ $levelBadge[$pickStatus->level] ?? 'badge-light border' }}"
                                                             title="{{ $pickStatus->message }}">{{ $levelLabel[$pickStatus->level] ?? '' }}
@@ -298,7 +298,7 @@
                                                     @if ($pickStatus)
                                                         <button type="button" class="btn-est-thr-detail text-primary"
                                                             data-params="{{ json_encode(['category_id' => $deptCategory->id]) }}"
-                                                            title="Xem các lượng đóng góp: tồn theo lô, dự trù chưa hoàn thành">
+                                                            title="Xem các lượng đóng góp: tồn theo lô, mua hàng chưa hoàn thành">
                                                             <i class="fas fa-search-plus"></i> Chi tiết
                                                         </button>
                                                     @endif
@@ -322,7 +322,7 @@
                         <div class="emi-picker-foot">
                             <span class="emi-pick-count">Đã chọn 0 {{ $emi['itemLabel'] }}</span>
                             <button type="button" class="btn btn-sm btn-primary btn-emi-pick-apply" disabled>
-                                <i class="fas fa-arrow-down mr-1"></i> Thêm vào bảng dự trù
+                                <i class="fas fa-arrow-down mr-1"></i> Thêm vào bảng mua hàng
                             </button>
                         </div>
                     </div>

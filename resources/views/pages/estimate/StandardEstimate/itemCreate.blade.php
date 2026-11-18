@@ -9,7 +9,7 @@
 @include('pages.estimate.shared.batchItemCreate', [
     'emi' => [
         'kind' => 'standard',
-        'title' => 'Thêm Chất Chuẩn Dự Trù',
+        'title' => 'Thêm Chất Chuẩn Mua Hàng',
         'icon' => 'fas fa-vial-circle-check',
         'saveLabel' => 'Lưu chất chuẩn',
         'listField' => 'standard_estimate_id',

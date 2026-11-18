@@ -68,7 +68,6 @@ Route::prefix('/category')
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');
-            Route::post('approve', 'approve')->name('approve');
         });
 
         // Cấu hình riêng của từng phòng ban cho vật tư dùng chung - không có bước duyệt,

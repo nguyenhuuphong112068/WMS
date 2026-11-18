@@ -148,30 +148,30 @@ class LoginController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'changePasswordErrors')->with('activeForm', 'changePass');
+            return $this->backToChangePass($request)->withErrors($validator, 'changePasswordErrors');
         }
 
         if ($request->oldPassword === $request->newPassword) {
-            return redirect()->route('login')->with('error', 'Mật khẩu mới trùng mật khẩu hiện tại!')->with('activeForm', 'changePass');
+            return $this->backToChangePass($request, 'Mật khẩu mới trùng mật khẩu hiện tại!');
         }
 
         // 2️⃣ Lấy thông tin người dùng
-        $getUser = DB::table('user_management')->where('userName', '=', trim((string) $request->username))->first();
+        // Đang bị buộc đổi (lần đăng nhập đầu / hết hạn): dùng đúng tài khoản vừa đăng nhập, không lấy ô có thể bị trình duyệt tự điền
+        $changeUserName = $request->filled('forcedUser') ? trim((string) $request->forcedUser) : trim((string) $request->username);
+        $getUser = DB::table('user_management')->where('userName', '=', $changeUserName)->first();
 
         if (! $getUser) {
-            return back()->with('error', 'User Không tồn tại')->with('activeForm', 'changePass');
+            return $this->backToChangePass($request, 'User Không tồn tại');
         }
 
         // 3️⃣ Xác thực mật khẩu cũ
         if (! Hash::check($request->oldPassword, $getUser->passWord)) {
-            return back()->with('error', 'Mật khẩu hiện tại không đúng.')->with('activeForm', 'changePass');
+            return $this->backToChangePass($request, 'Mật khẩu hiện tại không đúng.');
         }
 
         // 4️⃣ §11.300(b) - không cho dùng lại mật khẩu cũ
         if ($this->passwordRecentlyUsed($getUser, $request->newPassword)) {
-            return back()
-                ->with('error', 'Mật khẩu mới trùng với một trong '.self::PASSWORD_HISTORY_DEPTH.' mật khẩu đã dùng gần đây. Vui lòng chọn mật khẩu khác.')
-                ->with('activeForm', 'changePass');
+            return $this->backToChangePass($request, 'Mật khẩu mới trùng với một trong '.self::PASSWORD_HISTORY_DEPTH.' mật khẩu đã dùng gần đây. Vui lòng chọn mật khẩu khác.');
         }
 
         // 5️⃣ Cập nhật mật khẩu mới (hash) + gia hạn + mở khoá
@@ -202,6 +202,24 @@ class LoginController extends Controller
     /* ==========================================================
      |  HÀM DÙNG CHUNG
      ========================================================== */
+
+    /**
+     * Quay lại form Đổi mật khẩu khi lỗi: giữ tên tài khoản đã nhập; nếu đang bị buộc đổi
+     * (lần đăng nhập đầu / hết hạn) thì giữ luôn tài khoản bị buộc để ô Tên tài khoản vẫn khoá,
+     * trình duyệt không tự điền tài khoản đã lưu khác (vd. Admin) vào.
+     */
+    private function backToChangePass(Request $request, ?string $error = null)
+    {
+        $response = redirect()->route('login')
+            ->withInput($request->only('username'))
+            ->with('activeForm', 'changePass');
+
+        if ($request->filled('forcedUser')) {
+            $response->with('pwExpiredUser', trim((string) $request->forcedUser));
+        }
+
+        return $error !== null ? $response->with('error', $error) : $response;
+    }
 
     /** Dựng session người dùng - KHÔNG lưu mật khẩu vào session (§11.300). */
     private function establishSession(Request $request, $getUser): void

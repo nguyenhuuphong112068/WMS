@@ -6,7 +6,7 @@
 <h3>Mở một màn hình</h3>
 <ol class="ug-steps">
     <li>Bấm icon của nhóm chức năng trên cột icon, ví dụ <b>Tồn kho</b>. Icon của nhóm chứa màn hình đang mở có vạch xanh bên trái.</li>
-    <li>Bảng con hiện ra bên cạnh. Với Danh Mục, Nhập, Sử Dụng, Tồn Kho, Dự Trù, Thống Kê, bảng con là các thẻ
+    <li>Bảng con hiện ra bên cạnh. Với Danh Mục, Nhập, Sử Dụng, Tồn Kho, Mua Hàng, Thống Kê, bảng con là các thẻ
         <b>Vật Tư</b> / <b>VPP</b> / <b>Hoá Chất</b> / <b>Chất Chuẩn</b>; Dữ Liệu Gốc chia theo nhóm (Tổ chức, Danh mục dùng chung...).</li>
     <li>Bấm thẻ hoặc dòng cần mở. <b>Trang chủ</b>, <b>CSDL</b> và <b>Cài Đặt Tablet</b> (hai mục sau chỉ Admin thấy) không có bảng con, bấm là mở thẳng.</li>
 </ol>

@@ -8,7 +8,7 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-ban"></i> Từ Chối Phiếu Dự Trù</h5>
+                <h5 class="modal-title"><i class="fas fa-ban"></i> Từ Chối Phiếu Mua Hàng</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
@@ -26,7 +26,7 @@
                         <label>Lý Do Từ Chối <span class="text-danger">*</span></label>
                         <textarea name="reject_reason" rows="3" maxlength="500"
                             class="form-control {{ $bag->has('reject_reason') ? 'is-invalid' : '' }}"
-                            placeholder="Ví dụ: Số lượng dự trù tháng 10 quá cao so với định mức sử dụng" required>{{ old('reject_reason') }}</textarea>
+                            placeholder="Ví dụ: Số lượng mua hàng tháng 10 quá cao so với định mức sử dụng" required>{{ old('reject_reason') }}</textarea>
                         @if ($bag->has('reject_reason'))
                             <span class="md-error">{{ $bag->first('reject_reason') }}</span>
                         @endif

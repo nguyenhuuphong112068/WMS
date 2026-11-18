@@ -1,21 +1,21 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
-<p>Tập trung mọi vật tư <b>đang cần mua</b> vào một chỗ, để lập phiếu dự trù chỉ bằng vài cú tick. Vật tư vào danh sách
+<p>Tập trung mọi vật tư <b>đang cần mua</b> vào một chỗ, để lập phiếu mua hàng chỉ bằng vài cú tick. Vật tư vào danh sách
     từ 3 nguồn (lọc được theo cột <b>Nguồn</b>):</p>
-@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/can-du-tru.png', 'caption' => 'Màn hình Dự Trù › Vật Tư › tab Danh sách vật tư cần dự trù'])
+@include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/material/can-du-tru.png', 'caption' => 'Màn hình Mua Hàng › Vật Tư › tab Danh sách vật tư cần mua hàng'])
 <ol>
     <li><b>Dưới ngưỡng tối thiểu</b>: tồn của phòng đang dưới <b>Ngưỡng Tồn Tối Thiểu</b> khai ở Vật Tư Của Phòng. Tự động.</li>
-    <li><b>Người dùng đề nghị</b>: người dùng bấm <b>Đề nghị dự trù vật tư</b> (bắt buộc nhập lý do) trên dòng đề nghị cấp phát
+    <li><b>Người dùng đề nghị</b>: người dùng bấm <b>Đề nghị mua hàng vật tư</b> (bắt buộc nhập lý do) trên dòng đề nghị cấp phát
         hoặc trên danh mục Vật Tư Của Phòng.</li>
-    <li><b>Thiếu tồn khả dụng cho tháng ...</b>: các dòng <b>Không đáp ứng</b> và dòng <b>Vừa đủ</b> có Cần Dự Trù &gt; 0 ở <a href="#kha-dung-thang-toi">Khả dụng tháng tới</a>.
-        Tự động, số lượng gợi ý = Cần Dự Trù. Nhãn trên từng dòng ghi lý do cụ thể (<i>Thiếu X so với nhu cầu tháng MM/YYYY…</i> hoặc <i>Hết tháng MM/YYYY dư X &lt; ngưỡng tối thiểu Y</i>), lý do này điền sẵn vào <b>Lý do dự trù</b>.</li>
+    <li><b>Thiếu tồn khả dụng cho tháng ...</b>: các dòng <b>Không đáp ứng</b> và dòng <b>Vừa đủ</b> có Cần Mua Hàng &gt; 0 ở <a href="#kha-dung-thang-toi">Khả dụng tháng tới</a>.
+        Tự động, số lượng gợi ý = Cần Mua Hàng. Nhãn trên từng dòng ghi lý do cụ thể (<i>Thiếu X so với nhu cầu tháng MM/YYYY…</i> hoặc <i>Hết tháng MM/YYYY dư X &lt; ngưỡng tối thiểu Y</i>), lý do này điền sẵn vào <b>Lý do mua hàng</b>.</li>
 </ol>
 
-<h3>Lập phiếu dự trù từ danh sách</h3>
+<h3>Lập phiếu mua hàng từ danh sách</h3>
 <ol class="ug-steps">
     <li>Tick chọn các vật tư cần mua (một vật tư thuộc nhiều nguồn chỉ hiện một dòng).</li>
     <li>Khai số lượng và tháng cần dùng cho từng dòng.</li>
-    <li>Lưu. Hệ thống tạo phiếu dự trù <b>Nháp</b> và mở thẳng trang chi tiết để bổ sung rồi <a href="#du-tru">trình ký</a>.</li>
+    <li>Lưu. Hệ thống tạo phiếu mua hàng <b>Nháp</b> và mở thẳng trang chi tiết để bổ sung rồi <a href="#du-tru">trình ký</a>.</li>
 </ol>
 
 <div class="ug-callout">

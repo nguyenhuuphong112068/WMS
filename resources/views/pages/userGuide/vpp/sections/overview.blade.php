@@ -34,7 +34,7 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">6</span>
         <b>Bổ sung hàng</b>
-        (chỉ Hành Chánh) <a href="#can-du-tru">VPP cần dự trù</a> → <a href="#du-tru">Phiếu dự trù</a> → Hành Chánh mua → quay lại bước 2
+        (chỉ Hành Chánh) <a href="#can-du-tru">VPP cần mua hàng</a> → <a href="#du-tru">Phiếu mua hàng</a> → Hành Chánh mua → quay lại bước 2
     </div>
 </div>
 
@@ -50,7 +50,7 @@
     <li><a href="#de-nghi-vpp">Đề nghị VPP đến HC</a>: cách lấy VPP thường dùng nhất - xin từ kho VPP của phòng Hành Chánh.</li>
     <li><a href="#lien-phong-ban">Đề nghị liên phòng ban</a>: xin VPP từ kho của một phòng khác (không phải Hành Chánh).</li>
     <li><a href="#cach-ly">Cách ly - Loại bỏ - Huỷ</a>: xử lý VPP hỏng, hết hạn.</li>
-    <li><a href="#danh-sach-chu-ky">Danh sách theo chu kỳ</a>: hệ thống tự tạo đề nghị hoặc phiếu dự trù định kỳ.</li>
+    <li><a href="#danh-sach-chu-ky">Danh sách theo chu kỳ</a>: hệ thống tự tạo đề nghị hoặc phiếu mua hàng định kỳ.</li>
 </ul>
 
 <div class="ug-callout">

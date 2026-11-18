@@ -54,7 +54,7 @@
                     <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-user-shield"></i></span> ở màn hình User.</td>
             </tr>
             <tr>
-                <td>Không có tên trong danh sách người ký dự trù</td>
+                <td>Không có tên trong danh sách người ký mua hàng</td>
                 <td style="font-weight: 400">Cần vai trò <b>Quản Lý Bộ Phân</b> (bước 1) hoặc <b>Ban Giám Đốc</b> (bước 2) với phạm vi
                     gồm đúng phòng lập phiếu.</td>
             </tr>

@@ -74,9 +74,9 @@ class MaterialEstimateController extends Controller
 
     private const CHAT_TYPE = 'material';
 
-    private const LABEL = 'phiếu dự trù vật tư';
+    private const LABEL = 'phiếu mua hàng vật tư';
 
-    private const ITEM_LABEL = 'vật tư dự trù';
+    private const ITEM_LABEL = 'vật tư mua hàng';
 
     private const EDITABLE_STATUSES = ['draft', 'rejected'];
 
@@ -85,7 +85,7 @@ class MaterialEstimateController extends Controller
     {
         return [
             'amount_fk' => 'material_estimate_item_id',
-            'title' => 'DỰ TRÙ VẬT TƯ',
+            'title' => 'MUA HÀNG VẬT TƯ',
             'file_prefix' => 'DuTruVatTu',
             'code_label' => 'Mã Vật Tư',
             'name_label' => 'Vật Tư',
@@ -165,7 +165,7 @@ class MaterialEstimateController extends Controller
             ? $request->query('tab')
             : (in_array(session('activeTab'), $tabs, true) ? session('activeTab') : ($tabs[0] ?? null));
 
-        session()->put(['title' => 'DỰ TRÙ - DỰ TRÙ VẬT TƯ']);
+        session()->put(['title' => 'MUA HÀNG - MUA HÀNG VẬT TƯ']);
 
         return view('pages.estimate.MaterialEstimate.list', [
             'datas' => $datas,
@@ -203,7 +203,7 @@ class MaterialEstimateController extends Controller
                 ->with('error', 'Không tìm thấy '.self::LABEL.' của phòng ban đang chọn!');
         }
 
-        session()->put(['title' => 'DỰ TRÙ - CHI TIẾT PHIẾU '.$list->code]);
+        session()->put(['title' => 'MUA HÀNG - CHI TIẾT PHIẾU '.$list->code]);
 
         $signs = $this->signRows([$list->id])->get($list->id, collect());
         $pendingSign = $this->pendingSign($list, $signs);
@@ -256,7 +256,7 @@ class MaterialEstimateController extends Controller
         }
 
         return redirect()->back()
-            ->with('success', 'Đã bỏ ghi nhớ vật tư cần dự trù!')
+            ->with('success', 'Đã bỏ ghi nhớ vật tư cần mua hàng!')
             ->with('activeTab', 'watchlist');
     }
 
@@ -376,7 +376,7 @@ class MaterialEstimateController extends Controller
             self::TABLE,
             $result['id'],
             'NA',
-            'Lập '.self::LABEL.' '.$result['code'].' từ danh sách vật tư cần dự trù ('.count($items).' mục)'
+            'Lập '.self::LABEL.' '.$result['code'].' từ danh sách vật tư cần mua hàng ('.count($items).' mục)'
         );
 
         return redirect()->route(self::EST_ROUTE.'detail', ['id' => $result['id']])
@@ -414,7 +414,7 @@ class MaterialEstimateController extends Controller
         });
 
         return redirect()->route('pages.estimate.materialEstimate.detail', ['id' => $result['id']])
-            ->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'! Hãy khai các vật tư cần dự trù.');
+            ->with('success', 'Đã tạo '.self::LABEL.' mã '.$result['code'].'! Hãy khai các vật tư cần mua hàng.');
     }
 
     public function update(Request $request)
@@ -442,7 +442,7 @@ class MaterialEstimateController extends Controller
 
         if ($current->app_status !== 'draft') {
             AuditTrialController::log('Cập nhật', self::TABLE, $current->id, $current->code, $current->code);
-            self::writeHistory($current->id, 'Sửa phiếu', null, $current->app_status, $current->app_status, 'Cập nhật thông tin phiếu dự trù.');
+            self::writeHistory($current->id, 'Sửa phiếu', null, $current->app_status, $current->app_status, 'Cập nhật thông tin phiếu mua hàng.');
         }
 
         return redirect()->back()->with('success', 'Cập nhật '.self::LABEL.' thành công!');
@@ -492,7 +492,7 @@ class MaterialEstimateController extends Controller
             'material_estimate_item_id' => ['required', 'integer'],
         ], [
             'attachments.required' => 'Vui lòng chọn file cần đính kèm.',
-            'material_estimate_item_id.required' => 'File đính kèm phải gắn với một mục dự trù.',
+            'material_estimate_item_id.required' => 'File đính kèm phải gắn với một mục mua hàng.',
             'attachments.max' => 'Mỗi lần tải tối đa 20 file.',
             'attachments.*.file' => 'File tải lên không hợp lệ.',
             'attachments.*.max' => 'Mỗi file tối đa 20MB.',
@@ -802,7 +802,7 @@ class MaterialEstimateController extends Controller
             self::writeHistory($list->id, 'Xoá mặt hàng', null, $list->app_status, $list->app_status, 'Xoá mặt hàng khỏi phiếu.');
         }
 
-        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu dự trù!');
+        return redirect()->back()->with('success', 'Đã xoá '.self::ITEM_LABEL.' khỏi phiếu mua hàng!');
     }
 
     /**
@@ -813,7 +813,7 @@ class MaterialEstimateController extends Controller
     public function updateItemStatus(Request $request)
     {
         if (! user_can(self::TRACK_PERMISSION)) {
-            return redirect()->back()->with('error', 'Bạn không có quyền cập nhật trạng thái mục dự trù!');
+            return redirect()->back()->with('error', 'Bạn không có quyền cập nhật trạng thái mục mua hàng!');
         }
 
         $request->validate([
@@ -887,7 +887,7 @@ class MaterialEstimateController extends Controller
             ->first();
 
         if (! $amount) {
-            return response()->json(['success' => false, 'message' => 'Không tìm thấy tháng dự trù cần hẹn ngày!']);
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy tháng mua hàng cần hẹn ngày!']);
         }
 
         $month = \Carbon\Carbon::parse($amount->for_month_year)->format('m/Y');
@@ -960,7 +960,7 @@ class MaterialEstimateController extends Controller
         ]);
 
         if (! user_can(self::CHAT_PERMISSION)) {
-            return response()->json(['success' => false, 'message' => 'Bạn không có quyền trao đổi ở mục dự trù!']);
+            return response()->json(['success' => false, 'message' => 'Bạn không có quyền trao đổi ở mục mua hàng!']);
         }
 
         // Phòng đề nghị (phiếu của phòng đang chọn) hoặc bộ phận mua hàng phụ trách mục
@@ -1725,14 +1725,14 @@ class MaterialEstimateController extends Controller
     private function watchlistItemMessages(): array
     {
         return [
-            'items.required' => 'Vui lòng chọn ít nhất một vật tư để lập phiếu dự trù.',
-            'items.min' => 'Vui lòng chọn ít nhất một vật tư để lập phiếu dự trù.',
+            'items.required' => 'Vui lòng chọn ít nhất một vật tư để lập phiếu mua hàng.',
+            'items.min' => 'Vui lòng chọn ít nhất một vật tư để lập phiếu mua hàng.',
             'items.*.category_id.exists' => 'Vật tư được chọn không tồn tại trong danh mục.',
             'items.*.material_name.max' => 'Tên vật tư tối đa 255 ký tự.',
             'items.*.purpose.max' => 'Mục đích sử dụng tối đa 1000 ký tự.',
-            'items.*.amount.required' => 'Vui lòng nhập số lượng dự trù cho mọi vật tư đã chọn.',
-            'items.*.amount.numeric' => 'Số lượng dự trù phải là số.',
-            'items.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.amount.required' => 'Vui lòng nhập số lượng mua hàng cho mọi vật tư đã chọn.',
+            'items.*.amount.numeric' => 'Số lượng mua hàng phải là số.',
+            'items.*.amount.min' => 'Số lượng mua hàng phải lớn hơn 0.',
             'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính cho mọi vật tư đã chọn.',
             'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
             'items.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng cho mọi vật tư đã chọn.',
@@ -1761,10 +1761,10 @@ class MaterialEstimateController extends Controller
     private function messages(): array
     {
         return [
-            'month.required' => 'Vui lòng chọn tháng dự trù.',
-            'month.between' => 'Tháng dự trù phải từ 1 đến 12.',
-            'year.required' => 'Vui lòng nhập năm dự trù.',
-            'year.between' => 'Năm dự trù không hợp lệ.',
+            'month.required' => 'Vui lòng chọn tháng mua hàng.',
+            'month.between' => 'Tháng mua hàng phải từ 1 đến 12.',
+            'year.required' => 'Vui lòng nhập năm mua hàng.',
+            'year.between' => 'Năm mua hàng không hợp lệ.',
             'note.max' => 'Ghi chú tối đa 500 ký tự.',
         ];
     }
@@ -1845,8 +1845,8 @@ class MaterialEstimateController extends Controller
             'items.*.expected_delivery_date.date' => 'Ngày mong muốn giao không hợp lệ.',
             'items.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
             'items.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
-            'items.*.amounts.*.numeric' => 'Số lượng dự trù phải là số.',
-            'items.*.amounts.*.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'items.*.amounts.*.numeric' => 'Số lượng mua hàng phải là số.',
+            'items.*.amounts.*.min' => 'Số lượng mua hàng phải lớn hơn 0.',
             'items.*.files.max' => 'Mỗi vật tư đính kèm tối đa 10 file.',
             'items.*.files.*.file' => 'File đính kèm không hợp lệ.',
             'items.*.files.*.max' => 'Mỗi file đính kèm tối đa 20MB.',
@@ -1871,9 +1871,9 @@ class MaterialEstimateController extends Controller
             'part_number.max' => 'Part Number tối đa 100 ký tự.',
             'amounts.required' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
             'amounts.min' => 'Vui lòng khai ít nhất một dòng số lượng theo tháng.',
-            'amounts.*.amount.required' => 'Vui lòng nhập số lượng dự trù.',
-            'amounts.*.amount.numeric' => 'Số lượng dự trù phải là số.',
-            'amounts.*.amount.min' => 'Số lượng dự trù phải lớn hơn 0.',
+            'amounts.*.amount.required' => 'Vui lòng nhập số lượng mua hàng.',
+            'amounts.*.amount.numeric' => 'Số lượng mua hàng phải là số.',
+            'amounts.*.amount.min' => 'Số lượng mua hàng phải lớn hơn 0.',
             'amounts.*.unit_id.required' => 'Vui lòng chọn đơn vị tính.',
             'amounts.*.unit_id.exists' => 'Đơn vị tính không hợp lệ.',
             'amounts.*.for_month_year.required' => 'Vui lòng chọn tháng cần dùng.',

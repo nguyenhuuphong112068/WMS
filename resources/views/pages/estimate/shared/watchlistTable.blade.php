@@ -25,7 +25,7 @@
 
         @if (user_can('estimate_' . $wlKind . '_create'))
             <button type="button" class="btn btn-primary btn-sm btn-wl-estimate" disabled>
-                <i class="fas fa-clipboard-check mr-1"></i> Lập phiếu dự trù <span class="wl-count"></span>
+                <i class="fas fa-clipboard-check mr-1"></i> Lập phiếu mua hàng <span class="wl-count"></span>
             </button>
         @endif
     </div>
@@ -82,10 +82,10 @@
                     class="{{ $wlLocked ? 'is-wl-progress' : '' }}">
                     <td class="text-center">
                         @if ($wlBlocked)
-                            <i class="fas fa-ban wl-lock text-danger" title="Đã vượt ngưỡng PL IV, không được dự trù thêm"></i>
+                            <i class="fas fa-ban wl-lock text-danger" title="Đã vượt ngưỡng PL IV, không được mua hàng thêm"></i>
                         @elseif ($item->in_progress)
                             {{-- Đã có phiếu chưa xong - không chọn lại được --}}
-                            <i class="fas fa-lock wl-lock" title="Đã lập phiếu, chờ xử lý xong mới dự trù lại được"></i>
+                            <i class="fas fa-lock wl-lock" title="Đã lập phiếu, chờ xử lý xong mới mua hàng lại được"></i>
                         @else
                             <input type="checkbox" class="js-wl-check" value="{{ $loop->index }}">
                         @endif
@@ -129,7 +129,7 @@
                         @endif
                         @foreach ($item->in_progress as $ref)
                             <div class="md-sub mt-1">
-                                <a href="{{ route($estRoute . 'detail', ['id' => $ref['id']]) }}" class="md-badge wl-progress" title="Mở phiếu dự trù">
+                                <a href="{{ route($estRoute . 'detail', ['id' => $ref['id']]) }}" class="md-badge wl-progress" title="Mở phiếu mua hàng">
                                     <i class="fas fa-file-signature mr-1"></i>Đã lập {{ $ref['code'] }} · {{ $ref['status'] }}
                                 </a>
                             </div>
@@ -226,7 +226,7 @@
             "columnDefs": [{ "orderable": false, "targets": [0] }],
             "language": {
                 "url": "{{ asset('dataTable/plugins/datatables/i18n/vi.json') }}",
-                "emptyTable": @json('Không có ' . $wlLabel . ' nào cần dự trù')
+                "emptyTable": @json('Không có ' . $wlLabel . ' nào cần mua hàng')
             }
         });
 

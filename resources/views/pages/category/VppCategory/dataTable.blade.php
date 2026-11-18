@@ -16,7 +16,7 @@
                 @endperm
 
                 <div class="md-filter">
-                    <label for="mdClassFilter"><i class="fas fa-filter mr-1"></i> Nhóm dự trù</label>
+                    <label for="mdClassFilter"><i class="fas fa-filter mr-1"></i> Nhóm mua hàng</label>
                     <select id="mdClassFilter" class="form-control form-control-sm" multiple
                         data-placeholder="Tất cả">
                         <option value="none">Chưa phân loại</option>
@@ -31,8 +31,6 @@
             </div>
         </div>
 
-        @include('pages.category.shared.approvalFilter', ['apfTarget' => 'mdTable'])
-
         <div class="table-responsive">
             <table id="mdTable" class="table table-bordered table-hover w-100" data-deferred>
                 <thead>
@@ -42,10 +40,9 @@
                         <th>Tên VPP</th>
                         <th>Nhà Sản Xuất</th>
                         <th class="text-center" style="width: 80px">Đơn Vị</th>
-                        <th style="width: 190px">Nhóm Dự Trù</th>
+                        <th style="width: 190px">Nhóm Mua Hàng</th>
                         <th style="width: 120px">Người Tạo</th>
                         <th class="text-center" style="width: 100px">Ngày Tạo</th>
-                        <th class="text-center" style="width: 125px">Duyệt</th>
                         <th class="text-center" style="width: 100px">Sử Dụng</th>
                         <th class="text-center" style="width: 215px">Thao Tác</th>
                     </tr>
@@ -58,11 +55,10 @@
                             $chips = VppClassification::chips($row->classification);
                             // Chuỗi "tiêu chí:giá trị" để bộ lọc phía trên đọc được mà không phải dò chữ
                             $classKeys = collect($classification)->map(fn($value, $key) => $key . ':' . $value)->implode(' ');
-                            // Màu nền mã theo tình trạng: khoá thắng duyệt, chưa duyệt thì vẫn vàng chờ
-                            $catCodeStatus = $row->status_id == 0 ? 'locked' : ($row->app_status === 'approved' ? 'approved' : 'pending');
+                            // Danh mục VPP không qua bước duyệt - màu nền mã chỉ theo khoá / hoạt động
+                            $catCodeStatus = $row->status_id == 0 ? 'locked' : 'approved';
                         @endphp
                         <tr data-classification="{{ $classKeys }}"
-                            data-approval="{{ $row->status_id == 0 ? 'locked' : ($row->app_status ?: 'pending') }}"
                             data-purchasing="{{ $row->purchasing_department ? 'purchasing_department:' . $row->purchasing_department : '' }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td><span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span></td>
@@ -99,9 +95,6 @@
                             <td class="md-sub">{{ $row->updated_by ?: $row->created_by ?: '—' }}</td>
                             <td class="text-center md-sub">
                                 {{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '—' }}
-                            </td>
-                            <td class="text-center">
-                                @include('pages.materData.shared.appStatus', ['row' => $row])
                             </td>
                             <td class="text-center">
                                 @if ($row->status_id == 1)

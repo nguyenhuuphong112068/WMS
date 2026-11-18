@@ -276,7 +276,7 @@ class VppPeriodicRequestController extends Controller
         if ($current->type === VppPeriodicRequest::TYPE_ESTIMATE) {
             return redirect()
                 ->route('pages.estimate.vppEstimate.detail', ['id' => $result['id']])
-                ->with('success', 'Đã lập phiếu dự trù '.$result['code'].' ở trạng thái Nháp. Kiểm tra, điều chỉnh rồi trình ký.');
+                ->with('success', 'Đã lập phiếu mua hàng '.$result['code'].' ở trạng thái Nháp. Kiểm tra, điều chỉnh rồi trình ký.');
         }
 
         return redirect()
@@ -531,10 +531,10 @@ class VppPeriodicRequestController extends Controller
             'items.*.requested_amount.numeric' => 'Số lượng đề nghị phải là số.',
             'items.*.requested_amount.min' => 'Số lượng đề nghị phải lớn hơn 0.',
             'items.*.purpose.max' => 'Mục đích sử dụng tối đa 500 ký tự.',
-            'items.*.requested_unit.required' => 'Vui lòng chọn đơn vị cho mọi dòng VPP dự trù.',
+            'items.*.requested_unit.required' => 'Vui lòng chọn đơn vị cho mọi dòng VPP mua hàng.',
             'items.*.requested_unit.exists' => 'Đơn vị không hợp lệ.',
-            'estimate_month_offset.required' => 'Vui lòng chọn tháng dự trù.',
-            'estimate_month_offset.in' => 'Tháng dự trù không hợp lệ.',
+            'estimate_month_offset.required' => 'Vui lòng chọn tháng mua hàng.',
+            'estimate_month_offset.in' => 'Tháng mua hàng không hợp lệ.',
         ];
     }
 

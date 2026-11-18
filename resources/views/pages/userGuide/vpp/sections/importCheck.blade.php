@@ -1,4 +1,4 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
 <p>Tab <b>Nhập VPP</b> (trước đây là "Chờ kiểm tra", nay đứng trước tab Sổ nhập VPP) liệt kê các lô vừa nhập, đang nằm trong khu Biệt Trữ chờ kiểm tra; dưới mỗi mã xuất nhập có <b>mã VPP</b>. Nút <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-plus mr-1"></i> Nhập VPP</span> để <a href="#nhap-vat-tu">tạo phiếu nhập</a> nằm ở tab này. Kiểm tra xong, lô mới được vào tồn và được đề
     nghị, cấp phát.</p>

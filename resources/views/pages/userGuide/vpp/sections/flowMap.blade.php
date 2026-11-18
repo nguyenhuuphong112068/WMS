@@ -22,7 +22,7 @@
 <div class="ugfm">
     <div class="ugfm-bar">
         <div class="ugfm-keys">
-            <button type="button" class="ugfm-key k1" data-lane="du-tru"><span class="bnum">1</span> Dự trù mua hàng</button>
+            <button type="button" class="ugfm-key k1" data-lane="du-tru"><span class="bnum">1</span> Mua hàng</button>
             <button type="button" class="ugfm-key k2" data-lane="vpp"><span class="bnum">2</span> Đề nghị VPP đến HC</button>
             <button type="button" class="ugfm-key k2" data-lane="lien-phong-ban"><span class="bnum">2</span> Liên phòng ban</button>
             <button type="button" class="ugfm-key k3" data-lane="noi-bo"><span class="bnum">3</span> Sử dụng - ghi sổ</button>
@@ -42,7 +42,7 @@
                     <th class="m-col DM"><span class="page-ico"></span>Danh Mục › VPP</th>
                     <th class="m-col TK"><span class="page-ico"></span>Tồn Kho › VPP</th>
                     <th class="m-col SD"><span class="page-ico"></span>Đề Nghị - Sử Dụng › VPP</th>
-                    <th class="m-col DT"><span class="page-ico"></span>Dự Trù › VPP</th>
+                    <th class="m-col DT"><span class="page-ico"></span>Mua Hàng › VPP</th>
                     <th class="m-col NH"><span class="page-ico"></span>Nhập › VPP</th>
                     <th class="m-col KQ"><span class="page-ico"></span>Tồn kho thay đổi</th>
                 </tr>
@@ -50,17 +50,17 @@
             <tbody>
                 {{-- 1. Dự trù mua hàng: chỉ phòng Hành Chánh (kho VPP) lập, tự tiếp nhận --}}
                 <tr class="m-row m1" data-lane="du-tru">
-                    <th class="m-lane"><span class="bnum">1</span><span class="m-lane-t"><b>Dự trù mua hàng</b><span>chỉ Hành Chánh lập · kho VPP tự mua về</span></span></th>
+                    <th class="m-lane"><span class="bnum">1</span><span class="m-lane-t"><b>Mua hàng</b><span>chỉ Hành Chánh lập · kho VPP tự mua về</span></span></th>
                     <td class="m-cell DM"><div class="m-flow">
-                        <a class="m-src m-node" data-to="1" href="#danh-sach-chu-ky"><b>DS dự trù theo chu kỳ</b><span>của HC · tự lập phiếu Nháp</span></a>
+                        <a class="m-src m-node" data-to="1" href="#danh-sach-chu-ky"><b>DS mua hàng theo chu kỳ</b><span>của HC · tự lập phiếu Nháp</span></a>
                         <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Kho VPP HC dưới ngưỡng</b><span>tự động</span></a>
-                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Nút Đề nghị dự trù VPP</b><span>VPP của phòng HC</span></a>
+                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Nút Đề nghị mua hàng VPP</b><span>VPP của phòng HC</span></a>
                     </div></td>
                     <td class="m-cell TK pass"></td>
                     <td class="m-cell SD pass"></td>
                     <td class="m-cell DT"><div class="m-flow">
                         <div class="m-act"><span>gom</span></div>
-                        <a class="m-doc m-node" data-n="0" href="#can-du-tru"><span class="k">tab DS VPP cần dự trù</span><span class="s">Chưa lập phiếu</span></a>
+                        <a class="m-doc m-node" data-n="0" href="#can-du-tru"><span class="k">tab DS VPP cần mua hàng</span><span class="s">Chưa lập phiếu</span></a>
                         <div class="m-act"><span>HC lập phiếu</span></div>
                         <a class="m-doc m-node" data-n="1" href="#du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Nháp</span></a>
                         <div class="m-act"><span>trình ký</span></div>
@@ -70,15 +70,15 @@
                         <div class="m-act"><span>ký bước 2</span></div>
                         <a class="m-doc m-node" data-n="4" href="#theo-doi-du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Đã phê duyệt · Chờ tiếp nhận</span></a>
                         <div class="m-act"><span>kho VPP HC tiếp nhận · hẹn ngày</span></div>
-                        <a class="m-doc m-node" data-n="5" href="#theo-doi-du-tru"><span class="k">tab Đơn dự trù đã được phê duyệt</span><span class="s">Đang giải quyết</span></a>
+                        <a class="m-doc m-node" data-n="5" href="#theo-doi-du-tru"><span class="k">tab Đơn mua hàng đã được phê duyệt</span><span class="s">Đang giải quyết</span></a>
                     </div></td>
                     <td class="m-cell NH"><div class="m-flow">
                         <div class="m-act"><span>hàng về · lập phiếu nhập</span></div>
                         <a class="m-doc m-node" data-n="6" href="#cho-kiem-tra"><span class="k">tab Chờ kiểm tra</span><span class="s">Chờ kiểm tra</span></a>
                         <div class="m-act"><span>kiểm tra Đạt</span></div>
                         <a class="m-doc m-node" data-n="7" href="#nhap-vat-tu"><span class="k">tab Sổ nhập VPP</span><span class="s">Lô vào tồn</span></a>
-                        <div class="m-act"><span>kho VPP HC xác nhận ở Dự Trù</span></div>
-                        <a class="m-doc m-node done" data-n="8" href="#theo-doi-du-tru"><span class="k">tab Theo dõi dự trù</span><span class="s">Hoàn thành</span></a>
+                        <div class="m-act"><span>kho VPP HC xác nhận ở Mua Hàng</span></div>
+                        <a class="m-doc m-node done" data-n="8" href="#theo-doi-du-tru"><span class="k">tab Theo dõi mua hàng</span><span class="s">Hoàn thành</span></a>
                     </div></td>
                     <td class="m-cell KQ"><div class="m-flow">
                         <div class="m-eff m-node up" data-from="7">▲ Kho VPP Hành Chánh tăng</div>
@@ -90,7 +90,7 @@
                     <th class="m-lane"><span class="bnum">2</span><span class="m-lane-t"><b>Đề nghị VPP đến HC</b><span>chuyển kho · phòng xin kho VPP Hành Chánh</span></span></th>
                     <td class="m-cell DM"><div class="m-flow">
                         <a class="m-src m-node" data-to="1" href="#danh-sach-chu-ky"><b>DS liên phòng ban theo chu kỳ</b><span>phòng cấp là HC</span></a>
-                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Dưới ngưỡng · nút Đề nghị dự trù VPP</b><span>VPP của phòng</span></a>
+                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Dưới ngưỡng · nút Đề nghị mua hàng VPP</b><span>VPP của phòng</span></a>
                     </div></td>
                     <td class="m-cell TK pass"></td>
                     <td class="m-cell SD"><div class="m-flow">
@@ -229,12 +229,12 @@
         </thead>
         <tbody>
             <tr>
-                <td><span class="ugfm-no k1">1</span> Dự trù mua hàng</td>
-                <td><b>Chỉ phòng Hành Chánh</b> (kho VPP) lập; phòng khác không dự trù VPP mà đi đường 2. VPP cần mua của kho Hành Chánh
-                    được gom vào <a href="#can-du-tru">Danh sách VPP cần dự trù</a> từ 2 nguồn (dưới ngưỡng, nút Đề nghị dự trù VPP), hoặc lập sẵn bằng <a href="#danh-sach-chu-ky">DS dự trù theo chu kỳ</a>.
+                <td><span class="ugfm-no k1">1</span> Mua hàng</td>
+                <td><b>Chỉ phòng Hành Chánh</b> (kho VPP) lập; phòng khác không mua hàng VPP mà đi đường 2. VPP cần mua của kho Hành Chánh
+                    được gom vào <a href="#can-du-tru">Danh sách VPP cần mua hàng</a> từ 2 nguồn (dưới ngưỡng, nút Đề nghị mua hàng VPP), hoặc lập sẵn bằng <a href="#danh-sach-chu-ky">DS mua hàng theo chu kỳ</a>.
                     Phiếu <a href="#du-tru">ký 2 bước</a> (Quản Lý Bộ Phận Hành Chánh, Ban Giám Đốc) rồi chính kho VPP Hành Chánh
                     <a href="#theo-doi-du-tru">tiếp nhận</a>, hẹn ngày đáp ứng. Hàng về được <a href="#nhap-vat-tu">nhập kho</a>,
-                    <a href="#cho-kiem-tra">kiểm tra Đạt</a> thì mới vào tồn; kho VPP Hành Chánh bấm <b>Hoàn thành</b> mục dự trù.</td>
+                    <a href="#cho-kiem-tra">kiểm tra Đạt</a> thì mới vào tồn; kho VPP Hành Chánh bấm <b>Hoàn thành</b> mục mua hàng.</td>
                 <td>Kho VPP Hành Chánh tăng khi lô kiểm tra Đạt.</td>
             </tr>
             <tr>

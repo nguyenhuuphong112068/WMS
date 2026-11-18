@@ -56,7 +56,8 @@
                                 <th class="text-center" style="width: 45px">STT</th>
                                 <th style="width: 165px">Mã Xuất Nhập</th>
                                 <th>VPP</th>
-                                <th style="width: 150px">Nhóm Dự Trù</th>
+                                <th style="width: 130px">Loại Nhập</th>
+                                <th style="width: 150px">Nhóm Mua Hàng</th>
                                 <th class="text-right" style="width: 110px">Số Lượng</th>
                                 <th style="width: 110px">Số Lô</th>
                                 <th style="width: 120px">Số Hoá Đơn</th>

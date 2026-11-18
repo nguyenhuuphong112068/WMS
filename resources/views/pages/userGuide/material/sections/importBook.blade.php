@@ -1,4 +1,4 @@
-@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
+@include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Mua hàng'])
 
 <p>Ghi nhận từng lô vật tư nhập vào kho của phòng đang chọn. Mỗi lô có một <b>mã xuất nhập</b> riêng. Lô mới nhập
     luôn ở trạng thái <span class="badge badge-warning">Chờ kiểm tra</span> và <b>chưa cộng vào tồn</b> cho tới khi

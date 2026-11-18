@@ -89,6 +89,7 @@
                                     <th class="text-center" style="width: 45px">STT</th>
                                     <th style="width: 165px">Mã Ống Chuẩn</th>
                                     <th>Chất Chuẩn</th>
+                                    <th style="width: 130px">Loại Nhập</th>
                                     <th style="width: 175px">Đặc Tính</th>
                                     <th class="text-right" style="width: 95px">Số Lượng</th>
                                     <th style="width: 100px">Số Lô</th>
@@ -150,6 +151,7 @@
                                                 @endif
                                             </div>
                                         </td>
+                                        <td>@include('pages.import.shared.importKind', ['row' => $row])</td>
                                         <td>
                                             @if ($hasProperties)
                                                 @if ($row->standard_form)

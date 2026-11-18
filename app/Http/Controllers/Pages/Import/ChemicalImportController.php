@@ -118,6 +118,8 @@ class ChemicalImportController extends Controller
                 'chem_names.name',
                 'suppliers.name',
                 'locations.code',
+                'from_dept.name',
+                'from_dept.shortName',
             ], $bookKeyword))
             ->orderBy(self::TABLE.'.imported_date', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')

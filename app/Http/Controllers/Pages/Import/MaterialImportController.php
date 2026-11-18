@@ -84,6 +84,8 @@ class MaterialImportController extends Controller
                 'material_categories.technical_specification',
                 'locations.code',
                 self::TABLE.'.note',
+                'from_dept.name',
+                'from_dept.shortName',
             ], $bookKeyword))
             ->orderBy(self::TABLE.'.imported_date', 'desc')
             ->orderBy(self::TABLE.'.id', 'desc')
@@ -181,6 +183,9 @@ class MaterialImportController extends Controller
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
             ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
             ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            // Loại nhập: lô nhận chuyển từ phòng ban khác (source_export_id) -> phòng đã cấp phát
+            ->leftJoin('material_exports as kind_export', self::TABLE.'.source_export_id', '=', 'kind_export.id')
+            ->leftJoin('deparments as from_dept', 'kind_export.department_id', '=', 'from_dept.id')
             ->select(
                 self::TABLE.'.*',
                 'material_categories.code as category_code',
@@ -198,7 +203,9 @@ class MaterialImportController extends Controller
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',
-                'tiers.name as tier_name'
+                'tiers.name as tier_name',
+                'from_dept.name as from_department_name',
+                'from_dept.shortName as from_department_short'
             )
             ->where(self::TABLE.'.department_id', $departmentId);
     }
