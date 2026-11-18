@@ -1,7 +1,13 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
 
-<p>Phòng lập <b>phiếu dự trù</b> để đề nghị <b>Hành Chánh</b> (bộ phận mua hàng của VPP) mua VPP cho một hoặc nhiều tháng. Phiếu phải được
-    ký đủ 2 bước mới chuyển tới Hành Chánh.</p>
+<p><b>Chỉ phòng Hành Chánh</b> (phòng giữ kho VPP, cũng là bộ phận mua VPP) lập <b>phiếu dự trù</b> để mua VPP cho một hoặc nhiều
+    tháng. Các phòng khác không dự trù VPP mà lấy VPP từ kho Hành Chánh qua <a href="#de-nghi-vpp">Đề nghị VPP đến Hành Chánh</a>.
+    Phiếu phải được ký đủ 2 bước rồi kho VPP Hành Chánh tự tiếp nhận.</p>
+<div class="ug-callout">
+    <i class="fas fa-lock"></i>
+    <div>Đang chọn phòng khác Hành Chánh thì nút <b>Lập phiếu dự trù</b> bị khoá, bên cạnh ghi <i>"Chỉ phòng Hành Chánh (phòng giữ kho
+        VPP) lập dự trù VPP"</i>, và không có tab <a href="#can-du-tru">Danh sách VPP cần dự trù</a>.</div>
+</div>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/du-tru.png', 'caption' => 'Màn hình Dự Trù › VPP › tab Danh sách phiếu'])
 
 <h3>Lập phiếu</h3>
@@ -28,7 +34,7 @@
         <tbody>
             <tr>
                 <td>Bước 1</td>
-                <td style="font-weight: 400"><b>Quản Lý Bộ Phận</b> của phòng lập phiếu. Không chỉ định đích danh: bất kỳ ai có vai trò này trong phòng đều ký được.</td>
+                <td style="font-weight: 400"><b>Quản Lý Bộ Phận</b> của phòng Hành Chánh. Không chỉ định đích danh: bất kỳ ai có vai trò này trong phòng đều ký được.</td>
             </tr>
             <tr>
                 <td>Bước 2</td>
@@ -37,7 +43,7 @@
         </tbody>
     </table>
 </div>
-<p>Ký và từ chối đều nhập lại mật khẩu. Ký xong bước 2 thì phiếu <b>Đã phê duyệt</b> và chờ Hành Chánh
+<p>Ký và từ chối đều nhập lại mật khẩu. Ký xong bước 2 thì phiếu <b>Đã phê duyệt</b> và chờ kho VPP Hành Chánh
     <a href="#theo-doi-du-tru">tiếp nhận</a>. Trạng thái phiếu:
     @foreach (config('estimate.app_statuses') as $label)
         <span class="ug-chip">{{ $label }}</span>

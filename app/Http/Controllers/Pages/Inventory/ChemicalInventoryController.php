@@ -842,7 +842,7 @@ class ChemicalInventoryController extends Controller
         return [
             'required',
             Rule::exists('locations', 'id')
-                ->where('department_id', $departmentId)
+                ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, ''))
                 ->where('status_id', 1)
                 ->where(fn ($query) => $query->whereNull('item_type')->orWhere('item_type', self::LOCATION_TYPE))
                 ->where(fn ($query) => $query->whereNull('zone_type')->orWhereNotIn('zone_type', self::ASSIGN_EXCEPT_ZONES)),
@@ -1591,14 +1591,15 @@ class ChemicalInventoryController extends Controller
             ->orderBy('name', 'asc')
             ->get();
 
-        return [
+        // Ô giao cho bộ phận khác (kèm hàng của họ, chỉ xem) + ô phòng khác giao cho phòng này (LocationShare)
+        return \App\Support\LocationShare::extendZones([
             'warehouses' => \App\Support\RoomLayout::attach($of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_polygon', 'layout_door_wall', 'layout_door_offset', 'layout_door'])),
             'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']),
             'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
             'tiers' => $of('tiers', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']),
             'locations' => $this->locationOptions($departmentId),
             'foreign' => \App\Support\RoomLayout::foreign($departmentId, self::LOCATION_TYPE),
-        ];
+        ], $departmentId, self::LOCATION_TYPE);
     }
 
     /**

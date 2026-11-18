@@ -172,6 +172,20 @@
         background: #DC2626; color: #fff; font-size: 9px; line-height: 14px; text-align: center; border: 1.5px solid #fff;
     }
     .mz-slot.is-compat { outline: 2px solid #DC2626; outline-offset: 1px; }
+    /* Ô chia sẻ giữa bộ phận (LocationShare): góc trái trên tam giác màu nhấn */
+    .mz-slot.is-shared::before {
+        content: ''; position: absolute; top: 0; left: 0; width: 0; height: 0; border-top-left-radius: 4px;
+        border-top: 10px solid var(--accent); border-right: 10px solid transparent;
+    }
+    .mz-slot.is-shared.is-empty { background: repeating-linear-gradient(135deg, #EEF2F6 0 4px, #DDF4F8 4px 8px); }
+    .mz-guest-tag {
+        display: inline-block; margin-top: 2px; padding: 0 7px; border-radius: 999px; font-size: .68rem; font-weight: 600;
+        background: rgba(23, 184, 212, .12); color: #0E7490; border: 1px solid rgba(23, 184, 212, .35);
+    }
+    .mz-d-share {
+        border: 1px solid rgba(23, 184, 212, .35); background: rgba(23, 184, 212, .08); border-radius: var(--border-radius-md);
+        padding: 8px 12px; margin-bottom: 12px; font-size: .82rem; color: #0E7490;
+    }
     .mz-slot:hover { transform: translateY(-1px) scale(1.08); box-shadow: var(--shadow-md); z-index: 1; }
     .mz-slot.has-zone:hover { box-shadow: inset 0 -4px 0 var(--zt), var(--shadow-md); }
     .mz-slot:focus-visible { outline: 2px solid var(--primary-dark); outline-offset: 2px; }

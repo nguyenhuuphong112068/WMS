@@ -1024,7 +1024,7 @@ class VppImportController extends Controller
      */
     private function rules(int $departmentId, bool $isCreate = true, bool $isChecked = false): array
     {
-        $locationRule = Rule::exists('locations', 'id')->where('department_id', $departmentId)->where('status_id', 1);
+        $locationRule = Rule::exists('locations', 'id')->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, ''))->where('status_id', 1);
 
         if (! $isChecked) {
             $locationRule->where('zone_type', 'quarantine');
@@ -1067,7 +1067,7 @@ class VppImportController extends Controller
             'check_result' => ['required', Rule::in(\App\Support\CheckStatus::RESULTS)],
             'location_id' => [
                 $passed ? 'required' : 'nullable',
-                Rule::exists('locations', 'id')->where('department_id', $departmentId)->where('status_id', 1),
+                Rule::exists('locations', 'id')->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, ''))->where('status_id', 1),
             ],
             'check_note' => [$passed ? 'nullable' : 'required', 'max:500'],
             'batch_no' => ['nullable', 'max:100'],

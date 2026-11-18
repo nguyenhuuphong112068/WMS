@@ -27,8 +27,17 @@
             </tr>
             <tr>
                 <td>"Vật tư này phải được QA hiệu chuẩn trước khi dùng"</td>
-                <td style="font-weight: 400">Bấm <b>Đề nghị HC</b> ở tab Chờ cấp phát và chờ QA xác nhận Đạt. Xem
+                <td style="font-weight: 400">Bấm <b>Đề nghị HC</b> ở tab Chờ cấp phát, chọn người xác nhận và chờ xác nhận Đạt. Xem
                     <a href="#hieu-chuan">Hiệu chuẩn</a>.</td>
+            </tr>
+            <tr>
+                <td>"Không được tự chọn mình xác nhận hiệu chuẩn phiếu của mình."</td>
+                <td style="font-weight: 400">Người đề nghị không tự xác nhận được: bỏ tick tên mình, chọn người khác có quyền xác nhận.</td>
+            </tr>
+            <tr>
+                <td>"Phiếu ... được gửi cho ... - bạn không phải người được chọn xác nhận"</td>
+                <td style="font-weight: 400">Chỉ người phòng đề nghị đã chọn mới ký được. Nhờ phòng đề nghị bấm nút
+                    <i class="fas fa-user-check"></i> để đổi người xác nhận nếu cần.</td>
             </tr>
             <tr>
                 <td>"... còn hứa được X. Được cấp vượt tối đa 5%"</td>

@@ -140,8 +140,6 @@ Route::prefix('/export')
             Route::get('requestStockMap', 'requestStockMap')->name('requestStockMap');
             // Ô chọn Đối Tượng ở cột Mục đích của dòng đề nghị (select2 AJAX)
             Route::get('requestObjects', 'requestObjects')->name('requestObjects');
-            // Tab "Cấp phát vật tư" - phiếu soạn hàng A4 in theo đường đi trong kho
-            Route::get('prepPrint', 'prepPrint')->name('prepPrint');
             // Tab "Sổ Cấp Phát" - in nhãn cấp phát (QR mã xuất nhập), mỗi lần in ghi audit log
             Route::get('label', 'label')->name('label');
             Route::post('labelPrinted', 'labelPrinted')->name('labelPrinted');

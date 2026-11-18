@@ -295,7 +295,7 @@ class DepartmentChemical
                 'columns.name as column_name',
                 'tiers.name as tier_name'
             )
-            ->where('locations.department_id', $departmentId)
+            ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId))
             ->where('locations.status_id', 1)
             // Chỉ những ô khai loại hoá chất, cộng thêm ô chưa khai loại (dùng chung)
             ->where(fn ($query) => $query->whereNull('locations.item_type')

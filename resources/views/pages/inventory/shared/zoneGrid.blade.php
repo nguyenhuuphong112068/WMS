@@ -143,6 +143,8 @@
                     </div>
                 </div>
 
+                <div class="mz-d-share" hidden></div>
+
                 <div class="mz-d-compat" hidden></div>
 
                 <table class="table table-bordered table-sm mb-0">
@@ -636,6 +638,13 @@
                     if (r.tier_id && !tiers[r.tier_id]) tiers[r.tier_id] = { name: r.tier_name };
                 });
 
+                // Hàng của bộ phận mượn ở các ô phòng mình đã giao (LocationShare) - chỉ xem, vẫn xét tương kỵ cùng tầng
+                (zones.guests || []).forEach(function(g) {
+                    if (g.location_id && locations[g.location_id]) {
+                        (byLocation[g.location_id] = byLocation[g.location_id] || []).push(g);
+                    }
+                });
+
                 // Cây Kho/Phòng -> Kệ/Tủ -> Cột -> Tầng -> Vị trí (khoá 0 = chưa gán cấp đó)
                 var tree = {};
                 var index = {};
@@ -657,6 +666,9 @@
 
                     var node = nodeOf(loc, byLocation[loc.id] || [], zoneTypes);
                     node.id = loc.id;
+                    // shared = ô phòng mình đã giao cho bộ phận khác; owner = ô phòng khác giao cho phòng mình
+                    node.shared = loc.shared_to || '';
+                    node.owner = loc.owner || '';
                     // Toạ độ ô trên lưới tầng: ngang (A, B...) × dãy sâu (1 = sát cửa) như Cấu trúc kho
                     node.p = Number(loc.position) > 0 ? Number(loc.position) : 0;
                     node.d = Math.max(1, Number(loc.depth) || 1);
@@ -664,8 +676,8 @@
                     // Vùng "gần nhau" để xét tương kỵ (vị trí chưa gán cấp đang xét thì chỉ xét chính nó)
                     var scopeId = compat ? (compat.scope === 'location' ? loc.id : loc[compat.scope + '_id']) : null;
                     node.scopeKey = scopeId ? compat.scope + scopeId : 'location' + loc.id;
-                    node.search = [node.code, sn.name, cn.name, tn.name].concat(node.items.map(function(r) {
-                        return r.name + ' ' + r.code;
+                    node.search = [node.code, sn.name, cn.name, tn.name, node.shared, node.owner].concat(node.items.map(function(r) {
+                        return r.name + ' ' + r.code + (r.guest ? ' ' + r.guest : '');
                     })).join(' ').toLowerCase();
 
                     index[node.key] = node;
@@ -728,12 +740,15 @@
                 //  số mã từng kho / kệ vẫn hiện ở đầu khối kho và dòng tiêu đề khung 3D.)
                 /** Vị trí nhận thêm / đổi hàng được (có quyền, không phải khu Biệt trữ / Cách ly / Loại bỏ) */
                 function canEdit(n) {
-                    return !!assign && (assign.except || []).indexOf(n.zoneType) < 0;
+                    // Ô đã giao cho bộ phận khác: phòng chủ kho chỉ xem, không cất / dời hàng vào ra
+                    return !!assign && !n.shared && (assign.except || []).indexOf(n.zoneType) < 0;
                 }
 
                 /** Tooltip một ô: mã vị trí, phân loại, các hoá chất đang có */
                 function slotTitle(n) {
                     var lines = [n.code + (n.zoneType ? ' · ' + ($root.find('.mz-zt-filter[data-zone-type="' + n.zoneType + '"]').text().trim()) : '')];
+                    if (n.shared) lines.push('Đã giao cho ' + n.shared + ' (chỉ xem)');
+                    if (n.owner) lines.push('Vị trí mượn của kho ' + n.owner);
                     if (!n.items.length) lines.push('Đang trống');
                     n.preview.forEach(function(p) { lines.push('· ' + p.name + ': ' + num(p.remaining) + ' ' + p.unit); });
                     if (n.cats.length > n.preview.length) lines.push('· +' + (n.cats.length - n.preview.length) + ' ' + item + ' khác');
@@ -750,7 +765,7 @@
                     var drag = canEdit(n) && n.lots > 0;
 
                     return '<span role="button" tabindex="0" class="mz-slot is-' + n.state + (zt ? ' has-zone' : '') +
-                        (clash ? ' is-compat' : '') + (canEdit(n) ? ' is-drop' : '') + (drag && assign.moveUrl ? ' is-pickable' : '') + '"' +
+                        (n.shared || n.owner ? ' is-shared' : '') + (clash ? ' is-compat' : '') + (canEdit(n) ? ' is-drop' : '') + (drag && assign.moveUrl ? ' is-pickable' : '') + '"' +
                         ' data-key="' + n.key + '" data-state="' + n.state + '" data-zone-type="' + esc(n.zoneType) + '"' +
                         (clash ? ' data-compat="1"' : '') + (drag ? ' draggable="true"' : '') +
                         ' data-search="' + esc(n.search) + '"' +
@@ -1693,6 +1708,11 @@
                     $modal.find('.mz-d-lots').text(n.lots);
                     $modal.find('.mz-d-items').text(n.cats.length);
 
+                    // Ô chia sẻ: phòng chủ kho thấy bộ phận đang mượn, bộ phận mượn thấy kho của phòng nào
+                    $modal.find('.mz-d-share').prop('hidden', !n.shared && !n.owner).html(n.shared
+                        ? '<i class="fas fa-handshake mr-1"></i>Vị trí đã giao cho <b>' + esc(n.shared) + '</b> - chỉ xem hàng của bộ phận này, phòng bạn không cất hàng vào đây.'
+                        : (n.owner ? '<i class="fas fa-handshake mr-1"></i>Vị trí mượn của kho <b>' + esc(n.owner) + '</b>.' : ''));
+
                     var clash = n.conflicts && n.conflicts.length > 0;
                     var $compat = $modal.find('.mz-d-compat').empty().prop('hidden', !clash);
                     if (clash) $compat.html(conflictConclusion(n, compat.scope_label));
@@ -1704,9 +1724,11 @@
                         $tb.append('<tr><td colspan="7" class="text-center text-muted font-italic">Vị trí đang trống</td></tr>');
                     }
                     n.items.forEach(function(r, i) {
-                        $tb.append('<tr>' + (editable ? '<td class="text-center"><input type="checkbox" class="mz-d-pick" value="' +
-                            esc(r.id) + '" title="Chọn để đổi vị trí"></td>' : '') + '<td class="text-center">' + (i + 1) + '</td>' +
-                            '<td class="font-weight-bold">' + esc(r.code) + '</td>' +
+                        $tb.append('<tr>' + (editable ? '<td class="text-center">' + (r.guest ? '' : '<input type="checkbox" class="mz-d-pick" value="' +
+                            esc(r.id) + '" title="Chọn để đổi vị trí">') + '</td>' : '') + '<td class="text-center">' + (i + 1) + '</td>' +
+                            '<td class="font-weight-bold">' + esc(r.code) +
+                            (r.guest ? '<div><span class="mz-guest-tag" title="Hàng của bộ phận mượn vị trí - chỉ xem">' +
+                                '<i class="fas fa-handshake"></i> ' + esc(r.guest) + '</span></div>' : '') + '</td>' +
                             '<td><div class="font-weight-bold">' + esc(r.name || '—') + '</div>' +
                             (r.sub ? '<div class="md-sub small text-muted">' + esc(r.sub) + '</div>' : '') + '</td>' +
                             '<td class="text-right font-weight-bold">' + num(r.remaining) + ' ' + esc(r.unit) + '</td>' +

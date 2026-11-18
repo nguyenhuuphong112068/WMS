@@ -451,7 +451,7 @@ class CategoryLookup
         $exceptZones = array_values(array_intersect($exceptZones, array_keys(ZoneType::TYPES)));
 
         $query = self::locationQuery()
-            ->where('locations.department_id', $departmentId)
+            ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId))
             ->where('locations.status_id', 1)
             ->when($itemType !== 'all', fn ($query) => $query->where(fn ($sub) => $sub->whereNull('locations.item_type')
                 ->orWhere('locations.item_type', $itemType)))

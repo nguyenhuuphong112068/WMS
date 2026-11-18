@@ -25,7 +25,7 @@ use Illuminate\Support\Str;
 class DatabaseCodeScanner
 {
     /** Tăng khi đổi cách quét để bỏ cache cũ */
-    const VERSION = 7;
+    const VERSION = 8;
 
     const CACHE_KEY = 'database_code_scan';
 
@@ -36,6 +36,12 @@ class DatabaseCodeScanner
     const SEED_DIR = 'database/seeders';
 
     const MIGRATION_DIR = 'database/migrations';
+
+    /**
+     * File schema gộp các migration cũ (php artisan schema:dump): CREATE TABLE của mọi bảng
+     * + dữ liệu cấu hình + danh sách migration đã gộp. Coi như một migration "gốc" đứng đầu.
+     */
+    const SCHEMA_FILE = 'database/schema/mysql-schema.sql';
 
     /** Không tự quét chính mình (mã ví dụ trong regex không phải tham chiếu thật) */
     const SELF_FILES = [
@@ -90,6 +96,10 @@ class DatabaseCodeScanner
 
         foreach (self::listDir(self::MIGRATION_DIR) as $rel => $abs) {
             $files[$rel] = ['path' => $abs, 'kind' => 'migration'];
+        }
+
+        if (is_file(base_path(self::SCHEMA_FILE))) {
+            $files[self::SCHEMA_FILE] = ['path' => base_path(self::SCHEMA_FILE), 'kind' => 'schema'];
         }
 
         foreach (self::SELF_FILES as $rel) {
@@ -191,7 +201,13 @@ class DatabaseCodeScanner
     {
         // Bỏ comment trước: docblock hay chép mã ví dụ (const TABLE = 'units'...)
         $sources = [];
+        $migrations = [];
         foreach ($files as $rel => $f) {
+            if ($f['kind'] === 'schema') {
+                $migrations[] = self::parseSchemaDump((string) @file_get_contents($f['path']));
+                unset($files[$rel]);
+                continue;
+            }
             $raw = (string) @file_get_contents($f['path']);
             $sources[$rel] = str_ends_with($rel, '.blade.php') ? self::cleanBlade($raw) : self::cleanPhp($raw);
         }
@@ -200,7 +216,6 @@ class DatabaseCodeScanner
 
         $refs = [];
         $joins = [];
-        $migrations = [];
 
         foreach ($files as $rel => $f) {
             $code = self::resolveConstants($sources[$rel], $consts, self::fileConstants($sources[$rel]));
@@ -639,6 +654,53 @@ class DatabaseCodeScanner
     | Migration
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * File schema gộp: mỗi CREATE TABLE = tạo bảng + thêm cột, INSERT = nạp dữ liệu.
+     * Tên mục mang ngày giờ của migration cuối cùng đã gộp để xếp đúng chỗ trong lịch sử;
+     * 'merged' = tên các migration đã gộp (có trong bảng migrations nhưng không còn file).
+     */
+    private static function parseSchemaDump(string $sql): array
+    {
+        $tables = [];
+        $columns = [];
+
+        if (preg_match_all('/CREATE TABLE `(\w+)` \((.*?)\n\)[^;]*;/s', $sql, $mm, PREG_SET_ORDER)) {
+            foreach ($mm as $m) {
+                $tables[$m[1]] = ['create'];
+                if (preg_match_all('/^\s*`(\w+)`\s/m', $m[2], $cc)) {
+                    foreach ($cc[1] as $col) {
+                        $columns[] = [$m[1], $col, 'add', null];
+                    }
+                }
+            }
+        }
+
+        if (preg_match_all('/INSERT INTO `(\w+)`/', $sql, $mm)) {
+            foreach (array_unique($mm[1]) as $t) {
+                if ($t !== 'migrations') {
+                    $tables[$t][] = 'data';
+                }
+            }
+        }
+
+        $merged = [];
+        if (preg_match_all("/INSERT INTO `migrations` [^;]*?VALUES \(\d+,'([^']+)'/", $sql, $mm)) {
+            $merged = $mm[1];
+            sort($merged);
+        }
+
+        $last = $merged ? end($merged) : '';
+        $prefix = preg_match('/^\d{4}_\d{2}_\d{2}_\d{6}_/', $last, $p) ? $p[0] : '';
+
+        return [
+            'name'     => $prefix . basename(self::SCHEMA_FILE) . ' (gộp ' . count($merged) . ' migration)',
+            'tables'   => $tables,
+            'columns'  => $columns,
+            'baseline' => true,
+            'merged'   => $merged,
+        ];
+    }
 
     private static function parseMigration(string $rel, string $code): array
     {

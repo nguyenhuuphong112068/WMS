@@ -117,7 +117,7 @@ class CategoryLookupController extends Controller
 
         $inDepartment = $locationId && DB::table('locations')
             ->where('id', $locationId)
-            ->where('department_id', $departmentId)
+            ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, 'locations'))
             ->exists();
 
         // Không đủ dữ liệu để xét thì trả "chưa xét" để khung cảnh báo tự ẩn, không báo lỗi

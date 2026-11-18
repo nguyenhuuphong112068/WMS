@@ -175,6 +175,8 @@ class ZoneController extends Controller
             'zoneTypeIcons' => ZoneType::ICONS,
             // Ngưỡng của lưới Cấu trúc kho (số cột / tầng / vị trí tối đa)
             'structureLimits' => ZoneStructureController::limits(),
+            // Bộ phận nhận chia sẻ vị trí (thanh chọn ô ở Cấu trúc kho) - App\Support\LocationShare
+            'shareDepartments' => \App\Support\LocationShare::departmentOptions((int) $departmentId),
             /*
             | Số lần thay đổi của từng mục, khoá là '<bảng>-<id>' vì năm cấp nằm chung
             | một trang. Badge trên nút Sửa đọc từ đây, nội dung lịch sử tải sau qua

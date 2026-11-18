@@ -1547,7 +1547,7 @@ class VppExportController extends Controller
         if ($destLocationId) {
             $locOk = DB::table('locations')
                 ->where('id', $destLocationId)
-                ->where('department_id', $departmentId)
+                ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, 'locations'))
                 ->where('status_id', 1)
                 ->exists();
 

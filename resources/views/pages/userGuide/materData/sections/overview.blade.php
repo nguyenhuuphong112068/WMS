@@ -24,7 +24,7 @@
         <span class="ug-flow-no">Bước 3</span>
         <b>Tên hàng</b>
         <a href="#hoat-chat">Đơn Chất</a> → <a href="#hoa-chat">Hoá Chất</a>;
-        <a href="#ten-chuan">Tên Chuẩn</a>; <a href="#ten-vat-tu">Tên Vật Tư</a>
+        <a href="#ten-chuan">Tên Chuẩn</a>; <a href="#ten-vat-tu">Tên Vật Tư</a>; <a href="#ten-vpp">Tên VPP</a>
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">Bước 4</span>
@@ -44,7 +44,7 @@
     <div>
         Hệ thống mới triển khai, cần nạp số lượng lớn? Quản trị viên có thể dùng
         <a href="#khoi-tao-du-lieu">Khởi Tạo Dữ Liệu</a>: gửi file Excel mẫu theo từng giai đoạn cho các phòng ban điền
-        dữ liệu gốc, danh mục, định khu và tồn đầu kỳ, phòng ban đính kèm file đã điền, Admin tổng hợp rồi nạp một lần
+        dữ liệu gốc, danh mục và tồn đầu kỳ (định khu tạo trên phần mềm trước), phòng ban đính kèm file đã điền, Admin tổng hợp rồi nạp một lần
         thay vì nhập tay từng màn hình.
     </div>
 </div>

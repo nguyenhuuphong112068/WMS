@@ -7,8 +7,7 @@
 
 <h3>Cấp phát</h3>
 <ol class="ug-steps">
-    <li>Xem cột <b>Cần Soạn</b> và <b>Tồn Khả Dụng</b>. Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-print mr-1"></i> In phiếu soạn hàng</span>
-        nếu cần đi lấy hàng theo danh sách.</li>
+    <li>Xem cột <b>Cần Soạn</b> và <b>Tồn Khả Dụng</b> để biết cần lấy bao nhiêu và kho còn đủ không.</li>
     <li>Cột <b>Cấp Phát</b> đã điền sẵn lô và số lượng theo FEFO/FIFO. Bấm nút bên cạnh để xem danh mục tồn của vật tư
         và chọn lô khác (nếu có quyền).</li>
     <li>Ra kệ lấy hàng, bấm <span class="btn btn-sm btn-outline-primary ug-ui"><i class="fas fa-qrcode mr-1"></i>Quét mã x/n</span>
@@ -39,6 +38,6 @@
 
 <div class="ug-callout is-warn">
     <i class="fas fa-ruler-combined"></i>
-    <div>Vật tư <b>Cần hiệu chuẩn trước khi dùng</b> không cấp ngay được. Bấm <b>Đề nghị HC</b> để gửi QA hiệu chuẩn trước.
-        Xem <a href="#hieu-chuan">Hiệu Chuẩn Trước Khi Cấp</a>.</div>
+    <div>Vật tư <b>Cần HC trước khi cấp phát</b> không cấp ngay được. Bấm <b>Đề nghị HC</b>, chọn người xác nhận và gửi hiệu chuẩn trước.
+        Vật tư <b>Cần HC sau khi cấp phát</b> cấp bình thường, hệ thống tự sinh phiếu hiệu chuẩn. Xem <a href="#hieu-chuan">Hiệu Chuẩn Vật Tư</a>.</div>
 </div>

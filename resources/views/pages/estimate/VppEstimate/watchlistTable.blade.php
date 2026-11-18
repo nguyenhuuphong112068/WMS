@@ -28,18 +28,6 @@
         'category' => 'Danh Mục VPP Của Phòng',
         default => null,
     };
-    // Lý do của nguồn Dự báo: thiếu nhu cầu tháng tới, hay vẫn dư nhưng hụt ngưỡng tối thiểu
-    $wlForecastReason = function ($item) use ($wlNum) {
-        $f = $item->forecast;
-        $label = $f->month_label;
-
-        if ($f->gap < 0) {
-            return 'Thiếu ' . $wlNum(-$f->gap) . ' so với nhu cầu ' . mb_strtolower($label)
-                . ($item->min_stock ? ' + giữ ngưỡng tối thiểu ' . $wlNum($item->min_stock) : '');
-        }
-
-        return 'Hết ' . mb_strtolower($label) . ' dư ' . $wlNum($f->gap) . ' < ngưỡng tối thiểu ' . $wlNum($item->min_stock);
-    };
 @endphp
 
 <div class="md-toolbar">
@@ -101,7 +89,6 @@
         <tbody>
             @foreach ($items as $item)
                 <tr data-sources="{{ implode(' ', $item->sources) }}"
-                    data-month="{{ $item->forecast->month ?? '' }}"
                     data-category-id="{{ $item->category_id }}"
                     data-name="{{ $item->material_name }}"
                     data-spec="{{ $item->technical_specification }}"
@@ -109,7 +96,7 @@
                     data-unit-id="{{ $item->unit_id }}"
                     {{-- Chưa có SL đề nghị thì mặc định bằng ngưỡng tối thiểu của phòng --}}
                     data-quantity="{{ $item->quantity !== null ? $wlNum($item->quantity) : ($item->min_stock ? $wlNum($item->min_stock) : '') }}"
-                    data-note="{{ $item->note ?: ($item->forecast ? $wlForecastReason($item) : '') }}"
+                    data-note="{{ $item->note }}"
                     data-progress="{{ $item->in_progress ? 'done' : 'open' }}"
                     class="{{ $item->in_progress ? 'is-wl-progress' : '' }}">
                     <td class="text-center">
@@ -153,14 +140,6 @@
                                 @endif
                             </div>
                         @endforeach
-                        @if ($item->forecast)
-                            <div class="md-sub mt-1">
-                                <span class="md-badge wl-forecast"
-                                    title="Khả dụng {{ $wlNum($item->forecast->available) }} - Nhu cầu chu kỳ {{ $wlNum($item->forecast->demand) }} = {{ $item->forecast->gap < 0 ? 'Thiếu ' . $wlNum(-$item->forecast->gap) : 'Dư ' . $wlNum($item->forecast->gap) }}">
-                                    {{ $wlForecastReason($item) }}
-                                </span>
-                            </div>
-                        @endif
                         @if ($item->watchlist_id)
                             <div class="md-sub mt-1">
                                 <span class="md-badge pending">Đề nghị dự trù</span>
@@ -236,13 +215,6 @@
 
     #mdWatchlistTable .wl-lock {
         color: var(--primary-lighter);
-        cursor: help;
-    }
-
-    .md-badge.wl-forecast {
-        background: var(--primary-soft);
-        color: var(--primary-dark);
-        border: 1px solid var(--primary-lighter);
         cursor: help;
     }
 
@@ -371,9 +343,7 @@
                 unit_id: $tr.attr('data-unit-id') || '',
                 // Số lượng đã khai lúc đề nghị dự trù, ',' ngăn nghìn của $wlNum phải bỏ trước khi điền vào ô số
                 quantity: ($tr.attr('data-quantity') || '').replace(/,/g, ''),
-                note: $tr.attr('data-note') || '',
-                // Tháng của nguồn "Thiếu tồn khả dụng" - điền sẵn tháng cần dùng của phiếu dự trù
-                month: $tr.attr('data-month') || ''
+                note: $tr.attr('data-note') || ''
             };
         }
 
@@ -449,7 +419,6 @@
                     .find('[data-field="display_spec"]').text(row.spec || '—').end()
                     .find('[data-field="unit_id"]').val(row.unit_id || '').end()
                     .find('[data-field="amount"]').val(row.quantity).end()
-                    .find('[data-field="for_month_year"]').val(function(i, val) { return row.month || val; }).end()
                     .find('[data-field="purpose"]').val(row.note).end();
             });
         });

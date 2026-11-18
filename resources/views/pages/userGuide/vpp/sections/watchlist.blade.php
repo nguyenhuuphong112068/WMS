@@ -1,14 +1,13 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
 
-<p>Tập trung mọi VPP <b>đang cần mua</b> vào một chỗ, để lập phiếu dự trù chỉ bằng vài cú tick. VPP vào danh sách
-    từ 3 nguồn (lọc được theo cột <b>Nguồn</b>):</p>
+<p>Tập trung mọi VPP <b>đang cần mua</b> vào một chỗ, để lập phiếu dự trù chỉ bằng vài cú tick. Tab chỉ có khi đang chọn
+    <b>phòng Hành Chánh</b> (phòng duy nhất lập dự trù VPP). VPP vào danh sách
+    từ 2 nguồn (lọc được theo cột <b>Nguồn</b>):</p>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/can-du-tru.png', 'caption' => 'Màn hình Dự Trù › VPP › tab Danh sách VPP cần dự trù'])
 <ol>
     <li><b>Dưới ngưỡng tối thiểu</b>: tồn của phòng đang dưới <b>Ngưỡng Tồn Tối Thiểu</b> khai ở VPP Của Phòng. Tự động.</li>
     <li><b>Người dùng đề nghị</b>: người dùng bấm <b>Đề nghị dự trù VPP</b> (bắt buộc nhập lý do) trên dòng đề nghị cấp phát
         hoặc trên danh mục VPP Của Phòng.</li>
-    <li><b>Thiếu tồn khả dụng cho tháng ...</b>: các dòng <b>Không đáp ứng</b> và dòng <b>Vừa đủ</b> có Cần Dự Trù &gt; 0 ở <a href="#kha-dung-thang-toi">Khả dụng tháng tới</a>.
-        Tự động, số lượng gợi ý = Cần Dự Trù. Nhãn trên từng dòng ghi lý do cụ thể (<i>Thiếu X so với nhu cầu tháng MM/YYYY…</i> hoặc <i>Hết tháng MM/YYYY dư X &lt; ngưỡng tối thiểu Y</i>), lý do này điền sẵn vào <b>Lý do dự trù</b>.</li>
 </ol>
 
 <h3>Lập phiếu dự trù từ danh sách</h3>

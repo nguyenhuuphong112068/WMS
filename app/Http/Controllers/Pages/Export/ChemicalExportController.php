@@ -2339,7 +2339,7 @@ class ChemicalExportController extends Controller
         }
 
         $destLocationId = (int) $request->dest_location_id;
-        $locOk = DB::table('locations')->where('id', $destLocationId)->where('department_id', $departmentId)->where('status_id', 1)->exists();
+        $locOk = DB::table('locations')->where('id', $destLocationId)->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, 'locations'))->where('status_id', 1)->exists();
         if (! $locOk) {
             return $error('Định khu được chọn không thuộc phòng ban bạn!');
         }

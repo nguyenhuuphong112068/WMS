@@ -341,8 +341,6 @@ class InitialDataTemplate
         'manufacturers' => 'thêm nhà sản xuất còn thiếu (tên viết tắt + tên đầy đủ, không trùng).',
         'suppliers' => 'thêm nhà cung cấp còn thiếu.',
         'purposes' => 'thêm mục đích sử dụng / chỉ tiêu kiểm nghiệm của chất chuẩn còn thiếu.',
-        'products' => 'thêm tên thành phẩm còn thiếu.',
-        'consumption' => 'thêm thiết bị / đối tượng tiêu hao vật tư định kỳ còn thiếu (loại, mã, tên, tần suất).',
         'dept_class' => 'thêm nhóm phân loại vật tư riêng của phòng (dùng ở sheet 27).',
         'material_names' => 'thêm tên vật tư chưa có (chỉ tên, KHÔNG kèm nhà sản xuất).',
         'vpp_names' => 'thêm tên VPP chưa có (chỉ tên, KHÔNG kèm nhà sản xuất).',
@@ -787,7 +785,7 @@ class InitialDataTemplate
                 ->map(fn ($r) => [$r->name, $r->description]),
             'units' => self::active($table)->orderBy('unit_group')->orderBy('factor_to_base')->get()
                 ->map(fn ($r) => [$r->short_name, $r->name, $label('unit_group', $r->unit_group), self::number($r->factor_to_base)]),
-            'packaging', 'purposes', 'products', 'material_names', 'vpp_names', 'chem_names' => self::active($table)->orderBy('name')->get()
+            'packaging', 'purposes', 'material_names', 'vpp_names', 'chem_names' => self::active($table)->orderBy('name')->get()
                 ->map(fn ($r) => [$r->name]),
             'storage' => self::active($table)->orderBy('name')->get()
                 ->map(fn ($r) => [$r->name, $r->note]),
@@ -795,8 +793,6 @@ class InitialDataTemplate
                 ->map(fn ($r) => [$r->short_name, $r->name]),
             'suppliers' => self::active($table)->orderBy('name')->get()
                 ->map(fn ($r) => [$r->name, $r->address, $r->tax_no, $r->note]),
-            'consumption' => self::active($table)->orderBy('type')->orderBy('code')->get()
-                ->map(fn ($r) => [$label('consumption_type', $r->type), $r->code, $r->name, $r->location, $label('frequency', $r->frequency)]),
             'standard_names' => self::active($table)->orderBy('name')->get()
                 ->map(fn ($r) => [$r->name, $r->active_ingredient_name, $r->cas_no]),
             'material_cats' => (function () use ($table, $makers, $label) {

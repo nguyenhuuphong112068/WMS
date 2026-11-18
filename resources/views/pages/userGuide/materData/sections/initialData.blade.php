@@ -10,14 +10,28 @@
         <tr><td>1. Tổ chức</td><td>Admin</td><td>01 Công ty, 02 Phòng ban, 04 Vai trò</td></tr>
         <tr><td>2. Người dùng &amp; Tổ - Nhóm</td><td>Phòng ban</td><td>03 Tổ - Nhóm (bổ sung tổ còn thiếu), 05 Người dùng
             (đăng nhập bằng <b>mã số nhân viên</b>)</td></tr>
-        <tr><td>3. Dữ liệu gốc &amp; danh mục</td><td>Phòng ban</td><td>06 - 18 (dữ liệu gốc, tên hàng; VPP dùng chung Tên vật tư ở sheet 15), 19 - 21 và 34 (danh mục công ty, 34 là DM VPP),
-            22 - 26 (định khu), 27 - 29 và 35 (hàng của phòng, 35 là VPP), 30 (quy đổi đơn vị)</td></tr>
+        <tr><td>3. Dữ liệu gốc &amp; danh mục</td><td>Phòng ban</td><td>06 - 11, 14 - 18 và 37 (dữ liệu gốc, tên hàng; 37 là Tên VPP), 19 - 21 và 34 (danh mục công ty, 34 là DM VPP chọn tên ở sheet 37),
+            sheet <b>Định khu</b> (chỉ xem), 27 - 29 và 35 (hàng của phòng, 35 là VPP), 30 (quy đổi đơn vị)</td></tr>
         <tr><td>4. Tồn đầu kỳ</td><td>Phòng ban</td><td>31 - 33 và 36 (Tồn đầu - VPP)</td></tr>
     </tbody>
 </table>
 <p>Giai đoạn 1 là một file toàn hệ thống. Giai đoạn 2 không chia module: tải file chung, hoặc chọn <b>Phạm vi file</b> là một
     phòng ban để file điền sẵn tổ và người dùng phòng đó đã có trên hệ thống (dòng xám), phòng chỉ thêm người / tổ mới hoặc
-    sửa người đã có. Giai đoạn 2 và 3 làm song song được.</p>
+    sửa người đã có. Giai đoạn 2 và 3 làm song song được. File mẫu hiện là phiên bản <b>V7</b>; file V6 giai đoạn 1, 2, 4
+    và file V4 - V5 giai đoạn 1 - 2 vẫn nộp được.</p>
+<div class="ug-callout">
+    <i class="fas fa-info-circle"></i>
+    <div>Ba loại dữ liệu <b>không khai trong file</b> mà tạo trực tiếp trên phần mềm:
+        <ul class="mb-0 pl-3">
+            <li><b>Định khu</b>: tạo ở <a href="#dinh-khu">Định Khu</a> <b>trước khi tải file</b> giai đoạn 3 - 4. Sheet <b>Định khu</b>
+                trong file đã khoá, chỉ liệt kê vị trí đang có (Phòng ban, Mã vị trí, Kho - Phòng, Kệ - Tủ, Cột, Tầng, Loại lưu trữ,
+                Phân loại khu) của phòng và module của file để chọn ở cột Vị trí mặc định / Vị trí lưu. Thiếu vị trí thì tạo trên
+                phần mềm rồi tải lại file.</li>
+            <li><b>Tên sản phẩm</b> và <b>Đối tượng tiêu hao</b>: cập nhật ở <a href="#ten-san-pham">Tên Sản Phẩm</a> và
+                <a href="#doi-tuong">Đối Tượng</a> (file mẫu không còn sheet 12, 13).</li>
+        </ul>
+    </div>
+</div>
 <div class="ug-callout is-warn">
     <i class="fas fa-exclamation-triangle"></i>
     <div>Hiện <b>tạm ẩn giai đoạn 3 (Dữ liệu gốc &amp; danh mục) và 4 (Tồn đầu kỳ)</b> với tài khoản không phải Admin: ô
@@ -32,7 +46,7 @@
         <ul class="mb-0 pl-3">
             <li>File một module chỉ gồm sheet dùng chung và sheet của module đó.</li>
             <li>File một phòng ban chỉ điền sẵn dữ liệu của phòng đó (giai đoạn 2: tổ + người dùng; giai đoạn 3: tổ, phân loại,
-                định khu); cột Phòng ban chỉ chọn được đúng phòng đó.</li>
+                danh sách định khu chỉ xem); cột Phòng ban chỉ chọn được đúng phòng đó.</li>
         </ul>
     </li>
     <li>Gửi file cho phòng ban. Người điền làm theo sheet <b>Hướng dẫn</b> trong file (mỗi loại file có mục đích, các bước
@@ -123,13 +137,15 @@
     <li><i>"File là mẫu phiên bản cũ"</i>: tải file mẫu mới nhất và điền lại.</li>
     <li><i>"File này đã được đính kèm"</i>: cùng nội dung file đang nộp, không cần nộp lại.</li>
     <li><i>"Giai đoạn ... đã hết hạn nộp"</i>: quá hạn nộp của giai đoạn - liên hệ Admin nếu cần gia hạn.</li>
+    <li><i>"Không có vị trí "X" của phòng Y (sheet Định khu - vị trí tạo trên màn hình Định Khu)."</i> (khi Admin nạp file):
+        cột vị trí ghi mã chưa có trên hệ thống - tạo vị trí ở <a href="#dinh-khu">Định Khu</a> rồi tải lại file mẫu.</li>
 </ul>
 
 <h3>Cách đọc file mẫu</h3>
 <ul>
     <li><b>Dòng nền xám</b> ở đầu sheet là dữ liệu đang có trên hệ thống, đã khoá. Điền dữ liệu mới ở các dòng trắng bên dưới.</li>
     <li><b>Sheet bổ sung</b> (tab màu xám): sheet giai đoạn trước mà file cần đến, VD file Tồn đầu kỳ kèm danh mục, khai báo
-        hàng của phòng, định khu, tên hàng. Còn thiếu thì <b>bổ sung trực tiếp vào file</b>, dữ liệu bổ sung được nạp lên hệ
+        hàng của phòng, tên hàng. Còn thiếu thì <b>bổ sung trực tiếp vào file</b> (trừ định khu: tạo trên phần mềm rồi tải lại file), dữ liệu bổ sung được nạp lên hệ
         thống cùng file. Riêng Công ty, Phòng ban, Vai trò do Admin khai, không bổ sung trong file của phòng ban.</li>
     <li>Sheet <b>05 Người dùng</b> chia phân quyền theo module: <b>Phân quyền chung</b>, <b>Phân quyền Vật tư</b>, <b>Phân quyền VPP</b>,
         <b>Phân quyền Hoá chất</b>, <b>Phân quyền Chất chuẩn</b>. Vai trò xếp vào cột theo <b>Loại Phụ Trách</b> khai ở

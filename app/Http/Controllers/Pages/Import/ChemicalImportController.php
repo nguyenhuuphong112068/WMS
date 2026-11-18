@@ -827,7 +827,7 @@ class ChemicalImportController extends Controller
             'check_result' => ['required', Rule::in(\App\Support\CheckStatus::RESULTS)],
             'location_id' => [
                 $passed ? 'required' : 'nullable',
-                Rule::exists('locations', 'id')->where('department_id', $departmentId)->where('status_id', 1),
+                Rule::exists('locations', 'id')->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, ''))->where('status_id', 1),
             ],
             'check_note' => [$passed ? 'nullable' : 'required', 'max:500'],
             'batch_no' => ['nullable', 'max:100'],
@@ -1299,7 +1299,7 @@ class ChemicalImportController extends Controller
                 'columns.name as column_name',
                 'tiers.name as tier_name'
             )
-            ->where('locations.department_id', $departmentId)
+            ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId))
             ->where('locations.status_id', 1)
             // Lô mới nhập chỉ được xếp tạm vào khu Biệt Trữ/Chờ kiểm tra
             ->when($quarantineOnly, fn ($query) => $query->where('locations.zone_type', 'quarantine'))
@@ -1343,7 +1343,7 @@ class ChemicalImportController extends Controller
     private function rules(int $departmentId, ?string $importedDate = null, bool $isCreate = false, bool $isChecked = false): array
     {
         $locationRule = Rule::exists('locations', 'id')
-            ->where('department_id', $departmentId)
+            ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, ''))
             ->where('status_id', 1);
 
         if (! $isChecked) {

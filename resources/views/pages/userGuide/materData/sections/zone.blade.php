@@ -45,7 +45,7 @@
         chiều bị lệch viền nét đứt màu cam, ô số hiện <span class="ug-key">≠</span> (<i>Đang khác nhau giữa các tầng</i>);
         nhập một số vào thẻ đó sẽ đặt lại cùng một giá trị cho cả kệ.</li>
     <li>Trên lưới, mỗi <b>cột</b> là một khối, mỗi <b>tầng</b> là một lưới nhỏ nhìn từ trên xuống, giống mặt kệ thật:
-        chiều <b>Ngang</b> là các ô <span class="ug-key">A</span>, <span class="ug-key">B</span>, <span class="ug-key">C</span>...
+        chiều <b>Ngang</b> là các ô <span class="ug-key">01</span>, <span class="ug-key">02</span>, <span class="ug-key">03</span>...
         dọc mép trước tầng, chiều <b>Sâu</b> là các dãy <span class="ug-key">1</span>, <span class="ug-key">2</span>,
         <span class="ug-key">3</span>... từ cửa vào trong (dãy 1 sát cửa, vẽ dưới cùng). Mỗi ô là một vị trí.
         Nhập số ô ngang ở ô số <b>dưới thước số</b>, số dãy sâu ở ô số <b>bên phải dãy trong cùng</b>, hoặc <b>kéo góc</b>
@@ -76,7 +76,7 @@
 <h3>Cách đọc mã vị trí</h3>
 <p>Mã vị trí gồm 4 đoạn cách nhau bằng dấu <span class="ug-key">/</span>:
     <span class="ug-key">Mã kệ/tủ</span> / <span class="ug-key">Cột</span> / <span class="ug-key">Tầng</span> /
-    <span class="ug-key">Ô ngang + Dãy sâu</span>. Ví dụ <span class="ug-key">QC2-INS-068/02/04/D4</span>:</p>
+    <span class="ug-key">Ô ngang.Dãy sâu</span>. Ví dụ <span class="ug-key">QC2-INS-068/02/04/04.4</span>:</p>
 <div class="table-responsive">
     <table class="table table-bordered ug-table">
         <thead>
@@ -105,34 +105,52 @@
                 <td>Tầng</td>
                 <td style="font-weight: 400">Tầng thứ 4. Tầng 01 nằm dưới cùng hay trên cùng tuỳ kệ chọn đánh số <i>Từ dưới lên</i>
                     hay <i>Từ trên xuống</i>. Đổi được thành mã tự đặt ở hộp <b>Đổi tên / mã tầng</b> (ví dụ
-                    <span class="ug-key">T4</span> → <span class="ug-key">…/02/T4/D4</span>).</td>
+                    <span class="ug-key">T4</span> → <span class="ug-key">…/02/T4/04.4</span>).</td>
             </tr>
             <tr>
-                <td><span class="ug-key">D</span></td>
+                <td><span class="ug-key">04</span></td>
                 <td>Ô ngang</td>
-                <td style="font-weight: 400">Ô thứ 4 dọc mép trước tầng, đếm từ trái sang: A = 1, B = 2, C = 3, D = 4. Hệ thống tự sinh.</td>
+                <td style="font-weight: 400">Ô thứ 4 dọc mép trước tầng, đếm từ trái sang, ghi 2 chữ số (01, 02...). Hệ thống tự sinh.</td>
             </tr>
             <tr>
-                <td><span class="ug-key">4</span></td>
+                <td><span class="ug-key">.4</span></td>
                 <td>Dãy sâu</td>
-                <td style="font-weight: 400">Dãy thứ 4 tính từ cửa vào trong (dãy 1 sát cửa). Hệ thống tự sinh.</td>
+                <td style="font-weight: 400">Sau dấu chấm: dãy thứ 4 tính từ cửa vào trong (dãy 1 sát cửa). Hệ thống tự sinh.</td>
             </tr>
         </tbody>
     </table>
 </div>
-<p>Đọc liền: tủ <b>QC2-INS-068</b> → cột <b>02</b> → tầng <b>04</b> → ô ngang thứ 4 (<b>D</b>), dãy thứ <b>4</b> tính từ cửa vào.
+<p>Đọc liền: tủ <b>QC2-INS-068</b> → cột <b>02</b> → tầng <b>04</b> → ô ngang thứ <b>04</b>, dãy thứ <b>4</b> tính từ cửa vào.
     Ô chọn Định khu ở hộp thoại <b>Khai Hoá Chất Cho Phòng</b> chỉ hiện mã này; các màn khác hiện kèm tên
     <i>Kho / Kệ / Cột / Tầng</i> phía trước.</p>
 
-<h3>Gán phân loại và loại lưu trữ cho vị trí</h3>
+<h3>Gán phân loại, loại lưu trữ và chia sẻ vị trí</h3>
 <ol class="ug-steps">
     <li>Mở một kệ đã lưu. <b>Bấm</b> hoặc <b>rê chuột</b> qua các ô để chọn nhiều vị trí; giữ <b>Shift</b> rồi kéo chuột để quét một khung chữ nhật, mọi ô chạm khung (kể cả ở nhiều tầng, nhiều cột) được thêm vào lựa chọn; bấm <b>Chọn cả kệ</b> để chọn tất cả.</li>
     <li>Chọn <b>Phân loại</b>: <i>Dự Phòng</i>, <i>Sử Dụng</i>, <i>Biệt Trữ</i>, <i>Cách Ly Chờ Quyết Định</i>, <i>Loại Bỏ/Chờ Huỷ</i>.
         Mỗi phân loại có một màu riêng trên lưới.</li>
     <li>Chọn <b>Loại lưu trữ</b>: <i>Vật tư</i>, <i>Hoá chất</i>, <i>Chất chuẩn</i> hoặc <i>Dùng chung</i>. Màn hình Tồn của
         từng loại chỉ hiện các vị trí đúng loại; vị trí <i>Dùng chung</i> hiện ở cả ba màn hình.</li>
-    <li>Bấm <b>Áp dụng</b>. Chọn <i>- Giữ nguyên -</i> ở ô nào thì ô đó không bị thay đổi.</li>
+    <li>Chọn <b>Chia sẻ cho</b> khi kho của phòng dùng chung với bộ phận khác (ví dụ kho chung của QC giao vài vị trí cho
+        Phân xưởng): chọn bộ phận được cất hàng ở các vị trí đang chọn, hoặc <i>Không chia sẻ</i> để lấy lại.
+        @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/materData/dinh-khu-chia-se.png', 'caption' => 'Thanh chọn vị trí: Phân loại, Loại lưu trữ, Chia sẻ cho'])
+    </li>
+    <li>Bấm <span class="btn btn-sm btn-primary ug-ui"><i class="fas fa-check mr-1"></i>Áp dụng</span>. Chọn <i>- Giữ nguyên -</i> ở ô nào thì ô đó không bị thay đổi.</li>
 </ol>
+<p>Vị trí đã chia sẻ có <b>tam giác màu ở góc trái trên</b> (chú thích <i>Chia sẻ cho bộ phận khác</i>); rê chuột vào ô để xem
+    tên bộ phận. Mỗi vị trí chỉ giao cho <b>một</b> bộ phận, và đã giao thì phòng chủ kho không cất hàng vào đó nữa:</p>
+<ul>
+    <li>Ô chọn định khu ở Nhập, Danh mục của phòng (Vị trí mặc định), Định khu ở Tồn Kho, Cách ly, Nhận chuyển:
+        phòng chủ kho <b>không còn thấy</b> vị trí đã giao, bộ phận được chia sẻ <b>thấy và chọn được</b>.</li>
+    <li>Tồn Kho tab <b>Theo định khu</b>: phòng chủ kho vẫn thấy hàng bộ phận kia cất ở vị trí đã giao (chỉ xem, có nhãn bộ phận,
+        hoá chất vẫn xét tương kỵ cùng tầng); bộ phận được chia sẻ thấy kho dạng <i>"Tên kho · kho &lt;phòng chủ&gt;"</i>.</li>
+</ul>
+<div class="ug-callout is-warn">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>Chỉ đổi chia sẻ được khi vị trí <b>đã trống</b> và không còn là <b>Vị trí mặc định</b> trong danh mục của bộ phận đang giữ
+        vị trí. Nếu không sẽ báo <i>"Chưa đổi được chia sẻ: vị trí ... còn hàng tồn / đang là Vị trí mặc định trong danh mục của ...
+        Hãy chuyển hàng / đổi Vị trí mặc định sang chỗ khác trước"</i>.</div>
+</div>
 <p>Nút <b>Tô màu theo</b> chuyển cách tô lưới: theo <b>Phân loại</b> hoặc theo <b>Trạng thái</b> (có lô hàng, trống, đang khoá).</p>
 
 <h3>Mặt bằng kho/phòng: hình dạng phòng, cửa và vị trí các kệ/tủ</h3>

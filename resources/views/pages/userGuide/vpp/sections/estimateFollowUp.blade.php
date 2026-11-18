@@ -1,12 +1,14 @@
 @include('pages.userGuide.shared.flowMapLink', ['lane' => 'du-tru', 'no' => 1, 'label' => 'Dự trù mua hàng'])
 
-<p>Sau khi phiếu dự trù được phê duyệt, phòng đề nghị và bộ phận mua hàng cùng theo dõi tới khi hàng về.</p>
+<p>Sau khi phiếu dự trù được phê duyệt, chính <b>kho VPP Hành Chánh</b> (vai trò Quản lý / Tổ trưởng Kho VPP) tiếp nhận, hẹn ngày đáp ứng
+    và theo dõi tới khi hàng về. Phòng lập và bộ phận mua hàng là một nên mọi việc làm ngay trên trang chi tiết phiếu.</p>
 @include('pages.userGuide.shared.shot', ['src' => 'img/userGuide/vpp/theo-doi-du-tru.png', 'caption' => 'Màn hình Dự Trù › VPP › tab Theo dõi dự trù / Đơn dự trù đã được phê duyệt'])
 
-<h3>Tab "Đơn dự trù đã được phê duyệt": dành cho bộ phận mua hàng</h3>
-<p>Chỉ hiện với người đang chọn đúng phòng mua hàng và có quyền <b>Tiếp Nhận Xử Lý Dự Trù VPP</b>.</p>
+<h3>Tab "Đơn dự trù đã được phê duyệt": dành cho kho VPP Hành Chánh</h3>
+<p>Chỉ hiện với người đang chọn phòng Hành Chánh và có quyền <b>Tiếp Nhận Xử Lý Dự Trù VPP</b> (mặc định Quản lý Kho VPP, Tổ trưởng
+    Kho VPP; Quản Lý Bộ Phận chỉ ký, không lập / sửa / huỷ / theo dõi giao hàng).</p>
 <ol class="ug-steps">
-    <li>Phiếu vừa duyệt ở trạng thái <b>Chờ tiếp nhận</b>. Bấm <b>Tiếp nhận</b> (cũng làm được ở Trang chủ); hệ thống ghi người và ngày tiếp nhận.</li>
+    <li>Phiếu vừa duyệt ở trạng thái <b>Chờ tiếp nhận</b>. Bấm <b>Tiếp nhận</b> ngay trên trang chi tiết phiếu (hoặc ở Trang chủ); hệ thống ghi người và ngày tiếp nhận.</li>
     <li>Với từng VPP, cập nhật <b>Ngày Hẹn Đáp Ứng</b> cho <b>từng tháng dự trù</b>, kèm lý do nếu đổi hẹn. Mỗi lần đổi đều
         lưu lịch sử để phòng đề nghị theo dõi. Chỉ hẹn được khi phiếu đã phê duyệt.</li>
     <li>Trạng thái tiếp nhận:
@@ -32,14 +34,7 @@
     tin ngay trên từng mặt hàng (quyền <i>Trao Đổi Theo Dõi Dự Trù</i>). Phòng đề nghị đánh dấu <b>Hoàn thành</b> khi đã nhận đủ
     hàng (quyền <i>Theo Dõi Giao Hàng Dự Trù VPP</i>).</p>
 
-<h3>Huỷ một mặt hàng đã duyệt: cần cả hai bên đồng ý</h3>
-<ol class="ug-steps">
-    <li><b>Phòng đề nghị</b> bấm <b>Huỷ</b> trên mặt hàng ở trang chi tiết phiếu. Mặt hàng chuyển sang <b>Chờ xác nhận huỷ</b>.</li>
-    <li><b>Bộ phận mua hàng</b> mở phiếu từ tab Đơn dự trù đã được phê duyệt, bấm <b>Đồng ý huỷ</b> hoặc <b>Không đồng ý</b>.</li>
-    <li>Đủ cả hai bên đồng ý thì mặt hàng mới bị huỷ.</li>
-</ol>
-<div class="ug-callout">
-    <i class="fas fa-info-circle"></i>
-    <div>Bộ phận mua hàng không tự đề nghị huỷ được; chỉ xác nhận khi phòng đề nghị đã bấm huỷ. Bộ phận mua hàng của mọi
-        mục dự trù VPP (kể cả ngoài danh mục) là <b>Hành Chánh</b>.</div>
-</div>
+<h3>Huỷ một mặt hàng đã duyệt</h3>
+<p>Khác dự trù Vật Tư / Hoá Chất / Chất Chuẩn (cần cả hai bên đồng ý), dự trù VPP chỉ cần <b>một lần xác nhận</b>: ở trang chi tiết
+    phiếu bấm <span class="btn btn-sm btn-danger ug-ui"><i class="fas fa-times"></i> Huỷ</span> trên mặt hàng, xác nhận
+    <i>"Huỷ mặt hàng này?"</i> là mặt hàng bị huỷ ngay, <b>không hoàn tác được</b>.</p>

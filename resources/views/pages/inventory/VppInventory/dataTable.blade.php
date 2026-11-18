@@ -120,16 +120,6 @@
                         <span class="badge badge-light ml-1">{{ $invExpiringSoon->count() }}</span>
                     </button>
                     @endtab
-                    @tab('inventory_vpp', 'next')
-                    <button type="button" class="mi-tab {{ $activeTab === 'next' ? 'is-active' : '' }}" data-pane="miPaneNext">
-                        <i class="fas fa-calendar-check mr-1"></i>Khả dụng {{ $forecast['month']['label'] }}
-                        @if ($forecast['summary']['short'] > 0)
-                            <span class="badge badge-danger ml-1">{{ $forecast['summary']['short'] }} mã không đáp ứng</span>
-                        @elseif ($forecast['summary']['tight'] > 0)
-                            <span class="badge badge-warning ml-1">{{ $forecast['summary']['tight'] }} mã vừa đủ</span>
-                        @endif
-                    </button>
-                    @endtab
                     @tab('inventory_vpp', 'check')
                     <button type="button" class="mi-tab {{ $activeTab === 'check' ? 'is-active' : '' }}" data-pane="miPaneCheck">
                         <i class="fas fa-clipboard-check mr-1"></i>Kiểm kê định kỳ
@@ -442,13 +432,6 @@
                 </div>
                 @endtab
 
-                {{-- ============ KHẢ DỤNG THÁNG TỚI ============ --}}
-                @tab('inventory_vpp', 'next')
-                <div class="mi-pane {{ $activeTab === 'next' ? 'is-active' : '' }}" id="miPaneNext">
-                    @include('pages.inventory.VppInventory.nextMonth')
-                </div>
-                @endtab
-
                 {{-- ============ KIỂM KÊ ĐỊNH KỲ (1 THÁNG 1 LẦN) ============ --}}
                 @tab('inventory_vpp', 'check')
                 <div class="mi-pane {{ $activeTab === 'check' ? 'is-active' : '' }}" id="miPaneCheck">
@@ -470,7 +453,7 @@
             $('.mi-pane').removeClass('is-active');
             $('#' + $(this).data('pane')).addClass('is-active');
             // Badge phân loại chỉ áp cho các tab dạng bảng tồn
-            $('#miClassBar').toggle(['miPaneCode', 'miPaneMat', 'miPaneExpiring', 'miPaneNext'].indexOf($(this).data('pane')) !== -1);
+            $('#miClassBar').toggle(['miPaneCode', 'miPaneMat', 'miPaneExpiring'].indexOf($(this).data('pane')) !== -1);
             $($.fn.dataTable.tables(true)).DataTable().columns.adjust();
         });
 
@@ -530,10 +513,5 @@
             if ($.fn.DataTable.isDataTable('#miExpiringTable')) $('#miExpiringTable').DataTable().draw();
         });
         mdDeferred.setEmpty('#miExpiringTable', 'Không có mã xuất nhập nào còn tồn mà sắp hết hạn.');
-
-        // Đổi tháng ở tab "Khả dụng tháng tới" nạp lại trang - mở lại đúng tab đó
-        if (location.search.indexOf('tab=forecast') >= 0) {
-            $('.mi-tab[data-pane="miPaneNext"]').trigger('click');
-        }
     });
 </script>

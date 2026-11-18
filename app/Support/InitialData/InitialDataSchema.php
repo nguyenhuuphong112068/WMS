@@ -2,7 +2,6 @@
 
 namespace App\Support\InitialData;
 
-use App\Http\Controllers\Pages\MaterData\ConsumptionObjectController;
 use App\Http\Controllers\Pages\MaterData\ZoneController;
 use App\Support\MaterialClassification;
 use App\Support\VppClassification;
@@ -46,14 +45,16 @@ use Illuminate\Support\Facades\Schema;
 class InitialDataSchema
 {
     /** Phiên bản cấu trúc file. Đổi cột / sheet thì tăng số này để chặn file mẫu cũ. */
-    public const VERSION = 'WMS-INITIAL-DATA-V6';
+    public const VERSION = 'WMS-INITIAL-DATA-V7';
 
     /**
      * Phiên bản cũ vẫn nhận cho các giai đoạn không đổi cấu trúc: [phiên bản => [giai đoạn]].
      * V5 (14/11/2026) chỉ đổi sheet định khu (giai đoạn 3 - 4) nên file V4 giai đoạn 1 - 2 vẫn dùng được.
      * V6 (16/11/2026) thêm sheet 37.Tên VPP (tách khỏi 15.Tên vật tư) - chỉ đổi giai đoạn 3 - 4.
+     * V7 (16/11/2026) bỏ sheet 12.Tên sản phẩm + 13.Đối tượng tiêu hao (cập nhật trực tiếp trên phần mềm)
+     * - chỉ đổi giai đoạn 3, file V6 giai đoạn 4 vẫn dùng được.
      */
-    public const COMPATIBLE_VERSIONS = ['WMS-INITIAL-DATA-V4' => [1, 2], 'WMS-INITIAL-DATA-V5' => [1, 2]];
+    public const COMPATIBLE_VERSIONS = ['WMS-INITIAL-DATA-V4' => [1, 2], 'WMS-INITIAL-DATA-V5' => [1, 2], 'WMS-INITIAL-DATA-V6' => [1, 2, 4]];
 
     /** File mẫu phiên bản $version, giai đoạn $stage còn dùng được (null = file đủ mọi giai đoạn). */
     public static function acceptsVersion(?string $version, ?int $stage): bool
@@ -171,7 +172,7 @@ class InitialDataSchema
 
     /**
      * Sheet (dữ liệu + tra cứu) thuộc riêng module nào; sheet không có ở đây là sheet dùng chung,
-     * có mặt trong file của mọi module (tổ chức, đơn vị, nhà sản xuất, sản phẩm, định khu, quy đổi).
+     * có mặt trong file của mọi module (tổ chức, đơn vị, nhà sản xuất, định khu, quy đổi).
      * Sheet Định khu dùng chung nhưng chỉ liệt kê vị trí có Loại lưu trữ trống hoặc đúng module.
      */
     public const MODULE_SHEETS = [
@@ -179,7 +180,6 @@ class InitialDataSchema
         'storage' => ['chemical', 'standard'],
         'suppliers' => ['chemical', 'standard'],
         'purposes' => ['standard'],
-        'consumption' => ['material'],
         'dept_class' => ['material'],
         'material_names' => ['material'],
         'vpp_names' => ['vpp'],
@@ -221,11 +221,6 @@ class InitialDataSchema
             $classification['cls_'.$key] = array_flip($criterion['options']);
         }
 
-        $consumptionTypes = [];
-        foreach (ConsumptionObjectController::TYPES as $key => $type) {
-            $consumptionTypes[$type['label']] = $key;
-        }
-
         $unitGroups = [];
         foreach (config('unit.groups') as $key => $group) {
             $unitGroups[$group['label']] = $key;
@@ -248,8 +243,6 @@ class InitialDataSchema
             'item_type' => array_flip(ZoneController::LOCATION_TYPES),
             'unit_group' => $unitGroups,
             'purchasing' => array_flip(MaterialClassification::PURCHASING_DEPARTMENTS),
-            'consumption_type' => $consumptionTypes,
-            'frequency' => array_flip(ConsumptionObjectController::FREQUENCIES),
             'chem_type' => array_combine(config('chemical.types'), config('chemical.types')),
             'category_type' => ['Vật tư' => 'material', 'Hoá chất' => 'chemical', 'Chất chuẩn' => 'standard'],
             'expiry_type' => [
@@ -489,28 +482,6 @@ class InitialDataSchema
                 'desc' => 'Mục đích sử dụng / chỉ tiêu kiểm nghiệm của chất chuẩn.',
                 'columns' => [
                     ['key' => 'name', 'label' => 'Mục đích / chỉ tiêu', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 34, 'hint' => 'VD: Định lượng'],
-                ],
-            ],
-            'products' => [
-                'title' => '12.Tên sản phẩm',
-                'table' => 'product_names',
-                'group' => 'Dữ liệu gốc dùng chung',
-                'desc' => 'Tên thành phẩm của nhà máy (dùng khi đề nghị cấp phát theo sản phẩm).',
-                'columns' => [
-                    ['key' => 'name', 'label' => 'Tên sản phẩm', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 50, 'hint' => 'Không trùng'],
-                ],
-            ],
-            'consumption' => [
-                'title' => '13.Đối tượng tiêu hao',
-                'table' => 'consumption_objects',
-                'group' => 'Dữ liệu gốc dùng chung',
-                'desc' => 'Thiết bị / đối tượng tiêu hao vật tư định kỳ. Không trùng bộ (Loại + Mã + Tần suất).',
-                'columns' => [
-                    ['key' => 'type', 'label' => 'Loại đối tượng', 'type' => 'list', 'list' => 'consumption_type', 'req' => true, 'width' => 22, 'hint' => 'Chọn trong danh sách'],
-                    ['key' => 'code', 'label' => 'Mã', 'type' => 'text', 'req' => true, 'max' => 50, 'width' => 16, 'hint' => 'VD: TB-001'],
-                    ['key' => 'name', 'label' => 'Tên', 'type' => 'text', 'req' => true, 'max' => 255, 'width' => 36, 'hint' => 'VD: Máy HPLC 01'],
-                    ['key' => 'location', 'label' => 'Vị trí đặt', 'type' => 'text', 'max' => 255, 'width' => 22, 'hint' => ''],
-                    ['key' => 'frequency', 'label' => 'Tần suất', 'type' => 'list', 'list' => 'frequency', 'req' => true, 'width' => 16, 'hint' => 'VD: Hằng tháng'],
                 ],
             ],
             'dept_class' => [

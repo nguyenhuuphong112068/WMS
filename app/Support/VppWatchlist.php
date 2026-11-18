@@ -2,13 +2,12 @@
 
 namespace App\Support;
 
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
  * VPP CẦN DỰ TRÙ - dùng cho tab "Danh sách VPP cần dự trù" (Dự Trù VPP).
  *
- * Gộp ba nguồn (SOURCE_* - cũng là các lựa chọn của bộ lọc "Nguồn" trên tab):
+ * Gộp hai nguồn (SOURCE_* - cũng là các lựa chọn của bộ lọc "Nguồn" trên tab):
  *   1. TỰ ĐỘNG: VPP của phòng đang tồn dưới ngưỡng tối thiểu đã khai
  *      (vpp_department_categories.min_stock) - tồn tính qua
  *      App\Support\MaxStockWarning::onHandVpp(), đúng công thức dùng ở màn Tồn Kho.
@@ -16,9 +15,7 @@ use Illuminate\Support\Facades\DB;
  *      trên dòng đề nghị của modal Đề Nghị Thường Quy / Theo ĐG Rủi Ro (SỬ DỤNG VPP,
  *      không phụ thuộc đề nghị đó có được lưu hay không), hoặc ngay trên danh mục
  *      "VPP Của Phòng" (DANH MỤC) - lưu ở bảng vpp_watchlist_items.
- *   3. TỰ ĐỘNG: VPP THIẾU TỒN KHẢ DỤNG cho nhu cầu theo chu kỳ của tháng tới - đúng các
- *      dòng "Không đáp ứng" của tab Khả dụng tháng tới ở màn Tồn Kho
- *      (App\Support\VppAvailabilityForecast); SL đề nghị gợi ý = lượng nên dự trù.
+ * (18/11/2026 bỏ nguồn "Thiếu tồn khả dụng tháng tới" cùng tab Khả dụng tháng tới của Tồn Kho VPP.)
  *
  * Một VPP trong danh mục thuộc nhiều nguồn cùng lúc chỉ hiện MỘT dòng - xem forTab().
  *
@@ -37,8 +34,6 @@ class VppWatchlist
 
     public const SOURCE_USER = 'user';
 
-    public const SOURCE_FORECAST = 'forecast';
-
     /** Đề nghị liên phòng ban còn dở (phòng nhận chưa cấp xong) và nhãn hiển thị - xem inProgress(). */
     private const TRANSFER_STATUS_LABELS = [
         'draft' => 'Lưu tạm',
@@ -47,19 +42,12 @@ class VppWatchlist
         'partial' => 'Cấp phát một phần',
     ];
 
-    /** Tháng đang xét của nguồn "Thiếu tồn khả dụng": luôn là tháng tiếp theo (Y-m). */
-    public static function forecastMonth(): string
-    {
-        return now()->startOfMonth()->addMonthNoOverflow()->format('Y-m');
-    }
-
     /** Nhãn các nguồn cho bộ lọc / cột Nguồn. */
     public static function sourceLabels(): array
     {
         return [
             self::SOURCE_THRESHOLD => 'Dưới ngưỡng tối thiểu',
             self::SOURCE_USER => 'Người dùng đề nghị',
-            self::SOURCE_FORECAST => 'Thiếu tồn khả dụng cho tháng '.Carbon::createFromFormat('Y-m-d', self::forecastMonth().'-01')->format('m/Y'),
         ];
     }
 
@@ -148,7 +136,6 @@ class VppWatchlist
             'on_hand' => null,
             'min_stock' => null,
             'below_threshold' => false,
-            'forecast' => null,
             'quantity' => null,
             'source_type' => null,
             'note' => null,
@@ -195,48 +182,6 @@ class VppWatchlist
             $rows[$key]->remembered_by = $r->updated_by ?: $r->created_by;
             $rows[$key]->remembered_at = $r->updated_at ?: $r->created_at;
             $rows[$key]->sources[] = self::SOURCE_USER;
-        }
-
-        // Dòng "Không đáp ứng" + dòng "Vừa đủ" còn lượng cần dự trù (sau tháng tới hụt ngưỡng tối thiểu)
-        // - khớp cột "Cần Dự Trù" của tab Khả dụng ở Tồn Kho VPP
-        $forecast = VppAvailabilityForecast::build($departmentId, self::forecastMonth());
-        $locked = self::lockedCategoryIds($departmentId);
-
-        foreach ($forecast['rows'] as $f) {
-            $needed = $f->state === 'short' || ($f->state === 'tight' && $f->suggest > 0);
-
-            if (! $needed || isset($locked[(int) $f->category_id])) {
-                continue;
-            }
-
-            $key = 'cat_'.$f->category_id;
-
-            $rows[$key] ??= (object) array_merge($blank, [
-                'category_id' => $f->category_id,
-                'material_name' => $f->material_name,
-                'technical_specification' => null,
-                'manufacturer_name' => $f->manufacturer_short_name,
-                'unit' => $f->unit_short_name,
-                'unit_id' => $f->unit_id,
-                'purchasing_department' => $f->purchasing_department,
-                'on_hand' => $f->stock,
-                'min_stock' => $f->min_stock,
-            ]);
-
-            $rows[$key]->forecast = (object) [
-                'month' => $forecast['month']['value'],
-                'month_label' => $forecast['month']['label'],
-                'available' => $f->available,
-                'demand' => $f->demand,
-                'gap' => $f->gap,
-                'suggest' => $f->suggest,
-            ];
-            $rows[$key]->sources[] = self::SOURCE_FORECAST;
-
-            // Người dùng chưa khai số lượng thì gợi ý bằng lượng nên dự trù của màn Tồn Kho
-            if ($rows[$key]->quantity === null && $f->suggest > 0) {
-                $rows[$key]->quantity = $f->suggest;
-            }
         }
 
         // Đã lập phiếu dự trù / đề nghị liên phòng ban mà chưa xong: gắn mã phiếu, khoá chọn lại

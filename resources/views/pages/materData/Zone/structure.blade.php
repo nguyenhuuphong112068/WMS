@@ -71,6 +71,7 @@
                     <span><i class="zs-swatch is-cut"></i> Sẽ khoá</span>
                     <span><i class="zs-swatch is-picked"></i> Đang chọn</span>
                     <span><i class="zs-swatch has-color"></i> Màu phân loại</span>
+                    <span><i class="zs-swatch is-free is-shared"></i> Chia sẻ cho bộ phận khác</span>
                 </div>
             </div>
 
@@ -94,6 +95,18 @@
                         <option value="">Dùng chung</option>
                         @foreach ($locationTypes as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                {{-- Giao ô cho bộ phận khác dùng chung kho (App\Support\LocationShare): mỗi ô một bộ phận --}}
+                <div class="zs-loc-field">
+                    <label for="zs-loc-share" class="mb-0">Chia sẻ cho</label>
+                    <select id="zs-loc-share" class="form-control form-control-sm zs-loc-share"
+                        title="Bộ phận được cất hàng ở các vị trí đang chọn - phòng bạn không cất hàng vào vị trí đã chia sẻ">
+                        <option value="__keep">- Giữ nguyên -</option>
+                        <option value="">Không chia sẻ</option>
+                        @foreach ($shareDepartments ?? [] as $dept)
+                            <option value="{{ $dept->id }}">{{ \App\Support\DepartmentOptions::label($dept) }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -1414,6 +1427,26 @@
         outline-offset: 1px;
     }
 
+    /* Vị trí chia sẻ cho bộ phận khác (LocationShare): tam giác màu nhấn ở góc trái trên */
+    .zs-cell.is-shared,
+    .zs-swatch.is-shared {
+        position: relative;
+    }
+
+    .zs-cell.is-shared::before,
+    .zs-swatch.is-shared::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        border-top: 8px solid var(--accent);
+        border-right: 8px solid transparent;
+    }
+
+    .zs-loc-field select.zs-loc-share {
+        width: 200px;
+    }
+
     .zs-swatch.is-picked {
         background: #fff;
     }
@@ -1605,6 +1638,7 @@
     "layout": @json(route('pages.materData.zone.structure.layout')),
     "saveLayout": @json(route('pages.materData.zone.structure.saveLayout')),
     "locationTypes": @json($locationTypes),
+    "shareDepartments": @json(collect($shareDepartments ?? [])->mapWithKeys(fn ($d) => [$d->id => \App\Support\DepartmentOptions::label($d)])),
     "zoneTypes": @json(\App\Support\ZoneType::TYPES),
     "zoneColors": @json(\App\Support\ZoneType::DEFAULT_COLORS),
     "maxColumns": {{ (int) $structureLimits['maxColumns'] }},
@@ -1653,6 +1687,7 @@
         locBar: byId('zs-loc-bar'),
         locCount: byId('zs-loc-count'),
         locType: byId('zs-loc-type'),
+        locShare: byId('zs-loc-share'),
         locAll: byId('zs-loc-all'),
         locClear: byId('zs-loc-clear'),
         locApply: byId('zs-loc-apply'),
@@ -3231,9 +3266,11 @@
                     extra = ' data-id="' + attr.id + '" data-zone="' + esc(zt ? attr.zone_type : '') + '"'
                         + (styles.length ? ' style="' + styles.join(';') + '"' : '');
                     cls += (attr.shown ? ' has-color' : '') + (zt ? ' has-zone' : '')
+                        + (attr.share ? ' is-shared' : '')
                         + (state.picked.has(attr.id) ? ' is-picked' : '');
                     status += ' · ' + (CFG.zoneTypes[attr.zone_type] || 'Chưa phân loại')
-                        + ' · ' + (CFG.locationTypes[attr.item_type] || 'Dùng chung');
+                        + ' · ' + (CFG.locationTypes[attr.item_type] || 'Dùng chung')
+                        + (attr.share ? ' · Chia sẻ cho ' + (CFG.shareDepartments[attr.share] || 'bộ phận khác') : '');
                     letter = TYPE_LETTERS[attr.item_type] || '';
                 }
 
@@ -3858,10 +3895,11 @@
     el.locApply.addEventListener('click', function () {
         var setZone = el.locZone.value !== '__keep';
         var setType = el.locType.value !== '__keep';
+        var setShare = !!el.locShare && el.locShare.value !== '__keep';
 
         if (!state.picked.size) return;
-        if (!setZone && !setType) {
-            toast('warning', 'Chọn phân loại hoặc loại lưu trữ cần áp cho các vị trí đang chọn.');
+        if (!setZone && !setType && !setShare) {
+            toast('warning', 'Chọn phân loại, loại lưu trữ hoặc bộ phận chia sẻ cần áp cho các vị trí đang chọn.');
             return;
         }
 
@@ -3872,7 +3910,9 @@
             set_zone: setZone,
             zone_type: setZone ? el.locZone.value : null,
             set_type: setType,
-            item_type: setType ? el.locType.value : null
+            item_type: setType ? el.locType.value : null,
+            set_share: setShare,
+            shared_department_id: setShare && el.locShare.value !== '' ? el.locShare.value : null
         }).then(function (result) {
             el.locApply.disabled = false;
             if (!result.ok) {

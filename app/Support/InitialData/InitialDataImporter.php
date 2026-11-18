@@ -893,32 +893,6 @@ class InitialDataImporter
         $this->simpleNames($rows, 'purposes', 'Chỉ tiêu kiểm');
     }
 
-    private function importProducts(array $rows): void
-    {
-        $this->simpleNames($rows, 'product_names', 'Tên sản phẩm');
-    }
-
-    private function importConsumption(array $rows): void
-    {
-        $this->eachUnique($rows, ['type', 'code', 'frequency'], function ($row) {
-            $exists = DB::table('consumption_objects')
-                ->where('type', $row['type'])->where('code', $row['code'])->where('frequency', $row['frequency'])
-                ->exists();
-            if ($exists) {
-                return $this->existing();
-            }
-
-            $this->insertMaster('consumption_objects', [
-                'source' => 'manual',
-                'type' => $row['type'],
-                'code' => $row['code'],
-                'name' => $row['name'],
-                'location' => $row['location'],
-                'frequency' => $row['frequency'],
-            ], ['Loại' => $row['type'], 'Mã' => $row['code'], 'Tên' => $row['name'], 'Tần suất' => $row['frequency']]);
-        });
-    }
-
     private function importDeptClass(array $rows): void
     {
         $this->eachUnique($rows, ['department', 'name'], function ($row) {

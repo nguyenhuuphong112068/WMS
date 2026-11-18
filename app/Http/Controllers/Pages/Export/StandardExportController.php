@@ -1882,7 +1882,7 @@ class StandardExportController extends Controller
         }
 
         if ($request->filled('dest_location_id')) {
-            $locOk = DB::table('locations')->where('id', $request->dest_location_id)->where('department_id', $departmentId)->where('status_id', 1)->exists();
+            $locOk = DB::table('locations')->where('id', $request->dest_location_id)->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, 'locations'))->where('status_id', 1)->exists();
             if (!$locOk) {
                 return $error('Vị trí lưu trữ được chọn không thuộc phòng ban bạn!');
             }

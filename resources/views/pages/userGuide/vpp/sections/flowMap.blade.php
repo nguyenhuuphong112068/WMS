@@ -48,30 +48,28 @@
                 </tr>
             </thead>
             <tbody>
-                {{-- 1. Dự trù mua hàng --}}
+                {{-- 1. Dự trù mua hàng: chỉ phòng Hành Chánh (kho VPP) lập, tự tiếp nhận --}}
                 <tr class="m-row m1" data-lane="du-tru">
-                    <th class="m-lane"><span class="bnum">1</span><span class="m-lane-t"><b>Dự trù mua hàng</b><span>bộ phận mua hàng mua về</span></span></th>
+                    <th class="m-lane"><span class="bnum">1</span><span class="m-lane-t"><b>Dự trù mua hàng</b><span>chỉ Hành Chánh lập · kho VPP tự mua về</span></span></th>
                     <td class="m-cell DM"><div class="m-flow">
-                        <a class="m-src m-node" data-to="1" href="#danh-sach-chu-ky"><b>DS dự trù theo chu kỳ</b><span>tự lập phiếu Nháp</span></a>
-                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>VPP dưới ngưỡng tối thiểu</b><span>tự động</span></a>
-                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Nút Đề nghị dự trù</b><span>người dùng</span></a>
+                        <a class="m-src m-node" data-to="1" href="#danh-sach-chu-ky"><b>DS dự trù theo chu kỳ</b><span>của HC · tự lập phiếu Nháp</span></a>
+                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Kho VPP HC dưới ngưỡng</b><span>tự động</span></a>
+                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Nút Đề nghị dự trù VPP</b><span>VPP của phòng HC</span></a>
                     </div></td>
-                    <td class="m-cell TK"><div class="m-flow">
-                        <a class="m-src m-node" data-to="0" href="#kha-dung-thang-toi"><b>Dự báo thiếu tồn tháng tới</b><span>tự động</span></a>
-                    </div></td>
+                    <td class="m-cell TK pass"></td>
                     <td class="m-cell SD pass"></td>
                     <td class="m-cell DT"><div class="m-flow">
-                        <div class="m-act"><span>gom · Hành Chánh mua</span></div>
+                        <div class="m-act"><span>gom</span></div>
                         <a class="m-doc m-node" data-n="0" href="#can-du-tru"><span class="k">tab DS VPP cần dự trù</span><span class="s">Chưa lập phiếu</span></a>
-                        <div class="m-act"><span>lập phiếu</span></div>
+                        <div class="m-act"><span>HC lập phiếu</span></div>
                         <a class="m-doc m-node" data-n="1" href="#du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Nháp</span></a>
                         <div class="m-act"><span>trình ký</span></div>
-                        <a class="m-doc m-node" data-n="2" href="#du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Chờ QLBP ký</span></a>
+                        <a class="m-doc m-node" data-n="2" href="#du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Chờ QLBP HC ký</span></a>
                         <div class="m-act"><span>ký bước 1</span></div>
                         <a class="m-doc m-node" data-n="3" href="#du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Chờ BGĐ ký</span></a>
                         <div class="m-act"><span>ký bước 2</span></div>
-                        <a class="m-doc m-node" data-n="4" href="#theo-doi-du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Đã phê duyệt</span></a>
-                        <div class="m-act"><span>mua hàng tiếp nhận</span></div>
+                        <a class="m-doc m-node" data-n="4" href="#theo-doi-du-tru"><span class="k">Chi tiết phiếu</span><span class="s">Đã phê duyệt · Chờ tiếp nhận</span></a>
+                        <div class="m-act"><span>kho VPP HC tiếp nhận · hẹn ngày</span></div>
                         <a class="m-doc m-node" data-n="5" href="#theo-doi-du-tru"><span class="k">tab Đơn dự trù đã được phê duyệt</span><span class="s">Đang giải quyết</span></a>
                     </div></td>
                     <td class="m-cell NH"><div class="m-flow">
@@ -79,52 +77,59 @@
                         <a class="m-doc m-node" data-n="6" href="#cho-kiem-tra"><span class="k">tab Chờ kiểm tra</span><span class="s">Chờ kiểm tra</span></a>
                         <div class="m-act"><span>kiểm tra Đạt</span></div>
                         <a class="m-doc m-node" data-n="7" href="#nhap-vat-tu"><span class="k">tab Sổ nhập VPP</span><span class="s">Lô vào tồn</span></a>
-                        <div class="m-act"><span>xác nhận ở Dự Trù</span></div>
+                        <div class="m-act"><span>kho VPP HC xác nhận ở Dự Trù</span></div>
                         <a class="m-doc m-node done" data-n="8" href="#theo-doi-du-tru"><span class="k">tab Theo dõi dự trù</span><span class="s">Hoàn thành</span></a>
                     </div></td>
                     <td class="m-cell KQ"><div class="m-flow">
-                        <div class="m-eff m-node up" data-from="7">▲ Tồn kho phòng tăng</div>
+                        <div class="m-eff m-node up" data-from="7">▲ Kho VPP Hành Chánh tăng</div>
                     </div></td>
                 </tr>
 
-                {{-- 2a. Đề nghị VPP đến HC --}}
+                {{-- 2a. Đề nghị cấp phát VPP đến HC (phòng khác xin kho VPP Hành Chánh) --}}
                 <tr class="m-row m2" data-lane="vpp">
-                    <th class="m-lane"><span class="bnum">2</span><span class="m-lane-t"><b>Đề nghị VPP đến HC</b><span>chuyển kho · Hành Chánh mua</span></span></th>
+                    <th class="m-lane"><span class="bnum">2</span><span class="m-lane-t"><b>Đề nghị VPP đến HC</b><span>chuyển kho · phòng xin kho VPP Hành Chánh</span></span></th>
                     <td class="m-cell DM"><div class="m-flow">
                         <a class="m-src m-node" data-to="1" href="#danh-sach-chu-ky"><b>DS liên phòng ban theo chu kỳ</b><span>phòng cấp là HC</span></a>
-                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Dưới ngưỡng · nút Đề nghị dự trù</b><span>VPP HC mua</span></a>
+                        <a class="m-src m-node" data-to="0" href="#vat-tu-cua-phong"><b>Dưới ngưỡng · nút Đề nghị dự trù VPP</b><span>VPP của phòng</span></a>
                     </div></td>
-                    <td class="m-cell TK"><div class="m-flow">
-                        <a class="m-src m-node" data-to="0" href="#kha-dung-thang-toi"><b>Dự báo thiếu tồn</b><span>VPP HC mua</span></a>
-                    </div></td>
+                    <td class="m-cell TK pass"></td>
                     <td class="m-cell SD"><div class="m-flow">
-                        <div class="m-act"><span>gom · HC mua</span></div>
+                        <div class="m-act"><span>gom</span></div>
                         <a class="m-doc m-node" data-n="0" href="#de-nghi-vpp"><span class="k">DS VPP cần đề nghị Hành Chính</span><span class="s">Chưa đề nghị</span></a>
                         <div class="m-act"><span>lập</span></div>
                         <a class="m-doc m-node" data-n="1" href="#de-nghi-vpp"><span class="k">tab VPP đến HC</span><span class="s">Lưu tạm</span></a>
                         <div class="m-act"><span>gửi</span></div>
                         <a class="m-doc m-node" data-n="2" href="#de-nghi-vpp"><span class="k">tab VPP đến HC</span><span class="s">Chờ ký</span></a>
-                        <div class="m-act"><span>ký duyệt</span></div>
-                        <a class="m-doc m-node" data-n="3" href="#de-nghi-vpp"><span class="k">Hành Chánh · gửi đến</span><span class="s">Chờ cấp phát</span></a>
+                        <div class="m-act"><span>QLBP phòng đề nghị → QLBP HC ký</span></div>
+                        <a class="m-doc m-node" data-n="3" href="#de-nghi-vpp"><span class="k">HC · các phòng gửi đến</span><span class="s">Chờ cấp phát / Cấp một phần</span></a>
                         <div class="m-act"><span>HC xuất chuyển kho</span></div>
-                        <a class="m-doc m-node" data-n="4" href="#de-nghi-vpp"><span class="k">tab VPP đến HC</span><span class="s">Chờ nhận</span></a>
-                        <div class="m-act"><span>nhận · kiểm tra</span></div>
-                        <a class="m-doc m-node done" data-n="5" href="#de-nghi-vpp"><span class="k">tab VPP đến HC</span><span class="s">Đã cấp đủ</span></a>
+                        <a class="m-doc m-node" data-n="4" href="#de-nghi-vpp"><span class="k">tab VPP đến HC · từng mục</span><span class="s">Chờ nhận</span></a>
+                        <div class="m-branch">
+                            <div class="m-line">
+                                <div class="m-act"><span>nhận · kiểm tra Đạt</span></div>
+                                <a class="m-doc m-node done" data-n="5" href="#de-nghi-vpp"><span class="k">tab VPP đến HC</span><span class="s">Đã nhận → Đã cấp đủ</span></a>
+                            </div>
+                            <div class="m-line">
+                                <div class="m-act"><span>Không đạt · từ chối nhận</span></div>
+                                <a class="m-doc m-node alt" data-from="4" href="#de-nghi-vpp"><span class="k">tab VPP đến HC · từng mục</span><span class="s">Đã từ chối nhận</span></a>
+                            </div>
+                        </div>
                     </div></td>
                     <td class="m-cell DT pass"></td>
                     <td class="m-cell NH"><div class="m-flow">
                         <div class="m-act"><span>tự tạo lô</span></div>
-                        <a class="m-doc m-node" data-n="6" href="#nhap-vat-tu"><span class="k">Lô nhập chuyển kho</span><span class="s">Vào tồn phòng</span></a>
+                        <a class="m-doc m-node" data-n="6" href="#nhap-vat-tu"><span class="k">Lô &lt;mã gốc&gt;-CKn</span><span class="s">Vào tồn phòng đề nghị</span></a>
                     </div></td>
                     <td class="m-cell KQ"><div class="m-flow">
-                        <div class="m-eff m-node down">▼ Kho VPP của HC giảm</div>
-                        <div class="m-eff m-node up">▲ Phòng đề nghị tăng</div>
+                        <div class="m-eff m-node down" data-from="4">▼ Kho VPP HC giảm<br><small>ngay lúc xuất chuyển kho</small></div>
+                        <div class="m-eff m-node up" data-from="6">▲ Phòng đề nghị tăng<br><small>khi kiểm tra Đạt</small></div>
+                        <div class="m-eff m-node up" data-from="alt">▲ Hoàn tồn kho VPP HC<br><small>khi từ chối nhận</small></div>
                     </div></td>
                 </tr>
 
-                {{-- 2b. Đề nghị liên phòng ban --}}
+                {{-- 2b. Đề nghị liên phòng ban - phòng ban khác (không phải HC) --}}
                 <tr class="m-row m2" data-lane="lien-phong-ban">
-                    <th class="m-lane"><span class="bnum">2</span><span class="m-lane-t"><b>Đề nghị liên phòng ban</b><span>chuyển kho · phòng A xin phòng B</span></span></th>
+                    <th class="m-lane"><span class="bnum">2</span><span class="m-lane-t"><b>Đề nghị liên phòng ban</b><span>chuyển kho · phòng A xin phòng B (khác HC)</span></span></th>
                     <td class="m-cell DM"><div class="m-flow">
                         <a class="m-src m-node" data-to="0" href="#danh-sach-chu-ky"><b>DS liên phòng ban theo chu kỳ</b><span>phòng cấp khác HC</span></a>
                     </div></td>
@@ -135,21 +140,30 @@
                         <a class="m-doc m-node" data-n="0" href="#lien-phong-ban"><span class="k">tab Phòng ban khác</span><span class="s">Lưu tạm</span></a>
                         <div class="m-act"><span>gửi</span></div>
                         <a class="m-doc m-node" data-n="1" href="#lien-phong-ban"><span class="k">tab Phòng ban khác</span><span class="s">Chờ ký</span></a>
-                        <div class="m-act"><span>ký duyệt</span></div>
-                        <a class="m-doc m-node" data-n="2" href="#lien-phong-ban"><span class="k">Phòng B · gửi đến</span><span class="s">Chờ cấp phát</span></a>
+                        <div class="m-act"><span>QLBP A → QLBP B ký</span></div>
+                        <a class="m-doc m-node" data-n="2" href="#lien-phong-ban"><span class="k">Phòng B · gửi đến</span><span class="s">Chờ cấp phát / Cấp một phần</span></a>
                         <div class="m-act"><span>B xuất chuyển kho</span></div>
-                        <a class="m-doc m-node" data-n="3" href="#lien-phong-ban"><span class="k">tab Phòng ban khác</span><span class="s">Chờ nhận</span></a>
-                        <div class="m-act"><span>A nhận · kiểm tra</span></div>
-                        <a class="m-doc m-node done" data-n="4" href="#lien-phong-ban"><span class="k">tab Phòng ban khác</span><span class="s">Đã cấp đủ</span></a>
+                        <a class="m-doc m-node" data-n="3" href="#lien-phong-ban"><span class="k">tab Phòng ban khác · từng mục</span><span class="s">Chờ nhận</span></a>
+                        <div class="m-branch">
+                            <div class="m-line">
+                                <div class="m-act"><span>A nhận · kiểm tra Đạt</span></div>
+                                <a class="m-doc m-node done" data-n="4" href="#lien-phong-ban"><span class="k">tab Phòng ban khác</span><span class="s">Đã nhận → Đã cấp đủ</span></a>
+                            </div>
+                            <div class="m-line">
+                                <div class="m-act"><span>Không đạt · từ chối nhận</span></div>
+                                <a class="m-doc m-node alt" data-from="3" href="#lien-phong-ban"><span class="k">tab Phòng ban khác · từng mục</span><span class="s">Đã từ chối nhận</span></a>
+                            </div>
+                        </div>
                     </div></td>
                     <td class="m-cell DT pass"></td>
                     <td class="m-cell NH"><div class="m-flow">
                         <div class="m-act"><span>tự tạo lô</span></div>
-                        <a class="m-doc m-node" data-n="5" href="#nhap-vat-tu"><span class="k">Lô nhập chuyển kho</span><span class="s">Vào tồn phòng A</span></a>
+                        <a class="m-doc m-node" data-n="5" href="#nhap-vat-tu"><span class="k">Lô &lt;mã gốc&gt;-CKn</span><span class="s">Vào tồn phòng A</span></a>
                     </div></td>
                     <td class="m-cell KQ"><div class="m-flow">
-                        <div class="m-eff m-node down">▼ Tồn phòng B giảm</div>
-                        <div class="m-eff m-node up">▲ Tồn phòng A tăng</div>
+                        <div class="m-eff m-node down" data-from="3">▼ Tồn phòng B giảm<br><small>ngay lúc xuất chuyển kho</small></div>
+                        <div class="m-eff m-node up" data-from="5">▲ Tồn phòng A tăng<br><small>khi kiểm tra Đạt</small></div>
+                        <div class="m-eff m-node up" data-from="alt">▲ Hoàn tồn phòng B<br><small>khi từ chối nhận</small></div>
                     </div></td>
                 </tr>
 
@@ -216,25 +230,26 @@
         <tbody>
             <tr>
                 <td><span class="ugfm-no k1">1</span> Dự trù mua hàng</td>
-                <td>VPP cần mua được gom vào <a href="#can-du-tru">Danh sách VPP cần dự trù</a> từ 3 nguồn (dưới ngưỡng,
-                    người dùng đề nghị, dự báo thiếu tháng tới), hoặc lập sẵn bằng <a href="#danh-sach-chu-ky">DS dự trù theo chu kỳ</a>.
-                    Phiếu <a href="#du-tru">ký 2 bước</a> rồi chuyển tới bộ phận mua hàng
-                    <a href="#theo-doi-du-tru">tiếp nhận</a>. Hàng về được <a href="#nhap-vat-tu">nhập kho</a>,
-                    <a href="#cho-kiem-tra">kiểm tra Đạt</a> thì mới vào tồn; phòng đề nghị bấm <b>Hoàn thành</b> mục dự trù.</td>
-                <td>Tăng khi lô kiểm tra Đạt.</td>
+                <td><b>Chỉ phòng Hành Chánh</b> (kho VPP) lập; phòng khác không dự trù VPP mà đi đường 2. VPP cần mua của kho Hành Chánh
+                    được gom vào <a href="#can-du-tru">Danh sách VPP cần dự trù</a> từ 2 nguồn (dưới ngưỡng, nút Đề nghị dự trù VPP), hoặc lập sẵn bằng <a href="#danh-sach-chu-ky">DS dự trù theo chu kỳ</a>.
+                    Phiếu <a href="#du-tru">ký 2 bước</a> (Quản Lý Bộ Phận Hành Chánh, Ban Giám Đốc) rồi chính kho VPP Hành Chánh
+                    <a href="#theo-doi-du-tru">tiếp nhận</a>, hẹn ngày đáp ứng. Hàng về được <a href="#nhap-vat-tu">nhập kho</a>,
+                    <a href="#cho-kiem-tra">kiểm tra Đạt</a> thì mới vào tồn; kho VPP Hành Chánh bấm <b>Hoàn thành</b> mục dự trù.</td>
+                <td>Kho VPP Hành Chánh tăng khi lô kiểm tra Đạt.</td>
             </tr>
             <tr>
                 <td><span class="ugfm-no k2">2</span> Đề nghị VPP đến HC</td>
-                <td>Văn phòng phẩm do Hành Chánh mua không lập dự trù mà xin thẳng kho của Hành Chánh
-                    (<a href="#de-nghi-vpp">Đề nghị VPP</a>). Hành Chánh xuất chuyển kho, phòng đề nghị nhận bằng cách
-                    <b>xác nhận kiểm tra</b>; hệ thống tự tạo lô nhập chuyển kho.</td>
-                <td>Kho HC giảm, phòng đề nghị tăng.</td>
+                <td>Phòng cần VPP xin thẳng kho VPP của Hành Chánh (<a href="#de-nghi-vpp">Đề nghị cấp phát VPP đến HC</a>), lập từ
+                    <b>Danh sách VPP cần đề nghị Hành Chính</b> hoặc bấm Tạo đề nghị. Phiếu ký 2 bước (Quản Lý Bộ Phận phòng đề nghị →
+                    Quản Lý Bộ Phận Hành Chánh) mới tới Hành Chánh. Hành Chánh xuất chuyển kho (cấp đủ hoặc một phần); phòng đề nghị
+                    nhận từng mục bằng <b>xác nhận kiểm tra</b>: Đạt thì hệ thống tự tạo lô nhập chuyển kho, Không đạt là <b>từ chối nhận</b>.</td>
+                <td>Kho HC giảm lúc xuất; phòng đề nghị tăng khi Đạt; từ chối nhận thì hoàn lại kho HC.</td>
             </tr>
             <tr>
                 <td><span class="ugfm-no k2">2</span> Đề nghị liên phòng ban</td>
-                <td>Giống VPP nhưng phòng cấp là một phòng bất kỳ (<a href="#lien-phong-ban">Đề nghị liên phòng ban</a>).
+                <td>Giống đường trên nhưng phòng cấp là một phòng khác Hành Chánh (<a href="#lien-phong-ban">Đề nghị liên phòng ban</a>).
                     Phiếu hiện ở mục <b>Gửi đến</b> của phòng cấp sau khi ký đủ 2 bước.</td>
-                <td>Phòng cấp giảm, phòng xin tăng.</td>
+                <td>Phòng cấp giảm lúc xuất; phòng xin tăng khi Đạt; từ chối nhận thì hoàn lại phòng cấp.</td>
             </tr>
             <tr>
                 <td><span class="ugfm-no k3">3</span> Sử dụng - ghi sổ</td>

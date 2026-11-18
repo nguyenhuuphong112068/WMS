@@ -26,7 +26,7 @@
 
 @include('pages.userGuide.shared.fields', ['fields' => [
     ['Mã', false, 'Hệ thống tự sinh khi lưu, dạng <span class="ug-key">P00001</span> (mã chuyển từ Vật Tư giữ phần số, đổi chữ M thành P).'],
-    ['Tên VPP', true, 'Chọn từ <b>Dữ Liệu Gốc › Tên Vật Tư</b> (đã duyệt) - danh sách tên dùng chung với Vật Tư.'],
+    ['Tên VPP', true, 'Chọn từ <b>Dữ Liệu Gốc › VPP › Tên VPP</b> (đã duyệt), danh sách tên riêng của VPP, không dùng chung với Tên Vật Tư.'],
     ['Nhà Sản Xuất', true, 'Chọn từ <b>Dữ Liệu Gốc › Nhà Sản Xuất</b>.'],
     ['Đơn Vị Tính', true, '<b>Cả công ty dùng chung một đơn vị</b> cho mỗi mã VPP: mọi phòng nhập, xuất, ghi tồn, dự trù theo đơn vị này. Phòng không tự đổi đơn vị.'],
     ['Nhóm Dự Trù', true, 'Mỗi VPP thuộc đúng một nhóm theo <b>cách dự trù</b>:<ul class="mb-0">'

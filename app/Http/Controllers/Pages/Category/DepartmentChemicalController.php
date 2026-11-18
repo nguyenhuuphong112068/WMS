@@ -226,11 +226,11 @@ class DepartmentChemicalController extends Controller
             'min_stock' => ['nullable', 'numeric', 'min:0'],
             'max_stock' => ['nullable', 'numeric', 'min:0'],
             'storage_condition_id' => ['nullable', 'exists:storage_conditions,id'],
-            // Định khu phải thuộc ĐÚNG phòng ban đang chọn, không mượn được của phòng khác
+            // Định khu phải là ô phòng đang chọn được cất hàng: ô của phòng (chưa giao đi) hoặc ô phòng khác giao cho (LocationShare)
             'default_location_id' => [
                 'nullable',
                 Rule::exists('locations', 'id')
-                    ->where('department_id', $departmentId)
+                    ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, ''))
                     ->where('status_id', 1),
             ],
             'note' => ['nullable', 'max:500'],

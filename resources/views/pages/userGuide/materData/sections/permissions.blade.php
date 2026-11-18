@@ -1,4 +1,4 @@
-<p>Mỗi màn hình Dữ Liệu Gốc thuộc một trong các phạm vi dưới đây (phạm vi <b>VPP</b> có quyền Xem / Thêm-Sửa-Khoá riêng nhưng hiện không có màn hình nào; tên VPP dùng chung màn Tên Vật Tư). Quyền được cấp ở màn hình <b>Phân Quyền › Nhóm Quyền</b>,
+<p>Mỗi màn hình Dữ Liệu Gốc thuộc một trong các phạm vi dưới đây. Quyền được cấp ở màn hình <b>Phân Quyền › Nhóm Quyền</b>,
     theo phạm vi và chi tiết tới từng màn hình.</p>
 
 <div class="table-responsive">
@@ -26,6 +26,10 @@
             <tr>
                 <td>Vật tư</td>
                 <td>Tên Vật Tư, Phân Loại, Trình Ký Đề Nghị CP Vật Tư.</td>
+            </tr>
+            <tr>
+                <td>VPP</td>
+                <td>Tên VPP</td>
             </tr>
         </tbody>
     </table>

@@ -118,7 +118,6 @@ class PageTabs
             'material' => 'Tồn theo mã VPP',
             'zone' => 'Tồn kho theo vị trí',
             'expiring' => 'Cận hạn dùng',
-            'next' => 'Khả dụng tháng tới',
             'check' => 'Kiểm kê định kỳ',
         ]],
         'inventory_chemical' => ['parent' => 'inventory_chemical_view', 'tabs' => [

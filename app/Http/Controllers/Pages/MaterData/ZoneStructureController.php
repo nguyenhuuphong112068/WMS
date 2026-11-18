@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Pages\MaterData;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pages\AuditTrail\AuditTrialController;
 use App\Support\DataMasterHistory;
+use App\Support\DepartmentOptions;
+use App\Support\LocationShare;
 use App\Support\ZoneType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -300,10 +302,13 @@ class ZoneStructureController extends Controller
             'item_type' => ['nullable', Rule::in(array_keys(ZoneController::LOCATION_TYPES))],
             'set_zone' => ['boolean'],
             'zone_type' => ['nullable', Rule::in(array_keys(ZoneType::TYPES))],
+            'set_share' => ['boolean'],
+            'shared_department_id' => ['nullable', 'integer'],
         ], [
             'ids.required' => 'Chưa chọn vị trí nào.',
             'item_type.in' => 'Loại lưu trữ được chọn không hợp lệ.',
             'zone_type.in' => 'Phân loại định khu không hợp lệ.',
+            'shared_department_id.integer' => 'Bộ phận được chia sẻ không hợp lệ.',
         ]);
 
         if ($validator->fails()) {
@@ -324,25 +329,47 @@ class ZoneStructureController extends Controller
             $payload['zone_type'] = $request->input('zone_type') ?: null;
         }
 
+        // Giao ô cho bộ phận khác dùng chung kho (LocationShare): null = thu hồi, chỉ phòng chủ kho dùng
+        $shareDepartments = LocationShare::departmentOptions((int) $this->departmentId())
+            ->mapWithKeys(fn ($d) => [(int) $d->id => DepartmentOptions::label($d)])
+            ->all();
+        if ($request->boolean('set_share')) {
+            $shareTo = $request->filled('shared_department_id') ? (int) $request->input('shared_department_id') : null;
+
+            if ($shareTo !== null && ! isset($shareDepartments[$shareTo])) {
+                return $this->fail('Bộ phận được chia sẻ không hợp lệ hoặc đã ngừng hoạt động.');
+            }
+
+            $payload['shared_department_id'] = $shareTo;
+        }
+
         if (! $payload) {
-            return $this->fail('Chưa chọn thay đổi nào: hãy chọn phân loại hoặc loại lưu trữ.');
+            return $this->fail('Chưa chọn thay đổi nào: hãy chọn phân loại, loại lưu trữ hoặc bộ phận chia sẻ.');
         }
 
         $rows = DB::table('locations')
             ->where('shelf_id', $shelf->id)
             ->whereIn('id', $request->input('ids'))
-            ->get(['id', 'code', 'zone_type', 'item_type']);
+            ->get(['id', 'code', 'zone_type', 'item_type', 'shared_department_id']);
 
         if ($rows->isEmpty()) {
             return $this->fail('Không tìm thấy vị trí nào của kệ/tủ này.', 404);
         }
 
+        if (array_key_exists('shared_department_id', $payload)
+            && ($blocked = $this->shareBlockers($rows, $payload['shared_department_id']))) {
+            return $this->fail($blocked);
+        }
+
         $fields = array_intersect_key([
             'zone_type' => 'Phân loại định khu', 'item_type' => 'Loại lưu trữ',
+            'shared_department_id' => 'Chia sẻ cho bộ phận',
         ], $payload);
         $maps = [
             'item_type' => ['' => 'Dùng chung'] + ZoneController::LOCATION_TYPES,
             'zone_type' => ZoneType::historyMap(),
+            'shared_department_id' => ['' => 'Không chia sẻ'] + $shareDepartments
+                + LocationShare::departmentLabels($rows->pluck('shared_department_id')->all()),
         ];
         $actor = $this->actor();
         $now = now();
@@ -372,6 +399,9 @@ class ZoneStructureController extends Controller
                 if (array_key_exists('item_type', $payload)) {
                     $parts[] = 'loại lưu trữ: ' . (ZoneController::LOCATION_TYPES[$payload['item_type']] ?? 'Dùng chung');
                 }
+                if (array_key_exists('shared_department_id', $payload)) {
+                    $parts[] = 'chia sẻ cho: ' . ($maps['shared_department_id'][$payload['shared_department_id'] ?? ''] ?? 'Không chia sẻ');
+                }
                 AuditTrialController::log('Cập nhật vị trí', 'locations', $shelf->id, $shelf->code,
                     $changed . ' vị trí của kệ ' . $shelf->code . ' - ' . implode(', ', $parts));
             }
@@ -381,7 +411,7 @@ class ZoneStructureController extends Controller
 
         $updated = DB::table('locations')
             ->whereIn('id', $rows->pluck('id'))
-            ->get(['id', 'zone_type', 'item_type'])
+            ->get(['id', 'zone_type', 'item_type', 'shared_department_id'])
             ->map(fn ($row) => $this->cellAttrs($row));
 
         return response()->json([
@@ -398,8 +428,62 @@ class ZoneStructureController extends Controller
             'id' => (int) $row->id,
             'zone_type' => $row->zone_type,
             'item_type' => $row->item_type,
+            // Bộ phận đang được giao ô này (LocationShare), null = chỉ phòng chủ kho dùng
+            'share' => ! empty($row->shared_department_id) ? (int) $row->shared_department_id : null,
             'shown' => isset(ZoneType::DEFAULT_COLORS[$row->zone_type]) ? ZoneType::color($row->zone_type) : null,
         ];
+    }
+
+    /**
+     * Lý do chưa giao / thu hồi được các ô (null = được): sau khi đổi, ô chỉ còn bộ phận $holder (hoặc phòng chủ
+     * kho khi null) cất hàng, nên ô không được còn tồn hay đang là Vị trí mặc định trong danh mục của phòng khác.
+     */
+    private function shareBlockers($rows, ?int $shareTo): ?string
+    {
+        $holder = $shareTo ?? (int) $this->departmentId();
+        $changing = $rows->filter(fn ($row) => (int) ($row->shared_department_id ?? 0) !== (int) ($shareTo ?? 0));
+
+        if ($changing->isEmpty()) {
+            return null;
+        }
+
+        $codes = $changing->pluck('code', 'id');
+        $ids = $codes->keys()->all();
+        $stock = [];
+        $defaults = [];
+        $departments = [];
+
+        foreach (LocationShare::onHandByLocation($ids) as $locationId => $byDept) {
+            foreach ($byDept as $deptId => $lots) {
+                if ($deptId !== $holder) {
+                    $stock[] = $codes[$locationId] ?? $locationId;
+                    $departments[] = $deptId;
+                }
+            }
+        }
+
+        foreach (LocationShare::defaultsByLocation($ids) as $locationId => $byDept) {
+            foreach ($byDept as $deptId => $count) {
+                if ($deptId !== $holder) {
+                    $defaults[] = $codes[$locationId] ?? $locationId;
+                    $departments[] = $deptId;
+                }
+            }
+        }
+
+        if (! $stock && ! $defaults) {
+            return null;
+        }
+
+        $list = fn (array $items) => implode(', ', array_slice(array_values(array_unique($items)), 0, 5))
+            . (count(array_unique($items)) > 5 ? '...' : '');
+        $names = implode(', ', LocationShare::departmentLabels($departments));
+
+        return 'Chưa đổi được chia sẻ: '
+            . ($stock ? 'vị trí ' . $list($stock) . ' còn hàng tồn' : '')
+            . ($stock && $defaults ? '; ' : '')
+            . ($defaults ? 'vị trí ' . $list($defaults) . ' đang là Vị trí mặc định trong danh mục' : '')
+            . ' của ' . $names . '. Hãy chuyển hàng / đổi Vị trí mặc định sang chỗ khác trước - mỗi vị trí chỉ một bộ phận cất hàng.';
     }
 
     /**
@@ -494,7 +578,7 @@ class ZoneStructureController extends Controller
         $locations = DB::table('locations')
             ->where('shelf_id', $shelf->id)
             ->whereNotNull('position')
-            ->get(['id', 'code', 'tier_id', 'position', 'depth', 'status_id', 'zone_type', 'item_type'])
+            ->get(['id', 'code', 'tier_id', 'position', 'depth', 'status_id', 'zone_type', 'item_type', 'shared_department_id'])
             ->groupBy('tier_id');
 
         $busy = $this->busyIds($locations->flatten()->pluck('id')->all());

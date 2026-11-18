@@ -3039,7 +3039,7 @@ class MaterialExportController extends Controller
         if ($destLocationId) {
             $locOk = DB::table('locations')
                 ->where('id', $destLocationId)
-                ->where('department_id', $departmentId)
+                ->where(fn ($q) => \App\Support\LocationShare::scope($q, $departmentId, 'locations'))
                 ->where('status_id', 1)
                 ->exists();
 
@@ -3963,12 +3963,12 @@ class MaterialExportController extends Controller
     /**
      * Mọi dòng đề nghị ĐÃ XONG QUY TRÌNH KÝ DUYỆT mà kho chưa cấp đủ - MỖI DÒNG ĐỀ NGHỊ MỘT
      * HÀNG, không gộp cùng vật tư của các phiếu khác, xếp theo số phiếu đề nghị (thứ tự lập
-     * phiếu). Giữ khoá 'demands' (mảng đúng một phần tử) để các modal / trang in dùng chung.
+     * phiếu). Giữ khoá 'demands' (mảng đúng một phần tử) để các modal dùng chung.
      *
      * Hai kế hoạch lô cho mỗi hàng:
      *   plan      - tồn của vật tư chia LẦN LƯỢT theo thứ tự số phiếu (allocateDemands): phiếu
-     *               trước giữ tồn trước. Dùng cho Tình trạng, chi tiết soạn hàng, phiếu in - để
-     *               nhiều phiếu cùng vật tư không cùng "đủ hàng" trên một phần tồn, in không lấy trùng lô.
+     *               trước giữ tồn trước. Dùng cho Tình trạng, chi tiết soạn hàng - để
+     *               nhiều phiếu cùng vật tư không cùng "đủ hàng" trên một phần tồn.
      *   item_plan - kế hoạch riêng của dòng đó trên toàn bộ tồn (MaterialPicking::plan), đúng
      *               phép chia issueStore() kiểm lại lúc cấp - cho form cột Cấp Phát.
      *
@@ -3978,7 +3978,7 @@ class MaterialExportController extends Controller
      * $withTransfer: thêm cả mục ĐỀ NGHỊ LIÊN PHÒNG BAN phòng khác gửi tới phòng mình đang
      * chờ cấp phát (kind = 'transfer', xếp sau các dòng nội bộ, chia tồn chung để Tình trạng phản
      * ánh đúng hàng đang bị tranh). Dòng này cấp phát ở modal chi tiết phiếu liên phòng ban (một
-     * mục một lô), không qua issueStore / phiếu in soạn hàng - prepPrint() gọi với false.
+     * mục một lô), không qua issueStore.
      *
      * @param  \Illuminate\Support\Collection  $lotsByCategory  Lô đã nạp ở index(): category_id => lô
      * @param  array{from: ?string, to: ?string}  $range
@@ -4648,65 +4648,6 @@ class MaterialExportController extends Controller
                 ->mapWithKeys(fn ($key) => [$key => $late->filter(fn ($r) => isset($r->causes[$key]))->count()])
                 ->all(),
         ];
-    }
-
-    /**
-     * PHIẾU SOẠN VẬT TƯ - trang A4 để in, mỗi dòng là MỘT LÔ ở MỘT vị trí.
-     *
-     * Thứ tự dòng do App\Support\MaterialPicking::sequence() quyết định (kho -> kệ ->
-     * cột -> tầng) để nhân viên đi một vòng là lấy đủ, không phải quay lại kệ cũ.
-     * In đúng khoảng "Ngày mong muốn" đang lọc ở tab (prep_from / prep_to).
-     */
-    public function prepPrint(Request $request)
-    {
-        $departmentId = $this->departmentId();
-        $prepRange = $this->prepRange($request);
-        // Phiếu in soạn hàng chỉ gồm đề nghị nội bộ - mục liên phòng ban cấp ở modal riêng
-        $prep = $this->preparationData($departmentId, $this->importOptions($departmentId)->groupBy('category_id'), $prepRange, false);
-
-        $lines = [];
-
-        // Nhu cầu của từng phiếu đề nghị, để tờ in nói rõ lô đang lấy là lấy cho phiếu nào
-        $requests = [];
-
-        foreach ($prep['groups'] as $group) {
-            foreach ($group['plan'] as $line) {
-                $lines[] = $line + [
-                    'material_name' => $group['name'],
-                    'category_code' => $group['category_code'],
-                    'specification' => $group['specification'],
-                    'requests' => collect($group['demands'])->map(fn ($demand) => [
-                        'code' => $demand['request_code'],
-                        'left' => $demand['left'],
-                        'unit' => $demand['unit'] ?: $group['unit'],
-                    ])->values()->all(),
-                ];
-            }
-
-            foreach ($group['demands'] as $demand) {
-                $requests[$demand['request_code']]['info'] ??= $demand;
-                $requests[$demand['request_code']]['items'][] = $demand + [
-                    'material_name' => $group['name'],
-                    'category_code' => $group['category_code'],
-                    'display_unit' => $demand['unit'] ?: $group['unit'],
-                ];
-            }
-        }
-
-        $lines = MaterialPicking::sequence($lines);
-
-        // Phiếu xếp theo số phiếu đề nghị (thứ tự lập phiếu) - cùng thứ tự với tab
-        $requests = collect($requests)
-            ->sortBy(fn ($request) => $request['info']['request_list_id'])
-            ->values();
-
-        return view('pages.export.MaterialExport.prepPrint', [
-            'prepGroups' => $prep['groups'],
-            'prepLines' => $lines,
-            'prepRequests' => $requests,
-            'prepRange' => $prepRange,
-            'department' => DB::table('deparments')->where('id', $departmentId)->first(),
-        ]);
     }
 
     /**

@@ -29,13 +29,12 @@
     <div class="ug-flow-step">
         <span class="ug-flow-no">5</span>
         <b>Theo dõi tồn</b>
-        <a href="#ton-kho">Tồn kho</a>, <a href="#kha-dung-thang-toi">Khả dụng tháng tới</a>,
-        <a href="#kiem-ke">Kiểm kê</a>
+        <a href="#ton-kho">Tồn kho</a>, <a href="#kiem-ke">Kiểm kê</a>
     </div>
     <div class="ug-flow-step">
         <span class="ug-flow-no">6</span>
         <b>Bổ sung hàng</b>
-        <a href="#can-du-tru">VPP cần dự trù</a> → <a href="#du-tru">Phiếu dự trù</a> → Hành Chánh mua → quay lại bước 2
+        (chỉ Hành Chánh) <a href="#can-du-tru">VPP cần dự trù</a> → <a href="#du-tru">Phiếu dự trù</a> → Hành Chánh mua → quay lại bước 2
     </div>
 </div>
 

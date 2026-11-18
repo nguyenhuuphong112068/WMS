@@ -16,8 +16,7 @@
 |   - đang chờ QA: chỉ xem lô đã gửi, nút Cấp Phát khoá;
 |   - đã đạt: form khoá đúng mã xuất nhập + số đạt (item_plan do controller dựng), cấp xong tải lại.
 |
-| Bộ lọc "Ngày mong muốn" (prep_from / prep_to) chạy ở server; nút In phiếu soạn hàng in
-| đúng khoảng đang lọc.
+| Bộ lọc "Ngày mong muốn" (prep_from / prep_to) chạy ở server.
 |
 | Dữ liệu vào: $prepGroups, $prepShortageCount, $prepRange - xem
 | MaterialExportController::preparationData().
@@ -42,8 +41,8 @@
         ['label' => 'Tất cả', 'from' => '', 'to' => ''],
     ];
 
-    // In phiếu soạn hàng theo đúng khoảng đang lọc
-    $prepPrintQuery = array_filter(['prep_from' => $prepRange['from'], 'prep_to' => $prepRange['to']]);
+    // Đang lọc theo ngày mong muốn - đổi câu báo khi bảng rỗng
+    $prepFiltered = array_filter(['prep_from' => $prepRange['from'], 'prep_to' => $prepRange['to']]);
 
     $prepCanIssue = user_can('export_material_issue');
     // Dòng đề nghị liên phòng ban: quyền cấp phát liên phòng ban (transferIssueStore)
@@ -154,20 +153,16 @@
     'rfQuick' => $prepQuick,
 ])
 
-<div class="md-toolbar">
-    <a href="{{ route($expRoute . 'prepPrint', $prepPrintQuery) }}" target="_blank" class="btn btn-primary">
-        <i class="fas fa-print mr-1"></i> In phiếu soạn hàng
-    </a>
-
-    @if ($prepShortageCount > 0)
+@if ($prepShortageCount > 0)
+    <div class="md-toolbar">
         <button type="button" class="btn btn-outline-warning text-dark btn-prep-short"
             style="border-color: #d97706; background-color: #fffbeb;"
             title="Chỉ hiện vật tư kho không đủ hàng để cấp">
             <i class="fas fa-exclamation-triangle mr-1 text-warning"></i> Thiếu hàng
             <span class="badge badge-warning ml-1" style="font-size: 0.8rem;">{{ $prepShortageCount }}</span>
         </button>
-    @endif
-</div>
+    </div>
+@endif
 
 <div class="table-responsive">
     {{-- data-no-responsive: dòng con của DataTables Responsive chép HTML ô, form cấp phát chép sang sẽ hỏng --}}
@@ -420,7 +415,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="11" class="text-center text-muted">{{ $prepPrintQuery ? 'Không có vật tư nào cần trong khoảng ngày đã chọn.' : 'Không còn vật tư nào chờ cấp phát.' }}</td></tr>
+                <tr><td colspan="11" class="text-center text-muted">{{ $prepFiltered ? 'Không có vật tư nào cần trong khoảng ngày đã chọn.' : 'Không còn vật tư nào chờ cấp phát.' }}</td></tr>
             @endforelse
         </tbody>
     </table>

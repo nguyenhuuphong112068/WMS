@@ -721,6 +721,25 @@ class DatabaseSchema
                 ? "$d[1]-$d[2]-$d[3] $d[4]:$d[5]:$d[6]"
                 : null;
 
+            // File schema gộp: đã chạy khi mọi migration nó gộp có trong bảng migrations
+            if (! empty($m['baseline'])) {
+                $done = ! array_diff($m['merged'], array_keys($ran));
+                $out[] = [
+                    'name'   => $m['name'],
+                    'date'   => $date,
+                    'batch'  => null,
+                    'ran'    => $done,
+                    'tables' => $m['tables'],
+                ];
+                foreach ($m['merged'] as $name) {
+                    unset($ran[$name]);
+                }
+                if (! $done) {
+                    $issues[] = ['level' => 'danger', 'type' => 'pending_migration', 'key' => $m['name']];
+                }
+                continue;
+            }
+
             $out[] = [
                 'name'   => $m['name'],
                 'date'   => $date,

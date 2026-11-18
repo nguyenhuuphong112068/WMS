@@ -65,11 +65,21 @@ return [
             'route' => 'pages.materData.materialSignFlow.list', 'perm' => md_perm('materialSignFlow', 'view'), 'chips' => [$byDept],
             'keywords' => 'cap ky nguoi ky vai tro dieu kien'],
     ],
+    'VPP' => [
+        ['id' => 'ten-vpp', 'file' => 'vppName', 'title' => 'Tên VPP', 'icon' => 'fas fa-paperclip',
+            'route' => 'pages.materData.vppName.list', 'perm' => md_perm('vppName', 'view'), 'chips' => [$approve],
+            'shots' => [
+                ['name' => 'ten-vpp', 'clip' => '.content-wrapper', 'maxHeight' => 640, 'pad' => 0, 'height' => 5000],
+                ['name' => 'ten-vpp-form', 'js' => '__ug.clickCreate()', 'clip' => '.modal.show .modal-content', 'pad' => 0],
+            ],
+            'keywords' => 'van phong pham ten vpp but giay'],
+    ],
     'Kho & đối tượng' => [
         ['id' => 'dinh-khu', 'file' => 'zone', 'title' => 'Định Khu', 'icon' => 'fas fa-sitemap',
             'route' => 'pages.materData.zone.list', 'perm' => md_perm('zone', 'view'), 'chips' => [$byDept],
-            // Phòng có sẵn kho/kệ; ảnh thêm = khung Thông số kệ/tủ + mô hình 3D khi tạo kệ mới
-            'shotDept' => 4,
+            // Phòng có sẵn kho/kệ (17/11/2026 định khu chỉ còn QC2 = phòng 9); ảnh thêm = khung Thông số kệ/tủ
+            // + mô hình 3D khi tạo kệ mới, thanh chọn ô (Phân loại / Loại lưu trữ / Chia sẻ cho), mặt bằng
+            'shotDept' => 9,
             'extraShots' => [
                 ['name' => 'dinh-khu-thong-so', 'clip' => '#zoneStructure', 'maxHeight' => 1150, 'pad' => 0, 'afterJs' => 1500,
                     'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
@@ -77,22 +87,24 @@ return [
                         ." for (let i = 0; i < 20 && !document.querySelector('#zs-warehouses .zs-tile'); i++) await w(300);"
                         ." document.querySelector('#zs-warehouses .zs-tile').click(); await w(1500);"
                         ." document.querySelector('#zs-add').click(); await w(800); return true; })()"],
-                // Mặt bằng kho/phòng: cửa ở tường dưới, tự xếp các kệ rồi chọn kệ đầu tiên
+                // Thanh chọn ô của kệ đã có: Chọn cả kệ để hiện ô Chia sẻ cho
+                ['name' => 'dinh-khu-chia-se', 'clip' => '#zoneStructure', 'maxHeight' => 760, 'pad' => 0, 'afterJs' => 1200,
+                    'highlight' => ['#zs-loc-share'],
+                    'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
+                        ." for (let i = 0; i < 20 && !document.querySelector('#zs-warehouses .zs-tile'); i++) await w(300);"
+                        ." document.querySelector('#zs-warehouses .zs-tile').click(); await w(1500);"
+                        ." document.querySelector('#zs-shelves .zs-tile').click(); await w(1800);"
+                        ." document.querySelector('#zs-loc-all').click(); await w(500); return true; })()"],
+                // Mặt bằng kho/phòng đã khai sẵn (QC09): mở mặt bằng rồi chọn kệ đầu tiên
                 ['name' => 'dinh-khu-mat-bang', 'clip' => '#zoneStructure', 'maxHeight' => 1100, 'pad' => 0, 'afterJs' => 1500,
                     'js' => "(async () => { const w = ms => new Promise(r => setTimeout(r, ms));"
                         ." for (let i = 0; i < 20 && !document.querySelector('#zs-warehouses .zs-tile'); i++) await w(300);"
                         ." document.querySelector('#zs-warehouses .zs-tile').click(); await w(1500);"
                         ." document.querySelector('#zs-layout-btn').click(); await w(2000);"
-                        ." const add = document.querySelector('.zl-door-add'); if (add && !add.hidden) add.click(); await w(300);"
-                        ." const mid = document.querySelector('[data-mid=\"2\"]'); if (mid) { const r = mid.getBoundingClientRect();"
-                        ." mid.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: r.left + 8, clientY: r.top + 8 }));"
-                        ." document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: r.left + 8, clientY: r.top - 40 }));"
-                        ." document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); await w(300); }"
-                        ." const auto = document.querySelector('.zl-auto'); if (!auto.disabled) auto.click(); await w(400);"
                         ." const shelf = document.querySelector('.zl-shelf'); if (shelf) { shelf.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));"
                         ." document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); } return true; })()"],
             ],
-            'keywords' => 'kho phong ke tu cot tang vi tri cau truc kho biet tru du phong thong so 3d mat bang so do phong cua ra vao'],
+            'keywords' => 'kho phong ke tu cot tang vi tri cau truc kho biet tru du phong thong so 3d mat bang so do phong cua ra vao chia se bo phan khac kho chung'],
         ['id' => 'doi-tuong', 'file' => 'consumptionObject', 'title' => 'Đối Tượng', 'icon' => 'fas fa-cogs',
             'route' => 'pages.materData.consumptionObject.list', 'perm' => md_perm('consumptionObject', 'view'),
             'keywords' => 'thiet bi cal dong bo tan suat'],
