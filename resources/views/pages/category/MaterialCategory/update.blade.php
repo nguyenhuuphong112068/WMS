@@ -1,6 +1,12 @@
 @php
     $bag = $errors->getBag('updateErrors');
     $oldClassification = $bag->any() ? (array) old('classification', []) : [];
+
+    // Ảnh hiện tại của dòng đang sửa khi modal mở lại sau lỗi validate
+    $mcuEditing = $bag->any() ? $datas->firstWhere('id', (int) old('id')) : null;
+    $mcuCurrentImage = $mcuEditing && $mcuEditing->image_path
+        ? route($mdRoute . 'image', ['id' => $mcuEditing->id, 'v' => substr(md5($mcuEditing->image_path), 0, 8)])
+        : null;
 @endphp
 
 <div class="modal fade md-modal" id="updateModal" tabindex="-1" role="dialog">
@@ -11,7 +17,7 @@
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
-            <form action="{{ route($mdRoute . 'update') }}" method="POST">
+            <form action="{{ route($mdRoute . 'update') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="id" value="{{ old('id') }}">
                 <div class="modal-body">
@@ -92,6 +98,28 @@
                                         @endif
                                     </div>
                                 </div>
+
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label class="d-block">Hình Ảnh Vật Tư</label>
+                                        {{-- Ảnh hiện tại đổ từ data-row.image_url khi bấm Sửa; remove_image = 1 khi gỡ ảnh cũ --}}
+                                        <label class="mci-picker mci-lg mb-0 {{ $bag->has('image') ? 'is-invalid' : '' }}"
+                                            id="mcuImagePicker">
+                                            <input type="file" name="image" class="mci-input" accept="image/*">
+                                            <input type="hidden" name="remove_image" class="mci-remove" value="0">
+                                            <span class="mci-pick" title="Chọn hình ảnh vật tư (không bắt buộc)">
+                                                <i class="fas fa-camera"></i> Chọn ảnh
+                                            </span>
+                                            <span class="mci-preview">
+                                                <img src="" alt="Ảnh vật tư" title="Bấm để xem ảnh lớn">
+                                                <button type="button" class="mci-clear" title="Gỡ ảnh">&times;</button>
+                                            </span>
+                                        </label>
+                                        @if ($bag->has('image'))
+                                            <span class="md-error">{{ $bag->first('image') }}</span>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="md-hint">
@@ -153,7 +181,27 @@
 
                 $(this).prop('checked', checked).closest('.cat-check-item').toggleClass('is-checked', checked);
             });
+
+            // Hình ảnh: hiện ảnh hiện tại (nếu có), bỏ file / cờ gỡ ảnh của lần sửa trước
+            var $picker = $('#mcuImagePicker');
+            $picker.find('.mci-input').val('');
+            $picker.find('.mci-remove').val('0');
+            $picker.data('hasCurrent', !!row.image_url).removeClass('is-invalid');
+            mciShow($picker, row.image_url || '');
         });
+
+        @if ($bag->any())
+            // Mở lại sau lỗi validate (tải lại trang): dựng lại ảnh hiện tại + cờ gỡ ảnh đã chọn
+            (function() {
+                var $picker = $('#mcuImagePicker');
+                var current = @json($mcuCurrentImage);
+                var removed = @json(old('remove_image') === '1');
+
+                $picker.data('hasCurrent', !!current);
+                $picker.find('.mci-remove').val(removed ? '1' : '0');
+                mciShow($picker, removed ? '' : (current || ''));
+            })();
+        @endif
     });
 </script>
 

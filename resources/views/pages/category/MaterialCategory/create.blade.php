@@ -46,7 +46,7 @@
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
 
-            <form action="{{ route($mdRoute . 'store') }}" method="POST">
+            <form action="{{ route($mdRoute . 'store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-body">
                     <div class="alert alert-danger cbt-errors" @if ($mcbErrors->isEmpty()) style="display:none" @endif>
@@ -67,7 +67,7 @@
                     </div>
 
                     <div class="cbt-scroll">
-                        <table class="table cbt-table" data-no-datatable style="min-width: 1520px">
+                        <table class="table cbt-table" data-no-datatable style="min-width: 1600px">
                             <colgroup>
                                 <col style="width: 44px">
                                 <col style="width: 90px">
@@ -75,6 +75,7 @@
                                 <col style="width: 210px">
                                 <col style="width: 120px">
                                 <col style="width: 170px">
+                                <col style="width: 80px">
                                 @foreach ($mcbGroups as $group)
                                     <col style="width: 110px">
                                 @endforeach
@@ -88,6 +89,7 @@
                                     <th>Nhà Sản Xuất <span class="text-danger">*</span></th>
                                     <th>Part Number</th>
                                     <th>Thông Tin Kỹ Thuật</th>
+                                    <th class="text-center" title="Hình ảnh vật tư (không bắt buộc)">Hình Ảnh</th>
                                     @foreach ($mcbGroups as $group)
                                         <th title="{{ $group['label'] }}">
                                             {{ \Illuminate\Support\Str::after($group['label'], 'Theo ') }}
@@ -107,7 +109,7 @@
                                             <option value="">-- Nhà sản xuất --</option>
                                         </select>
                                     </th>
-                                    <th colspan="2"></th>
+                                    <th colspan="3"></th>
                                     @foreach ($mcbGroups as $group)
                                         <th>
                                             <select class="form-control" data-fill="{{ $group['errorKey'] }}"
@@ -133,7 +135,7 @@
                             @endforeach
                             <tbody class="cbt-empty" @if (count($mcbRows)) style="display:none" @endif>
                                 <tr>
-                                    <td colspan="{{ 7 + count($mcbGroups) }}">
+                                    <td colspan="{{ 8 + count($mcbGroups) }}">
                                         <i class="fas fa-cubes"></i>
                                         Chưa có dòng nào. Bấm <b>Thêm dòng</b> để khai mã vật tư mới.
                                     </td>
@@ -189,6 +191,22 @@
                 '.mcb-mfr': $('#createModal').data('manufacturers') || []
             },
             blankStart: true
+        });
+
+        // PHP chỉ nhận tối đa max_file_uploads file mỗi lần gửi, file vượt quá bị bỏ không báo lỗi
+        var mcbMaxImages = {{ (int) ini_get('max_file_uploads') ?: 20 }};
+        $('#createModal form').on('submit', function(event) {
+            var count = $(this).find('.mci-input').filter(function() {
+                return this.files && this.files.length;
+            }).length;
+
+            if (count > mcbMaxImages) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                var msg = 'Mỗi lần lưu gửi được tối đa ' + mcbMaxImages + ' hình ảnh (đang chọn ' + count +
+                    '). Vui lòng lưu bớt dòng rồi thêm tiếp.';
+                window.Swal ? Swal.fire('Quá nhiều hình ảnh', msg, 'warning') : alert(msg);
+            }
         });
     });
 </script>

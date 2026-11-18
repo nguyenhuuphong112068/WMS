@@ -1108,12 +1108,14 @@
                         tiers: c.tiers.map(function(t) {
                             var list = [];
                             if (cells) {
-                                var busy = {};
+                                var busy = {}, shared = {};
                                 (t.busy || []).forEach(function(k) { busy[k] = true; });
+                                // Ô đã chia sẻ cho bộ phận khác: tam giác màu nhấn ở góc (WmsShelf3d share)
+                                (t.shared || []).forEach(function(k) { shared[k] = true; });
                                 for (var d = 1; d <= t.depth; d++) {
                                     for (var p = 1; p <= t.max; p++) {
                                         var on = busy[p + ':' + d];
-                                        list.push({ p: p, d: d, box: !!on, color: on ? '#2E7BC4' : null });
+                                        list.push({ p: p, d: d, box: !!on, color: on ? '#2E7BC4' : null, share: !!shared[p + ':' + d] });
                                     }
                                 }
                             }

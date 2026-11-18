@@ -655,7 +655,7 @@ class ZoneStructureController extends Controller
 
         $cells = DB::table('locations')
             ->whereIn('shelf_id', $ids)->where('status_id', 1)->whereNotNull('position')
-            ->get(['id', 'tier_id', 'position', 'depth']);
+            ->get(['id', 'tier_id', 'position', 'depth', 'shared_department_id']);
 
         $busy = $this->busyIds($cells->pluck('id')->all());
         $cells = $cells->groupBy('tier_id');
@@ -671,10 +671,15 @@ class ZoneStructureController extends Controller
                     'tiers' => ($tiers[$column->id] ?? collect())->map(function ($tier) use ($cells, $busy, &$total, &$used) {
                         $own = $cells[$tier->id] ?? collect();
                         $busyKeys = [];
+                        // Ô đã chia sẻ cho bộ phận khác (App\Support\LocationShare) - 3D Mặt bằng gắn dấu tam giác
+                        $sharedKeys = [];
 
                         foreach ($own as $cell) {
                             if (isset($busy[$cell->id])) {
                                 $busyKeys[] = $this->cellKey((int) $cell->position, $this->depthOf($cell));
+                            }
+                            if ($cell->shared_department_id) {
+                                $sharedKeys[] = $this->cellKey((int) $cell->position, $this->depthOf($cell));
                             }
                         }
 
@@ -688,6 +693,7 @@ class ZoneStructureController extends Controller
                             'max' => (int) $own->max('position'),
                             'depth' => (int) $own->max(fn ($cell) => $this->depthOf($cell)),
                             'busy' => $busyKeys,
+                            'shared' => $sharedKeys,
                         ];
                     })->filter(fn ($tier) => $tier['max'] > 0)->values(),
                 ];

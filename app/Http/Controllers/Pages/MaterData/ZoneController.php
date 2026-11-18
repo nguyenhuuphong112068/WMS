@@ -149,12 +149,16 @@ class ZoneController extends Controller
             ->leftJoin('shelves', 'locations.shelf_id', '=', 'shelves.id')
             ->leftJoin('columns', 'locations.column_id', '=', 'columns.id')
             ->leftJoin('tiers', 'locations.tier_id', '=', 'tiers.id')
+            // Bộ phận đang mượn ô (App\Support\LocationShare) - cột "Chia Sẻ Cho"
+            ->leftJoin('deparments as share_dept', 'locations.shared_department_id', '=', 'share_dept.id')
             ->select(
                 'locations.*',
                 'warehouses.name as warehouse_name',
                 'shelves.name as shelf_name',
                 'columns.name as column_name',
-                'tiers.name as tier_name'
+                'tiers.name as tier_name',
+                'share_dept.name as shared_department_name',
+                'share_dept.shortName as shared_department_short'
             )
             ->where('locations.department_id', $departmentId)
             ->orderBy('locations.code', 'asc')

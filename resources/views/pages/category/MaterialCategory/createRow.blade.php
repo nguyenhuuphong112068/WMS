@@ -49,6 +49,17 @@
                 class="form-control {{ $err('technical_specification') }}"
                 value="{{ $row['technical_specification'] ?? '' }}" placeholder="Thông tin kỹ thuật">
         </td>
+        <td class="text-center">
+            {{-- Ảnh không bắt buộc, không chép khi nhân bản dòng; trình duyệt không giữ file sau khi báo lỗi --}}
+            <label class="mci-picker mb-0 {{ $err('image') ? 'is-invalid' : '' }}">
+                <input type="file" name="items[{{ $index }}][image]" class="mci-input" accept="image/*">
+                <span class="mci-pick" title="Chọn hình ảnh vật tư (không bắt buộc)"><i class="fas fa-camera"></i></span>
+                <span class="mci-preview">
+                    <img src="" alt="Ảnh vật tư" title="Bấm để xem ảnh lớn">
+                    <button type="button" class="mci-clear" title="Bỏ ảnh">&times;</button>
+                </span>
+            </label>
+        </td>
         @foreach ($groups as $group)
             @php
                 $path = explode('.', $group['errorKey']);

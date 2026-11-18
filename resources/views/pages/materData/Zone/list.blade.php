@@ -77,6 +77,8 @@
             'hasType' => true,
             // Vị trí chỉ định danh bằng mã (A01, B02...) nên không có cột tên.
             'hasName' => false,
+            // Cột "Chia Sẻ Cho": bộ phận đang mượn ô (khai ở Cấu trúc kho).
+            'hasShare' => true,
         ],
     ];
 

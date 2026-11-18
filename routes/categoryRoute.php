@@ -51,6 +51,8 @@ Route::prefix('/category')
         Route::prefix('/materialCategory')->name('materialCategory.')->controller(MaterialCategoryController::class)->group(function () {
             Route::get('', 'index')->name('list');
             Route::get('history', 'history')->name('history');
+            // Hình ảnh vật tư (không bắt buộc) - ?id=<material_categories.id>
+            Route::get('image', 'image')->name('image');
             Route::post('store', 'store')->name('store');
             Route::post('update', 'update')->name('update');
             Route::post('deActive', 'deActive')->name('deActive');

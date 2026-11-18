@@ -259,6 +259,21 @@
         color: #cbd5e1;
     }
 
+    /* Cột "Chia Sẻ Cho" ở cấp Vị Trí - cùng màu tam giác ô chia sẻ ở Cấu trúc kho */
+    .zone-share-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--accent);
+        background: rgba(23, 184, 212, 0.12);
+        border: 1px solid rgba(23, 184, 212, 0.35);
+        white-space: nowrap;
+    }
+
     .zone-actions {
         display: flex;
         justify-content: center;
@@ -449,6 +464,9 @@
                                             @foreach ($meta['cols'] as $title)
                                                 <th>{{ $title }}</th>
                                             @endforeach
+                                            @if (!empty($meta['hasShare']))
+                                                <th style="width: 150px">Chia Sẻ Cho</th>
+                                            @endif
                                             <th style="width: 140px">Người Tạo</th>
                                             <th class="text-center" style="width: 110px">Ngày Tạo</th>
                                             <th class="text-center" style="width: 110px">Trạng Thái</th>
@@ -488,6 +506,17 @@
                                                         @endif
                                                     </td>
                                                 @endforeach
+                                                @if (!empty($meta['hasShare']))
+                                                    <td>
+                                                        @if (!empty($row->shared_department_id))
+                                                            <span class="zone-share-chip" title="{{ $row->shared_department_name }}">
+                                                                <i class="fas fa-share-alt"></i>{{ $row->shared_department_short ?: $row->shared_department_name ?: ('#' . $row->shared_department_id) }}
+                                                            </span>
+                                                        @else
+                                                            <span class="zone-empty">—</span>
+                                                        @endif
+                                                    </td>
+                                                @endif
                                                 <td>{{ $row->updated_by ?: $row->created_by ?: '—' }}</td>
                                                 <td class="text-center">
                                                     {{ $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') : '—' }}

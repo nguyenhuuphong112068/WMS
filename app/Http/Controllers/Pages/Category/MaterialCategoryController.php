@@ -67,7 +67,15 @@ class MaterialCategoryController extends Controller
         'classification' => 'Phân loại',
         'purchasing_department' => 'Bộ phận mua hàng',
         'lead_time_days' => 'Thời gian đặt hàng (ngày)',
+        'image_path' => 'Hình ảnh',
     ];
+
+    /**
+     * HÌNH ẢNH VẬT TƯ (không bắt buộc): một ảnh / mã, lưu ở storage thư mục IMAGE_FOLDER, xem qua
+     * image(). Thay / gỡ ảnh không xoá file cũ - bảng lịch sử vẫn trỏ tới để đối chiếu (CFR Part 11).
+     */
+    private const IMAGE_FOLDER = 'public/material_category_images';
+    private const IMAGE_RULES = ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,gif,webp,bmp', 'max:10240'];
 
     public function index()
     {
@@ -182,34 +190,61 @@ class MaterialCategoryController extends Controller
      */
     public function store(Request $request)
     {
-        // Dòng để trống hoàn toàn (chưa chọn tên, nhà sản xuất, chưa nhập thông tin) thì bỏ qua -
-        // phân loại không tính vì hàng Điền nhanh tự điền sẵn cho mọi dòng
-        $items = $this->batchItems($request, fn ($item) => blank($item['material_names_id'] ?? null)
-            && blank($item['manufacturers_id'] ?? null)
-            && blank($item['part_number'] ?? null)
-            && blank($item['technical_specification'] ?? null));
+        // Dòng để trống hoàn toàn (chưa chọn tên, nhà sản xuất, chưa nhập thông tin, chưa chọn ảnh) thì
+        // bỏ qua - phân loại không tính vì hàng Điền nhanh tự điền sẵn cho mọi dòng. Ảnh items[i][image]
+        // nằm ở phần file của request nên tự gom theo chỉ số dòng gốc rồi gắn vào dòng đã đánh số lại.
+        $items = [];
+
+        foreach ((array) $request->input('items', []) as $origIndex => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $image = $request->file('items.' . $origIndex . '.image');
+
+            if (! $image && blank($item['material_names_id'] ?? null)
+                && blank($item['manufacturers_id'] ?? null)
+                && blank($item['part_number'] ?? null)
+                && blank($item['technical_specification'] ?? null)) {
+                continue;
+            }
+
+            $items[] = $item + ['image' => $image];
+        }
 
         $validator = Validator::make(
             ['items' => $items],
-            $this->batchRules($this->rules()),
-            $this->batchMessages($this->messages(), 'Vui lòng thêm ít nhất một dòng vật tư.')
+            $this->batchRules($this->rules() + ['image' => self::IMAGE_RULES]),
+            $this->batchMessages($this->messages() + $this->imageMessages(), 'Vui lòng thêm ít nhất một dòng vật tư.')
         );
 
         $this->checkBatchDuplicates($validator, $items);
 
         if ($validator->fails()) {
-            // Gửi lại đúng các dòng đã kiểm tra (đã bỏ dòng trống) để số "Dòng N" khớp với bảng
-            return redirect()->back()->withErrors($validator, 'createErrors')->withInput(['items' => $items]);
+            // Trình duyệt không giữ file đã chọn sau khi tải lại trang: nhắc chọn lại ảnh
+            if (collect($items)->contains(fn ($item) => $item['image'])) {
+                $validator->errors()->add('items', 'Hình ảnh đã chọn không giữ lại được sau khi báo lỗi, vui lòng chọn lại ảnh.');
+            }
+
+            // Gửi lại đúng các dòng đã kiểm tra (đã bỏ dòng trống) để số "Dòng N" khớp với bảng.
+            // Bỏ file ảnh ra khỏi dữ liệu flash (không lưu UploadedFile vào session được).
+            $flash = array_map(fn ($item) => \Illuminate\Support\Arr::except($item, 'image'), $items);
+
+            return redirect()->back()->withErrors($validator, 'createErrors')->withInput(['items' => $flash]);
         }
 
+        // Lưu file ảnh trước, ngoài transaction (ghi file không rollback được)
+        $images = array_map(fn ($item) => $item['image'] ? $item['image']->store(self::IMAGE_FOLDER) : null, $items);
+
         // Sinh mã và ghi bản ghi trong cùng một transaction để hai người thêm cùng lúc không trùng mã
-        $ids = DB::transaction(function () use ($items) {
+        $ids = DB::transaction(function () use ($items, $images) {
             $number = $this->nextNumber();
             $ids = [];
 
-            foreach ($items as $item) {
+            foreach ($items as $index => $item) {
                 $payload = $this->payload($item);
                 $ids[] = DB::table(self::TABLE)->insertGetId($payload + [
+                    'image_path' => $images[$index] ?: null,
                     'code' => $this->formatCode($number++),
                     'app_status' => 'pending',
                     // Modal Thêm không có ô Thời gian đặt hàng: báo người có quyền vào khai (thẻ trang chủ),
@@ -250,23 +285,30 @@ class MaterialCategoryController extends Controller
 
         $validator = Validator::make(
             $request->all(),
-            $this->rules() + $this->changeReasonRules(),
-            $this->messages() + $this->changeReasonMessages()
+            $this->rules() + ['image' => self::IMAGE_RULES] + $this->changeReasonRules(),
+            $this->messages() + $this->imageMessages() + $this->changeReasonMessages()
         );
 
         $this->checkDuplicate($validator, $request, $current->id);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator, 'updateErrors')->withInput();
+            return redirect()->back()->withErrors($validator, 'updateErrors')->withInput($request->except('image'));
         }
 
         $payload = $this->payload($request->all());
         // Thời gian đặt hàng chỉ sửa qua updateLeadTime() (quyền riêng), ở đây giữ nguyên giá trị cũ
         $payload['lead_time_days'] = $current->lead_time_days;
+        // Ảnh: chọn ảnh mới thì thay, tick "Gỡ ảnh" thì bỏ, không thì giữ ảnh cũ. File cũ không xoá.
+        $newImage = $request->file('image');
+        $payload['image_path'] = $newImage ? '__new__' : ($request->boolean('remove_image') ? null : $current->image_path);
         $note = $this->changeNote($current, $payload);
 
         if ($note === '') {
-            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput();
+            return redirect()->back()->with('error', 'Chưa có thông tin nào thay đổi nên không lưu.')->withInput($request->except('image'));
+        }
+
+        if ($newImage) {
+            $payload['image_path'] = $newImage->store(self::IMAGE_FOLDER);
         }
 
         DB::table(self::TABLE)->where('id', $current->id)->update($payload + [
@@ -325,6 +367,20 @@ class MaterialCategoryController extends Controller
         return $this->setApproval($request);
     }
 
+    /** Hình ảnh hiện tại của một mã vật tư (thẻ <img> ở bảng danh sách / modal Cập nhật). */
+    public function image(Request $request)
+    {
+        $path = DB::table(self::TABLE)->where('id', (int) $request->id)->value('image_path');
+
+        if (! $path || ! \Illuminate\Support\Facades\Storage::exists($path)) {
+            abort(404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::response($path, null, [
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
     /** Trả về lịch sử thay đổi của một dòng danh mục cho modal xem lịch sử. */
     public function history(Request $request)
     {
@@ -350,6 +406,7 @@ class MaterialCategoryController extends Controller
                     'Nhà sản xuất' => $row->manufacturer_name ?: '—',
                     'Part Number' => $row->part_number ?: '—',
                     'Thông tin kỹ thuật' => $row->technical_specification ?: '—',
+                    'Hình ảnh' => $row->image_path ? 'Có ảnh' : '—',
                     'Phân loại' => MaterialClassification::describe($row->classification),
                     'Bộ phận mua hàng' => MaterialClassification::purchasingLabel($row->purchasing_department) ?: '—',
                     'Thời gian đặt hàng' => $row->lead_time_days === null ? '—' : $row->lead_time_days . ' ngày',
@@ -435,6 +492,7 @@ class MaterialCategoryController extends Controller
             'manufacturers_id' => $row->manufacturers_id,
             'part_number' => $row->part_number,
             'technical_specification' => $row->technical_specification,
+            'image_path' => $row->image_path,
             'classification' => $row->classification,
             'purchasing_department' => $row->purchasing_department,
             'lead_time_days' => $row->lead_time_days,
@@ -458,7 +516,13 @@ class MaterialCategoryController extends Controller
                 continue;
             }
 
-            if ($field === 'classification') {
+            if ($field === 'image_path') {
+                $parts[] = $title . ': ' . match (true) {
+                    blank($current->$field) => 'Thêm ảnh',
+                    blank($payload[$field]) => 'Gỡ ảnh',
+                    default => 'Thay ảnh mới',
+                };
+            } elseif ($field === 'classification') {
                 $parts[] = $title . ': '
                     . MaterialClassification::describe($current->$field) . ' -> '
                     . MaterialClassification::describe($payload[$field]);
@@ -652,6 +716,16 @@ class MaterialCategoryController extends Controller
     private function leadTimeApplies(?string $purchasing): bool
     {
         return $purchasing !== MaterialClassification::PURCHASING_ADMIN;
+    }
+
+    private function imageMessages(): array
+    {
+        return [
+            'image.image' => 'Hình ảnh phải là file ảnh.',
+            'image.mimes' => 'Hình ảnh chỉ nhận định dạng jpg, jpeg, png, gif, webp, bmp.',
+            'image.max' => 'Hình ảnh tối đa 10 MB.',
+            'image.uploaded' => 'Tải hình ảnh lên không thành công (file quá lớn so với cấu hình máy chủ?).',
+        ];
     }
 
     private function messages(): array

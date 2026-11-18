@@ -66,13 +66,29 @@
                             $classKeys = collect($classification)->map(fn($value, $key) => $key . ':' . $value)->implode(' ');
                             // Màu nền mã theo tình trạng: khoá thắng duyệt, chưa duyệt thì vẫn vàng chờ
                             $catCodeStatus = $row->status_id == 0 ? 'locked' : ($row->app_status === 'approved' ? 'approved' : 'pending');
+                            // Hình ảnh vật tư (không bắt buộc) - ?v đổi theo file để trình duyệt không giữ ảnh cũ sau khi thay
+                            $imageUrl = $row->image_path
+                                ? route($mdRoute . 'image', ['id' => $row->id, 'v' => substr(md5($row->image_path), 0, 8)])
+                                : null;
                         @endphp
                         <tr data-classification="{{ $classKeys }}"
                             data-approval="{{ $row->status_id == 0 ? 'locked' : ($row->app_status ?: 'pending') }}"
                             data-purchasing="{{ $row->purchasing_department ? 'purchasing_department:' . $row->purchasing_department : '' }}">
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td><span class="cat-code {{ $catCodeStatus }}">{{ $row->code }}</span></td>
-                            <td class="font-weight-bold">{{ $row->material_name ?: '—' }}</td>
+                            <td class="font-weight-bold">
+                                @if ($imageUrl)
+                                    <div class="mci-name">
+                                        <button type="button" class="mci-thumb" data-title="{{ $row->code }} - {{ $row->material_name }}"
+                                            title="Xem hình ảnh vật tư">
+                                            <img src="{{ $imageUrl }}" alt="" loading="lazy">
+                                        </button>
+                                        <span>{{ $row->material_name ?: '—' }}</span>
+                                    </div>
+                                @else
+                                    {{ $row->material_name ?: '—' }}
+                                @endif
+                            </td>
                             <td class="md-sub">
                                 @if ($row->manufacturer_name)
                                     {{ $row->manufacturer_name }}
@@ -144,6 +160,7 @@
                                         'classification' => (object) $classification,
                                         'purchasing_department' => $row->purchasing_department,
                                         'lead_time_days' => $row->lead_time_days,
+                                        'image_url' => $imageUrl,
                                     ],
                                 ])
                             </td>

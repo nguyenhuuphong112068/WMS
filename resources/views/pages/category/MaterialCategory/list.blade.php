@@ -292,6 +292,7 @@
 @endsection
 
 @section('model')
+    @include('pages.category.MaterialCategory.imageAssets')
     @include('pages.category.MaterialCategory.create')
     @include('pages.category.MaterialCategory.update')
     @include('pages.category.shared.leadTimeModal')

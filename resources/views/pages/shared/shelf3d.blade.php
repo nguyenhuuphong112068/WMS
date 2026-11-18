@@ -10,12 +10,14 @@
 |       unit: 16, gap: 3, pad: 7, tierHeight: 46, boxHeight: 0,
 |       levels: <số tầng cao nhất>,
 |       columns: [{ label, code, tiers: [{ label, first, level (0 = hàng dưới cùng), max, depth, texture,
-|                   cells: [{ p, d, cls, title, key, color, box, dim, hit, label, flag }] }] }]
+|                   cells: [{ p, d, cls, title, key, color, box, dim, hit, label, flag, share }] }] }]
 |   });
 |
 | code của cột hiện dưới tên cột (trên nóc cột); label của ô (đoạn mã vị trí, vd. A1) in nằm trên mặt ô / nắp thùng.
 | Hai nhãn này bỏ qua khi vẽ trong cả phòng (compact). flag = ô / thùng cần báo động (vd. tương kỵ hoá chất): viền đỏ
 | + dấu "!" đỏ trên nắp thùng, vẽ cả trong cả phòng. Kệ trong phòng có clash = vách + nhãn kệ tô đỏ.
+| share = ô chia sẻ giữa 2 bộ phận (App\Support\LocationShare): tam giác màu --accent ở góc trái trên mặt ô / nắp thùng,
+| giống lưới Cấu trúc kho và sơ đồ Thẻ.
 | p = ô ngang (1 = trái), d = dãy sâu (1 = sát mép trước). box = vẽ thùng hàng nổi lên (cao boxHeight),
 | không thì vẽ ô phẳng trên mặt tầng. Ô có key mang data-w3d-key để trang gắn sự kiện bấm.
 | Kéo chuột để xoay, nhấp đúp về góc nghiêng; [data-w3d-view] đổi góc nhìn, [data-w3d-zoom] phóng to;
@@ -255,6 +257,24 @@
         text-align: center;
         box-shadow: 0 0 0 1.5px #fff;
         pointer-events: none;
+    }
+
+    /* ô chia sẻ giữa 2 bộ phận: tam giác màu nhấn ở góc trái trên (cùng dấu với lưới Cấu trúc kho / sơ đồ Thẻ) */
+    .w3d-share {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 0;
+        height: 0;
+        border-style: solid;
+        border-width: 7px 7px 0 0;
+        border-color: var(--accent) transparent transparent transparent;
+        pointer-events: none;
+    }
+
+    .w3d-cell.is-share:not(.is-flag):not(.is-hit) {
+        border-color: var(--accent);
+        border-style: dashed;
     }
 
     .w3d-unit.is-clash .w3d-lip {
@@ -837,7 +857,7 @@
 
         function cellMarkup(c, x, y, U, H, compact) {
             var cls = (c.cls || '') + (c.d === 1 ? ' d1' : '') + (c.p === 1 ? ' p1' : '') +
-                (c.dim ? ' is-dim' : '') + (c.hit ? ' is-hit' : '') + (c.flag ? ' is-flag' : '');
+                (c.dim ? ' is-dim' : '') + (c.hit ? ' is-hit' : '') + (c.flag ? ' is-flag' : '') + (c.share ? ' is-share' : '');
             var attrs = (c.key ? ' data-w3d-key="' + esc(c.key) + '"' : '') + (c.title ? ' title="' + esc(c.title) + '"' : '');
             var style = 'left:' + px(x) + ';top:' + px(y) + ';width:' + px(U) + ';height:' + px(U) +
                 (c.color ? ';--c:' + esc(c.color) : '') + (c.style || '');
@@ -849,6 +869,7 @@
                 code = '<em class="w3d-cell-code" style="--fs:' + fs.toFixed(1) + 'px">' + esc(c.label) + '</em>';
             }
             if (c.flag) code += '<i class="w3d-flag">!</i>';
+            if (c.share) code += '<i class="w3d-share"></i>';
 
             if (!c.box || !H) {
                 return '<span class="w3d-cell ' + cls + '" style="' + style + '"' + attrs + '>' + code + '</span>';

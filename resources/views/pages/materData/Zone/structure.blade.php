@@ -3142,9 +3142,12 @@
                                     var key = cellKey(p, d);
                                     var cls = cell3dClass(tier, key);
                                     var code = cellCode(column, tier, tier.codes[key]) || tierCode(column, tier) + '/' + cellSeg(p, d);
+                                    // Ô đã chia sẻ cho bộ phận khác: tam giác màu nhấn ở góc như lưới 2D
+                                    var shareTo = (cls === 'is-free' || cls === 'is-busy' || cls === 'is-off') && tier.attrs[key] ? tier.attrs[key].share : null;
                                     cells.push({
                                         p: p, d: d, cls: cls, style: cell3dStyle(tier, key, cls),
-                                        title: code, label: code.split('/').pop()
+                                        title: code + (shareTo ? ' · Chia sẻ cho ' + (CFG.shareDepartments[shareTo] || 'bộ phận khác') : ''),
+                                        label: code.split('/').pop(), share: !!shareTo
                                     });
                                 }
                             }

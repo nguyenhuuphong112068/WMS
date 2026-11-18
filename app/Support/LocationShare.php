@@ -254,8 +254,9 @@ class LocationShare
      *    các ô đó (chỉ xem; hoá chất có 'sw' để đối chiếu tương kỵ cùng tầng).
      *  - Phòng MƯỢN: thêm các ô được giao (đúng loại hàng hoặc dùng chung) + kho/kệ/cột/tầng chứa chúng; tên
      *    kho kèm tên phòng chủ kho, ô mang owner.
+     * $guests = false: không lấy hàng của bộ phận mượn (trang tra cứu công khai chỉ hiện hàng của phòng được tra).
      */
-    public static function extendZones(array $zones, int $departmentId, string $module): array
+    public static function extendZones(array $zones, int $departmentId, string $module, bool $guests = true): array
     {
         $zones['guests'] = [];
         $locations = collect($zones['locations'] ?? []);
@@ -277,7 +278,9 @@ class LocationShare
                 return $loc;
             });
 
-            $zones['guests'] = self::guestRows($module, $shared->keys()->all(), $departmentId);
+            if ($guests) {
+                $zones['guests'] = self::guestRows($module, $shared->keys()->all(), $departmentId);
+            }
         }
 
         // Ô phòng khác giao cho phòng mình

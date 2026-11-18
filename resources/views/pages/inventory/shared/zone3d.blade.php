@@ -246,6 +246,28 @@
         border-color: #DC2626;
     }
 
+    /* Kệ có ô chia sẻ giữa 2 bộ phận (App\Support\LocationShare): tam giác màu nhấn ở góc như ô ở sơ đồ Thẻ */
+    .mz-3d-title .tag.is-share {
+        background: rgba(23, 184, 212, 0.14);
+        color: #0E7490;
+    }
+
+    .mz-plan-shelf.is-share::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        border-style: solid;
+        border-width: 9px 9px 0 0;
+        border-color: var(--accent) transparent transparent transparent;
+        pointer-events: none;
+    }
+
+    .w3d-legend i.is-share-swatch {
+        background: linear-gradient(135deg, var(--accent) 0 45%, #EEF2F6 45% 100%);
+        border: 1px dashed var(--accent);
+    }
+
     .mz-3d-bar {
         height: 4px;
         border-radius: 999px;
@@ -725,6 +747,20 @@
             return !!(node && node.conflicts && node.conflicts.length);
         }
 
+        // Ô chia sẻ giữa 2 bộ phận (App\Support\LocationShare::extendZones): shared_to = ô phòng mình đã giao cho bộ
+        // phận khác (chỉ xem hàng bên mượn), owner = ô phòng khác giao cho phòng mình. Trả về câu mô tả, không chia sẻ = ''.
+        function shareOf(loc) {
+            if (!loc) return '';
+            if (loc.shared_to) return 'Đã giao cho ' + loc.shared_to + ' (chỉ xem)';
+            if (loc.owner) return 'Vị trí mượn của kho ' + loc.owner;
+            return '';
+        }
+
+        function sharedTag(st) {
+            return st.shared ? '<span class="tag is-share" title="Vị trí chia sẻ giữa 2 bộ phận - Dữ Liệu Gốc → Định Khu → Cấu trúc kho">' +
+                '<i class="fas fa-handshake mr-1"></i>' + st.shared + ' vị trí chia sẻ</span>' : '';
+        }
+
         function names(node) {
             return (node.preview || node.items || []).slice(0, 3).map(function(x) {
                 return x.name || x.material_name || x.code;
@@ -732,7 +768,7 @@
         }
 
         function statOf(ctx, shelf, f) {
-            var st = { locations: 0, filled: 0, lots: 0, alerts: 0, hits: 0, compat: 0 };
+            var st = { locations: 0, filled: 0, lots: 0, alerts: 0, hits: 0, compat: 0, shared: 0 };
             shelf.columnList.forEach(function(c) {
                 c.tierList.forEach(function(t) {
                     t.cells.forEach(function(cell) {
@@ -742,6 +778,7 @@
                         st.lots += node ? Number(node.lots) || 0 : 0;
                         st.alerts += node ? Number(node.alerts) || 0 : 0;
                         if (clashOf(node)) st.compat++;
+                        if (shareOf(cell.loc)) st.shared++;
                         if (f.active && matches(f, node)) st.hits++;
                     });
                 });
@@ -751,7 +788,8 @@
 
         /* ---------- vẽ ---------- */
         function legend(ctx) {
-            return legendBase(ctx) + (ctx.compat ? '<span><i style="background:#fff;border:2px solid #DC2626"></i>Tương kỵ cùng tầng</span>' : '');
+            return legendBase(ctx) + (ctx.compat ? '<span><i style="background:#fff;border:2px solid #DC2626"></i>Tương kỵ cùng tầng</span>' : '') +
+                (ctx.hasShare ? '<span><i class="is-share-swatch"></i>Vị trí chia sẻ</span>' : '');
         }
 
         function legendBase(ctx) {
@@ -782,9 +820,11 @@
             var hit = f.active && matches(f, node);
             var clash = stocked && clashOf(node);
             if (clash) title += '\n⚠ ' + (window.wmsConflictTitle ? window.wmsConflictTitle(node) : 'Tương kỵ cùng tầng');
+            var share = shareOf(cell.loc);
+            if (share) title += '\n' + share;
 
             return {
-                p: cell.p, d: cell.d, key: stocked ? 'L' + cell.loc.id : null, title: title, flag: clash,
+                p: cell.p, d: cell.d, key: stocked ? 'L' + cell.loc.id : null, title: title, flag: clash, share: !!share,
                 label: cell.loc.code ? String(cell.loc.code).split('/').pop() : '',
                 color: color, box: stocked, dim: f.active && !hit, hit: hit
             };
@@ -896,7 +936,7 @@
                 '<span class="tag">' + shelf.columnList.length + ' cột</span>' +
                 '<span class="tag">' + st.filled + '/' + st.locations + ' vị trí có hàng · ' + st.lots + ' mã</span>' +
                 (st.alerts ? '<span class="tag is-alert">' + st.alerts + ' cần chú ý</span>' : '') +
-                compatTag(st) +
+                compatTag(st) + sharedTag(st) +
                 (f.active ? '<span class="tag">' + st.hits + ' vị trí khớp bộ lọc</span>' : '') +
                 unzonedTag(ctx);
 
@@ -985,11 +1025,11 @@
         }
 
         function roomStat(ctx, room, f) {
-            var acc = { locations: 0, filled: 0, lots: 0, alerts: 0, hits: 0, compat: 0, byShelf: {} };
+            var acc = { locations: 0, filled: 0, lots: 0, alerts: 0, hits: 0, compat: 0, shared: 0, byShelf: {} };
             room.shelves.forEach(function(shelf) {
                 var st = statOf(ctx, shelf, f);
                 acc.byShelf[shelf.id] = st;
-                ['locations', 'filled', 'lots', 'alerts', 'hits', 'compat'].forEach(function(k) { acc[k] += st[k]; });
+                ['locations', 'filled', 'lots', 'alerts', 'hits', 'compat', 'shared'].forEach(function(k) { acc[k] += st[k]; });
             });
             return acc;
         }
@@ -1055,7 +1095,7 @@
                 (room.items.length > room.shelves.length ? '<span class="tag">' + (room.items.length - room.shelves.length) + ' kệ module khác (mờ)</span>' : '') +
                 '<span class="tag">' + st.filled + '/' + st.locations + ' vị trí có hàng · ' + st.lots + ' mã</span>' +
                 (st.alerts ? '<span class="tag is-alert">' + st.alerts + ' cần chú ý</span>' : '') +
-                compatTag(st) +
+                compatTag(st) + sharedTag(st) +
                 (f.active ? '<span class="tag">' + st.hits + ' vị trí khớp bộ lọc</span>' : '') +
                 unzonedTag(ctx);
 
@@ -1135,10 +1175,12 @@
                     return;
                 }
                 var ss = st.byShelf[item.shelf.id];
-                var cls = f.active ? (ss.hits ? ' is-hit' : ' is-miss') : (ss.compat ? ' is-compat' : (ss.alerts ? ' is-alert' : (ss.filled ? ' is-stocked' : '')));
+                var cls = (f.active ? (ss.hits ? ' is-hit' : ' is-miss') : (ss.compat ? ' is-compat' : (ss.alerts ? ' is-alert' : (ss.filled ? ' is-stocked' : '')))) +
+                    (ss.shared ? ' is-share' : '');
                 html += '<button type="button" class="mz-plan-shelf' + cls + '" data-plan-shelf="' + esc(item.shelf.id) + '"' +
                     ' title="' + esc((item.shelf.code || '') + ' - ' + (item.shelf.name || '') + ' · ' + ss.filled + '/' + ss.locations +
                     ' vị trí có hàng' + (ss.compat ? ' · ' + ss.compat + ' vị trí tương kỵ' : '') +
+                    (ss.shared ? ' · ' + ss.shared + ' vị trí chia sẻ' : '') +
                     (f.active ? ' · ' + ss.hits + ' khớp' : '') + ' · nhấp đúp để xem 3D kệ này') + '"' +
                     ' style="left:' + ((item.x - item.width / 2) * sc) + 'px;top:' + ((item.y - item.depth / 2) * sc) + 'px;width:' +
                     (item.width * sc) + 'px;height:' + (item.depth * sc) + 'px;transform:rotate(' + item.rotation + 'deg)">' +
@@ -1396,6 +1438,8 @@
                 nodes: opts.nodes || {},
                 // Trang bật đối chiếu tương kỵ (Tồn Kho Hoá Chất): chú thích thêm "Tương kỵ cùng tầng"
                 compat: !!opts.compat,
+                // Có ô chia sẻ giữa 2 bộ phận (LocationShare) thì chú thích thêm "Vị trí chia sẻ"
+                hasShare: values(asMap((opts.zones || {}).locations)).some(function(loc) { return !!shareOf(loc); }),
                 zoneTypes: zoneTypes,
                 zoneLabels: zoneLabels,
                 shelves: buildShelves(opts.zones || {}),

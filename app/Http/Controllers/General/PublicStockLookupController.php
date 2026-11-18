@@ -279,7 +279,9 @@ class PublicStockLookupController extends Controller
 
     /**
      * Định khu của phòng ban cho sơ đồ 3D / Mặt bằng: giống zoneOptions() của màn hình Tồn Kho - chỉ lấy ô
-     * dành cho loại hàng này hoặc ô dùng chung (chưa khai loại).
+     * dành cho loại hàng này hoặc ô dùng chung (chưa khai loại). Cộng thêm ô phòng khác giao cho phòng này
+     * (kho mang tên phòng chủ kho) và đánh dấu ô phòng này đã giao đi - App\Support\LocationShare, không kèm
+     * hàng của bộ phận mượn.
      */
     private function zones(string $kind, int $departmentId): array
     {
@@ -290,7 +292,7 @@ class PublicStockLookupController extends Controller
             ->orderBy('name', 'asc')
             ->get();
 
-        return [
+        return \App\Support\LocationShare::extendZones([
             'warehouses' => \App\Support\RoomLayout::attach($of('warehouses', ['id', 'code', 'name', 'layout_width', 'layout_depth', 'layout_polygon', 'layout_door_wall', 'layout_door_offset', 'layout_door'])),
             'shelves' => $of('shelves', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']),
             'columns' => $of('columns', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']),
@@ -303,7 +305,7 @@ class PublicStockLookupController extends Controller
                 ->orderBy('code', 'asc')
                 ->get(),
             'foreign' => \App\Support\RoomLayout::foreign($departmentId, $kind),
-        ];
+        ], $departmentId, $kind, false);
     }
 
     /**
