@@ -335,6 +335,9 @@
 
         @yield('model')
 
+        {{-- Nút "Chọn trên 3D" tự gắn cho mọi ô chọn định khu (VT/HC/CC/VPP) --}}
+        @include('pages.shared.locationPicker3d')
+
         @yield('script')
 
 
@@ -798,7 +801,10 @@
             }
 
             $('#notif-bell-btn, #close-notif-drawer, #notification-overlay').on('click', function() {
-                toggleDrawer($('#notification-drawer').hasClass('open') ? false : true);
+                var opening = !$('#notification-drawer').hasClass('open');
+                toggleDrawer(opening);
+                // Mở thanh là tải lại để khớp trạng thái đọc / xử lý mới nhất ở trang chủ
+                if (opening) loadNotifications(false);
             });
 
             /*
@@ -924,10 +930,12 @@
                 form.append('_token', "{{ csrf_token() }}");
                 form.append('review_key', $(this).data('review-key'));
                 navigator.sendBeacon("{{ route('notifications.markAsRead') }}", form);
+                setTimeout(function() { loadNotifications(false); }, 400);
             });
 
             window.openNotificationDrawer = function(tab) {
                 if (tab) $('.notif-tab[data-tab="' + tab + '"]').trigger('click');
+                else loadNotifications(false);
                 toggleDrawer(true);
             };
 

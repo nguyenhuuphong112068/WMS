@@ -263,7 +263,6 @@
                                             @endif
                                             {{-- Hoàn thành / Huỷ mục đã duyệt (phòng đề nghị), xác nhận huỷ (bộ phận mua hàng) --}}
                                             @include('pages.estimate.shared.itemStatus', ['trackPermission' => 'estimate_vpp_tracking', 'singleSideCancel' => true])
-                                            @include('pages.estimate.shared.itemChatButton', ['chatPermission' => 'estimate_vpp_chat'])
                                         </td>
                                     </tr>
                                 @endforeach

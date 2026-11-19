@@ -33,6 +33,8 @@
     cần cất hàng để chỉ còn vị trí của kệ/tủ đó (số bên cạnh là số vị trí). Hai hàng chip dùng cùng nhau được; đóng ô chọn thì
     chip trở về <b>Tất cả</b>. Phòng chỉ có một kệ/tủ thì không hiện hàng chip Kệ/Tủ.</p>
 
+@include('pages.userGuide.shared.locationPicker3d', ['ugCompat' => true])
+
 <h3>Ký điện tử bằng mật khẩu</h3>
 <p>Các thao tác <span class="ug-chip is-warn">Ký bằng mật khẩu</span> (duyệt danh mục, xác nhận khai báo cổng quốc gia,
     quyết định loại bỏ, huỷ, ký mua hàng) bắt buộc nhập lại mật khẩu đăng nhập (21 CFR Part 11).</p>

@@ -70,9 +70,7 @@ class VppEstimateController extends Controller
     /** Hoàn thành / Huỷ / Hoàn tác mục dự trù đã duyệt (phía phòng đề nghị) */
     private const TRACK_PERMISSION = 'estimate_vpp_tracking';
 
-    /** Gửi tin ở nút "Trao đổi" từng VPP trong chi tiết phiếu (quyền con của estimate_vpp_view) */
-    private const CHAT_PERMISSION = 'estimate_vpp_chat';
-
+    /* Mua hàng VPP không có Trao đổi theo mặt hàng (bỏ 18/11/2026) - CHAT_TYPE chỉ còn cho dòng nhật ký hệ thống */
 
     private const CHAT_TYPE = 'vpp';
 
@@ -865,43 +863,6 @@ class VppEstimateController extends Controller
         });
 
         return redirect()->back()->with('success', 'Đã cập nhật trạng thái '.self::ITEM_LABEL.'!');
-    }
-
-    public function storeItemChat(Request $request)
-    {
-        $request->validate([
-            'item_id' => 'required|integer',
-            'content' => 'required|string|max:1000',
-        ]);
-
-        if (! user_can(self::CHAT_PERMISSION)) {
-            return response()->json(['success' => false, 'message' => 'Bạn không có quyền trao đổi ở mục mua hàng!']);
-        }
-
-        // Phòng đề nghị (phiếu của phòng đang chọn) hoặc bộ phận mua hàng phụ trách mục
-        [$item, $list] = $this->findItem($request->item_id);
-        if (! $item) {
-            [$item, $list] = $this->findPurchasingItem($request->item_id);
-        }
-
-        if (! $item) {
-            return response()->json(['success' => false, 'message' => 'Không tìm thấy '.self::ITEM_LABEL]);
-        }
-
-        $chatId = DB::table('estimate_item_chats')->insertGetId([
-            'item_id' => $item->id,
-            'item_type' => self::CHAT_TYPE,
-            'user_name' => $this->actor(),
-            'content' => $request->content,
-            'type' => 'chat',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $chat = DB::table('estimate_item_chats')->where('id', $chatId)->first();
-        $chat->created_at_formatted = \Carbon\Carbon::parse($chat->created_at)->format('H:i d/m/Y');
-
-        return response()->json(['success' => true, 'chat' => $chat]);
     }
 
     /* ==========================================================

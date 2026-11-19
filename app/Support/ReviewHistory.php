@@ -133,7 +133,12 @@ class ReviewHistory
                 ->all();
 
             if ($resolved) {
-                DB::table('notification_recipients')->whereIn('id', $resolved)->update(['resolved_at' => $now]);
+                // Đã xử lý xong thì không còn gì để đọc - bỏ chấm chưa đọc theo thẻ trang chủ
+                DB::table('notification_recipients')->whereIn('id', $resolved)->update([
+                    'resolved_at' => $now,
+                    'is_read' => 1,
+                    'read_at' => DB::raw('COALESCE(read_at, '.DB::getPdo()->quote($now->toDateTimeString()).')'),
+                ]);
             }
         });
     }

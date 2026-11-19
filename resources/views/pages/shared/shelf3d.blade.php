@@ -804,7 +804,11 @@
         var PRESETS = {
             iso: { ax: -24, ay: -32 },
             front: { ax: -12, ay: 0 },
-            top: { ax: -82, ay: 0 }
+            top: { ax: -82, ay: 0 },
+            // Nhìn từ hai bên / phía sau (ô chọn định khu 3D - pages.shared.locationPicker3d)
+            left: { ax: -18, ay: 75 },
+            right: { ax: -18, ay: -75 },
+            back: { ax: -18, ay: 180 }
         };
 
         function esc(value) {

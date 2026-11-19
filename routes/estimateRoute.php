@@ -204,6 +204,5 @@ Route::prefix('/estimate')
 
             // Hoàn thành / Huỷ mục đã duyệt (mua hàng VPP không có ngày mong muốn / ngày hẹn đáp ứng)
             Route::post('updateItemStatus', 'updateItemStatus')->name('updateItemStatus');
-            Route::post('storeItemChat', 'storeItemChat')->name('storeItemChat');
         });
     });

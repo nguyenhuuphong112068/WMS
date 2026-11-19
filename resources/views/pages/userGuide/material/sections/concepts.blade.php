@@ -31,6 +31,8 @@
     cần cất hàng để chỉ còn vị trí của kệ/tủ đó (số bên cạnh là số vị trí). Hai hàng chip dùng cùng nhau được; đóng ô chọn thì
     chip trở về <b>Tất cả</b>. Phòng chỉ có một kệ/tủ thì không hiện hàng chip Kệ/Tủ.</p>
 
+@include('pages.userGuide.shared.locationPicker3d')
+
 <h3>Sửa, duyệt, khoá ở Danh Mục không tải lại trang</h3>
 <p>Ở Danh Mục Vật Tư (tab Công Ty, Vật Tư Của Phòng và các danh sách theo chu kỳ), <b>Sửa</b>, <b>Duyệt</b> và
     <b>Khoá / Mở khoá</b> lưu ngay tại chỗ: bảng tự cập nhật dòng vừa đổi, giữ nguyên tab, ô tìm kiếm, bộ lọc, trang

@@ -437,6 +437,63 @@ class CategoryLookup
         ])->values()->all();
     }
 
+    /**
+     * Dữ liệu modal "Chọn định khu trên 3D" (pages.shared.locationPicker3d): mọi kệ/tủ có ít nhất một vị trí
+     * chọn được (CÙNG điều kiện searchLocations), dựng đủ lưới cột → tầng → ô của kệ đó. Ô không khớp điều kiện
+     * vẫn vẽ (mờ, không bấm được) để kệ đúng hình thật. Mỗi ô kèm số lô đang tồn (mọi loại hàng) để tô màu.
+     *
+     * @return array{warehouses: array, shelves: array, columns: array, tiers: array, locations: array}
+     */
+    public static function locationGrid(string $itemType, int $departmentId, ?string $onlyZone = null, array $exceptZones = []): array
+    {
+        $allowed = self::locationScope($itemType, $departmentId, null, $onlyZone, $exceptZones)
+            ->whereNotNull('locations.shelf_id')
+            ->reorder()
+            ->select('locations.id', 'locations.shelf_id')
+            ->get();
+
+        $shelfIds = $allowed->pluck('shelf_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $allowedIds = array_flip($allowed->pluck('id')->map(fn ($id) => (int) $id)->all());
+
+        if (! $shelfIds) {
+            return ['warehouses' => [], 'shelves' => [], 'columns' => [], 'tiers' => [], 'locations' => []];
+        }
+
+        $locations = self::locationQuery()
+            ->whereIn('locations.shelf_id', $shelfIds)
+            ->where('locations.status_id', 1)
+            ->addSelect('locations.shelf_id', 'locations.column_id', 'locations.tier_id', 'locations.position', 'locations.depth')
+            ->get();
+
+        $onHand = LocationShare::onHandByLocation($locations->pluck('id')->all());
+
+        $shelves = DB::table('shelves')->whereIn('id', $shelfIds)
+            ->select('id', 'code', 'name', 'warehouse_id', 'tier_order')->orderBy('name')->get();
+
+        return [
+            'warehouses' => DB::table('warehouses')->whereIn('id', $shelves->pluck('warehouse_id')->filter()->unique()->all())
+                ->select('id', 'code', 'name')->orderBy('name')->get()->all(),
+            'shelves' => $shelves->all(),
+            'columns' => DB::table('columns')->whereIn('shelf_id', $shelfIds)->where('status_id', 1)
+                ->select('id', 'code', 'name', 'shelf_id', 'position')->get()->all(),
+            'tiers' => DB::table('tiers')->whereIn('shelf_id', $shelfIds)->where('status_id', 1)
+                ->select('id', 'code', 'name', 'shelf_id', 'column_id', 'position')->get()->all(),
+            'locations' => $locations->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'code' => (string) $row->code,
+                'text' => self::locationLabel($row),
+                'shelf_id' => (int) $row->shelf_id,
+                'column_id' => $row->column_id ? (int) $row->column_id : null,
+                'tier_id' => $row->tier_id ? (int) $row->tier_id : null,
+                'position' => (int) $row->position,
+                'depth' => (int) $row->depth,
+                'zone_type' => $row->zone_type,
+                'ok' => isset($allowedIds[(int) $row->id]),
+                'lots' => array_sum($onHand[(int) $row->id] ?? []),
+            ])->values()->all(),
+        ];
+    }
+
     /** Khoá nhóm "Kho › Kệ/Tủ" cho option định khu render sẵn (data-shelf) - '' khi chưa gán kệ/tủ. */
     public static function shelfKey($row): string
     {

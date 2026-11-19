@@ -61,6 +61,29 @@ class CategoryLookupController extends Controller
             return response()->json(['shelves' => CategoryLookup::locationShelves($type, $departmentId, $zone, $onlyZone, $exceptZones)]);
         }
 
+        // grid=1: lưới kệ/tủ cho modal "Chọn định khu trên 3D" (pages.shared.locationPicker3d). Kèm category_id
+        // (hoá chất đang chọn) thì ô cùng tầng với hoá chất tương kỵ mang câu cảnh báo (vẫn chọn được).
+        if ($request->boolean('grid')) {
+            $grid = CategoryLookup::locationGrid($type, $departmentId, $onlyZone, $exceptZones);
+            $categoryId = (int) $request->category_id;
+
+            if ($categoryId > 0 && in_array($type, ['chemical', 'all'], true) && $grid['locations']) {
+                $okItems = array_values(array_filter($grid['locations'], fn ($loc) => $loc['ok']));
+                $warn = [];
+                foreach (ChemicalCompatibility::annotateLocationOptions($okItems, $categoryId) as $item) {
+                    if (! empty($item['warning'])) {
+                        $warn[$item['id']] = $item['warning'];
+                    }
+                }
+                foreach ($grid['locations'] as &$loc) {
+                    $loc['warning'] = $warn[$loc['id']] ?? null;
+                }
+                unset($loc);
+            }
+
+            return response()->json($grid);
+        }
+
         // shelf_filter: chip "Kệ/Tủ" đang chọn (shelves.id, '__none' = chưa gán kệ/tủ)
         $shelf = $request->filled('shelf_filter') ? (string) $request->shelf_filter : null;
 
