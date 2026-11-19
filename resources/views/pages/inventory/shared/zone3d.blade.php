@@ -1001,6 +1001,7 @@
                             shelf: shelf, x: Number(shelf.layout_x), y: Number(shelf.layout_y),
                             width: Number(shelf.layout_width) || defaultSize(shelf).width,
                             depth: Number(shelf.layout_depth) || defaultSize(shelf).depth,
+                            height: Number(shelf.layout_height) || 0,
                             rotation: Number(shelf.layout_rotation) || 0
                         });
                     });
@@ -1109,7 +1110,7 @@
                         return {
                             ghost: true,
                             label: (item.shelf.code || item.shelf.name || '') + ' · ' + item.shelf.ghost,
-                            x: item.x, y: item.y, width: item.width, depth: item.depth, rotation: item.rotation,
+                            x: item.x, y: item.y, width: item.width, depth: item.depth, height: item.height, rotation: item.rotation,
                             model: shelfModel(ctx, item.shelf, f, true)
                         };
                     }
@@ -1120,7 +1121,7 @@
                         label: (clashes ? '⚠ ' : '') + (item.shelf.code || item.shelf.name || '') + (f.active && hits ? ' · ' + hits + ' khớp' : '') +
                             (clashes ? ' · ' + clashes + ' tương kỵ' : ''),
                         clash: clashes > 0,
-                        x: item.x, y: item.y, width: item.width, depth: item.depth, rotation: item.rotation,
+                        x: item.x, y: item.y, width: item.width, depth: item.depth, height: item.height, rotation: item.rotation,
                         selected: f.active && hits > 0,
                         // Đang tìm (gõ / quét mã): thẻ chi tiết hàng khớp thay cho nhãn mã kệ
                         card: seeking && hits ? hitCard(ctx, item.shelf, f) : null,

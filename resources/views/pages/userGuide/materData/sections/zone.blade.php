@@ -172,7 +172,7 @@
     <li>Đặt kệ vào phòng: kéo tên kệ ở dòng <b>Kệ/tủ chưa đặt</b> thả vào sơ đồ, bấm vào tên kệ để đặt vào chỗ trống đầu tiên,
         hoặc bấm <b>Tự xếp kệ chưa đặt</b> để xếp lần lượt tất cả. Kệ mới đặt lấy kích thước gợi ý theo số ô của kệ.</li>
     <li>Kéo kệ trên sơ đồ để dời chỗ (bước 0,05 m, không ra được ngoài tường). Bấm chọn một kệ để chỉnh ở khung bên phải:
-        <b>Bề ngang kệ (mặt trước)</b>, <b>Bề sâu kệ</b>, <b>Cách mép trái</b>, <b>Cách mép trên</b> (tính từ mép khung bao) và
+        <b>Bề ngang kệ (mặt trước)</b>, <b>Bề sâu kệ</b>, <b>Chiều cao kệ</b> (chiều cao thật để 3D Mặt bằng vẽ đúng tỉ lệ; nhập 0 = tự tính theo số tầng, mỗi tầng 0,4 m), <b>Cách mép trái</b>, <b>Cách mép trên</b> (tính từ mép khung bao) và
         <b>Mặt trước (phía lấy hàng) hướng</b> xuống / trái / lên / phải. Trên sơ đồ, mặt trước là cạnh đậm có mũi tên.
         Phím tắt khi đang chọn kệ: mũi tên dời 0,1 m (giữ <span class="ug-key">Shift</span>: 0,5 m),
         <span class="ug-key">R</span> xoay 90°, <span class="ug-key">Delete</span> gỡ khỏi mặt bằng,

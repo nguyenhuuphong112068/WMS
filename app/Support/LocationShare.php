@@ -320,7 +320,7 @@ class LocationShare
                 });
 
             $zones['warehouses'] = collect($zones['warehouses'] ?? [])->concat(RoomLayout::attach($warehouses))->values();
-            $zones['shelves'] = collect($zones['shelves'] ?? [])->concat($extra('shelves', 'shelf_id', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']))->values();
+            $zones['shelves'] = collect($zones['shelves'] ?? [])->concat($extra('shelves', 'shelf_id', ['id', 'code', 'name', 'warehouse_id', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_height', 'layout_rotation']))->values();
             $zones['columns'] = collect($zones['columns'] ?? [])->concat($extra('columns', 'column_id', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'position']))->values();
             $zones['tiers'] = collect($zones['tiers'] ?? [])->concat($extra('tiers', 'tier_id', ['id', 'code', 'name', 'warehouse_id', 'shelf_id', 'column_id', 'position']))->values();
         }

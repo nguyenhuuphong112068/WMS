@@ -48,6 +48,9 @@ class ZoneStructureController extends Controller
     private const LAYOUT_MAX_ROOM = 200;
     private const LAYOUT_MIN_SHELF = 0.2;
     private const LAYOUT_MAX_SHELF = 50;
+
+    /** Chiều cao kệ/tủ tối đa khai ở Mặt bằng (m) */
+    private const LAYOUT_MAX_HEIGHT = 15;
     private const DOOR_WIDTH = 1;
 
     /** Tường có cửa trên sơ đồ mặt bằng (trên = tường trong cùng khi nhìn 3D). */
@@ -637,7 +640,7 @@ class ZoneStructureController extends Controller
             ->where('warehouse_id', $warehouse->id)
             ->where('status_id', 1)
             ->orderBy('code')
-            ->get(['id', 'code', 'name', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation']);
+            ->get(['id', 'code', 'name', 'tier_order', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_height', 'layout_rotation']);
 
         $ids = $shelves->pluck('id')->all();
 
@@ -706,6 +709,8 @@ class ZoneStructureController extends Controller
                 'y' => (float) $shelf->layout_y,
                 'width' => (float) $shelf->layout_width,
                 'depth' => (float) $shelf->layout_depth,
+                // 0 = tự tính theo số tầng
+                'height' => (float) $shelf->layout_height,
                 'rotation' => (int) $shelf->layout_rotation,
             ];
 
@@ -753,6 +758,7 @@ class ZoneStructureController extends Controller
             'shelves.*.y' => ['nullable', 'numeric', 'min:0', 'max:' . $max],
             'shelves.*.width' => ['nullable', 'numeric', 'min:' . self::LAYOUT_MIN_SHELF, 'max:' . self::LAYOUT_MAX_SHELF],
             'shelves.*.depth' => ['nullable', 'numeric', 'min:' . self::LAYOUT_MIN_SHELF, 'max:' . self::LAYOUT_MAX_SHELF],
+            'shelves.*.height' => ['nullable', 'numeric', 'min:0', 'max:' . self::LAYOUT_MAX_HEIGHT],
             'shelves.*.rotation' => ['nullable', Rule::in(self::ROTATIONS)],
         ], [
             'room.polygon.required' => 'Chưa vẽ hình dạng phòng.',
@@ -766,6 +772,7 @@ class ZoneStructureController extends Controller
             'shelves.*.depth.min' => 'Bề sâu kệ tối thiểu ' . self::LAYOUT_MIN_SHELF . ' m.',
             'shelves.*.width.max' => 'Bề ngang kệ tối đa ' . self::LAYOUT_MAX_SHELF . ' m.',
             'shelves.*.depth.max' => 'Bề sâu kệ tối đa ' . self::LAYOUT_MAX_SHELF . ' m.',
+            'shelves.*.height.max' => 'Chiều cao kệ tối đa ' . self::LAYOUT_MAX_HEIGHT . ' m.',
             'shelves.*.rotation.in' => 'Hướng mặt trước của kệ không hợp lệ.',
         ]);
 
@@ -838,7 +845,7 @@ class ZoneStructureController extends Controller
         $current = DB::table('shelves')
             ->where('department_id', $this->departmentId())
             ->where('warehouse_id', $warehouse->id)
-            ->get(['id', 'code', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation'])
+            ->get(['id', 'code', 'layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_height', 'layout_rotation'])
             ->keyBy('id');
 
         $plans = [];
@@ -854,8 +861,11 @@ class ZoneStructureController extends Controller
                 'layout_y' => $this->metre($item['y'] ?? 0),
                 'layout_width' => $this->metre($item['width'] ?? 1),
                 'layout_depth' => $this->metre($item['depth'] ?? 0.5),
+                // Chiều cao kệ: 0 / trống = tự tính theo số tầng
+                'layout_height' => (float) ($item['height'] ?? 0) > 0
+                    ? $this->metre(min((float) $item['height'], self::LAYOUT_MAX_HEIGHT)) : null,
                 'layout_rotation' => (int) ($item['rotation'] ?? 0),
-            ] : array_fill_keys(['layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_rotation'], null);
+            ] : array_fill_keys(['layout_x', 'layout_y', 'layout_width', 'layout_depth', 'layout_height', 'layout_rotation'], null);
         }
 
         // Kệ phải nằm trọn trong phòng và không chồng lên nhau (kệ xoay 90/270 thì đổi ngang - sâu).
@@ -884,10 +894,11 @@ class ZoneStructureController extends Controller
         $shelfFields = [
             'layout_x' => 'Mặt bằng - tâm kệ theo chiều ngang (m)', 'layout_y' => 'Mặt bằng - tâm kệ theo chiều sâu (m)',
             'layout_width' => 'Mặt bằng - bề ngang kệ (m)', 'layout_depth' => 'Mặt bằng - bề sâu kệ (m)',
+            'layout_height' => 'Mặt bằng - chiều cao kệ (m)',
             'layout_rotation' => 'Mặt bằng - hướng mặt trước',
         ];
         $roomMaps = ['layout_door_wall' => ['' => 'Chưa khai'] + self::DOOR_WALLS, 'layout_polygon' => ['' => 'Hình chữ nhật'], 'layout_door' => ['' => 'Chưa có cửa']];
-        $shelfMaps = ['layout_rotation' => ['' => 'Chưa đặt'] + self::ROTATION_LABELS];
+        $shelfMaps = ['layout_height' => ['' => 'Tự tính theo số tầng'], 'layout_rotation' => ['' => 'Chưa đặt'] + self::ROTATION_LABELS];
 
         $changed = DB::transaction(function () use ($warehouse, $room, $plans, $current, $roomFields, $shelfFields, $roomMaps, $shelfMaps, $polygon) {
             $actor = $this->actor();
@@ -932,6 +943,7 @@ class ZoneStructureController extends Controller
             'maxRoom' => self::LAYOUT_MAX_ROOM,
             'minShelf' => self::LAYOUT_MIN_SHELF,
             'maxShelf' => self::LAYOUT_MAX_SHELF,
+            'maxHeight' => self::LAYOUT_MAX_HEIGHT,
             'doorWidth' => \App\Support\RoomLayout::DOOR_DEFAULT,
             'doorMin' => \App\Support\RoomLayout::DOOR_MIN,
             'doorMax' => \App\Support\RoomLayout::DOOR_MAX,

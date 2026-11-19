@@ -1029,6 +1029,15 @@
 
         /* ---------- khung chỉnh kệ đang chọn ---------- */
 
+        // Chiều cao mặc định khi chưa khai: số tầng cao nhất × TIER_METRE
+        function autoHeight(s) {
+            var levels = 0;
+            (s.columns || []).forEach(function(c) {
+                (c.tiers || []).forEach(function(t) { levels = Math.max(levels, Number(t.position) || 0); });
+            });
+            return round(Math.max(1, levels) * TIER_METRE);
+        }
+
         function stepper(field, label, value, step, min, max) {
             var off = editable() ? '' : ' disabled';
             return '<div class="zl-field"><label>' + label + '</label>' +
@@ -1056,6 +1065,8 @@
                     ? '<div class="zl-sel-grid">' +
                         stepper('shelf.width', 'Bề ngang kệ (mặt trước)', s.width, 0.1, S.limits.minShelf, S.limits.maxShelf) +
                         stepper('shelf.depth', 'Bề sâu kệ', s.depth, 0.1, S.limits.minShelf, S.limits.maxShelf) +
+                        // Chiều cao thật của kệ (3D Mặt bằng). 0 = tự tính theo số tầng
+                        stepper('shelf.height', 'Chiều cao kệ' + (s.height > 0 ? '' : ' (tự tính)'), s.height > 0 ? s.height : autoHeight(s), 0.1, 0, S.limits.maxHeight || 15) +
                         stepper('shelf.left', 'Cách mép trái', b[0], 0.1, 0, S.limits.maxRoom) +
                         stepper('shelf.top', 'Cách mép trên', b[1], 0.1, 0, S.limits.maxRoom) +
                         '</div>' +
@@ -1145,7 +1156,7 @@
                 empty: 'Chưa đặt kệ/tủ nào vào phòng.',
                 shelves: placed.map(function(s) {
                     return {
-                        key: String(s.id), label: s.code, x: s.x, y: s.y, width: s.width, depth: s.depth, rotation: s.rotation,
+                        key: String(s.id), label: s.code, x: s.x, y: s.y, width: s.width, depth: s.depth, height: s.height, rotation: s.rotation,
                         selected: S.selected === s.id, clash: !!bad[s.id], model: shelfModel(s, cells)
                     };
                 })
@@ -1180,7 +1191,8 @@
                             id: Number(s.id), code: s.code, name: s.name, tier_order: s.tier_order, columns: s.columns,
                             total: s.total, used: s.used, placed: !!s.layout,
                             x: s.layout ? s.layout.x : 0, y: s.layout ? s.layout.y : 0,
-                            width: size.width, depth: size.depth, rotation: s.layout ? s.layout.rotation : 0
+                            width: size.width, depth: size.depth, rotation: s.layout ? s.layout.rotation : 0,
+                            height: s.layout ? Number(s.layout.height) || 0 : 0
                         };
                     });
 
@@ -1245,7 +1257,7 @@
                         door: S.room.door ? { edge: S.room.door.edge, offset: round(S.room.door.offset), width: round(S.room.door.width) } : null
                     },
                     shelves: S.shelves.map(function(s) {
-                        return { id: s.id, placed: s.placed, x: s.x, y: s.y, width: s.width, depth: s.depth, rotation: s.rotation };
+                        return { id: s.id, placed: s.placed, x: s.x, y: s.y, width: s.width, depth: s.depth, height: s.height || 0, rotation: s.rotation };
                     })
                 })
             })
@@ -1310,6 +1322,9 @@
                 var c = clampCenter(s, s.x, s.y);
                 s.x = round(c.x);
                 s.y = round(c.y);
+            } else if (s && field === 'shelf.height') {
+                // 0 hoặc trống = tự tính theo số tầng
+                s.height = value > 0 ? clamp(round(value), 0.3, S.limits.maxHeight || 15) : 0;
             } else if (s && (field === 'shelf.left' || field === 'shelf.top')) {
                 var b = box(s);
                 var at = clampCenter(s, field === 'shelf.left' ? s.x + value - b[0] : s.x, field === 'shelf.top' ? s.y + value - b[1] : s.y);
@@ -1328,7 +1343,7 @@
             if (field.indexOf('room.') === 0) return Number(S.room[field.slice(5)]) || 0;
             if (!s) return 0;
             var b = box(s);
-            return { 'shelf.width': s.width, 'shelf.depth': s.depth, 'shelf.left': b[0], 'shelf.top': b[1] }[field];
+            return { 'shelf.width': s.width, 'shelf.depth': s.depth, 'shelf.height': s.height > 0 ? s.height : autoHeight(s), 'shelf.left': b[0], 'shelf.top': b[1] }[field];
         }
 
         root.addEventListener('click', function(event) {

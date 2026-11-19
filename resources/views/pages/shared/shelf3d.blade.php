@@ -1161,7 +1161,7 @@
          |           width, depth, ppm (px/m, mặc định 100), tierMetre (chiều cao 1 tầng, m),
          |           door: { edge, offset, width } (cạnh i đi từ góc i tới góc i+1, offset đo từ góc i)
          |                 hoặc kiểu cũ { wall: top|right|bottom|left, offset, width } | null,
-         |           shelves: [{ key, label, x, y (tâm, m), width, depth (m), rotation, selected, clash, model,
+         |           shelves: [{ key, label, x, y (tâm, m), width, depth, height (m, tuỳ chọn), rotation, selected, clash, model,
          |                       card: { title, count, lines: [{ name, code, qty, loc }], more } }] }
          | Trục sơ đồ: x sang phải, y xuống dưới (= hướng về phía người xem ở 3D). rotation = hướng mặt trước
          | theo chiều kim đồng hồ trên sơ đồ: 0 xuống, 90 trái, 180 lên, 270 phải.
@@ -1266,7 +1266,8 @@
             (room.shelves || []).forEach(function(s, si) {
                 var built = buildShelf(s.model || {}, true);
                 var X = s.x * PPM - RW / 2, Z = s.y * PPM - RD / 2;
-                var height = (built ? built.levels : 1) * (room.tierMetre || 0.4) * PPM;
+                // Chiều cao thật đã khai ở Mặt bằng (m), chưa khai thì theo số tầng × tierMetre
+                var height = (Number(s.height) > 0 ? Number(s.height) : (built ? built.levels : 1) * (room.tierMetre || 0.4)) * PPM;
                 tallest = Math.max(tallest, height);
                 units.push({ x: X, z: Z });
 
