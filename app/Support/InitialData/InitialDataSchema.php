@@ -138,8 +138,9 @@ class InitialDataSchema
     /**
      * TẠM ẨN với user khác Admin (12/11/2026): chưa mở giai đoạn này cho phòng ban - không hiện ở ô
      * chọn giai đoạn / bảng theo dõi, không tải mẫu / đính kèm / đánh dấu được. Mở lại: để mảng rỗng.
+     * 20/11/2026: đã mở GĐ 3, 4 cho phòng ban.
      */
-    public const ADMIN_ONLY_STAGES = [3, 4];
+    public const ADMIN_ONLY_STAGES = [];
 
     /** Giai đoạn user thấy được: Admin thấy đủ, user khác bỏ các giai đoạn đang tạm ẩn. */
     public static function stagesFor(bool $isAdmin): array

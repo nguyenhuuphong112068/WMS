@@ -32,11 +32,6 @@
         </ul>
     </div>
 </div>
-<div class="ug-callout is-warn">
-    <i class="fas fa-exclamation-triangle"></i>
-    <div>Hiện <b>tạm ẩn giai đoạn 3 (Dữ liệu gốc &amp; danh mục) và 4 (Tồn đầu kỳ)</b> với tài khoản không phải Admin: ô
-        Giai đoạn chỉ có giai đoạn 2, khối Theo dõi tiến độ chỉ có tab giai đoạn 2. Admin vẫn thấy đủ 4 giai đoạn.</div>
-</div>
 
 <h3>Các bước (Admin)</h3>
 <ol class="ug-steps">
