@@ -1083,8 +1083,14 @@
                     }
                 }
 
+                // Cột ít tầng hơn cột cao nhất: giãn đều các tầng của cột trên cả chiều cao kệ (khoảng cách tầng
+                // = H / số tầng của cột) thay vì dồn xuống dưới. model.evenTiers === false để giữ kiểu cũ.
+                var colLevels = 1;
+                column.tiers.forEach(function(tier) { colLevels = Math.max(colLevels, (tier.level || 0) + 1); });
+                var step = model.evenTiers === false ? TH : H / colLevels;
+
                 column.tiers.forEach(function(tier) {
-                    var y = floor - (tier.level || 0) * TH;
+                    var y = floor - (tier.level || 0) * step;
                     // Tầng ít vị trí hơn tầng rộng / sâu nhất của cột: chia đều các ô trên cả mặt tầng (ô đầu, ô cuối sát
                     // mép như tầng đầy đủ; chỉ 1 ô thì nằm giữa) thay vì dồn về góc trái-trước.
                     var nx = Math.max(1, tier.max || 1), nd = Math.max(1, tier.depth || 1);
